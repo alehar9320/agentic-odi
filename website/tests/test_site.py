@@ -484,8 +484,8 @@ def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
     # The MCP reference is the long pole: every tool's argument table and the
     # whole ODI schema live on that one page, so it grows with each paginated
-    # list tool and each entity we add. The V2MOM entity, the five
-    # scheduled-work tools, and the three signal tools bring the page to ~78 KB;
-    # the four Stage 5 and 6 tools (segment_market, get_segments, get_strategy,
-    # propose_strategy) bring it to ~80 KB.
-    assert size <= 84 * 1024, f"{page}: {size} bytes"
+    # list tool and each entity we add. The V2MOM entity, the five scheduled-work
+    # tools, the three signal tools, the four Stage 5 and 6 tools, and the
+    # interview/quote tools with their two schema entities and the evidence-claim
+    # markers bring the page to ~92 KB.
+    assert size <= 92 * 1024, f"{page}: {size} bytes"

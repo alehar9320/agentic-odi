@@ -255,6 +255,30 @@ When no path has evidence, `strategy propose` exits non-zero and says what is
 missing rather than inventing a bet. Until one exists, `strategy show` prints
 "No strategy recorded" and points at `strategy propose`.
 
+## Interviews
+
+An interview records who took part, when, and the job it informs. Its quotes
+are the verbatim sentences the research is built from — the unit the Listen
+pillar works on.
+
+```bash
+# Record an interview
+agentic-odi interviews add \
+  --title "Ana — onboarding" --participant "Ana" \
+  --role "Ops lead" --job-id <job-id>
+
+# Read and delete
+agentic-odi interviews list --job-id <job-id>
+agentic-odi interviews list --json
+agentic-odi interviews get <interview-id>
+agentic-odi interviews quotes <interview-id>
+agentic-odi interviews delete <interview-id> --yes
+```
+
+`participant_label` is free text such as `"Ana"` or `"Participant 3"` — never a
+real name, email, or company. Quotes are ordered by a service-assigned ordinal;
+deleting an interview removes its quotes and nothing else.
+
 ## Schema, scoring, and guidance
 
 ```bash

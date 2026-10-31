@@ -10,6 +10,8 @@ from typing import Any, Protocol, TypeVar
 from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
+    Interview,
+    InterviewQuote,
     Job,
     Outcome,
     ScheduledWork,
@@ -118,6 +120,8 @@ class Repository(Protocol):
     evidence: dict[str, Evidence]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
+    interviews: dict[str, Interview]
+    quotes: dict[str, InterviewQuote]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
 
@@ -198,6 +202,19 @@ class Repository(Protocol):
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
 
+    def add_interview(self, interview: Interview) -> Interview: ...
+    def get_interview(self, interview_id: str) -> Interview | None: ...
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]: ...
+    def update_interview(self, interview_id: str, updates: dict) -> Interview | None: ...
+    def delete_interview(self, interview_id: str) -> list[str]: ...
+    def add_quote(self, quote: InterviewQuote) -> InterviewQuote: ...
+    def get_quote(self, quote_id: str) -> InterviewQuote | None: ...
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]: ...
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -214,6 +231,8 @@ class InMemoryRepository:
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.interviews: dict[str, Interview] = {}
+        self.quotes: dict[str, InterviewQuote] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
 
@@ -249,6 +268,10 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
             del self.customer_outcomes[key]
+        for key in [k for k, v in self.interviews.items() if v.job_id == job_id]:
+            del self.interviews[key]
+            for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
+                del self.quotes[quote_key]
         #: Do not destroy research evidence: unlink references to the removed
         #: job, its steps and its outcomes instead of deleting the rows.
         for key, ev in list(self.evidence.items()):
@@ -516,6 +539,56 @@ class InMemoryRepository:
             return True
         return False
 
+    def add_interview(self, interview: Interview) -> Interview:
+        self.interviews[interview.id] = interview
+        return interview
+
+    def get_interview(self, interview_id: str) -> Interview | None:
+        return self.interviews.get(interview_id)
+
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]:
+        if job_id is None:
+            items = list(self.interviews.values())
+        else:
+            items = [i for i in self.interviews.values() if i.job_id == job_id]
+        return page(items, limit, offset)
+
+    def update_interview(self, interview_id: str, updates: dict) -> Interview | None:
+        interview = self.interviews.get(interview_id)
+        if not interview:
+            return None
+        current = interview.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_interview = interview.model_validate(current)
+        self.interviews[interview_id] = new_interview
+        return new_interview
+
+    def delete_interview(self, interview_id: str) -> list[str]:
+        """Delete an interview and cascade its quotes; return the removed quote ids."""
+        if interview_id not in self.interviews:
+            return []
+        del self.interviews[interview_id]
+        removed = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
+        for quote_id in removed:
+            del self.quotes[quote_id]
+        return removed
+
+    def add_quote(self, quote: InterviewQuote) -> InterviewQuote:
+        self.quotes[quote.id] = quote
+        return quote
+
+    def get_quote(self, quote_id: str) -> InterviewQuote | None:
+        return self.quotes.get(quote_id)
+
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
+        items = [q for q in self.quotes.values() if q.interview_id == interview_id]
+        return sorted(items, key=lambda q: q.ordinal)
+
     def add_segment(self, segment: Segment) -> Segment:
         self.segments[segment.id] = segment
         return segment
@@ -570,6 +643,8 @@ class InMemoryRepository:
         self.customer_outcomes.clear()
         self.evidence.clear()
         self.signals.clear()
+        self.interviews.clear()
+        self.quotes.clear()
         self.segments.clear()
         self.strategies.clear()
 

@@ -17,6 +17,7 @@ from agentic_odi_core import (
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
+    InterviewNotFoundError,
     JobNotFoundError,
     JobStage,
     OdiError,
@@ -95,6 +96,10 @@ def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
     if hint:
         message = f"{message} {hint}"
     return message
+
+
+def _interview_not_found(interview_id: str) -> str:
+    return f"Error: Interview with ID {interview_id} not found."
 
 
 @mcp.prompt
@@ -522,6 +527,98 @@ def delete_evidence(evidence_id: str) -> str:
     except EvidenceNotFoundError as exc:
         return _evidence_not_found(evidence_id, exc.hint)
     return f"Evidence deleted successfully: {evidence_id}"
+
+
+@mcp.tool
+def add_interview(
+    title: str,
+    participant_label: str,
+    job_id: str | None = None,
+    participant_role: str | None = None,
+    conducted_at: str | None = None,
+    source_kind: str = "manual",
+    notes: str | None = None,
+) -> str:
+    """Record a research interview: who took part, when, and the job it informs.
+
+    ``participant_label`` is a free-text label such as ``"Ana"`` or
+    ``"Participant 3"`` — never a real name, email, or company.
+    """
+    try:
+        interview = service.add_interview(
+            title=title,
+            participant_label=participant_label,
+            job_id=job_id,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+            notes=notes,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return f"Interview created successfully: {interview.model_dump_json()}"
+
+
+@mcp.tool
+def get_interview(interview_id: str) -> str:
+    interview = service.get_interview(interview_id)
+    if interview is None:
+        return _interview_not_found(interview_id)
+    return interview.model_dump_json()
+
+
+@mcp.tool
+def list_interviews(
+    job_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> str:
+    """List interviews, optionally filtered by job, one page at a time."""
+    items = service.list_interviews(job_id=job_id, limit=limit, offset=offset)
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def delete_interview(interview_id: str) -> str:
+    """Delete an interview and the quotes it recorded."""
+    try:
+        service.delete_interview(interview_id)
+    except InterviewNotFoundError:
+        return _interview_not_found(interview_id)
+    return f"Interview deleted successfully: {interview_id}"
+
+
+@mcp.tool
+def add_quote(
+    interview_id: str,
+    text: str,
+    speaker: str | None = None,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+) -> str:
+    """Append a verbatim quote to an interview; the service assigns its ordinal."""
+    try:
+        quote = service.add_quote(
+            interview_id=interview_id,
+            text=text,
+            speaker=speaker,
+            start_ms=start_ms,
+            end_ms=end_ms,
+        )
+    except InterviewNotFoundError:
+        return _interview_not_found(interview_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return f"Quote created successfully: {quote.model_dump_json()}"
+
+
+@mcp.tool
+def list_quotes(interview_id: str) -> str:
+    """List an interview's quotes in ordinal order."""
+    items = service.list_quotes(interview_id)
+    return json.dumps([item.model_dump() for item in items])
 
 
 @mcp.tool
