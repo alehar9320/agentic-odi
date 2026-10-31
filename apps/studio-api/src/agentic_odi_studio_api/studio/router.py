@@ -14,6 +14,7 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    DUPLICATE_THRESHOLD,
     CandidateNotFoundError,
     CandidateStatus,
     EvidenceNotFoundError,
@@ -857,11 +858,12 @@ async def get_candidates(
 async def patch_candidate(
     candidate_id: str, body: DecideCandidateRequest, request: Request
 ) -> dict:
-    """Accept, reject, or edit one candidate without losing its evidence.
+    """Accept, reject, merge, or edit one candidate without losing its evidence.
 
     ``{"status": "accepted"}`` needs the outcome's importance and satisfaction;
-    ``{"status": "rejected"}`` needs a nonblank reason; omitting ``status``
-    edits the statement only.
+    ``{"status": "rejected"}`` needs a nonblank reason; ``{"status": "merged"}``
+    needs the accepted outcome id in ``merged_into``; omitting ``status`` edits
+    the statement only.
     """
     if body.status == "accepted" and (body.importance is None or body.satisfaction is None):
         raise StudioHTTPError(
@@ -878,6 +880,15 @@ async def patch_candidate(
                 code=StudioErrorCode.VALIDATION,
                 message="Rejecting a candidate requires a nonblank reason.",
                 suggestion="Say why the candidate is not a real need.",
+            ),
+            status_code=422,
+        )
+    if body.status == "merged" and not (body.merged_into or "").strip():
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="Merging a candidate requires the outcome id in merged_into.",
+                suggestion="Merge into an outcome a person already accepted.",
             ),
             status_code=422,
         )
@@ -901,6 +912,13 @@ async def patch_candidate(
                 target,
                 ToolName.REJECT_CANDIDATE.value,
                 {"candidate_id": candidate_id, "reason": body.reason},
+            )
+            return {"ok": True, "result": _json_or_raw(result)}
+        if body.status == "merged":
+            result = await call_mcp_tool(
+                target,
+                ToolName.MERGE_CANDIDATES.value,
+                {"target_id": body.merged_into, "merged_ids": [candidate_id]},
             )
             return {"ok": True, "result": _json_or_raw(result)}
         result = await call_mcp_tool(
@@ -929,6 +947,18 @@ async def patch_candidate(
         if body.status == "rejected":
             candidate = service.reject_candidate(candidate_id, reason=body.reason or "")
             return {"ok": True, "result": candidate.model_dump(mode="json")}
+        if body.status == "merged":
+            merged_outcome, merged_evidence, merged_candidates = service.merge_candidates(
+                body.merged_into or "", [candidate_id]
+            )
+            return {
+                "ok": True,
+                "result": (
+                    merged_candidates[0].model_dump(mode="json") if merged_candidates else None
+                ),
+                "outcome": merged_outcome.model_dump(mode="json"),
+                "evidence": [item.model_dump(mode="json") for item in merged_evidence],
+            }
         updates: dict[str, Any] = {}
         if body.statement is not None:
             updates["statement"] = body.statement
@@ -936,6 +966,32 @@ async def patch_candidate(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True, "result": candidate.model_dump(mode="json")}
+
+
+@router.get("/candidates/duplicates")
+async def get_duplicate_candidates(
+    request: Request,
+    interview_id: str | None = Query(None),
+    threshold: float | None = Query(None, ge=0.0, le=1.0),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Suggest groups of proposed candidates that look like the same need.
+
+    Read-only: nothing is written and nothing is merged. A match is a
+    suggestion; a person picks the target and merges the rest into it.
+    """
+    if _uses_mcp(request):
+        target = _require_mcp_url(mcp_url or "")
+        arguments: dict[str, Any] = {}
+        if interview_id:
+            arguments["interview_id"] = interview_id
+        if threshold is not None:
+            arguments["threshold"] = threshold
+        result = await call_mcp_tool(target, ToolName.SUGGEST_DUPLICATE_CANDIDATES.value, arguments)
+        return {"ok": True, "result": _json_or_raw(result)}
+    service = _service(request)
+    groups = service.suggest_duplicate_groups(interview_id, threshold or DUPLICATE_THRESHOLD)
+    return {"ok": True, "result": {"groups": groups}}
 
 
 @router.get("/memory/observations", response_model=ObservationListResponse)

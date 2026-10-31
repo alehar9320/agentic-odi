@@ -117,3 +117,24 @@ def candidate_reason_required(candidate_id: str | None) -> str:
         f"A rejection reason is required for outcome candidate {candidate_id}; "
         "the reason is kept beside the candidate so the decision is defensible."
     )
+
+
+def merge_target_must_be_outcome(target_id: str | None) -> str:
+    return (
+        f"Merge target {target_id} is not an accepted outcome. Accept the candidate first, "
+        "then merge other candidates into the outcome it produced."
+    )
+
+
+def merge_source_already_merged(candidate_id: str | None, merged_into: str | None) -> str:
+    return (
+        f"Outcome candidate {candidate_id} is already merged into {merged_into}; "
+        "repeating the merge changes nothing."
+    )
+
+
+def merge_source_cannot_absorb_evidence(candidate_id: str | None, status: str | None) -> str:
+    return (
+        f"Outcome candidate {candidate_id} is {status}, so its evidence cannot be absorbed. "
+        "Only a proposed candidate can be merged into an outcome."
+    )

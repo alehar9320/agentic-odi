@@ -485,5 +485,6 @@ def test_page_weights_are_within_budget(page: str):
     # The MCP reference is the long pole: every tool's argument table lives on
     # that one page, so it grows with each tool we add. Raised 60→64 for the
     # paginated list tools, 64→80 for the interview/quote tools and their two
-    # schema entities, 80→88 for the candidate review tools.
-    assert size <= 88 * 1024, f"{page}: {size} bytes"
+    # schema entities, 80→88 for the candidate review tools, 88→92 for the
+    # duplicate-suggestion and merge tools.
+    assert size <= 92 * 1024, f"{page}: {size} bytes"

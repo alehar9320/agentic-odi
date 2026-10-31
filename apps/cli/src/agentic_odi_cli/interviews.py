@@ -18,7 +18,9 @@ from agentic_odi_cli.render import (
     render_candidate,
     render_candidate_acceptance,
     render_candidate_list,
+    render_candidate_merge,
     render_deleted,
+    render_duplicate_groups,
     render_interview,
     render_interview_list,
     render_quote_list,
@@ -288,6 +290,51 @@ def reject_candidate(
     typer.echo(
         render_candidate(
             run_tool("reject_candidate", {"candidate_id": candidate_id, "reason": reason}),
+            as_json=json_output,
+        )
+    )
+
+
+@candidates_app.command("duplicates")
+def duplicates(
+    interview_id: str | None = typer.Option(None, help="Only candidates for this interview"),
+    threshold: float | None = typer.Option(
+        None, help="Similarity threshold, 0 to 1 (default: 0.82)"
+    ),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Suggest groups of candidates that look like the same need. Read-only.
+
+    Nothing is written and nothing is merged: a person chooses which candidate
+    becomes the outcome target, then merges the rest into it.
+    """
+    args: dict[str, Any] = {}
+    if interview_id is not None:
+        args["interview_id"] = interview_id
+    if threshold is not None:
+        args["threshold"] = threshold
+    typer.echo(
+        render_duplicate_groups(run_tool("suggest_duplicate_candidates", args), as_json=json_output)
+    )
+
+
+@candidates_app.command("merge")
+def merge_candidates(
+    target_id: str = typer.Argument(..., help="Outcome ID to merge evidence into"),
+    merged_ids: list[str] = typer.Argument(  # noqa: B008
+        ..., help="Proposed candidate IDs to absorb"
+    ),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Merge proposed candidates' evidence into one accepted outcome.
+
+    The target is an accepted outcome; each source candidate's verbatim quote is
+    added as evidence on it and the candidate is marked ``merged``. No second
+    outcome is created and the sources and quotes are retained.
+    """
+    typer.echo(
+        render_candidate_merge(
+            run_tool("merge_candidates", {"target_id": target_id, "merged_ids": merged_ids}),
             as_json=json_output,
         )
     )
