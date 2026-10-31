@@ -93,6 +93,27 @@ Score **> 10** → underserved, innovate. **= 10** → served, maintain.
 **< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
 (as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
 
+Every score also carries **who stands behind it**. `score_method` records whether
+the number is a one-person `estimate`, a `survey`, or an `import`, and
+`importance_n` / `satisfaction_n` record how many people answered. An unknown
+count stays unknown — the CLI renders it as `est.`, never `n=0` — and an
+`estimate` that claims a sample above one is refused before the write. See
+[CLI reference](docs/cli.md#desired-outcomes) for the flags.
+
+A score is a number with a **range**, not a point. Importing a survey with
+`odi survey import <csv>` lands each outcome's mean, its sample and a bootstrap
+band from the real paired responses; editing the score without a fresh band
+clears the stale one, so a new number never carries an old range. A stored band
+is readable with its provenance — sample, seed, confidence level, method and
+computed-at, plus whether a later snapshot moved the score — through
+`odi desired-outcomes get`, the `get_outcome_interval` tool and
+`GET /api/outcomes/{id}/interval`. A score with no band reads as `no band`, not
+as a zero-width range, and a stale band says so.
+`odi top` answers "what should we build next?" from the measured section only —
+highest low end of the band first — naming the thin and unscored outcomes it
+left out, and `odi coverage` reports that split. An estimate can no longer
+outrank a measured score.
+
 ## Quick Start
 
 **Run the full stack locally.** Prerequisites: Python 3.10+,

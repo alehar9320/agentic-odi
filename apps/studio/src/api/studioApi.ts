@@ -24,6 +24,8 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
+  OutcomeInterval,
+  ScoreSnapshot,
   Signal,
   Step,
   StudioConfig,
@@ -341,13 +343,46 @@ export function deleteStep(stepId: string, mcpUrl: string): Promise<{ deleted: s
 
 export function updateOutcome(
   outcomeId: string,
-  payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
+  payload: {
+    statement?: string;
+    importance?: number;
+    satisfaction?: number;
+    importance_n?: number | null;
+    satisfaction_n?: number | null;
+    score_method?: "estimate" | "survey" | "import";
+    note?: string | null;
+    mcp_url: string;
+  },
 ): Promise<Outcome> {
   return sendJson<Outcome>(
     "PATCH",
     `/api/outcomes/${encodeURIComponent(outcomeId)}`,
     payload,
   );
+}
+
+export function fetchOutcomeHistory(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<ScoreSnapshot[]> {
+  return getJson<{ result: ScoreSnapshot[] }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/history?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/**
+ * Fetch an outcome's stored band and its provenance. `band` is null when the
+ * score carries no band at all — an estimate or an unscored outcome — which is
+ * a distinct state from a zero-width band, so the caller must not treat null as
+ * a tight band.
+ */
+export function fetchOutcomeInterval(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeInterval> {
+  return getJson<{ result: OutcomeInterval }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/interval?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
 }
 
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {

@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasState } from "../../types";
 import { OpportunityLandscape } from "./OpportunityLandscape";
 
+vi.mock("../../api/studioApi", () => ({
+  fetchOutcomeHistory: vi.fn().mockResolvedValue([]),
+  fetchOutcomeInterval: vi.fn().mockResolvedValue({ outcome_id: "", band: null }),
+}));
+
 // Mock StudioContext
 const mockCanvasData = {
   jobs: [{ id: "JOB-1", name: "Deploy Service" }],
@@ -25,6 +30,7 @@ const harness = vi.hoisted(() => ({
     pushToast: vi.fn(),
     theses: [],
     deleteThesis: vi.fn(),
+    settings: { mcp_url: "http://localhost:8000/mcp" },
     focusedSubject: null as { kind: string; id: string } | null,
     focusSubject: vi.fn(),
   },
@@ -200,6 +206,64 @@ describe("OpportunityLandscape accessibility", () => {
   });
 });
 
+describe("OpportunityLandscape sample and method", () => {
+  beforeEach(() => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [{ id: "JOB-1", name: "Deploy Service" }],
+        steps: [],
+        outcomes: [
+          {
+            id: "O-201",
+            statement: "Minimize time spent syncing secrets",
+            importance: 9,
+            satisfaction: 2,
+            opportunity_score: 16,
+            score_method: "estimate",
+          },
+          {
+            id: "O-202",
+            statement: "Minimize risk of configuration drift",
+            importance: 8,
+            satisfaction: 4,
+            opportunity_score: 12,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 40,
+          },
+          {
+            id: "O-203",
+            statement: "Minimize the number of manual approvals",
+            importance: 7,
+            satisfaction: 3,
+            opportunity_score: 11,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 12,
+          },
+        ],
+        source: "seed" as const,
+      },
+    } as unknown as CanvasState;
+  });
+
+  it("shows est. for an estimate and n=40 (survey) for a survey", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText("est.")).toBeInTheDocument();
+    expect(screen.getByText("n=40 (survey)")).toBeInTheDocument();
+  });
+
+  it("shows both counts when the dimensions differ instead of a fabricated shared n", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText("n=40/12 (survey)")).toBeInTheDocument();
+  });
+});
+
 describe("OpportunityLandscape canvas states", () => {
   it("shows the failure and a retry instead of the metrics when the canvas failed", () => {
     harness.state.canvasState = {
@@ -282,5 +346,136 @@ describe("OpportunityLandscape canvas states", () => {
     const { container } = render(<OpportunityLandscape />);
 
     expect(container.textContent).not.toContain("Active Job Map Contexts");
+  });
+
+  it("renders the Band and Sample columns in the table view", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-201",
+            statement: "Minimize time spent syncing secrets",
+            importance: 8,
+            satisfaction: 4,
+            opportunity_score: 12,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 40,
+            opportunity_low: 10.5,
+            opportunity_high: 13.5,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText("Band")).toBeInTheDocument();
+    expect(screen.getByText("10.5–13.5")).toBeInTheDocument();
+    expect(screen.getByText("n=40 (survey)")).toBeInTheDocument();
+  });
+
+  it("ranks a measured need above a thin higher point estimate", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-THIN",
+            statement: "Minimize the risk of a thin high guess",
+            importance: 9,
+            satisfaction: 3,
+            opportunity_score: 15,
+            score_method: "estimate",
+          },
+          {
+            id: "O-MEASURED",
+            statement: "Minimize the risk of a measured need",
+            importance: 8,
+            satisfaction: 5,
+            opportunity_score: 11,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 40,
+            opportunity_low: 10,
+            opportunity_high: 12,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const rows = screen.getAllByRole("row");
+    // Row 0 is the header; the measured need must come before the thin guess.
+    expect(rows[1]).toHaveTextContent("Minimize the risk of a measured need");
+    expect(rows[2]).toHaveTextContent("Minimize the risk of a thin high guess");
+  });
+});
+
+describe("OpportunityLandscape M2-14 advisory chip", () => {
+  beforeEach(() => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [{ id: "JOB-1", name: "Deploy Service" }],
+        steps: [],
+        outcomes: [
+          {
+            id: "O-MEASURED",
+            statement: "Minimize time spent syncing secrets",
+            importance: 9,
+            satisfaction: 2,
+            opportunity_score: 16,
+            score_method: "survey",
+            importance_n: 40,
+            satisfaction_n: 40,
+          },
+          {
+            id: "O-THIN",
+            statement: "Minimize risk of configuration drift",
+            importance: 8,
+            satisfaction: 7,
+            opportunity_score: 9,
+            score_method: "survey",
+            importance_n: 4,
+            satisfaction_n: 4,
+          },
+          {
+            id: "O-ESTIMATE",
+            statement: "Minimize the cost of rollbacks",
+            importance: 7,
+            satisfaction: 3,
+            opportunity_score: 11,
+            score_method: "estimate",
+          },
+        ],
+        source: "seed" as const,
+      },
+    } as unknown as CanvasState;
+  });
+
+  it("marks exactly the outcomes the shared advisory flags, never the estimate", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    // The thin survey row is flagged; the measured row and the estimate are not.
+    expect(screen.getByTestId("advisory-O-THIN")).toBeInTheDocument();
+    expect(screen.queryByTestId("advisory-O-MEASURED")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("advisory-O-ESTIMATE")).not.toBeInTheDocument();
+  });
+
+  it("puts the advisory sentence in the chip's title so it is readable on hover", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const chip = screen.getByTestId("advisory-O-THIN");
+    expect(chip.getAttribute("title")).toContain("below the advisory threshold");
+    expect(chip.getAttribute("title")).toContain("4");
   });
 });

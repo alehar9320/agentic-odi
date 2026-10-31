@@ -18,6 +18,7 @@ from agentic_odi_core.models import (
     Job,
     Outcome,
     ScheduledWork,
+    ScoreSnapshot,
     Signal,
     Step,
     compute_opportunity_score,
@@ -49,7 +50,10 @@ class SQLiteRepository(Repository):
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
         self._backfilled = False
+        self._legacy_method_ids: set[str] = set()
+        self._method_backfilled_ids: set[str] = set()
         self._load_snapshot()
+        self._backfill_outcome_method()
         self._backfill_legacy_outcomes()
 
     def _load_snapshot(self) -> None:
@@ -60,9 +64,34 @@ class SQLiteRepository(Repository):
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.score_snapshots: list[ScoreSnapshot] = []
         self._last_event_id = 0
+        self._legacy_method_ids = set()
+        self._method_backfilled_ids = set()
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
+
+    def _backfill_outcome_method(self) -> None:
+        """One-time migration: label legacy outcomes with their score method.
+
+        Rows written before the method field existed are estimates by
+        definition, so each gets an ``OUTCOME_METHOD_BACKFILLED`` event carrying
+        ``score_method='estimate'``. The event is a no-op state-wise (the model
+        default already produces it) but it is the auditable record that the
+        label was applied rather than inferred. The pending set is derived from
+        the replayed stream, so re-running adds no duplicate events.
+        """
+        pending = self._legacy_method_ids - self._method_backfilled_ids
+        if not pending:
+            return
+        for outcome_id in sorted(pending):
+            self.store.append(
+                "OUTCOME_METHOD_BACKFILLED",
+                {"id": outcome_id, "updates": {"score_method": "estimate"}},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+        self._sync()
 
     def _backfill_legacy_outcomes(self) -> None:
         """One-time migration: backfill null scores on legacy outcomes.
@@ -115,11 +144,20 @@ class SQLiteRepository(Repository):
         elif et == "STEP_CREATED":
             self.steps[p["id"]] = Step.model_validate(p)
         elif et == "OUTCOME_CREATED":
+            if "score_method" not in p:
+                # A payload written before the method field existed: an estimate
+                # by definition, labelled once by the method backfill.
+                self._legacy_method_ids.add(p["id"])
             self.outcomes[p["id"]] = Outcome.model_validate(p)
+        elif et == "OUTCOME_METHOD_BACKFILLED":
+            self._method_backfilled_ids.add(p["id"])
+            self._merge_updates(self.outcomes, p, Outcome)
         elif et == "CUSTOMER_OUTCOME_CREATED":
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
+        elif et == "SCORE_SNAPSHOT_RECORDED":
+            self.score_snapshots.append(ScoreSnapshot.model_validate(p))
         elif et == "JOB_UPDATED":
             self._merge_updates(self.jobs, p, Job)
         elif et == "STEP_UPDATED":
@@ -164,6 +202,7 @@ class SQLiteRepository(Repository):
             self.outcomes.pop(outcome_id, None)
             for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
                 del self.evidence[key]
+            self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
         elif et == "SCHEDULED_WORK_CREATED":
@@ -468,6 +507,24 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return True
+
+    def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
+        with self._lock:
+            self.store.append(
+                "SCORE_SNAPSHOT_RECORDED",
+                snapshot.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return snapshot
+
+    def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]:
+        with self._lock:
+            self._sync()
+            if outcome_id is None:
+                return list(self.score_snapshots)
+            return [s for s in self.score_snapshots if s.outcome_id == outcome_id]
 
     def delete_customer_outcome(self, outcome_id: str) -> bool:
         with self._lock:

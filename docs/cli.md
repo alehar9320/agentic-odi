@@ -142,13 +142,102 @@ only when you intentionally need to stage a map before capturing outcomes.
 
 # Desired Outcomes
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to onboard" --importance 8 --satisfaction 4 --importance-n 40 --satisfaction-n 40 --method survey
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
+agentic-odi desired-outcomes update <outcome-id> --satisfaction 6 --why "after the review"
+agentic-odi desired-outcomes history <outcome-id>
+agentic-odi desired-outcomes history <outcome-id> --why --since 2026-01-01T00:00:00Z
 agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+
+Every outcome score carries its sample and method. `--importance-n` and
+`--satisfaction-n` record how many people stand behind each score, when known;
+`--method` records how the score was obtained (`estimate`, `survey`, or
+`import`). Omit all three for a single-person estimate — the default — and the
+rendered `sample` line reads `est.`. A count above one with `method=estimate` is
+refused, because an estimate cannot have asked people. When the two counts
+differ, `get` shows both (`n=40/12 (survey)`) so a thin dimension stays visible.
+
+Every accepted score change is written to an append-only history. Add `--why`
+to `add` or `update` to record *why* the number was given, then read the trail
+with `history`: one row per accepted change, oldest first, each row carrying the
+score and its sample/method companions. Add `--why` to `history` to show the
+signed change from a baseline, with `--since <timestamp>` choosing the baseline
+(the last snapshot at or before it; the earliest when omitted). A change that
+fails validation writes neither a score change nor a row, so the history never
+records a rejected edit. The reason is history metadata, not part of the outcome
+record.
+
+# Survey import
+agentic-odi survey import responses.csv
+agentic-odi survey import responses.csv --dry-run
+agentic-odi survey import responses.csv --match
+agentic-odi survey import responses.csv --json
+
+`survey import` reads a CSV of responses (one row per respondent, columns named
+for the outcome) and lands each outcome's accepted mean, sample size (`n`) and a
+bootstrap band computed from the real paired responses on the matching outcome.
+
+The import is a plan before it is a write. Every source row is accounted for by
+one report entry, so nothing is silently dropped:
+
+* `--dry-run` prints the match table and writes nothing — no score, event,
+  snapshot or retained response — so the report the user reads is the report the
+  real run would produce.
+* A row that matches no outcome is listed by its 1-based CSV line number
+  (including the header), and is never fuzzy-matched. When a quoted field spans
+  several physical lines, the line named is the record's *starting* line, the one
+  a person sees in their editor.
+* A row containing `0`, a score outside 1–10, a nonfinite value, a missing field
+  or an invalid id is rejected with its line number.
+* `--match` proposes one candidate per unmatched reference (a case- and
+  whitespace-normalized variant of an exact id or statement) and asks a person to
+  confirm each. A suggestion is never applied silently: without an explicit yes
+  the import fails safely and writes nothing, and a stale or ambiguous
+  confirmation cannot assign a row.
+
+A run writes only when every row is accepted. If any row is unmatched, ambiguous
+or invalid, the whole import is refused and the prior store is left unchanged, so
+a partial score write is impossible.
+
+# Evidence-aware ranking
+agentic-odi top
+agentic-odi top --job <job-id> --limit 5
+agentic-odi top --include-thin --json
+agentic-odi coverage --job <job-id>
+
+`top` lists a Job's measured outcomes, highest low end of the band first. By
+default it shows measured outcomes only and names the thin and unscored counts
+it excluded; `--include-thin` adds the thin section, while unscored outcomes stay
+counted but never listed as zero. Each row shows the score, its band or the
+reason it has none, and the per-dimension sample and method. A row whose recorded
+sample is below the advisory threshold (`MIN_MEANINGFUL_N = 20`) also gets a
+`note:` footer line naming the count, the dimension that triggered it and the
+threshold — a warning, not a filter: the outcome still renders and still ranks.
+`coverage` reports the measured/thin/unscored split for a Job. The `--json` shape
+for `top` is `{"measured": [...], "thin": [...], "excluded": {"thin": n, "none":
+n}}`, where each entry shares keys and semantics with the landscape's outcome
+entries, including an `advisory` object (`{n, threshold, method, dimension,
+message}`) or `null`.
+
+`get` shows the reason from the most recent accepted change as a `note` line, so
+the detail view carries the same "why" as the history, and prints an `advisory`
+line when the recorded sample is below the threshold. An estimate or an unknown
+count has no advisory — an unknown sample is never reported as `n=0`. When no
+reason was recorded, or the outcome has no history yet, the line is omitted
+rather than shown empty.
+
+`get` also shows the stored band and its provenance as `band` lines: the bounds,
+the sample (`band n`), the confidence level, the seed, the method and the
+computed-at. A score with no band — an estimate or an unscored outcome — reads
+`band  none`, never as a zero-width range. `band stale` is `yes` when a later
+snapshot moved the score the band was computed from, so a band is never read as
+current when it is not. The same shape is available as a tool
+(`get_outcome_interval`) and over HTTP at `GET /api/outcomes/{id}/interval`.
 
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>

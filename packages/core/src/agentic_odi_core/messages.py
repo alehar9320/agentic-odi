@@ -23,12 +23,16 @@ Follow this sequence when guiding a user through the ODI process:
 - **Object of control**: The thing being acted on (named after 'the').
 - **Contextual clarifier**: When it happens (when, while, before, after, during, if, as).
 - **Scores**: Both `importance` and `satisfaction` are required (1–10). An outcome without them cannot be compared to anything.
+- **Sample and method**: A score is only as strong as who stands behind it. When you score from one person's judgment, leave `importance_n`/`satisfaction_n` unset and `score_method` at its `estimate` default. When the score comes from asking people, pass the number who answered as `importance_n`/`satisfaction_n` and set `score_method="survey"` (or `"import"` for a pasted dataset). An `estimate` with a count above 1 is refused — do not invent a sample you do not have, and do not report an unknown count as 0 or 1.
+- **Evidence strength (measured / thin / none)**: Every score falls into exactly one bin. `measured` means a survey or import with at least 30 answers on both dimensions; `thin` means a survey or import with fewer; `none` means an estimate, an unknown count, or no score. A method label alone is never sufficient: a one-response survey is thin, not measured. The weakest dimension bounds the bin, so 40 importance answers with 2 satisfaction answers is thin. Never present thin or absent evidence as a measured finding, and never rank an unscored outcome as a zero.
+- **Bands**: A score from a survey carries a band (`opportunity_low`/`opportunity_high`), and ranking uses the low end so a thin high-variance guess does not sit above a measured need. An estimate has no band — say so rather than showing a tight range.
+- **Thin-sample advisory**: When a recorded sample is below the advisory threshold (20), say the score is below the advisory threshold and treat it as a lead to confirm. Never describe a below-threshold score as a finding, and never claim a score at or above the threshold is statistically valid — the threshold is a product warning line, not a validity test. An estimate or an unknown count has no advisory; do not invent an `n` for it.
 - **Expectation**: Qualitative interviews typically uncover 50–150 desired outcome statements.
 - **Tools to use**:
-  - `add_outcome(job_id, statement, importance, satisfaction)` — Capture each desired outcome with scores.
-  - `get_outcomes(job_id)` — Review all outcomes captured for a Job.
+  - `add_outcome(job_id, statement, importance, satisfaction, importance_n?, satisfaction_n?, score_method?)` — Capture each desired outcome with scores and, when known, its sample and method.
+  - `get_outcomes(job_id)` — Review all outcomes captured for a Job, including `score_method` and the counts.
   - `evaluate_outcome(statement, job_id?)` — **Pre-write check**: run this before `add_outcome` to confirm the statement matches the ODI format. It returns coded issues and suggestions for any failure.
-  - `update_outcome(outcome_id, ...)` — Correct a statement or scores; the same validation applies.
+  - `update_outcome(outcome_id, ...)` — Correct a statement, scores, or sample metadata; the same whole-record validation applies.
 
 ### Stage 3: Build the Job Map
 - **When**: After key outcomes are captured. Never build a map on a job with zero outcomes — outcomes are what give the steps their meaning.

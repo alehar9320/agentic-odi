@@ -195,3 +195,38 @@ async def test_promote_evidence_rejects_an_unknown_target():
 
     text = res.content[0].text  # type: ignore[index]
     assert text == "Error: Unknown promotion target: slide"
+
+
+@pytest.mark.asyncio
+async def test_get_outcome_interval_reports_a_no_band_and_a_stored_band():
+    async with Client(mcp) as client:
+        job_id = await _new_job(client)
+        added = await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time to ship a release when the build is green",
+                "importance": 8,
+                "satisfaction": 4,
+            },
+        )
+        outcome_id = json.loads(added.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
+
+        no_band = await client.call_tool("get_outcome_interval", {"outcome_id": outcome_id})
+        assert json.loads(no_band.content[0].text)["band"] is None  # type: ignore[index]
+
+        rows = [
+            {
+                "outcome_id": outcome_id,
+                "importance": 8.0,
+                "satisfaction": 4.0,
+                "respondent_id": f"r{i}",
+            }
+            for i in range(40)
+        ]
+        await client.call_tool("import_survey", {"rows": rows})
+
+        stored = await client.call_tool("get_outcome_interval", {"outcome_id": outcome_id})
+        band = json.loads(stored.content[0].text)["band"]  # type: ignore[index]
+        assert band["n"] == 40
+        assert band["stale"] is False

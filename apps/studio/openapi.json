@@ -1207,6 +1207,196 @@
         }
       }
     },
+    "/api/outcomes/{outcome_id}/history": {
+      "get": {
+        "summary": "Get Outcome History",
+        "description": "Return an outcome's accepted score snapshots, oldest first.\n\nSnapshots carry the score and its sample/method companions. The signed delta\nis served separately at ``/outcomes/{id}/delta`` so this list shape stays\nidentical across the local and MCP backends.",
+        "operationId": "get_outcome_history_api_outcomes__outcome_id__history_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome History Api Outcomes  Outcome Id  History Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/delta": {
+      "get": {
+        "summary": "Get Outcome Delta",
+        "description": "Return the signed change across an outcome's snapshots (B6.1).\n\n``since`` chooses the baseline (the last snapshot at or before it; the\nearliest when omitted). ``direction`` is the product's sign rule, so a\nconsumer never invents an \"improvement\" from a bare number.",
+        "operationId": "get_outcome_delta_api_outcomes__outcome_id__delta_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome Delta Api Outcomes  Outcome Id  Delta Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/interval": {
+      "get": {
+        "summary": "Get Outcome Interval",
+        "description": "Return an outcome's stored band and its provenance (B3.2).\n\n``band: null`` means the score carries no band at all \u2014 an estimate or an\nunscored outcome \u2014 which is a distinct state from a zero-width band. A\nstored band reports the sample, seed, confidence level, method and\ncomputed-at it was recorded with, plus whether a later snapshot moved the\nscore it came from, so a consumer never presents a stale band as current.",
+        "operationId": "get_outcome_interval_api_outcomes__outcome_id__interval_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome Interval Api Outcomes  Outcome Id  Interval Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/signals": {
       "get": {
         "summary": "Get Signals",
@@ -2900,6 +3090,52 @@
             "maximum": 10.0,
             "minimum": 1.0,
             "title": "Satisfaction"
+          },
+          "importance_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance N"
+          },
+          "satisfaction_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction N"
+          },
+          "score_method": {
+            "type": "string",
+            "enum": [
+              "estimate",
+              "survey",
+              "import"
+            ],
+            "title": "Score Method",
+            "default": "estimate"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
           }
         },
         "type": "object",
@@ -4539,6 +4775,58 @@
               }
             ],
             "title": "Satisfaction"
+          },
+          "importance_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance N"
+          },
+          "satisfaction_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction N"
+          },
+          "score_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "estimate",
+                  "survey",
+                  "import"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Method"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
           },
           "mcp_url": {
             "type": "string",

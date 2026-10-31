@@ -74,3 +74,66 @@ The open issues this milestone still has to answer, grouped by what they change.
 ### The docs stay true
 
 - [ ] **The docs must be the truth** — README, architecture, and a roadmap that tracks reality (this change).
+- [x] **Outcome sample and method** — every desired-outcome score carries `importance_n`, `satisfaction_n` and `score_method` (`estimate`, `survey`, `import`) through the model, service, SQLite replay, MCP tools, CLI and Studio API; an unknown count renders as `est.`, and an `estimate` that claims a sample above one is refused before the write ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
+
+- [x] **Score history** — every accepted score change is written as an append-only `ScoreSnapshot` alongside the score's sample and method, with an optional `note`. `desired-outcomes history`, `get_outcome_history` and `GET /api/outcomes/{id}/history` replay the trail; a rejected mutation writes no snapshot, so history never shows a change that did not happen. `desired-outcomes get` shows the latest accepted reason as a `note` line, so the detail view carries the same "why" as the history without inventing one ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
+
+- [x] **Survey import**: `odi survey import <csv>` parses a response file,
+  aggregates one mean per outcome and lands the mean, its sample (`n`) and a
+  bootstrap band computed from the real paired responses. The import is
+  all-or-nothing: an unresolved reference or a malformed row fails before any
+  outcome is written.
+- [x] **No row disappears without a report line**: `survey import` builds a
+  side-effect-free plan before it writes. `--dry-run` prints the match table and
+  writes nothing; every row is named by its 1-based CSV line (the record's
+  starting line when a quoted field spans several), so unmatched, ambiguous,
+  invalid and missing-field rows are listed rather than dropped. `--match`
+  proposes one normalized-exact candidate per unmatched reference and asks a
+  person to confirm each; a suggestion is never applied silently, a stale or
+  ambiguous confirmation cannot assign a row, and a run with any unresolved row
+  is refused whole, so a partial score write is impossible.
+- [x] **Reproducible bands**: A survey outcome stores `opportunity_low`/
+  `opportunity_high` with their provenance (`interval_n`, seed, confidence level,
+  computed-at). A score or method edit without a fresh band clears the stale one
+  in the same write, so a new number never carries an old range; an estimate
+  keeps the no-band placeholder rather than a fabricated width. The stored band
+  is readable through `get_outcome_interval`, `desired-outcomes get` and
+  `GET /api/outcomes/{id}/interval`; a no-band score reads as `no band` rather
+  than a zero-width range, and a band whose score a later snapshot moved is
+  marked `stale`.
+- [x] **Honest ranking**: `classify_confidence` labels each outcome
+  `measured`/`thin`/`none` from its weakest dimension, and
+  `rank_outcomes_for_job` ranks within a section by the band's low end, so an
+  estimate can no longer outrank a measured score. `odi top` lists the measured
+  section (naming the thin and unscored it excluded) and `odi coverage` reports
+  the split; the landscape renders the same band and groups by confidence class.
+- [x] **Signed deltas**: `outcome_delta` reads the recorded snapshots and reports
+  the per-dimension and opportunity differences with an explicit `direction`,
+  never inferring an "improvement" from a bare number. `desired-outcomes history
+  --why` and `GET /api/outcomes/{id}/delta` expose it; a missing dimension stays
+  `null`, not `0`.
+- [x] **Thin-sample advisory (M2-14)**: one `MIN_MEANINGFUL_N = 20` constant and
+  one `n_advisory(outcome) -> Advisory | None` in `evaluation.py` warn when a
+  recorded sample is below the threshold. The advisory takes the smaller of the
+  two counts and names the dimension that triggered it, returns a single sentence
+  plus `{n, threshold, method, dimension}`, and is worded as "below the advisory
+  threshold" — a product warning, not a claim of statistical validity on either
+  side. It is a statement about the data, never a filter: the score still renders
+  and still ranks. `odi top` prints it as a footer line, `desired-outcomes get`
+  prints it as an `advisory` line, and the landscape shows an `n<20` chip with the
+  sentence on hover; an estimate or an unknown count produces no advisory rather
+  than a fabricated `n=0`.
+- [x] **Trust seams for the gated increments**: The remaining Pillar-2
+  increments wait on decisions that are not yet approved, so `agentic_odi_core.trust`
+  exposes their shapes and refuses to answer: `retain_survey_inputs` (retention
+  policy) and `persisted_interval` when no band is stored (interval provenance).
+  Each raises `TrustContractPendingError` naming the blocking decision instead of
+  returning a fabricated band, class or direction. The retention read side,
+  `retained_survey_inputs`, refuses when nothing was retained for an outcome
+  rather than returning an empty list that would read as "zero responses".
+- [x] **Pillar integration contract**: one fixture is imported with per-outcome
+  counts, persisted and replayed through SQLite, ranked without mixing absent
+  scores into zeroes, explained with recorded arithmetic/method, and shown with
+  its band and confidence class — while an invalid import leaves the prior state
+  unchanged and a score edit clears the stale band. Pinned end to end by
+  `test_trust_pillar.py`.

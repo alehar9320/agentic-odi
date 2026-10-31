@@ -619,6 +619,10 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
                 "statement": body.statement,
                 "importance": body.importance,
                 "satisfaction": body.satisfaction,
+                "importance_n": body.importance_n,
+                "satisfaction_n": body.satisfaction_n,
+                "score_method": body.score_method,
+                "note": body.note,
             },
         )
         return _payload_from_text(result)
@@ -628,6 +632,10 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             statement=body.statement,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            importance_n=body.importance_n,
+            satisfaction_n=body.satisfaction_n,
+            score_method=body.score_method,
+            note=body.note,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
@@ -637,18 +645,124 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
 @router.patch("/outcomes/{outcome_id}")
 async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Request) -> dict:
     updates = body.model_dump(exclude_none=True, exclude={"mcp_url"})
+    # ``note`` is snapshot metadata, not an Outcome field: it is recorded with
+    # the new score rather than written onto the record.
+    note = updates.pop("note", None)
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.UPDATE_OUTCOME.value,
-            {"outcome_id": outcome_id, **updates},
+            {"outcome_id": outcome_id, "note": note, **updates},
         )
         return _payload_from_text(result)
     try:
-        outcome = _service(request).update_outcome(outcome_id, updates)
+        outcome = _service(request).update_outcome(outcome_id, updates, note=note)
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return outcome.model_dump(mode="json")
+
+
+@router.get("/outcomes/{outcome_id}/history")
+async def get_outcome_history(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return an outcome's accepted score snapshots, oldest first.
+
+    Snapshots carry the score and its sample/method companions. The signed delta
+    is served separately at ``/outcomes/{id}/delta`` so this list shape stays
+    identical across the local and MCP backends.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_HISTORY.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        snapshots = _service(request).get_score_history(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": [snapshot.model_dump(mode="json") for snapshot in snapshots]}
+
+
+@router.get("/outcomes/{outcome_id}/delta")
+async def get_outcome_delta(
+    outcome_id: str,
+    request: Request,
+    since: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Return the signed change across an outcome's snapshots (B6.1).
+
+    ``since`` chooses the baseline (the last snapshot at or before it; the
+    earliest when omitted). ``direction`` is the product's sign rule, so a
+    consumer never invents an "improvement" from a bare number.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_DELTA.value,
+            {"outcome_id": outcome_id, **({"since": since} if since else {})},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        delta = _service(request).get_outcome_delta(outcome_id, since)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": delta.outcome_id,
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        },
+    }
+
+
+@router.get("/outcomes/{outcome_id}/interval")
+async def get_outcome_interval(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return an outcome's stored band and its provenance (B3.2).
+
+    ``band: null`` means the score carries no band at all — an estimate or an
+    unscored outcome — which is a distinct state from a zero-width band. A
+    stored band reports the sample, seed, confidence level, method and
+    computed-at it was recorded with, plus whether a later snapshot moved the
+    score it came from, so a consumer never presents a stale band as current.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_INTERVAL.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        provenance = _service(request).get_outcome_interval(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if provenance is None:
+        return {"ok": True, "result": {"outcome_id": outcome_id, "band": None}}
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": provenance.outcome_id,
+            "band": {
+                "low": provenance.low,
+                "high": provenance.high,
+                "n": provenance.n,
+                "confidence_level": provenance.confidence_level,
+                "seed": provenance.seed,
+                "method": provenance.method,
+                "computed_at": provenance.computed_at,
+                "stale": provenance.stale,
+            },
+        },
+    }
 
 
 @router.delete("/outcomes/{outcome_id}")

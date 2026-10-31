@@ -145,6 +145,68 @@ def test_add_outcome_rejects_out_of_range_scores(
         )
 
 
+def test_add_outcome_rejects_an_estimate_with_a_count(service: ODIService) -> None:
+    job = service.add_job("Onboard customers")
+    with pytest.raises(ValueOutOfRangeError):
+        service.add_outcome(
+            job.id,
+            "Minimize the time to onboard a customer when they sign up",
+            importance=8.0,
+            satisfaction=6.0,
+            importance_n=40,
+        )
+
+
+def test_add_outcome_accepts_a_survey_with_counts(service: ODIService) -> None:
+    job = service.add_job("Onboard customers")
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time to onboard a customer when they sign up",
+        importance=8.0,
+        satisfaction=6.0,
+        importance_n=40,
+        satisfaction_n=40,
+        score_method="survey",
+    )
+    assert outcome.importance_n == 40
+    assert outcome.satisfaction_n == 40
+    assert outcome.score_method == "survey"
+
+
+def test_update_switching_survey_to_estimate_validates_the_whole_record(
+    service: ODIService,
+) -> None:
+    job = service.add_job("Onboard customers")
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time to onboard a customer when they sign up",
+        importance=8.0,
+        satisfaction=6.0,
+        importance_n=40,
+        satisfaction_n=40,
+        score_method="survey",
+    )
+    with pytest.raises(ValueOutOfRangeError):
+        service.update_outcome(outcome.id, {"score_method": "estimate"})
+
+
+def test_update_clearing_a_count_keeps_the_method(service: ODIService) -> None:
+    job = service.add_job("Onboard customers")
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time to onboard a customer when they sign up",
+        importance=8.0,
+        satisfaction=6.0,
+        importance_n=40,
+        satisfaction_n=40,
+        score_method="survey",
+    )
+    updated = service.update_outcome(outcome.id, {"importance_n": None})
+    assert updated.importance_n is None
+    assert updated.satisfaction_n == 40
+    assert updated.score_method == "survey"
+
+
 def test_get_outcomes_defaults_to_the_biggest_opportunities_first(service: ODIService) -> None:
     job = service.add_job("Onboard customers")
     low = "Minimize the time to onboard when a customer is new"

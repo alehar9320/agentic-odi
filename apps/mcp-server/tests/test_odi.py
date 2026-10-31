@@ -12,6 +12,68 @@ def extract_id(result_str):
 
 
 @pytest.mark.asyncio
+async def test_add_outcome_records_sample_metadata():
+    async with Client(mcp) as client:
+        job_text = (
+            (await client.call_tool("add_job", {"name": "Onboard customers", "description": ""}))
+            .content[0]
+            .text
+        )
+        job_id = extract_id(job_text)
+
+        survey_text = (
+            (
+                await client.call_tool(
+                    "add_outcome",
+                    {
+                        "job_id": job_id,
+                        "statement": "Minimize the time it takes to onboard a customer when they sign up",
+                        "importance": 8.0,
+                        "satisfaction": 6.0,
+                        "importance_n": 40,
+                        "satisfaction_n": 40,
+                        "score_method": "survey",
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
+        assert "Outcome created successfully" in survey_text
+        assert '"score_method":"survey"' in survey_text
+        assert '"importance_n":40' in survey_text
+
+
+@pytest.mark.asyncio
+async def test_add_outcome_refuses_an_estimate_with_a_count():
+    async with Client(mcp) as client:
+        job_text = (
+            (await client.call_tool("add_job", {"name": "Onboard customers", "description": ""}))
+            .content[0]
+            .text
+        )
+        job_id = extract_id(job_text)
+
+        text = (
+            (
+                await client.call_tool(
+                    "add_outcome",
+                    {
+                        "job_id": job_id,
+                        "statement": "Minimize the time it takes to onboard a customer when they sign up",
+                        "importance": 8.0,
+                        "satisfaction": 6.0,
+                        "importance_n": 40,
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
+        assert text.startswith("Error:")
+
+
+@pytest.mark.asyncio
 async def test_odi_workflow():
     """Test the full ODI workflow (Add Job -> Add Steps -> Add Outcome -> Get Data)."""
     # Use in-memory testing by passing the server instance directly to the client
@@ -116,3 +178,80 @@ async def test_get_capabilities_manifest_returns_json():
         assert "summary" in tool
         assert "effect" in tool
         assert "returns" in tool
+
+
+def _survey_rows(outcome_id: str, count: int) -> list[dict]:
+    return [
+        {"outcome_id": outcome_id, "importance": 8.0, "satisfaction": 4.0, "respondent_id": f"r{i}"}
+        for i in range(count)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_survey_import_plan_reports_every_row_without_writing():
+    async with Client(mcp) as client:
+        job_id = extract_id(
+            (await client.call_tool("add_job", {"name": "Onboard", "description": ""}))
+            .content[0]
+            .text
+        )
+        outcome_id = extract_id(
+            (
+                await client.call_tool(
+                    "add_outcome",
+                    {
+                        "job_id": job_id,
+                        "statement": "Minimize the time it takes to onboard a customer when they sign up",
+                        "importance": 8.0,
+                        "satisfaction": 4.0,
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
+
+        rows = [*_survey_rows(outcome_id, 40), *_survey_rows("ghost", 1)]
+        plan = json.loads(
+            (await client.call_tool("get_survey_import_plan", {"rows": rows})).content[0].text
+        )
+
+        assert plan["writable"] is False
+        assert plan["counts"]["unmatched"] == 1
+        assert plan["rows"][40]["line"] == 42  # header is line 1
+        assert plan["rows"][40]["status"] == "unmatched"
+
+
+@pytest.mark.asyncio
+async def test_commit_survey_import_refuses_an_unresolved_row():
+    async with Client(mcp) as client:
+        job_id = extract_id(
+            (await client.call_tool("add_job", {"name": "Onboard", "description": ""}))
+            .content[0]
+            .text
+        )
+        outcome_id = extract_id(
+            (
+                await client.call_tool(
+                    "add_outcome",
+                    {
+                        "job_id": job_id,
+                        "statement": "Minimize the time it takes to onboard a customer when they sign up",
+                        "importance": 8.0,
+                        "satisfaction": 4.0,
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
+
+        rows = [*_survey_rows(outcome_id, 40), *_survey_rows("ghost", 1)]
+        text = (await client.call_tool("commit_survey_import", {"rows": rows})).content[0].text
+        assert text.startswith("Error:")
+
+        # The refusal left the outcome unchanged.
+        fetched = (
+            (await client.call_tool("get_outcome", {"outcome_id": outcome_id})).content[0].text
+        )
+        assert '"score_method":"estimate"' in fetched

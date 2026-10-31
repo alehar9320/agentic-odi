@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class Direction(str, Enum):
@@ -91,6 +91,17 @@ JOB_NAME_PATTERN = r"^[A-Za-z0-9 _-]+$"
 JOB_NAME_MIN_LENGTH = 3
 JOB_NAME_MAX_LENGTH = 64
 JOB_DESCRIPTION_MAX_LENGTH = 500
+ScoreMethod = Literal["estimate", "survey", "import"]
+
+SCORE_SNAPSHOT_NOTE_MAX = 500
+
+
+def utc_now_iso() -> str:
+    """Return the current UTC time as an ISO-8601 string.
+
+    One helper so every snapshot timestamp shares a format and timezone.
+    """
+    return datetime.now(timezone.utc).isoformat()
 
 
 class Job(BaseModel):
@@ -142,6 +153,96 @@ class Outcome(BaseModel):
     )
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
+    )
+    importance_n: int | None = Field(
+        default=None, ge=1, description="People behind the importance score, when known"
+    )
+    satisfaction_n: int | None = Field(
+        default=None, ge=1, description="People behind the satisfaction score, when known"
+    )
+    score_method: ScoreMethod = Field(
+        default="estimate",
+        description="How the score was obtained: a one-person estimate, a survey, or an import",
+    )
+    opportunity_low: float | None = Field(
+        None, description="Low end of the score band, when a band was computed (B3)"
+    )
+    opportunity_high: float | None = Field(
+        None, description="High end of the score band, when a band was computed (B3)"
+    )
+    interval_n: int | None = Field(
+        None, ge=1, description="Observations the band was computed from (B3)"
+    )
+    interval_seed: int | None = Field(None, description="Seed that reproduces the band (B3)")
+    interval_confidence_level: float | None = Field(
+        None, description="Confidence level of the band, e.g. 0.95 (B3)"
+    )
+    interval_computed_at: str | None = Field(
+        None, description="When the band was computed, for staleness (B3.2)"
+    )
+
+    @model_validator(mode="after")
+    def _count_requires_a_sample(self) -> Outcome:
+        # A count above one means people were asked; an estimate cannot have asked them.
+        if self.score_method == "estimate" and (
+            (self.importance_n or 0) > 1 or (self.satisfaction_n or 0) > 1
+        ):
+            raise ValueError(
+                "score_method 'estimate' cannot carry a sample count above 1; "
+                "use 'survey' or 'import' when people were asked"
+            )
+        if (self.opportunity_low is None) != (self.opportunity_high is None):
+            raise ValueError("a band needs both opportunity_low and opportunity_high")
+        if (
+            self.opportunity_low is not None
+            and self.opportunity_high is not None
+            and self.opportunity_low > self.opportunity_high
+        ):
+            raise ValueError("opportunity_low cannot exceed opportunity_high")
+        # Provenance describes a band. With no band there is nothing to describe,
+        # so drop it rather than letting a cleared band keep a stale seed/level.
+        if self.opportunity_low is None:
+            self.interval_n = None
+            self.interval_seed = None
+            self.interval_confidence_level = None
+            self.interval_computed_at = None
+        return self
+
+
+class ScoreSnapshot(BaseModel):
+    """One accepted score state, kept so "did it move?" is a subtraction.
+
+    A snapshot records the score *and* its sample/method companions, because a
+    history of bare numbers cannot answer "did the evidence change or the
+    estimate?". It is written by one helper on every score-mutating path and
+    lives in the append-only event log, so replay reproduces it.
+
+    A snapshot is only written for an *accepted* mutation; a validation failure
+    creates neither a score change nor a snapshot.
+
+    The writer appends on every accepted ``update_outcome``, so a metadata-only
+    edit (method/count) and an equal-value re-submission each add a snapshot.
+    That is deliberate: the trail records that the decision was re-affirmed or
+    re-evidenced, and it keeps the count/method-only evidence state visible
+    rather than collapsing two unlike states into one identical number.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    outcome_id: str = Field(..., description="The outcome this snapshot belongs to")
+    at: str = Field(
+        default_factory=utc_now_iso,
+        description="ISO-8601 UTC timestamp of the accepted mutation",
+    )
+    importance: float | None = Field(None, ge=1.0, le=10.0)
+    satisfaction: float | None = Field(None, ge=1.0, le=10.0)
+    opportunity_score: float | None = None
+    importance_n: int | None = Field(None, ge=1)
+    satisfaction_n: int | None = Field(None, ge=1)
+    method: ScoreMethod = "estimate"
+    note: str | None = Field(
+        None,
+        max_length=SCORE_SNAPSHOT_NOTE_MAX,
+        description="Why the number was given, when the caller recorded one",
     )
 
 

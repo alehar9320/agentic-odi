@@ -20,6 +20,7 @@ from agentic_odi_core.models import (
     Job,
     Outcome,
     ScheduledWork,
+    ScoreSnapshot,
     Step,
     ValueMetric,
 )
@@ -35,6 +36,7 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "Evidence": Evidence,
     "V2MOM": V2MOM,
     "ScheduledWork": ScheduledWork,
+    "ScoreSnapshot": ScoreSnapshot,
 }
 
 

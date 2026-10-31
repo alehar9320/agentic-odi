@@ -3,6 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { OutcomeCard } from "./OutcomeCard";
 
+vi.mock("../../api/studioApi", () => ({
+  fetchOutcomeHistory: vi.fn().mockResolvedValue([]),
+  fetchOutcomeInterval: vi.fn().mockResolvedValue({ outcome_id: "", band: null }),
+}));
+
 const harness = vi.hoisted(() => ({
   state: {
     ask: vi.fn(),
@@ -12,6 +17,7 @@ const harness = vi.hoisted(() => ({
     // The card lists the records captured against its outcome, so the canvas
     // has to be there even when this test only cares about the copy action.
     canvasState: { kind: "ready", data: { jobs: [], steps: [], outcomes: [], source: "seed" } },
+    settings: { mcp_url: "http://localhost:8000/mcp" },
   },
 }));
 

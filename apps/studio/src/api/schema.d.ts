@@ -358,6 +358,80 @@ export interface paths {
         patch: operations["patch_outcome_api_outcomes__outcome_id__patch"];
         trace?: never;
     };
+    "/api/outcomes/{outcome_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outcome History
+         * @description Return an outcome's accepted score snapshots, oldest first.
+         *
+         *     Snapshots carry the score and its sample/method companions. The signed delta
+         *     is served separately at ``/outcomes/{id}/delta`` so this list shape stays
+         *     identical across the local and MCP backends.
+         */
+        get: operations["get_outcome_history_api_outcomes__outcome_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/delta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outcome Delta
+         * @description Return the signed change across an outcome's snapshots (B6.1).
+         *
+         *     ``since`` chooses the baseline (the last snapshot at or before it; the
+         *     earliest when omitted). ``direction`` is the product's sign rule, so a
+         *     consumer never invents an "improvement" from a bare number.
+         */
+        get: operations["get_outcome_delta_api_outcomes__outcome_id__delta_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/interval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outcome Interval
+         * @description Return an outcome's stored band and its provenance (B3.2).
+         *
+         *     ``band: null`` means the score carries no band at all — an estimate or an
+         *     unscored outcome — which is a distinct state from a zero-width band. A
+         *     stored band reports the sample, seed, confidence level, method and
+         *     computed-at it was recorded with, plus whether a later snapshot moved the
+         *     score it came from, so a consumer never presents a stale band as current.
+         */
+        get: operations["get_outcome_interval_api_outcomes__outcome_id__interval_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/signals": {
         parameters: {
             query?: never;
@@ -878,6 +952,18 @@ export interface components {
             importance: number;
             /** Satisfaction */
             satisfaction: number;
+            /** Importance N */
+            importance_n?: number | null;
+            /** Satisfaction N */
+            satisfaction_n?: number | null;
+            /**
+             * Score Method
+             * @default estimate
+             * @enum {string}
+             */
+            score_method: "estimate" | "survey" | "import";
+            /** Note */
+            note?: string | null;
         };
         /** AddStepRequest */
         AddStepRequest: {
@@ -1549,6 +1635,14 @@ export interface components {
             importance?: number | null;
             /** Satisfaction */
             satisfaction?: number | null;
+            /** Importance N */
+            importance_n?: number | null;
+            /** Satisfaction N */
+            satisfaction_n?: number | null;
+            /** Score Method */
+            score_method?: ("estimate" | "survey" | "import") | null;
+            /** Note */
+            note?: string | null;
             /**
              * Mcp Url
              * @default
@@ -2487,6 +2581,112 @@ export interface operations {
                 "application/json": components["schemas"]["UpdateOutcomeRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcome_history_api_outcomes__outcome_id__history_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcome_delta_api_outcomes__outcome_id__delta_get: {
+        parameters: {
+            query?: {
+                since?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcome_interval_api_outcomes__outcome_id__interval_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

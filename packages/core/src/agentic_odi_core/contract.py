@@ -27,6 +27,13 @@ class ToolName(str, Enum):
     GET_OUTCOMES = "get_outcomes"
     GET_OUTCOME = "get_outcome"
     UPDATE_OUTCOME = "update_outcome"
+    GET_OUTCOME_HISTORY = "get_outcome_history"
+    GET_OUTCOME_DELTA = "get_outcome_delta"
+    GET_OUTCOME_INTERVAL = "get_outcome_interval"
+    IMPORT_SURVEY = "import_survey"
+    GET_SURVEY_IMPORT_PLAN = "get_survey_import_plan"
+    COMMIT_SURVEY_IMPORT = "commit_survey_import"
+    RANK_OUTCOMES = "rank_outcomes"
     DELETE_OUTCOME = "delete_outcome"
     ADD_CUSTOMER_OUTCOME = "add_customer_outcome"
     GET_CUSTOMER_OUTCOME = "get_customer_outcome"
@@ -182,7 +189,17 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="add_outcome",
         summary="Add a desired Outcome to a Job.",
         effect=_derive_effect("add_outcome"),
-        arguments=("job_id", "statement", "importance", "satisfaction", "step_id"),
+        arguments=(
+            "job_id",
+            "statement",
+            "importance",
+            "satisfaction",
+            "step_id",
+            "importance_n",
+            "satisfaction_n",
+            "score_method",
+            "note",
+        ),
         required=("job_id", "statement", "importance", "satisfaction"),
         returns="The created Outcome.",
         stage="2",
@@ -209,10 +226,83 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="update_outcome",
         summary="Update an Outcome's statement or scores.",
         effect=_derive_effect("update_outcome"),
-        arguments=("outcome_id", "statement", "importance", "satisfaction", "step_id"),
+        arguments=(
+            "outcome_id",
+            "statement",
+            "importance",
+            "satisfaction",
+            "step_id",
+            "importance_n",
+            "satisfaction_n",
+            "score_method",
+            "note",
+        ),
         required=("outcome_id",),
         returns="The updated Outcome.",
         stage="2",
+    ),
+    ToolName.GET_OUTCOME_HISTORY.value: ToolSpec(
+        name="get_outcome_history",
+        summary="List the accepted score snapshots for an Outcome, oldest first.",
+        effect=_derive_effect("get_outcome_history"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="A list of score snapshots, oldest first.",
+        stage="4",
+    ),
+    ToolName.GET_OUTCOME_DELTA.value: ToolSpec(
+        name="get_outcome_delta",
+        summary="The signed score change across an Outcome's recorded snapshots.",
+        effect=_derive_effect("get_outcome_delta"),
+        arguments=("outcome_id", "since"),
+        required=("outcome_id",),
+        returns="The signed importance/satisfaction/opportunity deltas and a direction.",
+        stage="4",
+    ),
+    ToolName.GET_OUTCOME_INTERVAL.value: ToolSpec(
+        name="get_outcome_interval",
+        summary="The stored band and its provenance for an Outcome, or a no-band result.",
+        effect=_derive_effect("get_outcome_interval"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="The band's bounds, sample, seed, confidence, method, computed-at and staleness.",
+        stage="4",
+    ),
+    ToolName.IMPORT_SURVEY.value: ToolSpec(
+        name="import_survey",
+        summary="Land a survey's per-outcome means, sample and band on matching Outcomes.",
+        effect=_derive_effect("import_survey"),
+        arguments=("rows",),
+        required=("rows",),
+        returns="The updated Outcomes keyed by id.",
+        stage="4",
+    ),
+    ToolName.GET_SURVEY_IMPORT_PLAN.value: ToolSpec(
+        name="get_survey_import_plan",
+        summary="Plan a survey import without writing: every row's fate and line number.",
+        effect=_derive_effect("get_survey_import_plan"),
+        arguments=("rows", "confirmed_matches"),
+        required=("rows",),
+        returns="Per-row accepted/unmatched/ambiguous/invalid reports with line numbers.",
+        stage="4",
+    ),
+    ToolName.COMMIT_SURVEY_IMPORT.value: ToolSpec(
+        name="commit_survey_import",
+        summary="Write a survey import only when every row resolves; otherwise refuse.",
+        effect=ToolEffect.WRITE,
+        arguments=("rows", "confirmed_matches"),
+        required=("rows",),
+        returns="The updated Outcomes keyed by id, or a refusal naming the unresolved rows.",
+        stage="4",
+    ),
+    ToolName.RANK_OUTCOMES.value: ToolSpec(
+        name="rank_outcomes",
+        summary="Rank a Job's Outcomes by evidence strength into measured/thin/none sections.",
+        effect=_derive_effect("rank_outcomes"),
+        arguments=("job_id",),
+        required=("job_id",),
+        returns="The measured/thin/none sections with per-outcome score, band, sample and method.",
+        stage="4",
     ),
     ToolName.DELETE_OUTCOME.value: ToolSpec(
         name="delete_outcome",
