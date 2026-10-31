@@ -601,3 +601,23 @@ def render_candidate_list(items: Any, *, as_json: bool) -> str:
         ],
         empty="No outcome candidates found.",
     )
+
+
+def render_candidate_acceptance(result: Any, *, as_json: bool) -> str:
+    """Render an acceptance: the new outcome, its score, and the evidence quote."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    outcome = result.get("outcome", {})
+    evidence = result.get("evidence", {})
+    return _block(
+        [
+            ("outcome_id", outcome.get("id", "")),
+            ("statement", outcome.get("statement", "")),
+            ("opportunity_score", outcome.get("opportunity_score", "")),
+            ("evidence_id", evidence.get("id", "")),
+            ("evidence_source", evidence.get("source_name", "")),
+            ("quote", evidence.get("content", "")),
+        ]
+    )

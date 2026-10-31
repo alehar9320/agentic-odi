@@ -114,3 +114,94 @@ async def test_list_candidates_rejects_unknown_status() -> None:
     async with Client(mcp) as client:
         result = await client.call_tool("list_candidates", {"status": "nope"})
     assert _text(result) == "Error: unknown candidate status: nope"
+
+
+@pytest.mark.asyncio
+async def test_accept_candidate_returns_outcome_and_verbatim_evidence() -> None:
+    async with Client(mcp) as client:
+        _, quote_id = await _quote(client)
+        candidates = json.loads(
+            _text(await client.call_tool("extract_candidates", {"quote_id": quote_id}))
+        )
+        candidate = candidates[0]
+
+        result = json.loads(
+            _text(
+                await client.call_tool(
+                    "accept_candidate",
+                    {
+                        "candidate_id": candidate["id"],
+                        "importance": 8.0,
+                        "satisfaction": 3.0,
+                    },
+                )
+            )
+        )
+        evidence = json.loads(
+            _text(await client.call_tool("list_evidence", {"outcome_id": result["outcome"]["id"]}))
+        )
+
+    assert result["candidate"]["status"] == "accepted"
+    assert result["candidate"]["outcome_id"] == result["outcome"]["id"]
+    assert result["evidence"]["content"] == QUOTE
+    assert result["evidence"]["source_kind"] == "interview"
+    assert len(evidence) == 1
+
+
+@pytest.mark.asyncio
+async def test_accept_candidate_twice_does_not_duplicate_the_outcome() -> None:
+    async with Client(mcp) as client:
+        _, quote_id = await _quote(client)
+        candidates = json.loads(
+            _text(await client.call_tool("extract_candidates", {"quote_id": quote_id}))
+        )
+        candidate_id = candidates[0]["id"]
+        args = {"candidate_id": candidate_id, "importance": 8.0, "satisfaction": 3.0}
+
+        first = json.loads(_text(await client.call_tool("accept_candidate", args)))
+        second = json.loads(_text(await client.call_tool("accept_candidate", args)))
+        outcomes = json.loads(
+            _text(await client.call_tool("get_outcomes", {"job_id": first["outcome"]["job_id"]}))
+        )
+
+    assert first["outcome"]["id"] == second["outcome"]["id"]
+    assert first["evidence"]["id"] == second["evidence"]["id"]
+    assert len(outcomes) == 1
+
+
+@pytest.mark.asyncio
+async def test_reject_candidate_requires_a_reason_and_keeps_the_candidate() -> None:
+    async with Client(mcp) as client:
+        _, quote_id = await _quote(client)
+        candidates = json.loads(
+            _text(await client.call_tool("extract_candidates", {"quote_id": quote_id}))
+        )
+        candidate_id = candidates[0]["id"]
+
+        refused = await client.call_tool(
+            "reject_candidate", {"candidate_id": candidate_id, "reason": "   "}
+        )
+        rejected = json.loads(
+            _text(
+                await client.call_tool(
+                    "reject_candidate", {"candidate_id": candidate_id, "reason": "not a need"}
+                )
+            )
+        )
+        kept = json.loads(
+            _text(await client.call_tool("get_candidate", {"candidate_id": candidate_id}))
+        )
+
+    assert _text(refused).startswith("Error: A rejection reason is required")
+    assert rejected["status"] == "rejected"
+    assert rejected["decision_reason"] == "not a need"
+    assert kept["quote_id"] == candidates[0]["quote_id"]
+
+
+@pytest.mark.asyncio
+async def test_accept_candidate_reports_a_missing_candidate() -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "accept_candidate", {"candidate_id": "missing", "importance": 8.0, "satisfaction": 3.0}
+        )
+    assert _text(result) == "Error: Outcome candidate with ID missing not found."

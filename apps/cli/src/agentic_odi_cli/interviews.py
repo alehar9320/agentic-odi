@@ -16,6 +16,7 @@ import typer
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import (
     render_candidate,
+    render_candidate_acceptance,
     render_candidate_list,
     render_deleted,
     render_interview,
@@ -247,5 +248,46 @@ def delete_candidate(
             run_tool("delete_candidate", {"candidate_id": candidate_id}),
             as_json=json_output,
             noun="outcome candidate",
+        )
+    )
+
+
+@candidates_app.command("accept")
+def accept_candidate(
+    candidate_id: str = typer.Argument(..., help="Outcome candidate ID"),
+    importance: float = typer.Option(..., help="Importance score, 1.0 to 10.0"),
+    satisfaction: float = typer.Option(..., help="Current satisfaction, 1.0 to 10.0"),
+    statement: str | None = typer.Option(None, help="Edit the statement before accepting"),
+    step_id: str | None = typer.Option(None, help="Job-map Step the new outcome belongs to"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Accept a candidate into exactly one outcome, with its quote as evidence.
+
+    The statement is validated before anything is written; accepting twice
+    returns the first outcome, so a retry never duplicates it.
+    """
+    args: dict[str, Any] = {
+        "candidate_id": candidate_id,
+        "importance": importance,
+        "satisfaction": satisfaction,
+    }
+    if statement is not None:
+        args["statement"] = statement
+    if step_id is not None:
+        args["step_id"] = step_id
+    typer.echo(render_candidate_acceptance(run_tool("accept_candidate", args), as_json=json_output))
+
+
+@candidates_app.command("reject")
+def reject_candidate(
+    candidate_id: str = typer.Argument(..., help="Outcome candidate ID"),
+    reason: str = typer.Option(..., help="Why the candidate is rejected (required)"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Reject a candidate, keeping it and the reason beside its quote."""
+    typer.echo(
+        render_candidate(
+            run_tool("reject_candidate", {"candidate_id": candidate_id, "reason": reason}),
+            as_json=json_output,
         )
     )

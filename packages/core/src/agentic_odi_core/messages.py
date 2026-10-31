@@ -119,6 +119,13 @@ def candidate_not_found(candidate_id: str | None) -> str:
     return f"Outcome candidate not found: {candidate_id}"
 
 
+def candidate_reason_required(candidate_id: str | None) -> str:
+    return (
+        f"A rejection reason is required for outcome candidate {candidate_id}; "
+        "the reason is kept beside the candidate so the decision is defensible."
+    )
+
+
 def invalid_strategy_request(message: str) -> str:
     """The one spelling of a refused Stage 6 request.
 

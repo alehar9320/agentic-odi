@@ -244,3 +244,48 @@ def test_legacy_store_without_interviews_opens_cleanly(tmp_path) -> None:
     assert reopened.list_interviews() == []
     assert reopened.list_quotes("anything") == []
     assert reopened.get_job("job-1") is not None
+
+
+def test_candidate_acceptance_round_trips_through_sqlite(tmp_path) -> None:
+    """Accepting a candidate writes the outcome, the evidence and the link.
+
+    The candidate's ``outcome_id`` is the join between the decision and the
+    outcome; a store that drops it on replay would silently accept the same
+    candidate twice, so this pins the whole acceptance write.
+    """
+    from agentic_odi_core import ODIService
+
+    db = str(tmp_path / "accept.db")
+    repo = SQLiteRepository(db)
+    service = ODIService(repo)
+    repo.add_job(Job(id="job-1", name="Onboard"))
+    repo.add_interview(
+        Interview(id="interview-1", job_id="job-1", title="Ana", participant_label="Ana")
+    )
+    repo.add_quote(
+        InterviewQuote(id="quote-1", interview_id="interview-1", text="Slow.", ordinal=0)
+    )
+    repo.add_candidate(
+        OutcomeCandidate(
+            id="candidate-1",
+            interview_id="interview-1",
+            quote_id="quote-1",
+            statement="Minimize the time it takes to onboard when hiring",
+            confidence=0.6,
+        )
+    )
+
+    accepted, outcome, evidence = service.accept_candidate(
+        "candidate-1", importance=8.0, satisfaction=3.0
+    )
+    live = _snapshot(repo)
+
+    repo.reload()
+    assert _snapshot(repo) == live
+    reopened = ODIService(SQLiteRepository(db))
+    assert _snapshot(reopened.repo) == live
+    replayed = reopened.get_candidate("candidate-1")
+    assert replayed is not None
+    assert replayed.outcome_id == outcome.id
+    assert [e.id for e in reopened.list_evidence(outcome_id=outcome.id)] == [evidence.id]
+    assert accepted.status.value == "accepted"
