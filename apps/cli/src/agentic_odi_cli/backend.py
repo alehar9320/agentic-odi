@@ -353,6 +353,30 @@ class LocalBackend(Backend):
             "direction": delta.direction,
         }
 
+    def _get_outcome_interval(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        try:
+            provenance = self.service.get_outcome_interval(outcome_id)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        if provenance is None:
+            return {"outcome_id": outcome_id, "band": None}
+        return {
+            "outcome_id": provenance.outcome_id,
+            "band": {
+                "low": provenance.low,
+                "high": provenance.high,
+                "n": provenance.n,
+                "confidence_level": provenance.confidence_level,
+                "seed": provenance.seed,
+                "method": provenance.method,
+                "computed_at": provenance.computed_at,
+                "stale": provenance.stale,
+            },
+        }
+
     def _import_survey(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
         from agentic_odi_core.errors import ValidationError
@@ -799,6 +823,7 @@ _LOCAL_HANDLERS = {
     "get_outcome": LocalBackend._get_outcome,
     "get_outcome_history": LocalBackend._get_outcome_history,
     "get_outcome_delta": LocalBackend._get_outcome_delta,
+    "get_outcome_interval": LocalBackend._get_outcome_interval,
     "import_survey": LocalBackend._import_survey,
     "get_survey_import_plan": LocalBackend._get_survey_import_plan,
     "commit_survey_import": LocalBackend._commit_survey_import,

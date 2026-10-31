@@ -226,3 +226,79 @@ def test_commit_survey_import_accepts_a_confirmed_match() -> None:
 
     updated = service.commit_survey_import(rows, confirmed_matches={outcome.id.upper(): outcome.id})
     assert updated[outcome.id].importance_n == 40
+
+
+def test_get_outcome_interval_returns_the_stored_band_and_provenance() -> None:
+    service, job_id = _service_with_job()
+    outcome = service.add_outcome(
+        job_id,
+        "Minimize the time to publish when a plugin is ready.",
+        7.0,
+        3.0,
+    )
+    service.import_survey(_rows(outcome.id, 40, importance=8.0, satisfaction=4.0))
+
+    provenance = service.get_outcome_interval(outcome.id)
+
+    assert provenance is not None
+    assert provenance.n == 40
+    assert provenance.low <= provenance.high
+    assert provenance.stale is False
+
+
+def test_get_outcome_interval_is_none_for_an_estimate_with_no_band() -> None:
+    service, job_id = _service_with_job()
+    outcome = service.add_outcome(
+        job_id,
+        "Minimize the time to publish when a plugin is ready.",
+        7.0,
+        3.0,
+    )
+
+    assert service.get_outcome_interval(outcome.id) is None
+
+
+def test_get_outcome_interval_clears_a_band_when_the_score_is_edited() -> None:
+    service, job_id = _service_with_job()
+    outcome = service.add_outcome(
+        job_id,
+        "Minimize the time to publish when a plugin is ready.",
+        7.0,
+        3.0,
+    )
+    service.import_survey(_rows(outcome.id, 40, importance=8.0, satisfaction=4.0))
+    # A manual edit without fresh paired inputs moves the score, so the survey
+    # band is cleared in the same write rather than left describing a stale
+    # score.
+    service.update_outcome(outcome.id, {"importance": 9.0}, note="revised")
+
+    assert service.get_outcome_interval(outcome.id) is None
+
+
+def test_get_outcome_interval_flags_a_band_whose_score_later_moved() -> None:
+    service, job_id = _service_with_job()
+    outcome = service.add_outcome(
+        job_id,
+        "Minimize the time to publish when a plugin is ready.",
+        7.0,
+        3.0,
+    )
+    service.import_survey(_rows(outcome.id, 40, importance=8.0, satisfaction=4.0))
+    # A repository-level score write bypasses the service's band-clearing, so a
+    # band can still describe a score a later snapshot moved. The read must say
+    # so rather than presenting the bounds as current.
+    service.repo.update_outcome(outcome.id, {"opportunity_score": 99.0})
+
+    provenance = service.get_outcome_interval(outcome.id)
+
+    assert provenance is not None
+    assert provenance.stale is True
+
+
+def test_get_outcome_interval_rejects_an_unknown_outcome() -> None:
+    service, _job_id = _service_with_job()
+
+    with pytest.raises(Exception) as caught:
+        service.get_outcome_interval("ghost")
+
+    assert "ghost" in str(caught.value)

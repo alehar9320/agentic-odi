@@ -207,13 +207,56 @@ def _sample_label(outcome: dict[str, Any]) -> str:
     return f"n={importance_n or '?'}/{satisfaction_n or '?'} ({method})"
 
 
-def render_outcome(outcome: Any, *, as_json: bool, latest_note: str | None = None) -> str:
+def render_interval_provenance(interval: Any, *, as_json: bool = False) -> str:
+    """Render a stored band and its provenance, or the no-band reason (B3.2).
+
+    A ``None`` band is *no band* — an estimate or an unscored outcome — and is
+    said so explicitly rather than shown as a zero-width band. A stored band
+    names the sample, seed and confidence level it was computed with, and is
+    marked ``stale`` when a later snapshot moved the score it came from, so a
+    band is never presented as current when it is not.
+    """
+    if as_json:
+        return _json(interval)
+    if not isinstance(interval, dict):
+        return str(interval)
+    band = interval.get("band")
+    if not band:
+        return "band  none (no band recorded; an estimate or an unscored outcome)"
+    low = band.get("low")
+    high = band.get("high")
+    seed = band.get("seed")
+    seed_label = "unrecorded" if seed is None else str(seed)
+    confidence = band.get("confidence_level")
+    confidence_label = f"{confidence:.2f}" if isinstance(confidence, (int, float)) else "unrecorded"
+    return _block(
+        [
+            ("band", f"[{low}–{high}]" if low != high else f"±0 ({low})"),
+            ("band n", str(band.get("n"))),
+            ("band method", str(band.get("method") or "unrecorded")),
+            ("band confidence", confidence_label),
+            ("band seed", seed_label),
+            ("band computed", str(band.get("computed_at") or "unrecorded")),
+            ("band stale", "yes" if band.get("stale") else "no"),
+        ]
+    )
+
+
+def render_outcome(
+    outcome: Any,
+    *,
+    as_json: bool,
+    latest_note: str | None = None,
+    interval: Any = None,
+) -> str:
     """Render one desired Outcome as a labelled block or JSON.
 
     ``latest_note`` is the reason recorded with the most recent accepted score
     change. It is snapshot metadata, not an Outcome field, so it is shown as a
     separate line and omitted entirely when empty — an absent reason renders
-    nothing rather than a placeholder.
+    nothing rather than a placeholder. ``interval`` is the stored band and its
+    provenance; a no-band outcome renders an explicit "no band" line so the
+    absence of a band is visible rather than left to inference.
     """
     if not isinstance(outcome, dict):
         return _json(outcome) if as_json else str(outcome)
@@ -233,7 +276,10 @@ def render_outcome(outcome: Any, *, as_json: bool, latest_note: str | None = Non
         note_line = _note_cell(latest_note)
         if note_line:
             rows.append(("note", note_line))
-    return _block(rows)
+    block = _block(rows)
+    if interval is not None:
+        block = f"{block}\n{render_interval_provenance(interval)}"
+    return block
 
 
 JOB_MAP_STAGES = 8

@@ -501,3 +501,52 @@ def test_evaluate_outcome_job_error_surfaces_as_a_backend_error():
 
     with pytest.raises(BackendError, match="Job not found: missing"):
         _parse_remote("evaluate_outcome", "Job not found: missing")
+
+
+def test_local_backend_get_outcome_interval_reports_a_no_band(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job J"})["id"]
+    outcome_id = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to publish when a plugin is ready.",
+            "importance": 8.0,
+            "satisfaction": 5.0,
+        },
+    )["id"]
+
+    result = backend.call("get_outcome_interval", {"outcome_id": outcome_id})
+
+    assert result == {"outcome_id": outcome_id, "band": None}
+
+
+def test_local_backend_get_outcome_interval_reports_a_stored_band(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job J"})["id"]
+    outcome_id = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to publish when a plugin is ready.",
+            "importance": 8.0,
+            "satisfaction": 5.0,
+        },
+    )["id"]
+    rows = [
+        {
+            "outcome_id": outcome_id,
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "respondent_id": f"r{i}",
+        }
+        for i in range(40)
+    ]
+    backend.call("import_survey", {"rows": rows})
+
+    result = backend.call("get_outcome_interval", {"outcome_id": outcome_id})
+
+    band = result["band"]
+    assert band is not None
+    assert band["n"] == 40
+    assert band["stale"] is False

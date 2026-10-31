@@ -96,7 +96,11 @@ The open issues this milestone still has to answer, grouped by what they change.
   `opportunity_high` with their provenance (`interval_n`, seed, confidence level,
   computed-at). A score or method edit without a fresh band clears the stale one
   in the same write, so a new number never carries an old range; an estimate
-  keeps the no-band placeholder rather than a fabricated width.
+  keeps the no-band placeholder rather than a fabricated width. The stored band
+  is readable through `get_outcome_interval`, `desired-outcomes get` and
+  `GET /api/outcomes/{id}/interval`; a no-band score reads as `no band` rather
+  than a zero-width range, and a band whose score a later snapshot moved is
+  marked `stale`.
 - [x] **Honest ranking**: `classify_confidence` labels each outcome
   `measured`/`thin`/`none` from its weakest dimension, and
   `rank_outcomes_for_job` ranks within a section by the band's low end, so an

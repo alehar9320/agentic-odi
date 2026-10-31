@@ -42,9 +42,11 @@ from agentic_odi_core.repository import Repository, page
 from agentic_odi_core.stats import DEFAULT_SEED, opportunity_interval
 from agentic_odi_core.survey import SurveyPlan, aggregate_survey, parse_survey, plan_survey
 from agentic_odi_core.trust import (
+    IntervalProvenance,
     OutcomeDelta,
     classify_confidence,
     outcome_delta,
+    persisted_interval,
     rank_outcomes_honestly,
 )
 
@@ -405,6 +407,24 @@ class ODIService:
         """
         history = self.get_score_history(outcome_id)
         return outcome_delta(history, since)
+
+    def get_outcome_interval(self, outcome_id: str) -> IntervalProvenance | None:
+        """The stored band and its provenance, or ``None`` for a no-band score (B3.2).
+
+        Reads the persisted ``opportunity_low``/``opportunity_high`` off the
+        outcome together with the recorded sample, seed, confidence level and
+        computed-at, and marks the band stale when a later accepted snapshot
+        moved the score it was computed from. ``None`` means the outcome carries
+        no band at all — an estimate or an unscored outcome — which is a
+        distinct state from a band, and never a zero-width one.
+        """
+        outcome = self.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        if outcome.opportunity_low is None or outcome.opportunity_high is None:
+            return None
+        history = self.repo.list_score_snapshots(outcome_id)
+        return persisted_interval(outcome, history)
 
     def rank_outcomes_for_job(self, job_id: str) -> dict[str, Any]:
         """Partition and rank a job's outcomes by evidence strength (B4/B4.1).

@@ -664,6 +664,49 @@ async def get_outcome_delta(
     }
 
 
+@router.get("/outcomes/{outcome_id}/interval")
+async def get_outcome_interval(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return an outcome's stored band and its provenance (B3.2).
+
+    ``band: null`` means the score carries no band at all — an estimate or an
+    unscored outcome — which is a distinct state from a zero-width band. A
+    stored band reports the sample, seed, confidence level, method and
+    computed-at it was recorded with, plus whether a later snapshot moved the
+    score it came from, so a consumer never presents a stale band as current.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_INTERVAL.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        provenance = _service(request).get_outcome_interval(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if provenance is None:
+        return {"ok": True, "result": {"outcome_id": outcome_id, "band": None}}
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": provenance.outcome_id,
+            "band": {
+                "low": provenance.low,
+                "high": provenance.high,
+                "n": provenance.n,
+                "confidence_level": provenance.confidence_level,
+                "seed": provenance.seed,
+                "method": provenance.method,
+                "computed_at": provenance.computed_at,
+                "stale": provenance.stale,
+            },
+        },
+    }
+
+
 @router.delete("/outcomes/{outcome_id}")
 async def delete_outcome(
     outcome_id: str, request: Request, mcp_url: str | None = Query(None)

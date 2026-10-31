@@ -5,6 +5,7 @@ import { OutcomeCard } from "./OutcomeCard";
 
 vi.mock("../../api/studioApi", () => ({
   fetchOutcomeHistory: vi.fn().mockResolvedValue([]),
+  fetchOutcomeInterval: vi.fn().mockResolvedValue({ outcome_id: "", band: null }),
 }));
 
 vi.mock("../../state/StudioContext", () => ({

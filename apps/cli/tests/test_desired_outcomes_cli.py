@@ -381,3 +381,36 @@ def test_a_multiline_note_renders_on_one_line(tmp_path) -> None:
     history = runner.invoke(app, ["--db", db, "desired-outcomes", "history", added["id"]])
     assert history.exit_code == 0, history.output
     assert "first pass second line" in history.output
+
+
+def test_show_renders_no_band_for_an_estimate(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(runner, db, job_id)
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    assert "band" in shown.output
+    assert "no band" in shown.output
+
+
+def test_show_renders_the_stored_band_and_its_provenance(tmp_path) -> None:
+    runner = CliRunner()
+    db = str(tmp_path / "odi.db")
+    job_id = _job_id(runner, db)
+    added = _add(runner, db, job_id, "--importance-n", "40", "--method", "survey")
+    csv_path = tmp_path / "survey.csv"
+    lines = ["outcome_id,importance,satisfaction,respondent_id"]
+    lines += [f"{added['id']},8.0,4.0,r{i}" for i in range(40)]
+    csv_path.write_text("\n".join(lines) + "\n")
+    import_result = runner.invoke(app, ["--db", db, "survey", "import", str(csv_path)])
+    assert import_result.exit_code == 0, import_result.output
+
+    shown = runner.invoke(app, ["--db", db, "desired-outcomes", "get", added["id"]])
+
+    assert shown.exit_code == 0, shown.output
+    assert "band n" in shown.output
+    assert "band stale" in shown.output
+    assert "band stale       no" in shown.output

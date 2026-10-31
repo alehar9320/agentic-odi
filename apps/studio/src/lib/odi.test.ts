@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   confidenceClass,
   formatBand,
+  formatBandProvenance,
   formatOpportunityScore,
   formatSample,
   isUnderserved,
@@ -140,5 +141,48 @@ describe("confidenceClass", () => {
     expect(confidenceClass({ score_method: "survey", importance_n: 40, satisfaction_n: 2 })).toBe(
       "thin",
     );
+  });
+});
+
+describe("formatBandProvenance", () => {
+  it("says plainly when a score carries no band", () => {
+    expect(formatBandProvenance(null)).toBe("no band");
+    expect(formatBandProvenance({ outcome_id: "O-1", band: null })).toBe("no band");
+  });
+
+  it("names the sample, confidence and seed behind a stored band", () => {
+    expect(
+      formatBandProvenance({
+        outcome_id: "O-1",
+        band: {
+          low: 14,
+          high: 18,
+          n: 40,
+          confidence_level: 0.95,
+          seed: 7,
+          method: "survey",
+          computed_at: "2026-01-01T00:00:00+00:00",
+          stale: false,
+        },
+      }),
+    ).toBe("n=40 · 95% · seed 7");
+  });
+
+  it("marks a stale band and an unrecorded seed rather than faking either", () => {
+    expect(
+      formatBandProvenance({
+        outcome_id: "O-1",
+        band: {
+          low: 14,
+          high: 18,
+          n: 40,
+          confidence_level: 0.95,
+          seed: null,
+          method: "survey",
+          computed_at: "2026-01-01T00:00:00+00:00",
+          stale: true,
+        },
+      }),
+    ).toBe("n=40 · 95% · seed unrecorded · stale");
   });
 });

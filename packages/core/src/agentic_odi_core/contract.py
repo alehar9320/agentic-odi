@@ -29,6 +29,7 @@ class ToolName(str, Enum):
     UPDATE_OUTCOME = "update_outcome"
     GET_OUTCOME_HISTORY = "get_outcome_history"
     GET_OUTCOME_DELTA = "get_outcome_delta"
+    GET_OUTCOME_INTERVAL = "get_outcome_interval"
     IMPORT_SURVEY = "import_survey"
     GET_SURVEY_IMPORT_PLAN = "get_survey_import_plan"
     COMMIT_SURVEY_IMPORT = "commit_survey_import"
@@ -256,6 +257,15 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("outcome_id", "since"),
         required=("outcome_id",),
         returns="The signed importance/satisfaction/opportunity deltas and a direction.",
+        stage="4",
+    ),
+    ToolName.GET_OUTCOME_INTERVAL.value: ToolSpec(
+        name="get_outcome_interval",
+        summary="The stored band and its provenance for an Outcome, or a no-band result.",
+        effect=_derive_effect("get_outcome_interval"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="The band's bounds, sample, seed, confidence, method, computed-at and staleness.",
         stage="4",
     ),
     ToolName.IMPORT_SURVEY.value: ToolSpec(

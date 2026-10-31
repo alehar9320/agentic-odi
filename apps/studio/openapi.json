@@ -1339,6 +1339,64 @@
         }
       }
     },
+    "/api/outcomes/{outcome_id}/interval": {
+      "get": {
+        "summary": "Get Outcome Interval",
+        "description": "Return an outcome's stored band and its provenance (B3.2).\n\n``band: null`` means the score carries no band at all \u2014 an estimate or an\nunscored outcome \u2014 which is a distinct state from a zero-width band. A\nstored band reports the sample, seed, confidence level, method and\ncomputed-at it was recorded with, plus whether a later snapshot moved the\nscore it came from, so a consumer never presents a stale band as current.",
+        "operationId": "get_outcome_interval_api_outcomes__outcome_id__interval_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Outcome Interval Api Outcomes  Outcome Id  Interval Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/signals": {
       "get": {
         "summary": "Get Signals",

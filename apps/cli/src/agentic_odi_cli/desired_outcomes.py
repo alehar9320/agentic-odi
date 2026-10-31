@@ -132,7 +132,10 @@ def get(
     """Get a desired Outcome by ID."""
     outcome = run_tool("get_outcome", {"outcome_id": outcome_id})
     latest_note = None if json_output else _latest_note(outcome_id)
-    typer.echo(render_outcome(outcome, as_json=json_output, latest_note=latest_note))
+    interval = None if json_output else run_tool("get_outcome_interval", {"outcome_id": outcome_id})
+    typer.echo(
+        render_outcome(outcome, as_json=json_output, latest_note=latest_note, interval=interval)
+    )
 
 
 def _latest_note(outcome_id: str) -> str | None:

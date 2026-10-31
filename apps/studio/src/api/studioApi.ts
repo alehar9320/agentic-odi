@@ -24,8 +24,9 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
-  Signal,
+  OutcomeInterval,
   ScoreSnapshot,
+  Signal,
   Step,
   StudioConfig,
   StudioError,
@@ -342,6 +343,21 @@ export function fetchOutcomeHistory(
 ): Promise<ScoreSnapshot[]> {
   return getJson<{ result: ScoreSnapshot[] }>(
     `/api/outcomes/${encodeURIComponent(outcomeId)}/history?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/**
+ * Fetch an outcome's stored band and its provenance. `band` is null when the
+ * score carries no band at all — an estimate or an unscored outcome — which is
+ * a distinct state from a zero-width band, so the caller must not treat null as
+ * a tight band.
+ */
+export function fetchOutcomeInterval(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeInterval> {
+  return getJson<{ result: OutcomeInterval }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/interval?mcp_url=${encodeURIComponent(mcpUrl)}`,
   ).then((body) => body.result);
 }
 

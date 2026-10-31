@@ -26,8 +26,31 @@ export interface Outcome {
   opportunity_low?: number | null;
   opportunity_high?: number | null;
   interval_n?: number | null;
+  interval_seed?: number | null;
+  interval_confidence_level?: number | null;
+  interval_computed_at?: string | null;
   evidence?: string;
   telemetry?: string;
+}
+
+/**
+ * A stored band and the provenance it was recorded with (B3.2). `band` is null
+ * when the score carries no band at all — an estimate or an unscored outcome —
+ * which is a distinct state from a zero-width band. `stale` marks a band whose
+ * score a later snapshot moved, so a consumer never presents it as current.
+ */
+export interface OutcomeInterval {
+  outcome_id: string;
+  band: {
+    low: number;
+    high: number;
+    n: number;
+    confidence_level: number;
+    seed: number | null;
+    method: string;
+    computed_at: string;
+    stale: boolean;
+  } | null;
 }
 
 export interface Evidence {

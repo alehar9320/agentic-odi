@@ -522,6 +522,39 @@ def get_outcome_delta(outcome_id: str, since: str | None = None) -> str:
 
 
 @mcp.tool
+def get_outcome_interval(outcome_id: str) -> str:
+    """The stored band and its provenance for an Outcome, or a no-band result.
+
+    Reports the persisted bounds with the sample, seed, confidence level,
+    method and computed-at they were recorded with, and whether a later
+    snapshot moved the score the band was computed from. ``band: null`` means
+    the score carries no band at all — an estimate or an unscored outcome —
+    which is never the same as a zero-width band.
+    """
+    try:
+        provenance = service.get_outcome_interval(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    if provenance is None:
+        return json.dumps({"outcome_id": outcome_id, "band": None})
+    return json.dumps(
+        {
+            "outcome_id": provenance.outcome_id,
+            "band": {
+                "low": provenance.low,
+                "high": provenance.high,
+                "n": provenance.n,
+                "confidence_level": provenance.confidence_level,
+                "seed": provenance.seed,
+                "method": provenance.method,
+                "computed_at": provenance.computed_at,
+                "stale": provenance.stale,
+            },
+        }
+    )
+
+
+@mcp.tool
 def import_survey(rows: list[dict[str, Any]]) -> str:
     """Land a survey's per-outcome means, sample and band on matching Outcomes.
 

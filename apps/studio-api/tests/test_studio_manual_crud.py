@@ -228,3 +228,58 @@ def test_outcome_note_is_snapshot_metadata_not_a_record_field() -> None:
 
     assert edited.status_code == 200
     assert "note" not in edited.json()
+
+
+def test_outcome_interval_reports_no_band_for_an_estimate() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+
+    interval = client.get(f"/api/outcomes/{outcome['id']}/interval").json()["result"]
+
+    assert interval == {"outcome_id": outcome["id"], "band": None}
+
+
+def test_outcome_interval_reports_a_stored_band_and_provenance() -> None:
+    repo = InMemoryRepository()
+    client = TestClient(create_app(repo, backend="local"))
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+    # The Studio API has no survey-import route yet, so seed the band through
+    # the core service on the same repository the app reads from.
+    from agentic_odi_core import ODIService
+
+    rows = [
+        {
+            "outcome_id": outcome["id"],
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "respondent_id": f"r{i}",
+        }
+        for i in range(40)
+    ]
+    ODIService(repo).import_survey(rows)
+
+    band = client.get(f"/api/outcomes/{outcome['id']}/interval").json()["result"]["band"]
+
+    assert band["n"] == 40
+    assert band["stale"] is False
+    assert band["seed"] == 0

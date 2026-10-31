@@ -406,6 +406,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/outcomes/{outcome_id}/interval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Outcome Interval
+         * @description Return an outcome's stored band and its provenance (B3.2).
+         *
+         *     ``band: null`` means the score carries no band at all — an estimate or an
+         *     unscored outcome — which is a distinct state from a zero-width band. A
+         *     stored band reports the sample, seed, confidence level, method and
+         *     computed-at it was recorded with, plus whether a later snapshot moved the
+         *     score it came from, so a consumer never presents a stale band as current.
+         */
+        get: operations["get_outcome_interval_api_outcomes__outcome_id__interval_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/signals": {
         parameters: {
             query?: never;
@@ -2617,6 +2643,41 @@ export interface operations {
         parameters: {
             query?: {
                 since?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcome_interval_api_outcomes__outcome_id__interval_get: {
+        parameters: {
+            query?: {
                 mcp_url?: string | null;
             };
             header?: never;

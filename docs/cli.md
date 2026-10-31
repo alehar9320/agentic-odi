@@ -224,6 +224,14 @@ the detail view carries the same "why" as the history. When no reason was
 recorded, or the outcome has no history yet, the line is omitted rather than
 shown empty.
 
+`get` also shows the stored band and its provenance as `band` lines: the bounds,
+the sample (`band n`), the confidence level, the seed, the method and the
+computed-at. A score with no band — an estimate or an unscored outcome — reads
+`band  none`, never as a zero-width range. `band stale` is `yes` when a later
+snapshot moved the score the band was computed from, so a band is never read as
+current when it is not. The same shape is available as a tool
+(`get_outcome_interval`) and over HTTP at `GET /api/outcomes/{id}/interval`.
+
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
 agentic-odi summary <job-id> --top 3 --json

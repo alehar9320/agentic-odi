@@ -102,7 +102,12 @@ count stays unknown — the CLI renders it as `est.`, never `n=0` — and an
 A score is a number with a **range**, not a point. Importing a survey with
 `odi survey import <csv>` lands each outcome's mean, its sample and a bootstrap
 band from the real paired responses; editing the score without a fresh band
-clears the stale one, so a new number never carries an old range.
+clears the stale one, so a new number never carries an old range. A stored band
+is readable with its provenance — sample, seed, confidence level, method and
+computed-at, plus whether a later snapshot moved the score — through
+`odi desired-outcomes get`, the `get_outcome_interval` tool and
+`GET /api/outcomes/{id}/interval`. A score with no band reads as `no band`, not
+as a zero-width range, and a stale band says so.
 `odi top` answers "what should we build next?" from the measured section only —
 highest low end of the band first — naming the thin and unscored outcomes it
 left out, and `odi coverage` reports that split. An estimate can no longer

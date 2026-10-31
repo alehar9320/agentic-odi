@@ -1,3 +1,5 @@
+import type { OutcomeInterval } from "../types";
+
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -78,6 +80,23 @@ export function formatBand(outcome: BandMetadata): string {
     return method === "estimate" ? "no band" : `±0 (n=1)`;
   }
   return `${low.toFixed(1)}–${high.toFixed(1)}`;
+}
+
+/**
+ * Describe a stored band's provenance in one line, or say plainly that there is
+ * no band. Mirrors the CLI so both surfaces say the same thing: a no-band score
+ * reads "no band", and a stale band says so rather than presenting its bounds
+ * as current.
+ */
+export function formatBandProvenance(interval: OutcomeInterval | null): string {
+  const band = interval?.band;
+  if (!band) {
+    return "no band";
+  }
+  const confidence = `${(band.confidence_level * 100).toFixed(0)}%`;
+  const seed = band.seed == null ? "seed unrecorded" : `seed ${band.seed}`;
+  const stale = band.stale ? " · stale" : "";
+  return `n=${band.n} · ${confidence} · ${seed}${stale}`;
 }
 
 export type ConfidenceClass = "measured" | "thin" | "none";
