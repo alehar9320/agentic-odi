@@ -195,3 +195,59 @@ async def test_promote_evidence_rejects_an_unknown_target():
 
     text = res.content[0].text  # type: ignore[index]
     assert text == "Error: Unknown promotion target: slide"
+
+
+@pytest.mark.asyncio
+async def test_segment_lifecycle_over_mcp():
+    """The MCP surface exposes segments and strategy with the same guardrails."""
+    async with Client(mcp) as client:
+        job_id = await _new_job(client)
+        out = await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time it takes to publish a plugin when a release is ready",
+                "importance": 9,
+                "satisfaction": 3,
+            },
+        )
+        outcome_id = json.loads(out.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
+
+        created = await client.call_tool(
+            "add_segment",
+            {
+                "job_id": job_id,
+                "name": "Release engineers",
+                "criterion": "They own the publish step.",
+                "outcome_ids": [outcome_id],
+            },
+        )
+        segment_id = json.loads(created.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
+
+        profile = await client.call_tool("get_segment_profile", {"segment_id": segment_id})
+        payload = json.loads(profile.content[0].text)  # type: ignore[index]
+        assert payload["total_members"] == 1
+
+        # An underserved member can carry a differentiated strategy.
+        chosen = await client.call_tool(
+            "choose_strategy",
+            {
+                "segment_id": segment_id,
+                "kind": "differentiated",
+                "rationale": "The gap is real.",
+                "expected_effect": "Shorter publish time.",
+            },
+        )
+        assert "Strategy recorded" in chosen.content[0].text  # type: ignore[index]
+
+        listed = await client.call_tool("list_strategies", {"segment_id": segment_id})
+        assert len(json.loads(listed.content[0].text)) == 1  # type: ignore[index]
+
+        deleted = await client.call_tool("delete_segment", {"segment_id": segment_id})
+        assert "Segment deleted" in deleted.content[0].text  # type: ignore[index]
+        assert (
+            json.loads(  # type: ignore[index]
+                (await client.call_tool("list_segments", {"job_id": job_id})).content[0].text
+            )
+            == []
+        )

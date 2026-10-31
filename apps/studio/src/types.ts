@@ -126,6 +126,62 @@ export interface Bet {
   measured_at?: string | null;
 }
 
+export type SegmentOrigin = "manual" | "candidate";
+export type StrategyKind = "differentiated" | "disruptive" | "new_market";
+export type OpportunityBand = "underserved" | "appropriate" | "overserved" | "unscored";
+
+/** A named group of outcomes that share a job step or a service level (D1–D3). */
+export interface Segment {
+  id: string;
+  job_id: string;
+  name: string;
+  criterion: string;
+  outcome_ids: string[];
+  notes?: string | null;
+  origin: SegmentOrigin;
+  created_at: string;
+}
+
+/** One member of a segment profile, carrying its own measured band. */
+export interface SegmentOutcome {
+  outcome_id: string;
+  statement: string;
+  score: number | null;
+  band: OpportunityBand;
+}
+
+/**
+ * A segment's servability. ``measured_ratio`` is ``null`` when nothing is
+ * measured — never ``0`` — so "we did not look" cannot read as "we looked and
+ * found none". ``gaps`` names what is missing rather than hiding it.
+ */
+export interface SegmentProfile {
+  segment_id: string;
+  segment_name: string;
+  total_members: number;
+  measured_count: number;
+  unscored_count: number;
+  missing_count: number;
+  underserved_count: number;
+  appropriate_count: number;
+  overserved_count: number;
+  top_underserved: SegmentOutcome[];
+  top_overserved: SegmentOutcome[];
+  measured_ratio: number | null;
+  gaps: string[];
+}
+
+/** A decision about how to serve a segment, with its rationale (D4). */
+export interface Strategy {
+  id: string;
+  segment_id: string;
+  kind: StrategyKind;
+  rationale: string;
+  expected_effect: string;
+  chosen_at: string;
+  superseded_by?: string | null;
+}
+
 export interface Thesis {
   id: string;
   outcome_id: string;

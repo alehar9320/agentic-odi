@@ -187,3 +187,111 @@ def test_brief_export_omits_worth_when_no_value_recorded(tmp_path) -> None:
     assert result.exit_code == 0, result.output
     assert "worth is unknown, not zero" in result.output
     assert "(market, sized)" not in result.output
+
+
+def test_brief_export_shows_the_recorded_strategy(tmp_path) -> None:
+    """The exported case must carry the strategy, like the service's own brief.
+
+    The CLI assembles its own ``BriefInput``; if it forgets to select the
+    strategy, the section silently vanishes from the file while the core brief
+    still renders it.
+    """
+    db = str(tmp_path / "studio.db")
+    job = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "Publish a plugin", "--json"])
+    job_id = json.loads(job.output)["id"]
+    outcome = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "add",
+            "--job-id",
+            job_id,
+            "--statement",
+            "Minimize the time it takes to publish a plugin when a release is ready",
+            "--importance",
+            "9",
+            "--satisfaction",
+            "2",
+            "--json",
+        ],
+    )
+    outcome_id = json.loads(outcome.output)["id"]
+
+    added = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "segments",
+            "add",
+            "--job-id",
+            job_id,
+            "--name",
+            "Release engineers",
+            "--criterion",
+            "They own the publish step.",
+            "--outcome-id",
+            outcome_id,
+            "--json",
+        ],
+    )
+    assert added.exit_code == 0, added.output
+    segment_id = json.loads(added.output)["id"]
+
+    decided = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "decide",
+            "record",
+            "--job-id",
+            job_id,
+            "--choose",
+            outcome_id,
+            "--rationale",
+            "The publish path blocks every release.",
+            "--decided-by",
+            "alex",
+        ],
+    )
+    assert decided.exit_code == 0, decided.output
+
+    strategy = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "segments",
+            "strategy",
+            "--segment-id",
+            segment_id,
+            "--kind",
+            "differentiated",
+            "--rationale",
+            "The publish path blocks every release.",
+            "--expected-effect",
+            "Shorter publish time.",
+        ],
+    )
+    assert strategy.exit_code == 0, strategy.output
+
+    result = runner.invoke(app, ["--db", db, "brief", "export", "--job-id", job_id])
+
+    assert result.exit_code == 0, result.output
+    assert "## The strategy" in result.output
+    assert "- Kind: differentiated" in result.output
+    assert "- Segment: Release engineers" in result.output
+    assert "The publish path blocks every release." in result.output
+
+
+def test_brief_export_omits_the_strategy_section_when_none_is_recorded(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id = _seed(db)
+
+    result = runner.invoke(app, ["--db", db, "brief", "export", "--job-id", job_id])
+
+    assert result.exit_code == 0, result.output
+    assert "## The strategy" not in result.output

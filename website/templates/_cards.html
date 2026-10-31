@@ -1,5 +1,5 @@
 {#
-  The twelve ODI cards the agent may compose, rendered as the shipped catalog
+  The thirteen ODI cards the agent may compose, rendered as the shipped catalog
   renders them. These are the agent's closed catalog — a stable contract —
   not the Studio's canvas view names, which are in flux.
 #}
@@ -216,6 +216,37 @@
 </article>
 {% endmacro %}
 
+{% macro segment_profile(data) %}
+<article class="surface" data-surface="segment-profile">
+  <div class="surface__head">
+    <span class="surface__id">Segment</span>
+    <span class="pill">{{ data.total_members }} members</span>
+  </div>
+  <p class="surface__statement">{{ data.title }}</p>
+  <div class="surface__scores">
+    <span>Measured {{ data.measured_count }}</span>
+    <span aria-hidden="true">·</span>
+    <span>Underserved {{ data.underserved_count }}</span>
+    <span aria-hidden="true">·</span>
+    <span>Overserved {{ data.overserved_count }}</span>
+  </div>
+  {% if data.top_underserved %}
+  <div class="stack">
+    {% for row in data.top_underserved %}
+    <div class="surface__row">
+      <p class="surface__statement">{{ row.statement | default(row.outcome_id) }}</p>
+      <div class="surface__scores">
+        <span>{{ row.band }}</span>
+        <span aria-hidden="true">·</span>
+        <span>{{ row.score if row.score is defined else "not measured" }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</article>
+{% endmacro %}
+
 {#
   Dispatch a card by its catalog type. Every type the catalog can produce
   has a macro above; anything unknown falls back to nothing rather than
@@ -231,6 +262,7 @@
   {% elif card.type == "decision-record" %}{{ decision_record(card.data) }}
   {% elif card.type == "decision-review" %}{{ decision_review(card.data) }}
   {% elif card.type == "bet" %}{{ bet(card.data) }}
+  {% elif card.type == "segment-profile" %}{{ segment_profile(card.data) }}
   {% elif card.type == "opportunity-brief" %}{{ opportunity_brief(card.data) }}
   {% elif card.type == "outcome-compare" %}{{ outcome_compare(card.data) }}
   {% endif %}

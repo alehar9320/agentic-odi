@@ -17,6 +17,7 @@ const DOMAIN_CARDS = [
   "decision-record",
   "decision-review",
   "bet",
+  "segment-profile",
 ];
 
 function expectOk(spec: unknown) {

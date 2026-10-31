@@ -487,5 +487,6 @@ def test_page_weights_are_within_budget(page: str):
     # and each entity we add. The budget is a tripwire, not a target. Raised for
     # pillar 3, which added the decision-review, score-history and bet tools plus
     # the ScoreSnapshot and Bet entities, on top of the scheduled-work and signal
-    # tools already on the page.
-    assert size <= 100 * 1024, f"{page}: {size} bytes"
+    # tools already on the page. Raised again for the segments/strategy tools and
+    # the Segment/Strategy entities the D increments added.
+    assert size <= 118 * 1024, f"{page}: {size} bytes"

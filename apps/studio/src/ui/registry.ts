@@ -11,6 +11,7 @@ import {
   OpportunityBrief,
   OutcomeCompare,
   Roadmap,
+  SegmentProfile,
   OpportunityThesis,
   OutcomeCard,
 } from "./cards";
@@ -55,4 +56,5 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
   "decision-record": DecisionRecord,
   "decision-review": DecisionReview,
   bet: Bet,
+  "segment-profile": SegmentProfile,
 };

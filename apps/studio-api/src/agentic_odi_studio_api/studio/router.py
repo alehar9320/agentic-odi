@@ -23,6 +23,7 @@ from agentic_odi_core import (
     OutcomeNotFoundError,
     OutcomeStatementError,
     Rejection,
+    SegmentNotFoundError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
@@ -60,10 +61,12 @@ from agentic_odi_studio_api.studio.probes import (
     list_models,
 )
 from agentic_odi_studio_api.studio.schemas import (
+    AcceptSegmentCandidateRequest,
     AddConnectorRequest,
     AddCustomerOutcomeRequest,
     AddEvidenceRequest,
     AddOutcomeRequest,
+    AddSegmentRequest,
     AddStepRequest,
     AdvanceBetRequest,
     ApprovalDecisionRequest,
@@ -71,6 +74,7 @@ from agentic_odi_studio_api.studio.schemas import (
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
+    ChooseStrategyRequest,
     ConnectorListItem,
     ConnectorOperationResponse,
     ConversationResponse,
@@ -711,6 +715,198 @@ async def post_bet_advance(bet_id: str, body: AdvanceBetRequest, request: Reques
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return bet.model_dump(mode="json")
+
+
+@router.post("/segments")
+async def post_segment(body: AddSegmentRequest, request: Request) -> dict:
+    """Create a segment from its member outcomes."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.ADD_SEGMENT.value,
+            {
+                "job_id": body.job_id,
+                "name": body.name,
+                "criterion": body.criterion,
+                "outcome_ids": body.outcome_ids,
+                "notes": body.notes,
+                "origin": body.origin.value,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        segment = _service(request).add_segment(
+            job_id=body.job_id,
+            name=body.name,
+            criterion=body.criterion,
+            outcome_ids=body.outcome_ids,
+            notes=body.notes,
+            origin=body.origin,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return segment.model_dump(mode="json")
+
+
+@router.get("/segments")
+async def get_segments(
+    request: Request,
+    job_id: str | None = Query(None),
+) -> list[dict]:
+    try:
+        segments = _service(request).list_segments(job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return [s.model_dump(mode="json") for s in segments]
+
+
+@router.get("/segments/{segment_id}")
+async def get_segment(segment_id: str, request: Request) -> dict:
+    try:
+        segment = _service(request).get_segment(segment_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if segment is None:
+        raise _as_http_error(SegmentNotFoundError(segment_id))
+    return segment.model_dump(mode="json")
+
+
+@router.delete("/segments/{segment_id}")
+async def delete_segment(segment_id: str, request: Request) -> dict:
+    """Delete a segment. Outcomes are never touched."""
+    try:
+        _service(request).delete_segment(segment_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"deleted": segment_id}
+
+
+@router.get("/segments/{segment_id}/profile")
+async def get_segment_profile(segment_id: str, request: Request) -> dict:
+    """Read a segment's servability: underserved vs overserved, kept separate."""
+    try:
+        profile = _service(request).segment_profile(segment_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "segment_id": profile.segment_id,
+        "segment_name": profile.segment_name,
+        "total_members": profile.total_members,
+        "measured_count": profile.measured_count,
+        "unscored_count": profile.unscored_count,
+        "missing_count": profile.missing_count,
+        "underserved_count": profile.underserved_count,
+        "appropriate_count": profile.appropriate_count,
+        "overserved_count": profile.overserved_count,
+        "top_underserved": [
+            {"outcome_id": e.outcome_id, "statement": e.statement, "score": e.score, "band": e.band}
+            for e in profile.top_underserved
+        ],
+        "top_overserved": [
+            {"outcome_id": e.outcome_id, "statement": e.statement, "score": e.score, "band": e.band}
+            for e in profile.top_overserved
+        ],
+        "measured_ratio": profile.measured_ratio,
+        "gaps": list(profile.gaps),
+    }
+
+
+@router.get("/jobs/{job_id}/segment-candidates")
+async def get_segment_candidates(job_id: str, request: Request) -> dict:
+    """Propose segment candidates from the scores. Writes nothing."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(request.query_params.get("mcp_url", "")),
+            ToolName.SUGGEST_SEGMENTS.value,
+            {"job_id": job_id},
+        )
+        return _payload_from_text(result)
+    try:
+        candidates = _service(request).suggest_segments(job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "candidates": [
+            {
+                "name": c.name,
+                "members": list(c.members),
+                "rationale": c.rationale,
+                "evidence_count": c.evidence_count,
+                "segment": c.segment,
+                "decile": c.decile,
+                "fingerprint": c.fingerprint,
+            }
+            for c in candidates.candidates
+        ],
+        "reason": candidates.reason,
+    }
+
+
+@router.post("/segment-candidates/accept")
+async def post_accept_segment_candidate(
+    body: AcceptSegmentCandidateRequest, request: Request
+) -> dict:
+    """Accept a suggested candidate into a segment."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.ACCEPT_SEGMENT_CANDIDATE.value,
+            {
+                "job_id": body.job_id,
+                "fingerprint": body.fingerprint,
+                "name": body.name,
+                "criterion": body.criterion,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        segment = _service(request).accept_segment_candidate(
+            job_id=body.job_id,
+            fingerprint=body.fingerprint,
+            name=body.name,
+            criterion=body.criterion,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return segment.model_dump(mode="json")
+
+
+@router.post("/segments/{segment_id}/strategy")
+async def post_strategy(segment_id: str, body: ChooseStrategyRequest, request: Request) -> dict:
+    """Record a strategy for a segment, refusing one its data does not support."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.CHOOSE_STRATEGY.value,
+            {
+                "segment_id": segment_id,
+                "kind": body.kind.value,
+                "rationale": body.rationale,
+                "expected_effect": body.expected_effect,
+                "chosen_at": body.chosen_at,
+            },
+        )
+        return _payload_from_text(result)
+    try:
+        strategy = _service(request).choose_strategy(
+            segment_id=segment_id,
+            kind=body.kind,
+            rationale=body.rationale,
+            expected_effect=body.expected_effect,
+            chosen_at=body.chosen_at,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return strategy.model_dump(mode="json")
+
+
+@router.get("/strategies")
+async def get_strategies(request: Request, segment_id: str | None = Query(None)) -> list[dict]:
+    try:
+        strategies = _service(request).list_strategies(segment_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return [s.model_dump(mode="json") for s in strategies]
 
 
 @router.post("/jobs")

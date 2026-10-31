@@ -221,6 +221,12 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
 - "No fabricated numeral" tests must derive their allow-list **deterministically** from recorded
   inputs, computed scores, and structural positions. Pulling numerals out of a random UUID (as
   one pillar test did) makes the assertion pass by luck.
+- A **second assembly path is a second place to forget a section**. `render_brief` gained a
+  `strategy` field and `build_brief` supplied it, but the CLI's `brief export` builds its own
+  `BriefInput` from `run_tool` records and dropped it — the section vanished from the exported
+  file while the core brief still rendered it. When two callers assemble the same input, extract
+  the *selection* rule into a pure function in the core module and have both call it; do not
+  copy the rule.
 
 
 ## Merging `origin/main` into a long-lived feature branch

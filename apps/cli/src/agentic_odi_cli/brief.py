@@ -107,6 +107,8 @@ def assemble_brief_inputs(
     decisions: list[dict[str, Any]],
     *,
     generated_at: str,
+    segments: list[dict[str, Any]] | None = None,
+    strategies: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Shape the backend's records into the renderer's inputs.
 
@@ -134,6 +136,7 @@ def assemble_brief_inputs(
             }
         )
     consideration = None
+    chosen: list[str] = []
     if decisions:
         latest = decisions[-1]
         chosen = latest.get("chosen_outcome_ids") or []
@@ -144,8 +147,48 @@ def assemble_brief_inputs(
         "generated_at": generated_at,
         "outcomes": shaped,
         "decision_consideration": consideration,
+        "chosen_outcome_ids": chosen,
         "evidence_count": len(evidence),
+        "segments": segments or [],
+        "strategies": strategies or [],
     }
+
+
+def _select_strategy(brief_inputs: dict[str, Any]) -> Any:
+    """Pick the one strategy the brief shows, via the shared pure selector.
+
+    The CLI assembles its own ``BriefInput``, so it must apply the *same*
+    selection rule the service does — otherwise a recorded strategy shows in the
+    Studio's case but silently vanishes from the exported file.
+    """
+    from agentic_odi_core import (
+        BriefSegment,
+        BriefStrategyRecord,
+        select_brief_strategy,
+    )
+
+    segments = [
+        BriefSegment(
+            segment_id=segment["id"],
+            name=segment.get("name", ""),
+            outcome_ids=tuple(segment.get("outcome_ids") or []),
+        )
+        for segment in brief_inputs.get("segments", [])
+        if isinstance(segment.get("id"), str)
+    ]
+    strategies = [
+        BriefStrategyRecord(
+            strategy_id=strategy["id"],
+            segment_id=strategy.get("segment_id", ""),
+            chosen_at=strategy.get("chosen_at", ""),
+            kind=strategy.get("kind", ""),
+            rationale=strategy.get("rationale", ""),
+            expected_effect=strategy.get("expected_effect", ""),
+        )
+        for strategy in brief_inputs.get("strategies", [])
+        if isinstance(strategy.get("id"), str)
+    ]
+    return select_brief_strategy(brief_inputs.get("chosen_outcome_ids", []), segments, strategies)
 
 
 def _render(brief_inputs: dict[str, Any]) -> str:
@@ -175,6 +218,7 @@ def _render(brief_inputs: dict[str, Any]) -> str:
         outcomes=outcomes,
         decision_consideration=brief_inputs["decision_consideration"],
         evidence_count=brief_inputs["evidence_count"],
+        strategy=_select_strategy(brief_inputs),
     )
     return render_brief(brief)
 
@@ -200,6 +244,8 @@ def export(
     outcomes = run_tool("get_outcomes", {"job_id": job_id})
     evidence = run_tool("list_evidence", {"job_id": job_id})
     decisions = run_tool("list_decisions", {"job_id": job_id})
+    segments = run_tool("list_segments", {"job_id": job_id})
+    strategies = run_tool("list_strategies", {})
 
     brief_inputs = assemble_brief_inputs(
         job,
@@ -207,6 +253,8 @@ def export(
         evidence if isinstance(evidence, list) else [],
         decisions if isinstance(decisions, list) else [],
         generated_at=stamped_at,
+        segments=segments if isinstance(segments, list) else [],
+        strategies=strategies if isinstance(strategies, list) else [],
     )
     markdown = _render(brief_inputs)
     document = markdown if fmt == "md" else brief_to_html(markdown, source=f"job {job_id}")

@@ -20,8 +20,10 @@ from agentic_odi_core.models import (
     Outcome,
     ScheduledWork,
     ScoreSnapshot,
+    Segment,
     Signal,
     Step,
+    Strategy,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import (
@@ -65,6 +67,8 @@ class SQLiteRepository(Repository):
         self.score_snapshots: list[ScoreSnapshot] = []
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -131,6 +135,15 @@ class SQLiteRepository(Repository):
             self.bets[p["id"]] = Bet.model_validate(p)
         elif et == "BET_UPDATED":
             self._merge_updates(self.bets, p, Bet)
+        elif et == "SEGMENT_CREATED":
+            self.segments[p["id"]] = Segment.model_validate(p)
+        elif et == "SEGMENT_DELETED":
+            segment_id = p["id"]
+            self.segments.pop(segment_id, None)
+            for key in [k for k, v in self.strategies.items() if v.segment_id == segment_id]:
+                del self.strategies[key]
+        elif et == "STRATEGY_RECORDED":
+            self.strategies[p["id"]] = Strategy.model_validate(p)
         elif et == "SCORE_SNAPSHOT_RECORDED":
             self.score_snapshots.append(ScoreSnapshot.model_validate(p))
         elif et == "EVIDENCE_CREATED":
@@ -173,6 +186,10 @@ class SQLiteRepository(Repository):
                 or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
             ]:
                 del self.evidence[key]
+            for key in [k for k, v in self.segments.items() if v.job_id == job_id]:
+                del self.segments[key]
+            for key in [k for k, v in self.strategies.items() if v.segment_id not in self.segments]:
+                del self.strategies[key]
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
@@ -606,6 +623,72 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return self.bets.get(bet_id)
+
+    def add_segment(self, segment: Segment) -> Segment:
+        with self._lock:
+            self.store.append(
+                "SEGMENT_CREATED",
+                segment.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return segment
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        with self._lock:
+            self._sync()
+            return self.segments.get(segment_id)
+
+    def list_segments(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Segment]:
+        with self._lock:
+            self._sync()
+            items = list(self.segments.values())
+            if job_id is not None:
+                items = [s for s in items if s.job_id == job_id]
+            return page(items, limit, offset)
+
+    def delete_segment(self, segment_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if segment_id not in self.segments:
+                return False
+            self.store.append(
+                "SEGMENT_DELETED",
+                {"id": segment_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
+
+    def add_strategy(self, strategy: Strategy) -> Strategy:
+        with self._lock:
+            self.store.append(
+                "STRATEGY_RECORDED",
+                strategy.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return strategy
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        with self._lock:
+            self._sync()
+            return self.strategies.get(strategy_id)
+
+    def list_strategies(
+        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Strategy]:
+        with self._lock:
+            self._sync()
+            items = list(self.strategies.values())
+            if segment_id is not None:
+                items = [s for s in items if s.segment_id == segment_id]
+            return page(items, limit, offset)
 
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
         with self._lock:

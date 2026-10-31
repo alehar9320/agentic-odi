@@ -14,8 +14,10 @@ from agentic_odi_core.models import (
     Outcome,
     ScheduledWork,
     ScoreSnapshot,
+    Segment,
     Signal,
     Step,
+    Strategy,
 )
 
 _Item = TypeVar("_Item")
@@ -93,6 +95,8 @@ class Repository(Protocol):
     score_snapshots: list[ScoreSnapshot]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
+    segments: dict[str, Segment]
+    strategies: dict[str, Strategy]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -155,6 +159,17 @@ class Repository(Protocol):
         offset: int = 0,
     ) -> list[Bet]: ...
     def update_bet(self, bet_id: str, updates: dict) -> Bet | None: ...
+    def add_segment(self, segment: Segment) -> Segment: ...
+    def get_segment(self, segment_id: str) -> Segment | None: ...
+    def list_segments(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Segment]: ...
+    def delete_segment(self, segment_id: str) -> bool: ...
+    def add_strategy(self, strategy: Strategy) -> Strategy: ...
+    def get_strategy(self, strategy_id: str) -> Strategy | None: ...
+    def list_strategies(
+        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Strategy]: ...
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot: ...
     def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]: ...
     def add_signal(self, signal: Signal) -> Signal: ...
@@ -189,6 +204,8 @@ class InMemoryRepository:
         self.score_snapshots: list[ScoreSnapshot] = []
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -240,6 +257,10 @@ class InMemoryRepository:
             or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
         ]:
             del self.evidence[key]
+        for key in [k for k, v in self.segments.items() if v.job_id == job_id]:
+            del self.segments[key]
+        for key in [k for k, v in self.strategies.items() if v.segment_id not in self.segments]:
+            del self.strategies[key]
         return True
 
     def add_step(self, step: Step) -> Step:
@@ -333,6 +354,10 @@ class InMemoryRepository:
             for key in [k for k, v in self.bets.items() if v.outcome_id == outcome_id]:
                 del self.bets[key]
             self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
+            # A segment's stored membership is left as-is: a member that no
+            # longer resolves is a visible gap the profile reports (D3), not a
+            # silent edit to what the person approved. Deleting an outcome never
+            # rewrites a segment.
             return True
         return False
 
@@ -467,6 +492,47 @@ class InMemoryRepository:
         new_bet = bet.model_validate(current)
         self.bets[bet_id] = new_bet
         return new_bet
+
+    def add_segment(self, segment: Segment) -> Segment:
+        self.segments[segment.id] = segment
+        return segment
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        return self.segments.get(segment_id)
+
+    def list_segments(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Segment]:
+        items = list(self.segments.values())
+        if job_id is not None:
+            items = [s for s in items if s.job_id == job_id]
+        # Insertion order, so a segment list is stable across a reload.
+        return page(items, limit, offset)
+
+    def delete_segment(self, segment_id: str) -> bool:
+        # Deleting a segment never touches an outcome: the segment was a lens on
+        # the outcomes, not their owner. Its strategies go with it.
+        if segment_id not in self.segments:
+            return False
+        del self.segments[segment_id]
+        for key in [k for k, v in self.strategies.items() if v.segment_id == segment_id]:
+            del self.strategies[key]
+        return True
+
+    def add_strategy(self, strategy: Strategy) -> Strategy:
+        self.strategies[strategy.id] = strategy
+        return strategy
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        return self.strategies.get(strategy_id)
+
+    def list_strategies(
+        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Strategy]:
+        items = list(self.strategies.values())
+        if segment_id is not None:
+            items = [s for s in items if s.segment_id == segment_id]
+        return page(items, limit, offset)
 
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
         self.score_snapshots.append(snapshot)

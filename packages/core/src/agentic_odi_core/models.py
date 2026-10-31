@@ -392,6 +392,74 @@ class Bet(BaseModel):
         return self.status in TERMINAL_BET_STATUSES
 
 
+class SegmentOrigin(str, Enum):
+    """Where a segment came from: a person typed it, or a person accepted a candidate."""
+
+    MANUAL = "manual"
+    CANDIDATE = "candidate"
+
+
+class Segment(BaseModel):
+    """A named group defined by the outcomes it cares about (D1/ALH-40).
+
+    Never by demographics: outcome-based segmentation is the method's actual
+    claim, and a demographics column would make the feature wrong rather than
+    merely incomplete. ``outcome_ids`` is the stored membership, so a segment
+    means the same thing next quarter; ``criterion`` is free text saying *why*
+    the group is coherent. The members are the definition — not a filter
+    re-evaluated on read.
+
+    ``origin`` records whether a person typed the segment or accepted a derived
+    candidate (D2.2/ALH-161); a hand-made and an accepted segment differ only
+    here, so both stay ordinary segments.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str = Field(..., description="The Job this segment's members belong to")
+    name: str = Field(..., min_length=1, description="The segment's name")
+    criterion: str = Field(
+        ..., min_length=1, description="Why this group is coherent — free text, never a filter"
+    )
+    outcome_ids: list[str] = Field(
+        ..., min_length=1, description="The member Outcome IDs that define the segment"
+    )
+    notes: str | None = Field(None, description="Optional free-text notes")
+    origin: SegmentOrigin = Field(
+        SegmentOrigin.MANUAL, description="manual, or candidate when accepted from a proposal"
+    )
+    candidate_fingerprint: str | None = Field(
+        None, description="The accepted candidate's stable fingerprint, when origin is candidate"
+    )
+
+
+class StrategyKind(str, Enum):
+    """The three ODI strategy paths (D4/ALH-43). There is no fourth."""
+
+    DIFFERENTIATED = "differentiated"
+    DISRUPTIVE = "disruptive"
+    NEW_MARKET = "new_market"
+
+
+class Strategy(BaseModel):
+    """A recorded strategy for a segment, with the reasoning and expected effect.
+
+    The kind is stored with the rationale so the choice is not a slogan: the
+    guardrail in ``services.choose_strategy`` refuses a kind whose data
+    precondition the segment's profile does not meet.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    segment_id: str = Field(..., description="The Segment this strategy is for")
+    kind: StrategyKind = Field(..., description="differentiated, disruptive, or new_market")
+    rationale: str = Field(
+        ..., min_length=1, description="Why this strategy, in the caller's words"
+    )
+    chosen_at: str = Field(..., description="ISO-8601 timestamp, supplied at write time")
+    expected_effect: str = Field(
+        ..., min_length=1, description="What the caller expects this to change"
+    )
+
+
 class SignalKind(str, Enum):
     """The facts a signal may report. Every kind here has a real producer."""
 

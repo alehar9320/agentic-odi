@@ -124,3 +124,94 @@ def test_deleting_a_job_cascades_identically_in_both_stores(tmp_path) -> None:
     assert replayed.list_bets() == memory_service.list_bets() == []
     assert replayed.list_score_snapshots() == memory_service.list_score_snapshots() == []
     replayed.repo.close()
+
+
+def _normalise(record: dict) -> dict:
+    """Replace random ids with their position so two builds compare.
+
+    A segment's member ids are freshly generated per build, so the cross-store
+    assertion is over structure: the same name, criterion, origin and *shape* of
+    membership. Reload parity (below) keeps the real ids.
+    """
+    normalised = {k: v for k, v in record.items() if not k.endswith("_id") and k != "id"}
+    members = normalised.pop("outcome_ids", None)
+    if members is not None:
+        normalised["member_count"] = len(members)
+    return normalised
+
+
+def _build_segment(service: ODIService):
+    """One job with three underserved outcomes, a segment, and a strategy."""
+    job = service.add_job("Publish a plugin")
+    outcomes = [
+        service.add_outcome(job.id, _STATEMENT, 9.0, 3.0, at="2026-01-01T00:00:00Z"),
+        service.add_outcome(
+            job.id,
+            "Minimize the cost of supporting a plugin when it ships",
+            9.0,
+            2.0,
+            at="2026-01-01T00:00:00Z",
+        ),
+        service.add_outcome(
+            job.id,
+            "Minimize the time it takes to resolve a support ticket after a bug",
+            9.0,
+            4.0,
+            at="2026-01-01T00:00:00Z",
+        ),
+    ]
+    segment = service.add_segment(
+        job.id,
+        "Release engineers",
+        "They own the publish step.",
+        [o.id for o in outcomes],
+        origin="manual",
+    )
+    strategy = service.choose_strategy(
+        segment.id,
+        "differentiated",
+        rationale="The publish path blocks every release.",
+        expected_effect="Shorter publish time.",
+        chosen_at="2026-01-05T00:00:00Z",
+    )
+    return job, outcomes, segment, strategy
+
+
+def test_in_memory_and_sqlite_read_back_the_same_segments_and_strategies(tmp_path) -> None:
+    memory_service = ODIService(InMemoryRepository())
+    _, _, memory_segment, memory_strategy = _build_segment(memory_service)
+
+    path = str(tmp_path / "segments.db")
+    sqlite_service = ODIService(SQLiteRepository(db_path=path))
+    _, _, sqlite_segment, sqlite_strategy = _build_segment(sqlite_service)
+    sqlite_service.repo.commit()
+    sqlite_service.repo.close()
+
+    replayed = ODIService(SQLiteRepository(db_path=path))
+    stored_segment = replayed.get_segment(sqlite_segment.id)
+    assert stored_segment is not None
+    assert _normalise(stored_segment.model_dump(mode="json")) == _normalise(
+        memory_segment.model_dump(mode="json")
+    )
+    stored_strategy = replayed.get_strategy(sqlite_strategy.id)
+    assert stored_strategy is not None
+    assert _normalise(stored_strategy.model_dump(mode="json")) == _normalise(
+        memory_strategy.model_dump(mode="json")
+    )
+    replayed.repo.close()
+
+
+def test_deleting_a_segment_removes_its_strategies_across_replay(tmp_path) -> None:
+    path = str(tmp_path / "segment-delete.db")
+    service = ODIService(SQLiteRepository(db_path=path))
+    _, outcomes, segment, _ = _build_segment(service)
+    service.delete_segment(segment.id)
+    service.repo.commit()
+    service.repo.close()
+
+    replayed = ODIService(SQLiteRepository(db_path=path))
+    assert replayed.list_segments() == []
+    assert replayed.list_strategies() == []
+    # The outcomes survive: the segment was a lens, not their owner.
+    assert all(replayed.get_outcome(o.id) is not None for o in outcomes)
+    replayed.repo.close()

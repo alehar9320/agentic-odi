@@ -399,7 +399,7 @@ tool is available in this environment, so it ran inline via
 `superpowers:executing-plans`, preserving the review rigor (tests, ruff, mypy,
 studio suite, whole-branch self-review).
 
-**Status: M1 complete on branch. W1 complete.**
+**Status: M1 complete on branch. W1 complete. D complete.**
 
 Commits on `alexanderharenstam/alh-8-pillar-3-decide-this-not-that-and-here-is-why`:
 
@@ -414,6 +414,7 @@ Commits on `alexanderharenstam/alh-8-pillar-3-decide-this-not-that-and-here-is-w
 | `439e6a1` | B6 blocker record |
 | `a38bef7` | C8, E1 |
 | `5b4bd74` | pillar end-to-end acceptance test + `PATCH` alignment |
+| `5714255` | D1–D4 (ALH-40/41/161/42/43) + CLI brief strategy parity |
 
 On `alexanderharenstam/alh-64-w1-what-is-this-opportunity-worth`:
 
@@ -469,7 +470,51 @@ remain deferred by the plan; this fix is confined to C4's exported-case parity.
 - W1: the estimate is a caller judgement, never score-derived, never summed;
   `market`/`pilot` requires a named source; unsized ≠ 0.
 
-**Deferred (own specs, sequenced after M1)** — not implemented here: D1–D4
-segments/strategy, M3 narrative/memo/challenge/portfolio, M4 collaboration and
-role-policy rollout, and W1's split capture/display/ordering children
-(ALH-186/188/189).
+**Deferred (own specs, sequenced after M1)** — not implemented here: M3
+narrative/memo/challenge/portfolio, M4 collaboration and role-policy rollout,
+and W1's split capture/display/ordering children (ALH-186/188/189).
+
+## D increments — segments and strategy (ALH-40/41/161/42/43)
+
+Landed after M1 and W1 on the same branch, once the services they expose were
+ready. Each increment is a thin adapter over one shared `ODIService` call.
+
+| Increment | Slice | Surface |
+|---|---|---|
+| D1 · ALH-40 | `Segment` entity, membership validation, cascade delete | core, CLI `segments add\|list\|show\|delete` |
+| D2 · ALH-41 | `segmentation.py` deterministic candidate derivation | core, CLI `segments suggest` |
+| D2.2 · ALH-161 | fingerprint-matched acceptance, `SegmentOrigin` | core, CLI `segments accept` |
+| D3 · ALH-42 | `segment_profile.py` underserved/overserved split | core, CLI `segments profile`, segment-profile card |
+| D4 · ALH-43 | `Strategy` entity with per-kind guardrails, brief integration | core, CLI `segments strategy\|strategies` |
+
+Readiness choices pinned (recorded, not inferred):
+
+- **Membership is stored, never re-derived.** A segment is its explicit
+  `outcome_ids`; duplicate ids collapse to one keeping first-seen order, and a
+  cross-job or missing member is refused before any write.
+- **A suggestion is a read.** `suggest_segments` persists nothing; acceptance is
+  the only write, matched by the candidate's stable fingerprint. A fingerprint
+  whose membership has changed is refused as *stale* rather than accepting a
+  different group, and repeat acceptance returns the existing segment.
+- **A ratio of nothing is not zero.** `measured_ratio` is `measured / total` with
+  the denominator stated as member outcomes (never a respondent sample); with no
+  measured outcome it is `None` and `gaps` says why.
+- **A strategy is a claim with evidence.** `differentiated` needs ≥1 underserved
+  member, `disruptive` needs ≥1 overserved; `new_market` is refused while
+  alternatives evidence (M2-07/ALH-71) is absent, because an unchecked absence is
+  not a checked one. Each refusal names the missing condition.
+- **Deleting a segment never touches its outcomes**, only the lens on them; its
+  strategies go with it.
+
+**Surface-parity fix (found in a live CLI smoke, not the unit suites).**
+`render_brief` gained the `strategy` field and `ODIService.build_brief` supplied
+it, but the CLI `brief export` adapter assembles its own `BriefInput` from
+`run_tool` records and dropped it — the section rendered in the Studio's case and
+vanished from the exported file, contradicting D4's "a strategy appears in the
+brief" criterion. The *selection* rule (which segment's strategy a decision
+shows) is now the pure `brief.select_brief_strategy`; both `build_brief` and the
+CLI call it, so the two paths cannot drift. Pinned with CLI tests for the present
+and absent cases and a direct selector unit test.
+
+Deferred to their own increments: MCP adapters [ALH-182], roadmap ordering
+[ALH-184]. Both wait for the services above and are not implemented here.

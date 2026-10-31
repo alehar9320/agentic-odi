@@ -12,7 +12,14 @@ from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
 
-from agentic_odi_core.brief import BriefInput, BriefOutcome
+from agentic_odi_core.brief import (
+    BriefInput,
+    BriefOutcome,
+    BriefSegment,
+    BriefStrategy,
+    BriefStrategyRecord,
+    select_brief_strategy,
+)
 from agentic_odi_core.compare import (
     MAX_COMPARE_OUTCOMES,
     MIN_COMPARE_OUTCOMES,
@@ -49,9 +56,13 @@ from agentic_odi_core.models import (
     ScheduledWorkTriggerType,
     ScoreMethod,
     ScoreSnapshot,
+    Segment,
+    SegmentOrigin,
     Signal,
     SignalKind,
     Step,
+    Strategy,
+    StrategyKind,
     ValueBasis,
     ValueUnit,
     compute_opportunity_score,
@@ -59,6 +70,11 @@ from agentic_odi_core.models import (
 from agentic_odi_core.repository import Repository, page
 from agentic_odi_core.review import DecisionReview, review_decision
 from agentic_odi_core.roadmap import Roadmap, build_roadmap
+from agentic_odi_core.segment_profile import SegmentProfile, build_segment_profile
+from agentic_odi_core.segmentation import (
+    SegmentCandidateSet,
+    suggest_segment_candidates,
+)
 
 
 class JobNotFoundError(NotFoundError):
@@ -107,6 +123,18 @@ class ScheduledWorkNotFoundError(NotFoundError, ValueError):
     def __init__(self, work_id: str, hint: str | None = None) -> None:
         self.work_id = work_id
         super().__init__(work_id, "scheduled work", hint)
+
+
+class SegmentNotFoundError(NotFoundError):
+    def __init__(self, segment_id: str) -> None:
+        self.segment_id = segment_id
+        super().__init__(segment_id, "segment")
+
+
+class StrategyNotFoundError(NotFoundError):
+    def __init__(self, strategy_id: str) -> None:
+        self.strategy_id = strategy_id
+        super().__init__(strategy_id, "strategy")
 
 
 class EvidenceNotFoundError(NotFoundError, ValueError):
@@ -205,6 +233,22 @@ def _now_iso() -> str:
     pure renderer and derivation takes its clock as an argument instead.
     """
     return datetime.now(timezone.utc).isoformat()
+
+
+def _normalise_member_ids(outcome_ids: list[str]) -> list[str]:
+    """Deduplicate member ids, keeping first-seen order.
+
+    A repeated id is the same member twice, not two members; storing it twice
+    would inflate every count built on the segment.
+    """
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for outcome_id in outcome_ids:
+        if outcome_id in seen:
+            continue
+        seen.add(outcome_id)
+        ordered.append(outcome_id)
+    return ordered
 
 
 def _require_finite(value: float, field: str) -> None:
@@ -1086,6 +1130,237 @@ class ODIService:
             updates["measured_at"] = at or _now_iso()
         return self.repo.update_bet(bet_id, updates) or bet
 
+    # ---------------------------------------------------------------- segments
+
+    def add_segment(
+        self,
+        job_id: str,
+        name: str,
+        criterion: str,
+        outcome_ids: list[str],
+        notes: str | None = None,
+        origin: SegmentOrigin | str = SegmentOrigin.MANUAL,
+        candidate_fingerprint: str | None = None,
+    ) -> Segment:
+        """Create a segment: a named group defined by the outcomes it cares about.
+
+        Every member must belong to ``job_id``; a cross-job or missing member is
+        refused before any write, because a segment that spans jobs would corrupt
+        every profile built on it. Duplicate member ids are normalised to one
+        occurrence, keeping first-seen order. No demographic field exists, by
+        design — that is the method's actual claim.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        name = name.strip()
+        if not name:
+            raise ValidationError("A segment needs a name.")
+        criterion = criterion.strip()
+        if not criterion:
+            raise ValidationError("A segment needs a criterion saying why the group is coherent.")
+
+        members = _normalise_member_ids(outcome_ids)
+        if not members:
+            raise ValidationError("A segment needs at least one member outcome.")
+        for outcome_id in members:
+            outcome = self.repo.get_outcome(outcome_id)
+            if outcome is None:
+                raise OutcomeNotFoundError(outcome_id)
+            if outcome.job_id != job_id:
+                raise ValidationError(
+                    f"Outcome {outcome_id} belongs to a different job; "
+                    "a segment's members must all come from its job."
+                )
+
+        try:
+            resolved_origin = SegmentOrigin(origin)
+        except ValueError as exc:
+            raise ValidationError(
+                f"Unknown segment origin: {origin!r}. "
+                f"Use one of {[o.value for o in SegmentOrigin]}."
+            ) from exc
+
+        segment = Segment(
+            job_id=job_id,
+            name=name,
+            criterion=criterion,
+            outcome_ids=members,
+            notes=notes,
+            origin=resolved_origin,
+            candidate_fingerprint=candidate_fingerprint,
+        )
+        return self.repo.add_segment(segment)
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        return self.repo.get_segment(segment_id)
+
+    def list_segments(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Segment]:
+        return self.repo.list_segments(job_id, limit=limit, offset=offset)
+
+    def delete_segment(self, segment_id: str) -> None:
+        """Delete a segment. Outcomes are never touched — only the lens on them."""
+        if not self.repo.delete_segment(segment_id):
+            raise SegmentNotFoundError(segment_id)
+
+    def suggest_segments(self, job_id: str) -> SegmentCandidateSet:
+        """Propose segment candidates from the scores. Persists nothing (D2).
+
+        The repository is untouched: a suggestion is a read, and the same
+        landscape yields the same candidates every time.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        outcomes = self.repo.get_outcomes(job_id, limit=None)
+        return suggest_segment_candidates(outcomes)
+
+    def accept_segment_candidate(
+        self,
+        job_id: str,
+        fingerprint: str,
+        name: str | None = None,
+        criterion: str | None = None,
+    ) -> Segment:
+        """Accept exactly the candidate the person saw (D2.2/ALH-161).
+
+        The candidate is recomputed from the current landscape and matched by its
+        stable fingerprint, so acceptance targets precisely the proposal that was
+        shown. A fingerprint that no longer matches is **stale** (membership
+        changed since it was suggested) and is refused with a message naming the
+        reason rather than silently accepting a different group.
+
+        Repeat acceptance is idempotent: a segment already created from this
+        fingerprint is returned instead of creating a second one, so a retry
+        cannot duplicate a segment. ``name`` and ``criterion`` are the
+        human-confirmed labels; they default to the candidate's own so acceptance
+        needs no extra typing.
+        """
+        candidates = self.suggest_segments(job_id)
+        match = next((c for c in candidates.candidates if c.fingerprint == fingerprint), None)
+        if match is None:
+            raise ValidationError(
+                "No candidate matches that fingerprint for this job; it is stale "
+                "(the scores changed since it was proposed). Suggest again and accept "
+                "the candidate you are shown."
+            )
+
+        for existing in self.repo.list_segments(job_id, limit=None):
+            if (
+                existing.origin is SegmentOrigin.CANDIDATE
+                and existing.candidate_fingerprint == fingerprint
+            ):
+                return existing
+
+        return self.add_segment(
+            job_id=job_id,
+            name=name if name is not None else match.name,
+            criterion=criterion if criterion is not None else match.rationale,
+            outcome_ids=list(match.members),
+            origin=SegmentOrigin.CANDIDATE,
+            candidate_fingerprint=fingerprint,
+        )
+
+    def segment_profile(self, segment_id: str) -> SegmentProfile:
+        """Read a segment's servability, split into underserved and overserved.
+
+        A read-only projection: nothing is written. A member that no longer
+        resolves is reported as a gap, never silently dropped.
+        """
+        segment = self.repo.get_segment(segment_id)
+        if segment is None:
+            raise SegmentNotFoundError(segment_id)
+        resolved: list[Outcome] = []
+        missing: list[str] = []
+        for outcome_id in segment.outcome_ids:
+            outcome = self.repo.get_outcome(outcome_id)
+            if outcome is None:
+                missing.append(outcome_id)
+            else:
+                resolved.append(outcome)
+        return build_segment_profile(segment, resolved, missing_ids=missing)
+
+    # -------------------------------------------------------------- strategies
+
+    def choose_strategy(
+        self,
+        segment_id: str,
+        kind: StrategyKind | str,
+        rationale: str,
+        expected_effect: str,
+        chosen_at: str | None = None,
+    ) -> Strategy:
+        """Record a strategy for a segment, refusing one its data does not support.
+
+        Each kind has a guardrail that fails with a message naming the missing
+        condition, so a strategy is a claim with evidence rather than a slogan:
+
+        * ``differentiated`` needs at least one underserved outcome in the segment.
+        * ``disruptive`` needs at least one overserved outcome.
+        * ``new_market`` needs an outcome with no evidence of an existing solution.
+          That evidence (alternatives data, ``M2-07``/``ALH-71``) is not in the
+          product yet, so the rule cannot distinguish an *unchecked* absence from
+          an explicit ``nothing`` alternative. Rather than treat unchecked absence
+          as proof, the write is refused and the missing evidence is named.
+        """
+        segment = self.repo.get_segment(segment_id)
+        if segment is None:
+            raise SegmentNotFoundError(segment_id)
+        try:
+            resolved_kind = StrategyKind(kind)
+        except ValueError as exc:
+            raise ValidationError(
+                f"Unknown strategy kind: {kind!r}. Use one of {[k.value for k in StrategyKind]}."
+            ) from exc
+        rationale = rationale.strip()
+        if not rationale:
+            raise ValidationError("A strategy needs a rationale.")
+        expected_effect = expected_effect.strip()
+        if not expected_effect:
+            raise ValidationError("A strategy needs an expected_effect.")
+
+        profile = self.segment_profile(segment_id)
+        if resolved_kind is StrategyKind.DIFFERENTIATED and profile.underserved_count < 1:
+            raise ValidationError(
+                "A differentiated strategy needs at least one underserved outcome "
+                "in the segment; this segment has none."
+            )
+        if resolved_kind is StrategyKind.DISRUPTIVE and profile.overserved_count < 1:
+            raise ValidationError(
+                "A disruptive strategy needs at least one overserved outcome "
+                "in the segment; this segment has none."
+            )
+        if resolved_kind is StrategyKind.NEW_MARKET:
+            raise ValidationError(
+                "A new-market strategy needs evidence that no existing solution "
+                "serves the outcome. That alternatives data is not recorded yet "
+                "(M2-07/ALH-71), so an unchecked absence cannot stand in for a "
+                "checked one. Record the alternatives first."
+            )
+
+        strategy = Strategy(
+            segment_id=segment_id,
+            kind=resolved_kind,
+            rationale=rationale,
+            chosen_at=chosen_at or _now_iso(),
+            expected_effect=expected_effect,
+        )
+        return self.repo.add_strategy(strategy)
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        return self.repo.get_strategy(strategy_id)
+
+    def list_strategies(
+        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Strategy]:
+        return self.repo.list_strategies(segment_id, limit=limit, offset=offset)
+
+    def latest_strategy(self, segment_id: str) -> Strategy | None:
+        """The most recently chosen strategy for a segment, or ``None``."""
+        history = self.repo.list_strategies(segment_id, limit=None)
+        history.sort(key=lambda s: (s.chosen_at, s.id))
+        return history[-1] if history else None
+
     # ------------------------------------------------------------------ review
 
     def review_decision(self, decision_id: str, *, today: date) -> DecisionReview:
@@ -1150,7 +1425,36 @@ class ODIService:
             outcomes=tuple(brief_outcomes),
             decision_consideration=consideration,
             evidence_count=len(self.repo.list_evidence(job_id=job_id)),
+            strategy=self._brief_strategy(job_id, decision),
         )
+
+    def _brief_strategy(self, job_id: str, decision: Decision | None) -> BriefStrategy | None:
+        """The recorded strategy to show in the brief, or ``None``.
+
+        Sourced from a segment whose membership overlaps the latest decision's
+        chosen outcomes — the segment the decision was actually about. With no
+        such segment, or no strategy on it, the brief omits the section rather
+        than showing a slogan. The selection rule is the shared pure
+        :func:`select_brief_strategy`, so the CLI's export path cannot drift.
+        """
+        if decision is None:
+            return None
+        segments = [
+            BriefSegment(segment_id=s.id, name=s.name, outcome_ids=tuple(s.outcome_ids))
+            for s in self.repo.list_segments(job_id, limit=None)
+        ]
+        strategies = [
+            BriefStrategyRecord(
+                strategy_id=s.id,
+                segment_id=s.segment_id,
+                chosen_at=s.chosen_at,
+                kind=s.kind.value,
+                rationale=s.rationale,
+                expected_effect=s.expected_effect,
+            )
+            for s in self.repo.list_strategies(limit=None)
+        ]
+        return select_brief_strategy(decision.chosen_outcome_ids, segments, strategies)
 
     def schedule_work(
         self,

@@ -54,7 +54,7 @@
     "id": "surfaces",
     "eyebrow": "The surfaces",
     "title": "The agent composes, it does not describe.",
-    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Twelve shapes, each one a thing you can act on.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Thirteen shapes, each one a thing you can act on.",
     "cards": [
       {
         "type": "outcome-card",
@@ -228,6 +228,26 @@
           "target": 17.0,
           "measure_by": "2026-04-01",
           "status": "running"
+        }
+      },
+      {
+        "type": "segment-profile",
+        "title": "Segment",
+        "blurb": "A group of outcomes that share a service level, with the underserved and overserved counts kept apart. A ratio of nothing reads not measured, never zero.",
+        "data": {
+          "title": "Finance leads on small teams",
+          "total_members": 6,
+          "measured_count": 5,
+          "underserved_count": 2,
+          "overserved_count": 1,
+          "top_underserved": [
+            {
+              "outcome_id": "OUT-1",
+              "statement": "Reconcile invoices without manual effort",
+              "score": 13.0,
+              "band": "underserved"
+            }
+          ]
         }
       },
       {

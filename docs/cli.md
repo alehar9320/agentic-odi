@@ -310,6 +310,52 @@ cannot drift. The outcome must be one the decision chose. `bets advance` moves a
 bet through `planned → running → measured` (or `abandoned`); an illegal
 transition is refused by name. `--at` pins the transition timestamp.
 
+## Segments and strategy
+
+```bash
+agentic-odi segments add --job-id JOB-1 --name "Release engineers" \
+  --criterion "They own the publish step." \
+  --outcome-id OUT-1 --outcome-id OUT-2
+agentic-odi segments list --job-id JOB-1
+agentic-odi segments show --segment-id SEG-1
+agentic-odi segments delete --segment-id SEG-1
+
+agentic-odi segments suggest --job-id JOB-1
+agentic-odi segments accept --job-id JOB-1 --fingerprint <fingerprint>
+
+agentic-odi segments profile --segment-id SEG-1
+
+agentic-odi segments strategy --segment-id SEG-1 --kind differentiated \
+  --rationale "The publish path blocks every release." \
+  --expected-effect "Shorter publish time."
+agentic-odi segments strategies --segment-id SEG-1
+```
+
+A segment is a named group defined by the outcomes it cares about — never by
+demographics. Every member must belong to the job; a cross-job or missing member
+is refused before any write, and duplicate ids collapse to one. Deleting a
+segment never touches its outcomes.
+
+`segments suggest` derives candidates deterministically from the scores: groups
+that share an opportunity band and an importance decile, at least three members
+each. It **writes nothing**. `segments accept` is the only write, and it targets
+exactly the candidate you saw by its fingerprint; a fingerprint whose membership
+has changed is refused as stale rather than accepting a different group, and
+repeating an acceptance returns the same segment instead of a second one.
+
+`segments profile` reads a segment's servability with the underserved and
+overserved halves kept separate. An empty segment reports zeroed counts; a
+segment with no scored outcome reports the ratio as `not measured`, never `0`,
+and says why.
+
+`segments strategy` records one of `differentiated`, `disruptive`, or
+`new_market` with its rationale and expected effect. Each kind is refused unless
+the segment's data supports it — a differentiated strategy needs an underserved
+outcome, a disruptive one needs an overserved outcome — and the message names
+the missing condition. `new_market` is refused while alternatives evidence
+(`M2-07`) is absent, because an unchecked absence is not proof that no solution
+exists. A recorded strategy renders into the brief's decision section.
+
 ## Inspect settings and feature flags
 
 ```bash

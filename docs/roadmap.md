@@ -42,3 +42,10 @@ As we validate the feasibility of this architecture, our next milestones include
   same projection behind the MCP tools, `odi decide`/`odi roadmap`/`odi review`/
   `odi bets`, the Studio API, and the Studio cards. A missing measurement stays
   `not measured` / `no evidence`, never `0` and never `no change`.
+- [x] **Segments and strategy**: Define a segment by the outcomes it cares about,
+  derive candidate groups deterministically from the scores, profile a segment's
+  underserved and overserved halves separately, and record a strategy only when
+  its evidence precondition holds — the same service behind `odi segments`, the
+  MCP tools, the Studio API, and the segment-profile card. A proposal writes
+  nothing until a person accepts it; an unscored ratio stays `not measured`,
+  never `0`.

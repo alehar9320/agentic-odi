@@ -4,7 +4,7 @@
 
 | Layer | Owns | Persists |
 |---|---|---|
-| `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `Decision`, `Bet`, `ScoreSnapshot`, `Signal`, `ODIService`, repository protocol | SQLite event log + snapshots |
+| `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `Decision`, `Bet`, `ScoreSnapshot`, `Segment`, `Strategy`, `Signal`, `ODIService`, repository protocol | SQLite event log + snapshots |
 | `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
 | `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | Via the same repository when the local backend is active; conversations and memory in `~/.agentic-odi/studio.db` |
 | `packages/connectors` | Connector protocol, presets, record mapping | Shared `connectors.json` registry; ingested batches land in an in-process sink |
@@ -48,7 +48,7 @@ apps/studio SPA
   -> StudioMemory (conversation turns + remembered observations)
 
 apps/studio SPA
-  -> GET /api/compare, /api/roadmap, /api/decisions
+  -> GET /api/compare, /api/roadmap, /api/decisions, /api/segments
   -> backend=local: ODIService -> Repository (pure derivation, no writes)
 
 apps/studio SPA

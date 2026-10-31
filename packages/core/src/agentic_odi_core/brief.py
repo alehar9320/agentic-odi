@@ -57,6 +57,95 @@ class BriefOutcome:
 
 
 @dataclass(frozen=True)
+class BriefStrategy:
+    """A recorded strategy, supplied to the brief (D4/ALH-43).
+
+    Every field is an input: the renderer never looks up a strategy, so the
+    brief stays a pure function of what the caller hands it. ``kind`` is a
+    string rather than the enum so ``brief.py`` keeps no dependency on the
+    service layer's model.
+    """
+
+    kind: str
+    rationale: str
+    expected_effect: str
+    segment_name: str
+
+
+@dataclass(frozen=True)
+class BriefSegment:
+    """A segment as the brief selector needs it (D4/ALH-43).
+
+    Supplied, never looked up: the selector is a pure function of its inputs.
+    """
+
+    segment_id: str
+    name: str
+    outcome_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class BriefStrategyRecord:
+    """One recorded strategy, before selection (D4/ALH-43)."""
+
+    strategy_id: str
+    segment_id: str
+    chosen_at: str
+    kind: str
+    rationale: str
+    expected_effect: str
+
+
+def select_brief_strategy(
+    chosen_outcome_ids: Sequence[str],
+    segments: Sequence[BriefSegment],
+    strategies: Sequence[BriefStrategyRecord],
+) -> BriefStrategy | None:
+    """The one strategy the brief should show, or ``None``.
+
+    The segment a decision is *about* is one whose membership overlaps the
+    decision's chosen outcomes; its latest strategy (by ``chosen_at``, then id)
+    is the candidate. Across several overlapping segments the latest candidate
+    wins, so the choice is deterministic and matches the service's derivation.
+    Pure: no repository access, so the CLI and the service cannot drift.
+    """
+    chosen = set(chosen_outcome_ids)
+    latest_by_segment: dict[str, BriefStrategyRecord] = {}
+    for record in strategies:
+        current = latest_by_segment.get(record.segment_id)
+        if current is None or (record.chosen_at, record.strategy_id) > (
+            current.chosen_at,
+            current.strategy_id,
+        ):
+            latest_by_segment[record.segment_id] = record
+
+    best: BriefStrategyRecord | None = None
+    for segment in segments:
+        if not chosen.intersection(segment.outcome_ids):
+            continue
+        candidate = latest_by_segment.get(segment.segment_id)
+        if candidate is None:
+            continue
+        if best is None or (candidate.chosen_at, candidate.strategy_id) > (
+            best.chosen_at,
+            best.strategy_id,
+        ):
+            best = candidate
+    if best is None:
+        return None
+    name = next(
+        (segment.name for segment in segments if segment.segment_id == best.segment_id),
+        best.segment_id,
+    )
+    return BriefStrategy(
+        kind=best.kind,
+        rationale=best.rationale,
+        expected_effect=best.expected_effect,
+        segment_name=name,
+    )
+
+
+@dataclass(frozen=True)
 class BriefInput:
     """Everything the brief renders, supplied by the caller."""
 
@@ -67,6 +156,9 @@ class BriefInput:
     decision_consideration: str | None = None
     evidence_count: int = 0
     holes: tuple[str, ...] = field(default_factory=tuple)
+    #: The recorded strategy for the decision's segment, when there is one. The
+    #: brief renders it; it never fetches it.
+    strategy: BriefStrategy | None = None
 
 
 def _escape(text: str) -> str:
@@ -230,6 +322,24 @@ def _fmt_value(value: float | None) -> str:
     return f"{value:g}"
 
 
+def _render_strategy(strategy: BriefStrategy | None) -> list[str]:
+    """*The strategy* — the recorded choice, its reason, and its expected effect.
+
+    Rendered only when a strategy is supplied. With none, the section is omitted
+    (not filled with a placeholder): "no strategy recorded" is the honest state,
+    and a slogan is worse than silence.
+    """
+    if strategy is None:
+        return []
+    lines = ["## The strategy", ""]
+    lines.append(f"- Kind: {_escape(strategy.kind)}")
+    lines.append(f"- Segment: {_escape(strategy.segment_name)}")
+    lines.append(f"- Why: {_escape(strategy.rationale)}")
+    lines.append(f"- Expected effect: {_escape(strategy.expected_effect)}")
+    lines.append("")
+    return lines
+
+
 def render_brief(brief: BriefInput) -> str:
     """Render the factual review case as markdown.
 
@@ -272,6 +382,7 @@ def render_brief(brief: BriefInput) -> str:
     lines.extend(_render_supported(selected))
     lines.extend(_render_build(selected))
     lines.extend(_render_value(selected))
+    lines.extend(_render_strategy(brief.strategy))
     lines.extend(_render_risks(brief.holes))
 
     lines.append("## Sources")

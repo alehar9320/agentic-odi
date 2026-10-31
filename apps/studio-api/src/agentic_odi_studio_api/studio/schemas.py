@@ -11,6 +11,8 @@ from agentic_odi_core.models import (
     DecisionConfidence,
     JobStage,
     ScoreMethod,
+    SegmentOrigin,
+    StrategyKind,
     ValueBasis,
     ValueUnit,
 )
@@ -161,6 +163,38 @@ class AdvanceBetRequest(BaseModel):
     status: BetStatus
     at: str | None = None
     mcp_url: str = ""
+
+
+class AddSegmentRequest(BaseModel):
+    """Create a segment from its member outcomes."""
+
+    mcp_url: str = ""
+    job_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    criterion: str = Field(min_length=1)
+    outcome_ids: list[str] = Field(min_length=1)
+    notes: str | None = None
+    origin: SegmentOrigin = SegmentOrigin.MANUAL
+
+
+class AcceptSegmentCandidateRequest(BaseModel):
+    """Accept a suggested candidate, matched by its stable fingerprint."""
+
+    mcp_url: str = ""
+    job_id: str = Field(min_length=1)
+    fingerprint: str = Field(min_length=1)
+    name: str | None = None
+    criterion: str | None = None
+
+
+class ChooseStrategyRequest(BaseModel):
+    """Record a strategy for a segment."""
+
+    mcp_url: str = ""
+    kind: StrategyKind
+    rationale: str = Field(min_length=1)
+    expected_effect: str = Field(min_length=1)
+    chosen_at: str | None = None
 
 
 class SignalActionRequest(BaseModel):

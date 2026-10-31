@@ -517,6 +517,70 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     },
     ["hypothesis", "baseline", "target", "measure_by", "status"],
   ),
+  entry(
+    "segment-profile",
+    "leaf",
+    "A segment's servability: how many members are measured, the underserved and overserved counts kept apart, and the top outcome on each side. A ratio of nothing renders as not measured, never zero. Render it once, then one sentence — never restate in prose what the card shows.",
+    {
+      title: { type: "string", description: "The segment's name." },
+      total_members: { type: "number", description: "How many outcomes the segment holds." },
+      measured_count: {
+        type: "number",
+        description: "Members with a measured score. The rest are unscored or missing.",
+      },
+      unscored_count: {
+        type: "number",
+        description: "Members whose scores exist but have no measured basis.",
+      },
+      missing_count: {
+        type: "number",
+        description: "Members whose outcome no longer exists. Named, never silently dropped.",
+      },
+      underserved_count: { type: "number" },
+      appropriate_count: { type: "number" },
+      overserved_count: { type: "number" },
+      measured_ratio: {
+        type: "number",
+        description:
+          "The measured share of the segment. Omitted or null when nothing is measured — never zero, because we did not look.",
+      },
+      top_underserved: {
+        type: "array",
+        description: "The strongest underserved outcomes, most severe first.",
+        items: {
+          type: "object",
+          properties: {
+            outcome_id: { type: "string" },
+            statement: { type: "string" },
+            score: { type: "number" },
+            band: { enum: ["underserved", "appropriate", "overserved", "unscored"] },
+          },
+        },
+      },
+      top_overserved: {
+        type: "array",
+        description: "The strongest overserved outcomes, most severe first.",
+        items: {
+          type: "object",
+          properties: {
+            outcome_id: { type: "string" },
+            statement: { type: "string" },
+            score: { type: "number" },
+            band: { enum: ["underserved", "appropriate", "overserved", "unscored"] },
+          },
+        },
+      },
+      strategy: {
+        type: "string",
+        description: "The recorded strategy for this segment, if one has been chosen.",
+      },
+      gaps: {
+        type: "array",
+        description: "What is missing or unscored, stated in words rather than hidden.",
+      },
+    },
+    ["total_members", "measured_count", "underserved_count", "overserved_count"],
+  ),
 ];
 
 const CATALOG_TYPES = new Set(CATALOG.map((component) => component.type));

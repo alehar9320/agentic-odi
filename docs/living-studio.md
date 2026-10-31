@@ -326,11 +326,11 @@ paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, the factual review case for a job, a
 two-outcome comparison, the outcome roadmap derived from recorded decisions, a
 before/after simulation of a bet, a customer quote with its lineage, the
-eight-stage job map, an opportunity thesis, a decision record, the review of a past decision, or a tracked bet.
+eight-stage job map, an opportunity thesis, a decision record, the review of a past decision, a tracked bet, or a segment profile.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and twelve cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and thirteen cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
@@ -367,6 +367,12 @@ The bet card is a recorded expectation: the hypothesis, the outcome it targets,
 the baseline captured at creation, the target, and the date to look. The baseline
 is stored at creation and never recomputed from the live score, so the starting
 point cannot drift.
+
+The segment-profile card is the strategy view: a segment's members, how many are
+measured, and the underserved and overserved halves kept separate. An empty
+segment reports zeroed counts; a segment with no scored outcome reports its ratio
+as `not measured`, never `0`, and says why. It is the same projection
+`odi segments profile` renders.
 
 The roadmap card is the decision artifact, drawn: one row per outcome a
 recorded decision chose, grouped by the quarter of its decision date, each row

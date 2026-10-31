@@ -856,6 +856,167 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return bet.model_dump(mode="json")
 
+    def _add_segment(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import (
+            JobNotFoundError,
+            OutcomeNotFoundError,
+            job_not_found,
+            outcome_not_found,
+        )
+
+        try:
+            segment = self.service.add_segment(
+                job_id=args["job_id"],
+                name=args["name"],
+                criterion=args["criterion"],
+                outcome_ids=list(args["outcome_ids"]),
+                notes=args.get("notes"),
+                origin=args.get("origin", "manual"),
+            )
+        except JobNotFoundError as exc:
+            raise BackendError(job_not_found(exc.resource_id)) from None
+        except OutcomeNotFoundError as exc:
+            raise BackendError(outcome_not_found(exc.outcome_id)) from None
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return segment.model_dump(mode="json")
+
+    def _get_segment(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import segment_not_found
+
+        segment = self.service.get_segment(args["segment_id"])
+        if segment is None:
+            raise BackendError(segment_not_found(args["segment_id"]))
+        return segment.model_dump(mode="json")
+
+    def _list_segments(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        segments = self.service.list_segments(
+            job_id=args.get("job_id"),
+            limit=args.get("limit"),
+            offset=args.get("offset", 0),
+        )
+        return [s.model_dump(mode="json") for s in segments]
+
+    def _delete_segment(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import SegmentNotFoundError, segment_not_found
+
+        try:
+            self.service.delete_segment(args["segment_id"])
+        except SegmentNotFoundError:
+            raise BackendError(segment_not_found(args["segment_id"])) from None
+        return {"deleted": args["segment_id"]}
+
+    def _suggest_segments(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        try:
+            result = self.service.suggest_segments(args["job_id"])
+        except JobNotFoundError as exc:
+            raise BackendError(job_not_found(exc.resource_id)) from None
+        return {
+            "candidates": [
+                {
+                    "name": c.name,
+                    "members": list(c.members),
+                    "rationale": c.rationale,
+                    "evidence_count": c.evidence_count,
+                    "segment": c.segment,
+                    "decile": c.decile,
+                    "fingerprint": c.fingerprint,
+                }
+                for c in result.candidates
+            ],
+            "reason": result.reason,
+        }
+
+    def _accept_segment_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        try:
+            segment = self.service.accept_segment_candidate(
+                job_id=args["job_id"],
+                fingerprint=args["fingerprint"],
+                name=args.get("name"),
+                criterion=args.get("criterion"),
+            )
+        except JobNotFoundError as exc:
+            raise BackendError(job_not_found(exc.resource_id)) from None
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return segment.model_dump(mode="json")
+
+    def _get_segment_profile(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import SegmentNotFoundError, segment_not_found
+
+        try:
+            profile = self.service.segment_profile(args["segment_id"])
+        except SegmentNotFoundError:
+            raise BackendError(segment_not_found(args["segment_id"])) from None
+        return {
+            "segment_id": profile.segment_id,
+            "segment_name": profile.segment_name,
+            "total_members": profile.total_members,
+            "measured_count": profile.measured_count,
+            "unscored_count": profile.unscored_count,
+            "missing_count": profile.missing_count,
+            "underserved_count": profile.underserved_count,
+            "appropriate_count": profile.appropriate_count,
+            "overserved_count": profile.overserved_count,
+            "top_underserved": [
+                {
+                    "outcome_id": e.outcome_id,
+                    "statement": e.statement,
+                    "score": e.score,
+                    "band": e.band,
+                }
+                for e in profile.top_underserved
+            ],
+            "top_overserved": [
+                {
+                    "outcome_id": e.outcome_id,
+                    "statement": e.statement,
+                    "score": e.score,
+                    "band": e.band,
+                }
+                for e in profile.top_overserved
+            ],
+            "measured_ratio": profile.measured_ratio,
+            "gaps": list(profile.gaps),
+        }
+
+    def _choose_strategy(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import SegmentNotFoundError, segment_not_found
+
+        try:
+            strategy = self.service.choose_strategy(
+                segment_id=args["segment_id"],
+                kind=args["kind"],
+                rationale=args["rationale"],
+                expected_effect=args["expected_effect"],
+                chosen_at=args.get("chosen_at"),
+            )
+        except SegmentNotFoundError:
+            raise BackendError(segment_not_found(args["segment_id"])) from None
+        except ValueError as exc:
+            raise BackendError(str(exc)) from None
+        return strategy.model_dump(mode="json")
+
+    def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import strategy_not_found
+
+        strategy = self.service.get_strategy(args["strategy_id"])
+        if strategy is None:
+            raise BackendError(strategy_not_found(args["strategy_id"]))
+        return strategy.model_dump(mode="json")
+
+    def _list_strategies(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        strategies = self.service.list_strategies(
+            segment_id=args.get("segment_id"),
+            limit=args.get("limit"),
+            offset=args.get("offset", 0),
+        )
+        return [s.model_dump(mode="json") for s in strategies]
+
     def _list_signals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         signals = self.service.list_signals(
             unread_only=bool(args.get("unread_only", False)),
@@ -931,6 +1092,16 @@ _LOCAL_HANDLERS = {
     "get_bet": LocalBackend._get_bet,
     "list_bets": LocalBackend._list_bets,
     "advance_bet": LocalBackend._advance_bet,
+    "add_segment": LocalBackend._add_segment,
+    "get_segment": LocalBackend._get_segment,
+    "list_segments": LocalBackend._list_segments,
+    "delete_segment": LocalBackend._delete_segment,
+    "suggest_segments": LocalBackend._suggest_segments,
+    "accept_segment_candidate": LocalBackend._accept_segment_candidate,
+    "get_segment_profile": LocalBackend._get_segment_profile,
+    "choose_strategy": LocalBackend._choose_strategy,
+    "get_strategy": LocalBackend._get_strategy,
+    "list_strategies": LocalBackend._list_strategies,
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
     "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,

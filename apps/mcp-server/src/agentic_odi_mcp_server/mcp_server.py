@@ -98,6 +98,14 @@ def _bet_not_found(bet_id: str | None) -> str:
     return f"Error: Bet with ID {bet_id} not found."
 
 
+def _segment_not_found(segment_id: str | None) -> str:
+    return f"Error: Segment with ID {segment_id} not found."
+
+
+def _strategy_not_found(strategy_id: str | None) -> str:
+    return f"Error: Strategy with ID {strategy_id} not found."
+
+
 def _first_line(text: str) -> str:
     for line in text.splitlines():
         stripped = line.strip()
@@ -882,6 +890,194 @@ def advance_bet(bet_id: str, status: str, at: str | None = None) -> str:
     except (OdiError, ValueError) as exc:
         return f"Error: {exc}"
     return f"Bet advanced successfully: {bet.model_dump_json()}"
+
+
+@mcp.tool
+def add_segment(
+    job_id: str,
+    name: str,
+    criterion: str,
+    outcome_ids: list[str],
+    notes: str | None = None,
+    origin: str = "manual",
+) -> str:
+    try:
+        segment = service.add_segment(
+            job_id=job_id,
+            name=name,
+            criterion=criterion,
+            outcome_ids=outcome_ids,
+            notes=notes,
+            origin=origin,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    except OutcomeNotFoundError as exc:
+        return _outcome_not_found(exc.outcome_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return f"Segment created successfully: {segment.model_dump_json()}"
+
+
+@mcp.tool
+def get_segment(segment_id: str) -> str:
+    segment = service.get_segment(segment_id)
+    if segment is None:
+        return _segment_not_found(segment_id)
+    return segment.model_dump_json()
+
+
+@mcp.tool
+def list_segments(
+    job_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> str:
+    segments = service.list_segments(job_id, limit=limit, offset=offset)
+    return json.dumps([s.model_dump(mode="json") for s in segments])
+
+
+@mcp.tool
+def delete_segment(segment_id: str) -> str:
+    from agentic_odi_core import SegmentNotFoundError
+
+    try:
+        service.delete_segment(segment_id)
+    except SegmentNotFoundError:
+        return _segment_not_found(segment_id)
+    return f"Segment deleted: {segment_id}"
+
+
+@mcp.tool
+def suggest_segments(job_id: str) -> str:
+    try:
+        result = service.suggest_segments(job_id)
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    return json.dumps(
+        {
+            "candidates": [
+                {
+                    "name": c.name,
+                    "members": list(c.members),
+                    "rationale": c.rationale,
+                    "evidence_count": c.evidence_count,
+                    "segment": c.segment,
+                    "decile": c.decile,
+                    "fingerprint": c.fingerprint,
+                }
+                for c in result.candidates
+            ],
+            "reason": result.reason,
+        }
+    )
+
+
+@mcp.tool
+def accept_segment_candidate(
+    job_id: str,
+    fingerprint: str,
+    name: str | None = None,
+    criterion: str | None = None,
+) -> str:
+    try:
+        segment = service.accept_segment_candidate(
+            job_id=job_id,
+            fingerprint=fingerprint,
+            name=name,
+            criterion=criterion,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return f"Segment accepted: {segment.model_dump_json()}"
+
+
+@mcp.tool
+def get_segment_profile(segment_id: str) -> str:
+    from agentic_odi_core import SegmentNotFoundError
+
+    try:
+        profile = service.segment_profile(segment_id)
+    except SegmentNotFoundError:
+        return _segment_not_found(segment_id)
+    return json.dumps(
+        {
+            "segment_id": profile.segment_id,
+            "segment_name": profile.segment_name,
+            "total_members": profile.total_members,
+            "measured_count": profile.measured_count,
+            "unscored_count": profile.unscored_count,
+            "missing_count": profile.missing_count,
+            "underserved_count": profile.underserved_count,
+            "appropriate_count": profile.appropriate_count,
+            "overserved_count": profile.overserved_count,
+            "top_underserved": [
+                {
+                    "outcome_id": e.outcome_id,
+                    "statement": e.statement,
+                    "score": e.score,
+                    "band": e.band,
+                }
+                for e in profile.top_underserved
+            ],
+            "top_overserved": [
+                {
+                    "outcome_id": e.outcome_id,
+                    "statement": e.statement,
+                    "score": e.score,
+                    "band": e.band,
+                }
+                for e in profile.top_overserved
+            ],
+            "measured_ratio": profile.measured_ratio,
+            "gaps": list(profile.gaps),
+        }
+    )
+
+
+@mcp.tool
+def choose_strategy(
+    segment_id: str,
+    kind: str,
+    rationale: str,
+    expected_effect: str,
+    chosen_at: str | None = None,
+) -> str:
+    from agentic_odi_core import SegmentNotFoundError
+
+    try:
+        strategy = service.choose_strategy(
+            segment_id=segment_id,
+            kind=kind,
+            rationale=rationale,
+            expected_effect=expected_effect,
+            chosen_at=chosen_at,
+        )
+    except SegmentNotFoundError:
+        return _segment_not_found(segment_id)
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return f"Strategy recorded: {strategy.model_dump_json()}"
+
+
+@mcp.tool
+def get_strategy(strategy_id: str) -> str:
+    strategy = service.get_strategy(strategy_id)
+    if strategy is None:
+        return _strategy_not_found(strategy_id)
+    return strategy.model_dump_json()
+
+
+@mcp.tool
+def list_strategies(
+    segment_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> str:
+    strategies = service.list_strategies(segment_id, limit=limit, offset=offset)
+    return json.dumps([s.model_dump(mode="json") for s in strategies])
 
 
 @mcp.tool

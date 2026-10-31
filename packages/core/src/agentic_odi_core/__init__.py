@@ -12,7 +12,11 @@ from agentic_odi_core.brief import (
     NOT_MEASURED,
     BriefInput,
     BriefOutcome,
+    BriefSegment,
+    BriefStrategy,
+    BriefStrategyRecord,
     render_brief,
+    select_brief_strategy,
     select_underserved,
 )
 from agentic_odi_core.compare import (
@@ -42,8 +46,10 @@ from agentic_odi_core.errors import (
     error_status,
 )
 from agentic_odi_core.evaluation import (
+    OpportunitySegment,
     OutcomeStatementError,
     ValueSize,
+    classify_opportunity,
     classify_value,
     evaluate_outcome_statement,
     statement_to_dict,
@@ -66,7 +72,9 @@ from agentic_odi_core.messages import (
     job_not_found,
     outcome_not_found,
     scheduled_work_not_found,
+    segment_not_found,
     step_not_found,
+    strategy_not_found,
 )
 from agentic_odi_core.models import (
     BET_TRANSITIONS,
@@ -93,9 +101,13 @@ from agentic_odi_core.models import (
     ScheduledWorkTriggerType,
     ScoreMethod,
     ScoreSnapshot,
+    Segment,
+    SegmentOrigin,
     Signal,
     SignalKind,
     Step,
+    Strategy,
+    StrategyKind,
     ValueBasis,
     ValueMetric,
     ValueUnit,
@@ -128,6 +140,18 @@ from agentic_odi_core.roadmap import (
 )
 from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
+from agentic_odi_core.segment_profile import (
+    ProfileEntry,
+    SegmentProfile,
+    build_segment_profile,
+)
+from agentic_odi_core.segmentation import (
+    MIN_MEMBERS,
+    SegmentCandidate,
+    SegmentCandidateSet,
+    importance_decile,
+    suggest_segment_candidates,
+)
 from agentic_odi_core.services import (
     BetNotFoundError,
     CustomerOutcomeNotFoundError,
@@ -139,9 +163,11 @@ from agentic_odi_core.services import (
     OutcomeNotFoundError,
     Rejection,
     ScheduledWorkNotFoundError,
+    SegmentNotFoundError,
     SignalBudget,
     SignalNotFoundError,
     StepNotFoundError,
+    StrategyNotFoundError,
     ValueOutOfRangeError,
 )
 from agentic_odi_core.steve_jobs import (
@@ -183,6 +209,10 @@ __all__ = [
     "BusinessValue",
     "BriefInput",
     "BriefOutcome",
+    "BriefStrategy",
+    "BriefSegment",
+    "BriefStrategyRecord",
+    "select_brief_strategy",
     "NOT_MEASURED",
     "render_brief",
     "select_underserved",
@@ -190,6 +220,22 @@ __all__ = [
     "RoadmapEntry",
     "build_roadmap",
     "render_roadmap",
+    "MIN_MEMBERS",
+    "Segment",
+    "SegmentOrigin",
+    "SegmentCandidate",
+    "SegmentCandidateSet",
+    "SegmentProfile",
+    "ProfileEntry",
+    "SegmentNotFoundError",
+    "Strategy",
+    "StrategyKind",
+    "StrategyNotFoundError",
+    "OpportunitySegment",
+    "classify_opportunity",
+    "build_segment_profile",
+    "importance_decile",
+    "suggest_segment_candidates",
     "CAPABILITIES",
     "ConflictError",
     "CustomerOutcome",
@@ -262,6 +308,8 @@ __all__ = [
     "outcome_not_found",
     "parse_tool_result",
     "statement_to_dict",
+    "segment_not_found",
     "step_not_found",
+    "strategy_not_found",
     "tool_result_text",
 ]

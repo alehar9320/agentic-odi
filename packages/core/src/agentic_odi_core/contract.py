@@ -51,6 +51,16 @@ class ToolName(str, Enum):
     GET_BET = "get_bet"
     LIST_BETS = "list_bets"
     ADVANCE_BET = "advance_bet"
+    ADD_SEGMENT = "add_segment"
+    GET_SEGMENT = "get_segment"
+    LIST_SEGMENTS = "list_segments"
+    DELETE_SEGMENT = "delete_segment"
+    SUGGEST_SEGMENTS = "suggest_segments"
+    ACCEPT_SEGMENT_CANDIDATE = "accept_segment_candidate"
+    GET_SEGMENT_PROFILE = "get_segment_profile"
+    CHOOSE_STRATEGY = "choose_strategy"
+    GET_STRATEGY = "get_strategy"
+    LIST_STRATEGIES = "list_strategies"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
     COMPUTE_OPPORTUNITY = "compute_opportunity"
@@ -558,6 +568,122 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("bet_id", "status", "at"),
         required=("bet_id", "status"),
         returns="The updated Bet.",
+        stage="6",
+    ),
+    ToolName.ADD_SEGMENT.value: ToolSpec(
+        name="add_segment",
+        summary=(
+            "Create a segment: a named group of a job's outcomes defined by the "
+            "outcomes it cares about. No demographic fields exist, by design."
+        ),
+        effect=_derive_effect("add_segment"),
+        arguments=("job_id", "name", "criterion", "outcome_ids", "notes", "origin"),
+        required=("job_id", "name", "criterion", "outcome_ids"),
+        returns=(
+            "The created Segment. A member that is missing or belongs to another "
+            "job is refused before any write."
+        ),
+        stage="6",
+    ),
+    ToolName.GET_SEGMENT.value: ToolSpec(
+        name="get_segment",
+        summary="Get a single segment by ID.",
+        effect=_derive_effect("get_segment"),
+        arguments=("segment_id",),
+        required=("segment_id",),
+        returns="The Segment, or an error string if not found.",
+        stage="6",
+    ),
+    ToolName.LIST_SEGMENTS.value: ToolSpec(
+        name="list_segments",
+        summary="List segments, optionally filtered by job.",
+        effect=_derive_effect("list_segments"),
+        arguments=("job_id", "limit", "offset"),
+        required=(),
+        returns="The segments in creation order.",
+        stage="6",
+    ),
+    ToolName.DELETE_SEGMENT.value: ToolSpec(
+        name="delete_segment",
+        summary=(
+            "Delete a segment. Outcomes are never touched — only the lens on them is removed."
+        ),
+        effect=_derive_effect("delete_segment"),
+        arguments=("segment_id",),
+        required=("segment_id",),
+        returns="Nothing on success; an error string if not found.",
+        stage="6",
+    ),
+    ToolName.SUGGEST_SEGMENTS.value: ToolSpec(
+        name="suggest_segments",
+        summary=(
+            "Propose segment candidates from the scores: deterministic groups over "
+            "band and importance decile. Persists nothing."
+        ),
+        effect=_derive_effect("suggest_segments"),
+        arguments=("job_id",),
+        required=("job_id",),
+        returns=(
+            "The candidates with their member outcomes and a stable fingerprint, "
+            "or a reason no group clears the bar. Writes nothing."
+        ),
+        stage="6",
+    ),
+    ToolName.ACCEPT_SEGMENT_CANDIDATE.value: ToolSpec(
+        name="accept_segment_candidate",
+        summary=(
+            "Accept a suggested candidate into a segment, matched by its stable "
+            "fingerprint. A stale fingerprint is refused; a repeat accept is "
+            "idempotent."
+        ),
+        effect=_derive_effect("accept_segment_candidate"),
+        arguments=("job_id", "fingerprint", "name", "criterion"),
+        required=("job_id", "fingerprint"),
+        returns="The created (or already-created) Segment.",
+        stage="6",
+    ),
+    ToolName.GET_SEGMENT_PROFILE.value: ToolSpec(
+        name="get_segment_profile",
+        summary=(
+            "Read a segment's servability: counts and the top underserved and "
+            "overserved outcomes, kept separate. A ratio of nothing is null, "
+            "never 0."
+        ),
+        effect=_derive_effect("get_segment_profile"),
+        arguments=("segment_id",),
+        required=("segment_id",),
+        returns="The segment profile, including any missing members as gaps.",
+        stage="6",
+    ),
+    ToolName.CHOOSE_STRATEGY.value: ToolSpec(
+        name="choose_strategy",
+        summary=(
+            "Record a strategy for a segment. Each kind has a guardrail that names "
+            "the missing condition; new-market is refused while alternatives "
+            "evidence is absent."
+        ),
+        effect=_derive_effect("choose_strategy"),
+        arguments=("segment_id", "kind", "rationale", "expected_effect", "chosen_at"),
+        required=("segment_id", "kind", "rationale", "expected_effect"),
+        returns="The recorded Strategy, or an error naming the unmet condition.",
+        stage="6",
+    ),
+    ToolName.GET_STRATEGY.value: ToolSpec(
+        name="get_strategy",
+        summary="Get a single strategy by ID.",
+        effect=_derive_effect("get_strategy"),
+        arguments=("strategy_id",),
+        required=("strategy_id",),
+        returns="The Strategy, or an error string if not found.",
+        stage="6",
+    ),
+    ToolName.LIST_STRATEGIES.value: ToolSpec(
+        name="list_strategies",
+        summary="List strategies, optionally filtered by segment.",
+        effect=_derive_effect("list_strategies"),
+        arguments=("segment_id", "limit", "offset"),
+        required=(),
+        returns="The strategies in creation order.",
         stage="6",
     ),
     ToolName.GET_ODI_SCHEMA.value: ToolSpec(

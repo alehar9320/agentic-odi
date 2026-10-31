@@ -106,3 +106,17 @@ def scheduled_work_not_found(work_id: str | None, hint: str | None = None) -> st
     if hint:
         message = f"{message}. {hint}"
     return message
+
+
+def segment_not_found(segment_id: str | None, hint: str | None = None) -> str:
+    message = f"Segment not found: {segment_id}"
+    if hint:
+        message = f"{message}. {hint}"
+    return message
+
+
+def strategy_not_found(strategy_id: str | None, hint: str | None = None) -> str:
+    message = f"Strategy not found: {strategy_id}"
+    if hint:
+        message = f"{message}. {hint}"
+    return message

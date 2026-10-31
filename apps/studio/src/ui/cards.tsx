@@ -770,3 +770,86 @@ export function Bet({ node }: NodeProps) {
     </article>
   );
 }
+
+const BAND_TONE: Record<string, Tone> = {
+  underserved: "warning",
+  appropriate: "positive",
+  overserved: "critical",
+  unscored: "neutral",
+};
+
+export function SegmentProfile({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const strategy = str(node.props, "strategy");
+  const gaps = stringList(node.props.gaps);
+  const total = num(node.props, "total_members") ?? 0;
+  const measured = num(node.props, "measured_count") ?? 0;
+  const ratio = typeof node.props.measured_ratio === "number" ? node.props.measured_ratio : null;
+
+  return (
+    <article className="ui-card ui-card--segment-profile" aria-label={title || "Segment profile"}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">Segment</span>
+        {title ? <h4 className="ui-card__title">{title}</h4> : null}
+      </header>
+
+      <dl className="ui-fields">
+        <div className="ui-field">
+          <dt>Members</dt>
+          <dd>{total}</dd>
+        </div>
+        <div className="ui-field">
+          <dt>Measured</dt>
+          <dd>
+            {measured}
+            {ratio == null ? ` · ${NOT_MEASURED}` : ` · ${Math.round(ratio * 100)}%`}
+          </dd>
+        </div>
+        <div className="ui-field">
+          <dt>Underserved</dt>
+          <dd>{num(node.props, "underserved_count") ?? 0}</dd>
+        </div>
+        <div className="ui-field">
+          <dt>Overserved</dt>
+          <dd>{num(node.props, "overserved_count") ?? 0}</dd>
+        </div>
+      </dl>
+
+      {(["top_underserved", "top_overserved"] as const).map((key) => {
+        const entries = recordList(node.props[key]);
+        if (entries.length === 0) {
+          return null;
+        }
+        return (
+          <div className="ui-segment__group" key={key}>
+            <h5 className="ui-segment__legend">
+              {key === "top_underserved" ? "Most underserved" : "Most overserved"}
+            </h5>
+            <ul className="ui-segment__list">
+              {entries.map((entry, index) => (
+                <li key={`${key}-${index}`}>
+                  <span>{str(entry, "statement") || str(entry, "outcome_id")}</span>
+                  <ScorePill tone={BAND_TONE[str(entry, "band")] ?? "neutral"}>
+                    {measurement(entry.score)}
+                  </ScorePill>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+
+      {strategy ? <p className="ui-segment__strategy">{strategy}</p> : null}
+
+      {gaps.length > 0 ? (
+        <ul className="ui-segment__gaps">
+          {gaps.map((gap, index) => (
+            <li key={`gap-${index}`}>{gap}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
