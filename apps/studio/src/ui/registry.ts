@@ -9,6 +9,8 @@ import {
   OpportunityBoard,
   OpportunityThesis,
   OutcomeCard,
+  SegmentCard,
+  StrategyCard,
 } from "./cards";
 import {
   Callout,
@@ -47,4 +49,6 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
   "job-map": JobMap,
   "decision-record": DecisionRecord,
   "candidate-queue": CandidateQueue,
+  "segment-card": SegmentCard,
+  "strategy-card": StrategyCard,
 };

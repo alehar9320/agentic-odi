@@ -54,7 +54,7 @@
     "id": "surfaces",
     "eyebrow": "The surfaces",
     "title": "The agent composes, it does not describe.",
-    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Eight shapes, each one a thing you can act on.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Ten shapes, each one a thing you can act on.",
     "cards": [
       {
         "type": "outcome-card",
@@ -182,6 +182,47 @@
             }
           ]
         }
+      },
+      {
+        "type": "segment-card",
+        "title": "Segment",
+        "blurb": "Who the scored outcomes point at: a group of people plus the job they are doing, never a slice by demographic.",
+        "data": {
+          "id": "SEG-2",
+          "name": "Finance leads, match each line",
+          "people": "Finance leads",
+          "peopleInferred": false,
+          "jobStatement": "Reconcile invoices without manual effort",
+          "verdict": "underserved",
+          "confidence": 0.83,
+          "outcomeIds": ["O-14", "O-19", "O-27"],
+          "rationale": "Three outcomes on Match each line (60% of the job's outcomes); underserved: at least one outcome scores above 10; scores: O-14=14.2, O-19=13.8, O-27=12.1."
+        }
+      },
+      {
+        "type": "strategy-card",
+        "title": "Strategy",
+        "blurb": "The one path the segments support, with the two it beat and the reason each was rejected.",
+        "data": {
+          "id": "ST-1",
+          "kind": "differentiated",
+          "segmentId": "SEG-2",
+          "thesis": "Finance leads are underserved on matching each line while the same job is already served on filing and closing. Improve the existing product against the gap instead of building a second one: the job is the same, the unmet need is not.",
+          "bets": [
+            "Build against match each line for finance leads",
+            "Pilot with the three highest-volume vendors"
+          ],
+          "rejected": [
+            {
+              "kind": "disruptive",
+              "why": "no segment is overserved, so a low-cost offer has nobody to win"
+            },
+            {
+              "kind": "new_market",
+              "why": "every outcome maps to a job already in the store, so there is no job that is entirely unaddressed"
+            }
+          ]
+        }
       }
     ]
   },
@@ -196,7 +237,7 @@
       },
       {
         "title": "Ask",
-        "body": "Any agent calls the same MCP tools the studio uses: job maps, outcomes, evidence, opportunity scores. Thirty tools, at decision time, from your own machine or the hosted server."
+        "body": "Any agent calls the same MCP tools the studio uses: job maps, outcomes, evidence, opportunity scores, and the segments and strategy they imply. Forty-three tools, at decision time, from your own machine or the hosted server."
       },
       {
         "title": "Steer",
@@ -255,7 +296,7 @@
   "tools": {
     "id": "tools",
     "eyebrow": "The MCP surface",
-    "title": "Thirty tools. One contract.",
+    "title": "Forty-three tools. One contract.",
     "blurb": "Every tool the server exposes is listed, with its arguments, in the reference. A few of them:",
     "peek": [
       "get_job_map",

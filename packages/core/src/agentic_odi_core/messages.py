@@ -49,7 +49,12 @@ Follow this sequence when guiding a user through the ODI process:
 - **When**: After outcomes are scored.
 - **Never** segment by demographics. A segment is a group of people plus a functional job.
 - **Tools**: `get_segments(job_id?)`, `propose_strategy()`.
-- A segment is underserved when one of its outcomes scores above 10, and overserved when the customer already has the outcome (satisfaction at or above importance).
+- `segment_market(job_id?, people?)` produces the segments those tools read: it clusters the
+  scored outcomes by job and job-map step, so run it before answering 'who is this for?'.
+- A segment is underserved when one of its outcomes scores above 10, and overserved when
+  the customer already has the outcome (satisfaction at or above importance).
+- An outcome that joins no cluster is reported as unclustered, never dropped or inflated
+  into a segment.
 
 ### Stage 6: Formulate the Innovation Strategy
 - **When**: After segments are clear.
@@ -58,6 +63,8 @@ Follow this sequence when guiding a user through the ODI process:
 - **New-Market**: create for a job no one is being served on today.
 - **Tools**: `propose_strategy(job_id?)`.
 - Always state the strategies you rejected and why.
+- `get_strategy()` reads back the recorded path. When no path has evidence, `propose_strategy`
+  refuses and reports what is missing — say so instead of inventing a bet.
 
 ### General Rule
 Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), always capture Outcomes (Stage 2) before building the Job Map (Stage 3), and always score outcomes (Stage 2) before computing opportunity (Stage 4). If a tool rejects a write, read the message, fix the statement or the numbers, and try once. Do not retry the same call unchanged."""
@@ -117,6 +124,16 @@ def candidate_reason_required(candidate_id: str | None) -> str:
         f"A rejection reason is required for outcome candidate {candidate_id}; "
         "the reason is kept beside the candidate so the decision is defensible."
     )
+
+
+def invalid_strategy_request(message: str) -> str:
+    """The one spelling of a refused Stage 6 request.
+
+    Stage 6 refuses rather than inventing a bet, and every adapter reports that
+    refusal the same way: a validation problem with the caller's request, not a
+    server failure.
+    """
+    return f"Invalid strategy request: {message}"
 
 
 def merge_target_must_be_outcome(target_id: str | None) -> str:

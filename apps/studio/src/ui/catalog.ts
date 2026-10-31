@@ -376,6 +376,92 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     },
     ["state"],
   ),
+  entry(
+    "segment-card",
+    "leaf",
+    "One outcome-based segment (Stage 5): the people, the job they are doing, and the verdict their scored outcomes support. Never a demographic grouping.",
+    {
+      id: { type: "string" },
+      name: {
+        type: "string",
+        description: 'Composed from the evidence: "<the people>, <the step they are stuck on>".',
+      },
+      people: {
+        type: "string",
+        description: "The group in their own words when those words are on record.",
+      },
+      peopleInferred: {
+        type: "boolean",
+        description: "True when `people` was derived from the outcomes rather than supplied.",
+      },
+      jobStatement: { type: "string", description: "The functional job this segment is doing." },
+      verdict: {
+        enum: ["underserved", "overserved", "appropriately_served", "unknown"],
+        description:
+          '"unknown" when any outcome is unscored — an unclassifiable segment is reported, not guessed.',
+      },
+      confidence: {
+        type: "number",
+        minimum: 0,
+        maximum: 1,
+        description: "How much evidence stands behind the verdict. Never shown apart from it.",
+      },
+      outcomeIds: {
+        type: "array",
+        minItems: 2,
+        maxItems: 40,
+        items: { type: "string" },
+        description: "The outcomes this segment rests on. Two is the floor: one is a hypothesis.",
+      },
+      rationale: { type: "string", description: "Why this verdict, naming the outcomes behind it." },
+      unclustered: {
+        type: "array",
+        maxItems: 40,
+        items: { type: "string" },
+        description: "Outcome ids that joined no segment. Shown as their own group, never dropped.",
+      },
+    },
+    ["id", "name", "people", "jobStatement", "verdict", "confidence", "rationale"],
+  ),
+  entry(
+    "strategy-card",
+    "leaf",
+    "The one innovation path the segments support (Stage 6), with every path it beat and why.",
+    {
+      id: { type: "string" },
+      kind: {
+        enum: ["differentiated", "disruptive", "new_market"],
+        description: "Improve for an underserved segment, undercut an overserved one, or serve a job nobody serves.",
+      },
+      segmentId: { type: "string", description: "The segment this bet is aimed at, when there is one." },
+      thesis: {
+        type: "string",
+        description: "Why this path, from the evidence — it names the outcomes, not a hunch.",
+      },
+      bets: {
+        type: "array",
+        maxItems: 6,
+        items: { type: "string" },
+        description: "The concrete moves proposed.",
+      },
+      rejected: {
+        type: "array",
+        minItems: 2,
+        maxItems: 2,
+        description:
+          "One entry per path not chosen, with the reason. A strategy without these is a conclusion, not a recommendation.",
+        items: {
+          type: "object",
+          properties: {
+            kind: { enum: ["differentiated", "disruptive", "new_market"] },
+            why: { type: "string" },
+          },
+          required: ["kind", "why"],
+        },
+      },
+    },
+    ["kind", "thesis", "rejected"],
+  ),
 ];
 
 const CATALOG_TYPES = new Set(CATALOG.map((component) => component.type));
