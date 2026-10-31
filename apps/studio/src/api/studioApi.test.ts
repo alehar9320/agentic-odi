@@ -17,6 +17,7 @@ import {
   fetchSignals,
   fetchUnreadSignalCount,
   markSignalRead,
+  scoreOutcomes,
   updateObservation,
   fetchCanvas,
   fetchChangelog,
@@ -645,5 +646,70 @@ describe("fetchOutcomeEvidence", () => {
     expect(response.result).toHaveLength(1);
     expect(response.result[0].content).toBe("Setup takes forever.");
     expect(String(fetchMock.mock.calls[0][0])).toContain("/api/outcomes/O-101/evidence");
+  });
+});
+
+describe("scoreOutcomes", () => {
+  it("posts one item and returns its per-item result", async () => {
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            results: [
+              {
+                outcome_id: "O-101",
+                importance: 9,
+                satisfaction: 3,
+                ok: true,
+                outcome: { id: "O-101", importance: 9, satisfaction: 3, opportunity_score: 15 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await scoreOutcomes(
+      [{ outcome_id: "O-101", importance: 9, satisfaction: 3 }],
+      "http://mcp/mcp",
+    );
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/outcomes/score-batch");
+    expect(String(fetchMock.mock.calls[0][0])).toContain("mcp_url=");
+    expect(response.results[0]).toMatchObject({ outcome_id: "O-101", ok: true });
+  });
+
+  it("carries a refusal back on the item without throwing away the batch", async () => {
+    mockJson({
+      ok: true,
+      results: [
+        { outcome_id: "O-101", importance: 11, satisfaction: 3, ok: false, error: "out of range" },
+      ],
+    });
+
+    const response = await scoreOutcomes(
+      [{ outcome_id: "O-101", importance: 11, satisfaction: 3 }],
+      "http://mcp/mcp",
+    );
+
+    expect(response.results[0].ok).toBe(false);
+    expect(response.results[0].error).toBe("out of range");
+  });
+
+  it("sends a null pair so an unscored outcome can be restored", async () => {
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () => new Response(JSON.stringify({ ok: true, results: [] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await scoreOutcomes(
+      [{ outcome_id: "O-101", importance: null, satisfaction: null }],
+      "http://mcp/mcp",
+    );
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body).toEqual([{ outcome_id: "O-101", importance: null, satisfaction: null }]);
   });
 });
