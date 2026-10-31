@@ -69,6 +69,43 @@ export interface OutcomeInputs {
   }[] | null;
 }
 
+/**
+ * What a customer uses today for one Job (M2-07). `kind` is one of product,
+ * service, workaround, manual, nothing — a `nothing` row is real evidence for a
+ * new-market bet, not an absent record.
+ */
+export interface Alternative {
+  id?: string;
+  job_id?: string;
+  name?: string;
+  kind?: "product" | "service" | "workaround" | "manual" | "nothing";
+  notes?: string | null;
+  source_kind?: string;
+}
+
+/** A customer's own adequacy rating of one alternative against one outcome (M2-07). */
+export interface AlternativeLink {
+  outcome_id: string;
+  alternative_id: string;
+  adequacy: number;
+  usage_n?: number | null;
+  note?: string | null;
+}
+
+/** An alternative paired with the adequacy link that rates it for one outcome. */
+export interface OutcomeAlternative {
+  alternative: Alternative;
+  link: AlternativeLink;
+}
+
+/**
+ * Whether an existing solution is recorded for an outcome (M2-07). `yes` means
+ * a solution is recorded; `no_linked_nothing` means we asked and the customer
+ * uses nothing today; `no_link_at_all` means we have not asked. Only `yes`
+ * means a solution exists — an empty inventory is never evidence.
+ */
+export type ExistingSolution = "yes" | "no_linked_nothing" | "no_link_at_all";
+
 export interface Evidence {
   id: string;
   source_name?: string;

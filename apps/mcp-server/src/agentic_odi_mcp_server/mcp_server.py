@@ -14,6 +14,7 @@ from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     TOOL_SPECS,
+    AlternativeNotFoundError,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
@@ -338,6 +339,116 @@ def delete_customer_outcome(outcome_id: str) -> str:
     except CustomerOutcomeNotFoundError:
         return _cust_not_found(outcome_id)
     return f"Customer outcome deleted successfully: {outcome_id}"
+
+
+@mcp.tool
+def add_alternative(
+    job_id: str,
+    name: str,
+    kind: str,
+    notes: str | None = None,
+    source_kind: str = "manual",
+) -> str:
+    """Record what a customer uses today for one Job (M2-07).
+
+    ``kind`` is one of product, service, workaround, manual, nothing. A
+    ``nothing`` row is real evidence for a new-market bet, not an absent record.
+    ``source_kind`` is one of the provisional set ALTERNATIVE_SOURCE_KINDS.
+    """
+    try:
+        alternative = service.add_alternative(job_id, name, kind, notes, source_kind)
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    except ValidationError as e:
+        return f"Error: {e}"
+    return json.dumps(alternative.model_dump())
+
+
+@mcp.tool
+def get_alternative(alternative_id: str) -> str:
+    """Get a single Alternative by ID."""
+    try:
+        alternative = service.get_alternative(alternative_id)
+    except AlternativeNotFoundError:
+        return f"Alternative not found: {alternative_id}"
+    return json.dumps(alternative.model_dump())
+
+
+@mcp.tool
+def list_alternatives(job_id: str | None = None, limit: int | None = None, offset: int = 0) -> str:
+    """List the Alternatives recorded for a Job."""
+    items = service.list_alternatives(job_id, limit=limit, offset=offset)
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def delete_alternative(alternative_id: str) -> str:
+    """Delete an Alternative and its links; its outcomes stay intact."""
+    try:
+        service.delete_alternative(alternative_id)
+    except AlternativeNotFoundError:
+        return f"Alternative not found: {alternative_id}"
+    return f"Alternative deleted successfully: {alternative_id}"
+
+
+@mcp.tool
+def link_alternative(
+    outcome_id: str,
+    alternative_id: str,
+    adequacy: float,
+    usage_n: int | None = None,
+    note: str | None = None,
+) -> str:
+    """Rate one Alternative against one Outcome with the customer's adequacy (1-10)."""
+    try:
+        link = service.link_alternative(outcome_id, alternative_id, adequacy, usage_n, note)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    except AlternativeNotFoundError:
+        return f"Alternative not found: {alternative_id}"
+    except ValidationError as e:
+        return f"Error: {e}"
+    return json.dumps(link.model_dump())
+
+
+@mcp.tool
+def unlink_alternative(outcome_id: str, alternative_id: str) -> str:
+    """Remove one Alternative-to-Outcome link; both records stay."""
+    try:
+        service.unlink_alternative(outcome_id, alternative_id)
+    except ValidationError as e:
+        return f"Error: {e}"
+    return json.dumps({"outcome_id": outcome_id, "alternative_id": alternative_id})
+
+
+@mcp.tool
+def get_outcome_alternatives(outcome_id: str) -> str:
+    """The Alternatives recorded for one Outcome, with each adequacy rating."""
+    try:
+        pairs = service.outcome_alternatives(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    return json.dumps(
+        [
+            {"alternative": alternative.model_dump(), "link": link.model_dump()}
+            for alternative, link in pairs
+        ]
+    )
+
+
+@mcp.tool
+def get_has_existing_solution(outcome_id: str) -> str:
+    """Whether an existing solution is recorded for an outcome (M2-07).
+
+    One of ``yes`` (a solution is recorded), ``no_linked_nothing`` (we asked and
+    the customer uses nothing today), or ``no_link_at_all`` (we have not asked).
+    Only ``yes`` means a solution exists; an empty inventory is not evidence.
+    """
+    try:
+        verdict = service.has_existing_solution(outcome_id)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(outcome_id)
+    return json.dumps({"outcome_id": outcome_id, "existing_solution": verdict})
 
 
 @mcp.tool

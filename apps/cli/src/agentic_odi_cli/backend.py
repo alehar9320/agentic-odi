@@ -581,6 +581,109 @@ class LocalBackend(Backend):
             raise BackendError(customer_outcome_not_found(outcome_id)) from None
         return outcome_id
 
+    def _add_alternative(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+        from pydantic import ValidationError
+
+        try:
+            alternative = self.service.add_alternative(
+                job_id=args["job_id"],
+                name=args["name"],
+                kind=args["kind"],
+                notes=args.get("notes"),
+                source_kind=args.get("source_kind", "manual"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args["job_id"])) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return alternative.model_dump()
+
+    def _get_alternative(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import AlternativeNotFoundError
+
+        alternative_id = args["alternative_id"]
+        try:
+            alternative = self.service.get_alternative(alternative_id)
+        except AlternativeNotFoundError:
+            raise BackendError(f"alternative not found: {alternative_id}") from None
+        return alternative.model_dump()
+
+    def _list_alternatives(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        kwargs: dict[str, Any] = {"job_id": args.get("job_id")}
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        alternatives = self.service.list_alternatives(**kwargs)
+        return [alternative.model_dump() for alternative in alternatives]
+
+    def _delete_alternative(self, args: dict[str, Any]) -> str:
+        from agentic_odi_core import AlternativeNotFoundError
+
+        alternative_id = args["alternative_id"]
+        try:
+            self.service.delete_alternative(alternative_id)
+        except AlternativeNotFoundError:
+            raise BackendError(f"alternative not found: {alternative_id}") from None
+        return alternative_id
+
+    def _link_alternative(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import (
+            AlternativeNotFoundError,
+            OutcomeNotFoundError,
+            outcome_not_found,
+        )
+        from pydantic import ValidationError
+
+        try:
+            link = self.service.link_alternative(
+                outcome_id=args["outcome_id"],
+                alternative_id=args["alternative_id"],
+                adequacy=args["adequacy"],
+                usage_n=args.get("usage_n"),
+                note=args.get("note"),
+            )
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except AlternativeNotFoundError:
+            raise BackendError(f"alternative not found: {args['alternative_id']}") from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return link.model_dump()
+
+    def _unlink_alternative(self, args: dict[str, Any]) -> dict[str, Any]:
+        from pydantic import ValidationError
+
+        try:
+            self.service.unlink_alternative(args["outcome_id"], args["alternative_id"])
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return {"outcome_id": args["outcome_id"], "alternative_id": args["alternative_id"]}
+
+    def _get_outcome_alternatives(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        try:
+            pairs = self.service.outcome_alternatives(outcome_id)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        return [
+            {"alternative": alternative.model_dump(), "link": link.model_dump()}
+            for alternative, link in pairs
+        ]
+
+    def _get_has_existing_solution(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        outcome_id = args["outcome_id"]
+        try:
+            verdict = self.service.has_existing_solution(outcome_id)
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(outcome_id)) from None
+        return {"outcome_id": outcome_id, "existing_solution": verdict}
+
     def _add_evidence(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
             JobNotFoundError,
@@ -858,6 +961,14 @@ _LOCAL_HANDLERS = {
     "list_customer_outcomes": LocalBackend._list_customer_outcomes,
     "update_customer_outcome": LocalBackend._update_customer_outcome,
     "delete_customer_outcome": LocalBackend._delete_customer_outcome,
+    "add_alternative": LocalBackend._add_alternative,
+    "get_alternative": LocalBackend._get_alternative,
+    "list_alternatives": LocalBackend._list_alternatives,
+    "delete_alternative": LocalBackend._delete_alternative,
+    "link_alternative": LocalBackend._link_alternative,
+    "unlink_alternative": LocalBackend._unlink_alternative,
+    "get_outcome_alternatives": LocalBackend._get_outcome_alternatives,
+    "get_has_existing_solution": LocalBackend._get_has_existing_solution,
     "add_evidence": LocalBackend._add_evidence,
     "get_evidence": LocalBackend._get_evidence,
     "list_evidence": LocalBackend._list_evidence,

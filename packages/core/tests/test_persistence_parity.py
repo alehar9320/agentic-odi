@@ -184,3 +184,37 @@ def test_retained_survey_inputs_survive_every_repository(repo: Repository) -> No
     assert loaded.pairs == pairs
     assert loaded.respondent_refs == ["r-1", "r-2"]
     assert loaded.input_ref == "survey-inputs-v1:test"
+
+
+def test_alternatives_survive_every_repository(repo: Repository) -> None:
+    from agentic_odi_core.models import Alternative, AlternativeLink
+
+    outcome = _seed(repo)
+    alternative = repo.add_alternative(
+        Alternative(
+            job_id=outcome.job_id,
+            name="Spreadsheet",
+            kind="manual",
+            notes="kept by hand",
+            source_kind="interview",
+        )
+    )
+    link = repo.link_alternative(
+        AlternativeLink(
+            outcome_id=outcome.id, alternative_id=alternative.id, adequacy=7.0, usage_n=12
+        )
+    )
+
+    reloaded = _reopen(repo)
+    loaded = reloaded.get_alternative(alternative.id)
+    assert loaded is not None
+    assert (loaded.name, loaded.kind, loaded.notes, loaded.source_kind) == (
+        "Spreadsheet",
+        "manual",
+        "kept by hand",
+        "interview",
+    )
+    links = reloaded.list_alternative_links(outcome_id=outcome.id)
+    assert [(item.alternative_id, item.adequacy, item.usage_n) for item in links] == [
+        (alternative.id, link.adequacy, 12)
+    ]

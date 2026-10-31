@@ -41,6 +41,14 @@ class ToolName(str, Enum):
     LIST_CUSTOMER_OUTCOMES = "list_customer_outcomes"
     UPDATE_CUSTOMER_OUTCOME = "update_customer_outcome"
     DELETE_CUSTOMER_OUTCOME = "delete_customer_outcome"
+    ADD_ALTERNATIVE = "add_alternative"
+    GET_ALTERNATIVE = "get_alternative"
+    LIST_ALTERNATIVES = "list_alternatives"
+    DELETE_ALTERNATIVE = "delete_alternative"
+    LINK_ALTERNATIVE = "link_alternative"
+    UNLINK_ALTERNATIVE = "unlink_alternative"
+    GET_OUTCOME_ALTERNATIVES = "get_outcome_alternatives"
+    GET_HAS_EXISTING_SOLUTION = "get_has_existing_solution"
     ADD_EVIDENCE = "add_evidence"
     GET_EVIDENCE = "get_evidence"
     LIST_EVIDENCE = "list_evidence"
@@ -382,6 +390,77 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("outcome_id",),
         required=("outcome_id",),
         returns="The deleted Customer Outcome ID.",
+    ),
+    ToolName.ADD_ALTERNATIVE.value: ToolSpec(
+        name="add_alternative",
+        summary="Record what a customer uses today for one Job.",
+        effect=_derive_effect("add_alternative"),
+        arguments=("job_id", "name", "kind", "notes", "source_kind"),
+        required=("job_id", "name", "kind"),
+        returns="The created Alternative.",
+        stage="2",
+    ),
+    ToolName.GET_ALTERNATIVE.value: ToolSpec(
+        name="get_alternative",
+        summary="Get a single Alternative by ID.",
+        effect=_derive_effect("get_alternative"),
+        arguments=("alternative_id",),
+        required=("alternative_id",),
+        returns="The Alternative, or an error string if not found.",
+        stage="2",
+    ),
+    ToolName.LIST_ALTERNATIVES.value: ToolSpec(
+        name="list_alternatives",
+        summary="List the Alternatives recorded for a Job.",
+        effect=_derive_effect("list_alternatives"),
+        arguments=("job_id", "limit", "offset"),
+        returns="A list of Alternatives.",
+        stage="2",
+    ),
+    ToolName.DELETE_ALTERNATIVE.value: ToolSpec(
+        name="delete_alternative",
+        summary="Delete an Alternative and its links.",
+        effect=_derive_effect("delete_alternative"),
+        arguments=("alternative_id",),
+        required=("alternative_id",),
+        returns="The deleted Alternative ID.",
+        stage="2",
+    ),
+    ToolName.LINK_ALTERNATIVE.value: ToolSpec(
+        name="link_alternative",
+        summary="Rate one Alternative against one Outcome with the customer's adequacy.",
+        effect=_derive_effect("link_alternative"),
+        arguments=("outcome_id", "alternative_id", "adequacy", "usage_n", "note"),
+        required=("outcome_id", "alternative_id", "adequacy"),
+        returns="The created Alternative link.",
+        stage="2",
+    ),
+    ToolName.UNLINK_ALTERNATIVE.value: ToolSpec(
+        name="unlink_alternative",
+        summary="Remove one Alternative-to-Outcome link.",
+        effect=_derive_effect("unlink_alternative"),
+        arguments=("outcome_id", "alternative_id"),
+        required=("outcome_id", "alternative_id"),
+        returns="The removed link's identifiers.",
+        stage="2",
+    ),
+    ToolName.GET_OUTCOME_ALTERNATIVES.value: ToolSpec(
+        name="get_outcome_alternatives",
+        summary="The Alternatives recorded for one Outcome, with each adequacy rating.",
+        effect=ToolEffect.READ,
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="A list of Alternatives paired with their adequacy link.",
+        stage="2",
+    ),
+    ToolName.GET_HAS_EXISTING_SOLUTION.value: ToolSpec(
+        name="get_has_existing_solution",
+        summary="Whether an existing solution is recorded: yes, nothing linked, or not asked.",
+        effect=ToolEffect.READ,
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="One of yes, no_linked_nothing, no_link_at_all.",
+        stage="2",
     ),
     ToolName.ADD_EVIDENCE.value: ToolSpec(
         name="add_evidence",

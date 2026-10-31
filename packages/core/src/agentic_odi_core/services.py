@@ -7,7 +7,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
@@ -17,9 +17,12 @@ from agentic_odi_core.evaluation import (
     require_outcome_statement,
 )
 from agentic_odi_core.models import (
+    ALTERNATIVE_SOURCE_KINDS,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     SCORE_SNAPSHOT_NOTE_MAX,
+    Alternative,
+    AlternativeLink,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
@@ -76,6 +79,12 @@ class CustomerOutcomeNotFoundError(NotFoundError):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
         super().__init__(outcome_id, "customer_outcome")
+
+
+class AlternativeNotFoundError(NotFoundError):
+    def __init__(self, alternative_id: str) -> None:
+        self.alternative_id = alternative_id
+        super().__init__(alternative_id, "alternative")
 
 
 class ScheduledWorkNotFoundError(NotFoundError, ValueError):
@@ -898,6 +907,114 @@ class ODIService:
         ok = self.repo.delete_customer_outcome(outcome_id)
         if not ok:
             raise CustomerOutcomeNotFoundError(outcome_id)
+
+    def add_alternative(
+        self,
+        job_id: str,
+        name: str,
+        kind: str,
+        notes: str | None = None,
+        source_kind: str = "manual",
+    ) -> Alternative:
+        """Record what a customer uses today for one Job (M2-07).
+
+        Never inferred from a score or an import: the caller supplies the
+        customer's own inventory. An unknown job or an unapproved source_kind is
+        refused rather than silently accepted.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        if source_kind not in ALTERNATIVE_SOURCE_KINDS:
+            raise ValidationError(
+                f"source_kind {source_kind!r} is not one of {', '.join(ALTERNATIVE_SOURCE_KINDS)}"
+            )
+        alternative = Alternative(
+            job_id=job_id, name=name, kind=kind, notes=notes, source_kind=source_kind
+        )
+        return self.repo.add_alternative(alternative)
+
+    def get_alternative(self, alternative_id: str) -> Alternative:
+        alternative = self.repo.get_alternative(alternative_id)
+        if alternative is None:
+            raise AlternativeNotFoundError(alternative_id)
+        return alternative
+
+    def list_alternatives(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Alternative]:
+        return self.repo.list_alternatives(job_id, limit=limit, offset=offset)
+
+    def delete_alternative(self, alternative_id: str) -> None:
+        if not self.repo.delete_alternative(alternative_id):
+            raise AlternativeNotFoundError(alternative_id)
+
+    def link_alternative(
+        self,
+        outcome_id: str,
+        alternative_id: str,
+        adequacy: float,
+        usage_n: int | None = None,
+        note: str | None = None,
+    ) -> AlternativeLink:
+        """Rate one alternative against one outcome, from the customer (M2-07).
+
+        Refuses a cross-job link: the outcome and the alternative must belong to
+        the same Job, or the link would compare unrelated work.
+        """
+        outcome = self.repo.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        alternative = self.repo.get_alternative(alternative_id)
+        if alternative is None:
+            raise AlternativeNotFoundError(alternative_id)
+        if outcome.job_id != alternative.job_id:
+            raise ValidationError(
+                "an alternative link must join an outcome and an alternative in the "
+                f"same job; outcome job {outcome.job_id!r} != alternative job "
+                f"{alternative.job_id!r}"
+            )
+        link = AlternativeLink(
+            outcome_id=outcome_id,
+            alternative_id=alternative_id,
+            adequacy=adequacy,
+            usage_n=usage_n,
+            note=note,
+        )
+        return self.repo.link_alternative(link)
+
+    def unlink_alternative(self, outcome_id: str, alternative_id: str) -> None:
+        if not self.repo.unlink_alternative(outcome_id, alternative_id):
+            raise ValidationError(
+                f"no link between outcome {outcome_id!r} and alternative {alternative_id!r}"
+            )
+
+    def outcome_alternatives(self, outcome_id: str) -> list[tuple[Alternative, AlternativeLink]]:
+        """The alternatives recorded for one outcome, each with its adequacy link."""
+        if self.repo.get_outcome(outcome_id) is None:
+            raise OutcomeNotFoundError(outcome_id)
+        result: list[tuple[Alternative, AlternativeLink]] = []
+        for link in self.repo.list_alternative_links(outcome_id=outcome_id):
+            alternative = self.repo.get_alternative(link.alternative_id)
+            if alternative is not None:
+                result.append((alternative, link))
+        return result
+
+    def has_existing_solution(
+        self, outcome_id: str
+    ) -> Literal["yes", "no_linked_nothing", "no_link_at_all"]:
+        """Whether an existing solution is recorded for an outcome (M2-07).
+
+        A two-valued question with three honest answers, so a caller can tell
+        "we asked and there is nothing" (``no_linked_nothing``) from "we have not
+        asked" (``no_link_at_all``). Only ``yes`` means a solution is recorded;
+        an empty inventory is never evidence that no solution exists.
+        """
+        pairs = self.outcome_alternatives(outcome_id)
+        if not pairs:
+            return "no_link_at_all"
+        if any(alternative.kind != "nothing" for alternative, _ in pairs):
+            return "yes"
+        return "no_linked_nothing"
 
     def add_evidence(
         self,

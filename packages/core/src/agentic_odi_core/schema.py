@@ -13,6 +13,8 @@ from pydantic import BaseModel
 
 from agentic_odi_core.models import (
     V2MOM,
+    Alternative,
+    AlternativeLink,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
@@ -34,6 +36,8 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "CustomerValue": CustomerValue,
     "BusinessValue": BusinessValue,
     "CustomerOutcome": CustomerOutcome,
+    "Alternative": Alternative,
+    "AlternativeLink": AlternativeLink,
     "Evidence": Evidence,
     "V2MOM": V2MOM,
     "ScheduledWork": ScheduledWork,

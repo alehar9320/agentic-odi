@@ -82,6 +82,10 @@ def customer_outcome_not_found(outcome_id: str) -> str:
     return f"Customer outcome not found: {outcome_id}"
 
 
+def alternative_not_found(alternative_id: str) -> str:
+    return f"Alternative not found: {alternative_id}"
+
+
 def step_not_found(step_id: str | None) -> str:
     return f"Step not found: {step_id}"
 

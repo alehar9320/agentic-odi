@@ -7,6 +7,8 @@ from typing import Protocol, TypeVar
 
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.models import (
+    Alternative,
+    AlternativeLink,
     CustomerOutcome,
     Evidence,
     Job,
@@ -100,6 +102,8 @@ class Repository(Protocol):
     steps: dict[str, Step]
     outcomes: dict[str, Outcome]
     customer_outcomes: dict[str, CustomerOutcome]
+    alternatives: dict[str, Alternative]
+    alternative_links: dict[tuple[str, str], AlternativeLink]
     evidence: dict[str, Evidence]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
@@ -140,6 +144,20 @@ class Repository(Protocol):
     ) -> list[CustomerOutcome]: ...
     def update_customer_outcome(self, outcome_id: str, updates: dict) -> CustomerOutcome | None: ...
     def delete_customer_outcome(self, outcome_id: str) -> bool: ...
+    def add_alternative(self, alternative: Alternative) -> Alternative: ...
+    def get_alternative(self, alternative_id: str) -> Alternative | None: ...
+    def list_alternatives(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Alternative]: ...
+    def delete_alternative(self, alternative_id: str) -> bool: ...
+    def link_alternative(self, link: AlternativeLink) -> AlternativeLink: ...
+    def get_alternative_link(
+        self, outcome_id: str, alternative_id: str
+    ) -> AlternativeLink | None: ...
+    def list_alternative_links(
+        self, outcome_id: str | None = None, alternative_id: str | None = None
+    ) -> list[AlternativeLink]: ...
+    def unlink_alternative(self, outcome_id: str, alternative_id: str) -> bool: ...
     def add_evidence(self, evidence: Evidence) -> Evidence: ...
     def get_evidence(self, evidence_id: str) -> Evidence | None: ...
     def list_evidence(
@@ -183,6 +201,8 @@ class InMemoryRepository:
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
+        self.alternatives: dict[str, Alternative] = {}
+        self.alternative_links: dict[tuple[str, str], AlternativeLink] = {}
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
@@ -219,6 +239,9 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
             del self.customer_outcomes[key]
+        for key in [k for k, v in self.alternatives.items() if v.job_id == job_id]:
+            del self.alternatives[key]
+        self._drop_orphan_alternative_links()
         for key in [
             k
             for k, v in self.evidence.items()
@@ -260,6 +283,7 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
             del self.customer_outcomes[key]
+        self._drop_orphan_alternative_links()
         for key in [
             k
             for k, v in self.evidence.items()
@@ -306,6 +330,7 @@ class InMemoryRepository:
                 del self.evidence[key]
             self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
             self.survey_input_sets.pop(outcome_id, None)
+            self._drop_orphan_alternative_links()
             return True
         return False
 
@@ -343,6 +368,63 @@ class InMemoryRepository:
             del self.customer_outcomes[outcome_id]
             return True
         return False
+
+    def add_alternative(self, alternative: Alternative) -> Alternative:
+        self.alternatives[alternative.id] = alternative
+        return alternative
+
+    def get_alternative(self, alternative_id: str) -> Alternative | None:
+        return self.alternatives.get(alternative_id)
+
+    def list_alternatives(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Alternative]:
+        if job_id is None:
+            items = list(self.alternatives.values())
+        else:
+            items = [a for a in self.alternatives.values() if a.job_id == job_id]
+        return page(items, limit, offset)
+
+    def delete_alternative(self, alternative_id: str) -> bool:
+        if alternative_id not in self.alternatives:
+            return False
+        del self.alternatives[alternative_id]
+        for key in [k for k in self.alternative_links if k[1] == alternative_id]:
+            del self.alternative_links[key]
+        return True
+
+    def link_alternative(self, link: AlternativeLink) -> AlternativeLink:
+        self.alternative_links[(link.outcome_id, link.alternative_id)] = link
+        return link
+
+    def get_alternative_link(self, outcome_id: str, alternative_id: str) -> AlternativeLink | None:
+        return self.alternative_links.get((outcome_id, alternative_id))
+
+    def list_alternative_links(
+        self, outcome_id: str | None = None, alternative_id: str | None = None
+    ) -> list[AlternativeLink]:
+        items = list(self.alternative_links.values())
+        if outcome_id is not None:
+            items = [link for link in items if link.outcome_id == outcome_id]
+        if alternative_id is not None:
+            items = [link for link in items if link.alternative_id == alternative_id]
+        return items
+
+    def unlink_alternative(self, outcome_id: str, alternative_id: str) -> bool:
+        return self.alternative_links.pop((outcome_id, alternative_id), None) is not None
+
+    def _drop_orphan_alternative_links(self) -> None:
+        """Drop links whose outcome or alternative no longer exists.
+
+        An alternative or outcome deletion must not leave a link that reads as a
+        live observation of something that is gone.
+        """
+        for key in [
+            k
+            for k in self.alternative_links
+            if k[0] not in self.outcomes or k[1] not in self.alternatives
+        ]:
+            del self.alternative_links[key]
 
     def add_evidence(self, evidence: Evidence) -> Evidence:
         self.evidence[evidence.id] = evidence
@@ -476,6 +558,8 @@ class InMemoryRepository:
         self.steps.clear()
         self.outcomes.clear()
         self.customer_outcomes.clear()
+        self.alternatives.clear()
+        self.alternative_links.clear()
         self.evidence.clear()
         self.signals.clear()
         self.score_snapshots.clear()

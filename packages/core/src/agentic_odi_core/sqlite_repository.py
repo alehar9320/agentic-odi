@@ -14,6 +14,8 @@ from agentic_odi_core.errors import ValidationError as OdiValidationError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    Alternative,
+    AlternativeLink,
     CustomerOutcome,
     Evidence,
     Job,
@@ -63,6 +65,8 @@ class SQLiteRepository(Repository):
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
+        self.alternatives: dict[str, Alternative] = {}
+        self.alternative_links: dict[tuple[str, str], AlternativeLink] = {}
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
@@ -174,6 +178,19 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.outcomes, p, Outcome)
         elif et == "CUSTOMER_OUTCOME_UPDATED":
             self._merge_updates(self.customer_outcomes, p, CustomerOutcome)
+        elif et == "ALTERNATIVE_CREATED":
+            self.alternatives[p["id"]] = Alternative.model_validate(p)
+        elif et == "ALTERNATIVE_UPDATED":
+            self._merge_updates(self.alternatives, p, Alternative)
+        elif et == "ALTERNATIVE_DELETED":
+            self.alternatives.pop(p["id"], None)
+            for link_key in [k for k in self.alternative_links if k[1] == p["id"]]:
+                del self.alternative_links[link_key]
+        elif et == "ALTERNATIVE_LINKED":
+            link = AlternativeLink.model_validate(p)
+            self.alternative_links[(link.outcome_id, link.alternative_id)] = link
+        elif et == "ALTERNATIVE_UNLINKED":
+            self.alternative_links.pop((p["outcome_id"], p["alternative_id"]), None)
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
@@ -183,6 +200,9 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
+            for key in [k for k, v in self.alternatives.items() if v.job_id == job_id]:
+                del self.alternatives[key]
+            self._drop_orphan_alternative_links()
             for key in [
                 k
                 for k, v in self.evidence.items()
@@ -199,6 +219,7 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
                 del self.customer_outcomes[key]
+            self._drop_orphan_alternative_links()
             for key in [
                 k
                 for k, v in self.evidence.items()
@@ -214,6 +235,7 @@ class SQLiteRepository(Repository):
                 del self.evidence[key]
             self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id != outcome_id]
             self.survey_input_sets.pop(outcome_id, None)
+            self._drop_orphan_alternative_links()
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
         elif et == "SCHEDULED_WORK_CREATED":
@@ -242,6 +264,15 @@ class SQLiteRepository(Repository):
         """
         for outcome_id in [k for k in self.survey_input_sets if k not in self.outcomes]:
             del self.survey_input_sets[outcome_id]
+
+    def _drop_orphan_alternative_links(self) -> None:
+        """Drop links whose outcome or alternative no longer exists."""
+        for key in [
+            k
+            for k in self.alternative_links
+            if k[0] not in self.outcomes or k[1] not in self.alternatives
+        ]:
+            del self.alternative_links[key]
 
     @staticmethod
     def _merge_updates(entities: dict[str, Any], p: dict, model: type[BaseModel]) -> None:
@@ -601,6 +632,89 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_alternative(self, alternative: Alternative) -> Alternative:
+        with self._lock:
+            self.store.append(
+                "ALTERNATIVE_CREATED",
+                alternative.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return alternative
+
+    def get_alternative(self, alternative_id: str) -> Alternative | None:
+        with self._lock:
+            self._sync()
+            return self.alternatives.get(alternative_id)
+
+    def list_alternatives(
+        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Alternative]:
+        with self._lock:
+            self._sync()
+            if job_id is None:
+                items = list(self.alternatives.values())
+            else:
+                items = [a for a in self.alternatives.values() if a.job_id == job_id]
+            return page(items, limit, offset)
+
+    def delete_alternative(self, alternative_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if alternative_id not in self.alternatives:
+                return False
+            self.store.append(
+                "ALTERNATIVE_DELETED",
+                {"id": alternative_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
+
+    def link_alternative(self, link: AlternativeLink) -> AlternativeLink:
+        with self._lock:
+            self.store.append(
+                "ALTERNATIVE_LINKED",
+                link.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return link
+
+    def get_alternative_link(self, outcome_id: str, alternative_id: str) -> AlternativeLink | None:
+        with self._lock:
+            self._sync()
+            return self.alternative_links.get((outcome_id, alternative_id))
+
+    def list_alternative_links(
+        self, outcome_id: str | None = None, alternative_id: str | None = None
+    ) -> list[AlternativeLink]:
+        with self._lock:
+            self._sync()
+            items = list(self.alternative_links.values())
+            if outcome_id is not None:
+                items = [link for link in items if link.outcome_id == outcome_id]
+            if alternative_id is not None:
+                items = [link for link in items if link.alternative_id == alternative_id]
+            return items
+
+    def unlink_alternative(self, outcome_id: str, alternative_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if (outcome_id, alternative_id) not in self.alternative_links:
+                return False
+            self.store.append(
+                "ALTERNATIVE_UNLINKED",
+                {"outcome_id": outcome_id, "alternative_id": alternative_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
 
     def add_signal(self, signal: Signal) -> Signal:
         with self._lock:

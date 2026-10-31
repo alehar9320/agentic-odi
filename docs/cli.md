@@ -436,6 +436,36 @@ agentic-odi outcomes score 8 2
 Set `AGENTIC_ODI_MCP_URL` (or `--mcp-url`) to point to a non-default server when
 using `--backend mcp` (default: `http://localhost:8000/mcp`).
 
+## Record what customers use today
+
+An opportunity score says a need is unmet; it does not say whether a solution
+exists and is merely disliked. The `alternatives` group records the alternatives
+in play for each Job — a product, a service, a workaround, a manual process, or
+`nothing` — and rates each one against an outcome with the customer's own
+`adequacy` (1–10). `nothing` is a real row and the most informative one, because
+it is the evidence for a new-market bet.
+
+```bash
+# Record what the customer uses today for a Job
+agentic-odi alternatives add --job-id <job-id> --name "Spreadsheet" --kind manual
+agentic-odi alternatives add --job-id <job-id> --name "Nothing today" --kind nothing
+
+# List the inventory for a Job
+agentic-odi alternatives list --job-id <job-id>
+
+# Rate an alternative against an outcome with the customer's own adequacy
+agentic-odi alternatives link <outcome-id> <alternative-id> --adequacy 7 --usage-n 12
+
+# Show one outcome's inventory and its solution state
+agentic-odi alternatives show <outcome-id>
+```
+
+`alternatives show` prints the explicit three-state result: `yes` when a
+solution is recorded, `no — the customer uses nothing today` when the only link
+is a `nothing` row, and `not yet inventoried — we have not asked` when there is
+no link at all. Only `yes` means a solution exists; an empty inventory is never
+rendered as "no solution".
+
 ## Schedule Work
 
 Schedule, inspect, cancel, and trigger background cloud agent work tasks:

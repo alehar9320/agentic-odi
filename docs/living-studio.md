@@ -415,6 +415,20 @@ per-dimension and opportunity differences plus a `direction` (`up`/`down`/
 `flat`) taken from the opportunity sign — a consumer never infers an
 "improvement" from a bare number. A missing dimension stays `null`, not `0`.
 
+The alternatives inventory records what a customer uses today for each Job — a
+product, a service, a workaround, a manual process, or `nothing` — and rates each
+against an outcome with the customer's own `adequacy` (1–10). The sidecar exposes
+`GET /api/alternatives` (optionally `?job_id=`), `GET /api/alternatives/{id}`,
+`POST /api/alternatives`, `DELETE /api/alternatives/{id}`, plus the per-outcome
+link reads and writes at `GET /api/outcomes/{id}/alternatives`,
+`POST /api/outcomes/{id}/alternatives`, `DELETE /api/outcomes/{id}/alternatives/{alternative_id}`
+and `GET /api/outcomes/{id}/existing-solution`. `Alternative`, `AlternativeLink`,
+`ExistingSolution` and `OutcomeAlternative` are exported from `types.ts` and read
+through `fetchAlternatives` / `linkAlternative`. The `existing-solution` read
+returns the explicit three-state result `yes | no_linked_nothing | no_link_at_all`,
+so the outcome detail can distinguish "we asked and there is nothing" from "we
+have not asked" without inferring a solution from a score.
+
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
 paragraph after it. The opportunity score is computed from importance and

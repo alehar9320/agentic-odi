@@ -157,3 +157,16 @@ The open issues this milestone still has to answer, grouped by what they change.
   described it. Pinned end to end by `test_trust_pillar.py`, which also
   re-bootstraps the stored band from the retained inputs after a reopen and
   asserts it matches bit for bit.
+- [x] **Alternatives inventory (M2-07)**: what a customer uses today is a
+  first-class record, not an inference from a score. `Alternative`
+  (`product|service|workaround|manual|nothing`) belongs to a Job, and
+  `AlternativeLink` carries the customer's own `adequacy` (1–10) and optional
+  `usage_n` against an Outcome. `has_existing_solution` returns the explicit
+  three-state result `yes | no_linked_nothing | no_link_at_all`, so "we asked and
+  there is nothing" is never confused with "we have not asked"; only `yes` means
+  a solution is recorded. The inventory is reachable through `add_alternative`,
+  `list_alternatives`, `link_alternative`, `get_outcome_alternatives` and
+  `get_has_existing_solution`, the `odi alternatives add|list|link|show` CLI, and
+  the Studio API. Deleting an alternative leaves its outcomes intact with no
+  orphan link; cross-job links and nonfinite or out-of-range adequacy are refused
+  before any event is written.

@@ -14,6 +14,7 @@ from typing import Any
 import typer
 
 from agentic_odi_cli import context, paths, update, version
+from agentic_odi_cli.alternatives import alternatives_app
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
@@ -47,6 +48,7 @@ app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desire
 app.add_typer(survey_app, name="survey", help="Import survey responses as measured scores.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
+app.add_typer(alternatives_app, name="alternatives", help="Record what customers use today.")
 app.add_typer(
     signals_app,
     name="signals",

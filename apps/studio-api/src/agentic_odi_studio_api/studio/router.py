@@ -61,6 +61,7 @@ from agentic_odi_studio_api.studio.probes import (
     list_models,
 )
 from agentic_odi_studio_api.studio.schemas import (
+    AddAlternativeRequest,
     AddConnectorRequest,
     AddCustomerOutcomeRequest,
     AddEvidenceRequest,
@@ -78,6 +79,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationTreeResponse,
     CreateJobRequest,
     LatestConversationResponse,
+    LinkAlternativeRequest,
     LlmHealthRequest,
     LlmProxyRequest,
     MarketplaceListingOut,
@@ -996,6 +998,166 @@ async def delete_customer_outcome(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True}
+
+
+@router.get("/alternatives")
+async def get_alternatives(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_ALTERNATIVES.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    alternatives = _service(request).list_alternatives(job_id)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in alternatives]}
+
+
+@router.get("/alternatives/{alternative_id}")
+async def get_alternative(
+    alternative_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_ALTERNATIVE.value,
+            {"alternative_id": alternative_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        alternative = _service(request).get_alternative(alternative_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": alternative.model_dump(mode="json")}
+
+
+@router.post("/alternatives")
+async def post_alternative(body: AddAlternativeRequest, request: Request) -> dict:
+    arguments = body.model_dump(exclude={"mcp_url"})
+    if _uses_mcp(request):
+        result = await call_mcp_tool(body.mcp_url, ToolName.ADD_ALTERNATIVE.value, arguments)
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        alternative = _service(request).add_alternative(
+            job_id=body.job_id,
+            name=body.name,
+            kind=body.kind,
+            notes=body.notes,
+            source_kind=body.source_kind,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": alternative.model_dump(mode="json")}
+
+
+@router.delete("/alternatives/{alternative_id}")
+async def delete_alternative(
+    alternative_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.DELETE_ALTERNATIVE.value,
+            {"alternative_id": alternative_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).delete_alternative(alternative_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.post("/outcomes/{outcome_id}/alternatives")
+async def link_alternative(outcome_id: str, body: LinkAlternativeRequest, request: Request) -> dict:
+    arguments = {"outcome_id": outcome_id, **body.model_dump(exclude={"mcp_url"})}
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.LINK_ALTERNATIVE.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        link = _service(request).link_alternative(
+            outcome_id=outcome_id,
+            alternative_id=body.alternative_id,
+            adequacy=body.adequacy,
+            usage_n=body.usage_n,
+            note=body.note,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": link.model_dump(mode="json")}
+
+
+@router.delete("/outcomes/{outcome_id}/alternatives/{alternative_id}")
+async def unlink_alternative(
+    outcome_id: str,
+    alternative_id: str,
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.UNLINK_ALTERNATIVE.value,
+            {"outcome_id": outcome_id, "alternative_id": alternative_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).unlink_alternative(outcome_id, alternative_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.get("/outcomes/{outcome_id}/alternatives")
+async def get_outcome_alternatives(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_ALTERNATIVES.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        pairs = _service(request).outcome_alternatives(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": [
+            {
+                "alternative": alternative.model_dump(mode="json"),
+                "link": link.model_dump(mode="json"),
+            }
+            for alternative, link in pairs
+        ],
+    }
+
+
+@router.get("/outcomes/{outcome_id}/existing-solution")
+async def get_has_existing_solution(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_HAS_EXISTING_SOLUTION.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        verdict = _service(request).has_existing_solution(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": {"outcome_id": outcome_id, "existing_solution": verdict}}
 
 
 @router.get("/evidence")

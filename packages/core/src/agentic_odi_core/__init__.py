@@ -42,6 +42,7 @@ from agentic_odi_core.messages import (
     CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
+    alternative_not_found,
     customer_outcome_not_found,
     evidence_not_found,
     job_not_found,
@@ -50,9 +51,13 @@ from agentic_odi_core.messages import (
     step_not_found,
 )
 from agentic_odi_core.models import (
+    ALTERNATIVE_SOURCE_KINDS,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     V2MOM,
+    Alternative,
+    AlternativeKind,
+    AlternativeLink,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -88,6 +93,7 @@ from agentic_odi_core.repository import InMemoryRepository, Repository
 from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.services import (
+    AlternativeNotFoundError,
     CustomerOutcomeNotFoundError,
     EvidenceNotFoundError,
     InvalidOutcomeStatementError,
@@ -137,6 +143,11 @@ __all__ = [
     "CAPABILITIES",
     "ConflictError",
     "CustomerOutcome",
+    "ALTERNATIVE_SOURCE_KINDS",
+    "Alternative",
+    "AlternativeKind",
+    "AlternativeLink",
+    "AlternativeNotFoundError",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
     "DeltaDirection",
@@ -215,6 +226,7 @@ __all__ = [
     "build_repository",
     "compute_opportunity_score",
     "create_job",
+    "alternative_not_found",
     "customer_outcome_not_found",
     "error_status",
     "evaluate_outcome_statement",

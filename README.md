@@ -120,6 +120,17 @@ score that no longer exists. Read them with `get_outcome_inputs`,
 `GET /api/outcomes/{id}/inputs`, or the CLI local backend; `null` means nothing
 is retained, a distinct state from a retained set and never an empty list that
 would read as zero responses.
+
+A score says a need is unmet; it does not say whether a solution exists and is
+merely disliked. The **alternatives inventory** records what a customer uses
+today for each Job — a product, a service, a workaround, a manual process, or
+`nothing` — and rates each against an outcome with the customer's own `adequacy`
+(1–10). The explicit three-state query distinguishes "we asked and there is
+nothing" from "we have not asked", so an un-inventoried outcome is never rendered
+as "no solution". Record it with `odi alternatives add|list|link|show`, the
+`add_alternative` / `link_alternative` / `get_outcome_alternatives` tools, or the
+Studio API.
+
 `odi top` answers "what should we build next?" from the measured section only —
 highest low end of the band first — naming the thin and unscored outcomes it
 left out, and `odi coverage` reports that split. An estimate can no longer

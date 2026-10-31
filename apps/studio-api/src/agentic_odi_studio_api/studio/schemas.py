@@ -128,6 +128,23 @@ class UpdateCustomerOutcomeRequest(BaseModel):
     step_id: str | None = None
 
 
+class AddAlternativeRequest(BaseModel):
+    mcp_url: str = ""
+    job_id: str
+    name: str
+    kind: str
+    notes: str | None = None
+    source_kind: str = "manual"
+
+
+class LinkAlternativeRequest(BaseModel):
+    mcp_url: str = ""
+    alternative_id: str
+    adequacy: float
+    usage_n: int | None = None
+    note: str | None = None
+
+
 class StudioBrief(BaseModel):
     """The user's context, captured during first-run onboarding."""
 

@@ -4,6 +4,8 @@ import type {
   AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
+  Alternative,
+  AlternativeLink,
   CanvasData,
   ChangelogData,
   ChatStreamRequest,
@@ -14,6 +16,7 @@ import type {
   Conversation,
   ConversationTree,
   CreateJobPayload,
+  ExistingSolution,
   Job,
   LatestConversation,
   LlmHealth,
@@ -24,6 +27,7 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
+  OutcomeAlternative,
   OutcomeInterval,
   OutcomeInputs,
   ScoreSnapshot,
@@ -399,6 +403,75 @@ export function fetchOutcomeInputs(
   return getJson<{ result: OutcomeInputs }>(
     `/api/outcomes/${encodeURIComponent(outcomeId)}/inputs?mcp_url=${encodeURIComponent(mcpUrl)}`,
   ).then((body) => body.result);
+}
+
+/** Fetch the alternatives recorded for a job (M2-07). */
+export function fetchAlternatives(jobId: string, mcpUrl: string): Promise<Alternative[]> {
+  return getJson<{ result: Alternative[] }>(
+    `/api/alternatives?job_id=${encodeURIComponent(jobId)}&mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/** Record what a customer uses today for one job (M2-07). */
+export function addAlternative(
+  input: { job_id: string; name: string; kind: string; notes?: string; source_kind?: string },
+  mcpUrl: string,
+): Promise<Alternative> {
+  return postJson<{ result: Alternative }>("/api/alternatives", {
+    ...input,
+    mcp_url: mcpUrl,
+  }).then((body) => body.result);
+}
+
+export function deleteAlternative(
+  alternativeId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/alternatives/${encodeURIComponent(alternativeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+/** Rate one alternative against one outcome with the customer's adequacy (M2-07). */
+export function linkAlternative(
+  outcomeId: string,
+  input: { alternative_id: string; adequacy: number; usage_n?: number; note?: string },
+  mcpUrl: string,
+): Promise<AlternativeLink> {
+  return postJson<{ result: AlternativeLink }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/alternatives`,
+    { ...input, mcp_url: mcpUrl },
+  ).then((body) => body.result);
+}
+
+export function unlinkAlternative(
+  outcomeId: string,
+  alternativeId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/alternatives/${encodeURIComponent(alternativeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+/** The alternatives recorded for one outcome, each with its adequacy link (M2-07). */
+export function fetchOutcomeAlternatives(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeAlternative[]> {
+  return getJson<{ result: OutcomeAlternative[] }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/alternatives?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/** Whether an existing solution is recorded for an outcome (M2-07). */
+export function fetchExistingSolution(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<ExistingSolution> {
+  return getJson<{ result: { outcome_id: string; existing_solution: ExistingSolution } }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/existing-solution?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result.existing_solution);
 }
 
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {

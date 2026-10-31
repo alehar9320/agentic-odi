@@ -465,6 +465,78 @@ def render_signal_list(signals: Any, *, as_json: bool) -> str:
     )
 
 
+def render_alternative(item: Any, *, as_json: bool) -> str:
+    """Render one alternative as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("job_id", item.get("job_id", "")),
+            ("name", item.get("name", "")),
+            ("kind", item.get("kind", "")),
+            ("source_kind", item.get("source_kind", "")),
+            ("notes", _note_cell(item.get("notes"))),
+        ]
+    )
+
+
+def render_alternative_list(
+    items: Any, *, as_json: bool, empty: str = "No alternatives found."
+) -> str:
+    """Render alternatives as an aligned table or JSON.
+
+    ``get_outcome_alternatives`` returns ``{alternative, link}`` pairs; a plain
+    job-level list returns bare alternatives. Both render under the same table,
+    so a caller never sees two shapes for the same noun.
+    """
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    rows: list[tuple[str, ...]] = []
+    for item in items:
+        if isinstance(item, dict) and "alternative" in item:
+            alternative = item.get("alternative") or {}
+            link = item.get("link") or {}
+        else:
+            alternative = item
+            link = {}
+        rows.append(
+            (
+                str(alternative.get("id", "")),
+                _truncate(str(alternative.get("name", ""))),
+                _cell(alternative, "kind"),
+                _num(link.get("adequacy", "")),
+                str(link.get("usage_n", "") or ""),
+            )
+        )
+    return _table(
+        ("id", "name", "kind", "adequacy", "usage_n"),
+        rows,
+        empty=empty,
+    )
+
+
+def render_existing_solution(verdict: Any, *, as_json: bool) -> str:
+    """Render the three-state existing-solution result.
+
+    ``yes`` means a solution is recorded; ``no_linked_nothing`` means we asked
+    and the customer uses nothing today; ``no_link_at_all`` means we have not
+    asked. Only ``yes`` means a solution exists.
+    """
+    if as_json:
+        return _json(verdict)
+    state = verdict.get("existing_solution") if isinstance(verdict, dict) else verdict
+    if state == "yes":
+        return "Existing solution: yes — a solution is recorded."
+    if state == "no_linked_nothing":
+        return "Existing solution: no — the customer uses nothing today."
+    return "Existing solution: not yet inventoried — we have not asked."
+
+
 def render_saved(verb: str, outcome: Any, *, as_json: bool, noun: str = "Customer outcome") -> str:
     """Confirm a create/update, showing the record by default."""
     if not isinstance(outcome, dict):

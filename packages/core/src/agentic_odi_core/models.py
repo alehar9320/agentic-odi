@@ -369,6 +369,58 @@ class CustomerOutcome(BaseModel):
         return self.customer_value.opportunity_score
 
 
+#: B-provisional convention (M2-07). The *allowed values* of ``source_kind`` and
+#: their meaning are not yet approved, so the product runs on this named set:
+#: ``manual`` (a person typed it), ``interview`` (recorded from a research
+#: conversation), ``import`` (landed from a file), ``customer`` (the customer
+#: supplied it directly). The field is a plain string so an unapproved value is
+#: never silently dropped; the set is named here in one place and swappable.
+ALTERNATIVE_SOURCE_KINDS = ("manual", "interview", "import", "customer")
+
+#: M2-07 provisional convention. The alternative *kinds* a customer can be using
+#: today. ``nothing`` is a real, informative row: it is the evidence for a
+#: new-market bet, not an absent one.
+AlternativeKind = Literal["product", "service", "workaround", "manual", "nothing"]
+
+
+class Alternative(BaseModel):
+    """What a customer uses today for one Job (M2-07).
+
+    A competitor, a spreadsheet, a workaround, or nothing. Recorded so
+    "underserved" has something to be underserved relative to. An alternative is
+    never inferred from a score or created by an import: it is customer-provided.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str = Field(..., description="The ID of the Job this alternative serves")
+    name: str = Field(..., min_length=1, description="Short human-readable label")
+    kind: AlternativeKind = Field(..., description="What kind of alternative this is")
+    notes: str | None = Field(None, description="Customer-provided source notes, kept as text")
+    source_kind: str = Field(
+        "manual",
+        description="Where the record came from; see ALTERNATIVE_SOURCE_KINDS (provisional)",
+    )
+
+
+class AlternativeLink(BaseModel):
+    """A customer's adequacy rating for one alternative against one outcome (M2-07).
+
+    Adequacy belongs to the link, not the alternative: the same competitor is
+    adequate for one need and useless for another. The rating is the customer's
+    own, never derived from the opportunity score.
+    """
+
+    outcome_id: str = Field(..., description="The outcome this link rates")
+    alternative_id: str = Field(..., description="The alternative this link rates")
+    adequacy: float = Field(
+        ..., ge=1.0, le=10.0, description="How adequate the alternative is for the outcome (1-10)"
+    )
+    usage_n: int | None = Field(
+        None, ge=1, description="People behind the rating, when known; unknown stays None"
+    )
+    note: str | None = Field(None, description="Customer-provided note, kept as text")
+
+
 class SignalKind(str, Enum):
     """The facts a signal may report. Every kind here has a real producer."""
 
