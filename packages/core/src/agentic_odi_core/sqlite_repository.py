@@ -142,16 +142,16 @@ class SQLiteRepository(Repository):
                 del self.customer_outcomes[key]
             #: Do not destroy research evidence: unlink references to the removed
             #: job, its steps and its outcomes instead of deleting the rows.
-            for key, ev in list(self.evidence.items()):
+            for key, record in list(self.evidence.items()):
                 updates: dict[str, Any] = {}
-                if ev.job_id == job_id:
+                if record.job_id == job_id:
                     updates["job_id"] = None
-                if ev.step_id in deleted_steps:
+                if record.step_id in deleted_steps:
                     updates["step_id"] = None
-                if ev.outcome_id in deleted_outcomes:
+                if record.outcome_id in deleted_outcomes:
                     updates["outcome_id"] = None
                 if updates:
-                    current = ev.model_dump(exclude_unset=True)
+                    current = record.model_dump(exclude_unset=True)
                     current.update(updates)
                     self.evidence[key] = Evidence.model_validate(current)
         elif et == "STEP_DELETED":
@@ -162,9 +162,9 @@ class SQLiteRepository(Repository):
             for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
                 del self.customer_outcomes[key]
             #: Unlink evidence instead of destroying it.
-            for key, ev in list(self.evidence.items()):
-                if ev.step_id == step_id:
-                    current = ev.model_dump(exclude_unset=True)
+            for key, record in list(self.evidence.items()):
+                if record.step_id == step_id:
+                    current = record.model_dump(exclude_unset=True)
                     current["step_id"] = None
                     self.evidence[key] = Evidence.model_validate(current)
         elif et == "OUTCOME_DELETED":
@@ -172,9 +172,9 @@ class SQLiteRepository(Repository):
             self.outcomes.pop(outcome_id, None)
             #: Unlink evidence instead of destroying it: point outcome_id to NULL
             #: so the quote survives the outcome's removal.
-            for key, ev in list(self.evidence.items()):
-                if ev.outcome_id == outcome_id:
-                    current = ev.model_dump(exclude_unset=True)
+            for key, record in list(self.evidence.items()):
+                if record.outcome_id == outcome_id:
+                    current = record.model_dump(exclude_unset=True)
                     current["outcome_id"] = None
                     self.evidence[key] = Evidence.model_validate(current)
         elif et == "EVIDENCE_DELETED":
@@ -499,20 +499,21 @@ class SQLiteRepository(Repository):
                 source_kind, source_name, name, content, url, raw
             )
             for existing in self.evidence.values():
-                if compute_evidence_fingerprint(
-                    existing.source_kind,
-                    existing.source_name,
-                    existing.name,
-                    existing.content,
-                    existing.url,
-                    existing.raw,
-                ) == fingerprint:
+                if (
+                    compute_evidence_fingerprint(
+                        existing.source_kind,
+                        existing.source_name,
+                        existing.name,
+                        existing.content,
+                        existing.url,
+                        existing.raw,
+                    )
+                    == fingerprint
+                ):
                     return existing
             return None
 
-    def update_evidence(
-        self, evidence_id: str, updates: dict[str, Any]
-    ) -> Evidence | None:
+    def update_evidence(self, evidence_id: str, updates: dict[str, Any]) -> Evidence | None:
         with self._lock:
             self._sync()
             evidence = self.evidence.get(evidence_id)

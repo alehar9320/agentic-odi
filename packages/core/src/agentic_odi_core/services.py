@@ -34,7 +34,7 @@ from agentic_odi_core.models import (
     Step,
     compute_opportunity_score,
 )
-from agentic_odi_core.repository import Repository, compute_evidence_fingerprint, page
+from agentic_odi_core.repository import Repository, page
 
 
 class JobNotFoundError(NotFoundError):

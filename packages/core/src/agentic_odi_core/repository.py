@@ -411,14 +411,17 @@ class InMemoryRepository:
             source_kind, source_name, name, content, url, raw
         )
         for existing in self.evidence.values():
-            if compute_evidence_fingerprint(
-                existing.source_kind,
-                existing.source_name,
-                existing.name,
-                existing.content,
-                existing.url,
-                existing.raw,
-            ) == fingerprint:
+            if (
+                compute_evidence_fingerprint(
+                    existing.source_kind,
+                    existing.source_name,
+                    existing.name,
+                    existing.content,
+                    existing.url,
+                    existing.raw,
+                )
+                == fingerprint
+            ):
                 return existing
         return None
 

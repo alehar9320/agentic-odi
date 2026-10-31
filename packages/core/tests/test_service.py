@@ -8,7 +8,6 @@ from agentic_odi_core.models import (
     BusinessValue,
     CustomerValue,
     Direction,
-    Evidence,
     Job,
     Outcome,
 )
@@ -379,8 +378,9 @@ def test_evidence_delete_and_promote(service: ODIService) -> None:
     assert isinstance(outcome, Outcome)
     assert outcome.statement == "Minimize the time to review a quote when feedback arrives"
     assert outcome.opportunity_score == 12.0
-    with pytest.raises(ValueError):
-        service.promote_evidence(evidence.id, "outcome")
+    #: Promotion is idempotent: re-promoting returns the same outcome, and the
+    #: evidence now links back to it instead of being promoted twice.
+    assert service.promote_evidence(evidence.id, "outcome").id == outcome.id
     with pytest.raises(ValueError):
         service.promote_evidence(evidence.id, "solution")
 
@@ -445,18 +445,20 @@ def test_promote_evidence_is_idempotent_and_links_back(service: ODIService) -> N
         evidence.id,
         "outcome",
         job_id=job.id,
-        statement="Minimize the time to rotate secrets",
+        statement="Minimize the time to rotate secrets when deploying",
         importance=8.0,
         satisfaction=4.0,
     )
     #: The evidence row now points back at the outcome.
-    assert service.get_evidence(evidence.id).outcome_id == outcome.id
+    linked = service.get_evidence(evidence.id)
+    assert linked is not None
+    assert linked.outcome_id == outcome.id
     #: Re-promoting the same evidence returns the existing outcome, not a copy.
     again = service.promote_evidence(
         evidence.id,
         "outcome",
         job_id=job.id,
-        statement="Minimize the time to rotate secrets",
+        statement="Minimize the time to rotate secrets when deploying",
         importance=8.0,
         satisfaction=4.0,
     )
@@ -466,7 +468,12 @@ def test_promote_evidence_is_idempotent_and_links_back(service: ODIService) -> N
 
 def test_delete_outcome_unlinks_evidence(service: ODIService) -> None:
     job = service.add_job("Job")
-    outcome = service.add_outcome(job.id, "Min x", importance=5.0, satisfaction=5.0)
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time to review a quote when feedback arrives",
+        importance=5.0,
+        satisfaction=5.0,
+    )
     evidence = service.add_evidence(
         source_name="gong",
         source_kind="mcp",
