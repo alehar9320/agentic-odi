@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
@@ -41,6 +42,33 @@ JOB_STAGE_ORDER: list[JobStage] = [
 JOB_STAGE_INDEX: dict[JobStage, int] = {
     stage: index + 1 for index, stage in enumerate(JOB_STAGE_ORDER)
 }
+
+JOB_STAGE_DESCRIPTIONS: dict[JobStage, str] = {
+    JobStage.DEFINE: "Determine goals and criteria",
+    JobStage.LOCATE: "Gather inputs and resources",
+    JobStage.PREPARE: "Set up context and workspace",
+    JobStage.CONFIRM: "Verify readiness to execute",
+    JobStage.EXECUTE: "Carry out core job work",
+    JobStage.MONITOR: "Track performance and errors",
+    JobStage.MODIFY: "Adjust inputs or workflows",
+    JobStage.CONCLUDE: "Finish and store outputs",
+}
+
+
+def job_stage_catalog() -> list[dict[str, str]]:
+    """The eight Universal Job Map stages as display data.
+
+    ``apps/studio/src/domain/jobStages.ts`` is generated from this function
+    (``scripts/gen_job_stages.py``); a contract test fails if the two drift.
+    """
+    return [
+        {
+            "id": stage.value,
+            "name": f"{index}. {stage.value.capitalize()}",
+            "desc": JOB_STAGE_DESCRIPTIONS[stage],
+        }
+        for index, stage in enumerate(JOB_STAGE_ORDER, start=1)
+    ]
 
 
 class BusinessImpactCategory(str, Enum):
@@ -151,12 +179,17 @@ class Evidence(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     source_name: str = Field(..., description="Connector or person that produced the record")
-    source_kind: str = Field(..., description="Connector kind, e.g. mcp, rest, webhook, manual")
+    source_kind: str = Field(
+        ..., description="Connector kind, e.g. mcp, rest, webhook, manual — or demo for a fixture"
+    )
     item_type: EvidenceItemType = Field(
         "manual", description="Normalized record kind produced by the connector"
     )
     name: str = Field(..., description="Short human-readable label for the record")
     content: str = Field(..., description="Normalized text content of the record")
+    url: str | None = Field(
+        None, description="External URL/link to the signal/evidence in the source system"
+    )
     raw: dict[str, Any] = Field(default_factory=dict, description="Original record payload")
     job_id: str | None = Field(None, description="Job this evidence supports")
     step_id: str | None = Field(None, description="Job-map Step this evidence supports")
@@ -277,3 +310,106 @@ class MeasurementRecord(BaseModel):
     metric: str = Field(..., description="The metric that was measured")
     value: float | None = Field(default=None, description="The measured value, if taken")
     observed_at: str = Field(..., description="ISO-8601 timestamp of the observation")
+
+
+class SignalKind(str, Enum):
+    """The facts a signal may report. Every kind here has a real producer."""
+
+    OUTCOME_SCORED = "outcome_scored"
+    OPPORTUNITY_CROSSED = "opportunity_crossed"
+    EVIDENCE_INGESTED = "evidence_ingested"
+    EVIDENCE_PROMOTED = "evidence_promoted"
+    JOB_ADDED = "job_added"
+    JOB_MAP_COMPLETED = "job_map_completed"
+
+
+SignalSeverity = Literal["info", "notice", "urgent"]
+
+
+class Signal(BaseModel):
+    """One fact that happened in the store, surfaced in the Catch Up feed."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kind: SignalKind
+    title: str = Field(..., max_length=120, description="One line, at most 120 characters")
+    detail: str | None = None
+    subject_kind: (
+        Literal["job", "step", "outcome", "evidence", "connector", "agent_work"] | None
+    ) = None
+    subject_id: str | None = None
+    severity: SignalSeverity = "info"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    read_at: datetime | None = None
+    dismissed_at: datetime | None = None
+    #: True when the attention budget withheld this signal from the feed.
+    suppressed: bool = False
+    fingerprint: str = Field(
+        ..., description="sha256 of kind|subject_kind|subject_id|discriminator"
+    )
+
+
+class V2MOM(BaseModel):
+    """The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
+
+    Only ``vision`` has an input path today, in the Studio's context
+    conversation. Nothing extracts the other four from a conversation and no
+    surface captures them, so a V2MOM in practice is its vision and four empty
+    lists.
+    """
+
+    vision: str = Field("", description="What you want to achieve or create")
+    values: list[str] = Field(
+        default_factory=list, description="Principles and beliefs that guide decisions"
+    )
+    methods: list[str] = Field(
+        default_factory=list, description="Actions and strategies to achieve the vision"
+    )
+    obstacles: list[str] = Field(
+        default_factory=list, description="Challenges and risks that stand in the way"
+    )
+    measures: list[str] = Field(
+        default_factory=list, description="Metrics and key results that measure success"
+    )
+
+
+class ScheduledWorkStatus(str, Enum):
+    PENDING = "pending"
+    SCHEDULED = "scheduled"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ScheduledWorkTriggerType(str, Enum):
+    ONESHOT = "oneshot"
+    CRON = "cron"
+    INTERVAL = "interval"
+
+
+class ScheduledWork(BaseModel):
+    """A scheduled task or agent run in the cloud."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = Field(..., description="Name or title of the scheduled work task")
+    agent_id: str = Field(
+        "default-agent", description="ID/alias of the agent assigned to run the work"
+    )
+    trigger_type: ScheduledWorkTriggerType = Field(
+        ScheduledWorkTriggerType.ONESHOT, description="Trigger mechanism (oneshot, cron, interval)"
+    )
+    schedule_expression: str = Field(
+        ...,
+        description="ISO timestamp, relative delay, or cron expression (e.g. '0 * * * *' or '+1h')",
+    )
+    payload: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters or prompt for the cloud task"
+    )
+    status: ScheduledWorkStatus = Field(
+        ScheduledWorkStatus.SCHEDULED, description="Current status of the task"
+    )
+    job_id: str | None = Field(None, description="Associated ODI Job ID, if any")
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
+    next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
+    result_summary: str | None = Field(None, description="Execution outcome or error summary")

@@ -13,6 +13,7 @@ def test_schema_exposes_every_odi_entity() -> None:
         "BusinessValue",
         "CustomerOutcome",
         "Evidence",
+        "V2MOM",
     } <= set(schema)
 
 

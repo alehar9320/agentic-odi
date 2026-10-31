@@ -141,7 +141,7 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 
 <!-- BEGIN GENERATED TOOLS (scripts/integration_guide.py) -->
 
-42 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
+50 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
 
 | Tool | Effect | Stage | Required arguments | Purpose |
 | ---- | ------ | ----- | ------------------ | ------- |
@@ -187,6 +187,14 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `record_decision` | `write` | — | `subject_id`, `choice`, `rationale` | Record a decision about a subject, with its rationale. |
 | `track_bet` | `write` | — | `decision_id`, `statement`, `metric` | Track a bet under a decision, with the metric that would move. |
 | `get_measurement` | `read` | — | `bet_id` | Read what a bet measured; an unmeasured bet reports nothing yet. |
+| `list_signals` | `read` | — | — | List recorded signals, newest first, one page at a time. |
+| `mark_signal_read` | `write` | — | `signal_id` | Mark a signal as read so it stops counting toward the unread badge. |
+| `dismiss_signal` | `write` | — | `signal_id` | Dismiss a signal; it stays recorded but leaves the feed. |
+| `schedule_work` | `write` | — | `name`, `schedule_expression` | Schedule agent work with a cron or one-shot expression. |
+| `get_scheduled_work` | `read` | — | `work_id` | Fetch one scheduled work item by id. |
+| `list_scheduled_work` | `read` | — | — | List scheduled work, optionally for one Job or status. |
+| `cancel_scheduled_work` | `write` | — | `work_id` | Cancel a scheduled work item. |
+| `trigger_scheduled_work` | `write` | — | `work_id` | Dispatch a scheduled work item immediately. |
 
 <!-- END GENERATED TOOLS -->
 

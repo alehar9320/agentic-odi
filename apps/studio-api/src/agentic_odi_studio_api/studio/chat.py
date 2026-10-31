@@ -65,6 +65,9 @@ MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
     "remove_",
 )
 
+#: Writes whose names do not follow the verb-prefix convention.
+MUTATING_TOOLS: frozenset[str] = frozenset({"promote_evidence"})
+
 #: Attachments are context, not a corpus: five files, and a bounded slice of each.
 MAX_ATTACHMENTS = 5
 MAX_ATTACHMENT_TEXT = 20_000
@@ -75,7 +78,7 @@ MAX_SOURCE_PREVIEW = 160
 
 def is_mutating_tool(name: str) -> bool:
     """Whether a tool call changes stored data and should be confirmed."""
-    return name.startswith(MUTATING_TOOL_PREFIXES)
+    return name in MUTATING_TOOLS or name.startswith(MUTATING_TOOL_PREFIXES)
 
 
 SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.
@@ -105,6 +108,17 @@ def _brief_lines(brief: StudioBrief | None) -> list[str]:
         ("Job to be done", brief.job_statement),
         ("Core problem", brief.core_problem),
     ]
+    if brief.v2mom:
+        if brief.v2mom.vision:
+            facts.append(("Vision (V2MOM)", brief.v2mom.vision))
+        if brief.v2mom.values:
+            facts.append(("Values (V2MOM)", ", ".join(brief.v2mom.values)))
+        if brief.v2mom.methods:
+            facts.append(("Methods (V2MOM)", ", ".join(brief.v2mom.methods)))
+        if brief.v2mom.obstacles:
+            facts.append(("Obstacles (V2MOM)", ", ".join(brief.v2mom.obstacles)))
+        if brief.v2mom.measures:
+            facts.append(("Measures (V2MOM)", ", ".join(brief.v2mom.measures)))
     return [f"- {label}: {value}" for label, value in facts if value.strip()]
 
 
@@ -721,9 +735,17 @@ async def _turn_frames(
                     result_str = declined
                     yield frame("tool", {"name": name, "status": "declined", "preview": declined})
                 elif name == "add_connector":
+                    yield frame("tool", {"name": name, "status": "start"})
                     result_str, events = _apply_add_connector(arguments, connector_service)
                     for event in events:
                         yield frame(event["event"], event["data"])
+                    if result_str.startswith("Error:"):
+                        counters["tool_errors"] += 1
+                        yield frame(
+                            "tool", {"name": name, "status": "error", "preview": result_str}
+                        )
+                    else:
+                        yield frame("tool", {"name": name, "status": "ok"})
                 elif name == "remember":
                     yield frame("tool", {"name": name, "status": "start"})
                     result_str, memory_event = _apply_remember(arguments, memory)

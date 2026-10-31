@@ -6,10 +6,12 @@ import { EvidenceStream } from "../canvas/EvidenceStream";
 import { JobMap } from "../canvas/JobMap";
 import { MemoryPanel } from "../canvas/MemoryPanel";
 import { OpportunityLandscape } from "../canvas/OpportunityLandscape";
+import { SchedulePanel } from "../canvas/SchedulePanel";
 import { CatchUpFeed } from "../notifications/CatchUpFeed";
 import { SettingsPanel } from "../SettingsPanel";
 import {
   BellIcon,
+  BoltIcon,
   CaptureIcon,
   CompassIcon,
   RouteIcon,
@@ -103,6 +105,14 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
       intent:
         "Here's what you've learned about me and the work so far. Ask me what's wrong or missing, and update your notes.",
     },
+  },
+  {
+    id: "schedule",
+    label: "Schedule",
+    title: "Cloud Agent Scheduling",
+    blurb: "Schedule, trigger, and inspect background cloud agent tasks.",
+    icon: <BoltIcon />,
+    render: () => <SchedulePanel />,
   },
   {
     id: "capture",

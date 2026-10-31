@@ -112,6 +112,7 @@ async def test_live_registry_snapshot() -> None:
                     "source_kind": {"type": "string"},
                     "source_name": {"type": "string"},
                     "step_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "url": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
                 },
                 "required": ["content", "name", "source_kind", "source_name"],
                 "type": "object",
@@ -171,6 +172,12 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["job_id", "name", "order"],
                 "type": "object",
             },
+            "cancel_scheduled_work": {
+                "additionalProperties": False,
+                "properties": {"work_id": {"type": "string"}},
+                "required": ["work_id"],
+                "type": "object",
+            },
             "compute_opportunity": {
                 "additionalProperties": False,
                 "properties": {
@@ -208,6 +215,12 @@ async def test_live_registry_snapshot() -> None:
                 "additionalProperties": False,
                 "properties": {"step_id": {"type": "string"}},
                 "required": ["step_id"],
+                "type": "object",
+            },
+            "dismiss_signal": {
+                "additionalProperties": False,
+                "properties": {"signal_id": {"type": "string"}},
+                "required": ["signal_id"],
                 "type": "object",
             },
             "evaluate_outcome": {
@@ -324,6 +337,12 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["job_id"],
                 "type": "object",
             },
+            "get_scheduled_work": {
+                "additionalProperties": False,
+                "properties": {"work_id": {"type": "string"}},
+                "required": ["work_id"],
+                "type": "object",
+            },
             "get_step": {
                 "additionalProperties": False,
                 "properties": {"step_id": {"type": "string"}},
@@ -362,6 +381,28 @@ async def test_live_registry_snapshot() -> None:
                     },
                     "step_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
                 },
+                "type": "object",
+            },
+            "list_scheduled_work": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "status": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                },
+                "type": "object",
+            },
+            "list_signals": {
+                "additionalProperties": False,
+                "properties": {
+                    "limit": {"default": 50, "type": "integer"},
+                    "unread_only": {"default": False, "type": "boolean"},
+                },
+                "type": "object",
+            },
+            "mark_signal_read": {
+                "additionalProperties": False,
+                "properties": {"signal_id": {"type": "string"}},
+                "required": ["signal_id"],
                 "type": "object",
             },
             "merge_candidate": {
@@ -409,6 +450,25 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["candidate_id", "reason"],
                 "type": "object",
             },
+            "schedule_work": {
+                "additionalProperties": False,
+                "properties": {
+                    "agent_id": {"default": "default-agent", "type": "string"},
+                    "job_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "name": {"type": "string"},
+                    "payload": {
+                        "anyOf": [
+                            {"additionalProperties": True, "type": "object"},
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                    },
+                    "schedule_expression": {"type": "string"},
+                    "trigger_type": {"default": "oneshot", "type": "string"},
+                },
+                "required": ["name", "schedule_expression"],
+                "type": "object",
+            },
             "track_bet": {
                 "additionalProperties": False,
                 "properties": {
@@ -417,6 +477,12 @@ async def test_live_registry_snapshot() -> None:
                     "statement": {"type": "string"},
                 },
                 "required": ["decision_id", "metric", "statement"],
+                "type": "object",
+            },
+            "trigger_scheduled_work": {
+                "additionalProperties": False,
+                "properties": {"work_id": {"type": "string"}},
+                "required": ["work_id"],
                 "type": "object",
             },
             "update_customer_outcome": {
@@ -561,6 +627,7 @@ def test_declared_tool_surface_snapshot() -> None:
                     "source_kind",
                     "source_name",
                     "step_id",
+                    "url",
                 ],
                 "effect": "write",
                 "required": ["content", "name", "source_kind", "source_name"],
@@ -591,6 +658,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The created Step.",
                 "stage": "3",
                 "summary": "Add a step to a Job's job map.",
+            },
+            "cancel_scheduled_work": {
+                "arguments": ["work_id"],
+                "effect": "write",
+                "required": ["work_id"],
+                "returns": "The cancelled scheduled work item.",
+                "stage": None,
+                "summary": "Cancel a scheduled work item.",
             },
             "compute_opportunity": {
                 "arguments": ["importance", "satisfaction"],
@@ -639,6 +714,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The deleted Step ID.",
                 "stage": "3",
                 "summary": "Delete a Step and its cascading dependents.",
+            },
+            "dismiss_signal": {
+                "arguments": ["signal_id"],
+                "effect": "write",
+                "required": ["signal_id"],
+                "returns": "The updated Signal.",
+                "stage": None,
+                "summary": "Dismiss a signal; it stays recorded but leaves the feed.",
             },
             "evaluate_outcome": {
                 "arguments": ["job_id", "statement"],
@@ -776,6 +859,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": "2",
                 "summary": "List desired Outcomes for a Job.",
             },
+            "get_scheduled_work": {
+                "arguments": ["work_id"],
+                "effect": "read",
+                "required": ["work_id"],
+                "returns": "The scheduled work item, or an error string if not found.",
+                "stage": None,
+                "summary": "Get a scheduled work item by ID.",
+            },
             "get_step": {
                 "arguments": ["step_id"],
                 "effect": "read",
@@ -807,6 +898,30 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "A list of Evidence records.",
                 "stage": None,
                 "summary": "List evidence records, optionally filtered by job/step/outcome.",
+            },
+            "list_scheduled_work": {
+                "arguments": ["job_id", "status"],
+                "effect": "read",
+                "required": [],
+                "returns": "A list of scheduled work items.",
+                "stage": None,
+                "summary": "List scheduled work, optionally filtered by Job or status.",
+            },
+            "list_signals": {
+                "arguments": ["limit", "unread_only"],
+                "effect": "read",
+                "required": [],
+                "returns": "A list of Signals, newest first.",
+                "stage": None,
+                "summary": "List signals the store recorded — real changes worth attention.",
+            },
+            "mark_signal_read": {
+                "arguments": ["signal_id"],
+                "effect": "write",
+                "required": ["signal_id"],
+                "returns": "The updated Signal.",
+                "stage": None,
+                "summary": "Mark a signal as read so it stops counting toward the unread badge.",
             },
             "merge_candidate": {
                 "arguments": ["candidate_id", "merged_into"],
@@ -848,6 +963,21 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": "2",
                 "summary": "Reject a proposed outcome; a non-empty reason is required and kept.",
             },
+            "schedule_work": {
+                "arguments": [
+                    "agent_id",
+                    "job_id",
+                    "name",
+                    "payload",
+                    "schedule_expression",
+                    "trigger_type",
+                ],
+                "effect": "write",
+                "required": ["name", "schedule_expression"],
+                "returns": "The created scheduled work item.",
+                "stage": None,
+                "summary": "Schedule agent work with a cron or one-shot expression.",
+            },
             "track_bet": {
                 "arguments": ["decision_id", "metric", "statement"],
                 "effect": "write",
@@ -855,6 +985,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The tracked bet.",
                 "stage": None,
                 "summary": "Track a bet under a decision, with the metric that would move.",
+            },
+            "trigger_scheduled_work": {
+                "arguments": ["work_id"],
+                "effect": "write",
+                "required": ["work_id"],
+                "returns": "The dispatched scheduled work item.",
+                "stage": None,
+                "summary": "Dispatch a scheduled work item immediately.",
             },
             "update_customer_outcome": {
                 "arguments": [
@@ -1282,7 +1420,7 @@ why, and is the parent of the :class:`BetRecord` that tests it.\
                         "type": "object",
                     },
                     "source_kind": {
-                        "description": "Connector kind, e.g. mcp, rest, webhook, manual",
+                        "description": "Connector kind, e.g. mcp, rest, webhook, manual — or demo for a fixture",
                         "title": "Source Kind",
                         "type": "string",
                     },
@@ -1296,6 +1434,12 @@ why, and is the parent of the :class:`BetRecord` that tests it.\
                         "default": None,
                         "description": "Job-map Step this evidence supports",
                         "title": "Step Id",
+                    },
+                    "url": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "External URL/link to the signal/evidence in the source system",
+                        "title": "Url",
                     },
                 },
                 "required": ["content", "name", "source_kind", "source_name"],
@@ -1519,6 +1663,91 @@ rather than owning it.\
                 "title": "OutcomeCandidate",
                 "type": "object",
             },
+            "ScheduledWork": {
+                "$defs": {
+                    "ScheduledWorkStatus": {
+                        "enum": [
+                            "cancelled",
+                            "completed",
+                            "failed",
+                            "pending",
+                            "running",
+                            "scheduled",
+                        ],
+                        "title": "ScheduledWorkStatus",
+                        "type": "string",
+                    },
+                    "ScheduledWorkTriggerType": {
+                        "enum": ["cron", "interval", "oneshot"],
+                        "title": "ScheduledWorkTriggerType",
+                        "type": "string",
+                    },
+                },
+                "description": "A scheduled task or agent run in the cloud.",
+                "properties": {
+                    "agent_id": {
+                        "default": "default-agent",
+                        "description": "ID/alias of the agent assigned to run the work",
+                        "title": "Agent Id",
+                        "type": "string",
+                    },
+                    "created_at": {"title": "Created At", "type": "string"},
+                    "id": {"title": "Id", "type": "string"},
+                    "job_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "Associated ODI Job ID, if any",
+                        "title": "Job Id",
+                    },
+                    "last_run_at": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "ISO timestamp of last execution",
+                        "title": "Last Run At",
+                    },
+                    "name": {
+                        "description": "Name or title of the scheduled work task",
+                        "title": "Name",
+                        "type": "string",
+                    },
+                    "next_run_at": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "ISO timestamp of next scheduled execution",
+                        "title": "Next Run At",
+                    },
+                    "payload": {
+                        "additionalProperties": True,
+                        "description": "Parameters or prompt for the cloud task",
+                        "title": "Payload",
+                        "type": "object",
+                    },
+                    "result_summary": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "Execution outcome or error summary",
+                        "title": "Result Summary",
+                    },
+                    "schedule_expression": {
+                        "description": "ISO timestamp, relative delay, or cron expression (e.g. '0 * * * *' or '+1h')",
+                        "title": "Schedule Expression",
+                        "type": "string",
+                    },
+                    "status": {
+                        "$ref": "#/$defs/ScheduledWorkStatus",
+                        "default": "scheduled",
+                        "description": "Current status of the task",
+                    },
+                    "trigger_type": {
+                        "$ref": "#/$defs/ScheduledWorkTriggerType",
+                        "default": "oneshot",
+                        "description": "Trigger mechanism (oneshot, cron, interval)",
+                    },
+                },
+                "required": ["name", "schedule_expression"],
+                "title": "ScheduledWork",
+                "type": "object",
+            },
             "Step": {
                 "$defs": {
                     "JobStage": {
@@ -1578,6 +1807,50 @@ rather than owning it.\
                 },
                 "required": ["job_id", "name", "order"],
                 "title": "Step",
+                "type": "object",
+            },
+            "V2MOM": {
+                "description": """\
+The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
+
+Only ``vision`` has an input path today, in the Studio's context
+conversation. Nothing extracts the other four from a conversation and no
+surface captures them, so a V2MOM in practice is its vision and four empty
+lists.\
+""",
+                "properties": {
+                    "measures": {
+                        "description": "Metrics and key results that measure success",
+                        "items": {"type": "string"},
+                        "title": "Measures",
+                        "type": "array",
+                    },
+                    "methods": {
+                        "description": "Actions and strategies to achieve the vision",
+                        "items": {"type": "string"},
+                        "title": "Methods",
+                        "type": "array",
+                    },
+                    "obstacles": {
+                        "description": "Challenges and risks that stand in the way",
+                        "items": {"type": "string"},
+                        "title": "Obstacles",
+                        "type": "array",
+                    },
+                    "values": {
+                        "description": "Principles and beliefs that guide decisions",
+                        "items": {"type": "string"},
+                        "title": "Values",
+                        "type": "array",
+                    },
+                    "vision": {
+                        "default": "",
+                        "description": "What you want to achieve or create",
+                        "title": "Vision",
+                        "type": "string",
+                    },
+                },
+                "title": "V2MOM",
                 "type": "object",
             },
             "ValueMetric": {

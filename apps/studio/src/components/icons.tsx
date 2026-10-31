@@ -114,6 +114,14 @@ export function SettingsIcon(props: IconProps) {
   );
 }
 
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 9l6 6 6-6" />
+    </Icon>
+  );
+}
+
 export function CloseIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -126,6 +134,14 @@ export function ArrowUpIcon(props: IconProps) {
   return (
     <Icon {...props}>
       <path d="M12 19V5M6 11l6-6 6 6" />
+    </Icon>
+  );
+}
+
+export function ArrowDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M6 13l6 6 6-6" />
     </Icon>
   );
 }
@@ -163,24 +179,25 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
-export function ChevronDownIcon(props: IconProps) {
+
+export function FileIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <path d="m6 9 6 6 6-6" />
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
     </Icon>
   );
 }
 
-export function ImageIcon(props: IconProps) {
+export function AlertIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <rect x="3" y="4" width="18" height="16" rx="2.5" />
-      <circle cx="9" cy="10" r="1.6" />
-      <path d="m4 18 5-5 3.5 3.5L16 13l4 4" />
+      <path d="M12 8v5" />
+      <path d="M12 16.5h.01" />
+      <path d="M10.3 4.3 3.1 17a1.9 1.9 0 0 0 1.7 2.9h14.4A1.9 1.9 0 0 0 21 17L13.7 4.3a1.9 1.9 0 0 0-3.4 0Z" />
     </Icon>
   );
 }
-
 export function SparkIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -216,15 +233,6 @@ export function MenuIcon(props: IconProps) {
   );
 }
 
-export function AlertIcon(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M12 3.5 2.9 19.2a1 1 0 0 0 .87 1.5h16.46a1 1 0 0 0 .87-1.5z" />
-      <path d="M12 9.2v4.4" />
-      <path d="M12 17.2h.01" />
-    </Icon>
-  );
-}
 
 export function BellIcon(props: IconProps) {
   return (

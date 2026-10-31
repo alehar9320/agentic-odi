@@ -1,31 +1,33 @@
 import { useState } from "react";
 
+import { JOB_STAGES, type JobStage } from "../../domain/jobStages";
 import { useStudio } from "../../state/StudioContext";
 import { FailurePanel } from "../FailurePanel";
 import { GhostJobSteps } from "../Skeletons";
 
-// Ulwick Universal Job Process Phases (8 phases)
-const UNIVERSAL_PHASES = [
-  { id: "define", name: "1. Define", desc: "Determine goals and criteria" },
-  { id: "locate", name: "2. Locate", desc: "Gather inputs and resources" },
-  { id: "prepare", name: "3. Prepare", desc: "Set up context and workspace" },
-  { id: "confirm", name: "4. Confirm", desc: "Verify readiness to execute" },
-  { id: "execute", name: "5. Execute", desc: "Carry out core job work" },
-  { id: "monitor", name: "6. Monitor", desc: "Track performance and errors" },
-  { id: "modify", name: "7. Modify", desc: "Adjust inputs or workflows" },
-  { id: "conclude", name: "8. Conclude", desc: "Finish and store outputs" },
-];
-
 /** Spread any number of steps across the eight phases, wrapping by order. */
 function phaseIndexFor(order: number, stepCount: number): number {
-  return Math.min(Math.max(Math.floor(((order - 1) / Math.max(stepCount, 8)) * 8), 0), 7);
+  const stages = JOB_STAGES.length;
+  return Math.min(
+    Math.max(Math.floor(((order - 1) / Math.max(stepCount, stages)) * stages), 0),
+    stages - 1,
+  );
 }
 
 export function JobMap() {
-  const { canvasState, refreshCanvas, addStep, updateStep, deleteStep, updateJob, deleteJob } =
-    useStudio();
+  const {
+    canvasState,
+    refreshCanvas,
+    addStep,
+    updateStep,
+    deleteStep,
+    updateJob,
+    deleteJob,
+    focusedJobId,
+  } = useStudio();
   const canvas = canvasState.data;
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [followedJobId, setFollowedJobId] = useState<string | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [focusedStepId, setFocusedStepId] = useState<string | null>(null);
   const [editStepName, setEditStepName] = useState("");
@@ -38,7 +40,14 @@ export function JobMap() {
   const [newStepName, setNewStepName] = useState("");
 
   const jobs = canvas?.jobs ?? [];
-  const activeJob = jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
+
+  // A signal names the job it is about. Follow it until the person picks a job
+  // themselves, so the map never fights with an explicit choice.
+  const focusedJob =
+    focusedJobId && focusedJobId !== followedJobId
+      ? jobs.find((job) => job.id === focusedJobId)
+      : undefined;
+  const activeJob = focusedJob ?? jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
   const activeJobId = activeJob?.id ?? "";
   const steps = (canvas?.steps ?? []).filter(
     (step) => !activeJobId || !step.job_id || step.job_id === activeJobId,
@@ -106,8 +115,10 @@ export function JobMap() {
 
   // Map steps to 8 phases evenly or by order
   const stepPhaseMapping = (() => {
-    const buckets: Array<{ phase: (typeof UNIVERSAL_PHASES)[0]; steps: typeof steps }> =
-      UNIVERSAL_PHASES.map((phase) => ({ phase, steps: [] }));
+    const buckets: Array<{ phase: JobStage; steps: typeof steps }> = JOB_STAGES.map((phase) => ({
+      phase,
+      steps: [],
+    }));
 
     steps.forEach((step, idx) => {
       const order = step.order ?? idx + 1;
@@ -143,8 +154,8 @@ export function JobMap() {
     <section className="fade-in">
       <p className="section-title">Universal Job Map (8 Process Phases)</p>
       <p className="caption">
-        Ulwick Universal Job Steps: Deconstruct human execution into 8 predictable phases to uncover
-        latent friction.
+        Ulwick Universal Job Steps: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify
+        ➔ Conclude
       </p>
 
       {jobs.length > 1 && (
@@ -156,6 +167,7 @@ export function JobMap() {
             value={activeJobId}
             onChange={(event) => {
               setSelectedJobId(event.target.value);
+              setFollowedJobId(focusedJobId);
               setEditingStepId(null);
             }}
           >
@@ -178,16 +190,24 @@ export function JobMap() {
           marginBottom: 20,
         }}
       >
-        {UNIVERSAL_PHASES.map((phase, idx) => {
+        {JOB_STAGES.map((phase, idx) => {
           const bucket = stepPhaseMapping[idx];
           const hasSteps = bucket.steps.length > 0;
           const isSelected = selectedPhaseIndex === idx;
 
           return (
-            <div
+            <button
               key={phase.id}
+              type="button"
+              aria-pressed={isSelected}
+              aria-label={`Filter steps by ${phase.name}`}
               onClick={() => setSelectedPhaseIndex(isSelected ? null : idx)}
               style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                font: "inherit",
+                color: "inherit",
                 background: isSelected
                   ? "rgba(129, 140, 248, 0.2)"
                   : hasSteps
@@ -205,17 +225,19 @@ export function JobMap() {
                 position: "relative",
               }}
             >
-              <div
+              <span
                 style={{
+                  display: "block",
                   fontSize: "0.78rem",
                   fontWeight: 700,
                   color: hasSteps ? "var(--studio-text)" : "var(--studio-muted)",
                 }}
               >
                 {phase.name}
-              </div>
-              <div
+              </span>
+              <span
                 style={{
+                  display: "block",
                   fontSize: "0.7rem",
                   color: "var(--studio-muted)",
                   marginTop: 2,
@@ -224,8 +246,8 @@ export function JobMap() {
                 }}
               >
                 {phase.desc}
-              </div>
-              <div
+              </span>
+              <span
                 style={{
                   marginTop: 8,
                   display: "flex",
@@ -244,14 +266,14 @@ export function JobMap() {
                 >
                   {bucket.steps.length} {bucket.steps.length === 1 ? "step" : "steps"}
                 </span>
-              </div>
-            </div>
+              </span>
+            </button>
           );
         })}
       </div>
 
       {/* A job has one step per phase: the domain refuses an order past 8. */}
-      {activeJobId && steps.length < UNIVERSAL_PHASES.length && (
+      {activeJobId && steps.length < JOB_STAGES.length && (
         <div className="jm-add">
           {addStepOpen ? (
             <form
@@ -397,7 +419,7 @@ export function JobMap() {
                           fontStyle: "italic",
                         }}
                       >
-                        {UNIVERSAL_PHASES[phaseIndexFor(order, steps.length)].name}
+                        {JOB_STAGES[phaseIndexFor(order, steps.length)].name}
                       </span>
                       {step.id && (
                         <span className="step__actions">

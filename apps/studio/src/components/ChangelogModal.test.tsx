@@ -100,6 +100,35 @@ describe("ChangelogModal", () => {
     expect(screen.getAllByText("New")).toHaveLength(1);
   });
 
+  it("says so plainly when there are no release notes to show", async () => {
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({ releases: [] });
+
+    render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+
+    expect(
+      await screen.findByText(/release notes come from the studio service/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("article")).toBeNull();
+  });
+
+  it("moves focus into the dialog and traps Tab at both ends", async () => {
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({ releases: [] });
+
+    render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+
+    const dialog = screen.getByRole("dialog");
+    const close = screen.getByRole("button", { name: "Close changelog modal" });
+    await waitFor(() => expect(close).toHaveFocus());
+
+    const done = screen.getByRole("button", { name: "Done" });
+    done.focus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(close).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(done).toHaveFocus();
+  });
+
   it("closes on Escape key press", async () => {
     vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({
       releases: [],

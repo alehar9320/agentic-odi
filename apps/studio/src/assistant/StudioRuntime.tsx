@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components -- runtime module intentionally exports the provider alongside suggestions and helpers */
+
 /**
  * The conversation runtime.
  *

@@ -1,14 +1,19 @@
 """Agentic ODI MCP Server (FastMCP)."""
 
+import argparse
+import asyncio
 import json
+import os
 import signal
-from collections.abc import AsyncIterator
+import sys
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from typing import Any
 
 from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
+    TOOL_SPECS,
     CandidateAlreadyDecidedError,
     CandidateNotFoundError,
     CandidateStatus,
@@ -23,7 +28,10 @@ from agentic_odi_core import (
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    ScheduledWorkNotFoundError,
+    SignalNotFoundError,
     StepNotFoundError,
+    ToolName,
     ValueOutOfRangeError,
     build_repository,
     capability_manifest,
@@ -32,6 +40,7 @@ from agentic_odi_core import (
     evaluate_outcome_statement,
     job_not_found,
     odi_schema,
+    scheduled_work_not_found,
 )
 from agentic_odi_core import (
     accept_candidate as accept_candidate_impl,
@@ -84,6 +93,7 @@ steps_db = _repo.steps
 outcomes_db = _repo.outcomes
 customer_outcomes_db = _repo.customer_outcomes
 evidence_db = _repo.evidence
+signals_db = _repo.signals
 
 
 def _step_not_found(step_id: str | None) -> str:
@@ -452,6 +462,7 @@ async def add_evidence(
     source_kind: str,
     name: str,
     content: str,
+    url: str | None = None,
     item_type: EvidenceItemType = "manual",
     raw: dict[str, Any] | None = None,
     job_id: str | None = None,
@@ -466,6 +477,7 @@ async def add_evidence(
             item_type=item_type,
             name=name,
             content=content,
+            url=url,
             raw=raw,
             job_id=job_id,
             step_id=step_id,
@@ -679,6 +691,67 @@ def get_measurement(bet_id: str) -> str:
 
 
 @mcp.tool
+def schedule_work(
+    name: str,
+    schedule_expression: str,
+    agent_id: str = "default-agent",
+    trigger_type: str = "oneshot",
+    payload: dict[str, Any] | None = None,
+    job_id: str | None = None,
+) -> str:
+    try:
+        work = service.schedule_work(
+            name=name,
+            schedule_expression=schedule_expression,
+            agent_id=agent_id,
+            trigger_type=trigger_type,
+            payload=payload,
+            job_id=job_id,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    except ValueError as exc:
+        return f"Error: {exc}"
+    return f"Scheduled work created successfully: {work.model_dump_json()}"
+
+
+@mcp.tool
+def get_scheduled_work(work_id: str) -> str:
+    try:
+        work = service.get_scheduled_work(work_id)
+    except ScheduledWorkNotFoundError:
+        return scheduled_work_not_found(work_id)
+    return work.model_dump_json()
+
+
+@mcp.tool
+def list_scheduled_work(
+    job_id: str | None = None,
+    status: str | None = None,
+) -> str:
+    items = service.list_scheduled_work(job_id=job_id, status=status)
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def cancel_scheduled_work(work_id: str) -> str:
+    try:
+        work = service.cancel_scheduled_work(work_id)
+    except ScheduledWorkNotFoundError:
+        return scheduled_work_not_found(work_id)
+    return f"Scheduled work cancelled successfully: {work.model_dump_json()}"
+
+
+@mcp.tool
+def trigger_scheduled_work(work_id: str) -> str:
+    try:
+        work = service.trigger_scheduled_work(work_id)
+    except ScheduledWorkNotFoundError:
+        return scheduled_work_not_found(work_id)
+    return f"Scheduled work dispatched: {work.model_dump_json()}"
+
+
+@mcp.tool
 def get_odi_schema() -> str:
     return json.dumps(odi_schema())
 
@@ -803,6 +876,122 @@ def merge_candidate(candidate_id: str, merged_into: str) -> str:
     return f"Candidate merged: {candidate.model_dump_json()}"
 
 
+@mcp.tool
+def list_signals(unread_only: bool = False, limit: int = 50) -> str:
+    """List recorded signals, newest first; ``unread_only`` trims to the badge."""
+    signals = service.list_signals(unread_only=unread_only, limit=limit)
+    return json.dumps([signal.model_dump(mode="json") for signal in signals])
+
+
+@mcp.tool
+def mark_signal_read(signal_id: str) -> str:
+    try:
+        signal = service.mark_signal_read(signal_id)
+    except SignalNotFoundError:
+        return f"Error: Signal with ID {signal_id} not found."
+    return f"Signal marked as read: {signal.model_dump_json()}"
+
+
+@mcp.tool
+def dismiss_signal(signal_id: str) -> str:
+    try:
+        signal = service.dismiss_signal(signal_id)
+    except SignalNotFoundError:
+        return f"Error: Signal with ID {signal_id} not found."
+    return f"Signal dismissed: {signal.model_dump_json()}"
+
+
+DEFAULT_PORT = 8000
+
+
+def resolve_port(cli_port: int | None = None) -> int:
+    """Return the HTTP port for the server: flag, then env var, then default."""
+    if cli_port is not None:
+        return cli_port
+    raw = os.environ.get("AGENTIC_ODI_MCP_PORT")
+    if raw is None or not raw.strip():
+        return DEFAULT_PORT
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(f"AGENTIC_ODI_MCP_PORT must be an integer, got {raw!r}") from exc
+
+
+def validate_tool_specs(
+    specs: Mapping[str, Any] | None = None,
+    tools: Sequence[Any] | None = None,
+) -> list[str]:
+    """Return every mismatch between the contract and the live tool registry.
+
+    ``tools`` is FastMCP's registry; omitting it checks the contract alone.
+    """
+    specs = TOOL_SPECS if specs is None else specs
+    errors: list[str] = []
+    enum_names = {member.value for member in ToolName}
+    for name in sorted(enum_names - set(specs)):
+        errors.append(f"{name}: ToolName member has no TOOL_SPECS entry")
+    for name in sorted(set(specs) - enum_names):
+        errors.append(f"{name}: TOOL_SPECS entry is not a ToolName member")
+    declared = [spec.name for spec in specs.values()]
+    for name in sorted({item for item in declared if declared.count(item) > 1}):
+        errors.append(f"{name}: duplicate TOOL_SPECS name")
+    if tools is None:
+        return errors
+    by_name: dict[str, Any] = {}
+    for tool in tools:
+        if tool.name in by_name:
+            errors.append(f"{tool.name}: duplicate tool registration")
+        by_name[tool.name] = tool
+    for name in sorted(set(specs) - set(by_name)):
+        errors.append(f"{name}: contract tool has no registered handler")
+    for name in sorted(set(by_name) - set(specs)):
+        errors.append(f"{name}: registered tool is not in TOOL_SPECS")
+    for name in sorted(set(specs) & set(by_name)):
+        spec = specs[name]
+        tool = by_name[name]
+        schema = getattr(tool, "parameters", None) or {}
+        arguments = set(schema.get("properties", {}))
+        if arguments != set(spec.arguments):
+            errors.append(
+                f"{name}: contract arguments {sorted(spec.arguments)} do not match "
+                f"handler arguments {sorted(arguments)}"
+            )
+        required = set(schema.get("required", []))
+        if required != set(spec.required):
+            errors.append(
+                f"{name}: contract required {sorted(spec.required)} do not match "
+                f"handler required {sorted(required)}"
+            )
+        handler = getattr(tool, "fn", None)
+        if handler is not None and not callable(handler):
+            errors.append(f"{name}: registered handler is not callable")
+    return errors
+
+
+def validate_at_startup() -> None:
+    """Refuse to serve when the registry disagrees with the contract."""
+    errors = validate_tool_specs(tools=asyncio.run(mcp.list_tools()))
+    if not errors:
+        return
+    for error in errors:
+        print(f"Error: {error}", file=sys.stderr)
+    sys.exit(1)
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Run the Agentic ODI MCP server over HTTP.")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help=f"Port to listen on (default: $AGENTIC_ODI_MCP_PORT or {DEFAULT_PORT}).",
+    )
+    args = parser.parse_args(argv)
+    validate_at_startup()
+    setup_graceful_shutdown()
+    mcp.run(transport="http", port=resolve_port(args.port))
+
+
 def setup_graceful_shutdown() -> None:
     """Flush the event store when the process is asked to stop.
 
@@ -821,11 +1010,6 @@ def setup_graceful_shutdown() -> None:
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, _chain(signal.getsignal(sig)))
-
-
-def main() -> None:
-    setup_graceful_shutdown()
-    mcp.run(transport="http", port=8000)
 
 
 if __name__ == "__main__":

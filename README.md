@@ -64,11 +64,19 @@ per-platform archives with SHA-256 checksums for a manual download. See
 
 - **A brain for customer needs.** Jobs, desired outcomes, evidence, and
   opportunity scores in one store — queryable by any MCP client.
-- **A conversation, not a form.** The Living Studio turns "a customer still
-  reconciles invoices by hand" into a scored outcome, a job map, and a ranked
-  opportunity board — inline in the thread.
+- **A conversation, not a form.** The Living Studio opens on one question —
+  **What do you want to win?** — with the composer focused. Its optional
+  four-step tour stays out of the way, and in-place guidance appears only after
+  the first exchange. It turns "a customer still reconciles invoices by hand"
+  into a scored outcome, a job map, and a ranked opportunity board — inline in
+  the thread.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
+- **A catch-up that means something.** Writes emit signals — an outcome
+  re-scored, evidence promoted, a job map completed — stored in the same
+  event log and read by the CLI, any MCP client, and the Studio's bell.
+  Nothing is invented, and the feed is deduped and budgeted so it stays
+  worth opening.
 
 ## How it works
 
@@ -102,16 +110,23 @@ uv run python scripts/dev.py        # start the MCP server + Studio together
 | MCP Server | http://localhost:8000/mcp |
 | The Living Studio | http://127.0.0.1:8100 |
 
+Run the MCP server on another port with `python -m agentic_odi_mcp_server --port 8010`
+or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
+
 - **Hot reload:** `npm --prefix apps/studio run dev:full` (Vite on
   http://localhost:5173).
 - **Desktop app:** `npm --prefix apps/studio run tauri dev`.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
+- **A real conversation runtime.** The Studio uses assistant-ui over its
+  sidecar-owned transcript, with attachments, tool traces, approvals, and
+  branch-aware editing and regeneration. See [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
 ```bash
 odi jobs list
 odi desired-outcomes list --job-id <id>
+odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal
 ```
@@ -158,6 +173,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [Integrate an Agent](docs/integration.md) | Connect an external agent over MCP: connect, read, write under consent, and errors |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |

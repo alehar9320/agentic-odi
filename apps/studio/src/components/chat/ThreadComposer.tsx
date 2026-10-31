@@ -21,7 +21,7 @@ import {
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from "../icons";
-import { CommandPalette, ComposerHint, ConnectorChips, paletteOpenFor } from "./composerParts";
+import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
 import { ModelPicker } from "./ModelPicker";
 
 const acceptedAttachmentTypes = ATTACHMENT_ACCEPT.split(",");
@@ -169,6 +169,7 @@ function ComposerBody({
 
   return (
     <>
+      <SuggestionPills />
       <CommandPalette
         id={paletteId}
         open={open}

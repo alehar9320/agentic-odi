@@ -1,10 +1,16 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../App";
-import type { StudioNotification } from "../../types";
+import {
+  dismissSignal,
+  fetchSignals,
+  fetchUnreadSignalCount,
+  markSignalRead,
+} from "../../api/studioApi";
+import type { Signal } from "../../types";
 
-vi.mock("../../api/studioApi", () => ({
+const api = vi.hoisted(() => ({
   fetchConfig: vi.fn(async () => ({
     base_url: "http://localhost:8001/v1",
     api_key: "local",
@@ -48,124 +54,177 @@ vi.mock("../../api/studioApi", () => ({
   deleteObservation: vi.fn(async () => ({ ok: true })),
   clearMemory: vi.fn(async () => ({ ok: true })),
   streamChat: vi.fn(async () => undefined),
+  fetchSignals: vi.fn(async () => []),
+  fetchUnreadSignalCount: vi.fn(async () => 0),
+  markSignalRead: vi.fn(async () => ({ id: "sig-1" })),
+  dismissSignal: vi.fn(async () => ({ id: "sig-1" })),
 }));
 
-const BRIEF = {
-  product_name: "Ambient",
-  target_user: "Platform engineers",
-  job_statement: "Get a service from commit to production",
-  core_problem: "A missed config key costs hours",
-};
+vi.mock("../../api/studioApi", () => api);
 
-function seedNotifications(notifications: StudioNotification[]): void {
-  window.localStorage.setItem("studio.notifications", JSON.stringify(notifications));
-}
+const MCP_URL = "http://localhost:8000/mcp";
 
-function notification(overrides: Partial<StudioNotification> = {}): StudioNotification {
+function signal(overrides: Partial<Signal> = {}): Signal {
   return {
-    id: "NOTIF-1",
-    title: "Opportunity Score Shift Identified",
-    message: "An outcome was rescored.",
-    category: "outcome",
-    timestamp: new Date().toISOString(),
-    read: false,
-    simulated: false,
+    id: "sig-1",
+    kind: "outcome_scored",
+    title: "Outcome rescored: minimize deploy time",
+    detail: "Opportunity moved from 7.00 to 16.00.",
+    subject_kind: "outcome",
+    subject_id: "O-1",
+    severity: "notice",
+    created_at: new Date().toISOString(),
+    suppressed: false,
+    fingerprint: "fp-1",
     ...overrides,
   };
 }
 
+/** Point the mocked store at a feed; `unread` defaults to what the feed shows. */
+function serveFeed(feed: Signal[], unread?: number): void {
+  vi.mocked(fetchSignals).mockImplementation(async () => [...feed]);
+  vi.mocked(fetchUnreadSignalCount).mockImplementation(
+    async () => unread ?? feed.filter((item) => !item.read_at).length,
+  );
+}
+
 beforeEach(() => {
-  window.localStorage.clear();
-  window.localStorage.setItem("studio.brief", JSON.stringify(BRIEF));
+  localStorage.clear();
+  serveFeed([]);
 });
 
-describe("Catch Up & Notification System", () => {
-  it("starts with an honest empty feed instead of fabricated activity", async () => {
+describe("Catch Up reads the signal inbox", () => {
+  it("reads the feed from the store and ignores the old local notification store", async () => {
+    localStorage.setItem(
+      "studio.notifications",
+      JSON.stringify([
+        { id: "NOTIF-1", title: "Invented while you were away", read: false, simulated: false },
+      ]),
+    );
+    serveFeed([signal()]);
+
     render(<App />);
-
-    const bellBtn = await screen.findByRole("button", { name: /catch up notifications/i });
-    expect(within(bellBtn).queryByText("2")).toBeNull();
-
-    fireEvent.click(bellBtn);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
 
     expect(await screen.findByRole("heading", { name: /while you were away/i })).toBeInTheDocument();
-    expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
-    expect(screen.queryByText(/opportunity score shift identified/i)).toBeNull();
+    expect(screen.getByText("Outcome rescored: minimize deploy time")).toBeInTheDocument();
+    expect(screen.queryByText(/invented while you were away/i)).toBeNull();
+    expect(fetchSignals).toHaveBeenCalled();
   });
 
-  it("filters notifications by category", async () => {
-    seedNotifications([
-      notification(),
-      notification({
-        id: "NOTIF-2",
-        title: "Friction Collapse Simulation Complete",
-        category: "simulation",
-        read: true,
+  it("exposes the feed as a named region for landmark navigation", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
+
+    expect(await screen.findByRole("region", { name: "Signal inbox" })).toBeInTheDocument();
+  });
+
+  it("counts unread signals from the unread-count endpoint, not the page it happens to show", async () => {
+    // The store holds a budgeted inbox: the badge reports all of it.
+    serveFeed([signal(), signal({ id: "sig-2", read_at: new Date().toISOString() })], 3);
+
+    render(<App />);
+    const bell = await screen.findByRole("button", { name: "Signal inbox: 3 unread" });
+
+    expect(within(bell).getByText("3")).toBeInTheDocument();
+    expect(fetchUnreadSignalCount).toHaveBeenCalled();
+  });
+
+  it("filters with toggle buttons instead of a tablist", async () => {
+    serveFeed([
+      signal(),
+      signal({
+        id: "sig-2",
+        kind: "evidence_ingested",
+        title: "Evidence captured from Support",
+        subject_kind: "evidence",
+        subject_id: "EV-1",
+        read_at: new Date().toISOString(),
       }),
     ]);
+
     render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    await screen.findByText("Outcome rescored: minimize deploy time");
 
-    fireEvent.click(await screen.findByRole("button", { name: /catch up notifications/i }));
-    await screen.findByRole("heading", { name: /while you were away/i });
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByRole("tab")).toBeNull();
 
-    fireEvent.click(screen.getByRole("tab", { name: /outcome shifts \(1\)/i }));
+    const evidenceChip = screen.getByRole("button", { name: "Evidence (1)" });
+    expect(evidenceChip).toHaveAttribute("aria-pressed", "false");
 
-    expect(screen.getByText(/Opportunity Score Shift Identified/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Friction Collapse Simulation Complete/i)).toBeNull();
+    fireEvent.click(evidenceChip);
+
+    expect(evidenceChip).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("Outcome rescored: minimize deploy time")).toBeNull();
+    expect(screen.getByText("Evidence captured from Support")).toBeInTheDocument();
   });
 
-  it("marks simulated events and keeps them out of the unread count", async () => {
-    seedNotifications([
-      notification({
-        id: "NOTIF-SIM",
-        title: "New Opportunity Uncovered",
-        simulated: true,
+  it("activates a card with Enter alone: mark read, then open what it is about", async () => {
+    serveFeed([
+      signal({
+        kind: "job_added",
+        title: 'Job added: "Deploy services"',
+        subject_kind: "job",
+        subject_id: "JOB-1",
+        severity: "info",
       }),
     ]);
+
     render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    const card = await screen.findByRole("button", { name: /^Job added: "Deploy services"\./i });
 
-    const bellBtn = await screen.findByRole("button", { name: /catch up notifications/i });
-    expect(within(bellBtn).queryByText("1")).toBeNull();
+    fireEvent.keyDown(card, { key: "Enter" });
 
-    fireEvent.click(bellBtn);
-    await screen.findByRole("heading", { name: /while you were away/i });
-
-    expect(screen.getByText(/new opportunity uncovered/i)).toBeInTheDocument();
-    expect(screen.getByText(/^simulated$/i)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /unread \(0\)/i })).toBeInTheDocument();
+    await waitFor(() => expect(markSignalRead).toHaveBeenCalledWith("sig-1", MCP_URL));
+    expect(await screen.findByRole("heading", { name: /universal job map/i })).toBeInTheDocument();
   });
 
-  it("simulates a background system update on demand", async () => {
+  it("activates a card with Space alone too", async () => {
+    serveFeed([signal({ kind: "job_added", subject_kind: "job", subject_id: "JOB-1" })]);
+
     render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    const card = await screen.findByRole("button", { name: /^Outcome rescored: minimize deploy time\./i });
 
-    fireEvent.click(await screen.findByRole("button", { name: /catch up notifications/i }));
-    await screen.findByRole("heading", { name: /while you were away/i });
+    fireEvent.keyDown(card, { key: " " });
 
-    const simBtn = screen.getByRole("button", { name: /\+ simulate update/i });
-    fireEvent.click(simBtn);
-
-    expect(await screen.findByText(/Background Activity:/i)).toBeInTheDocument();
-    expect(screen.getByText(/^simulated$/i)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /unread \(0\)/i })).toBeInTheDocument();
+    await waitFor(() => expect(markSignalRead).toHaveBeenCalledWith("sig-1", MCP_URL));
   });
 
-  it("navigates to target workspace panel upon notification action", async () => {
-    seedNotifications([
-      notification({
-        title: "Rescored outcome",
-        targetPanel: "landscape",
-        actionText: "View Landscape",
-        chatPrompt: "Why did this outcome move?",
-      }),
-    ]);
+  it("dismisses through the store and drops the card", async () => {
+    const feed = [signal()];
+    serveFeed(feed);
+    vi.mocked(dismissSignal).mockImplementation(async (id: string) => {
+      const index = feed.findIndex((item) => item.id === id);
+      if (index >= 0) {
+        feed.splice(index, 1);
+      }
+      return signal({ id });
+    });
+
     render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    await screen.findByText("Outcome rescored: minimize deploy time");
 
-    fireEvent.click(await screen.findByRole("button", { name: /catch up notifications/i }));
-    await screen.findByRole("heading", { name: /while you were away/i });
+    fireEvent.click(screen.getByRole("button", { name: /^Dismiss/i }));
 
-    const actionBtn = screen.getAllByRole("button", { name: /view landscape →/i })[0];
-    fireEvent.click(actionBtn);
+    await waitFor(() =>
+      expect(screen.getByText(/nothing happened while you were away/i)).toBeInTheDocument(),
+    );
+    expect(dismissSignal).toHaveBeenCalledWith("sig-1", MCP_URL);
+  });
 
-    expect(await screen.findByRole("heading", { name: /opportunity landscape/i })).toBeInTheDocument();
+  it("labels a simulated event and keeps it out of every count", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
+    await screen.findByText(/nothing happened while you were away/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /\+ simulate update/i }));
+
+    expect(await screen.findByText(/^Simulated$/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All (0)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unread (0)" })).toBeInTheDocument();
   });
 });

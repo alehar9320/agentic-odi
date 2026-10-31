@@ -443,4 +443,12 @@ TOOL_PURPOSES: dict[str, str] = {
     "record_decision": "Record a decision about a subject, with its rationale.",
     "track_bet": "Track a bet under a decision, with the metric that would move.",
     "get_measurement": "Read what a bet measured; an unmeasured bet reports nothing yet.",
+    "list_signals": "List recorded signals, newest first, one page at a time.",
+    "mark_signal_read": "Mark a signal as read so it stops counting toward the unread badge.",
+    "dismiss_signal": "Dismiss a signal; it stays recorded but leaves the feed.",
+    "schedule_work": "Schedule agent work with a cron or one-shot expression.",
+    "get_scheduled_work": "Fetch one scheduled work item by id.",
+    "list_scheduled_work": "List scheduled work, optionally for one Job or status.",
+    "cancel_scheduled_work": "Cancel a scheduled work item.",
+    "trigger_scheduled_work": "Dispatch a scheduled work item immediately.",
 }

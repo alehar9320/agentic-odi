@@ -32,18 +32,16 @@ const baseProps = {
 };
 
 describe("Composer command palette", () => {
-  it("groups every command under its category", () => {
+  it("exposes commands as options in the labeled listbox", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext);
 
     render(<Composer {...baseProps} value="/" />);
 
-    expect(screen.getByRole("group", { name: "Start" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Explore" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Act" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Studio" })).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: "Commands" })).toBeInTheDocument();
+    expect(screen.getAllByRole("option").length).toBeGreaterThan(0);
   });
 
-  it("narrows the groups to the typed match and runs it with Enter", () => {
+  it("narrows options to the typed match and runs it with Enter", () => {
     const onCommand = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext);
     const { rerender } = render(
@@ -52,8 +50,8 @@ describe("Composer command palette", () => {
 
     rerender(<Composer {...baseProps} value="/status" onCommand={onCommand} />);
 
-    expect(screen.queryByRole("group", { name: "Start" })).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Studio" })).toBeInTheDocument();
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.getByRole("option")).toHaveTextContent("/status");
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
     expect(onCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "status" }));
   });

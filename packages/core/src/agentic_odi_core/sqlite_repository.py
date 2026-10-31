@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -20,10 +21,18 @@ from agentic_odi_core.models import (
     MeasurementRecord,
     Outcome,
     OutcomeCandidate,
+    ScheduledWork,
+    Signal,
     Step,
     compute_opportunity_score,
 )
-from agentic_odi_core.repository import Repository, page, sort_outcomes
+from agentic_odi_core.repository import (
+    Repository,
+    page,
+    rank_signals,
+    sort_outcomes,
+    unread_signals,
+)
 
 DEFAULT_DB_PATH = os.path.expanduser("~/.agentic-odi/odi.db")
 
@@ -69,6 +78,8 @@ class SQLiteRepository(Repository):
         self.decisions: dict[str, DecisionRecord] = {}
         self.bets: dict[str, BetRecord] = {}
         self.measurements: dict[str, MeasurementRecord] = {}
+        self.signals: dict[str, Signal] = {}
+        self.scheduled_work: dict[str, ScheduledWork] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -208,8 +219,21 @@ class SQLiteRepository(Repository):
                 del self.measurements[key]
         elif et == "MEASUREMENT_DELETED":
             self.measurements.pop(p["id"], None)
+        elif et == "SCHEDULED_WORK_CREATED":
+            self.scheduled_work[p["id"]] = ScheduledWork.model_validate(p)
+        elif et == "SCHEDULED_WORK_UPDATED":
+            self._merge_updates(self.scheduled_work, p, ScheduledWork)
+        elif et == "SCHEDULED_WORK_DELETED":
+            self.scheduled_work.pop(p["id"], None)
+
         elif et == "CUSTOMER_OUTCOME_DELETED":
             self.customer_outcomes.pop(p["id"], None)
+        elif et == "SIGNAL_CREATED":
+            self.signals[p["id"]] = Signal.model_validate(p)
+        elif et == "SIGNAL_READ":
+            self._merge_updates(self.signals, p, Signal)
+        elif et == "SIGNAL_DISMISSED":
+            self._merge_updates(self.signals, p, Signal)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     def _cascade_decisions(self) -> None:
@@ -658,6 +682,123 @@ class SQLiteRepository(Repository):
             if bet_id is not None:
                 items = [m for m in items if m.bet_id == bet_id]
             return page(items, limit, offset)
+
+    def add_signal(self, signal: Signal) -> Signal:
+        with self._lock:
+            self.store.append(
+                "SIGNAL_CREATED",
+                signal.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return signal
+
+    def get_signal(self, signal_id: str) -> Signal | None:
+        with self._lock:
+            self._sync()
+            return self.signals.get(signal_id)
+
+    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]:
+        with self._lock:
+            self._sync()
+            items = (
+                unread_signals(list(self.signals.values()))
+                if unread_only
+                else rank_signals(list(self.signals.values()))
+            )
+            return page(items, limit)
+
+    def mark_signal_read(self, signal_id: str) -> Signal | None:
+        return self._stamp_signal(signal_id, "SIGNAL_READ", "read_at")
+
+    def dismiss_signal(self, signal_id: str) -> Signal | None:
+        return self._stamp_signal(signal_id, "SIGNAL_DISMISSED", "dismissed_at")
+
+    def _stamp_signal(self, signal_id: str, event_type: str, field: str) -> Signal | None:
+        with self._lock:
+            self._sync()
+            signal = self.signals.get(signal_id)
+            if signal is None:
+                return None
+            if getattr(signal, field) is None:
+                self.store.append(
+                    event_type,
+                    {"id": signal_id, "updates": {field: datetime.now(timezone.utc).isoformat()}},
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
+                self._sync()
+                signal = self.signals[signal_id]
+            return signal
+
+    def count_unread_signals(self) -> int:
+        with self._lock:
+            self._sync()
+            return len(unread_signals(list(self.signals.values())))
+
+    def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork:
+        with self._lock:
+            self.store.append(
+                "SCHEDULED_WORK_CREATED",
+                work.model_dump(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return work
+
+    def get_scheduled_work(self, work_id: str) -> ScheduledWork | None:
+        with self._lock:
+            self._sync()
+            return self.scheduled_work.get(work_id)
+
+    def list_scheduled_work(
+        self, job_id: str | None = None, status: str | None = None
+    ) -> list[ScheduledWork]:
+        with self._lock:
+            self._sync()
+            items = list(self.scheduled_work.values())
+            if job_id is not None:
+                items = [item for item in items if item.job_id == job_id]
+            if status is not None:
+                items = [item for item in items if item.status == status]
+            return items
+
+    def update_scheduled_work(self, work_id: str, updates: dict[str, Any]) -> ScheduledWork | None:
+        with self._lock:
+            self._sync()
+            work = self.scheduled_work.get(work_id)
+            if not work:
+                return None
+            current = work.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_work = work.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "SCHEDULED_WORK_UPDATED",
+                {"id": work_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_work
+
+    def delete_scheduled_work(self, work_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if work_id in self.scheduled_work:
+                self.store.append(
+                    "SCHEDULED_WORK_DELETED",
+                    {"id": work_id},
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
+                self._sync()
+                return True
+            return False
 
     def clear(self) -> None:
         with self._lock:

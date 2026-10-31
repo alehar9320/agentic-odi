@@ -63,6 +63,13 @@ def test_every_tool_signature_on_the_site_is_the_real_one():
             assert param["name"] in html
 
 
+def test_tool_reference_does_not_repeat_defaults_outside_the_signature():
+    html = read_page("docs/mcp/index.html")
+
+    assert "<th>Default</th>" not in html
+    assert "allow_empty_job_map: bool = False" in html
+
+
 def test_site_connector_list_matches_the_catalog():
     presets = extract.read_connectors(CATALOG_PY)
     html = read_page("index.html")

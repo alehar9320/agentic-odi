@@ -23,8 +23,11 @@ from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
+from agentic_odi_cli.profile import setup_wizard
 from agentic_odi_cli.render import render_job_summary
+from agentic_odi_cli.schedule import schedule_app
 from agentic_odi_cli.settings import settings_app
+from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
@@ -35,6 +38,9 @@ app = typer.Typer(
 )
 app.add_typer(connectors_app, name="connectors")
 app.add_typer(jobs_app, name="jobs", help="Manage Jobs-to-be-Done.")
+app.add_typer(
+    schedule_app, name="schedule", help="Schedule and manage background cloud agent tasks."
+)
 app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
@@ -45,6 +51,11 @@ app.add_typer(
     help="Review proposed outcomes extracted from quotes.",
 )
 app.add_typer(demo_app, name="demo", help="Load a labelled sample workspace on purpose.")
+app.add_typer(
+    signals_app,
+    name="signals",
+    help="Read the signal inbox — real changes worth attention.",
+)
 app.add_typer(
     customer_outcomes_app,
     name="outcomes",
@@ -344,7 +355,7 @@ def store_cmd(
 
 app.add_typer(settings_app, name="settings")
 app.add_typer(profile_app, name="profile")
-app.add_typer(profile_app, name="setup", hidden=True)
+app.command(name="setup", help="Configure product baseline interactively.")(setup_wizard)
 
 
 @app.command(name="summary")
@@ -369,9 +380,19 @@ def summary(
 
 
 @app.command(name="version")
-def version_cmd() -> None:
+def version_cmd(
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show verbose version information (including build metadata).",
+    ),
+) -> None:
     """Show CLI version."""
-    typer.echo(version.build_summary())
+    if verbose:
+        typer.echo(version.verbose_summary())
+    else:
+        typer.echo(version.build_summary())
 
 
 @app.command(name="wizard")

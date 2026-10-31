@@ -117,7 +117,10 @@ def reject_candidate(repo: Repository, candidate_id: str, *, reason: str) -> Out
         candidate_id,
         {"status": CandidateStatus.REJECTED.value, "rejection_reason": reason.strip()},
     )
-    assert updated is not None  # _require_proposed proved it exists
+    if updated is None:
+        # _require_proposed proved it exists, so this is a store that lost the
+        # row between the read and the write, not a caller error.
+        raise CandidateNotFoundError(candidate_id)
     return updated
 
 
@@ -146,7 +149,10 @@ def merge_candidate(
             "outcome_id": merged_into,
         },
     )
-    assert updated is not None
+    if updated is None:
+        # The candidate was read a moment ago under _require_proposed, so a
+        # missing row here means the store lost it, not that the id was wrong.
+        raise CandidateNotFoundError(candidate_id)
     return updated
 
 

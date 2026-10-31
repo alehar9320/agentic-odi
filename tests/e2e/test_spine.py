@@ -25,15 +25,32 @@ _STORE_PATH = os.environ.setdefault("AGENTIC_ODI_DB", ":memory:")
 
 @pytest.fixture
 def server(tmp_path, monkeypatch):
+    """A server on its own SQLite file, built as an isolated module instance.
+
+    ``mcp_server`` builds its repository at import time, so a throwaway store
+    means loading a fresh copy under a private name. Reloading the shared module
+    would rebind the globals the rest of the suite imports and close the store
+    out from under them.
+    """
     db = str(tmp_path / "e2e.db")
     monkeypatch.setenv("AGENTIC_ODI_DB", db)
-    import importlib
+    import importlib.util
+    from pathlib import Path
 
-    from agentic_odi_mcp_server import mcp_server
-
-    importlib.reload(mcp_server)
-    yield mcp_server, db
-    mcp_server.shutdown_store()
+    source = (
+        Path(__file__).resolve().parents[2]
+        / "apps"
+        / "mcp-server"
+        / "src"
+        / "agentic_odi_mcp_server"
+        / "mcp_server.py"
+    )
+    spec = importlib.util.spec_from_file_location("_e2e_mcp_server", source)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    yield module, db
+    module.shutdown_store()
 
 
 def _json_of(payload: str) -> dict:

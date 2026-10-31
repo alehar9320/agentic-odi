@@ -67,9 +67,14 @@ export function SettingsPanel() {
     setDisplayName,
     brief,
     openSetup,
+    closeSetup,
     clearChat,
     refreshCanvas,
     llmHealth,
+    models,
+    modelsLoading,
+    modelsMessage,
+    refreshModels,
     mcpReachable,
     connectors,
     connectorsError,
@@ -106,6 +111,11 @@ export function SettingsPanel() {
               ? `${brief.product_name || "Your product"} — ${brief.job_statement}`
               : "Not set yet. The studio starts every reply from this."}
           </p>
+          {brief?.v2mom?.vision && (
+            <p className="settings__context-value">
+              <strong>Vision:</strong> {brief.v2mom.vision}
+            </p>
+          )}
         </div>
         <button type="button" className="button button--ghost" onClick={openSetup}>
           {brief ? "Edit context" : "Set up context"}
@@ -159,14 +169,42 @@ export function SettingsPanel() {
         </div>
       </div>
       <div className="field">
-        <label htmlFor="model-name">Model</label>
+        <label htmlFor="model-name">
+          Model <span className="field__hint">pick from your endpoint, or type one</span>
+        </label>
         <input
           id="model-name"
           className="input"
+          list={models.length ? "studio-model-options" : undefined}
           value={settings.model_name}
           spellCheck={false}
           onChange={(event) => update("model_name", event.target.value)}
         />
+        {models.length ? (
+          <datalist id="studio-model-options">
+            {models.map((model) => (
+              <option key={model} value={model} />
+            ))}
+          </datalist>
+        ) : null}
+        <div className="settings__model-state">
+          <button
+            type="button"
+            className="quiet-action"
+            disabled={modelsLoading}
+            onClick={() => void refreshModels()}
+          >
+            {modelsLoading ? "Looking for models…" : "Find models"}
+          </button>
+          {models.length ? (
+            <span className="muted">
+              {models.length} model{models.length === 1 ? "" : "s"} available
+            </span>
+          ) : modelsMessage ? (
+            // The endpoint would not list what it serves; typing still works.
+            <span className="muted">Type the model name — {modelsMessage}</span>
+          ) : null}
+        </div>
       </div>
 
       <h3 className="settings__title">Studio bridge</h3>
@@ -320,7 +358,14 @@ export function SettingsPanel() {
       )}
 
       <div className="settings__actions">
-        <button type="button" className="button" onClick={clearChat}>
+        <button
+          type="button"
+          className="button"
+          onClick={() => {
+            closeSetup();
+            clearChat();
+          }}
+        >
           Start a new conversation
         </button>
         <button type="button" className="button button--ghost" onClick={() => void refreshCanvas()}>
@@ -331,9 +376,11 @@ export function SettingsPanel() {
       {tourEnabled ? (
         <div className="settings__tour">
           <h3 className="settings__title">Getting started</h3>
-          <p className="muted">A four-step tour of what the studio can do, and where to begin.</p>
+          <p className="muted">
+            A four-step product tour, when you want one. It never opens by itself.
+          </p>
           <button type="button" className="button button--ghost" onClick={restartTour}>
-            Replay the welcome tour
+            Replay the tour
           </button>
         </div>
       ) : null}

@@ -1,5 +1,7 @@
-from agentic_odi_connectors.mapping import drafts_from_batch
+import pytest
+from agentic_odi_connectors.mapping import drafts_from_batch, validate_evidence_draft
 from agentic_odi_connectors.models import IngestBatch, IngestRecord
+from pydantic import ValidationError
 
 
 def _batch() -> IngestBatch:
@@ -64,6 +66,7 @@ def test_a_draft_has_exactly_the_evidence_contract_fields() -> None:
         "item_type": "resource",
         "name": "feedback",
         "content": "Onboarding is slow",
+        "url": "resource://feedback",
         "raw": {"uri": "resource://feedback"},
         "job_id": None,
         "step_id": None,
@@ -98,6 +101,7 @@ def test_unknown_payload_keys_stay_inside_raw() -> None:
         "item_type",
         "name",
         "content",
+        "url",
         "raw",
         "job_id",
         "step_id",
@@ -110,3 +114,27 @@ def test_mapping_preserves_record_order_and_count() -> None:
 
     assert len(drafts) == len(_batch().records)
     assert [draft.item_type for draft in drafts] == ["catalog", "resource", "tool_result"]
+
+
+def test_validate_evidence_draft_returns_a_good_draft() -> None:
+    draft = drafts_from_batch(_batch())[0]
+
+    assert validate_evidence_draft(draft) == draft
+
+
+def test_validate_evidence_draft_rejects_a_missing_item_type() -> None:
+    with pytest.raises(ValidationError, match="item_type"):
+        validate_evidence_draft(
+            {
+                "source_name": "gong",
+                "source_kind": "mcp",
+                "name": "feedback",
+                "content": "Onboarding is slow",
+            }
+        )
+
+
+def test_validate_evidence_draft_is_exported_from_the_package() -> None:
+    from agentic_odi_connectors import validate_evidence_draft as exported
+
+    assert exported is validate_evidence_draft

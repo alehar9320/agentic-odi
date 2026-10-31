@@ -14,7 +14,11 @@ from agentic_odi_connectors.catalog import (
     list_presets,
 )
 from agentic_odi_connectors.factory import build_connector, known_kinds, register_kind
-from agentic_odi_connectors.mapping import EvidenceDraft, drafts_from_batch
+from agentic_odi_connectors.mapping import (
+    EvidenceDraft,
+    drafts_from_batch,
+    validate_evidence_draft,
+)
 from agentic_odi_connectors.marketplace import (
     MarketplaceCache,
     MarketplaceListing,
@@ -147,4 +151,5 @@ __all__ = [
     "listing_from_preset",
     "listing_from_registry_record",
     "register_kind",
+    "validate_evidence_draft",
 ]

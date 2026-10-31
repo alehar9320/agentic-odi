@@ -253,7 +253,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Jobs */
+        get: operations["get_jobs_api_jobs_get"];
         put?: never;
         /**
          * Post Job
@@ -273,7 +274,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Job */
+        get: operations["get_job_api_jobs__job_id__get"];
         put?: never;
         post?: never;
         /** Delete Job */
@@ -291,10 +293,29 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Steps */
+        get: operations["get_steps_api_steps_get"];
         put?: never;
         /** Post Step */
         post: operations["post_step_api_steps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Outcomes */
+        get: operations["get_outcomes_api_outcomes_get"];
+        put?: never;
+        /** Post Outcome */
+        post: operations["post_outcome_api_outcomes_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -319,23 +340,6 @@ export interface paths {
         patch: operations["patch_step_api_steps__step_id__patch"];
         trace?: never;
     };
-    "/api/outcomes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Post Outcome */
-        post: operations["post_outcome_api_outcomes_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/outcomes/{outcome_id}": {
         parameters: {
             query?: never;
@@ -352,6 +356,156 @@ export interface paths {
         head?: never;
         /** Patch Outcome */
         patch: operations["patch_outcome_api_outcomes__outcome_id__patch"];
+        trace?: never;
+    };
+    "/api/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Signals
+         * @description The signal feed, newest first. Same facts under both backends.
+         */
+        get: operations["get_signals_api_signals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/signals/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Signal Unread Count
+         * @description What the bell badge shows. Suppressed and dismissed signals never count.
+         */
+        get: operations["get_signal_unread_count_api_signals_unread_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/signals/{signal_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Signal Read */
+        post: operations["post_signal_read_api_signals__signal_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/signals/{signal_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Signal Dismiss */
+        post: operations["post_signal_dismiss_api_signals__signal_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/customer-outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer Outcomes */
+        get: operations["get_customer_outcomes_api_customer_outcomes_get"];
+        put?: never;
+        /** Post Customer Outcome */
+        post: operations["post_customer_outcome_api_customer_outcomes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/customer-outcomes/{outcome_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer Outcome */
+        get: operations["get_customer_outcome_api_customer_outcomes__outcome_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Customer Outcome */
+        delete: operations["delete_customer_outcome_api_customer_outcomes__outcome_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Customer Outcome */
+        patch: operations["patch_customer_outcome_api_customer_outcomes__outcome_id__patch"];
+        trace?: never;
+    };
+    "/api/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Evidence Records */
+        get: operations["get_evidence_records_api_evidence_get"];
+        put?: never;
+        /**
+         * Post Evidence
+         * @description Capture a research record, keeping the knowledge where it already lives.
+         */
+        post: operations["post_evidence_api_evidence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/{evidence_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Evidence */
+        get: operations["get_evidence_api_evidence__evidence_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Evidence */
+        delete: operations["delete_evidence_api_evidence__evidence_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/memory/observations": {
@@ -558,6 +712,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Scheduled Work */
+        get: operations["get_scheduled_work_api_schedule_get"];
+        put?: never;
+        /** Post Scheduled Work */
+        post: operations["post_scheduled_work_api_schedule_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/schedule/{work_id}/trigger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Trigger Scheduled Work */
+        post: operations["post_trigger_scheduled_work_api_schedule__work_id__trigger_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/schedule/{work_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Cancel Scheduled Work */
+        post: operations["post_cancel_scheduled_work_api_schedule__work_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/{evidence_id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote Evidence
+         * @description Promote a record into a Job or a Desired Outcome.
+         */
+        post: operations["promote_evidence_api_evidence__evidence_id__promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/{full_path}": {
         parameters: {
             query?: never;
@@ -590,6 +816,56 @@ export interface components {
             /** Marketplace Id */
             marketplace_id?: string | null;
         };
+        /** AddCustomerOutcomeRequest */
+        AddCustomerOutcomeRequest: {
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+            /** Job Id */
+            job_id: string;
+            customer_value: components["schemas"]["CustomerValue"];
+            business_value: components["schemas"]["BusinessValue"];
+            /** Step Id */
+            step_id?: string | null;
+        };
+        /**
+         * AddEvidenceRequest
+         * @description A research record delegated from an external tool, or captured by hand.
+         */
+        AddEvidenceRequest: {
+            /** Source Name */
+            source_name: string;
+            /**
+             * Source Kind
+             * @default manual
+             */
+            source_kind: string;
+            /** Name */
+            name: string;
+            /** Content */
+            content: string;
+            /** Url */
+            url?: string | null;
+            /**
+             * Item Type
+             * @default manual
+             * @enum {string}
+             */
+            item_type: "catalog" | "resource" | "tool_result" | "manual" | "note";
+            /** Job Id */
+            job_id?: string | null;
+            /** Step Id */
+            step_id?: string | null;
+            /** Outcome Id */
+            outcome_id?: string | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
         /** AddOutcomeRequest */
         AddOutcomeRequest: {
             /** Mcp Url */
@@ -613,6 +889,12 @@ export interface components {
             name: string;
             /** Order */
             order: number;
+            stage?: components["schemas"]["JobStage"] | null;
+            /**
+             * Allow Empty Job Map
+             * @default false
+             */
+            allow_empty_job_map: boolean;
         };
         /** ApprovalDecisionRequest */
         ApprovalDecisionRequest: {
@@ -656,6 +938,23 @@ export interface components {
             text?: string | null;
             /** Data Url */
             data_url?: string | null;
+        };
+        /**
+         * BusinessImpactCategory
+         * @enum {string}
+         */
+        BusinessImpactCategory: "revenue_growth" | "cost_reduction" | "retention" | "risk_mitigation" | "operational_efficiency" | "compliance" | "brand_reputation" | "other";
+        /** BusinessValue */
+        BusinessValue: {
+            category: components["schemas"]["BusinessImpactCategory"];
+            /** Statement */
+            statement: string;
+            /** Detail */
+            detail?: string | null;
+            /** Estimated Annual Value */
+            estimated_annual_value?: number | null;
+            /** Confidence */
+            confidence?: number | null;
         };
         /** CapabilitiesResponse */
         CapabilitiesResponse: {
@@ -785,6 +1084,29 @@ export interface components {
              */
             mcp_url: string;
         };
+        /** CustomerValue */
+        CustomerValue: {
+            direction: components["schemas"]["Direction"];
+            /** Unit Of Measure */
+            unit_of_measure: string;
+            /** Object Of Control */
+            object_of_control: string;
+            /** Contextual Clarifier */
+            contextual_clarifier?: string | null;
+            /** Statement */
+            statement: string;
+            /** Importance */
+            importance: number;
+            /** Satisfaction */
+            satisfaction: number;
+            /** Value Metrics */
+            value_metrics?: components["schemas"]["ValueMetric"][];
+        };
+        /**
+         * Direction
+         * @enum {string}
+         */
+        Direction: "minimize" | "maximize";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -801,6 +1123,12 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * JobStage
+         * @description Ulwick's Universal Job Map stages, in canonical order.
+         * @enum {string}
+         */
+        JobStage: "define" | "locate" | "prepare" | "confirm" | "execute" | "monitor" | "modify" | "conclude";
         /** LatestConversationResponse */
         LatestConversationResponse: {
             conversation?: components["schemas"]["ConversationModel"] | null;
@@ -1035,6 +1363,71 @@ export interface components {
             confidence?: number | null;
         };
         /**
+         * PromoteEvidenceRequest
+         * @description Turn a captured record into a Job or a Desired Outcome.
+         */
+        PromoteEvidenceRequest: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "job" | "outcome";
+            /** Job Id */
+            job_id?: string | null;
+            /** Statement */
+            statement?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Importance */
+            importance?: number | null;
+            /** Satisfaction */
+            satisfaction?: number | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /** ScheduleWorkRequest */
+        ScheduleWorkRequest: {
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+            /** Name */
+            name: string;
+            /** Schedule Expression */
+            schedule_expression: string;
+            /**
+             * Agent Id
+             * @default default-agent
+             */
+            agent_id: string;
+            /**
+             * Trigger Type
+             * @default oneshot
+             */
+            trigger_type: string;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** Job Id */
+            job_id?: string | null;
+        };
+        /**
+         * SignalActionRequest
+         * @description Body for the read/dismiss signal routes; only the MCP backend needs it.
+         */
+        SignalActionRequest: {
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
          * StudioBrief
          * @description The user's context, captured during first-run onboarding.
          */
@@ -1064,6 +1457,7 @@ export interface components {
              * @default
              */
             core_problem: string;
+            v2mom?: components["schemas"]["V2MOM"] | null;
         };
         /** TurnModel */
         TurnModel: {
@@ -1120,6 +1514,21 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /**
+         * UpdateCustomerOutcomeRequest
+         * @description Both values are replaced wholesale — a partial score would be ambiguous.
+         */
+        UpdateCustomerOutcomeRequest: {
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+            customer_value?: components["schemas"]["CustomerValue"] | null;
+            business_value?: components["schemas"]["BusinessValue"] | null;
+            /** Step Id */
+            step_id?: string | null;
+        };
         /** UpdateJobRequest */
         UpdateJobRequest: {
             /** Name */
@@ -1158,6 +1567,28 @@ export interface components {
              */
             mcp_url: string;
         };
+        /**
+         * V2MOM
+         * @description The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
+         *
+         *     Only ``vision`` is captured today, by the context conversation; the other
+         *     four fields have no input path yet and arrive empty.
+         */
+        V2MOM: {
+            /**
+             * Vision
+             * @default
+             */
+            vision: string;
+            /** Values */
+            values?: string[];
+            /** Methods */
+            methods?: string[];
+            /** Obstacles */
+            obstacles?: string[];
+            /** Measures */
+            measures?: string[];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1170,6 +1601,18 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** ValueMetric */
+        ValueMetric: {
+            /** Name */
+            name: string;
+            direction: components["schemas"]["Direction"];
+            /** Unit Of Measure */
+            unit_of_measure: string;
+            /** Importance */
+            importance: number;
+            /** Satisfaction */
+            satisfaction: number;
         };
     };
     responses: never;
@@ -1609,6 +2052,39 @@ export interface operations {
             };
         };
     };
+    get_jobs_api_jobs_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     post_job_api_jobs_post: {
         parameters: {
             query?: never;
@@ -1621,6 +2097,41 @@ export interface operations {
                 "application/json": components["schemas"]["CreateJobRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_jobs__job_id__get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -1716,6 +2227,40 @@ export interface operations {
             };
         };
     };
+    get_steps_api_steps_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     post_step_api_steps_post: {
         parameters: {
             query?: never;
@@ -1726,6 +2271,76 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AddStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcomes_api_outcomes_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                step_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_outcome_api_outcomes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddOutcomeRequest"];
             };
         };
         responses: {
@@ -1823,41 +2438,6 @@ export interface operations {
             };
         };
     };
-    post_outcome_api_outcomes_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddOutcomeRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     delete_outcome_api_outcomes__outcome_id__delete: {
         parameters: {
             query?: {
@@ -1907,6 +2487,465 @@ export interface operations {
                 "application/json": components["schemas"]["UpdateOutcomeRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_signals_api_signals_get: {
+        parameters: {
+            query?: {
+                unread_only?: boolean;
+                limit?: number;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_signal_unread_count_api_signals_unread_count_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_signal_read_api_signals__signal_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                signal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignalActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_signal_dismiss_api_signals__signal_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                signal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignalActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_outcomes_api_customer_outcomes_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_customer_outcome_api_customer_outcomes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddCustomerOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_outcome_api_customer_outcomes__outcome_id__get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_customer_outcome_api_customer_outcomes__outcome_id__delete: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_customer_outcome_api_customer_outcomes__outcome_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCustomerOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_evidence_records_api_evidence_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                step_id?: string | null;
+                outcome_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_evidence_api_evidence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddEvidenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_evidence_api_evidence__evidence_id__get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_evidence_api_evidence__evidence_id__delete: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -2287,6 +3326,183 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scheduled_work_api_schedule_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                status?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_scheduled_work_api_schedule_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleWorkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_trigger_scheduled_work_api_schedule__work_id__trigger_post: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_cancel_scheduled_work_api_schedule__work_id__cancel_post: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_evidence_api_evidence__evidence_id__promote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromoteEvidenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

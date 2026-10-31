@@ -485,15 +485,14 @@ def test_every_page_resolves_its_own_assets(page: str):
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
     # A page is a product surface, so it should stay cheap to load. The MCP
-    # reference is the long pole: every tool's argument table lives on that one
-    # page, so it grows with each paginated list tool we add. The ceiling leaves
-    # room for the per-page social metadata every page now carries (its own
-    # og:image, twitter:image, and their alt text); before that metadata the
-    # studio page already sat within ~120 bytes of the old 64 KiB limit. It moved
-    # to 76 KiB when the candidate-review tools (extract/list/get/accept/reject/
-    # merge) joined the reference — six argument tables on the one page. It moved
-    # again to 80 KiB when the decision, bet and measurement entities joined the
-    # schema reference — three more entity schema blocks on the same page. It moved
-    # to 88 KiB when the score, brief, decision, bet and measure tools joined the
-    # tool reference — five more argument tables on that same page.
-    assert size <= 88 * 1024, f"{page}: {size} bytes"
+    # reference is the long pole: every tool's argument table and the whole ODI
+    # schema live on that one page, so it grows with each paginated list tool and
+    # each entity we add. The ceiling leaves room for the per-page social
+    # metadata every page now carries (its own og:image, twitter:image, and their
+    # alt text). It moved to 76 KiB when the candidate-review tools
+    # (extract/list/get/accept/reject/merge) joined the reference, to 80 KiB when
+    # the decision, bet and measurement entities joined the schema reference, to
+    # 88 KiB when the score, brief, decision, bet and measure tools joined the
+    # tool reference, and to 100 KiB when the V2MOM entity, the scheduled-work
+    # tools and the signal tools landed on the same page.
+    assert size <= 100 * 1024, f"{page}: {size} bytes"

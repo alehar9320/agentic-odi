@@ -38,16 +38,24 @@ import client as agent_client  # noqa: E402
 
 @pytest.fixture
 def server(tmp_path, monkeypatch):
-    """A server on its own SQLite file, reloaded so the store is fresh."""
+    """A server on its own SQLite file, built as an isolated module instance.
+
+    ``mcp_server`` builds its repository at import time, so exercising a
+    throwaway store means loading a fresh copy under a private name. Reloading
+    the shared module would rebind the globals that the rest of the suite
+    imports (``jobs_db``, ``mcp``, ...) and close the store out from under them.
+    """
     db = str(tmp_path / "integration.db")
     monkeypatch.setenv("AGENTIC_ODI_DB", db)
-    import importlib
+    import importlib.util
 
-    from agentic_odi_mcp_server import mcp_server
-
-    importlib.reload(mcp_server)
-    yield mcp_server
-    mcp_server.shutdown_store()
+    source = ROOT / "apps" / "mcp-server" / "src" / "agentic_odi_mcp_server" / "mcp_server.py"
+    spec = importlib.util.spec_from_file_location("_integration_mcp_server", source)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    yield module
+    module.shutdown_store()
 
 
 def _load_generator():
