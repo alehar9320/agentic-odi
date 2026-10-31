@@ -70,7 +70,7 @@ the model, so they work when it is offline.
 | `/new` | New conversation |
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
-| `/landscape`, `/jobmap`, `/evidence`, `/settings` | Open that lens beside the conversation |
+| `/landscape`, `/jobmap`, `/evidence`, `/work`, `/schedule`, `/settings` | Open that lens beside the conversation |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
 
@@ -227,6 +227,32 @@ fixtures. Its real content is the store's signal inbox
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
+
+### Agent work
+
+The **Work** lens (`/work`) is the orchestrator's queue, read where the
+conversation already is. It shows whether the daemon is running, how many items
+are queued and finished, which targets exist, and for each item its source,
+target, repository, and latest run — status, cost, tokens, approvals, summary,
+error, or blocked reason, with links to the pull request and the OpenHands
+conversation. An active item can be cancelled; a terminal one can be retried.
+Both actions are one request to the sidecar; neither claims that work ran.
+
+Nothing in the lens moves on its own. The daemon is a separate foreground
+process (`odi orchestrate start`), and the panel says so when it is not
+running: enqueued work stays queued, and the next tick after the daemon starts
+picks it up. Completed, failed, and blocked runs each emit one signal, and
+those signals open this lens from Catch up.
+
+The **Schedule** lens (`/schedule`) is the same contract. An expression is
+parsed when it is created — ISO-8601, a relative offset such as `+1h`, or a
+cron expression — and decides whether the work runs once or repeatedly. **Queue
+now** asks for the next occurrence; it marks the request as pending and the
+daemon creates the work item. Until then the panel reads *Queued for the
+orchestrator*, never *ran*.
+
+Agents may open a pull request; they never merge. That boundary lives in the
+work prompt and the confirmation policy, not in this panel.
 
 ### The thread is the room
 

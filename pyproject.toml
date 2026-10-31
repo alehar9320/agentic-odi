@@ -14,6 +14,8 @@ members = [
     "apps/studio-api",
     "packages/connectors",
     "packages/core",
+    "packages/openhands",
+    "packages/integrations/openhands",
 ]
 
 [dependency-groups]
@@ -67,6 +69,8 @@ source = [
     "agentic_odi_connectors",
     "agentic_odi_core",
     "agentic_odi_mcp_server",
+    "agentic_odi_openhands",
+    "agentic_odi_integrations_openhands",
     "agentic_odi_studio_api",
 ]
 

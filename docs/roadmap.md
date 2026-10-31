@@ -47,6 +47,7 @@ counted as done.
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
 - [ ] **Outcome-based segments and the strategy they imply** — the scored outcomes group into segments, and the recorded path names the ones it beat ([PR #367](https://github.com/alehar9320/agentic-odi/pull/367)).
 - [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
+- [ ] **Agent autopilot** — `odi orchestrate` queues work, runs OpenHands Cloud conversations under a deterministic policy, and reports terminal outcomes as signals ([PR #363](https://github.com/alehar9320/agentic-odi/pull/363)).
 
 ## Next
 

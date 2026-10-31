@@ -39,6 +39,8 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_remote.py` — shared MCP tool-result and error parser.
 - `test_connection.py` — MCP timeout and keepalive settings read from the environment.
 - `test_messages.py` — framework guidelines and shared assistant messages.
+- `test_schedule_expr.py` — ISO, relative, and cron parsing, next occurrence, and rejection.
+- `test_scheduled_work.py` — schedule CRUD and the truthful "queued for the orchestrator" trigger.
 
 ### `apps/mcp-server/tests/`
 
@@ -70,6 +72,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_studio_probes.py` — endpoint probing and LLM health classification.
 - `test_studio_ui_spec.py` — catalog-driven UI validation.
 - `test_studio_router.py` — passthrough responses from the Studio router.
+- `test_studio_work.py` — work-item, run, target, and daemon-status routes, redaction, and conflict errors.
 - `test_app_spa.py` — static SPA fallback and the local server entrypoint.
 - `conftest.py` — shared `InMemoryRepository` fixtures.
 
@@ -82,6 +85,8 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_context.py` — the global backend context.
 - `test_chat_cli.py`, `test_chat_runtime.py`, `test_chat_wizard.py` — chat command, interactive loop and handlers (including reasoning kept out of the answer, and the terminal-only `thinking…` hint), and first-run wizard.
 - `test_connectors_cli.py`, `test_connectors_edges.py` — `connectors` subcommands and their edges.
+- `test_schedule_cli.py` — schedule creation, listing, and the queue-for-the-orchestrator trigger.
+- `test_orchestrate_cli.py` — `orchestrate` add/list/show/cancel/status/agents and one daemon tick.
 - `test_onboard.py` — first-run onboarding signal extraction and gating.
 - `test_update.py`, `test_update_command.py`, `test_update_edges.py`, `test_update_check.py` — update checks and installation.
 - `test_profile.py`, `test_paths.py` — config/data directories and `--profile`.
@@ -103,6 +108,21 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_http_client.py` — the shared HTTP client reads its pool, timeout, and retry settings from the environment.
 - `test_rate_limit.py` — token-bucket ingest limits and environment configuration.
 - `test_sink.py` — the in-process ingest sink and its rate gate.
+
+### `packages/openhands/tests/`
+
+- `test_client.py` — request bodies, auth header variants, status-to-error mapping, redaction, and every Cloud/Agent Server path, all through `httpx.MockTransport`.
+- `test_wire_models.py` — start-task and conversation flattening, risk coercion, unknown-event degradation, pending-action rules, and final message/PR extraction.
+
+### `packages/integrations/openhands/tests/`
+
+- `test_orchestrator_models.py` — status sets, target key redaction, confirmation policies, alias uniqueness.
+- `test_store.py` — event replay across processes, dedupe by work key, latest run, counts, and daily spend.
+- `test_config.py` — config path, `0600` round trip, invalid input, environment overrides, and default lock/heartbeat/workspace paths.
+- `test_policy.py` — the deterministic allowlist and denylist: repo-scoped edits, feature-branch pushes, force-push/deletion variants, path traversal and scope escapes, every denied command family, budgets, and the rejection limit.
+- `test_service_flow.py` — a fake Cloud + Agent Server cycle: success and PR, quiet polls, confirmation approval, dangerous-action block, hook blocks, retries, crash recovery/adoption, cancellation, schedules, and daily cost caps.
+- `test_github_source.py` — labeled-issue intake, pull-request suppression, `ETag`/304, idempotency, reported failures, and terminal labels/comments.
+- `test_daemon.py` — single-instance lock, stale/corrupt PID recovery, heartbeat health, recovery notes, signal-driven shutdown, and `--once`.
 
 ### Root `tests/`
 

@@ -641,6 +641,138 @@ def trigger_scheduled_work(work_id: str) -> str:
     return f"Scheduled work dispatched: {work.model_dump_json()}"
 
 
+_orchestrator: Any = None
+
+
+def orchestrator_service() -> Any:
+    """Compose the orchestrator lazily so ordinary MCP startup stays light."""
+    global _orchestrator
+    if _orchestrator is None:
+        from agentic_odi_integrations_openhands import OrchestratorService
+
+        _orchestrator = OrchestratorService()
+    return _orchestrator
+
+
+@mcp.tool
+def add_work_item(
+    title: str,
+    prompt: str,
+    target: str | None = None,
+    repository: str | None = None,
+    branch: str | None = None,
+    priority: int = 0,
+    job_id: str | None = None,
+    work_key: str | None = None,
+) -> str:
+    """Queue work for an OpenHands Cloud agent.
+
+    The tool returns immediately; the daemon dispatches it on its next tick.
+    """
+    from agentic_odi_integrations_openhands import OrchestratorError
+
+    try:
+        work, created = orchestrator_service().add_work_item(
+            title=title,
+            prompt=prompt,
+            target_alias=target,
+            repository=repository,
+            branch=branch,
+            priority=priority,
+            job_id=job_id,
+            work_key=work_key,
+        )
+    except (OrchestratorError, ValueError) as exc:
+        return f"Error: {exc}"
+    verb = "queued" if created else "already queued"
+    return f"Work item {verb}: {work.model_dump_json()}"
+
+
+@mcp.tool
+def list_work_items(status: str | None = None, source: str | None = None) -> str:
+    items = orchestrator_service().list_work_items(status=status, source_kind=source)
+    return json.dumps([item.model_dump(mode="json") for item in items])
+
+
+@mcp.tool
+def get_work_item(work_id: str) -> str:
+    from agentic_odi_integrations_openhands import OrchestratorError
+
+    try:
+        orchestrator = orchestrator_service()
+        work = orchestrator.get_work_item(work_id)
+        run = orchestrator.latest_run(work.id)
+    except OrchestratorError as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "work_item": work.model_dump(mode="json"),
+            "latest_run": run.public_view() if run is not None else None,
+        }
+    )
+
+
+@mcp.tool
+def cancel_work_item(work_id: str) -> str:
+    from agentic_odi_integrations_openhands import OrchestratorError
+
+    try:
+        work = orchestrator_service().cancel_work_item(work_id)
+    except OrchestratorError as exc:
+        return f"Error: {exc}"
+    return f"Work item cancelled: {work.model_dump_json()}"
+
+
+@mcp.tool
+def retry_work_item(work_id: str) -> str:
+    from agentic_odi_integrations_openhands import OrchestratorError
+
+    try:
+        work = orchestrator_service().retry_work_item(work_id)
+    except OrchestratorError as exc:
+        return f"Error: {exc}"
+    return f"Work item requeued: {work.model_dump_json()}"
+
+
+@mcp.tool
+def list_agent_targets() -> str:
+    return json.dumps([target.public_view() for target in orchestrator_service().targets()])
+
+
+@mcp.tool
+def list_agent_runs(work_id: str | None = None) -> str:
+    from agentic_odi_integrations_openhands import OrchestratorError
+
+    try:
+        runs = orchestrator_service().list_runs(work_id)
+    except OrchestratorError as exc:
+        return f"Error: {exc}"
+    return json.dumps([run.public_view() for run in runs])
+
+
+@mcp.tool
+def get_agent_run(run_id: str) -> str:
+    from agentic_odi_integrations_openhands import OrchestratorError
+
+    try:
+        orchestrator = orchestrator_service()
+        run = orchestrator.get_run(run_id)
+        approvals = orchestrator.approvals(run.id)
+    except OrchestratorError as exc:
+        return f"Error: {exc}"
+    return json.dumps(
+        {
+            "run": run.public_view(),
+            "approvals": [record.model_dump(mode="json") for record in approvals],
+        }
+    )
+
+
+@mcp.tool
+def get_orchestrator_status() -> str:
+    return orchestrator_service().status().model_dump_json()
+
+
 @mcp.tool
 def get_odi_schema() -> str:
     return json.dumps(odi_schema())

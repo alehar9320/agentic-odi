@@ -232,6 +232,7 @@ const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = 
   step: "jobmap",
   outcome: "landscape",
   evidence: "evidence",
+  agent_work: "work",
   segment: "segments",
   strategy: "segments",
 };

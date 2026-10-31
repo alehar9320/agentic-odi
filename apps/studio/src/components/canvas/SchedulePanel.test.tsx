@@ -39,8 +39,11 @@ const task = {
   schedule_expression: "+1h",
   agent_id: "default-agent",
   trigger_type: "oneshot" as const,
-  status: "running" as const,
-  result_summary: "Dispatched at 2026-10-26T09:00:00Z; no executor is installed, so nothing has run.",
+  status: "scheduled" as const,
+  next_run_at: "2026-10-29T13:00:00+00:00",
+  last_run_at: null,
+  trigger_requested_at: null,
+  result_summary: null,
 };
 
 beforeEach(() => {
@@ -57,12 +60,14 @@ beforeEach(() => {
 });
 
 describe("SchedulePanel", () => {
-  it("says plainly that nothing reads the schedule expression yet", () => {
+  it("explains that the expression is parsed when scheduled", () => {
     render(<SchedulePanel />);
 
     expect(screen.getByLabelText(/when/i)).toBeInTheDocument();
-    expect(screen.getByText(/stored verbatim, not parsed yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/Nothing reads this expression yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/parsed when you schedule it/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/decides whether the work runs once or repeatedly/i),
+    ).toBeInTheDocument();
   });
 
   it("schedules with the agent id it was given, not a name baked in here", async () => {
@@ -87,6 +92,7 @@ describe("SchedulePanel", () => {
         }),
       );
     });
+    expect(api.scheduleWork.mock.calls[0][0]).not.toHaveProperty("trigger_type");
     expect(harness.state.refreshCanvas).toHaveBeenCalled();
   });
 
@@ -106,22 +112,43 @@ describe("SchedulePanel", () => {
     });
   });
 
-  it("shows a dispatched task with the note that nothing ran", () => {
+  it("shows the real next run and last run for a scheduled task", () => {
     harness.state.canvas = {
       jobs: [],
       steps: [],
       outcomes: [],
-      scheduled_work: [task],
+      scheduled_work: [{ ...task, last_run_at: "2026-10-28T13:00:00+00:00" }],
     } as unknown;
 
     render(<SchedulePanel />);
 
     expect(screen.getByText("Nightly audit")).toBeInTheDocument();
-    expect(screen.getByText(/no executor is installed, so nothing has run/i)).toBeInTheDocument();
-    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.getByText(/next run/i)).toBeInTheDocument();
+    expect(screen.getByText(/last run/i)).toBeInTheDocument();
+    expect(screen.getByText("scheduled")).toBeInTheDocument();
   });
 
-  it("dispatches and cancels a task", async () => {
+  it("shows a queued occurrence as queued, not as a result", () => {
+    harness.state.canvas = {
+      jobs: [],
+      steps: [],
+      outcomes: [],
+      scheduled_work: [
+        {
+          ...task,
+          trigger_requested_at: "2026-10-29T12:00:00+00:00",
+          result_summary: "Queued for the orchestrator; not run yet.",
+        },
+      ],
+    } as unknown;
+
+    render(<SchedulePanel />);
+
+    expect(screen.getAllByText(/queued for the orchestrator/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/not run yet/i)).toBeInTheDocument();
+  });
+
+  it("queues now and cancels a task", async () => {
     api.triggerScheduledWork.mockResolvedValue({ ok: true });
     api.cancelScheduledWork.mockResolvedValue({ ok: true });
     harness.state.canvas = {
@@ -133,7 +160,7 @@ describe("SchedulePanel", () => {
 
     render(<SchedulePanel />);
 
-    fireEvent.click(screen.getByRole("button", { name: /dispatch/i }));
+    fireEvent.click(screen.getByRole("button", { name: /queue now/i }));
     await waitFor(() => {
       expect(api.triggerScheduledWork).toHaveBeenCalledWith("work-1", "http://mcp");
     });
