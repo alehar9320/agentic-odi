@@ -148,6 +148,13 @@ download, and install), `transport.test.ts` (Tauri boundary), and the
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
+Copied UI is guarded structurally: `src/vendor/boundary.test.ts` reads every
+`.ts` and `.tsx` file under `apps/studio/src/vendor/` and fails on a specifier
+that resolves into a product slice (`state`, `api`, `assistant`, `bff`). It is
+the second pair of eyes behind the ESLint rule in
+`apps/studio/eslint.config.js`, because widening a lint glob silently deletes
+the rule. See [Vendor alley](vendor.md).
+
 ## Accessibility
 
 Accessibility is tested, not asserted. Three kinds of checks run with the normal
