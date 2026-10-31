@@ -85,6 +85,21 @@ def test_unhandled_exception_returns_the_error_shape(monkeypatch) -> None:
     assert "secret internal detail" not in response.text
 
 
+def test_unhandled_exception_does_not_claim_anyone_was_notified(monkeypatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_DISABLE_SPA", "1")
+    app = create_app(InMemoryRepository())
+
+    @app.get("/api/kaput")
+    def kaput():
+        raise RuntimeError("private detail")
+
+    response = _client(app).get("/api/kaput")
+
+    assert response.status_code == 500
+    assert "team has been notified" not in response.text.lower()
+    assert "Diagnostics" in response.text
+
+
 def test_unhandled_exception_surfaces_the_request_id_in_the_message(monkeypatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_DISABLE_SPA", "1")
     app = create_app(InMemoryRepository())
