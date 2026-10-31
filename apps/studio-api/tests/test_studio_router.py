@@ -371,3 +371,33 @@ def test_get_outcomes_on_mcp_requires_a_job(monkeypatch) -> None:
     response = _client().get("/api/outcomes", params={"mcp_url": "http://mcp"})
 
     assert response.status_code == 400
+
+
+def test_get_schema_returns_the_canonical_stages_in_order() -> None:
+    response = _client().get("/api/schema")
+
+    assert response.status_code == 200
+    stages = response.json()["stages"]
+    assert [entry["id"] for entry in stages] == [
+        "define",
+        "locate",
+        "prepare",
+        "confirm",
+        "execute",
+        "monitor",
+        "modify",
+        "conclude",
+    ]
+    assert stages[0] == {
+        "id": "define",
+        "name": "1. Define",
+        "description": "Determine goals and criteria",
+    }
+
+
+def test_get_schema_needs_no_backend() -> None:
+    # The stages are static domain vocabulary, so both backends answer the same.
+    mcp = _client("mcp").get("/api/schema").json()
+    local = _client("local").get("/api/schema").json()
+
+    assert mcp == local

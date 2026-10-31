@@ -186,9 +186,9 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 
 **Files:** `apps/studio/src/components/canvas/JobMap.tsx`; component tests.
 
-- [ ] **Step 1:** Read the enum from `GET /api/schema` (the request the Studio already makes) and render in the returned order; delete the local literal array (no fallback).
-- [ ] **Step 2:** A reduced/reordered fixture renders exactly what was supplied; a separate production-schema contract test fails if a canonical stage is missing.
-- [ ] **Step 3:** A failed fetch renders the failure panel and names the request, not an empty map; loading is visible; rendering writes nothing.
+- [x] **Step 1:** Read the enum from `GET /api/schema` (the request the Studio already makes) and render in the returned order; delete the local literal array (no fallback).
+- [x] **Step 2:** A reduced/reordered fixture renders exactly what was supplied; a separate production-schema contract test fails if a canonical stage is missing.
+- [x] **Step 3:** A failed fetch renders the failure panel and names the request, not an empty map; loading is visible; rendering writes nothing.
 
 ### Task 11: A8 — Coverage: what the research does not cover ([ALH-21])
 

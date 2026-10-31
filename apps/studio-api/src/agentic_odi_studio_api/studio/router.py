@@ -28,6 +28,7 @@ from agentic_odi_core import (
     ToolName,
     ValueOutOfRangeError,
     error_status,
+    stage_catalog,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, Query, Request
@@ -189,6 +190,17 @@ def get_config() -> dict:
 @router.get("/changelog")
 def get_changelog_route() -> dict:
     return get_changelog()
+
+
+@router.get("/schema")
+def get_schema_route() -> dict:
+    """The canonical ODI stages, so the client renders what the server names.
+
+    The Studio's Job Map reads its stages here instead of holding a second copy:
+    a stage the server does not name cannot appear, and one it does cannot be
+    dropped by a stale literal.
+    """
+    return {"stages": stage_catalog()}
 
 
 @router.post("/health/mcp")

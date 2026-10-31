@@ -21,6 +21,7 @@ import {
   fetchCanvas,
   fetchChangelog,
   fetchConfig,
+  fetchStages,
   fetchConnectorCatalog,
   fetchConnectors,
   healthLlm,
@@ -65,6 +66,27 @@ describe("fetchChangelog", () => {
 
     const data = await fetchChangelog();
     expect(data.releases[0].version).toBe("0.8.0");
+  });
+});
+
+describe("fetchStages", () => {
+  it("returns the server's stages in the order it sent them", async () => {
+    mockJson({
+      stages: [
+        { id: "conclude", name: "Z. Conclude", description: "Finish and store outputs" },
+        { id: "define", name: "A. Define", description: "Determine goals and criteria" },
+      ],
+    });
+
+    const stages = await fetchStages();
+
+    expect(stages.map((stage) => stage.id)).toEqual(["conclude", "define"]);
+  });
+
+  it("returns an empty list rather than undefined when the body omits stages", async () => {
+    mockJson({});
+
+    await expect(fetchStages()).resolves.toEqual([]);
   });
 });
 
