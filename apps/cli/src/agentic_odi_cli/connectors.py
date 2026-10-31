@@ -433,6 +433,7 @@ def ingest_connector(
             err=True,
         )
         raise typer.Exit(code=1)
+    from agentic_odi_connectors.models import RateLimitExceededError
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
     parsed_tool_args: dict[str, dict] = {}
@@ -479,7 +480,11 @@ def ingest_connector(
             preview["evidence_drafts"] = len(drafts)
         typer.echo(json.dumps(preview, indent=2))
         return
-    get_default_sink().append(batch)
+    try:
+        get_default_sink().append(batch)
+    except RateLimitExceededError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
     typer.echo(batch.model_dump_json())
     if drafts is None:
         return
