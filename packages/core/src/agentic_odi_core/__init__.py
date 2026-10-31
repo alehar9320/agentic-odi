@@ -116,6 +116,7 @@ from agentic_odi_core.trust import (
     persisted_interval,
     rank_outcomes_honestly,
     retain_survey_inputs,
+    retained_survey_inputs,
 )
 
 __all__ = [
@@ -189,6 +190,7 @@ __all__ = [
     "persisted_interval",
     "rank_outcomes_honestly",
     "retain_survey_inputs",
+    "retained_survey_inputs",
     "V2MOM",
     "capability_manifest",
     "capability_summary",

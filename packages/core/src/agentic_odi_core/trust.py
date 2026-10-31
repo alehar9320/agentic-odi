@@ -18,7 +18,10 @@ Provisional conventions (each names the decision it stands in for):
   to it and returns a *no-band* placeholder for an estimate.
 * B3.1 retention -- :func:`retain_survey_inputs` is an in-memory stub: it keeps
   the paired inputs for the process lifetime and performs no deletion, because
-  the retention/deletion and study-lineage policy is not yet approved.
+  the retention/deletion and study-lineage policy is not yet approved. Its read
+  side, :func:`retained_survey_inputs`, refuses when nothing was retained for an
+  outcome rather than returning an empty list that would read as "zero
+  responses".
 * B3.2 provenance -- :func:`persisted_interval` reads the stored band and its
   provenance off the outcome, and reports a band stale when the score it was
   computed from has since moved.
@@ -262,8 +265,19 @@ def retain_survey_inputs(inputs: list[RetainedSurveyInput]) -> list[RetainedSurv
 
 
 def retained_survey_inputs(outcome_id: str) -> list[RetainedSurveyInput]:
-    """The paired inputs retained for an outcome (B3.1 stub read side)."""
-    return list(_RETAINED_SURVEY_INPUTS.get(outcome_id, []))
+    """The paired inputs retained for an outcome (B3.1 stub read side).
+
+    Refuses rather than returning an empty list when nothing was retained for
+    the outcome: an empty list reads as "zero responses", which would let a
+    caller bootstrap a band from no data instead of being told the input set is
+    unavailable. That is exactly the unknown-turned-into-a-fact failure the
+    retention decision must settle, so it stays a named refusal until the policy
+    is approved.
+    """
+    bucket = _RETAINED_SURVEY_INPUTS.get(outcome_id)
+    if not bucket:
+        raise TrustContractPendingError("retained_survey_inputs", RetentionPolicy)
+    return list(bucket)
 
 
 def persisted_interval(

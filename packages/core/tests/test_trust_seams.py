@@ -15,6 +15,7 @@ from agentic_odi_core.models import Outcome, ScoreSnapshot
 from agentic_odi_core.trust import (
     BootstrapConvention,
     IntervalProvenancePolicy,
+    RetentionPolicy,
     TrustContractPendingError,
     classify_confidence,
     opportunity_delta_from_scores,
@@ -162,6 +163,16 @@ def test_retain_survey_inputs_keeps_inputs_without_deleting() -> None:
     retain_survey_inputs([item])  # a repeat does not duplicate
 
     assert retained_survey_inputs("o-1") == [item]
+
+
+def test_retained_survey_inputs_refuses_when_nothing_was_retained() -> None:
+    # An empty list would read as "zero responses" and let a caller bootstrap
+    # from no data; the read side must name the unapproved retention decision.
+    with pytest.raises(TrustContractPendingError) as caught:
+        retained_survey_inputs("never-imported")
+
+    assert caught.value.decision == RetentionPolicy
+    assert caught.value.capability == "retained_survey_inputs"
 
 
 # --- B3.2: persisted interval provenance -------------------------------------
@@ -315,6 +326,7 @@ def test_the_surfaces_are_exported_from_the_package_root() -> None:
         "parse_survey",
         "aggregate_survey",
         "retain_survey_inputs",
+        "retained_survey_inputs",
         "persisted_interval",
         "rank_outcomes_honestly",
     ):

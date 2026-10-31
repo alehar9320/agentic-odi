@@ -752,6 +752,23 @@ instead of returning a fabricated band, class, aggregate or direction;
 `test_trust_seams.py` pins the refusal. When a gate clears, replace the raise
 with the approved implementation and drop the corresponding seam test.
 
+The retention read side, `retained_survey_inputs`, refuses when nothing was
+retained for an outcome rather than returning an empty list: an empty list reads
+as "zero responses" and would let a caller bootstrap a band from no data, which
+is the unknown-turned-into-a-fact failure the B3.1 retention decision must
+settle.
+
+## Pillar integration contract (ALH-7)
+
+The pillar-level acceptance sentence is pinned end to end by
+`packages/core/tests/test_trust_pillar.py`, over a real SQLite reopen so
+"persisted and replayed" is not a dict. One fixture is imported with
+per-outcome counts, replayed, ranked without mixing an absent score into a zero,
+explained with the recorded arithmetic/method, and shown with its band and
+confidence class; an invalid import leaves the prior state unchanged and a score
+edit clears the stale band. Increment-level tests stay in their own modules; this
+one fails if two increments ever disagree across the seam.
+
 The B6.1 read surface is partly present: `desired-outcomes history` and
 `get_outcome_history` replay the recorded snapshots, `--why` records the reason
 on the snapshot, and `desired-outcomes get` shows the latest accepted reason as a

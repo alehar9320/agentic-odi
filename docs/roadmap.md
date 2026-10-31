@@ -113,5 +113,12 @@ The open issues this milestone still has to answer, grouped by what they change.
   exposes their shapes and refuses to answer: `retain_survey_inputs` (retention
   policy) and `persisted_interval` when no band is stored (interval provenance).
   Each raises `TrustContractPendingError` naming the blocking decision instead of
-  returning a fabricated band, class or direction.
-
+  returning a fabricated band, class or direction. The retention read side,
+  `retained_survey_inputs`, refuses when nothing was retained for an outcome
+  rather than returning an empty list that would read as "zero responses".
+- [x] **Pillar integration contract**: one fixture is imported with per-outcome
+  counts, persisted and replayed through SQLite, ranked without mixing absent
+  scores into zeroes, explained with recorded arithmetic/method, and shown with
+  its band and confidence class — while an invalid import leaves the prior state
+  unchanged and a score edit clears the stale band. Pinned end to end by
+  `test_trust_pillar.py`.
