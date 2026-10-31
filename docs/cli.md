@@ -401,6 +401,25 @@ python -m agentic_odi_cli connectors ingest --name github
 python -m agentic_odi_cli connectors ingest --name github --dry-run   # preview only
 ```
 
+## Diagnosing a failed start
+
+`odi doctor` aggregates the local checks that explain why the Studio will not
+start: the CLI and package versions, Python and uv, the workspace root, the SPA
+build, the database path and its integrity, both ports, the model, the connector
+registry, and directory permissions. Every check is read-only; doctor never
+creates the database and never starts a server.
+
+```bash
+odi doctor                 # PASS/WARN/FAIL/SKIP per check, plus what to try
+odi doctor --json          # one machine-readable object on stdout
+odi doctor --offline       # skip the network checks
+odi doctor --timeout 5     # seconds per network check (default 2)
+```
+
+Exit code `0` means every check passed or warned, `1` means at least one failed,
+and `2` means doctor could not run. Credentials are never printed: the value of
+`AGENTIC_ODI_API_KEY` is redacted, and URL userinfo is stripped.
+
 ## Updates
 
 `odi update` checks for and installs a new binary release. Auto-update is on by
