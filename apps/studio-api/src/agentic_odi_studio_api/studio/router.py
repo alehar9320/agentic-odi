@@ -77,6 +77,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ClaimOut,
     ConnectorListItem,
     ConnectorOperationResponse,
+    ConversationListResponse,
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
@@ -1059,6 +1060,15 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
     return LatestConversationResponse(
         conversation=conversation.to_dict(),
         turns=[turn.to_dict() for turn in turns],
+    )
+
+
+@router.get("/conversations", response_model=ConversationListResponse)
+def list_conversations(request: Request) -> ConversationListResponse:
+    """The history a switcher lists: every thread, most recent touch first."""
+    conversations = _memory(request).list_conversations()
+    return ConversationListResponse(
+        conversations=[conversation.to_dict() for conversation in conversations]
     )
 
 

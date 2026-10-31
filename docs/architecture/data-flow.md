@@ -117,6 +117,7 @@ The SPA owns the visible path; the sidecar owns the record. Turns persist with
 `message_id` and `parent_id`, and the conversation stores `head_id`:
 
 ```text
+GET   /api/conversations                       -> every thread, last touch first
 GET   /api/conversations/latest                -> thread + turns (resume)
 GET   /api/conversations/{id}/tree             -> branch tree + head
 PATCH /api/conversations/{id} {"head_id"}      -> record the visible branch

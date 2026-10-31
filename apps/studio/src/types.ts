@@ -432,6 +432,11 @@ export interface Conversation {
   head_id?: string | null;
 }
 
+/** A conversation as the history list shows it: enough to name it and size it. */
+export interface ConversationSummary extends Conversation {
+  turn_count: number;
+}
+
 export interface ConversationTurn {
   id: number;
   conversation_id: string;
