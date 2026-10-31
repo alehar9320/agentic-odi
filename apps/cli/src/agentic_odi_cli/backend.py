@@ -107,6 +107,25 @@ def _validation_message(exc: Exception) -> str:
     return f"Invalid customer outcome: {exc}"
 
 
+def _serialize_plan(plan: Any) -> dict[str, Any]:
+    """Render a ``SurveyPlan`` as the JSON shape the CLI and MCP share (B2.2)."""
+    counts = {"accepted": 0, "unmatched": 0, "ambiguous": 0, "invalid": 0}
+    rows: list[dict[str, Any]] = []
+    for row in plan.rows:
+        counts[row.status] += 1
+        rows.append(
+            {
+                "line": row.line,
+                "status": row.status,
+                "reason": row.reason,
+                "outcome_ref": row.outcome_ref,
+                "suggestion": row.suggestion,
+            }
+        )
+    counts["total"] = len(plan.rows)
+    return {"rows": rows, "counts": counts, "writable": plan.writable}
+
+
 class Backend(ABC):
     @abstractmethod
     def call(self, tool_name: str, args: dict[str, Any]) -> Any:
@@ -340,6 +359,31 @@ class LocalBackend(Backend):
 
         try:
             updated = self.service.import_survey(args["rows"])
+        except OutcomeNotFoundError as exc:
+            raise BackendError(outcome_not_found(exc.resource_id)) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return {outcome_id: outcome.model_dump() for outcome_id, outcome in updated.items()}
+
+    def _get_survey_import_plan(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core.errors import ValidationError
+
+        try:
+            plan = self.service.get_survey_import_plan(
+                args["rows"], confirmed_matches=args.get("confirmed_matches")
+            )
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return _serialize_plan(plan)
+
+    def _commit_survey_import(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
+
+        try:
+            updated = self.service.commit_survey_import(
+                args["rows"], confirmed_matches=args.get("confirmed_matches")
+            )
         except OutcomeNotFoundError as exc:
             raise BackendError(outcome_not_found(exc.resource_id)) from None
         except ValidationError as exc:
@@ -756,6 +800,8 @@ _LOCAL_HANDLERS = {
     "get_outcome_history": LocalBackend._get_outcome_history,
     "get_outcome_delta": LocalBackend._get_outcome_delta,
     "import_survey": LocalBackend._import_survey,
+    "get_survey_import_plan": LocalBackend._get_survey_import_plan,
+    "commit_survey_import": LocalBackend._commit_survey_import,
     "rank_outcomes": LocalBackend._rank_outcomes,
     "update_outcome": LocalBackend._update_outcome,
     "delete_outcome": LocalBackend._delete_outcome,

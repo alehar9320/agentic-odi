@@ -178,3 +178,80 @@ async def test_get_capabilities_manifest_returns_json():
         assert "summary" in tool
         assert "effect" in tool
         assert "returns" in tool
+
+
+def _survey_rows(outcome_id: str, count: int) -> list[dict]:
+    return [
+        {"outcome_id": outcome_id, "importance": 8.0, "satisfaction": 4.0, "respondent_id": f"r{i}"}
+        for i in range(count)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_survey_import_plan_reports_every_row_without_writing():
+    async with Client(mcp) as client:
+        job_id = extract_id(
+            (await client.call_tool("add_job", {"name": "Onboard", "description": ""}))
+            .content[0]
+            .text
+        )
+        outcome_id = extract_id(
+            (
+                await client.call_tool(
+                    "add_outcome",
+                    {
+                        "job_id": job_id,
+                        "statement": "Minimize the time it takes to onboard a customer when they sign up",
+                        "importance": 8.0,
+                        "satisfaction": 4.0,
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
+
+        rows = [*_survey_rows(outcome_id, 40), *_survey_rows("ghost", 1)]
+        plan = json.loads(
+            (await client.call_tool("get_survey_import_plan", {"rows": rows})).content[0].text
+        )
+
+        assert plan["writable"] is False
+        assert plan["counts"]["unmatched"] == 1
+        assert plan["rows"][40]["line"] == 42  # header is line 1
+        assert plan["rows"][40]["status"] == "unmatched"
+
+
+@pytest.mark.asyncio
+async def test_commit_survey_import_refuses_an_unresolved_row():
+    async with Client(mcp) as client:
+        job_id = extract_id(
+            (await client.call_tool("add_job", {"name": "Onboard", "description": ""}))
+            .content[0]
+            .text
+        )
+        outcome_id = extract_id(
+            (
+                await client.call_tool(
+                    "add_outcome",
+                    {
+                        "job_id": job_id,
+                        "statement": "Minimize the time it takes to onboard a customer when they sign up",
+                        "importance": 8.0,
+                        "satisfaction": 4.0,
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
+
+        rows = [*_survey_rows(outcome_id, 40), *_survey_rows("ghost", 1)]
+        text = (await client.call_tool("commit_survey_import", {"rows": rows})).content[0].text
+        assert text.startswith("Error:")
+
+        # The refusal left the outcome unchanged.
+        fetched = (
+            (await client.call_tool("get_outcome", {"outcome_id": outcome_id})).content[0].text
+        )
+        assert '"score_method":"estimate"' in fetched

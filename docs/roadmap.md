@@ -83,6 +83,15 @@ The open issues this milestone still has to answer, grouped by what they change.
   bootstrap band computed from the real paired responses. The import is
   all-or-nothing: an unresolved reference or a malformed row fails before any
   outcome is written.
+- [x] **No row disappears without a report line**: `survey import` builds a
+  side-effect-free plan before it writes. `--dry-run` prints the match table and
+  writes nothing; every row is named by its 1-based CSV line (the record's
+  starting line when a quoted field spans several), so unmatched, ambiguous,
+  invalid and missing-field rows are listed rather than dropped. `--match`
+  proposes one normalized-exact candidate per unmatched reference and asks a
+  person to confirm each; a suggestion is never applied silently, a stale or
+  ambiguous confirmation cannot assign a row, and a run with any unresolved row
+  is refused whole, so a partial score write is impossible.
 - [x] **Reproducible bands**: A survey outcome stores `opportunity_low`/
   `opportunity_high` with their provenance (`interval_n`, seed, confidence level,
   computed-at). A score or method edit without a fresh band clears the stale one

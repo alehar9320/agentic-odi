@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.stats import percentile
@@ -36,6 +36,10 @@ OUTCOME_REF_KEYS = ("outcome_id", "outcome_statement")
 IMPORTANCE_KEY = "importance"
 SATISFACTION_KEY = "satisfaction"
 RESPONDENT_KEY = "respondent_id"
+
+#: A row's fate in an import plan (B2.2). ``accepted`` rows resolve to exactly
+#: one outcome; the other three are named reasons a row cannot be written.
+RowStatus = Literal["accepted", "unmatched", "ambiguous", "invalid"]
 
 
 @dataclass(frozen=True)
@@ -74,6 +78,214 @@ class SurveyImportResult:
 
     aggregates: dict[str, SurveyAggregate]
     responses: list[SurveyResponse] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RowReport:
+    """One source row's fate in an import plan, named by its CSV line (B2.2).
+
+    ``line`` is the 1-based physical line including the header, so a rejected
+    row can be found in the spreadsheet it came from. ``suggestion`` carries a
+    single candidate outcome id for a ``--match`` proposal; it is never applied
+    without human confirmation.
+    """
+
+    line: int
+    status: RowStatus
+    reason: str
+    outcome_ref: str = ""
+    suggestion: str | None = None
+
+
+@dataclass(frozen=True)
+class SurveyPlan:
+    """A validated, side-effect-free import plan (B2.2).
+
+    Every input row appears exactly once in :attr:`rows`, so nothing is dropped
+    silently. The plan holds only rows that will be written in
+    :attr:`accepted`; a plan with any non-accepted row is not writable until the
+    caller resolves or confirms it.
+    """
+
+    rows: list[RowReport]
+    accepted: list[SurveyResponse]
+    aggregates: dict[str, SurveyAggregate]
+
+    @property
+    def rejected(self) -> list[RowReport]:
+        """Rows that would not be written, in input order."""
+        return [row for row in self.rows if row.status != "accepted"]
+
+    @property
+    def writable(self) -> bool:
+        """True when every row is accepted, so the plan may be committed."""
+        return not self.rejected
+
+
+def _normalize(value: str) -> str:
+    """Case- and whitespace-insensitive key for a match *proposal* (B2.2).
+
+    This is not fuzzy matching: it only collapses case and runs of whitespace, so
+    a suggestion is a spelling variant of an exact reference. It is still only a
+    proposal a person confirms.
+    """
+    return " ".join(value.split()).casefold()
+
+
+def suggest_matches(
+    refs: Iterable[str],
+    *,
+    id_by_statement: Mapping[str, str | None] | None = None,
+    known_ids: set[str] | None = None,
+) -> dict[str, str]:
+    """Propose one candidate outcome id per unresolved reference (B2.2).
+
+    A suggestion is returned only when exactly one id or statement matches the
+    reference after normalization; an ambiguous or absent match yields no entry,
+    so a proposal never guesses. The caller must confirm before writing.
+    """
+    id_by_statement = id_by_statement or {}
+    known_ids = known_ids or set()
+    normalized_ids: dict[str, str] = {}
+    ambiguous_ids: set[str] = set()
+    for outcome_id in known_ids:
+        key = _normalize(outcome_id)
+        if key in normalized_ids or key in ambiguous_ids:
+            ambiguous_ids.add(key)
+            normalized_ids.pop(key, None)
+        else:
+            normalized_ids[key] = outcome_id
+    normalized_statements: dict[str, str] = {}
+    ambiguous_statements: set[str] = set()
+    for statement, statement_id in id_by_statement.items():
+        key = _normalize(statement)
+        if statement_id is None or key in normalized_statements or key in ambiguous_statements:
+            ambiguous_statements.add(key)
+            normalized_statements.pop(key, None)
+        else:
+            normalized_statements[key] = statement_id
+
+    suggestions: dict[str, str] = {}
+    for ref in refs:
+        key = _normalize(ref)
+        candidate = normalized_ids.get(key) or normalized_statements.get(key)
+        if candidate:
+            suggestions[ref] = candidate
+    return suggestions
+
+
+def plan_survey(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    id_by_statement: Mapping[str, str | None] | None = None,
+    known_ids: set[str] | None = None,
+    confirmed_matches: Mapping[str, str] | None = None,
+) -> SurveyPlan:
+    """Build a side-effect-free import plan that accounts for every row (B2.2).
+
+    The plan is the whole difference between an importer a researcher trusts and
+    one they re-check in a spreadsheet: each row is either accepted or named with
+    a reason and its line number, and nothing is silently dropped. A malformed
+    value or a non-finite/out-of-range score makes only *that* row ``invalid``;
+    the rest of the plan is still reported so the user sees the full picture.
+
+    An unresolved row gets a ``suggestion`` — a single normalized-exact candidate
+    — but a suggestion is never applied by itself. ``confirmed_matches`` maps a
+    raw reference to an outcome id a person has confirmed; a confirmation only
+    assigns when its target still exists in ``known_ids``, so a stale or
+    ambiguous confirmation cannot assign a row.
+    """
+    rows = list(rows)
+    id_by_statement = id_by_statement or {}
+    known_ids = known_ids or set()
+    confirmed_matches = confirmed_matches or {}
+
+    reports: list[RowReport] = []
+    accepted: list[SurveyResponse] = []
+    seen: set[tuple[str, str]] = set()
+
+    for offset, row in enumerate(rows):
+        # Prefer the physical starting line a reader tagged (``_line``) so a
+        # quoted multiline record names the line a person sees in their editor.
+        line = int(row.get("_line", offset + 2))
+        ref_key = next((key for key in OUTCOME_REF_KEYS if key in row), None)
+        if ref_key is None:
+            reports.append(
+                RowReport(
+                    line,
+                    "invalid",
+                    f"missing an outcome reference ({', '.join(OUTCOME_REF_KEYS)})",
+                )
+            )
+            continue
+        missing = next((key for key in (IMPORTANCE_KEY, SATISFACTION_KEY) if key not in row), None)
+        if missing is not None:
+            reports.append(RowReport(line, "invalid", f"missing required column {missing!r}"))
+            continue
+        ref = str(row[ref_key]).strip()
+        if not ref:
+            reports.append(RowReport(line, "invalid", "outcome reference is empty"))
+            continue
+
+        try:
+            importance = _number(row[IMPORTANCE_KEY], field_name=IMPORTANCE_KEY, row=line)
+            satisfaction = _number(row[SATISFACTION_KEY], field_name=SATISFACTION_KEY, row=line)
+        except ValidationError as err:
+            reports.append(RowReport(line, "invalid", str(err), outcome_ref=ref))
+            continue
+
+        if ref_key == "outcome_id":
+            outcome_id: str | None = ref if ref in known_ids else None
+        else:
+            outcome_id = id_by_statement.get(ref)
+        if outcome_id is None:
+            confirmed = confirmed_matches.get(ref)
+            if confirmed is not None and confirmed in known_ids:
+                outcome_id = confirmed  # a person confirmed this exact assignment
+        if outcome_id is None:
+            status: RowStatus = (
+                "ambiguous"
+                if ref_key == "outcome_statement" and ref in id_by_statement
+                else "unmatched"
+            )
+            reason = (
+                "statement matched more than one outcome"
+                if status == "ambiguous"
+                else f"no outcome matches {ref!r}; references must be exact"
+            )
+            proposal = suggest_matches(
+                [ref], id_by_statement=id_by_statement, known_ids=known_ids
+            ).get(ref)
+            reports.append(RowReport(line, status, reason, outcome_ref=ref, suggestion=proposal))
+            continue
+
+        respondent = str(row.get(RESPONDENT_KEY) or f"row-{line}").strip()
+        key = (outcome_id, respondent)
+        if key in seen:
+            reports.append(
+                RowReport(
+                    line,
+                    "invalid",
+                    f"respondent {respondent!r} already answered for {outcome_id!r}; "
+                    "a repeated respondent is a conflict, not an overwrite",
+                    outcome_ref=ref,
+                )
+            )
+            continue
+        seen.add(key)
+        accepted.append(
+            SurveyResponse(
+                outcome_ref=outcome_id,
+                importance=importance,
+                satisfaction=satisfaction,
+                respondent=respondent,
+                outcome_ref_kind="outcome_id",
+            )
+        )
+        reports.append(RowReport(line, "accepted", "", outcome_ref=ref))
+
+    aggregates = _aggregate_responses([(r.outcome_ref, r) for r in accepted]) if accepted else {}
+    return SurveyPlan(rows=reports, accepted=accepted, aggregates=aggregates)
 
 
 def _number(value: Any, *, field_name: str, row: int) -> float:
@@ -168,6 +380,16 @@ def aggregate_survey(
                 )
         resolved.append((outcome_id, response))
 
+    return SurveyImportResult(
+        aggregates=_aggregate_responses(resolved),
+        responses=responses,
+    )
+
+
+def _aggregate_responses(
+    resolved: list[tuple[str, SurveyResponse]],
+) -> dict[str, SurveyAggregate]:
+    """Aggregate already-resolved ``(outcome_id, response)`` pairs into means."""
     by_outcome: dict[str, list[SurveyResponse]] = {}
     for outcome_id, response in resolved:
         by_outcome.setdefault(outcome_id, []).append(response)
@@ -186,7 +408,7 @@ def aggregate_survey(
             satisfaction_p90=percentile(satisfaction, 0.90),
             n=len(group),
         )
-    return SurveyImportResult(aggregates=aggregates, responses=responses)
+    return aggregates
 
 
 def survey_csv_header(row: Mapping[str, Any]) -> None:

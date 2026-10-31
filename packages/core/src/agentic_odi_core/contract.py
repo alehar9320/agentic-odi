@@ -30,6 +30,8 @@ class ToolName(str, Enum):
     GET_OUTCOME_HISTORY = "get_outcome_history"
     GET_OUTCOME_DELTA = "get_outcome_delta"
     IMPORT_SURVEY = "import_survey"
+    GET_SURVEY_IMPORT_PLAN = "get_survey_import_plan"
+    COMMIT_SURVEY_IMPORT = "commit_survey_import"
     RANK_OUTCOMES = "rank_outcomes"
     DELETE_OUTCOME = "delete_outcome"
     ADD_CUSTOMER_OUTCOME = "add_customer_outcome"
@@ -263,6 +265,24 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("rows",),
         required=("rows",),
         returns="The updated Outcomes keyed by id.",
+        stage="4",
+    ),
+    ToolName.GET_SURVEY_IMPORT_PLAN.value: ToolSpec(
+        name="get_survey_import_plan",
+        summary="Plan a survey import without writing: every row's fate and line number.",
+        effect=_derive_effect("get_survey_import_plan"),
+        arguments=("rows", "confirmed_matches"),
+        required=("rows",),
+        returns="Per-row accepted/unmatched/ambiguous/invalid reports with line numbers.",
+        stage="4",
+    ),
+    ToolName.COMMIT_SURVEY_IMPORT.value: ToolSpec(
+        name="commit_survey_import",
+        summary="Write a survey import only when every row resolves; otherwise refuse.",
+        effect=ToolEffect.WRITE,
+        arguments=("rows", "confirmed_matches"),
+        required=("rows",),
+        returns="The updated Outcomes keyed by id, or a refusal naming the unresolved rows.",
         stage="4",
     ),
     ToolName.RANK_OUTCOMES.value: ToolSpec(

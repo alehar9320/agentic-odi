@@ -153,3 +153,76 @@ def test_a_score_edit_clears_the_stale_band() -> None:
     assert edited.opportunity_high is None
     assert edited.interval_n is None
     assert edited.opportunity_score == 11.0
+
+
+# --- B2.2: plan/commit service paths ------------------------------------------
+
+
+def test_get_survey_import_plan_writes_nothing() -> None:
+    service, job_id = _service_with_job()
+    outcome = service.add_outcome(
+        job_id,
+        "Minimize the time to publish when a plugin is ready.",
+        7.0,
+        3.0,
+    )
+
+    plan = service.get_survey_import_plan(_rows(outcome.id, 40))
+
+    assert plan.writable is True
+    assert plan.aggregates[outcome.id].n == 40
+    # The plan is a read: the store is untouched.
+    unchanged = service.get_outcome(outcome.id)
+    assert unchanged is not None
+    assert unchanged.score_method == "estimate"
+
+
+def test_commit_survey_import_refuses_an_unresolved_row() -> None:
+    service, job_id = _service_with_job()
+    outcome = service.add_outcome(
+        job_id,
+        "Minimize the time to publish when a plugin is ready.",
+        7.0,
+        3.0,
+    )
+
+    with pytest.raises(ValidationError) as excinfo:
+        service.commit_survey_import([*_rows(outcome.id, 40), *_rows("ghost", 1)])
+
+    assert "unresolved" in str(excinfo.value)
+    unchanged = service.get_outcome(outcome.id)
+    assert unchanged is not None
+    assert unchanged.score_method == "estimate"
+
+
+def test_commit_survey_import_writes_a_fully_accepted_plan() -> None:
+    service, job_id = _service_with_job()
+    outcome = service.add_outcome(
+        job_id,
+        "Minimize the time to publish when a plugin is ready.",
+        7.0,
+        3.0,
+    )
+
+    updated = service.commit_survey_import(_rows(outcome.id, 40))
+
+    assert updated[outcome.id].importance_n == 40
+    assert updated[outcome.id].score_method == "survey"
+
+
+def test_commit_survey_import_accepts_a_confirmed_match() -> None:
+    service, job_id = _service_with_job()
+    outcome = service.add_outcome(
+        job_id,
+        "Minimize the time to publish when a plugin is ready.",
+        7.0,
+        3.0,
+    )
+    rows = [dict(row, outcome_id=outcome.id.upper()) for row in _rows(outcome.id, 40)]
+
+    plan = service.get_survey_import_plan(rows)
+    assert plan.rows[0].suggestion == outcome.id
+    assert plan.writable is False
+
+    updated = service.commit_survey_import(rows, confirmed_matches={outcome.id.upper(): outcome.id})
+    assert updated[outcome.id].importance_n == 40

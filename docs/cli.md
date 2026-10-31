@@ -174,14 +174,35 @@ record.
 
 # Survey import
 agentic-odi survey import responses.csv
+agentic-odi survey import responses.csv --dry-run
+agentic-odi survey import responses.csv --match
 agentic-odi survey import responses.csv --json
 
 `survey import` reads a CSV of responses (one row per respondent, columns named
 for the outcome) and lands each outcome's accepted mean, sample size (`n`) and a
 bootstrap band computed from the real paired responses on the matching outcome.
-The import is all-or-nothing: a row that matches no outcome, a malformed value
-or a duplicate respondent fails the whole import before any outcome is written,
-so nothing is silently dropped or partially applied.
+
+The import is a plan before it is a write. Every source row is accounted for by
+one report entry, so nothing is silently dropped:
+
+* `--dry-run` prints the match table and writes nothing — no score, event,
+  snapshot or retained response — so the report the user reads is the report the
+  real run would produce.
+* A row that matches no outcome is listed by its 1-based CSV line number
+  (including the header), and is never fuzzy-matched. When a quoted field spans
+  several physical lines, the line named is the record's *starting* line, the one
+  a person sees in their editor.
+* A row containing `0`, a score outside 1–10, a nonfinite value, a missing field
+  or an invalid id is rejected with its line number.
+* `--match` proposes one candidate per unmatched reference (a case- and
+  whitespace-normalized variant of an exact id or statement) and asks a person to
+  confirm each. A suggestion is never applied silently: without an explicit yes
+  the import fails safely and writes nothing, and a stale or ambiguous
+  confirmation cannot assign a row.
+
+A run writes only when every row is accepted. If any row is unmatched, ambiguous
+or invalid, the whole import is refused and the prior store is left unchanged, so
+a partial score write is impossible.
 
 # Evidence-aware ranking
 agentic-odi top

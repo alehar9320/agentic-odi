@@ -539,6 +539,53 @@ def import_survey(rows: list[dict[str, Any]]) -> str:
 
 
 @mcp.tool
+def get_survey_import_plan(
+    rows: list[dict[str, Any]], confirmed_matches: dict[str, str] | None = None
+) -> str:
+    """Plan a survey import without writing: every row's fate and line number.
+
+    Returns the per-row accepted/unmatched/ambiguous/invalid report with a
+    ``counts`` summary, so a dry run shows the report the real run would produce
+    and no row disappears without a report line.
+    """
+    plan = service.get_survey_import_plan(rows, confirmed_matches=confirmed_matches)
+    counts = {"accepted": 0, "unmatched": 0, "ambiguous": 0, "invalid": 0}
+    reports = []
+    for row in plan.rows:
+        counts[row.status] += 1
+        reports.append(
+            {
+                "line": row.line,
+                "status": row.status,
+                "reason": row.reason,
+                "outcome_ref": row.outcome_ref,
+                "suggestion": row.suggestion,
+            }
+        )
+    counts["total"] = len(plan.rows)
+    return json.dumps({"rows": reports, "counts": counts, "writable": plan.writable})
+
+
+@mcp.tool
+def commit_survey_import(
+    rows: list[dict[str, Any]], confirmed_matches: dict[str, str] | None = None
+) -> str:
+    """Write a survey import only when every row resolves; otherwise refuse.
+
+    A plan with any unmatched, ambiguous or invalid row is refused as a whole, so
+    a partial score write is impossible. Accepted rows land through the same
+    sample/band path as ``import_survey``.
+    """
+    try:
+        updated = service.commit_survey_import(rows, confirmed_matches=confirmed_matches)
+    except OutcomeNotFoundError as exc:
+        return f"Error: {exc}"
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps({outcome_id: outcome.model_dump() for outcome_id, outcome in updated.items()})
+
+
+@mcp.tool
 def rank_outcomes(job_id: str) -> str:
     """Rank a Job's Outcomes by evidence strength into measured/thin/none sections.
 

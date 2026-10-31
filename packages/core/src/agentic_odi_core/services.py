@@ -40,7 +40,7 @@ from agentic_odi_core.models import (
 )
 from agentic_odi_core.repository import Repository, page
 from agentic_odi_core.stats import DEFAULT_SEED, opportunity_interval
-from agentic_odi_core.survey import aggregate_survey, parse_survey
+from agentic_odi_core.survey import SurveyPlan, aggregate_survey, parse_survey, plan_survey
 from agentic_odi_core.trust import (
     OutcomeDelta,
     classify_confidence,
@@ -447,6 +447,93 @@ class ODIService:
             "confidence": classify_confidence(outcome),
         }
 
+    def _survey_reference_index(self) -> tuple[set[str], dict[str, str | None]]:
+        """The exact-match resolution tables for a survey import (B2).
+
+        ``known_ids`` is every outcome id in the store; ``id_by_statement`` maps
+        a statement to its single outcome id, or to ``None`` when the statement
+        is ambiguous. Both are job-agnostic because an import may reference any
+        outcome the store holds.
+        """
+        outcomes = [
+            outcome for job in self.repo.list_jobs() for outcome in self.repo.get_outcomes(job.id)
+        ]
+        known_ids = {outcome.id for outcome in outcomes}
+        id_by_statement: dict[str, str | None] = {}
+        for outcome in outcomes:
+            if outcome.statement in id_by_statement:
+                id_by_statement[outcome.statement] = None  # ambiguous
+            else:
+                id_by_statement[outcome.statement] = outcome.id
+        return known_ids, id_by_statement
+
+    def get_survey_import_plan(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        confirmed_matches: dict[str, str] | None = None,
+    ) -> SurveyPlan:
+        """Build a side-effect-free import plan that accounts for every row (B2.2).
+
+        Resolves references against the whole store exactly as :meth:`import_survey`
+        does, but writes nothing: the plan names each row's fate and line number,
+        so a dry run prints the report the real run would produce.
+        """
+        known_ids, id_by_statement = self._survey_reference_index()
+        return plan_survey(
+            rows,
+            id_by_statement=id_by_statement,
+            known_ids=known_ids,
+            confirmed_matches=confirmed_matches,
+        )
+
+    def commit_survey_import(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        confirmed_matches: dict[str, str] | None = None,
+    ) -> dict[str, Outcome]:
+        """Plan and write a survey import, refusing any unresolved row (B2.2).
+
+        Re-plans from the same rows and writes only when every row is accepted,
+        so a dry run and the real run agree and a partial write is impossible.
+        """
+        plan = self.get_survey_import_plan(rows, confirmed_matches=confirmed_matches)
+        return self.commit_survey_plan(plan)
+
+    def commit_survey_plan(self, plan: SurveyPlan) -> dict[str, Outcome]:
+        """Write an already-reviewed, fully-accepted plan (B2.2).
+
+        Refuses a plan with any rejected row, so a partial write is impossible:
+        the caller must resolve or explicitly confirm every row first. Accepted
+        rows land through the same band/sample path as :meth:`import_survey`.
+        """
+        if not plan.writable:
+            rejected = ", ".join(f"line {row.line} ({row.status})" for row in plan.rejected)
+            raise ValidationError(
+                f"import plan has {len(plan.rejected)} unresolved row(s): {rejected}; "
+                "resolve or confirm every row before writing"
+            )
+        observations: dict[str, list[tuple[float, float]]] = {}
+        for response in plan.accepted:
+            observations.setdefault(response.outcome_ref, []).append(
+                (response.importance, response.satisfaction)
+            )
+        updated: dict[str, Outcome] = {}
+        for outcome_id, aggregate in plan.aggregates.items():
+            if self.get_outcome(outcome_id) is None:
+                raise OutcomeNotFoundError(outcome_id)
+            updates: dict[str, Any] = {
+                "importance": round(aggregate.importance_mean, 6),
+                "satisfaction": round(aggregate.satisfaction_mean, 6),
+                "importance_n": aggregate.n,
+                "satisfaction_n": aggregate.n,
+                "score_method": "survey",
+            }
+            updates.update(self._band_for(observations.get(outcome_id, [])))
+            updated[outcome_id] = self.update_outcome(outcome_id, updates)
+        return updated
+
     def import_survey(
         self,
         rows: list[dict[str, Any]],
@@ -461,16 +548,7 @@ class ODIService:
         a reference that does not resolve.
         """
         responses = parse_survey(rows)
-        outcomes = [
-            outcome for job in self.repo.list_jobs() for outcome in self.repo.get_outcomes(job.id)
-        ]
-        known_ids = {outcome.id for outcome in outcomes}
-        id_by_statement: dict[str, str | None] = {}
-        for outcome in outcomes:
-            if outcome.statement in id_by_statement:
-                id_by_statement[outcome.statement] = None  # ambiguous
-            else:
-                id_by_statement[outcome.statement] = outcome.id
+        known_ids, id_by_statement = self._survey_reference_index()
         result = aggregate_survey(responses, id_by_statement=id_by_statement, known_ids=known_ids)
 
         # The band is bootstrapped from the paired responses, not from the mean,

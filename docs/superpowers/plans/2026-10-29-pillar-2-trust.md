@@ -712,6 +712,29 @@ implicit, because ALH-29 asks for it explicitly:
 - `rank_outcomes` keeps an unscored outcome after every scored one instead of
   sorting it as `0.0` — `test_rank_outcomes_puts_unscored_last_not_at_zero`.
 
+## B2.2 import plan behaviour (implemented)
+
+B2.2 extends the B2 import with a plan step; it adds no new convention, so it did
+not need a separate gate. The decisions it does touch are pinned rather than left
+implicit:
+
+- The plan is pure: `plan_survey` returns the same report for the same input, so
+  a dry run cannot diverge from the real run —
+  `test_dry_run_and_real_run_agree_for_the_same_input`.
+- Every row is accounted for: a malformed value, a missing field, a nonfinite or
+  out-of-range score, and an empty reference each make only *that* row `invalid`,
+  named by its 1-based physical line —
+  `test_plan_rejects_a_nonfinite_value_by_line`,
+  `test_plan_rejects_a_missing_field_by_line`.
+- A repeated respondent/outcome is a conflict, not an overwrite — the row is
+  `invalid` and the import is refused.
+- A `--match` suggestion is a normalized-exact variant only; an ambiguous or
+  absent match yields no suggestion, and a confirmation assigns only when its
+  target still exists in the store —
+  `test_commit_survey_import_accepts_a_confirmed_match`.
+- A run with any unresolved row is refused whole, leaving the store unchanged —
+  `test_commit_survey_import_refuses_an_unresolved_row`.
+
 ## Seams added ahead of the gates
 
 `packages/core/src/agentic_odi_core/trust.py` names the contract each blocked
