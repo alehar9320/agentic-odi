@@ -721,6 +721,48 @@ class ODIService:
     def get_quote(self, quote_id: str) -> InterviewQuote | None:
         return self.repo.get_quote(quote_id)
 
+    def import_transcript(
+        self,
+        text: str,
+        *,
+        title: str,
+        participant_label: str,
+        filename: str | None = None,
+        fmt: str | None = None,
+        job_id: str | None = None,
+        participant_role: str | None = None,
+        conducted_at: str | None = None,
+        source_kind: str = "transcript",
+    ) -> tuple[Interview, list[InterviewQuote]]:
+        """Parse a transcript, then persist it as one interview.
+
+        The parse is pure and runs first, so a malformed transcript raises
+        before any interview or quote is written — there is no partial state.
+        """
+        from agentic_odi_core.transcript import detect_format, parse_transcript
+
+        resolved = fmt or detect_format(text, filename)
+        turns = parse_transcript(text, resolved)
+        interview = self.add_interview(
+            title=title,
+            participant_label=participant_label,
+            job_id=job_id,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+        )
+        quotes = [
+            self.add_quote(
+                interview.id,
+                turn.text,
+                speaker=turn.speaker,
+                start_ms=turn.start_ms,
+                end_ms=turn.end_ms,
+            )
+            for turn in turns
+        ]
+        return interview, quotes
+
     def promote_evidence(
         self,
         evidence_id: str,

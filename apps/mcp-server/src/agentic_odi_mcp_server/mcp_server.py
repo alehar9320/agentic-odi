@@ -622,6 +622,45 @@ def list_quotes(interview_id: str) -> str:
 
 
 @mcp.tool
+def import_transcript(
+    text: str,
+    title: str,
+    participant_label: str,
+    filename: str | None = None,
+    format: str | None = None,
+    job_id: str | None = None,
+    participant_role: str | None = None,
+    conducted_at: str | None = None,
+) -> str:
+    """Parse a transcript and persist it as one interview with its quotes.
+
+    ``format`` is one of ``md``, ``txt``, ``vtt``, or ``srt``; omit it to detect
+    from ``filename`` and the content. A malformed transcript is refused before
+    anything is written, so a failure leaves no partial interview.
+    """
+    from agentic_odi_core.transcript import TranscriptFormatError
+
+    try:
+        interview, quotes = service.import_transcript(
+            text,
+            title=title,
+            participant_label=participant_label,
+            filename=filename,
+            fmt=format,
+            job_id=job_id,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    except TranscriptFormatError as exc:
+        return f"Error: {exc}"
+    except (OdiError, ValueError) as exc:
+        return f"Error: {exc}"
+    return json.dumps({"interview": interview.model_dump(), "quote_count": len(quotes)})
+
+
+@mcp.tool
 def promote_evidence(
     evidence_id: str,
     target: str,

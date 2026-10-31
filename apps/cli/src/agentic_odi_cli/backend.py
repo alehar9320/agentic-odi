@@ -627,6 +627,30 @@ class LocalBackend(Backend):
         items = self.service.list_quotes(args["interview_id"])
         return [item.model_dump() for item in items]
 
+    def _import_transcript(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+        from agentic_odi_core.transcript import TranscriptFormatError
+
+        display = args.get("display_name") or args.get("filename") or "stdin"
+        try:
+            interview, quotes = self.service.import_transcript(
+                args["text"],
+                title=args["title"],
+                participant_label=args["participant_label"],
+                filename=args.get("filename"),
+                fmt=args.get("format"),
+                job_id=args.get("job_id"),
+                participant_role=args.get("participant_role"),
+                conducted_at=args.get("conducted_at"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id") or "")) from None
+        except TranscriptFormatError as exc:
+            raise BackendError(f"{display}: {exc}") from None
+        except ValueError as exc:
+            raise BackendError(f"{display}: {exc}") from None
+        return {"interview": interview.model_dump(), "quote_count": len(quotes)}
+
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
         from agentic_odi_core.evaluation import (
@@ -766,6 +790,7 @@ _LOCAL_HANDLERS = {
     "delete_interview": LocalBackend._delete_interview,
     "add_quote": LocalBackend._add_quote,
     "list_quotes": LocalBackend._list_quotes,
+    "import_transcript": LocalBackend._import_transcript,
     "promote_evidence": LocalBackend._promote_evidence,
     "schedule_work": LocalBackend._schedule_work,
     "get_scheduled_work": LocalBackend._get_scheduled_work,
