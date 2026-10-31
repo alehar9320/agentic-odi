@@ -742,6 +742,34 @@ class LocalBackend(Backend):
     def _get_orchestrator_status(self, args: dict[str, Any]) -> dict[str, Any]:
         return self.orchestrator.status().model_dump(mode="json")
 
+    def _segment_market(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        job_id = args.get("job_id")
+        try:
+            segments = self.service.segment_market(job_id=job_id, people=args.get("people"))
+        except JobNotFoundError:
+            raise BackendError(job_not_found(job_id or "")) from None
+        return [segment.model_dump(mode="json") for segment in segments]
+
+    def _get_segments(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        segments = self.service.list_segments(job_id=args.get("job_id"))
+        return [segment.model_dump(mode="json") for segment in segments]
+
+    def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        strategy = self.service.get_strategy()
+        return None if strategy is None else strategy.model_dump(mode="json")
+
+    def _propose_strategy(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        job_id = args.get("job_id")
+        try:
+            strategy = self.service.propose_strategy(job_id=job_id)
+        except JobNotFoundError:
+            raise BackendError(job_not_found(job_id or "")) from None
+        return strategy.model_dump(mode="json")
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -783,6 +811,10 @@ _LOCAL_HANDLERS = {
     "list_signals": LocalBackend._list_signals,
     "mark_signal_read": LocalBackend._mark_signal_read,
     "dismiss_signal": LocalBackend._dismiss_signal,
+    "segment_market": LocalBackend._segment_market,
+    "get_segments": LocalBackend._get_segments,
+    "get_strategy": LocalBackend._get_strategy,
+    "propose_strategy": LocalBackend._propose_strategy,
     "add_work_item": LocalBackend._add_work_item,
     "list_work_items": LocalBackend._list_work_items,
     "get_work_item": LocalBackend._get_work_item,
@@ -859,6 +891,8 @@ _LIST_TOOLS = frozenset(
         "list_evidence",
         "list_signals",
         "list_scheduled_work",
+        "segment_market",
+        "get_segments",
         "list_work_items",
         "list_agent_targets",
         "list_agent_runs",
@@ -879,6 +913,8 @@ def _parse_remote(tool_name: str, text: str) -> Any:
         return _extract_float(stripped)
     if tool_name in _ID_TOOLS:
         return stripped.rsplit(": ", 1)[-1]
+    if stripped == "null":
+        return None
 
     payload = _extract_json(stripped)
     if tool_name in _LIST_TOOLS and not isinstance(payload, list):

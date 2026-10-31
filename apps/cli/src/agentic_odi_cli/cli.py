@@ -26,9 +26,11 @@ from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
 from agentic_odi_cli.render import render_job_summary
 from agentic_odi_cli.schedule import schedule_app
+from agentic_odi_cli.segments import segments_app
 from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
+from agentic_odi_cli.strategy import strategy_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -54,6 +56,16 @@ app.add_typer(
     signals_app,
     name="signals",
     help="Read the signal inbox — real changes worth attention.",
+)
+app.add_typer(
+    segments_app,
+    name="segments",
+    help="Stage 5: segments derived from scored outcomes, never from demographics.",
+)
+app.add_typer(
+    strategy_app,
+    name="strategy",
+    help="Stage 6: the innovation path the segments support, with the paths it beat.",
 )
 app.add_typer(
     customer_outcomes_app,

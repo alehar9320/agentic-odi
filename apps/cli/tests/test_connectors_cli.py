@@ -11,6 +11,7 @@ from agentic_odi_connectors.models import (
     HealthStatus,
     IngestBatch,
     IngestRecord,
+    RateLimitExceededError,
     RestConnectorSettings,
 )
 from agentic_odi_connectors.rest.connector import RestConnector
@@ -403,6 +404,51 @@ def test_connectors_ingest_appends_to_sink(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0
     sink.append.assert_called_once()
     assert "gong" in _strip(result.output)
+
+
+def test_connectors_ingest_reports_a_rate_limit_instead_of_a_traceback(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = tmp_path / "connectors.json"
+    runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "gong",
+            "--url",
+            "http://localhost:9000/mcp",
+            "--config",
+            str(config),
+        ],
+    )
+    batch = IngestBatch(
+        connector_name="gong",
+        records=[
+            IngestRecord(
+                source_name="gong",
+                source_kind="mcp",
+                item_type="resource",
+                name="Call notes",
+                content="Onboarding is slow",
+            )
+        ],
+    )
+    sink = MagicMock()
+    sink.append.side_effect = RateLimitExceededError(rate=100, requested=150)
+    monkeypatch.setattr(
+        "agentic_odi_cli.connectors.build_connector", lambda _config: _FakeConnector(batch)
+    )
+    monkeypatch.setattr("agentic_odi_cli.connectors.get_default_sink", lambda: sink)
+
+    result = runner.invoke(app, ["connectors", "ingest", "--name", "gong", "--config", str(config)])
+
+    assert result.exit_code == 1
+    output = _strip(result.output)
+    assert "Rate limit exceeded" in output
+    assert "Traceback" not in output
 
 
 class _SlowConnector:

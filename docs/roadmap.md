@@ -26,7 +26,7 @@ it is merged; the link is the proof.
 - [x] **Tool spec validation on MCP startup** — the server refuses to serve a malformed registry ([PR #288](https://github.com/alehar9320/agentic-odi/pull/288)).
 - [x] **Keyboard navigation for the feed and job map** — phase cards, step rows, and both dialogs are operable without a mouse ([PR #297](https://github.com/alehar9320/agentic-odi/pull/297)).
 - [x] **`odi data export`** — back the ODI state up as JSON ([PR #293](https://github.com/alehar9320/agentic-odi/pull/293)).
-- [x] **Agent autopilot** — `odi orchestrate` queues work, runs OpenHands Cloud conversations under a deterministic policy, and reports terminal outcomes as signals ([PR #363](https://github.com/alehar9320/agentic-odi/pull/363)).
+- [x] **Conversational first-run introduction** — the agent speaks first in five short turns and returns an editable brief, replacing the setup form ([PR #362](https://github.com/alehar9320/agentic-odi/pull/362)).
 - [x] **`odi connectors list-presets`** — discover and copy a preset from the terminal ([PR #290](https://github.com/alehar9320/agentic-odi/pull/290)).
 
 ## In flight
@@ -45,6 +45,9 @@ counted as done.
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
+- [ ] **Outcome-based segments and the strategy they imply** — the scored outcomes group into segments, and the recorded path names the ones it beat ([PR #367](https://github.com/alehar9320/agentic-odi/pull/367)).
+- [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
+- [ ] **Agent autopilot** — `odi orchestrate` queues work, runs OpenHands Cloud conversations under a deterministic policy, and reports terminal outcomes as signals ([PR #363](https://github.com/alehar9320/agentic-odi/pull/363)).
 
 ## Next
 

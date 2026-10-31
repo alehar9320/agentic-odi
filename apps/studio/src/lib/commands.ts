@@ -95,6 +95,14 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     keywords: ["steps", "phases"],
   },
   {
+    id: "segments",
+    name: "/segments",
+    label: "Segments and the bet",
+    description: "Who the scored outcomes point at, and the strategy they imply.",
+    category: "Explore",
+    keywords: ["markets", "verdict", "strategy", "who is this for"],
+  },
+  {
     id: "impact",
     name: "/impact",
     label: "Simulate a bet",

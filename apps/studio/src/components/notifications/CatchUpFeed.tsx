@@ -24,6 +24,8 @@ const KIND_LABEL: Record<SignalKind, string> = {
   agent_work_completed: "Agent work",
   agent_work_failed: "Agent work",
   agent_work_blocked: "Agent work",
+  segment_identified: "Segment",
+  strategy_proposed: "Strategy",
 };
 
 const SEVERITY_BADGE: Record<SignalSeverity, string> = {

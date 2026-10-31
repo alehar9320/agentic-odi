@@ -7,6 +7,7 @@ import { JobMap } from "../canvas/JobMap";
 import { MemoryPanel } from "../canvas/MemoryPanel";
 import { OpportunityLandscape } from "../canvas/OpportunityLandscape";
 import { SchedulePanel } from "../canvas/SchedulePanel";
+import { SegmentBoard } from "../canvas/SegmentBoard";
 import { WorkPanel } from "../canvas/WorkPanel";
 import { CatchUpFeed } from "../notifications/CatchUpFeed";
 import { SettingsPanel } from "../SettingsPanel";
@@ -14,6 +15,7 @@ import {
   BellIcon,
   BoltIcon,
   CaptureIcon,
+  ClusterIcon,
   CompassIcon,
   RouteIcon,
   SettingsIcon,
@@ -79,6 +81,19 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
       label: "Walk me through the job",
       intent:
         "Walk me through the job step by step, and show me where the work breaks down today.",
+    },
+  },
+  {
+    id: "segments",
+    label: "Segments",
+    title: "Segments and the bet",
+    blurb: "Who the scored outcomes point at, and the strategy that follows from it.",
+    icon: <ClusterIcon />,
+    render: () => <SegmentBoard />,
+    talk: {
+      label: "Ask who this is for",
+      intent:
+        "Who is this for, according to the outcomes I have scored? Then tell me what to do about it, and name the paths you rejected.",
     },
   },
   {

@@ -432,6 +432,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Segments
+         * @description Stage 5's segments, same records under both backends.
+         *
+         *     Empty until the agent has run ``segment_market``: a segment is derived from
+         *     scored outcomes, never typed in.
+         */
+        get: operations["get_segments_api_segments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Strategy
+         * @description The recorded strategy and the paths it beat, or ``null`` before Stage 6.
+         */
+        get: operations["get_strategy_api_strategy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategy/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Strategy Propose
+         * @description Ask which innovation path the evidence supports.
+         *
+         *     A 422 with the missing evidence spelled out is the honest answer when no
+         *     path has support: the tool refuses rather than inventing a bet.
+         */
+        post: operations["post_strategy_propose_api_strategy_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/customer-outcomes": {
         parameters: {
             query?: never;
@@ -1507,6 +1573,22 @@ export interface components {
             importance?: number | null;
             /** Satisfaction */
             satisfaction?: number | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
+         * ProposeStrategyRequest
+         * @description Body for ``POST /api/strategy/propose``.
+         *
+         *     ``job_id`` narrows the bet to one job's segments; omitting it asks across the
+         *     whole workspace.
+         */
+        ProposeStrategyRequest: {
+            /** Job Id */
+            job_id?: string | null;
             /**
              * Mcp Url
              * @default
@@ -2752,6 +2834,108 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SignalActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_segments_api_segments_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_api_strategy_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    } | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_strategy_propose_api_strategy_propose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeStrategyRequest"];
             };
         };
         responses: {
