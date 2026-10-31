@@ -14,7 +14,7 @@ from agentic_odi_core.models import (
     Outcome,
     Step,
 )
-from agentic_odi_core.repository import InMemoryRepository
+from agentic_odi_core.repository import InMemoryRepository, rank_outcomes
 
 
 def _customer_outcome(outcome_id: str, job_id: str = "job-1") -> CustomerOutcome:
@@ -271,3 +271,37 @@ def test_reload_is_safe_on_an_empty_repository() -> None:
     repo.reload()
     repo.reload()
     assert repo.list_jobs() == []
+
+
+def test_rank_outcomes_puts_unscored_last_not_at_zero() -> None:
+    """An unscored outcome is unknown, not a zero.
+
+    Sorting an absent score as 0.0 would place it below a genuinely low
+    opportunity and present a gap as a measurement, so the rank must keep
+    unknown scores after every scored one.
+    """
+    scored_low = Outcome(
+        id="o-low",
+        job_id="job-1",
+        statement="Minimize the wait when a build fails",
+        importance=1.0,
+        satisfaction=1.0,
+        opportunity_score=1.0,
+    )
+    scored_high = Outcome(
+        id="o-high",
+        job_id="job-1",
+        statement="Minimize the time to onboard when joining",
+        importance=9.0,
+        satisfaction=1.0,
+        opportunity_score=17.0,
+    )
+    unscored = Outcome(
+        id="o-none",
+        job_id="job-1",
+        statement="Minimize the noise when a deploy breaks",
+    )
+
+    ranked = rank_outcomes([unscored, scored_low, scored_high])
+
+    assert [outcome.id for outcome in ranked] == ["o-high", "o-low", "o-none"]
