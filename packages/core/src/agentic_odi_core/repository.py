@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timezone
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.models import (
     CandidateStatus,
@@ -15,8 +17,10 @@ from agentic_odi_core.models import (
     Outcome,
     OutcomeCandidate,
     ScheduledWork,
+    Segment,
     Signal,
     Step,
+    Strategy,
 )
 
 _Item = TypeVar("_Item")
@@ -83,6 +87,33 @@ def sort_outcomes(items: list[Outcome], sort: str = "opportunity_score") -> list
     return rank_outcomes(items)
 
 
+def compute_evidence_fingerprint(
+    source_kind: str,
+    source_name: str,
+    name: str,
+    content: str,
+    url: str | None,
+    raw: dict[str, Any] | None,
+) -> str:
+    """Fingerprint for an evidence record: sha256 over its content-defining fields.
+
+    Records that share ``source_kind``, ``source_name``, ``name``, ``content``,
+    ``url`` and ``raw`` describe the same customer quote / observation, so a
+    repeat import or promotion must not create a duplicate evidence row.
+    """
+    payload = "|".join(
+        [
+            source_kind,
+            source_name,
+            name,
+            content,
+            url or "",
+            json.dumps(raw or {}, sort_keys=True),
+        ]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 class Repository(Protocol):
     jobs: dict[str, Job]
     steps: dict[str, Step]
@@ -94,6 +125,8 @@ class Repository(Protocol):
     interviews: dict[str, Interview]
     quotes: dict[str, InterviewQuote]
     candidates: dict[str, OutcomeCandidate]
+    segments: dict[str, Segment]
+    strategies: dict[str, Strategy]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -131,6 +164,16 @@ class Repository(Protocol):
     def delete_customer_outcome(self, outcome_id: str) -> bool: ...
     def add_evidence(self, evidence: Evidence) -> Evidence: ...
     def get_evidence(self, evidence_id: str) -> Evidence | None: ...
+    def get_evidence_by_fingerprint(
+        self,
+        source_kind: str,
+        source_name: str,
+        name: str,
+        content: str,
+        url: str | None,
+        raw: dict[str, Any] | None,
+    ) -> Evidence | None: ...
+    def update_evidence(self, evidence_id: str, updates: dict[str, Any]) -> Evidence | None: ...
     def list_evidence(
         self,
         job_id: str | None = None,
@@ -153,6 +196,14 @@ class Repository(Protocol):
     ) -> list[ScheduledWork]: ...
     def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
     def delete_scheduled_work(self, work_id: str) -> bool: ...
+    def add_segment(self, segment: Segment) -> Segment: ...
+    def get_segment(self, segment_id: str) -> Segment | None: ...
+    def list_segments(self, job_id: str | None = None) -> list[Segment]: ...
+    def update_segment(self, segment_id: str, updates: dict) -> Segment | None: ...
+    def add_strategy(self, strategy: Strategy) -> Strategy: ...
+    def get_strategy(self, strategy_id: str) -> Strategy | None: ...
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
+    def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
 
     def add_interview(self, interview: Interview) -> Interview: ...
     def get_interview(self, interview_id: str) -> Interview | None: ...
@@ -197,6 +248,8 @@ class InMemoryRepository:
         self.interviews: dict[str, Interview] = {}
         self.quotes: dict[str, InterviewQuote] = {}
         self.candidates: dict[str, OutcomeCandidate] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -222,26 +275,34 @@ class InMemoryRepository:
         if job_id not in self.jobs:
             return False
         del self.jobs[job_id]
-        for key in [k for k, v in self.steps.items() if v.job_id == job_id]:
+        deleted_steps = {k for k, v in self.steps.items() if v.job_id == job_id}
+        for key in deleted_steps:
             del self.steps[key]
-        for key in [k for k, v in self.outcomes.items() if v.job_id == job_id]:
+        deleted_outcomes = {k for k, v in self.outcomes.items() if v.job_id == job_id}
+        for key in deleted_outcomes:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
             del self.customer_outcomes[key]
-        for key in [
-            k
-            for k, v in self.evidence.items()
-            if v.job_id == job_id
-            or (v.step_id is not None and v.step_id not in self.steps)
-            or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-        ]:
-            del self.evidence[key]
         for key in [k for k, v in self.interviews.items() if v.job_id == job_id]:
             del self.interviews[key]
             for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
                 del self.quotes[quote_key]
             for candidate_key in [c for c, v in self.candidates.items() if v.interview_id == key]:
                 del self.candidates[candidate_key]
+        #: Do not destroy research evidence: unlink references to the removed
+        #: job, its steps and its outcomes instead of deleting the rows.
+        for key, ev in list(self.evidence.items()):
+            updates: dict[str, Any] = {}
+            if ev.job_id == job_id:
+                updates["job_id"] = None
+            if ev.step_id in deleted_steps:
+                updates["step_id"] = None
+            if ev.outcome_id in deleted_outcomes:
+                updates["outcome_id"] = None
+            if updates:
+                current = ev.model_dump(exclude_unset=True)
+                current.update(updates)
+                self.evidence[key] = Evidence.model_validate(current)
         return True
 
     def add_step(self, step: Step) -> Step:
@@ -275,13 +336,12 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
             del self.customer_outcomes[key]
-        for key in [
-            k
-            for k, v in self.evidence.items()
-            if v.step_id == step_id
-            or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-        ]:
-            del self.evidence[key]
+        #: Unlink evidence instead of destroying it.
+        for key, ev in list(self.evidence.items()):
+            if ev.step_id == step_id:
+                current = ev.model_dump(exclude_unset=True)
+                current["step_id"] = None
+                self.evidence[key] = Evidence.model_validate(current)
         return True
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
@@ -317,8 +377,13 @@ class InMemoryRepository:
     def delete_outcome(self, outcome_id: str) -> bool:
         if outcome_id in self.outcomes:
             del self.outcomes[outcome_id]
-            for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
-                del self.evidence[key]
+            #: Unlink evidence instead of destroying it: point outcome_id to NULL
+            #: so the quote survives the outcome's removal.
+            for key, ev in list(self.evidence.items()):
+                if ev.outcome_id == outcome_id:
+                    current = ev.model_dump(exclude_unset=True)
+                    current["outcome_id"] = None
+                    self.evidence[key] = Evidence.model_validate(current)
             return True
         return False
 
@@ -386,6 +451,43 @@ class InMemoryRepository:
             del self.evidence[evidence_id]
             return True
         return False
+
+    def get_evidence_by_fingerprint(
+        self,
+        source_kind: str,
+        source_name: str,
+        name: str,
+        content: str,
+        url: str | None,
+        raw: dict[str, Any] | None,
+    ) -> Evidence | None:
+        fingerprint = compute_evidence_fingerprint(
+            source_kind, source_name, name, content, url, raw
+        )
+        for existing in self.evidence.values():
+            if (
+                compute_evidence_fingerprint(
+                    existing.source_kind,
+                    existing.source_name,
+                    existing.name,
+                    existing.content,
+                    existing.url,
+                    existing.raw,
+                )
+                == fingerprint
+            ):
+                return existing
+        return None
+
+    def update_evidence(self, evidence_id: str, updates: dict[str, Any]) -> Evidence | None:
+        evidence = self.evidence.get(evidence_id)
+        if not evidence:
+            return None
+        current = evidence.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_evidence = evidence.model_validate(current)
+        self.evidence[evidence_id] = new_evidence
+        return new_evidence
 
     def add_signal(self, signal: Signal) -> Signal:
         self.signals[signal.id] = signal
@@ -508,6 +610,52 @@ class InMemoryRepository:
         items = [q for q in self.quotes.values() if q.interview_id == interview_id]
         return sorted(items, key=lambda q: q.ordinal)
 
+    def add_segment(self, segment: Segment) -> Segment:
+        self.segments[segment.id] = segment
+        return segment
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        return self.segments.get(segment_id)
+
+    def list_segments(self, job_id: str | None = None) -> list[Segment]:
+        items = list(self.segments.values())
+        if job_id is not None:
+            items = [segment for segment in items if segment.job_id == job_id]
+        return items
+
+    def update_segment(self, segment_id: str, updates: dict) -> Segment | None:
+        segment = self.segments.get(segment_id)
+        if segment is None:
+            return None
+        current = segment.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_segment = segment.model_validate(current)
+        self.segments[segment_id] = new_segment
+        return new_segment
+
+    def add_strategy(self, strategy: Strategy) -> Strategy:
+        self.strategies[strategy.id] = strategy
+        return strategy
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        return self.strategies.get(strategy_id)
+
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
+        items = list(self.strategies.values())
+        if segment_id is not None:
+            items = [strategy for strategy in items if strategy.segment_id == segment_id]
+        return items
+
+    def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None:
+        strategy = self.strategies.get(strategy_id)
+        if strategy is None:
+            return None
+        current = strategy.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_strategy = strategy.model_validate(current)
+        self.strategies[strategy_id] = new_strategy
+        return new_strategy
+
     def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
         self.candidates[candidate.id] = candidate
         return candidate
@@ -553,6 +701,8 @@ class InMemoryRepository:
         self.interviews.clear()
         self.quotes.clear()
         self.candidates.clear()
+        self.segments.clear()
+        self.strategies.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

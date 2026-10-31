@@ -1,5 +1,5 @@
 {#
-  The eight ODI cards the agent may compose, rendered as the shipped catalog
+  The ten ODI cards the agent may compose, rendered as the shipped catalog
   renders them. These are the agent's closed catalog — a stable contract —
   not the Studio's canvas view names, which are in flux.
 #}
@@ -146,6 +146,42 @@
 </article>
 {% endmacro %}
 
+{% macro segment_card(data) %}
+<article class="surface" data-surface="segment-card">
+  <div class="surface__head">
+    <span class="surface__id">{{ data.id | default("SEG-1") }}</span>
+    <span class="pill {% if data.verdict == 'underserved' %}pill--accent{% elif data.verdict == 'overserved' %}pill--warning{% endif %}">{{ data.verdict }}</span>
+  </div>
+  <p class="surface__statement">{{ data.name }}</p>
+  <p class="evidence__meta">{{ data.people }}{% if data.peopleInferred %} (inferred from the outcomes){% endif %} · {{ data.jobStatement }}</p>
+  <div class="surface__scores">
+    <span>Confidence {{ data.confidence }}</span>
+    <span aria-hidden="true">·</span>
+    <span>{{ data.outcomeIds | length }} outcomes</span>
+  </div>
+  <p class="evidence__meta">{{ data.rationale }}</p>
+</article>
+{% endmacro %}
+
+{% macro strategy_card(data) %}
+<article class="surface" data-surface="strategy-card">
+  <div class="surface__head">
+    <span class="surface__id">Strategy</span>
+    <span class="pill pill--accent">{{ data.kind }}</span>
+  </div>
+  <p class="surface__statement">{{ data.thesis }}</p>
+  <div class="stack">
+    {% for bet in data.bets %}
+    <p class="evidence__meta">{{ bet }}</p>
+    {% endfor %}
+  </div>
+  <p class="surface__scores">Rejected, and why</p>
+  {% for item in data.rejected %}
+  <p class="evidence__meta">{{ item.kind }} — {{ item.why }}</p>
+  {% endfor %}
+</article>
+{% endmacro %}
+
 {#
   Dispatch a card by its catalog type. Every type the catalog can produce
   has a macro above; anything unknown falls back to nothing rather than
@@ -160,5 +196,7 @@
   {% elif card.type == "opportunity-thesis" %}{{ opportunity_thesis(card.data) }}
   {% elif card.type == "decision-record" %}{{ decision_record(card.data) }}
   {% elif card.type == "candidate-queue" %}{{ candidate_queue(card.data) }}
+  {% elif card.type == "segment-card" %}{{ segment_card(card.data) }}
+  {% elif card.type == "strategy-card" %}{{ strategy_card(card.data) }}
   {% endif %}
 {% endmacro %}

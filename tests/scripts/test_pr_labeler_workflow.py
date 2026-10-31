@@ -103,3 +103,17 @@ def test_the_risk_job_creates_its_own_tier_labels():
     for tier in ("safe to merge", "needs a look", "danger zone"):
         assert f'gh label create "{tier}"' in risk_job, tier
         assert "--repo" in risk_job
+
+
+def test_the_trigger_does_not_restrict_to_the_main_branch():
+    """A stacked PR targets another feature branch and must still be labeled.
+
+    Scoping `pull_request` to `branches: [main]` meant the workflow never ran
+    for a PR stacked on top of another PR, so those PRs carried no size, domain,
+    or risk label at all. The filter must stay off; fork PRs are already skipped
+    per-job, so widening the trigger cannot fail on a read-only token.
+    """
+    text = RISK.read_text(encoding="utf-8")
+    trigger = text.split("on:", 1)[1].split("\nconcurrency:", 1)[0]
+    assert "pull_request:" in trigger
+    assert "branches:" not in trigger
