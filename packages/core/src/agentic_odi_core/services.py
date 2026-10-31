@@ -910,3 +910,11 @@ class ODIService:
             discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
         )
         return saved
+
+    def save_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        """Persist the vision, values, methods, obstacles, measures."""
+        return self.repo.add_v2mom(v2mom)
+
+    def get_v2mom(self) -> V2MOM | None:
+        """Get the stored vision, values, methods, obstacles, measures, or None."""
+        return self.repo.get_v2mom()

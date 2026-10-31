@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from agentic_odi_core.errors import ConflictError, StoreError
+from agentic_odi_core.errors import ConflictError, StoreCorrupt, StoreError
 from agentic_odi_core.events import (
     DEFAULT_DEVICE,
     DEFAULT_WORKSPACE,
@@ -27,11 +28,37 @@ class IntentStore:
     """SQLite implementation of the append-only event contract."""
 
     def __init__(self, db_path: str = "intent_store.db", check_same_thread: bool = True) -> None:
+        self.db_path = db_path
+        # Open read-only + immutable for the integrity check so a damaged
+        # file can never be modified by this process. Re-open read-write
+        # afterwards.
+        abs_path = os.path.abspath(db_path)
+        ro_uri = "file://" + abs_path if abs_path.startswith("/") else "file:" + abs_path
+        ro_conn = sqlite3.connect(ro_uri + "?immutable=1", uri=True)
+        try:
+            try:
+                cursor = ro_conn.execute("PRAGMA quick_check")
+                row = cursor.fetchone()
+            except sqlite3.DatabaseError as exc:
+                ro_conn.close()
+                raise StoreCorrupt(
+                    f"SQLite store is damaged: {exc}",
+                    path=db_path,
+                    rows=[str(exc)],
+                )
+            if row is None or row[0] != "ok":
+                cursor = ro_conn.execute("PRAGMA integrity_check")
+                rows = [str(r[0]) for r in cursor.fetchmany(20)]
+                ro_conn.close()
+                raise StoreCorrupt(
+                    "SQLite store failed integrity check",
+                    path=db_path,
+                    rows=rows,
+                )
+        finally:
+            ro_conn.close()
+
         self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
-        # WAL lets readers and one writer work at once; the busy timeout makes
-        # a second writer wait for the lock (the CLI, the sidecar, and a test
-        # can all hold a connection to the same file) instead of raising
-        # "database is locked" the moment the lock is taken.
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA busy_timeout=5000;")
         self._closed = False
@@ -39,6 +66,7 @@ class IntentStore:
 
     def _init_db(self) -> None:
         with self.conn:
+            self.conn.execute("PRAGMA user_version = 1")
             self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS events (

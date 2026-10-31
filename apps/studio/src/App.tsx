@@ -34,6 +34,7 @@ function StudioShell() {
     closeCustomize,
     streaming,
     stopStreaming,
+    navigateTo,
   } = useStudio();
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
@@ -44,6 +45,7 @@ function StudioShell() {
     closePanel();
     closeSetup();
     closeCustomize();
+    navigateTo({ name: "home" }, true);
   }
 
   function newConversation() {
@@ -51,6 +53,7 @@ function StudioShell() {
     closePanel();
     closeSetup();
     closeCustomize();
+    navigateTo({ name: "home" }, true);
   }
 
   useEffect(() => {

@@ -30,6 +30,8 @@ import type {
   Strategy,
   StudioConfig,
   StudioError,
+  Thesis,
+  V2MOM,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -210,6 +212,10 @@ async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   return sendJson<T>("POST", path, body);
+}
+
+async function putJson<T>(path: string, body: unknown): Promise<T> {
+  return sendJson<T>("PUT", path, body);
 }
 
 async function deleteJson<T>(path: string): Promise<T> {
@@ -761,5 +767,42 @@ export function promoteEvidence(
   return postJson<{ ok: boolean }>(
     `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
     payload,
+  );
+}
+
+export function fetchVision(): Promise<V2MOM | null> {
+  return getJson<{ ok: boolean; result: V2MOM | null }>("/api/vision").then(
+    (body) => body.result
+  );
+}
+
+export function saveVision(v2mom: V2MOM): Promise<V2MOM> {
+  return putJson<V2MOM>("/api/vision", v2mom);
+}
+
+export function fetchTheses(): Promise<Thesis[]> {
+  return getJson<{ ok: boolean; result: Thesis[] }>("/api/theses").then(
+    (body) => body.result
+  );
+}
+
+export function addThesis(
+  payload: {
+    outcome_id: string;
+    job_id: string;
+    statement: string;
+    rationale?: string;
+    importance?: number;
+    satisfaction?: number;
+  },
+): Promise<Thesis> {
+  return postJson<{ ok: boolean; result: Thesis }>("/api/theses", payload).then(
+    (body) => body.result
+  );
+}
+
+export function deleteThesis(thesisId: string): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/theses/${encodeURIComponent(thesisId)}`,
   );
 }

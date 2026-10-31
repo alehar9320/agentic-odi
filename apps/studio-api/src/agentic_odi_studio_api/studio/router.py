@@ -95,12 +95,16 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeStrategyRequest,
     ScheduleWorkRequest,
     SignalActionRequest,
+    ThesisRequest,
+    ThesisResponse,
     TurnNode,
     UpdateConversationRequest,
     UpdateCustomerOutcomeRequest,
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
+    V2MOMRequest,
+    V2MOMResponse,
 )
 
 router = APIRouter(prefix="/api")
@@ -1454,3 +1458,102 @@ async def promote_evidence(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True, "result": artifact.model_dump(mode="json")}
+
+
+@router.get("/api/vision")
+def get_vision(request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True, "result": None}
+    service = _service(request)
+    v2mom = service.get_v2mom()
+    if v2mom is None:
+        return {"ok": True, "result": None}
+    return {
+        "ok": True,
+        "result": {
+            "vision": v2mom.vision,
+            "values": v2mom.values,
+            "methods": v2mom.methods,
+            "obstacles": v2mom.obstacles,
+            "measures": v2mom.measures,
+        },
+    }
+
+
+@router.put("/api/vision")
+def put_vision(body: V2MOMRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True, "result": None}
+    service = _service(request)
+    v2mom = service.save_v2mom(
+        V2MOM(
+            vision=body.vision,
+            values=body.values,
+            methods=body.methods,
+            obstacles=body.obstacles,
+            measures=body.measures,
+        )
+    )
+    return {
+        "ok": True,
+        "result": {
+            "vision": v2mom.vision,
+            "values": v2mom.values,
+            "methods": v2mom.methods,
+            "obstacles": v2mom.obstacles,
+            "measures": v2mom.measures,
+        },
+    }
+
+
+@router.get("/api/theses")
+def list_theses(request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True, "result": []}
+    service = _service(request)
+    theses = service.repo.list_theses()
+    return {
+        "ok": True,
+        "result": [thesis.model_dump(mode="json") for thesis in theses],
+    }
+
+
+@router.post("/api/theses")
+def create_thesis(body: ThesisRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True, "result": None}
+    service = _service(request)
+    # Verify the outcome exists
+    outcome = service.repo.get_outcome(body.outcome_id)
+    if outcome is None:
+        raise _as_http_error(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Outcome {body.outcome_id} not found",
+            ),
+            status_code=404,
+        )
+    thesis = service.repo.add_thesis(
+        outcome_id=body.outcome_id,
+        job_id=body.job_id,
+        statement=body.statement,
+        rationale=body.rationale,
+        importance=body.importance,
+        satisfaction=body.satisfaction,
+    )
+    return {"ok": True, "result": thesis.model_dump(mode="json")}
+
+
+@router.delete("/api/theses/{thesis_id}")
+def delete_thesis(thesis_id: str, request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True}
+    service = _service(request)
+    try:
+        service.repo.delete_thesis(thesis_id)
+    except MemoryError as exc:
+        raise _as_http_error(
+            StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)),
+            status_code=404,
+        ) from exc
+    return {"ok": True}
