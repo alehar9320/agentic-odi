@@ -479,13 +479,24 @@ def test_every_page_resolves_its_own_assets(page: str):
         )
 
 
+# The MCP reference is the long pole: every tool's argument table and the
+# whole ODI schema live on that one page, so it grows with each paginated
+# list tool and each entity we add. The V2MOM entity, the five scheduled-work
+# tools, and the three signal tools bring the page to ~78 KB; the four Stage 5
+# and 6 tools (segment_market, get_segments, get_strategy, propose_strategy)
+# bring it to ~80 KB.
+PAGE_WEIGHT_BUDGET = 84 * 1024
+
+# The development guide mirrors the generated coverage map, which grows with
+# the test tree, so it needs its own ceiling rather than a raised one for
+# every page.
+PAGE_WEIGHT_OVERRIDES = {
+    "docs/development/index.html": 92 * 1024,
+}
+
+
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference is the long pole: every tool's argument table and the
-    # whole ODI schema live on that one page, so it grows with each paginated
-    # list tool and each entity we add. The V2MOM entity, the five
-    # scheduled-work tools, and the three signal tools bring the page to ~78 KB;
-    # the four Stage 5 and 6 tools (segment_market, get_segments, get_strategy,
-    # propose_strategy) bring it to ~80 KB.
-    assert size <= 84 * 1024, f"{page}: {size} bytes"
+    budget = PAGE_WEIGHT_OVERRIDES.get(page, PAGE_WEIGHT_BUDGET)
+    assert size <= budget, f"{page}: {size} bytes (budget {budget})"

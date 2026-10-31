@@ -7,16 +7,35 @@ coverage:
   range: "50...90"
 
   status:
-    # The suite is above 90% project-wide; hold that floor (with a 1% dip)
-    # instead of letting coverage drift back down.
+    # The authoritative Python gate is the `test` job in ci.yml: pytest runs
+    # with --cov-fail-under=89, so it needs no token and fires on forks. The
+    # studio job holds the front-end thresholds in vite.config.ts. Codecov is
+    # the reporting surface; its 90% target with a 1% dip lands on the same
+    # 89% minimum.
     project:
       default:
         target: 90%
         threshold: 1%
+        # The 90% bar is the Python floor measured by the `test` job. The
+        # studio upload reports under its own flag so its lower number cannot
+        # drag this status down; the Vitest thresholds gate the front end.
+        flags:
+          - python
     # Patch coverage is advisory while the suite is still being built out.
     patch:
       default:
         informational: true
+
+flags:
+  python:
+    paths:
+      - apps/cli
+      - apps/mcp-server
+      - apps/studio-api
+      - packages
+  studio:
+    paths:
+      - apps/studio
 
 comment:
   layout: "header, diff, files"
@@ -26,4 +45,3 @@ comment:
 
 ignore:
   - "**/tests/**"
-  - "apps/studio/**"
