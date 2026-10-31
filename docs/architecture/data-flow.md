@@ -11,6 +11,17 @@
 | `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | Browser cache only |
 | `apps/cli` | Terminal rendering, local/remote backend selection | SQLite directly for `local`, no local writes for `mcp` |
 
+## Store Version Gate
+
+`IntentStore` owns its file format: `schema_meta(version, updated_at)` is read on
+every open by `ensure_version()`, which applies `MIGRATIONS` (a `dict[int, Callable]`)
+in order inside one explicit transaction, so a step that raises leaves both the
+schema and the recorded version at the last good value. A database written by a
+newer build is refused rather than silently downgraded, and the refusal names the
+stored version, the version this build supports (`CURRENT_SCHEMA_VERSION`), and
+`odi update`. A store already at the current version runs no migration and writes
+nothing.
+
 ## Write Paths
 
 ### Local CLI

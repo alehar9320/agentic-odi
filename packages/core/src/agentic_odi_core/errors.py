@@ -63,6 +63,15 @@ class StoreError(OdiError):
     """The persistence layer could not complete the operation."""
 
 
+class SchemaVersionError(StoreError):
+    """The store's schema version is incompatible with this build.
+
+    Always names both versions (on disk and supported) and the supported
+    upgrade path, so the refusal is actionable rather than a bare
+    "incompatible".
+    """
+
+
 class SerializationError(OdiError):
     """A payload could not be converted to or from its wire format."""
 
