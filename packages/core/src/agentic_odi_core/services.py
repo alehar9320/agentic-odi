@@ -6,35 +6,50 @@ import hashlib
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
-from agentic_odi_core.errors import NotFoundError, ValidationError
+from agentic_odi_core.errors import ConflictError, NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     evaluate_outcome_statement,
     require_outcome_statement,
 )
 from agentic_odi_core.models import (
+    BET_TRANSITIONS,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    Bet,
+    BetMeasurementResult,
+    BetStatus,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
+    Decision,
+    DecisionConfidence,
+    Direction,
     Evidence,
     EvidenceItemType,
     Job,
     JobStage,
+    NotificationRule,
     Outcome,
+    RejectedOutcome,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
+    ScoreSnapshot,
     Signal,
     SignalKind,
     Step,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.signals import DEFAULT_SCORE_MOVE_THRESHOLD
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class JobNotFoundError(NotFoundError):
@@ -71,6 +86,36 @@ class ScheduledWorkNotFoundError(NotFoundError, ValueError):
     def __init__(self, work_id: str, hint: str | None = None) -> None:
         self.work_id = work_id
         super().__init__(work_id, "scheduled work", hint)
+
+
+class DecisionNotFoundError(NotFoundError):
+    def __init__(self, decision_id: str) -> None:
+        self.decision_id = decision_id
+        super().__init__(decision_id, "decision")
+
+
+class BetNotFoundError(NotFoundError):
+    def __init__(self, bet_id: str) -> None:
+        self.bet_id = bet_id
+        super().__init__(bet_id, "bet")
+
+
+class ScoreSnapshotNotFoundError(NotFoundError):
+    def __init__(self, snapshot_id: str) -> None:
+        self.snapshot_id = snapshot_id
+        super().__init__(snapshot_id, "score_snapshot")
+
+
+class InvalidBetTransitionError(ConflictError):
+    """An illegal bet status transition, naming the legal successors."""
+
+    def __init__(self, current: BetStatus, requested: BetStatus) -> None:
+        legal = BET_TRANSITIONS.get(current, ())
+        legal_text = ", ".join(status.value for status in legal) or "none (terminal)"
+        super().__init__(
+            f"cannot move a bet from '{current.value}' to '{requested.value}'; "
+            f"legal next states: {legal_text}"
+        )
 
 
 class EvidenceNotFoundError(NotFoundError, ValueError):
@@ -179,6 +224,8 @@ class ODIService:
         severity: str = "info",
         detail: str | None = None,
         discriminator: str = "",
+        magnitude: float | None = None,
+        job_id: str | None = None,
     ) -> Signal:
         """Record one fact. A signal with the same fingerprint already exists.
 
@@ -210,14 +257,18 @@ class ODIService:
             detail=detail,
             subject_kind=subject_kind,  # type: ignore[arg-type]
             subject_id=subject_id,
+            job_id=job_id,
             severity=severity,  # type: ignore[arg-type]
             suppressed=not budget.surfaces(severity, surfaced_today),
+            magnitude=magnitude,
             fingerprint=fingerprint,
         )
         return self.repo.add_signal(signal)
 
-    def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]:
-        return self.repo.list_signals(unread_only=unread_only, limit=limit)
+    def list_signals(
+        self, unread_only: bool = False, limit: int | None = 50, job_id: str | None = None
+    ) -> list[Signal]:
+        return self.repo.list_signals(unread_only=unread_only, limit=limit, job_id=job_id)
 
     def mark_signal_read(self, signal_id: str) -> Signal:
         signal = self.repo.mark_signal_read(signal_id)
@@ -234,6 +285,23 @@ class ODIService:
     def count_unread_signals(self) -> int:
         return self.repo.count_unread_signals()
 
+    def count_notifiable_signals(self) -> int:
+        """The bell count: unread, undismissed, and eligible to interrupt.
+
+        The shared policy decides what may interrupt, and the bell is the
+        interruption count, so it must apply ``should_notify`` exactly as the
+        digest does. A signal the policy keeps feed-only (a coverage gap under
+        the defaults, or any kind turned off in Settings) is real and visible
+        but never rings the bell. Computed at read time from the current rules,
+        so a rule edit changes the count immediately with no stored counter.
+        """
+        from agentic_odi_core.signals import count_notifiable
+
+        return count_notifiable(
+            self.repo.list_signals(unread_only=True, limit=None),
+            self.list_notification_rules(),
+        )
+
     def add_job(self, name: str, description: str | None = None) -> Job:
         job = Job(name=name, description=description)
         job = self.repo.add_job(job)
@@ -243,6 +311,7 @@ class ODIService:
             subject_kind="job",
             subject_id=job.id,
             discriminator=job.id,
+            job_id=job.id,
         )
         return job
 
@@ -318,6 +387,7 @@ class ODIService:
                     f"satisfaction {before.satisfaction} -> {after.satisfaction}"
                 ),
                 discriminator=f"importance={after.importance},satisfaction={after.satisfaction}",
+                job_id=after.job_id,
             )
         crossing = _opportunity_crossing(before.opportunity_score, after.opportunity_score)
         if crossing is not None:
@@ -330,6 +400,7 @@ class ODIService:
                 severity=severity,
                 detail=f"{before.opportunity_score} -> {after.opportunity_score}",
                 discriminator=f"{direction}:{after.opportunity_score}",
+                job_id=after.job_id,
             )
 
     def _emit_job_map_completed(self, job_id: str) -> None:
@@ -347,6 +418,7 @@ class ODIService:
             subject_id=job_id,
             severity="notice",
             discriminator="all-stages",
+            job_id=job_id,
         )
 
     def delete_outcome(self, outcome_id: str) -> None:
@@ -545,6 +617,7 @@ class ODIService:
             subject_kind="evidence",
             subject_id=evidence.id,
             discriminator=evidence.id,
+            job_id=evidence.job_id,
         )
         return evidence
 
@@ -619,6 +692,7 @@ class ODIService:
                 subject_id=outcome.id,
                 severity="notice",
                 discriminator=outcome.id,
+                job_id=outcome.job_id,
             )
             return outcome
         raise ValidationError(f"Unknown promotion target: {target}")
@@ -693,3 +767,472 @@ class ODIService:
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
         return updated
+
+    # -- Decisions (C6) ----------------------------------------------------
+
+    def record_decision(
+        self,
+        job_id: str,
+        chosen_outcome_ids: list[str],
+        rationale: str,
+        decided_by: str,
+        rejected: list[dict[str, Any]] | None = None,
+        confidence: DecisionConfidence | str = DecisionConfidence.MEDIUM,
+        decided_at: datetime | None = None,
+    ) -> Decision:
+        """Record a decision; a later decision supersedes the previous one.
+
+        A decision that resolves to a choice must name at least one outcome.
+        Referenced outcomes must belong to the decision's job, and a rejected
+        alternative must carry a non-empty reason — the reason is the point of
+        keeping rejected options.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        if not rationale or not rationale.strip():
+            raise ValidationError("decision rationale cannot be empty")
+        if not decided_by or not decided_by.strip():
+            raise ValidationError("decided_by cannot be empty")
+
+        chosen = list(dict.fromkeys(chosen_outcome_ids or []))
+        if not chosen:
+            raise ValidationError("a decision must choose at least one outcome")
+
+        rejected_models: list[RejectedOutcome] = []
+        for raw in rejected or []:
+            rejected_models.append(
+                raw if isinstance(raw, RejectedOutcome) else RejectedOutcome.model_validate(raw)
+            )
+
+        chosen_set = set(chosen)
+        rejected_ids = {item.outcome_id for item in rejected_models}
+        if chosen_set & rejected_ids:
+            raise ValidationError("an outcome cannot be both chosen and rejected")
+
+        for outcome_id in chosen:
+            outcome = self.repo.get_outcome(outcome_id)
+            if outcome is None:
+                raise OutcomeNotFoundError(outcome_id)
+            if outcome.job_id != job_id:
+                raise ValidationError(f"outcome {outcome_id} does not belong to job {job_id}")
+        for item in rejected_models:
+            outcome = self.repo.get_outcome(item.outcome_id)
+            if outcome is None:
+                raise OutcomeNotFoundError(item.outcome_id)
+            if outcome.job_id != job_id:
+                raise ValidationError(f"outcome {item.outcome_id} does not belong to job {job_id}")
+            if not item.reason.strip():
+                raise ValidationError("a rejected outcome needs a non-empty reason")
+
+        if isinstance(confidence, str):
+            confidence = DecisionConfidence(confidence)
+
+        when = decided_at or _utcnow()
+        decision = Decision(
+            id=str(uuid.uuid4()),
+            job_id=job_id,
+            chosen_outcome_ids=chosen,
+            rejected=rejected_models,
+            rationale=rationale.strip(),
+            decided_by=decided_by.strip(),
+            decided_at=when,
+            confidence=confidence,
+        )
+
+        # A new decision supersedes the previous live decision for the job
+        # rather than overwriting it: the record of the argument that lost
+        # is the product's memory.
+        previous = [
+            d
+            for d in self.repo.list_decisions(job_id)
+            if d.superseded_by is None and d.superseded_at is None
+        ]
+        created = self.repo.add_decision(decision)
+        for prior in previous:
+            if prior.id == created.id:
+                continue
+            self.repo.supersede_decision(
+                prior.id,
+                superseded_by=created.id,
+                superseded_at=when,
+            )
+            self.record_signal(
+                SignalKind.DECISION_SUPERSEDED,
+                f"Decision superseded: {prior.rationale[:80]}",
+                subject_kind="decision",
+                subject_id=prior.id,
+                severity="notice",
+                detail=f"Replaced by {created.id}",
+                discriminator=created.id,
+                job_id=prior.job_id,
+            )
+        return created
+
+    def get_decision(self, decision_id: str) -> Decision:
+        decision = self.repo.get_decision(decision_id)
+        if decision is None:
+            raise DecisionNotFoundError(decision_id)
+        return decision
+
+    def list_decisions(self, job_id: str) -> list[Decision]:
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        return self.repo.list_decisions(job_id)
+
+    def latest_decision(self, job_id: str) -> Decision | None:
+        decisions = self.list_decisions(job_id)
+        live = [d for d in decisions if d.superseded_by is None and d.superseded_at is None]
+        if live:
+            return live[-1]
+        return decisions[-1] if decisions else None
+
+    # -- Score snapshots (B6) ---------------------------------------------
+
+    def record_score_snapshot(
+        self,
+        outcome_id: str,
+        *,
+        at: datetime | None = None,
+        method: str | None = None,
+        note: str | None = None,
+        importance_n: int | None = None,
+        satisfaction_n: int | None = None,
+    ) -> ScoreSnapshot:
+        """Capture the outcome's current accepted score as an append-only snapshot.
+
+        The snapshot stores the score *and* its evidence companions, so a later
+        delta can distinguish "the evidence changed" from "the estimate changed".
+        """
+        outcome = self.repo.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        if outcome.importance is None or outcome.satisfaction is None:
+            raise ValidationError(
+                f"outcome {outcome_id} has no complete score to snapshot; "
+                "set importance and satisfaction first"
+            )
+        if note is not None and len(note) > 500:
+            raise ValidationError("score note cannot exceed 500 characters")
+        snapshot = ScoreSnapshot(
+            id=str(uuid.uuid4()),
+            outcome_id=outcome_id,
+            job_id=outcome.job_id,
+            at=at or _utcnow(),
+            importance=outcome.importance,
+            satisfaction=outcome.satisfaction,
+            importance_n=importance_n,
+            satisfaction_n=satisfaction_n,
+            method=method,
+            note=note,
+        )
+        earlier = self.repo.list_score_snapshots(outcome_id)
+        saved = self.repo.add_score_snapshot(snapshot)
+        if earlier:
+            delta = snapshot.opportunity_score - earlier[0].opportunity_score
+            if abs(delta) >= DEFAULT_SCORE_MOVE_THRESHOLD:
+                self.record_signal(
+                    SignalKind.SCORE_MOVED,
+                    f"Opportunity score moved {'up' if delta > 0 else 'down'} {abs(delta):.2f}",
+                    subject_kind="outcome",
+                    subject_id=outcome_id,
+                    severity="urgent" if delta > 0 else "notice",
+                    detail=f"{earlier[0].opportunity_score:.2f} → {snapshot.opportunity_score:.2f}",
+                    discriminator=saved.id,
+                    magnitude=delta,
+                    job_id=snapshot.job_id,
+                )
+        return saved
+
+    def list_score_snapshots(self, outcome_id: str) -> list[ScoreSnapshot]:
+        if self.repo.get_outcome(outcome_id) is None:
+            raise OutcomeNotFoundError(outcome_id)
+        return self.repo.list_score_snapshots(outcome_id)
+
+    def outcome_delta(self, outcome_id: str, since: datetime | None = None) -> dict[str, Any]:
+        """Signed change from an earlier snapshot to the latest one.
+
+        With no ``since`` the earliest snapshot is the baseline. The result is
+        descriptive, never a significance claim.
+        """
+        snapshots = self.list_score_snapshots(outcome_id)
+        if not snapshots:
+            return {
+                "outcome_id": outcome_id,
+                "available": False,
+                "reason": "no snapshots recorded for this outcome",
+            }
+        baseline = snapshots[0]
+        if since is not None:
+            eligible = [s for s in snapshots if s.at >= since]
+            if not eligible:
+                return {
+                    "outcome_id": outcome_id,
+                    "available": False,
+                    "reason": f"no snapshot at or after {since.isoformat()}",
+                }
+            baseline = eligible[0]
+        latest = snapshots[-1]
+        return {
+            "outcome_id": outcome_id,
+            "available": True,
+            "baseline": {
+                "id": baseline.id,
+                "at": baseline.at.isoformat(),
+                "importance": baseline.importance,
+                "satisfaction": baseline.satisfaction,
+                "opportunity": baseline.opportunity_score,
+            },
+            "latest": {
+                "id": latest.id,
+                "at": latest.at.isoformat(),
+                "importance": latest.importance,
+                "satisfaction": latest.satisfaction,
+                "opportunity": latest.opportunity_score,
+            },
+            "delta": {
+                "importance": latest.importance - baseline.importance,
+                "satisfaction": latest.satisfaction - baseline.satisfaction,
+                "opportunity": latest.opportunity_score - baseline.opportunity_score,
+            },
+        }
+
+    def outcome_history(self, outcome_id: str) -> list[ScoreSnapshot]:
+        return self.list_score_snapshots(outcome_id)
+
+    # -- Bets (E1) ---------------------------------------------------------
+
+    def create_bet(
+        self,
+        decision_id: str,
+        outcome_id: str,
+        hypothesis: str,
+        target: float,
+        measure_by: date,
+        *,
+        direction: Direction | str = Direction.MAXIMIZE,
+        created_at: datetime | None = None,
+    ) -> Bet:
+        """Create a bet with a baseline frozen from the outcome's score now.
+
+        The baseline is captured from the latest snapshot (or the outcome's
+        current score) and stored, never recomputed. A bet without a decision is
+        refused, and the decision's outcomes must include the bet's outcome.
+        """
+        decision = self.repo.get_decision(decision_id)
+        if decision is None:
+            raise DecisionNotFoundError(decision_id)
+        outcome = self.repo.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        if outcome.job_id != decision.job_id:
+            raise ValidationError(f"outcome {outcome_id} does not belong to decision {decision_id}")
+        if outcome_id not in decision.chosen_outcome_ids:
+            raise ValidationError(f"decision {decision_id} did not choose outcome {outcome_id}")
+        if not hypothesis or not hypothesis.strip():
+            raise ValidationError("bet hypothesis cannot be empty")
+
+        if direction is not None and isinstance(direction, str):
+            direction = Direction(direction)
+
+        baseline = _finite_float(target, "target")
+        if baseline != baseline or baseline in (float("inf"), float("-inf")):
+            raise ValidationError("target must be a finite number")
+
+        snapshots = self.repo.list_score_snapshots(outcome_id)
+        baseline_snapshot_id: str | None = None
+        if snapshots:
+            source = snapshots[-1]
+            baseline_value = source.opportunity_score
+            baseline_importance = source.importance
+            baseline_satisfaction = source.satisfaction
+            baseline_snapshot_id = source.id
+        else:
+            if outcome.importance is None or outcome.satisfaction is None:
+                raise ValidationError(
+                    f"outcome {outcome_id} has no score; set importance and satisfaction "
+                    "or record a snapshot before creating a bet"
+                )
+            baseline_value = compute_opportunity_score(outcome.importance, outcome.satisfaction)
+            baseline_importance = outcome.importance
+            baseline_satisfaction = outcome.satisfaction
+
+        when = created_at or _utcnow()
+        bet = Bet(
+            id=str(uuid.uuid4()),
+            decision_id=decision_id,
+            outcome_id=outcome_id,
+            job_id=outcome.job_id,
+            hypothesis=hypothesis.strip(),
+            baseline=baseline_value,
+            target=baseline,
+            measure_by=measure_by,
+            direction=direction,
+            status=BetStatus.PLANNED,
+            measured_at=None,
+            created_at=when,
+            baseline_snapshot_id=baseline_snapshot_id,
+            baseline_importance=baseline_importance,
+            baseline_satisfaction=baseline_satisfaction,
+        )
+        return self.repo.add_bet(bet)
+
+    def get_bet(self, bet_id: str) -> Bet:
+        bet = self.repo.get_bet(bet_id)
+        if bet is None:
+            raise BetNotFoundError(bet_id)
+        return bet
+
+    def list_bets(self, job_id: str | None = None) -> list[Bet]:
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        return self.repo.list_bets(job_id)
+
+    def transition_bet(
+        self,
+        bet_id: str,
+        status: BetStatus | str,
+        *,
+        measured_at: datetime | None = None,
+    ) -> Bet:
+        """Move a bet through a legal transition, or refuse naming the legal ones."""
+        bet = self.get_bet(bet_id)
+        if isinstance(status, str):
+            status = BetStatus(status)
+        legal = BET_TRANSITIONS.get(bet.status, ())
+        if status not in legal:
+            raise InvalidBetTransitionError(bet.status, status)
+        updates: dict[str, Any] = {"status": status}
+        if status is BetStatus.MEASURED:
+            updates["measured_at"] = measured_at or _utcnow()
+        return self.repo.update_bet(bet_id, updates) or bet
+
+    def measure_bet(self, bet_id: str, *, looked_at: datetime | None = None) -> dict[str, Any]:
+        """Compare the latest eligible snapshot against the bet's stored baseline.
+
+        The eligible snapshot is the latest one at or after ``measure_by``. If
+        none exists the answer is ``no_data`` with the date it looked — never the
+        latest snapshot overall (which would measure the wrong period), never a
+        zero, and never an exception. Measuring twice writes nothing.
+
+        The result carries signed deltas for importance, satisfaction and
+        opportunity against the baseline the bet froze, plus the selected
+        snapshot's identity so a caller can audit the comparison.
+
+        If the bet never stored its per-component baseline, the comparison is
+        not like-for-like: the answer is ``no_data`` with a reason, never a
+        fabricated delta or a met/missed claim.
+        """
+        bet = self.get_bet(bet_id)
+        when = looked_at or _utcnow()
+        cutoff = bet.measure_by
+        eligible = [
+            s
+            for s in self.repo.list_score_snapshots(bet.outcome_id)
+            if s.at.date() >= cutoff and s.at <= when
+        ]
+        if not eligible:
+            return {
+                "bet_id": bet.id,
+                "result": BetMeasurementResult.NO_DATA.value,
+                "looked_at": when.isoformat(),
+                "measure_by": cutoff.isoformat(),
+                "reason": f"no snapshot at or after {cutoff.isoformat()} for outcome {bet.outcome_id}",
+                "baseline": bet.baseline,
+                "target": bet.target,
+                "direction": bet.direction.value,
+                "baseline_snapshot_id": bet.baseline_snapshot_id,
+            }
+
+        if bet.baseline_importance is None or bet.baseline_satisfaction is None:
+            return {
+                "bet_id": bet.id,
+                "result": BetMeasurementResult.NO_DATA.value,
+                "looked_at": when.isoformat(),
+                "measure_by": cutoff.isoformat(),
+                "reason": (
+                    "baseline provenance is incomplete: the bet did not store "
+                    "importance/satisfaction at creation, so the deltas cannot "
+                    "be compared like-for-like"
+                ),
+                "baseline": bet.baseline,
+                "target": bet.target,
+                "direction": bet.direction.value,
+                "baseline_snapshot_id": bet.baseline_snapshot_id,
+            }
+
+        latest = eligible[-1]
+        observed = latest.opportunity_score
+        if bet.direction is Direction.MAXIMIZE:
+            met = observed >= bet.target
+        else:
+            met = observed <= bet.target
+        return {
+            "bet_id": bet.id,
+            "result": (
+                BetMeasurementResult.MET.value if met else BetMeasurementResult.MISSED.value
+            ),
+            "looked_at": when.isoformat(),
+            "measure_by": cutoff.isoformat(),
+            "baseline": bet.baseline,
+            "target": bet.target,
+            "direction": bet.direction.value,
+            "observed": observed,
+            "delta": observed - bet.baseline,
+            "baseline_importance": bet.baseline_importance,
+            "baseline_satisfaction": bet.baseline_satisfaction,
+            "observed_importance": latest.importance,
+            "observed_satisfaction": latest.satisfaction,
+            "delta_importance": latest.importance - bet.baseline_importance,
+            "delta_satisfaction": latest.satisfaction - bet.baseline_satisfaction,
+            "delta_opportunity": observed - bet.baseline,
+            "snapshot_id": latest.id,
+            "snapshot_at": latest.at.isoformat(),
+            "snapshot_method": latest.method,
+            "baseline_snapshot_id": bet.baseline_snapshot_id,
+        }
+
+    # -- Signals (E3) ------------------------------------------------------
+
+    def emit_know_signals(
+        self,
+        *,
+        job_id: str | None = None,
+        now: datetime | None = None,
+    ) -> list[Signal]:
+        """Record the "know" signals the store can prove, and return what is current.
+
+        Idempotent: every emission carries a deterministic discriminator, so a
+        second pass over an unchanged store records nothing new. Nothing is
+        invented — an empty store records nothing.
+        """
+        from agentic_odi_core.signals import emit_know_signals as _emit
+
+        return _emit(self, job_id=job_id, now=now)
+
+    # -- Notification rules (E6) ------------------------------------------
+
+    def set_notification_rule(
+        self, kind: SignalKind | str, *, threshold: float = 0.0, enabled: bool = True
+    ) -> NotificationRule:
+        if isinstance(kind, str):
+            kind = SignalKind(kind)
+        if threshold < 0:
+            raise ValidationError("notification threshold cannot be negative")
+        rule = NotificationRule(kind=kind, threshold=threshold, enabled=enabled)
+        return self.repo.set_notification_rule(rule)
+
+    def list_notification_rules(self) -> list[NotificationRule]:
+        from agentic_odi_core.signals import default_rules
+
+        stored = {rule.kind: rule for rule in self.repo.list_notification_rules()}
+        return [stored.get(kind, rule) for kind, rule in default_rules().items()]
+
+
+def _finite_float(value: Any, field: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(f"{field} must be a number") from exc
+    if number != number or number in (float("inf"), float("-inf")):
+        raise ValidationError(f"{field} must be a finite number")
+    return number

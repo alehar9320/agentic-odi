@@ -8,6 +8,7 @@ import pytest
 from agentic_odi_studio_api.studio.memory import (
     OBSERVATION_KINDS,
     ConversationNotFoundError,
+    MemoryError,
     ObservationNotFoundError,
     StudioMemory,
     default_db_path,
@@ -152,13 +153,56 @@ def test_clear_memory_removes_conversations_and_observations(memory: StudioMemor
     conversation = memory.create_conversation()
     memory.append_turn(conversation.id, "user", "hello")
     memory.add_observation("career", "Owns activation.")
+    memory.mark_signal("signal-1")
 
     memory.clear_memory()
 
     assert memory.latest_conversation() is None
     assert memory.list_observations() == []
+    assert memory.signal_state() == {}
     with pytest.raises(ConversationNotFoundError):
         memory.list_turns(conversation.id)
+
+
+def test_mark_signal_records_read_state_idempotently(memory: StudioMemory) -> None:
+    first = memory.mark_signal("signal-1")
+    assert first["read_at"] is not None
+    assert first["dismissed_at"] is None
+
+    # Marking again keeps the original timestamp rather than moving it.
+    again = memory.mark_signal("signal-1")
+    assert again["read_at"] == first["read_at"]
+
+
+def test_mark_signal_can_dismiss_and_keep_a_read_mark(memory: StudioMemory) -> None:
+    memory.mark_signal("signal-1")
+    dismissed = memory.mark_signal("signal-1", dismissed=True)
+    assert dismissed["read_at"] is not None
+    assert dismissed["dismissed_at"] is not None
+    assert memory.signal_state()["signal-1"]["dismissed_at"] == dismissed["dismissed_at"]
+
+
+def test_mark_signal_rejects_a_blank_id(memory: StudioMemory) -> None:
+    with pytest.raises(MemoryError):
+        memory.mark_signal("   ")
+
+
+def test_read_and_dismiss_state_survives_a_reload(tmp_path) -> None:
+    db = tmp_path / "studio.db"
+    first = StudioMemory(db)
+    first.mark_signal("signal-1")
+    first.mark_signal("signal-2", dismissed=True)
+    first.close()
+
+    # A brand-new store over the same file still knows what was read/dismissed.
+    second = StudioMemory(db)
+    try:
+        state = second.signal_state()
+        assert state["signal-1"]["read_at"] is not None
+        assert state["signal-1"]["dismissed_at"] is None
+        assert state["signal-2"]["dismissed_at"] is not None
+    finally:
+        second.close()
 
 
 def test_default_db_path_prefers_environment(tmp_path, monkeypatch) -> None:

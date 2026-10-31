@@ -54,7 +54,17 @@ apps/studio SPA
 apps/studio SPA
   -> POST /api/models
   -> probes.list_models -> OpenAI-compatible LLM (model ids)
+
+apps/studio SPA
+  -> GET /api/signals, POST /api/signals/{id}/read|dismiss
+  -> ODIService.derive_signals -> Repository (bets, scores, decisions, coverage)
+  -> StudioMemory.signal_state (read/dismiss marks, survives reload)
 ```
+
+The signal feed is derived, not stored: `derive_signals` computes the rows from
+the ODI repository on every read, and the sidecar's memory only holds the
+read/dismiss marks keyed by the signal's stable id. A dismissed signal is
+filtered out of the feed, never deleted, and stays derived from the same store.
 
 `/api/models` is read-only discovery for the composer's picker. It answers the
 SPA rather than the browser because the model server may only be reachable from
@@ -133,6 +143,10 @@ ODIService.get_jobs / get_job_map / get_outcomes
   -> Repository read-through state
   -> Pydantic models
   -> JSON (CLI --json, MCP text payload, Studio canvas)
+
+ODIService.derive_signals / measure_bet
+  -> Repository (bets, score snapshots, decisions, coverage)
+  -> Signal rows with stable ids, derived on every read (never persisted)
 ```
 
 Desired outcomes come back ranked by opportunity score (highest first, unscored

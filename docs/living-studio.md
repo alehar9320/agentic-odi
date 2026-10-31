@@ -190,8 +190,11 @@ it renders. The catch-up feed starts empty rather than inventing activity, and
 no surface can fabricate a signal: the three example signals live only in test
 fixtures. Its real content is the store's signal inbox
 ([The Signal Inbox](architecture/notifications.md)): the bell count comes from
-`/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
-refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
+`/api/signals/unread-count`, which counts the unread signals the shared
+notification policy actually lets interrupt — a coverage gap or a kind toggled
+off in Settings stays in the feed but never rings the bell. The feed loads on
+boot, re-reads after every canvas refresh, and polls once a minute while the
+window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
 
@@ -307,6 +310,46 @@ Storage is a separate SQLite file from the ODI repository:
 
 **Forget everything** is a two-step confirmation and also clears the visible
 thread, because the server deletes the conversations behind it.
+
+### Signals: what actually changed
+
+The **Catch up** feed shows what moved since you last looked, and every row is
+derived on read from your own store — bets, score snapshots, decisions, and
+job-map coverage. Nothing is simulated or invented: an empty store shows an
+empty feed with a real next step, and a measurement that cannot be made says so
+instead of guessing. A failed read is never dressed up as an empty inbox: the
+feed says the store did not answer, so "no changes" is a claim only a
+successful read can make.
+
+| Kind | What it means |
+|---|---|
+| `bet_due` | A bet's measure-by date has arrived and it is not yet measured |
+| `score_moved` | An outcome's opportunity score moved by at least the threshold |
+| `decision_superseded` | A newer decision replaced an older one |
+| `coverage_gap` | A universal job-map stage has no outcomes captured |
+
+Signals have stable ids, so **Read** and **Dismiss** are remembered: the state
+lives in the sidecar's own SQLite store and survives a reload. Dismissing hides
+a row from the feed without deleting anything — the signal is still real, it
+just stops asking for attention. The shared notification policy, editable
+through the API, decides which signals interrupt you (a score move needs a
+minimum threshold; coverage gaps are quiet by default). Everything else stays
+in the feed.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/signals` | Derived signals plus read/dismiss state |
+| `POST` | `/api/signals/{id}/read` | Mark one read |
+| `POST` | `/api/signals/{id}/dismiss` | Dismiss one |
+| `GET` | `/api/notification-rules` | The effective interruption policy |
+| `PUT` | `/api/notification-rules` | Store one rule for a signal kind |
+
+The **Notifications** section in Settings edits that shared policy. It reads and
+writes the same `/api/notification-rules` the digest and the bell consult, so a
+kind toggled off there stops interrupting everywhere — the signal stays in the
+feed, and the bell count drops on the next read with no stored counter to drift.
+Reading a signal clears the bell but does not erase it from the weekly digest:
+the digest is the record of what happened, not your personal read-state.
 
 ### The thread comes back
 

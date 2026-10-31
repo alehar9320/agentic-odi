@@ -281,7 +281,11 @@ export type SignalKind =
   | "opportunity_crossed"
   | "evidence_ingested"
   | "evidence_promoted"
-  | "job_map_completed";
+  | "job_map_completed"
+  | "bet_due"
+  | "score_moved"
+  | "decision_superseded"
+  | "coverage_gap";
 
 export type SignalSeverity = "info" | "notice" | "urgent";
 
@@ -300,6 +304,8 @@ export interface Signal {
   detail?: string | null;
   subject_kind?: SignalSubjectKind | null;
   subject_id?: string | null;
+  /** The Job this fact belongs to; scopes a feed or digest to one job. */
+  job_id?: string | null;
   severity: SignalSeverity;
   created_at: string;
   read_at?: string | null;
@@ -307,6 +313,13 @@ export interface Signal {
   /** Past the daily attention budget: recorded, but never surfaced or counted. */
   suppressed: boolean;
   fingerprint: string;
+}
+
+/** One shared interruption rule: whether a signal kind may interrupt, and above what. */
+export interface NotificationRule {
+  kind: SignalKind;
+  threshold: number;
+  enabled: boolean;
 }
 
 export interface ChatStreamRequest {

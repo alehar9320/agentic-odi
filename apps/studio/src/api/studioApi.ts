@@ -20,6 +20,7 @@ import type {
   MarketplaceSearch,
   McpHealth,
   ModelList,
+  NotificationRule,
   Observation,
   ObservationKind,
   ObservationStatus,
@@ -739,4 +740,21 @@ export function promoteEvidence(
     `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
     payload,
   );
+}
+
+/** The shared interruption policy, including documented defaults. */
+export function fetchNotificationRules(): Promise<NotificationRule[]> {
+  return getJson<NotificationRule[]>("/api/notification-rules");
+}
+
+/** Store one rule for a signal kind. */
+export function saveNotificationRule(rule: NotificationRule): Promise<NotificationRule[]> {
+  return fetch(apiUrl("/api/notification-rules"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(rule),
+  }).then(async (response) => {
+    if (!response.ok) throw await studioError(response);
+    return (await response.json()) as NotificationRule[];
+  });
 }

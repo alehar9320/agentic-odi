@@ -215,6 +215,13 @@ CREATE TABLE IF NOT EXISTS observations (
 );
 
 CREATE INDEX IF NOT EXISTS observations_by_status ON observations(status);
+
+CREATE TABLE IF NOT EXISTS signal_state (
+    signal_id TEXT PRIMARY KEY,
+    read_at TEXT,
+    dismissed_at TEXT,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -628,6 +635,46 @@ class StudioMemory:
             self._connection.execute("DELETE FROM turns")
             self._connection.execute("DELETE FROM observations")
             self._connection.execute("DELETE FROM conversations")
+            self._connection.execute("DELETE FROM signal_state")
+
+    # -- signal read/dismiss state ----------------------------------------
+
+    def signal_state(self) -> dict[str, dict[str, Any]]:
+        """Return read/dismiss state keyed by signal id, for signals we know."""
+        with self._lock:
+            rows = self._connection.execute("SELECT * FROM signal_state").fetchall()
+        return {
+            row["signal_id"]: {
+                "read_at": row["read_at"],
+                "dismissed_at": row["dismissed_at"],
+            }
+            for row in rows
+        }
+
+    def mark_signal(self, signal_id: str, *, dismissed: bool = False) -> dict[str, Any]:
+        """Mark a signal read, or dismissed; idempotent and state survives reload."""
+        if not signal_id.strip():
+            raise MemoryError("signal_id cannot be empty")
+        now = _now()
+        with self._lock, self._connection:
+            row = self._connection.execute(
+                "SELECT * FROM signal_state WHERE signal_id = ?", (signal_id,)
+            ).fetchone()
+            read_at = row["read_at"] if row is not None else None
+            dismissed_at = row["dismissed_at"] if row is not None else None
+            if dismissed:
+                dismissed_at = dismissed_at or now
+            else:
+                read_at = read_at or now
+            self._connection.execute(
+                "INSERT INTO signal_state (signal_id, read_at, dismissed_at, updated_at) "
+                "VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(signal_id) DO UPDATE SET "
+                "read_at = excluded.read_at, dismissed_at = excluded.dismissed_at, "
+                "updated_at = excluded.updated_at",
+                (signal_id, read_at, dismissed_at, now),
+            )
+        return {"signal_id": signal_id, "read_at": read_at, "dismissed_at": dismissed_at}
 
     # -- prompt context ----------------------------------------------------
 

@@ -274,6 +274,24 @@ def test_the_tool_count_on_the_page_matches_the_contract():
     assert f"See all {len(tools)} tools" in text
 
 
+def test_the_tools_title_names_no_count():
+    """A number in the title drifts the moment a tool is added.
+
+    The page renders the live count next to the link; the heading must not
+    restate a figure that can silently become wrong.
+    """
+    from site_support import SITE
+
+    content = json.loads((SITE / "content" / "landing.json").read_text(encoding="utf-8"))
+    title = content["tools"]["title"]
+    assert not re.search(
+        r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|"
+        r"twenty|thirty|forty|fifty)\s+tools?\b",
+        title,
+        re.IGNORECASE,
+    ), title
+
+
 def test_the_status_list_reports_what_ships():
     text = re.sub(r"\s+", " ", _visible_text(read_page("index.html")))
     tools = extract.read_tools(MCP_SERVER_PY, CONTRACT_PY)
@@ -484,6 +502,7 @@ def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
     # The MCP reference is the long pole: every tool's argument table and the
     # whole ODI schema live on that one page, so it grows with each paginated
-    # list tool and each entity we add. The V2MOM entity, the five
-    # scheduled-work tools, and the three signal tools bring the page to ~78 KB.
-    assert size <= 78 * 1024, f"{page}: {size} bytes"
+    # list tool and each entity we add. The V2MOM entity, the scheduled-work
+    # tools, and Pillar 4's decision/snapshot/bet/signal tools bring the page
+    # to ~100 KB.
+    assert size <= 104 * 1024, f"{page}: {size} bytes"

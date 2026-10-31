@@ -171,6 +171,80 @@ Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
 plus `job_id` and `step_id`, so it pipes straight into a spreadsheet or `jq`.
 
+## Know: decisions, bets, signals
+
+The `know` pillar closes the loop. You record what you chose, turn the choice
+into a dated bet with a frozen baseline, and read back honest signals derived
+from your own store. Nothing here is simulated or invented: an empty store
+returns an empty feed, and a measurement that cannot be made says `no_data`.
+
+```bash
+# Decisions: record once, supersede later — history is never overwritten
+agentic-odi decisions record --job-id <job-id> --outcome <outcome-id> \
+  --rationale "Biggest underserved opportunity" --by alex \
+  --reject <other-outcome-id>:"Lower reach"
+agentic-odi decisions list <job-id>
+agentic-odi decisions list <job-id> --json
+
+# Bets: a dated expectation with a baseline frozen at creation
+agentic-odi bets add --decision-id <decision-id> --outcome-id <outcome-id> \
+  --hypothesis "Onboarding time drops below the target" --target 12 \
+  --measure-by 2026-06-30 --direction minimize
+agentic-odi bets list --job-id <job-id>
+agentic-odi bets show <bet-id>
+agentic-odi bets measure <bet-id>
+agentic-odi bets status <bet-id> running
+
+# Signals, the digest, and where the spine stops
+agentic-odi signals list --unread
+agentic-odi digest --since 7d --out digest.md
+agentic-odi status --spine --job <job-id>
+```
+
+`odi digest` and `odi status --spine` are the documented spellings; `odi know
+digest` and `odi know spine` are kept as aliases.
+
+- A **decision** names the chosen outcomes, the rejected ones with reasons, the
+  rationale, and who decided. Recording a second decision for the same Job marks
+  the first `superseded` and links it forward; it stays readable.
+- A **bet** copies the outcome's score at creation into `baseline`. Re-scoring
+  the outcome later never moves that baseline, so the comparison stays
+  like-for-like. `measure` returns `met`, `missed`, or `no_data` — it only reads
+  a score at or after `measure_by`, and never treats a missing score as zero.
+  Only legal status transitions are accepted (`planned → running → measured`,
+  plus `abandoned`); an illegal jump is refused.
+- **Signals** are recorded by the store as it changes — a due bet, a moved
+  score, a superseded decision, a stage with no outcomes — never re-derived on
+  read, so an empty store gives an empty feed. Each has a stable fingerprint, so
+  a re-run writes nothing new and read/dismiss state survives a reload. The
+  shared notification policy decides which signals interrupt you (for example a
+  score must move by a threshold); everything else stays in the feed.
+- `know digest` refreshes the inbox, then writes deterministic markdown of the
+  know signals inside the window. `--job <id>` scopes both the refresh and the
+  read to one Job, so a per-job digest never shows another job's facts; an
+  unknown Job is an error rather than a silently empty digest. `--out <path>`
+  writes the same bytes it would print and echoes the path. `know spine` shows
+  each stage — captured, scored, decided, bet, measured — and the first missing
+  link, so you can see exactly where the evidence chain stops. Only the first
+  missing link is named; later stages stay blank, so the counts never imply one
+  closed chain. When an open bet exists, the `measured` row carries the real
+  `measure_by` date; with no open bet the date is absent rather than guessed. An
+  empty store prints `No job yet.` and nothing else. The spine reads only and
+  writes nothing.
+
+```
+$ agentic-odi status --spine --job <job-id>
+Spine for <job-id>
+
+captured   1
+scored     1
+decided    0  → record a decision
+bet        0
+measured   0
+```
+
+Add `--json` to any command for machine-readable output.
+
 ## Evidence
 
 Evidence is research captured from connectors (or entered by hand) and linked to
@@ -209,6 +283,7 @@ emit nothing.
 ```bash
 agentic-odi signals list                 # newest first
 agentic-odi signals list --unread --limit 5
+agentic-odi signals list --job-id <job-id>   # one Job's facts only
 agentic-odi signals unread --json
 agentic-odi signals read <signal-id>
 agentic-odi signals dismiss <signal-id>

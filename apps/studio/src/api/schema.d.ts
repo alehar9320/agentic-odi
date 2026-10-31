@@ -692,6 +692,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notification-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notification Rules
+         * @description The effective interruption policy, including documented defaults.
+         */
+        get: operations["get_notification_rules_api_notification_rules_get"];
+        /**
+         * Put Notification Rule
+         * @description Store one shared rule for a signal kind.
+         */
+        put: operations["put_notification_rule_api_notification_rules_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/llm/chat": {
         parameters: {
             query?: never;
@@ -778,23 +802,6 @@ export interface paths {
          * @description Promote a record into a Job or a Desired Outcome.
          */
         post: operations["promote_evidence_api_evidence__evidence_id__promote_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/{full_path}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Spa Fallback */
-        get: operations["spa_fallback__full_path__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1292,6 +1299,36 @@ export interface components {
              * @default
              */
             api_key: string;
+        };
+        /** NotificationRuleModel */
+        NotificationRuleModel: {
+            /** Kind */
+            kind: string;
+            /**
+             * Threshold
+             * @default 0
+             */
+            threshold: number;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** NotificationRuleRequest */
+        NotificationRuleRequest: {
+            /** Kind */
+            kind: string;
+            /**
+             * Threshold
+             * @default 0
+             */
+            threshold: number;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
         };
         /** ObservationCreateRequest */
         ObservationCreateRequest: {
@@ -3306,6 +3343,59 @@ export interface operations {
             };
         };
     };
+    get_notification_rules_api_notification_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationRuleModel"][];
+                };
+            };
+        };
+    };
+    put_notification_rule_api_notification_rules_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationRuleModel"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     proxy_llm_chat_api_llm_chat_post: {
         parameters: {
             query?: never;
@@ -3503,37 +3593,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    spa_fallback__full_path__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                full_path: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
