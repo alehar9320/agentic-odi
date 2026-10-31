@@ -36,7 +36,9 @@ import {
   fetchMarketplace,
   fetchMemory,
   fetchModels,
+  fetchSegments,
   fetchSignals,
+  fetchStrategy,
   fetchUnreadSignalCount,
   healthLlm,
   healthMcp,
@@ -70,8 +72,10 @@ import type {
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
+  Segment,
   Signal,
   SignalSubjectKind,
+  Strategy,
   StudioBrief,
   StudioConfig,
   StudioError,
@@ -168,6 +172,8 @@ const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = 
   step: "jobmap",
   outcome: "landscape",
   evidence: "evidence",
+  segment: "segments",
+  strategy: "segments",
 };
 
 /** The developer simulator's events never reach the store, so they carry this id prefix. */
@@ -347,6 +353,12 @@ export interface StudioContextValue {
   /** The job that owns the focused subject, so canvas panels can select it. */
   focusedJobId: string | null;
   simulateBackgroundEvent: () => void;
+  /** Stage 5: the segments the scored outcomes support, read from the store. */
+  segments: Segment[];
+  /** Stage 6: the recorded path, or null when none has evidence yet. */
+  strategy: Strategy | null;
+  segmentsError: StudioError | null;
+  refreshSegments: () => Promise<void>;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -467,6 +479,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [simulatedSignals, setSimulatedSignals] = useState<Signal[]>([]);
   const [unreadSignalCount, setUnreadSignalCount] = useState(0);
   const [signalsError, setSignalsError] = useState<StudioError | null>(null);
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [strategy, setStrategy] = useState<Strategy | null>(null);
+  const [segmentsError, setSegmentsError] = useState<StudioError | null>(null);
   const [focusedSubject, setFocusedSubject] = useState<{
     kind: SignalSubjectKind;
     id: string;
@@ -503,6 +518,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       // Keep the last feed on screen: a failed read is not an empty inbox.
       setSignalsError(asStudioError(error));
+    }
+  }, [settings.mcp_url]);
+
+  /**
+   * Stages 5 and 6 read as one lens: the segments and the bet they imply. A
+   * failed read keeps the last answer on screen rather than showing an empty
+   * board, which would read as "the evidence says nothing".
+   */
+  const refreshSegments = useCallback(async () => {
+    try {
+      const [nextSegments, nextStrategy] = await Promise.all([
+        fetchSegments(settings.mcp_url),
+        fetchStrategy(settings.mcp_url),
+      ]);
+      setSegments(nextSegments);
+      setStrategy(nextStrategy);
+      setSegmentsError(null);
+    } catch (error) {
+      setSegmentsError(asStudioError(error));
     }
   }, [settings.mcp_url]);
 
@@ -899,6 +933,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     // function either just changed the store or is checking what changed, and
     // a canvas that fails to load must not leave the bell showing stale counts.
     void refreshSignals();
+    // Segments and the strategy are the other things a turn can create, and the
+    // rail counts them, so they are re-read on the same beat.
+    void refreshSegments();
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
     try {
       const data = await fetchCanvas(settings.mcp_url);
@@ -916,7 +953,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const problem = asStudioError(error);
       setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
     }
-  }, [settings.mcp_url, refreshSignals]);
+  }, [settings.mcp_url, refreshSignals, refreshSegments]);
 
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
@@ -1902,6 +1939,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       focusedSubject,
       focusedJobId,
       simulateBackgroundEvent,
+      segments,
+      strategy,
+      segmentsError,
+      refreshSegments,
     }),
     [
       settings,
@@ -2008,6 +2049,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       focusedSubject,
       focusedJobId,
       simulateBackgroundEvent,
+      segments,
+      strategy,
+      segmentsError,
+      refreshSegments,
     ],
   );
 

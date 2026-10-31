@@ -21,6 +21,8 @@ const KIND_LABEL: Record<SignalKind, string> = {
   evidence_ingested: "Evidence",
   evidence_promoted: "Evidence",
   job_map_completed: "Job map",
+  segment_identified: "Segment",
+  strategy_proposed: "Strategy",
 };
 
 const SEVERITY_BADGE: Record<SignalSeverity, string> = {
