@@ -178,6 +178,70 @@ def _path_decision(path: str, workspace_root: str | None) -> PolicyDecision | No
     return None
 
 
+# Commands that, anywhere in a pipe, read stdin and execute it as code.
+_SHELL_INTERPRETERS = frozenset(
+    {
+        "sh",
+        "bash",
+        "zsh",
+        "dash",
+        "ksh",
+        "csh",
+        "tcsh",
+        "python",
+        "python3",
+        "node",
+        "ruby",
+        "perl",
+        "php",
+    }
+)
+
+# Tools whose primary use in a pipe is to send stdin off-host.
+_EXFILTRATION_TOOLS = frozenset({"nc", "ncat", "netcat"})
+
+
+def _simple_commands(tokens: list[str]) -> list[list[str]]:
+    """Split a token list on pipe boundaries into simple commands."""
+    commands: list[list[str]] = []
+    current: list[str] = []
+    for token in tokens:
+        if token == "|":  # nosec B105 - "|" is a pipe operator, not a secret
+            if current:
+                commands.append(current)
+                current = []
+        else:
+            current.append(token)
+    if current:
+        commands.append(current)
+    return commands
+
+
+def _pipe_decision(tokens: list[str]) -> PolicyDecision | None:
+    """Block pipes that route into a shell interpreter or exfiltration tool.
+
+    The first command in a pipe may be read-only, but a later command such as
+    ``sh`` or ``nc`` receives the piped input and can execute or exfiltrate it.
+    Single commands with no pipe are left to the existing allowlist logic.
+    """
+    commands = _simple_commands(tokens)
+    if len(commands) <= 1:
+        return None
+    for simple in commands:
+        if not simple:
+            continue
+        program = simple[0]
+        if program in _SHELL_INTERPRETERS:
+            return PolicyDecision(
+                Decision.BLOCK, "denylist", "pipe to shell interpreter is not allowed"
+            )
+        if program in _EXFILTRATION_TOOLS:
+            return PolicyDecision(
+                Decision.BLOCK, "denylist", "piped exfiltration is not allowed"
+            )
+    return None
+
+
 def _split_command(command: str) -> list[list[str]]:
     """Split a shell line into simple commands; shell operators are boundaries."""
     parts = re.split(r"\s*(?:&&|\|\||;|\n)\s*", command)
@@ -185,8 +249,6 @@ def _split_command(command: str) -> list[list[str]]:
     for part in parts:
         if not part.strip():
             continue
-        if "|" in part and re.search(r"(curl|wget)\b", part):
-            continue  # already blocked by the pipe-to-shell pattern
         try:
             segments.append(shlex.split(part))
         except ValueError:
@@ -254,6 +316,9 @@ def _command_decision(command: str, request: ActionRequest) -> PolicyDecision:
     for tokens in _split_command(command):
         if not tokens:
             continue
+        pipe = _pipe_decision(tokens)
+        if pipe is not None:
+            return pipe
         program = tokens[0]
         if program == "git":
             decision = _git_decision(tokens)
