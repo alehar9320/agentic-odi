@@ -50,6 +50,49 @@ export interface Thesis {
   created_at: string;
 }
 
+export type SegmentVerdict = "underserved" | "overserved" | "appropriately_served";
+
+/**
+ * Stage 5's segment: a group of people and the job they are doing, scoped to a
+ * job and evidenced by outcomes. `verdict` is null when an outcome in the group
+ * has no score — the studio reports that as "not enough signal" rather than
+ * guessing. No demographic field exists here by design.
+ */
+export interface Segment {
+  id: string;
+  job_id?: string | null;
+  name: string;
+  people: string;
+  people_inferred?: boolean;
+  job_statement: string;
+  outcome_ids: string[];
+  verdict?: SegmentVerdict | null;
+  rationale: string;
+  confidence: number;
+  created_at: string;
+}
+
+export type StrategyKind = "differentiated" | "disruptive" | "new_market";
+
+export interface RejectedPath {
+  kind: StrategyKind;
+  why: string;
+}
+
+/**
+ * Stage 6's recommendation. `rejected` carries a path for every kind that was
+ * not chosen: a strategy without its rejections is a conclusion.
+ */
+export interface Strategy {
+  id: string;
+  kind: StrategyKind;
+  segment_id?: string | null;
+  thesis: string;
+  bets: string[];
+  rejected: RejectedPath[];
+  created_at: string;
+}
+
 export type CanvasProvenanceKind = "live" | "seed" | "empty";
 
 /**
@@ -264,6 +307,7 @@ export interface StudioBrief {
 export type WorkspacePanelId =
   | "landscape"
   | "jobmap"
+  | "segments"
   | "evidence"
   | "capture"
   | "memory"
@@ -281,7 +325,9 @@ export type SignalKind =
   | "opportunity_crossed"
   | "evidence_ingested"
   | "evidence_promoted"
-  | "job_map_completed";
+  | "job_map_completed"
+  | "segment_identified"
+  | "strategy_proposed";
 
 export type SignalSeverity = "info" | "notice" | "urgent";
 
@@ -291,7 +337,9 @@ export type SignalSubjectKind =
   | "outcome"
   | "evidence"
   | "connector"
-  | "agent_work";
+  | "agent_work"
+  | "segment"
+  | "strategy";
 
 export interface Signal {
   id: string;

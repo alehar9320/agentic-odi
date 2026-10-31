@@ -80,6 +80,17 @@ export function RouteIcon(props: IconProps) {
   );
 }
 
+export function ClusterIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="7" cy="7.5" r="2.5" />
+      <circle cx="17" cy="7.5" r="2.5" />
+      <circle cx="12" cy="17" r="2.5" />
+      <path d="M9.5 7.5h5M8.2 9.7l2.6 5M15.8 9.7l-2.6 5" />
+    </Icon>
+  );
+}
+
 export function BoltIcon(props: IconProps) {
   return (
     <Icon {...props}>

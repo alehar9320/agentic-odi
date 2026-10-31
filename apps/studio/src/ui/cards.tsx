@@ -424,3 +424,158 @@ export function DecisionRecord({ node }: NodeProps) {
     </article>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* segment-card                                                        */
+/* ------------------------------------------------------------------ */
+
+const VERDICT_LABEL: Record<string, string> = {
+  underserved: "Underserved",
+  overserved: "Overserved",
+  appropriately_served: "Appropriately served",
+  unknown: "Not enough signal",
+};
+
+const VERDICT_TONE: Record<string, Tone> = {
+  underserved: "warning",
+  overserved: "info",
+  appropriately_served: "positive",
+  unknown: "neutral",
+};
+
+function formatConfidence(confidence: number): string {
+  return `${Math.round(confidence * 100)}%`;
+}
+
+export function SegmentCard({ node }: NodeProps) {
+  const id = str(node.props, "id", "Segment");
+  const name = str(node.props, "name", id);
+  const people = str(node.props, "people");
+  const jobStatement = str(node.props, "jobStatement");
+  const rationale = str(node.props, "rationale");
+  const verdict = str(node.props, "verdict", "unknown");
+  const confidence = num(node.props, "confidence", 0);
+  const outcomeIds = stringList(node.props.outcomeIds);
+  const unclustered = stringList(node.props.unclustered);
+  const inferred = node.props.peopleInferred === true;
+
+  return (
+    <article className="ui-card ui-card--segment" aria-label={`Segment: ${name}`}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">{id}</span>
+        <span className="ui-caption">Segment</span>
+        {/* A verdict is never shown apart from the confidence behind it. */}
+        <ScorePill tone={VERDICT_TONE[verdict] ?? "neutral"}>
+          {`${VERDICT_LABEL[verdict] ?? verdict} · ${formatConfidence(confidence)} confidence`}
+        </ScorePill>
+      </header>
+
+      <h4 className="ui-card__title">{name}</h4>
+
+      <dl className="ui-fields">
+        <div className="ui-field">
+          <dt>Who</dt>
+          <dd>
+            {people}
+            {inferred ? <span className="ui-caption"> — inferred from the outcomes</span> : null}
+          </dd>
+        </div>
+        {jobStatement ? (
+          <div className="ui-field">
+            <dt>Job</dt>
+            <dd>{jobStatement}</dd>
+          </div>
+        ) : null}
+        <div className="ui-field">
+          <dt>Evidence</dt>
+          <dd>{`${outcomeIds.length} outcomes: ${outcomeIds.join(", ") || "none"}`}</dd>
+        </div>
+        {rationale ? (
+          <div className="ui-field">
+            <dt>Why this verdict</dt>
+            <dd>
+              <Markdown source={rationale} />
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+
+      {unclustered.length > 0 ? (
+        <p className="ui-caption">
+          {`Unclustered — too few outcomes to be a market: ${unclustered.join(", ")}`}
+        </p>
+      ) : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* strategy-card                                                       */
+/* ------------------------------------------------------------------ */
+
+const KIND_LABEL: Record<string, string> = {
+  differentiated: "Differentiated",
+  disruptive: "Disruptive",
+  new_market: "New-Market",
+};
+
+const KIND_TONE: Record<string, Tone> = {
+  differentiated: "warning",
+  disruptive: "info",
+  new_market: "positive",
+};
+
+export function StrategyCard({ node }: NodeProps) {
+  const kind = str(node.props, "kind");
+  const thesis = str(node.props, "thesis");
+  const segmentId = str(node.props, "segmentId");
+  const bets = stringList(node.props.bets);
+  const rejected = recordList(node.props.rejected);
+
+  return (
+    <article className="ui-card ui-card--strategy" aria-label={`${KIND_LABEL[kind] ?? kind} strategy`}>
+      <header className="ui-card__head">
+        <span className="ui-card__id">Innovation strategy</span>
+        <ScorePill tone={KIND_TONE[kind] ?? "neutral"}>{KIND_LABEL[kind] ?? kind}</ScorePill>
+        {segmentId ? <span className="ui-caption">for {segmentId}</span> : null}
+      </header>
+
+      <p className="ui-card__statement">
+        <Markdown source={thesis} />
+      </p>
+
+      {bets.length > 0 ? (
+        <ul className="ui-bets">
+          {bets.map((bet, index) => (
+            <li className="ui-bets__item" key={`${index}-${bet.slice(0, 12)}`}>
+              {bet}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {/* The paths this one beat: a recommendation without them is a conclusion. */}
+      <div className="ui-rejected">
+        <div className="ui-rejected__label">Paths this beat</div>
+        {rejected.length === 0 ? (
+          <p className="ui-rejected__why">
+            No rejected paths recorded — this is a conclusion, not a recommendation.
+          </p>
+        ) : null}
+        {rejected.map((item, index) => {
+          const rejectedKind = str(item, "kind");
+          return (
+            <div className="ui-rejected__row" key={`${index}-${rejectedKind}`}>
+              <span className="ui-rejected__kind">{KIND_LABEL[rejectedKind] ?? rejectedKind}</span>
+              <span className="ui-rejected__why">{str(item, "why")}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
