@@ -796,6 +796,15 @@ class LocalBackend(Backend):
             ],
         }
 
+    def _render_memo(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import MemoDecisionNotFoundError, render_memo
+
+        try:
+            memo = self.service.build_memo(args["decision_id"])
+        except MemoDecisionNotFoundError:
+            raise BackendError(f"decision not found: {args['decision_id']}") from None
+        return {"decision_id": memo.decision_id, "markdown": render_memo(memo)}
+
     def _get_outcome_history(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         from agentic_odi_core import outcome_not_found
 
@@ -1102,6 +1111,7 @@ _LOCAL_HANDLERS = {
     "get_decision": LocalBackend._get_decision,
     "list_decisions": LocalBackend._list_decisions,
     "review_decision": LocalBackend._review_decision,
+    "render_memo": LocalBackend._render_memo,
     "get_outcome_history": LocalBackend._get_outcome_history,
     "get_outcome_delta": LocalBackend._get_outcome_delta,
     "record_bet": LocalBackend._record_bet,

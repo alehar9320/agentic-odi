@@ -19,6 +19,14 @@ it is merged; the link is the proof.
   same projection behind the MCP tools, `odi decide`/`odi roadmap`/`odi review`/
   `odi bets`, the Studio API, and the Studio cards. A missing measurement stays
   `not measured` / `no evidence`, never `0` and never `no change`.
+- [x] **The decision memo writes itself**: `odi decide memo` assembles the
+  one-page case from what is already recorded — the decision, why now, the
+  evidence with its citations, the options rejected and why, what the chosen
+  outcome is worth, how we will know it worked, and what we still do not know.
+  It reads no clock and invokes no model, so the same records render the same
+  bytes; a missing section is omitted with a one-line reason, never a zero. The
+  same projection backs `POST /api/decisions/memo` and the MCP `render_memo`
+  tool.
 - [x] **Segments and strategy**: Define a segment by the outcomes it cares about,
   derive candidate groups deterministically from the scores, profile a segment's
   underserved and overserved halves separately, and record a strategy only when

@@ -384,6 +384,14 @@ change, no evidence, or orphaned. A missing measurement is `no evidence`, never
 `no change`; an outcome that no longer exists is `orphaned`, never a crash. It is
 the same projection `odi review show` renders.
 
+The decision memo is the one-page case assembled on read from what is already
+recorded: the decision, why now, the evidence with its citations, the options
+rejected and why, what the chosen outcome is worth, how we will know it worked,
+and what we still do not know. It writes nothing and invokes no model; a section
+with nothing to say is omitted with a one-line reason, never placeholder prose
+and never a zero. It is the same projection `odi decide memo` renders and the
+MCP `render_memo` tool returns.
+
 The bet card is a recorded expectation: the hypothesis, the outcome it targets,
 the baseline captured at creation, the target, and the date to look. The baseline
 is stored at creation and never recomputed from the live score, so the starting

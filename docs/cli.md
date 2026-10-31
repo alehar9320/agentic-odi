@@ -325,6 +325,24 @@ never a crash. `--today` pins the comparison date so the day count and the
 verdicts are reproducible. The same projection backs `POST /api/decisions/review`
 and the Studio's decision-review card.
 
+## Assemble the decision memo
+
+```bash
+agentic-odi decide memo --decision-id DEC-1
+agentic-odi decide memo --decision-id DEC-1 --json
+```
+
+`decide memo` assembles the one-page memo a product leader can sign from what is
+already recorded: the decision, why now, the evidence with its citations, the
+options rejected and why, what the chosen outcome is worth, how we will know it
+worked, and what we still do not know. Every number is copied from a record —
+the assembler reads no clock, opens no store and invokes no model, so the same
+records always render the same bytes. A section with nothing to say is omitted
+with a one-line reason (`No value estimate recorded`, `No bet recorded`), never
+placeholder prose and never a zero; a value's unit and source travel with the
+number. The same projection backs `POST /api/decisions/memo` and the MCP
+`render_memo` tool.
+
 ## Track a bet
 
 ```bash

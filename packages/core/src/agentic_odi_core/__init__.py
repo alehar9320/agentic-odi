@@ -73,6 +73,14 @@ from agentic_odi_core.history import (
     outcome_delta,
     outcome_history,
 )
+from agentic_odi_core.memo import (
+    Memo,
+    MemoBet,
+    MemoDecisionNotFoundError,
+    MemoRejection,
+    build_memo,
+    render_memo,
+)
 from agentic_odi_core.messages import (
     CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
@@ -236,6 +244,12 @@ __all__ = [
     "Narrator",
     "NarratorError",
     "render_narrative",
+    "Memo",
+    "MemoBet",
+    "MemoRejection",
+    "MemoDecisionNotFoundError",
+    "build_memo",
+    "render_memo",
     "Roadmap",
     "RoadmapEntry",
     "build_roadmap",

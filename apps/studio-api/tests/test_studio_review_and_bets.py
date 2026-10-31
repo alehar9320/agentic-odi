@@ -245,3 +245,49 @@ def test_advancing_an_unknown_bet_is_404() -> None:
     client, _ = _client()
     response = client.post("/api/bets/nope/advance", json={"status": "running"})
     assert response.status_code == 404
+
+
+def test_memo_projects_the_decision_read_only() -> None:
+    """POST /api/decisions/memo is a read-only projection, no memo row stored."""
+    client, repo = _client()
+    service, job, chosen, other, decision = _seed(repo)
+    service.add_evidence(
+        "Interview 7",
+        "manual",
+        "interview-7",
+        "Publishing is slow",
+        job_id=job.id,
+        outcome_id=chosen.id,
+    )
+
+    before = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+    body = client.post("/api/decisions/memo", json={"decision_id": decision.id}).json()
+    after = {name: len(getattr(repo, name)) for name in ("decisions", "outcomes", "evidence")}
+
+    assert before == after
+    assert body["decision_id"] == decision.id
+    for section in (
+        "## Decision",
+        "## Why now",
+        "## What the evidence says",
+        "## What it is worth",
+        "## How we will know",
+        "## What we do not know",
+        "## Sources",
+    ):
+        assert section in body["markdown"]
+    assert "interview-7" in body["markdown"]
+
+
+def test_memo_omits_a_missing_value_with_a_reason_not_a_zero() -> None:
+    client, repo = _client()
+    _, _, _, _, decision = _seed(repo)
+    body = client.post("/api/decisions/memo", json={"decision_id": decision.id}).json()
+    assert "No value estimate recorded" in body["markdown"]
+    assert "0 currency" not in body["markdown"]
+
+
+def test_memo_of_an_unknown_decision_is_404() -> None:
+    client, _ = _client()
+    response = client.post("/api/decisions/memo", json={"decision_id": "nope"})
+    assert response.status_code == 404

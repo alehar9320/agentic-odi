@@ -127,6 +127,33 @@ async def test_review_reports_an_unknown_decision() -> None:
 
 
 @pytest.mark.asyncio
+async def test_render_memo_returns_the_decision_memo() -> None:
+    async with Client(mcp) as client:
+        _, decision_id = await _seed(client)
+        text = _text(await client.call_tool("render_memo", {"decision_id": decision_id}))
+    for section in (
+        "## Decision",
+        "## Why now",
+        "## What the evidence says",
+        "## What it is worth",
+        "## How we will know",
+        "## What we do not know",
+        "## Sources",
+    ):
+        assert section in text
+    # No value estimate was recorded, so the section carries its reason, not a zero.
+    assert "No value estimate recorded" in text
+    assert "0 currency" not in text
+
+
+@pytest.mark.asyncio
+async def test_render_memo_reports_an_unknown_decision() -> None:
+    async with Client(mcp) as client:
+        text = _text(await client.call_tool("render_memo", {"decision_id": "nope"}))
+    assert text.startswith("Error: decision not found")
+
+
+@pytest.mark.asyncio
 async def test_outcome_history_and_delta_round_trip() -> None:
     async with Client(mcp) as client:
         job_id, _ = await _seed(client)

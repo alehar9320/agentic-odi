@@ -33,6 +33,7 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.memo import Memo, MemoDecisionNotFoundError, build_memo
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
@@ -1427,6 +1428,23 @@ class ODIService:
             evidence_count=len(self.repo.list_evidence(job_id=job_id)),
             strategy=self._brief_strategy(job_id, decision),
         )
+
+    def build_memo(self, decision_id: str) -> Memo:
+        """Assemble the decision memo from what is actually recorded (M3-11/ALH-97).
+
+        Deterministic and read-only: it reads the decision, its job's outcomes,
+        evidence and bets, and never writes a row or invokes a provider. The memo
+        is generated on read and never stored — a stale stored memo would be
+        worse than none. An unknown decision raises, so "no such decision" is
+        never confused with an empty memo.
+        """
+        decision = self.repo.get_decision(decision_id)
+        if decision is None:
+            raise MemoDecisionNotFoundError(decision_id)
+        outcomes = self.repo.get_outcomes(decision.job_id, limit=None)
+        evidence = self.repo.list_evidence(job_id=decision.job_id, limit=None)
+        bets = self.repo.list_bets(decision_id=decision.id, limit=None)
+        return build_memo(decision, outcomes=outcomes, evidence=evidence, bets=bets)
 
     def _brief_strategy(self, job_id: str, decision: Decision | None) -> BriefStrategy | None:
         """The recorded strategy to show in the brief, or ``None``.

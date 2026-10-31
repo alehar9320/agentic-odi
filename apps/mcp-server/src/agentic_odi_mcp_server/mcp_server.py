@@ -22,6 +22,7 @@ from agentic_odi_core import (
     EvidenceNotFoundError,
     JobNotFoundError,
     JobStage,
+    MemoDecisionNotFoundError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
@@ -46,6 +47,9 @@ from agentic_odi_core import (
 )
 from agentic_odi_core import (
     outcome_delta as outcome_delta_read,
+)
+from agentic_odi_core import (
+    render_memo as render_memo_text,
 )
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
@@ -816,6 +820,16 @@ def review_decision(decision_id: str, today: str) -> str:
         ],
     }
     return json.dumps(payload)
+
+
+@mcp.tool
+def render_memo(decision_id: str) -> str:
+    """Assemble the decision memo from what is already recorded."""
+    try:
+        memo = service.build_memo(decision_id)
+    except MemoDecisionNotFoundError:
+        return f"Error: decision not found: {decision_id}"
+    return render_memo_text(memo)
 
 
 @mcp.tool

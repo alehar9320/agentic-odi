@@ -35,6 +35,7 @@ DECIDED_AT_OPTION = typer.Option(
     None, "--decided-at", help="ISO-8601 timestamp. Defaults to now in UTC."
 )
 SUPERSEDES_OPTION = typer.Option(None, "--supersedes", help="Decision ID this one replaces")
+DECISION_ID_OPTION = typer.Option(..., "--decision-id", help="Decision to assemble a memo for")
 
 
 def parse_rejection(raw: str) -> dict[str, str]:
@@ -94,3 +95,17 @@ def record(
     predecessor = supersedes
     if predecessor:
         typer.echo(f"  Supersedes: {predecessor}")
+
+
+@decide_app.command("memo")
+def memo(
+    decision_id: str = DECISION_ID_OPTION,
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Assemble the decision memo from what is already recorded."""
+    payload = run_tool("render_memo", {"decision_id": decision_id})
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        return
+    markdown = payload["markdown"] if isinstance(payload, dict) else payload
+    typer.echo(markdown, nl=False)

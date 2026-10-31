@@ -33,6 +33,7 @@ from agentic_odi_core import (
     ValueOutOfRangeError,
     error_status,
     outcome_delta,
+    render_memo,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -100,6 +101,7 @@ from agentic_odi_studio_api.studio.schemas import (
     PromoteEvidenceRequest,
     RecordBetRequest,
     RecordDecisionRequest,
+    RenderMemoRequest,
     ReviewDecisionRequest,
     ScheduleWorkRequest,
     SetOutcomeValueRequest,
@@ -699,6 +701,28 @@ async def post_decision_review(body: ReviewDecisionRequest, request: Request) ->
             for o in review.outcomes
         ],
     }
+
+
+@router.post("/decisions/memo")
+async def post_decision_memo(body: RenderMemoRequest, request: Request) -> dict:
+    """Assemble the decision memo from what is already recorded.
+
+    A read-only projection: it writes nothing and invokes no provider. Every
+    section is a projection of rows that already exist; a missing one is omitted
+    with a one-line reason, never placeholder prose and never a zero.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.RENDER_MEMO.value,
+            {"decision_id": body.decision_id},
+        )
+        return {"decision_id": body.decision_id, "markdown": _payload_from_text(result)}
+    try:
+        memo = _service(request).build_memo(body.decision_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"decision_id": memo.decision_id, "markdown": render_memo(memo)}
 
 
 @router.get("/outcomes/{outcome_id}/history")
