@@ -38,6 +38,8 @@ Uncovered inputs/conditions most likely to bite, each with a test in the owning 
 - **Task 0 (parity harness)** — done in this branch: `packages/core/tests/test_persistence_parity.py` drives both repositories and fails on a missed link.
 - **Task 1 (A1 — interviews and quotes)** — done in this branch: models, repository (Protocol + in-memory + SQLite), schema, service, contract, MCP tools, CLI group + renderers, docs, and tests.
 - **Task 9 (A7 — stages become data)** — done in this branch: `order`↔`stage` agreement on the model and service, `STEP_STAGE_BACKFILLED` on open, schema enum, CLI/MCP/API stage updates, docs, and `packages/core/tests/test_stages.py`.
+- **Task 10 (A7.2 — the map draws the stages it is given)** — done in this branch: `stage_catalog()` + `GET /api/schema`, the Studio fetches the stages at boot and `JobMap` renders exactly that list.
+- **Task 11 (A8 — coverage)** — done in this branch: `build_coverage_report` + `coverage_report(job_id)`, `get_coverage` MCP tool, `GET /api/jobs/{id}/coverage`, the CLI's `coverage`, the Studio's **Coverage** lens, docs, and tests in `packages/core/tests/test_coverage.py`, `apps/cli/tests/test_coverage_cli.py`, `apps/mcp-server/tests/test_coverage_tool.py`, `apps/studio-api/tests/test_studio_coverage.py`.
 - **Tasks 2–14 and Phases 2–4** — not started; each is its own issue and PR.
 
 ---
@@ -196,9 +198,9 @@ The **Persistence checklist** in every child points at `packages/core/tests/test
 
 **Interfaces (produces):** `CoverageReport{per_stage: list[StageCoverage{stage, outcomes, measured, quotes}], totals, gaps: list[JobStage]}`, explicit `unassigned`.
 
-- [ ] **Step 1:** All eight stage rows in stable order; explicit `unassigned` totals; `gaps` are stages with **zero** outcomes; `quotes` counts evidence rows linked to that stage's outcomes (not global quotes).
-- [ ] **Step 2:** Empty job returns a zeroed report; unknown job uses established not-found handling (distinct from an empty job); no cross-job leakage; report execution writes no events.
-- [ ] **Step 3:** CLI JSON / API / card counts match exactly; fixture covers unstaged, measured/unmeasured, duplicate-evidence cases.
+- [x] **Step 1:** All eight stage rows in stable order; explicit `unassigned` totals; `gaps` are stages with **zero** outcomes; `quotes` counts evidence rows linked to that stage's outcomes (not global quotes).
+- [x] **Step 2:** Empty job returns a zeroed report; unknown job uses established not-found handling (distinct from an empty job); no cross-job leakage; report execution writes no events.
+- [x] **Step 3:** CLI JSON / API / card counts match exactly; fixture covers unstaged, measured/unmeasured, duplicate-evidence cases.
 
 **Readiness blockers:** define what qualifies as "measured" and the identity of a counted evidence row when one quote supports multiple outcomes.
 

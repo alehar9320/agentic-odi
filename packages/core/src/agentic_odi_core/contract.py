@@ -56,6 +56,7 @@ class ToolName(str, Enum):
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
+    GET_COVERAGE = "get_coverage"
     COMPUTE_OPPORTUNITY = "compute_opportunity"
     GET_FRAMEWORK_GUIDELINES = "get_odi_framework_guidelines"
     GET_CAPABILITIES = "get_capabilities"
@@ -517,6 +518,14 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         effect=_derive_effect("get_odi_schema"),
         arguments=(),
         returns="The full JSON schema object.",
+    ),
+    ToolName.GET_COVERAGE.value: ToolSpec(
+        name="get_coverage",
+        summary="Read a job's stage coverage: outcomes, measured counts, quotes, and gaps. Read-only.",
+        effect=_derive_effect("get_coverage"),
+        arguments=("job_id",),
+        required=("job_id",),
+        returns="A coverage report with per-stage rows, totals, and the empty stages.",
     ),
     ToolName.COMPUTE_OPPORTUNITY.value: ToolSpec(
         name="compute_opportunity",

@@ -30,6 +30,7 @@ import type {
   StudioConfig,
   StudioError,
   JobStageDef,
+  CoverageReport,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -278,6 +279,21 @@ export function fetchChangelog(): Promise<ChangelogData> {
 export async function fetchStages(): Promise<JobStageDef[]> {
   const body = await getJson<{ stages?: JobStageDef[] }>("/api/schema");
   return body.stages ?? [];
+}
+
+/**
+ * What a job's research covers, per stage, with the gaps named. A read: the
+ * server writes nothing. An empty stage is reported as a row of zeros, so a
+ * surface can show what is missing instead of hiding it.
+ */
+export function fetchCoverage(
+  jobId: string,
+  mcpUrl?: string,
+): Promise<{ ok: boolean; result: CoverageReport }> {
+  const query = mcpUrl ? `?mcp_url=${encodeURIComponent(mcpUrl)}` : "";
+  return getJson<{ ok: boolean; result: CoverageReport }>(
+    `/api/jobs/${encodeURIComponent(jobId)}/coverage${query}`,
+  );
 }
 
 export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {

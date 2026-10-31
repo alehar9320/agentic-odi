@@ -45,7 +45,7 @@ The Studio opens as a conversation, not a dashboard.
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. |
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, **Customize**, and settings. There is no navigation drawer to compete with the thread. |
 | **Customize** | The one place to manage connectors. It replaces the conversation while open (the bar stays, so leaving is one gesture) and shows three bands: what is installed, read from the same `connectors.json` the CLI uses; a handful of curated picks as non-gating examples; and the marketplace, populated from the trusted vendor registry so a listing can be added by id. Capability areas filter the shelf, a listing that needs a token names its environment variable and stores nothing, a listing that cannot be installed says why, and an unreachable marketplace is reported rather than shown as an empty list. A studio with nothing installed suggests a connector when one would help; dismissing the suggestion keeps it dismissed. |
-| **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
+| **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Coverage · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
 | **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
@@ -70,7 +70,7 @@ the model, so they work when it is offline.
 | `/new` | New conversation |
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
-| `/landscape`, `/jobmap`, `/evidence`, `/settings` | Open that lens beside the conversation |
+| `/landscape`, `/jobmap`, `/coverage`, `/evidence`, `/settings` | Open that lens beside the conversation |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
 
@@ -236,6 +236,31 @@ The map holds no fallback array: if the request fails it shows the failure panel
 and a **Retry** rather than an empty map, because a broken request and an empty
 job look identical otherwise. A step that names a stage is placed by that stage;
 a legacy step with none is placed by its `order`.
+
+#### What the research does not cover
+
+A PM with six outcomes in Define and none in Conclude is about to decide on half
+a job map. **Coverage** answers "is there enough research to decide?" as a
+read-only report from `get_coverage` (the CLI's `coverage`, the API's
+`GET /api/jobs/{job_id}/coverage`, the Studio's **Coverage** lens). It reports
+one row per stage in canonical order — **including the empty ones**, because an
+empty stage is the finding, not an omission — with the outcome count, how many
+of those are *measured*, and how many evidence rows stand behind them.
+
+An outcome is **measured** when both `importance` and `satisfaction` are set;
+those are the two numbers an opportunity score is built from, so an outcome
+missing either is not yet measured. An outcome's stage is the stage of its step
+(`A7`'s stored field), never a recomputation from `order`. An outcome with no
+step, or a step with no stage, is counted in an explicit **`unassigned`** bucket
+that cannot be hidden inside the per-stage numbers.
+
+The **gaps** are the stages with zero outcomes; a stage with one thin outcome is
+a different problem and is left to the numbers. A quote is counted once per
+stage even when it is linked to several outcomes there, because the count is
+rows, not links, so a duplicated quote cannot inflate a stage. Reading coverage
+writes nothing and emits no event. An **unknown** job is a not-found error,
+distinct from an existing job with no outcomes, which returns a zeroed report;
+the two look different on every surface.
 
 ### The thread is the room
 

@@ -40,6 +40,7 @@ interface Turn {
 const PANEL_COMMANDS = new Set<string>([
   "landscape",
   "jobmap",
+  "coverage",
   "evidence",
   "capture",
   "settings",

@@ -22,6 +22,7 @@ import {
   fetchChangelog,
   fetchConfig,
   fetchStages,
+  fetchCoverage,
   fetchConnectorCatalog,
   fetchConnectors,
   healthLlm,
@@ -573,6 +574,56 @@ describe("signal inbox", () => {
     expect(calls[0]?.url).toBe("/api/signals/sig-1/dismiss");
     expect(JSON.parse(calls[0]!.body)).toEqual({ mcp_url: "http://mcp" });
   });
+});
+
+describe("fetchCoverage", () => {
+  it("reads a job's coverage from the jobs route, forwarding the mcp url", async () => {
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            result: {
+              job_id: "JOB-1",
+              per_stage: [{ stage: "define", outcomes: 2, measured: 1, quotes: 3 }],
+              totals: {
+                outcomes: 2,
+                measured: 1,
+                quotes: 3,
+                unassigned_outcomes: 0,
+                unassigned_measured: 0,
+                unassigned_quotes: 0,
+              },
+              gaps: ["locate"],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await fetchCoverage("JOB-1", "http://localhost:9000/mcp");
+
+    expect(response.result.per_stage[0].outcomes).toBe(2);
+    expect(response.result.gaps).toEqual(["locate"]);
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain("/api/jobs/JOB-1/coverage");
+    expect(url).toContain("mcp_url=http%3A%2F%2Flocalhost%3A9000%2Fmcp");
+  });
+
+  it("omits the mcp url when none is configured", async () => {
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () =>
+        new Response(JSON.stringify({ ok: true, result: { job_id: "JOB-1" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchCoverage("JOB-1");
+
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("mcp_url=");  });
 });
 
 describe("fetchOutcomeEvidence", () => {

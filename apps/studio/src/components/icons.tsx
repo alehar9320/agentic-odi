@@ -96,6 +96,14 @@ export function SignalIcon(props: IconProps) {
   );
 }
 
+export function CoverageIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z" />
+    </Icon>
+  );
+}
+
 export function CaptureIcon(props: IconProps) {
   return (
     <Icon {...props}>
