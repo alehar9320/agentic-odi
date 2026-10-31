@@ -20,6 +20,7 @@ import { useStudio } from "../state/StudioContext";
 import type { ChatMessage } from "../types";
 import { createAttachmentAdapter, preparedAttachments } from "./attachments";
 import { textOf, toThreadMessageLike } from "./convert";
+import { createDictationAdapter } from "./dictation";
 import { createSpeechAdapter } from "./speech";
 
 export interface StudioSuggestion {
@@ -143,6 +144,8 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
   } = useStudio();
 
   const attachments = useMemo(() => createAttachmentAdapter(), []);
+  // Null where speech recognition is missing, so the composer shows no mic.
+  const dictation = useMemo(() => createDictationAdapter(), []);
   // Null in a shell without Web Speech, so no Speak control is ever rendered
   // where it could only throw.
   const speech = useMemo(() => createSpeechAdapter(), []);
@@ -158,7 +161,7 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
     messages,
     convertMessage: toThreadMessageLike,
     suggestions,
-    adapters: { attachments, ...(speech ? { speech } : {}) },
+    adapters: { attachments, ...(dictation ? { dictation } : {}), ...(speech ? { speech } : {}) },
     onNew: async (message) => {
       await sendMessage(textOf(message), preparedAttachments(message.attachments));
     },
