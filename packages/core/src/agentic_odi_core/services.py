@@ -490,6 +490,7 @@ class ODIService:
         customer_value: CustomerValue | dict[str, Any],
         business_value: BusinessValue | dict[str, Any],
         step_id: str | None = None,
+        quote_id: str | None = None,
     ) -> CustomerOutcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -507,6 +508,7 @@ class ODIService:
             id=str(uuid.uuid4()),
             job_id=job_id,
             step_id=step_id,
+            quote_id=quote_id,
             customer_value=cv,
             business_value=bv,
         )
@@ -584,6 +586,18 @@ class ODIService:
             step_id=step_id,
             outcome_id=outcome_id,
         )
+        #: Dedupe: the same quote imported twice must not become two evidence
+        #: records. Return the existing record instead of appending.
+        duplicate = self.repo.get_evidence_by_fingerprint(
+            evidence.source_kind,
+            evidence.source_name,
+            evidence.name,
+            evidence.content,
+            evidence.url,
+            evidence.raw,
+        )
+        if duplicate is not None:
+            return duplicate
         evidence = self.repo.add_evidence(evidence)
         self.record_signal(
             SignalKind.EVIDENCE_INGESTED,
@@ -638,6 +652,12 @@ class ODIService:
             )
             return self.add_job(label, description=evidence.content or None)
         if target == "outcome":
+            #: Idempotent promotion: if this evidence was already promoted to an
+            #: outcome, return the existing outcome instead of creating a copy.
+            if evidence.outcome_id is not None:
+                existing = self.repo.get_outcome(evidence.outcome_id)
+                if existing is not None:
+                    return existing
             target_job_id = job_id or evidence.job_id
             if target_job_id is None:
                 raise ValidationError("job_id is required to promote evidence to an outcome")
@@ -658,6 +678,8 @@ class ODIService:
                 satisfaction=satisfaction,
                 step_id=evidence.step_id,
             )
+            #: Record the bidirectional link: evidence → outcome.
+            self.repo.update_evidence(evidence.id, {"outcome_id": outcome.id})
             self.record_signal(
                 SignalKind.EVIDENCE_PROMOTED,
                 f'Evidence promoted to an outcome: "{outcome.statement[:60]}"',

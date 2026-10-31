@@ -26,6 +26,7 @@ from agentic_odi_core.models import (
 )
 from agentic_odi_core.repository import (
     Repository,
+    compute_evidence_fingerprint,
     page,
     rank_signals,
     sort_outcomes,
@@ -135,20 +136,28 @@ class SQLiteRepository(Repository):
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
-            for key in [k for k, v in self.steps.items() if v.job_id == job_id]:
+            deleted_steps = {k for k, v in self.steps.items() if v.job_id == job_id}
+            for key in deleted_steps:
                 del self.steps[key]
-            for key in [k for k, v in self.outcomes.items() if v.job_id == job_id]:
+            deleted_outcomes = {k for k, v in self.outcomes.items() if v.job_id == job_id}
+            for key in deleted_outcomes:
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
-            for key in [
-                k
-                for k, v in self.evidence.items()
-                if v.job_id == job_id
-                or (v.step_id is not None and v.step_id not in self.steps)
-                or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-            ]:
-                del self.evidence[key]
+            #: Do not destroy research evidence: unlink references to the removed
+            #: job, its steps and its outcomes instead of deleting the rows.
+            for key, record in list(self.evidence.items()):
+                updates: dict[str, Any] = {}
+                if record.job_id == job_id:
+                    updates["job_id"] = None
+                if record.step_id in deleted_steps:
+                    updates["step_id"] = None
+                if record.outcome_id in deleted_outcomes:
+                    updates["outcome_id"] = None
+                if updates:
+                    current = record.model_dump(exclude_unset=True)
+                    current.update(updates)
+                    self.evidence[key] = Evidence.model_validate(current)
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
@@ -156,20 +165,26 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
                 del self.customer_outcomes[key]
-            for key in [
-                k
-                for k, v in self.evidence.items()
-                if v.step_id == step_id
-                or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-            ]:
-                del self.evidence[key]
+            #: Unlink evidence instead of destroying it.
+            for key, record in list(self.evidence.items()):
+                if record.step_id == step_id:
+                    current = record.model_dump(exclude_unset=True)
+                    current["step_id"] = None
+                    self.evidence[key] = Evidence.model_validate(current)
         elif et == "OUTCOME_DELETED":
             outcome_id = p["id"]
             self.outcomes.pop(outcome_id, None)
-            for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
-                del self.evidence[key]
+            #: Unlink evidence instead of destroying it: point outcome_id to NULL
+            #: so the quote survives the outcome's removal.
+            for key, record in list(self.evidence.items()):
+                if record.outcome_id == outcome_id:
+                    current = record.model_dump(exclude_unset=True)
+                    current["outcome_id"] = None
+                    self.evidence[key] = Evidence.model_validate(current)
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
+        elif et == "EVIDENCE_UPDATED":
+            self._merge_updates(self.evidence, p, Evidence)
         elif et == "SCHEDULED_WORK_CREATED":
             self.scheduled_work[p["id"]] = ScheduledWork.model_validate(p)
         elif et == "SCHEDULED_WORK_UPDATED":
@@ -480,6 +495,56 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return True
+
+    def get_evidence_by_fingerprint(
+        self,
+        source_kind: str,
+        source_name: str,
+        name: str,
+        content: str,
+        url: str | None,
+        raw: dict[str, Any] | None,
+    ) -> Evidence | None:
+        with self._lock:
+            self._sync()
+            fingerprint = compute_evidence_fingerprint(
+                source_kind, source_name, name, content, url, raw
+            )
+            for existing in self.evidence.values():
+                if (
+                    compute_evidence_fingerprint(
+                        existing.source_kind,
+                        existing.source_name,
+                        existing.name,
+                        existing.content,
+                        existing.url,
+                        existing.raw,
+                    )
+                    == fingerprint
+                ):
+                    return existing
+            return None
+
+    def update_evidence(self, evidence_id: str, updates: dict[str, Any]) -> Evidence | None:
+        with self._lock:
+            self._sync()
+            evidence = self.evidence.get(evidence_id)
+            if not evidence:
+                return None
+            current = evidence.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_evidence = evidence.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "EVIDENCE_UPDATED",
+                {"id": evidence_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_evidence
 
     def delete_customer_outcome(self, outcome_id: str) -> bool:
         with self._lock:
