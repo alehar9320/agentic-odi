@@ -58,6 +58,11 @@ python -m agentic_odi_cli connectors add mcp --name internal --url https://mcp.i
 python -m agentic_odi_cli connectors list
 ```
 
+Omit `--name` from `connectors health` to check every configured connector in
+one pass. It prints a markdown table of connector, status, and latency, names
+the error for each unreachable connector, and exits non-zero if any failed —
+so it can gate a deployment.
+
 > [!NOTE]
 > Presets cover MCP servers with a hosted endpoint. Servers you run yourself
 > (Snowflake, BigQuery, Google Drive, Brave Search, and similar) are added with
@@ -72,17 +77,41 @@ python -m agentic_odi_cli connectors list
 ## Ingest behavior
 
 Ingested records are normalized (`catalog`, `resource`, `tool_result`) and
-appended to the in-process ingest sink. They are **not** written into the ODI
-jobs/outcomes store — mapping ingested evidence onto ODI artifacts is still on
-the [roadmap](roadmap.md).
+appended to the in-process ingest sink. When `--job-id`, `--step-id`, or
+`--outcome-id` is supplied, each normalized record is **also** mapped to an
+evidence draft and written to the ODI store as an `Evidence` record, carrying
+the source name, source kind, item type, content, URL when one is present, the
+raw payload, and the link.
+
+Without a target id nothing enters the ODI store: the batch lives only in the
+in-process sink and is lost when the process exits. The mapping is
+field-for-field — it does not summarize, score, infer confidence, or dedupe.
+See [Evidence mapping](architecture/evidence-mapping.md) for the contract.
 
 Pass `--dry-run` to fetch and normalize without writing anything: it prints the
 record count, the first normalized record, and — when `--job-id`, `--step-id`,
 or `--outcome-id` is given — how many evidence drafts the ingest would create.
 
-Evidence drafts are checked against the `EvidenceDraft` contract with
-`validate_evidence_draft()` before they can be handed to the ODI store, so a
-record that crossed a process boundary cannot enter with a missing field.
+Every evidence draft is an `EvidenceDraft` model, so construction raises before
+a record that crossed a process boundary can reach the ODI store with a missing
+or mistyped field. `validate_evidence_draft()` applies the same check to a draft
+that arrives as a plain dict; the CLI path builds the model directly.
 
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.
+
+## HTTP client configuration
+
+Connector HTTP traffic goes through one configurable client,
+`agentic_odi_connectors.get_http_client()`, so pool size, timeout, and retry
+behavior are predictable. Tune it with environment variables:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AGENTIC_ODI_HTTP_POOL_SIZE` | `10` | Maximum open connections (and keep-alive connections) |
+| `AGENTIC_ODI_HTTP_TIMEOUT` | `30.0` | Per-request timeout in seconds |
+| `AGENTIC_ODI_HTTP_RETRIES` | `3` | Retries for connection-level failures |
+
+Invalid or out-of-range values fall back to the default instead of failing the
+process.
+

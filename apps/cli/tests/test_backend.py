@@ -208,6 +208,33 @@ def test_mcp_timeout_reads_env(monkeypatch):
     assert mcp_timeout() == 30.0
 
 
+def test_mcp_calls_bound_the_client_with_the_configured_timeout(monkeypatch):
+    created = {}
+
+    class _FakeResult:
+        content = [type("_Block", (), {"text": "[]"})()]
+
+    class _FakeClient:
+        def __init__(self, url, **kwargs):
+            created["url"] = url
+            created["kwargs"] = kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc_info):
+            return False
+
+        async def call_tool(self, tool, args):
+            return _FakeResult()
+
+    monkeypatch.setattr("fastmcp.Client", _FakeClient)
+
+    backend_module._call_mcp("get_jobs", {}, "http://example/mcp", 12.0)
+
+    assert created["kwargs"] == {"timeout": 12.0, "init_timeout": 12.0}
+
+
 def test_mcp_backend_parses_list_payload(monkeypatch):
     backend = MCPBackend(mcp_url="http://example/mcp")
     monkeypatch.setattr(
@@ -272,11 +299,11 @@ def test_mcp_backend_reports_unreachable_server(monkeypatch):
 
 def test_local_backend_job_step_outcome_crud(tmp_path):
     backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
-    job_id = backend.call("add_job", {"name": "J", "description": "d"})["id"]
+    job_id = backend.call("add_job", {"name": "Job", "description": "d"})["id"]
 
-    assert backend.call("get_jobs", {})[0]["name"] == "J"
-    assert backend.call("get_job", {"job_id": job_id})["name"] == "J"
-    assert backend.call("update_job", {"job_id": job_id, "name": "J2"})["name"] == "J2"
+    assert backend.call("get_jobs", {})[0]["name"] == "Job"
+    assert backend.call("get_job", {"job_id": job_id})["name"] == "Job"
+    assert backend.call("update_job", {"job_id": job_id, "name": "Job 2"})["name"] == "Job 2"
 
     # An outcome must exist before steps can be added.
     backend.call(
@@ -331,7 +358,7 @@ def test_local_backend_not_found_raises_backend_error(tmp_path):
 
 def test_local_backend_rejects_out_of_range_scores(tmp_path):
     backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
-    job_id = backend.call("add_job", {"name": "J"})["id"]
+    job_id = backend.call("add_job", {"name": "Job"})["id"]
 
     with pytest.raises(BackendError, match="between 1.0 and 10.0"):
         backend.call(
@@ -347,7 +374,7 @@ def test_local_backend_rejects_out_of_range_scores(tmp_path):
 
 def test_local_backend_update_customer_outcome_folds_value_metrics(tmp_path):
     backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
-    job_id = backend.call("add_job", {"name": "J"})["id"]
+    job_id = backend.call("add_job", {"name": "Job"})["id"]
     outcome_id = backend.call(
         "add_customer_outcome",
         {

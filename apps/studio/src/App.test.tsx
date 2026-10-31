@@ -125,7 +125,10 @@ describe("studio shell", () => {
       await screen.findByRole("heading", { name: "What do you want to win?" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sharpen an opportunity/i })).toBeInTheDocument();
+    // The first run offers a situation the person recognises, not our nouns.
+    expect(
+      screen.getByRole("button", { name: /turn 40 interview notes into one bet/i }),
+    ).toBeInTheDocument();
     // The classic UI is secondary: no workspace surface until you ask for one.
     expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
   });
@@ -133,7 +136,9 @@ describe("studio shell", () => {
   it("sends the runtime prompt when a contextual starter card is selected", async () => {
     render(<App />);
 
-    const start = await screen.findByRole("button", { name: /sharpen an opportunity/i });
+    const start = await screen.findByRole("button", {
+      name: /turn 40 interview notes into one bet/i,
+    });
     await act(async () => {
       fireEvent.click(start);
     });
@@ -145,7 +150,7 @@ describe("studio shell", () => {
           messages: [
             expect.objectContaining({
               content:
-                "I have an opportunity in mind. Ask me what it is, then help me sharpen it into something I can defend.",
+                "I have about 40 interview notes from the last month. Help me turn them into one opportunity we can defend: read what I paste, group what customers are trying to do, draft the desired outcomes in ODI form, and tell me which one is most underserved and what evidence is still missing.",
             }),
           ],
         }),

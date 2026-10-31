@@ -134,6 +134,28 @@ export interface McpHealth {
 
 export type ToolStatus = "running" | "ok" | "error" | "declined";
 
+export type ClaimStatus = "cited" | "hypothesis" | "uncited";
+
+/** The record label a claim carries, snapshotted when the turn was stored. */
+export interface ClaimCitation {
+  id: string;
+  name: string;
+  source_name: string;
+}
+
+/**
+ * One declarative sentence of an assistant reply. `cited` carries the evidence
+ * the turn actually read, `hypothesis` says no record supports it, and
+ * `uncited` is the visible underline for a sentence the agent could not ground.
+ */
+export interface Claim {
+  index: number;
+  text: string;
+  status: ClaimStatus;
+  evidence: ClaimCitation[];
+  reason?: string | null;
+}
+
 /** A write the agent is asking permission for. */
 export interface ToolApproval {
   id: string;
@@ -177,6 +199,12 @@ export type ChatPart =
       title: string;
       filename?: string;
       mediaType: string;
+    }
+  | {
+      kind: "claims";
+      /** The prose the claims were parsed from, markers and all. */
+      content: string;
+      claims: Claim[];
     };
 
 export interface ChatMessage {
@@ -285,8 +313,6 @@ export interface Signal {
   /** Past the daily attention budget: recorded, but never surfaced or counted. */
   suppressed: boolean;
   fingerprint: string;
-  /** Only the developer simulator (#78) sets this. Simulated entries never count. */
-  simulated?: boolean;
 }
 
 export interface ChatStreamRequest {
@@ -315,6 +341,8 @@ export interface TurnNode {
   role: string;
   content: string;
   created_at: string;
+  /** What each sentence stands behind, restored from the turn's citations. */
+  claims?: Claim[];
 }
 
 export interface ConversationTree {
@@ -366,6 +394,8 @@ export interface ConversationTurn {
   message_id?: string | null;
   /** The id of the turn this one answers, when it is a branch or edit. */
   parent_id?: string | null;
+  /** Persisted claim citations, reattached to the stored prose on restore. */
+  claims?: Claim[];
 }
 
 export interface LatestConversation {
