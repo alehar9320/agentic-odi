@@ -189,6 +189,17 @@ function ComposerBody({
           <ComposerPrimitive.DictationTranscript />
         </p>
       </AuiIf>
+      {/* The runtime renders this container only while a quote is set, so the
+          strip cannot promise a quote that is not there. */}
+      <ComposerPrimitive.Quote className="composer__quote">
+        <ComposerPrimitive.QuoteText className="composer__quote-text" />
+        <ComposerPrimitive.QuoteDismiss
+          className="composer__quote-dismiss"
+          aria-label="Remove quote"
+        >
+          ✕
+        </ComposerPrimitive.QuoteDismiss>
+      </ComposerPrimitive.Quote>
       <div className="composer__shell">
         <label className="sr-only" htmlFor={inputId}>
           Message the studio

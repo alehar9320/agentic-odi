@@ -290,7 +290,12 @@ export function SurfacePart() {
   if (!node) {
     return null;
   }
-  return <UiRenderer node={node} />;
+  // A card is not prose: a selection that spans it is not a quotable passage.
+  return (
+    <span data-aui-quote-selectable="false">
+      <UiRenderer node={node} />
+    </span>
+  );
 }
 
 /**
@@ -307,7 +312,7 @@ export function FilePart() {
   const size = prepared ? formatFileSize(prepared.size) : "";
 
   return (
-    <span className="attachment-chip">
+    <span className="attachment-chip" data-aui-quote-selectable="false">
       {prepared?.dataUrl ? (
         <img className="attachment-chip__thumb" src={prepared.dataUrl} alt="" />
       ) : null}
@@ -358,7 +363,12 @@ export function ToolPart({
 
   if (pending && !answered) {
     return (
-      <div className="approval" role="group" aria-label="Permission needed">
+      <div
+        className="approval"
+        role="group"
+        aria-label="Permission needed"
+        data-aui-quote-selectable="false"
+      >
         <p className="approval__prompt">{approval.prompt ?? `Run ${toolLabel(toolName)}?`}</p>
         <div className="approval__actions">
           <button
@@ -384,7 +394,10 @@ export function ToolPart({
 
   const tone = isError || payload?.status === "error" ? " is-error" : "";
   return (
-    <p className={`tool-trace${tone}${running ? " is-running" : ""}`}>
+    <p
+      className={`tool-trace${tone}${running ? " is-running" : ""}`}
+      data-aui-quote-selectable="false"
+    >
       <span className="tool-trace__dot" aria-hidden="true" />
       {toolLabel(toolName)}
       {running ? " · working" : payload?.status === "declined" ? " · declined" : ""}
