@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -67,6 +71,7 @@ from agentic_odi_studio_api.studio.schemas import (
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
+    ClaimOut,
     ConnectorListItem,
     ConnectorOperationResponse,
     ConversationResponse,
@@ -194,6 +199,59 @@ def _approvals(request: Request) -> ApprovalRegistry:
 @router.get("/config")
 def get_config() -> dict:
     return {"defaults": defaults()}
+
+
+@router.get("/diagnostics")
+def get_diagnostics(request: Request) -> dict[str, Any]:
+    """Return diagnostic metadata only; never return database paths or records."""
+    service = _service(request)
+    repository = service.repo
+    connection = getattr(getattr(repository, "store", None), "conn", None)
+    db_name = "odi.db"
+    size_bytes = 0
+    if connection is not None:
+        try:
+            database = next(
+                (row for row in connection.execute("PRAGMA database_list") if row[1] == "main"),
+                None,
+            )
+            filename = str(database[2]) if database else ""
+            if filename:
+                db_name = Path(filename).name
+                try:
+                    size_bytes = Path(filename).stat().st_size
+                except OSError:
+                    size_bytes = 0
+            else:
+                db_name = ":memory:"
+        except Exception:  # noqa: BLE001
+            # A missing/closed local store must not make diagnostics unavailable.
+            db_name = "odi.db"
+
+    try:
+        studio_version = package_version("agentic-odi-studio-api")
+    except PackageNotFoundError:
+        studio_version = "unknown"
+
+    counts = {
+        "jobs": len(getattr(repository, "jobs", {})),
+        "outcomes": len(getattr(repository, "outcomes", {})),
+        "evidence": len(getattr(repository, "evidence", {})),
+        "observations": len(_memory(request).list_observations(include_dismissed=True)),
+    }
+    capabilities = get_capabilities(request).capabilities
+    return {
+        "version": studio_version,
+        "python": sys.version.split()[0],
+        "db": {
+            "name": db_name,
+            "size_bytes": size_bytes,
+            "integrity": getattr(request.app.state, "db_integrity", "unknown"),
+            "counts": counts,
+        },
+        "migrations": {"events": "current"},
+        "capabilities": [capability.model_dump(mode="json") for capability in capabilities],
+    }
 
 
 @router.get("/changelog")
@@ -908,9 +966,12 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
     conversation = memory.latest_conversation()
     if conversation is None:
         return LatestConversationResponse(conversation=None, turns=[])
+    turns = memory.list_turns(conversation.id)
+    for turn in turns:
+        turn.claims = memory.claims_for_turn(turn)
     return LatestConversationResponse(
         conversation=conversation.to_dict(),
-        turns=[turn.to_dict() for turn in memory.list_turns(conversation.id)],
+        turns=[turn.to_dict() for turn in turns],
     )
 
 
@@ -941,6 +1002,7 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
                 role=turn.role,
                 content=turn.content,
                 created_at=turn.created_at,
+                claims=[ClaimOut(**claim.to_dict()) for claim in turn.claims],
             )
             for turn in turns
             if turn.role in {"user", "assistant"}
@@ -1010,6 +1072,7 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
             memory=request.app.state.memory,
             request_id=request_id,
             approvals=request.app.state.approvals,
+            local_service=request.app.state.service,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
