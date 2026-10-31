@@ -147,6 +147,16 @@ uv run --directory website pytest tests/
 The site is generated at CI time and never committed. CI runs `build_site.py` to
 produce `_site` and uploads it as the `website-site` artifact for review.
 
+The read-only sample workspace (`/sample/`) is the exception: `build_sample.py`
+renders it from `website/content/sample-study.json` and the result is committed,
+so a visitor can read it without a build and `test_content_sync.py` can fail
+when the fixture and the page disagree.
+
+```bash
+uv run python website/tools/build_sample.py          # regenerate the sample
+uv run python website/tools/build_sample.py --check  # fail on drift
+```
+
 Publishing happens in `.github/workflows/pages.yml`: it runs those tests,
 builds `_site` from `website/`, and deploys the artifact with
 `actions/deploy-pages` on every push to `main`. There is no `gh-pages` branch,

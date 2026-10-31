@@ -9,6 +9,11 @@ by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml).
 - A push to `main` runs the website tests, builds `_site` from `website/`, and
   deploys the artifact with `actions/deploy-pages`.
 - No site build output is committed; CI generates `_site` on every push.
+- One page is committed by design: the read-only
+  [sample workspace](https://alehar9320.github.io/agentic-odi/sample/) under
+  `/sample/`. `website/tools/build_sample.py` renders it from
+  `website/content/sample-study.json` and `test_content_sync.py` fails when the
+  two disagree, so it cannot drift from the fixture the demo loader uses.
 - `workflow_dispatch` republishes the site from the Actions tab without a code
   change.
 - Pages is configured with the "GitHub Actions" source, so there is no

@@ -121,7 +121,7 @@ Cross-package checks only:
 ### `brand/tests/` and `website/tests/`
 
 - `brand/tests/test_brand_assets.py`, `test_generated_sources.py` — mascot art and generated brand sources.
-- `website/tests/` — static site integrity (`test_site.py`), docs rendering (`test_docs_render.py`), content sync with the repo (`test_content_sync.py`, `test_generated.py`), OG art reproducibility (`test_make_og.py`), the design system (`test_design_system.py`), and the Pages deploy (`test_pages_deploy.py`).
+- `website/tests/` — static site integrity (`test_site.py`), docs rendering (`test_docs_render.py`), content sync with the repo (`test_content_sync.py`, `test_generated.py`), the read-only sample workspace and its drift alarm (`test_sample.py`), OG art reproducibility (`test_make_og.py`), the design system (`test_design_system.py`), and the Pages deploy (`test_pages_deploy.py`).
 
 ## Isolation Rules
 

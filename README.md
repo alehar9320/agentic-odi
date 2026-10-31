@@ -188,7 +188,10 @@ soon". See [External Connectors](docs/connectors.md).
 Every guide is also published on the
 [project site](https://alehar9320.github.io/agentic-odi/docs/), rendered from
 these files. The site adds a quick start, a generated MCP tool reference, the
-connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
+connector catalog, a read-only [sample
+workspace](https://alehar9320.github.io/agentic-odi/sample/) generated from the
+same fixture the demo loader uses, and client-side search over every page
+(`Ctrl`/`Cmd`+`K`).
 
 ## Code Overview
 

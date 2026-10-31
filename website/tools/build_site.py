@@ -310,6 +310,19 @@ def _render_docs_index(env: Environment, nav: dict[str, Any], context: dict[str,
     return env.get_template("docs_index.html").render(**page_context)
 
 
+def _render_sample() -> str:
+    """The read-only sample workspace, rendered from its committed fixture.
+
+    ``build_sample.py`` owns the page and commits the output; this renders the
+    same page into the site so it is published, indexed, and linked like every
+    other page. Imported here rather than at module scope because
+    ``build_sample`` imports this module for the Jinja environment.
+    """
+    import build_sample
+
+    return build_sample.render(build_sample.read_fixture())
+
+
 def _render_pages(env: Environment) -> dict[str, str]:
     """Render every page, returning output path -> HTML."""
     landing = _load_json("landing.json")
@@ -363,6 +376,8 @@ def _render_pages(env: Environment) -> dict[str, str]:
 
     rendered["docs/index.html"] = _render_docs_index(env, nav, context)
     rendered.update(_render_docs(env, nav, context))
+
+    rendered["sample/index.html"] = _render_sample()
 
     not_found = env.get_template("404.html").render(**context)
     rendered["404.html"] = not_found

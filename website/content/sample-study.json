@@ -1,0 +1,134 @@
+{
+  "label": "Sample workspace",
+  "notice": "Every row below is a sample. It came from a committed fixture, not from a connector, and it is not anyone's research.",
+  "origin": "sample",
+  "generated": "2026-10-31",
+  "job": {
+    "id": "JOB-402",
+    "name": "Sync Environment Secrets Across Microservices",
+    "description": "Backend developers configuring microservice deployment pipelines across staging and production.",
+    "origin": "sample"
+  },
+  "steps": [
+    {
+      "id": "STP-1",
+      "job_id": "JOB-402",
+      "name": "1. Define required environment variables",
+      "order": 1,
+      "origin": "sample"
+    },
+    {
+      "id": "STP-2",
+      "job_id": "JOB-402",
+      "name": "2. Locate credentials in Vault / 1Password",
+      "order": 2,
+      "origin": "sample"
+    },
+    {
+      "id": "STP-3",
+      "job_id": "JOB-402",
+      "name": "3. Prepare secrets payload for cluster",
+      "order": 3,
+      "origin": "sample"
+    },
+    {
+      "id": "STP-4",
+      "job_id": "JOB-402",
+      "name": "4. Confirm access permissions & scopes",
+      "order": 4,
+      "origin": "sample"
+    },
+    {
+      "id": "STP-5",
+      "job_id": "JOB-402",
+      "name": "5. Execute manual copy-paste into CI/CD secrets",
+      "order": 5,
+      "origin": "sample"
+    },
+    {
+      "id": "STP-6",
+      "job_id": "JOB-402",
+      "name": "6. Monitor pipeline build for config missing errors",
+      "order": 6,
+      "origin": "sample"
+    },
+    {
+      "id": "STP-7",
+      "job_id": "JOB-402",
+      "name": "7. Modify mismatched keys upon failed deploy",
+      "order": 7,
+      "origin": "sample"
+    },
+    {
+      "id": "STP-8",
+      "job_id": "JOB-402",
+      "name": "8. Conclude deployment confirmation",
+      "order": 8,
+      "origin": "sample"
+    }
+  ],
+  "outcomes": [
+    {
+      "id": "O-1",
+      "job_id": "JOB-402",
+      "statement": "Minimize the time taken to propagate secrets across environments",
+      "importance": 9.2,
+      "satisfaction": 3.1,
+      "opportunity_score": 15.3,
+      "origin": "sample"
+    },
+    {
+      "id": "O-2",
+      "job_id": "JOB-402",
+      "statement": "Minimize the likelihood of exposing plain-text keys in build logs",
+      "importance": 9.8,
+      "satisfaction": 4.5,
+      "opportunity_score": 15.1,
+      "origin": "sample"
+    },
+    {
+      "id": "O-3",
+      "job_id": "JOB-402",
+      "statement": "Minimize the effort required to rotate expired tokens in running pods",
+      "importance": 8.0,
+      "satisfaction": 7.2,
+      "opportunity_score": 8.8,
+      "origin": "sample"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EVD-101",
+      "source_name": "gong",
+      "source_kind": "demo",
+      "name": "Fintech Customer Call #104",
+      "content": "We had a junior engineer push code that broke staging because the Stripe secret wasn't copied over. Three senior engineers spent two hours on it. There has to be a better way than copy-pasting strings.",
+      "url": "https://app.gong.io/calls/104",
+      "job_id": "JOB-402",
+      "outcome_id": "O-1",
+      "origin": "sample"
+    },
+    {
+      "id": "EVD-102",
+      "source_name": "slack",
+      "source_kind": "demo",
+      "name": "Slack #incident-deployments",
+      "content": "Third time this week staging broke after a secret rotation. We need automated synchronization across microservices.",
+      "url": "https://workspace.slack.com/archives/C0123/p169000222",
+      "job_id": "JOB-402",
+      "outcome_id": "O-2",
+      "origin": "sample"
+    },
+    {
+      "id": "EVD-103",
+      "source_name": "notion",
+      "source_kind": "demo",
+      "name": "Vault Migration RFC",
+      "content": "Developer survey shows 85% of time spent on deployment blockers is caused by missing env variables in microservice pipelines.",
+      "url": "https://notion.so/org/Vault-Migration-RFC-99812",
+      "job_id": "JOB-402",
+      "outcome_id": "O-1",
+      "origin": "sample"
+    }
+  ]
+}
