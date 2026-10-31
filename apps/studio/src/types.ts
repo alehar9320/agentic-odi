@@ -307,8 +307,6 @@ export interface Signal {
   /** Past the daily attention budget: recorded, but never surfaced or counted. */
   suppressed: boolean;
   fingerprint: string;
-  /** Only the developer simulator (#78) sets this. Simulated entries never count. */
-  simulated?: boolean;
 }
 
 export interface ChatStreamRequest {

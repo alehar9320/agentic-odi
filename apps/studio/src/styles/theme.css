@@ -5962,11 +5962,6 @@ details[open] summary {
   color: var(--text);
 }
 
-.catchup-card.is-simulated {
-  border-style: dashed;
-  opacity: 0.88;
-}
-
 .settings__preset-group {
   margin-top: 10px;
 }

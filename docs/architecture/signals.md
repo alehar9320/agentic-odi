@@ -58,9 +58,8 @@ attention is finite — without it, a busy ingest turns the bell into noise.
 
 A signal must describe **something that happened**. No reminders, no "you
 should", no generated encouragement, no item whose subject cannot be looked up.
-The simulated demo signal exists only to exercise the UI; it is marked
-`simulated: true`, carries a badge, and is excluded from the unread count and
-every counter.
+Nothing in the Studio fabricates a signal: the developer simulator was removed,
+and its three example signals now live only in test fixtures.
 
 ## Surfaces
 

@@ -9,6 +9,7 @@ import {
   markSignalRead,
 } from "../../api/studioApi";
 import type { Signal } from "../../types";
+import { DEMO_SIGNALS } from "./__fixtures__/signals";
 
 const api = vi.hoisted(() => ({
   fetchConfig: vi.fn(async () => ({
@@ -215,15 +216,68 @@ describe("Catch Up reads the signal inbox", () => {
     expect(dismissSignal).toHaveBeenCalledWith("sig-1", MCP_URL);
   });
 
-  it("labels a simulated event and keeps it out of every count", async () => {
+  it("offers no simulator and explains the real triggers when the feed is empty", async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
     await screen.findByText(/nothing happened while you were away/i);
 
-    fireEvent.click(screen.getByRole("button", { name: /\+ simulate update/i }));
+    expect(screen.queryByRole("button", { name: /simulate/i })).toBeNull();
+    expect(screen.queryByText(/^Simulated$/i)).toBeNull();
+    expect(screen.getByText(/an outcome re-scored, evidence captured, a job map completed/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Capture evidence" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+  });
 
-    expect(await screen.findByText(/^Simulated$/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All (0)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Unread (0)" })).toBeInTheDocument();
+  it("opens the capture panel from the empty state's Capture evidence action", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
+    await screen.findByText(/nothing happened while you were away/i);
+
+    fireEvent.click(screen.getByRole("button", { name: "Capture evidence" }));
+
+    expect(await screen.findByRole("heading", { name: "Capture by hand" })).toBeInTheDocument();
+  });
+
+  it("renders a feed built from the demo fixtures like any other store signal", async () => {
+    serveFeed(DEMO_SIGNALS);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 3 unread" }));
+
+    expect(
+      await screen.findByText('Evidence from "telemetry": cluster config friction'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Opportunity score crossed 10 (up): validation rules"),
+    ).toBeInTheDocument();
+    // The fixtures carry no special class, badge, or count exemption.
+    expect(screen.queryByText(/^Simulated$/i)).toBeNull();
+    expect(screen.queryByText(/^Demo$/i)).toBeNull();
+    expect(screen.getByRole("button", { name: "All (3)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unread (3)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Urgent (1)" })).toBeInTheDocument();
+  });
+
+  it("renders the demo fixtures' cards exactly like cards built from store signals", async () => {
+    const fromFixtures = await cardClasses(DEMO_SIGNALS);
+    const fromStore = await cardClasses(
+      DEMO_SIGNALS.map((item, index) => signal({ ...item, id: `sig-${index + 1}` })),
+    );
+
+    expect(fromFixtures).toEqual(fromStore);
+    expect(fromFixtures).toHaveLength(3);
   });
 });
+
+/** Open the feed on `feed` and return each rendered card's class list. */
+async function cardClasses(feed: Signal[]): Promise<string[]> {
+  serveFeed(feed);
+  const view = render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /signal inbox: \d unread/i }));
+  await screen.findByRole("region", { name: "Signal inbox" });
+  const classes = Array.from(document.querySelectorAll("article.catchup-card")).map(
+    (card) => card.className,
+  );
+  view.unmount();
+  return classes;
+}

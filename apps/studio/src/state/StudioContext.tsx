@@ -229,9 +229,6 @@ const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = 
   evidence: "evidence",
 };
 
-/** The developer simulator's events never reach the store, so they carry this id prefix. */
-const SIMULATED_SIGNAL_PREFIX = "sim-";
-
 export const EMPTY_CONFIG: StudioConfig = {
   base_url: "http://localhost:8001/v1",
   api_key: "local",
@@ -408,7 +405,6 @@ export interface StudioContextValue {
   /** The evidence record a citation chip asked the Evidence lens to show. */
   focusedEvidenceId: string | null;
   focusEvidence: (evidenceId: string) => void;
-  simulateBackgroundEvent: () => void;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -526,7 +522,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [serverSignals, setServerSignals] = useState<Signal[]>([]);
-  const [simulatedSignals, setSimulatedSignals] = useState<Signal[]>([]);
   const [unreadSignalCount, setUnreadSignalCount] = useState(0);
   const [signalsError, setSignalsError] = useState<StudioError | null>(null);
   const [focusedSubject, setFocusedSubject] = useState<{
@@ -547,11 +542,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
-  /** Simulated events sit on top; they are labelled and never counted as unread. */
+  /** Newest first. The store is the only source; nothing is merged in front. */
   const signals = useMemo(
-    () =>
-      [...simulatedSignals, ...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
-    [simulatedSignals, serverSignals],
+    () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
+    [serverSignals],
   );
 
   const refreshSignals = useCallback(async () => {
@@ -594,14 +588,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const markSignalAsRead = useCallback(
     (id: string) => {
-      if (id.startsWith(SIMULATED_SIGNAL_PREFIX)) {
-        setSimulatedSignals((prev) =>
-          prev.map((item) =>
-            item.id === id ? { ...item, read_at: new Date().toISOString() } : item,
-          ),
-        );
-        return;
-      }
       apiMarkSignalRead(id, settings.mcp_url)
         .then(refreshSignals)
         .catch((error) => setSignalsError(asStudioError(error)));
@@ -611,10 +597,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const dismissSignal = useCallback(
     (id: string) => {
-      if (id.startsWith(SIMULATED_SIGNAL_PREFIX)) {
-        setSimulatedSignals((prev) => prev.filter((item) => item.id !== id));
-        return;
-      }
       apiDismissSignal(id, settings.mcp_url)
         .then(refreshSignals)
         .catch((error) => setSignalsError(asStudioError(error)));
@@ -809,48 +791,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, []);
-
-  /**
-   * The developer affordance #78 kept, re-shaped as a Signal. It demonstrates
-   * what a full inbox looks like; nothing it produces reaches the store, and
-   * the feed labels it so nobody mistakes it for something that happened.
-   */
-  const simulateBackgroundEvent = useCallback(() => {
-    const drafts: Array<Pick<Signal, "kind" | "title" | "severity" | "detail">> = [
-      {
-        kind: "evidence_ingested",
-        title: 'Evidence from "telemetry": cluster config friction',
-        detail: "Analyzed workflow traces: 82% of users report friction during cluster config.",
-        severity: "info",
-      },
-      {
-        kind: "opportunity_crossed",
-        title: "Opportunity score crossed 10 (up): validation rules",
-        detail: "Satisfaction fell to 3 while importance held at 9.",
-        severity: "urgent",
-      },
-      {
-        kind: "job_map_completed",
-        title: "Job map complete: Deploy a release covers all 8 stages",
-        severity: "notice",
-      },
-    ];
-
-    const chosen = drafts[Math.floor(Math.random() * drafts.length)];
-    const stamp = new Date().toISOString();
-    setSimulatedSignals((prev) => [
-      {
-        ...chosen,
-        id: `${SIMULATED_SIGNAL_PREFIX}${Date.now()}`,
-        created_at: stamp,
-        suppressed: false,
-        fingerprint: `simulated-${stamp}`,
-        simulated: true,
-      },
-      ...prev,
-    ]);
-    pushToast("info", `Simulated: ${chosen.title}`);
-  }, [pushToast]);
 
   // The theme lives on <html> so every surface, portal, and native control
   // follows one class instead of each component tracking its own copy.
@@ -1146,7 +1086,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    */
   const focusSignalSubject = useCallback(
     (signal: Signal) => {
-      if (!signal.simulated && !signal.read_at) {
+      if (!signal.read_at) {
         markSignalAsRead(signal.id);
       }
       const kind = signal.subject_kind;
@@ -2010,7 +1950,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       focusedJobId,
       focusedEvidenceId,
       focusEvidence,
-      simulateBackgroundEvent,
     }),
     [
       settings,
@@ -2118,7 +2057,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       focusedJobId,
       focusedEvidenceId,
       focusEvidence,
-      simulateBackgroundEvent,
     ],
   );
 

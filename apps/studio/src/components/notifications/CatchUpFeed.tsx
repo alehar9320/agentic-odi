@@ -63,9 +63,8 @@ function isEvidenceSignal(signal: Signal): boolean {
 }
 
 /**
- * The inbox the store actually holds. Simulated events (#78) stay visible so a
- * developer can see what a full feed looks like, but they are labelled and are
- * counted nowhere — the numbers on this page describe recorded activity only.
+ * The inbox the store actually holds. There is no simulator and no second
+ * array: every number on this panel comes from the recorded signals.
  */
 export function CatchUpFeed() {
   const {
@@ -76,22 +75,21 @@ export function CatchUpFeed() {
     markSignalAsRead,
     dismissSignal,
     focusSignalSubject,
-    simulateBackgroundEvent,
+    openPanel,
   } = useStudio();
 
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
-  const recorded = signals.filter((signal) => !signal.simulated);
-  const unread = recorded.filter((signal) => !signal.read_at);
+  const unread = signals.filter((signal) => !signal.read_at);
   const urgentCount = unread.filter((signal) => signal.severity === "urgent").length;
-  const outcomeCount = recorded.filter(isOutcomeSignal).length;
-  const evidenceCount = recorded.filter(isEvidenceSignal).length;
+  const outcomeCount = signals.filter(isOutcomeSignal).length;
+  const evidenceCount = signals.filter(isEvidenceSignal).length;
 
   const visible = signals.filter((signal) => {
-    if (activeFilter === "unread") return !signal.simulated && !signal.read_at;
-    if (activeFilter === "urgent") return !signal.simulated && signal.severity === "urgent";
-    if (activeFilter === "outcome") return isOutcomeSignal(signal) && !signal.simulated;
-    if (activeFilter === "evidence") return isEvidenceSignal(signal) && !signal.simulated;
+    if (activeFilter === "unread") return !signal.read_at;
+    if (activeFilter === "urgent") return signal.severity === "urgent";
+    if (activeFilter === "outcome") return isOutcomeSignal(signal);
+    if (activeFilter === "evidence") return isEvidenceSignal(signal);
     return true;
   });
 
@@ -100,7 +98,7 @@ export function CatchUpFeed() {
   }
 
   const chips: Array<{ id: FilterType; label: string; count: number }> = [
-    { id: "all", label: "All", count: recorded.length },
+    { id: "all", label: "All", count: signals.length },
     { id: "unread", label: "Unread", count: unreadSignalCount },
     { id: "urgent", label: "Urgent", count: urgentCount },
     { id: "outcome", label: "Outcome shifts", count: outcomeCount },
@@ -127,10 +125,10 @@ export function CatchUpFeed() {
             <button
               type="button"
               className="button button--ghost"
-              onClick={simulateBackgroundEvent}
-              title="Add a labelled demonstration signal. It is not recorded in the store."
+              onClick={() => openPanel("capture")}
+              title="Capture evidence, so a real signal can reach this inbox"
             >
-              + Simulate update
+              Capture evidence
             </button>
           </div>
         </div>
@@ -175,10 +173,10 @@ export function CatchUpFeed() {
             <BoltIcon size={18} />
           </span>
           <p className="catchup-empty__title">
-            {recorded.length === 0 ? "Nothing happened while you were away." : "No signals match."}
+            {signals.length === 0 ? "Nothing happened while you were away." : "No signals match."}
           </p>
           <p className="catchup-empty__hint">
-            {recorded.length === 0
+            {signals.length === 0
               ? "This inbox only fills from real changes: an outcome re-scored, evidence captured, a job map completed."
               : "Try another filter."}
           </p>
@@ -186,13 +184,11 @@ export function CatchUpFeed() {
       ) : (
         <div className="cards">
           {visible.map((item) => {
-            const unreadCard = !item.simulated && !item.read_at;
+            const unreadCard = !item.read_at;
             return (
               <article
                 key={item.id}
-                className={`card catchup-card${unreadCard ? " is-unread" : ""}${
-                  item.simulated ? " is-simulated" : ""
-                }`}
+                className={`card catchup-card${unreadCard ? " is-unread" : ""}`}
               >
                 {/* A real button stretched over the card: keyboard users get
                     Enter/Space for free, and the controls below sit above it. */}
@@ -215,19 +211,11 @@ export function CatchUpFeed() {
                         {KIND_LABEL[item.kind].toUpperCase()} · {item.severity}
                       </span>
                     </span>
-                    {item.simulated ? (
-                      <span
-                        className="badge badge--amber"
-                        title="Demonstration event, not recorded in the store"
-                      >
-                        Simulated
-                      </span>
-                    ) : null}
                     <span className="card__id">{formatRelativeTime(item.created_at)}</span>
                   </div>
 
                   <div className="catchup-card__controls">
-                    {!item.read_at && !item.simulated ? (
+                    {!item.read_at ? (
                       <button
                         type="button"
                         className="quiet-action"
