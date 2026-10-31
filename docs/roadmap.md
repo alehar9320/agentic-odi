@@ -13,12 +13,6 @@ it is merged; the link is the proof.
   outcome the sentence links; a failing sentence is dropped with its reason. The
   drafted block is always labelled, `--no-narrate` is byte-identical to the
   factual brief, and a missing provider still renders the facts.
-- [x] **Decide, then close the loop**: Record a decision with its rejected
-  options, derive and render the outcome roadmap, review a past decision against
-  today's numbers, and track a bet from its captured baseline to measured — the
-  same projection behind the MCP tools, `odi decide`/`odi roadmap`/`odi review`/
-  `odi bets`, the Studio API, and the Studio cards. A missing measurement stays
-  `not measured` / `no evidence`, never `0` and never `no change`.
 - [x] **The decision memo writes itself**: `odi decide memo` assembles the
   one-page case from what is already recorded — the decision, why now, the
   evidence with its citations, the options rejected and why, what the chosen
@@ -42,13 +36,6 @@ it is merged; the link is the proof.
   for length; a budget that cannot fit them fails loudly. It reads and writes
   nothing, and the same projection backs `GET /api/decisions/{id}/message` and the
   MCP `render_stakeholder_message` tool.
-- [x] **Segments and strategy**: Define a segment by the outcomes it cares about,
-  derive candidate groups deterministically from the scores, profile a segment's
-  underserved and overserved halves separately, and record a strategy only when
-  its evidence precondition holds — the same service behind `odi segments`, the
-  MCP tools, the Studio API, and the segment-profile card. A proposal writes
-  nothing until a person accepts it; an unscored ratio stays `not measured`,
-  never `0`.
 - [x] **One tool contract, exposed** — `ToolName` / `TOOL_SPECS` in `packages/core` are the single source of truth, and `get_capabilities` describes the surface from it ([PR #263](https://github.com/alehar9320/agentic-odi/pull/263)).
 - [x] **Generated capability manifest** — the CLI, MCP server, and Studio read the same capability manifest, and the CLI's local handlers are checked for parity ([PR #272](https://github.com/alehar9320/agentic-odi/pull/272)).
 - [x] **ODI write contract on every path** — every write path validates Job, Step, and Outcome rules instead of trusting the caller ([PR #270](https://github.com/alehar9320/agentic-odi/pull/270)).
