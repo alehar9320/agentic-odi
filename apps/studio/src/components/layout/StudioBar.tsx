@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
@@ -68,7 +69,7 @@ export function StudioBar({
   const status =
     llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
   const updateReady = update.phase === "ready";
-  const versionLabel = updateReady
+  const versionText = updateReady
     ? "Update ready"
     : update.currentVersion
       ? `v${update.currentVersion}`
@@ -81,13 +82,13 @@ export function StudioBar({
           type="button"
           className="brand brand--home"
           onClick={onHome}
-          aria-label="Go to home"
+          aria-label={`${PRODUCT_NAME}, go to home`}
           title="Home"
         >
           <span className="brand__mark" aria-hidden="true">
             <OdiMascot size={32} />
           </span>
-          <span className="brand__wordmark">Living Studio</span>
+          <span className="brand__wordmark">{PRODUCT_NAME}</span>
         </button>
       </div>
 
@@ -162,18 +163,18 @@ export function StudioBar({
           {status}
         </button>
 
-        {versionLabel && (
+        {versionText && (
           <button
             type="button"
             className={`bar__version${updateReady ? " is-accent" : ""}`}
             onClick={() => openPanel("settings")}
             title={
               update.currentVersion
-                ? `Living Studio ${update.currentVersion} — open software update settings`
+                ? `${versionLabel(update.currentVersion)}, open software update settings`
                 : "Open software update settings"
             }
           >
-            {versionLabel}
+            {versionText}
           </button>
         )}
 
