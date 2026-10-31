@@ -89,6 +89,10 @@ import back at `@/lib/utils` after each add.
 `npm --prefix apps/studio test -- --run src/vendor` proves the scope by reading the
 compiled stylesheet.
 
+What was copied, from where, and under which licence is recorded in
+`apps/studio/vendor.lock.json` and enforced by `scripts/vendor_policy.py`; see
+[docs/architecture/vendor-licensing.md](architecture/vendor-licensing.md).
+
 ### Conversational UI coverage
 
 The agent-composed surfaces, first-minute guidance, and the product tour are

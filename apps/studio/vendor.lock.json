@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "path": "components/ui/button.tsx",
+      "upstream": "https://ui.shadcn.com",
+      "commit": "shadcn-cli-4.23.0",
+      "copied_at": "2026-10-31",
+      "spdx": "MIT",
+      "local_edits": "the cn import points at @/lib/utils instead of the cn package"
+    }
+  ],
+  "packages": [
+    {
+      "name": "@tailwindcss/vite",
+      "spdx": "MIT",
+      "why": "runs the Tailwind compiler inside the Studio build"
+    },
+    {
+      "name": "class-variance-authority",
+      "spdx": "MIT",
+      "why": "the copied button builds its variant classes with it"
+    },
+    {
+      "name": "clsx",
+      "spdx": "MIT",
+      "why": "cn() joins the class lists the copied components pass in"
+    },
+    {
+      "name": "radix-ui",
+      "spdx": "MIT",
+      "why": "the copied button reads asChild through its Slot"
+    },
+    {
+      "name": "tailwind-merge",
+      "spdx": "MIT",
+      "why": "cn() drops conflicting Tailwind utilities"
+    },
+    {
+      "name": "tailwindcss",
+      "spdx": "MIT",
+      "why": "compiles the utilities the copied components use"
+    }
+  ]
+}
