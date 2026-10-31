@@ -414,6 +414,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/cli/tests/test_profile_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_render.py` | `apps/cli/src/agentic_odi_cli/render.py` |
 | `apps/cli/tests/test_schedule_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_segments_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_settings_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_signals_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_startup_perf.py` | — no direct source pair |
@@ -432,6 +433,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/mcp-server/tests/test_odi.py` | — no direct source pair |
 | `apps/mcp-server/tests/test_parity.py` | — no direct source pair |
 | `apps/mcp-server/tests/test_port_config.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
+| `apps/mcp-server/tests/test_segments.py` | — no direct source pair |
 | `apps/mcp-server/tests/test_server_tools.py` | — no direct source pair |
 | `apps/mcp-server/tests/test_signals.py` | — no direct source pair |
 | `apps/mcp-server/tests/test_tool_branches.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
@@ -440,6 +442,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/mcp-server/tests/test_tools.py` | — no direct source pair |
 | `apps/studio/e2e/capture.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/chat.spec.ts` | `apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/first-run.spec.ts` | — no direct source pair |
 | `apps/studio/e2e/landscape.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/mcp-backend.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/starters.spec.ts` | `apps/studio/e2e/helpers.ts` |
@@ -451,6 +454,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/assistant/attachments.test.ts` | `apps/studio/src/assistant/attachments.ts` |
 | `apps/studio/src/assistant/claims.test.ts` | `apps/studio/src/assistant/claims.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/assistant/convert.test.ts` | `apps/studio/src/assistant/convert.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
+| `apps/studio/src/assistant/dictation.test.ts` | `apps/studio/src/assistant/dictation.ts` |
 | `apps/studio/src/assistant/parts.test.tsx` | `apps/studio/src/assistant/parts.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/assistant/starterCopy.test.ts` | `apps/studio/src/assistant/StudioRuntime.tsx` |
 | `apps/studio/src/banners/BannerBridge.test.tsx` | `apps/studio/src/banners/BannerBridge.tsx`<br>`apps/studio/src/banners/BannerProvider.tsx`<br>`apps/studio/src/banners/BannerStack.tsx` |
@@ -484,6 +488,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/components/chat/CommandPalette.test.tsx` | `apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/Composer.test.tsx` | `apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/Conversation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
+| `apps/studio/src/components/chat/Dictation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | `apps/studio/src/components/chat/ModelPicker.tsx` |
 | `apps/studio/src/components/chat/SuggestionPills.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/composerParts.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/customize/ConnectorSuggestionModal.test.tsx` | `apps/studio/src/components/customize/ConnectorSuggestionModal.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
@@ -491,6 +496,8 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/components/layout/StudioBar.test.tsx` | `apps/studio/src/components/layout/StudioBar.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
 | `apps/studio/src/components/notifications/CatchUpFeed.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/notifications/CatchUpFeed.tsx`<br>`apps/studio/src/components/notifications/__fixtures__/signals.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/notifications/noFabricatedSignals.test.ts` | — no direct source pair |
+| `apps/studio/src/components/setup/IntroConversation.test.tsx` | `apps/studio/src/components/setup/IntroConversation.tsx`<br>`apps/studio/src/lib/intro.ts` |
+| `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | `apps/studio/src/components/setup/IntroConversation.tsx` |
 | `apps/studio/src/components/workspace/WorkbenchRail.test.tsx` | `apps/studio/src/components/workspace/WorkbenchRail.tsx` |
 | `apps/studio/src/components/workspace/WorkspacePanel.test.tsx` | `apps/studio/src/components/workspace/WorkspacePanel.tsx` |
 | `apps/studio/src/diagnostics/DiagnosticsModal.test.tsx` | `apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/diagnostics/DiagnosticsModal.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
@@ -503,12 +510,14 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/lib/export.test.ts` | `apps/studio/src/lib/export.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
 | `apps/studio/src/lib/greeting.test.ts` | `apps/studio/src/lib/greeting.ts` |
 | `apps/studio/src/lib/guidance.test.ts` | `apps/studio/src/lib/guidance.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/lib/intro.test.ts` | `apps/studio/src/lib/intro.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/lib/markdown.test.ts` | `apps/studio/src/lib/markdown.ts` |
 | `apps/studio/src/lib/odi.test.ts` | `apps/studio/src/lib/odi.ts` |
+| `apps/studio/src/lib/session.test.ts` | `apps/studio/src/lib/session.ts` |
 | `apps/studio/src/lib/setup.test.ts` | `apps/studio/src/lib/setup.ts` |
 | `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | `apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/onboarding/storage.ts` |
 | `apps/studio/src/onboarding/machine.test.ts` | `apps/studio/src/onboarding/machine.ts`<br>`apps/studio/src/onboarding/storage.ts` |
-| `apps/studio/src/state/StudioContext.test.tsx` | `apps/studio/src/state/StudioContext.tsx` |
+| `apps/studio/src/state/StudioContext.test.tsx` | `apps/studio/src/lib/session.ts`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/styles/print.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/theme.test.ts` | — no direct source pair |
 | `apps/studio/src/test/a11y.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/ChangelogModal.tsx`<br>`apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/components/canvas/JobMap.tsx`<br>`apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/components/chat/ChatStage.tsx`<br>`apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/components/notifications/CatchUpFeed.tsx`<br>`apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/test/axe.ts`<br>`apps/studio/src/updater/types.ts` |
@@ -520,6 +529,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/updater/machine.test.ts` | `apps/studio/src/updater/machine.ts`<br>`apps/studio/src/updater/types.ts` |
 | `apps/studio/src/updater/service.test.ts` | `apps/studio/src/updater/service.ts`<br>`apps/studio/src/updater/types.ts` |
 | `apps/studio/src/updater/transport.test.ts` | `apps/studio/src/updater/transport.ts`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/vendor/vendor.test.tsx` | — no direct source pair |
 | `apps/studio-api/tests/test_api.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
 | `apps/studio-api/tests/test_app_spa.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/main.py`<br>`packages/core/src/agentic_odi_core/messages.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
 | `apps/studio-api/tests/test_studio_api.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/chat.py` |
@@ -547,6 +557,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio-api/tests/test_studio_outcome_evidence_crud.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_probes.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/probes.py` |
 | `apps/studio-api/tests/test_studio_router.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
+| `apps/studio-api/tests/test_studio_segments.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
 | `apps/studio-api/tests/test_studio_signals.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/ui_spec.py` |
 | `brand/tests/test_brand_assets.py` | — no direct source pair |
@@ -559,9 +570,10 @@ the code disagree, so do not edit it by hand — run
 | `packages/connectors/tests/test_mapping.py` | `packages/connectors/src/agentic_odi_connectors/mapping.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py` |
 | `packages/connectors/tests/test_marketplace.py` | `packages/connectors/src/agentic_odi_connectors/catalog.py`<br>`packages/connectors/src/agentic_odi_connectors/marketplace.py` |
 | `packages/connectors/tests/test_mcp_connector.py` | `packages/connectors/src/agentic_odi_connectors/mcp/connector.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py` |
+| `packages/connectors/tests/test_rate_limit.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/rate_limit.py` |
 | `packages/connectors/tests/test_registry.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/registry.py` |
 | `packages/connectors/tests/test_rest_connector.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/rest/connector.py` |
-| `packages/connectors/tests/test_sink.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/sink.py` |
+| `packages/connectors/tests/test_sink.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/rate_limit.py`<br>`packages/connectors/src/agentic_odi_connectors/sink.py` |
 | `packages/core/tests/test_capability_manifest.py` | `packages/core/src/agentic_odi_core/contract.py` |
 | `packages/core/tests/test_connection.py` | `packages/core/src/agentic_odi_core/connection.py` |
 | `packages/core/tests/test_consent_pause.py` | `packages/core/src/agentic_odi_core/consent.py`<br>`packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
@@ -574,6 +586,7 @@ the code disagree, so do not edit it by hand — run
 | `packages/core/tests/test_messages.py` | `packages/core/src/agentic_odi_core/messages.py` |
 | `packages/core/tests/test_models.py` | `packages/core/src/agentic_odi_core/models.py` |
 | `packages/core/tests/test_opportunity_ranking.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_opportunity_score.py` | `packages/core/src/agentic_odi_core/models.py` |
 | `packages/core/tests/test_outcome_validation.py` | `packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
 | `packages/core/tests/test_pagination.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_remote.py` | `packages/core/src/agentic_odi_core/remote.py` |
@@ -583,9 +596,12 @@ the code disagree, so do not edit it by hand — run
 | `packages/core/tests/test_router.py` | `packages/core/src/agentic_odi_core/router.py`<br>`packages/core/src/agentic_odi_core/steve_jobs.py` |
 | `packages/core/tests/test_scheduled_work.py` | — no direct source pair |
 | `packages/core/tests/test_schema.py` | `packages/core/src/agentic_odi_core/schema.py` |
+| `packages/core/tests/test_segmentation.py` | `packages/core/src/agentic_odi_core/segmentation.py` |
+| `packages/core/tests/test_segments_service.py` | `packages/core/src/agentic_odi_core/errors.py` |
 | `packages/core/tests/test_service.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
 | `packages/core/tests/test_signal_inbox.py` | — no direct source pair |
 | `packages/core/tests/test_sqlite_repository.py` | `packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_strategy.py` | `packages/core/src/agentic_odi_core/strategy.py` |
 | `tests/contract/test_cli_contract.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
 | `tests/contract/test_mcp_contract.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
 | `tests/contract/test_protected_files.py` | — no direct source pair |
