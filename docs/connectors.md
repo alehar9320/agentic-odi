@@ -97,6 +97,24 @@ a record that crossed a process boundary can reach the ODI store with a missing
 or mistyped field. `validate_evidence_draft()` applies the same check to a draft
 that arrives as a plain dict; the CLI path builds the model directly.
 
+### Ingest rate limit
+
+The sink admits records through a token bucket so a burst cannot grow the
+in-process buffer without bound. `IngestSink.append` asks for one token per
+record and raises `RateLimitExceededError` when the bucket is empty; the CLI
+prints that as `Error: Rate limit exceeded: …` and exits 1. An empty batch does
+not consume tokens.
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| Records admitted per second | `AGENTIC_ODI_INGEST_RATE` | `100` |
+| Burst (max tokens held) | one second's worth | `100` for the default rate |
+
+Invalid or non-positive values fall back to 100. The limiter never blocks: a
+burst is shed with a typed error instead of being queued in memory, which is the
+failure mode this guard exists to prevent. Construct `IngestSink` with an
+explicit `RateLimiter` to override the rate or the burst in-process.
+
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.
 

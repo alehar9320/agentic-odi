@@ -100,7 +100,8 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_mcp_connector.py`, `test_rest_connector.py` — MCP and REST ingest.
 - `test_mapping.py` — connector records mapped to evidence drafts.
 - `test_http_client.py` — the shared HTTP client reads its pool, timeout, and retry settings from the environment.
-- `test_sink.py` — the in-process ingest sink.
+- `test_rate_limit.py` — token-bucket ingest limits and environment configuration.
+- `test_sink.py` — the in-process ingest sink and its rate gate.
 
 ### Root `tests/`
 
