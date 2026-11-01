@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 
-import { canvasStatus } from "../../lib/canvasProvenance";
+import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
 import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
@@ -22,6 +22,7 @@ const MATRIX_POINT_LIMIT = 200;
 export function OpportunityLandscape() {
   const {
     canvasState,
+    canvasCached,
     deleteThesis,
     openPanel,
     refreshCanvas,
@@ -45,6 +46,17 @@ export function OpportunityLandscape() {
   const isLoading = canvasState.kind === "loading";
   const isEmpty = canvasState.kind === "empty";
   const provenance = canvasStatus(canvas);
+  const hasRecords = canvasHasRecords(canvas);
+  const isFailed = canvasState.kind === "error";
+  const hasWarnings = Boolean(canvas?.warnings?.length);
+  // The board is drawn whenever real data is on screen and nothing else owns the
+  // space: not a failure, not the seed warning strip, not a genuinely empty
+  // store, and not a cold load that has nothing cached to draw.
+  const showBoard = !isFailed && !hasWarnings && !isEmpty && !(isLoading && !hasRecords);
+  // Draw the saved copy rather than a skeleton while the sidecar answers, and
+  // say when it was saved. A warm reload with live data draws it too but gets
+  // no caption, because that data is not a saved copy.
+  const savedCaption = canvasCached && hasRecords ? savedCopyCaption(canvas) : null;
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -159,6 +171,12 @@ export function OpportunityLandscape() {
         </p>
       ) : null}
 
+      {savedCaption && showBoard ? (
+        <p className="canvas-saved" role="status">
+          {savedCaption}
+        </p>
+      ) : null}
+
       {canvasState.kind === "error" ? (
         <FailurePanel
           error={canvasState.error}
@@ -173,12 +191,19 @@ export function OpportunityLandscape() {
         </ul>
       ) : isEmpty ? (
         <div className="studio-empty" role="status">
-          <p className="studio-empty__title">No opportunities yet</p>
+          <p className="studio-empty__title">No saved copy on this device</p>
           <p className="studio-empty__body">
             Capture an outcome and the landscape will show what is underserved.
           </p>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={() => openPanel("capture")}
+          >
+            Capture an outcome
+          </button>
         </div>
-      ) : isLoading ? (
+      ) : isLoading && !hasRecords ? (
         <GhostMetrics />
       ) : (
         <div className="metric-grid" style={{ marginTop: 16, marginBottom: 16 }}>
@@ -220,7 +245,7 @@ export function OpportunityLandscape() {
               className="studio-input"
               placeholder="Search opportunities / outcomes by statement or ID..."
               value={searchQuery}
-              disabled={isLoading}
+              disabled={isLoading && !hasRecords}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ width: "100%" }}
             />
@@ -229,7 +254,7 @@ export function OpportunityLandscape() {
             <input
               type="checkbox"
               checked={underservedOnly}
-              disabled={isLoading}
+              disabled={isLoading && !hasRecords}
               onChange={(event) => setUnderservedOnly(event.target.checked)}
               style={{ accentColor: "var(--studio-indigo)" }}
             />
@@ -240,7 +265,7 @@ export function OpportunityLandscape() {
               type="button"
               className="studio-button"
               style={{ fontSize: "0.78rem", padding: "4px 10px" }}
-              disabled={isLoading}
+              disabled={isLoading && !hasRecords}
               onClick={() => {
                 setSearchQuery("");
                 setUnderservedOnly(false);
@@ -252,7 +277,7 @@ export function OpportunityLandscape() {
         </div>
       )}
 
-      {isLoading ? (
+      {isLoading && !hasRecords ? (
         <GhostOpportunityCards />
       ) : canvasState.kind === "error" ? null : isEmpty ? (
         <p className="caption" style={{ padding: 24, textAlign: "center", background: "var(--studio-surface)", borderRadius: 8 }}>

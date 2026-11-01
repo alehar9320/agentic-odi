@@ -144,9 +144,10 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its
-  sidecar-owned transcript, with attachments, tool traces, approvals, and
-  branch-aware editing and regeneration. Settings → About also offers an
-  opt-in, redacted local diagnostics preview; no report is uploaded. See
+  sidecar-owned transcript, with attachments, tool traces, opt-in approvals for
+  chat writes and unknown tools, and branch-aware editing and regeneration.
+  Settings → About also offers an opt-in, redacted local diagnostics preview; no
+  report is uploaded. See
   [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
@@ -188,6 +189,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Reuse First](docs/architecture/reuse.md) | The ladder agents walk before writing code: reuse what exists, adopt what is declared, copy with provenance, then build |
 | [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
@@ -233,7 +235,7 @@ request:
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy apps packages && uv run pytest
-uv run python scripts/doc_check.py   # documented commands, paths, routes, and env vars exist
+uv run python scripts/doc_check.py   # documented commands, paths, routes, env vars, and the assistant-ui ledger hold up
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage

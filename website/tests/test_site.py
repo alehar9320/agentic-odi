@@ -508,12 +508,14 @@ def test_every_page_resolves_its_own_assets(page: str):
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference is the long pole: every tool's argument table and the
+    # The MCP reference was the long pole: every tool's argument table and the
     # whole ODI schema live on that one page, so it grows with each paginated
     # list tool and each entity we add. The V2MOM entity, the five
     # scheduled-work tools, and the three signal tools bring the page to ~78 KB;
     # the four Stage 5 and 6 tools (segment_market, get_segments, get_strategy,
     # propose_strategy) bring it to ~80 KB; the four outcome-proposal tools
     # (propose_outcome, list_proposals, approve_proposal, reject_proposal)
-    # bring it to ~85 KB.
-    assert size <= 88 * 1024, f"{page}: {size} bytes"
+    # bring it to ~85 KB. The assistant-ui ledger (issue #429) puts 129 rows
+    # on the Development page, which now reaches ~93 KB and is the new long
+    # pole; it is a coverage record, not decoration, so the ceiling moves.
+    assert size <= 96 * 1024, f"{page}: {size} bytes"
