@@ -361,7 +361,9 @@ Nothing is silently promoted: the agent may propose, but the person decides.
 The agent writes notes through a `remember` tool during a normal reply. The
 sidecar applies it, emits a `memory` SSE event, and the panel updates without a
 refresh. Memory writes are best-effort — a database failure never turns a good
-answer into an error.
+answer into an error. A turn can therefore finish without being remembered; when
+that happens the sidecar logs one warning carrying the request id, the role, and
+the exception class — never the words of the turn — instead of failing the reply.
 
 Storage is a separate SQLite file from the ODI repository:
 `~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`

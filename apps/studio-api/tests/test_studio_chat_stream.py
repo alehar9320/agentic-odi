@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from types import SimpleNamespace
 from typing import Any
 
@@ -513,3 +514,96 @@ def test_claims_are_persisted_with_the_turn(monkeypatch) -> None:
     assistant = memory.conversation_tree(conversation.id)[-1]
     assert assistant.claims[0].status == "cited"
     assert assistant.claims[0].evidence[0].name == "Call with Acme"
+
+
+def _offline(monkeypatch) -> None:
+    """Force the deterministic tier: no MCP, no model, one short reply."""
+
+    async def _unhealthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+        return False, "down"
+
+    monkeypatch.setattr(chat, "check_llm_health", _unhealthy)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
+
+
+def _memory_that_forgets_replies(monkeypatch) -> StudioMemory:
+    """A store that keeps what the person typed and fails on every reply."""
+    memory = StudioMemory(":memory:")
+    real_append = memory.append_turn
+
+    def _append(*args: Any, **kwargs: Any) -> int:
+        role = kwargs.get("role", args[1] if len(args) > 1 else "")
+        if role == "assistant":
+            raise RuntimeError("the store is closed")
+        return real_append(*args, **kwargs)
+
+    monkeypatch.setattr(memory, "append_turn", _append)
+    return memory
+
+
+def _ask_and_answer(memory: StudioMemory) -> list[str]:
+    async def _run() -> list[str]:
+        return [
+            frame
+            async for frame in chat.stream_chat(_request(), memory=memory, request_id="req-466")
+        ]
+
+    return asyncio.run(_run())
+
+
+def _warnings(caplog) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+
+
+def test_a_reply_that_is_not_stored_still_finishes(monkeypatch) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+
+    frames = _ask_and_answer(memory)
+
+    message = next(data for name, data in _parse(frames) if name == "message")
+    assert message["content"]
+
+
+def test_a_reply_that_is_not_stored_logs_a_warning(monkeypatch, caplog) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger="agentic_odi_studio_api.studio.chat"):
+        _ask_and_answer(memory)
+
+    assert len(_warnings(caplog)) == 1
+
+
+def test_the_persistence_warning_names_the_request_and_the_error(monkeypatch, caplog) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger="agentic_odi_studio_api.studio.chat"):
+        _ask_and_answer(memory)
+
+    warning = _warnings(caplog)[0]
+    assert "req-466" in warning
+    assert "RuntimeError" in warning
+    assert "assistant" in warning
+
+
+def test_the_persistence_warning_quotes_nothing_anyone_said(monkeypatch, caplog) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+    secret_words = "Propagate the quarterly hiring freeze"
+    request = _request(
+        api_key="sk-supersecret",
+        messages=[ChatMessage(role="user", content=secret_words, id="m-1")],
+    )
+
+    async def _run() -> None:
+        async for _frame in chat.stream_chat(request, memory=memory, request_id="req-466"):
+            pass
+
+    with caplog.at_level(logging.WARNING, logger="agentic_odi_studio_api.studio.chat"):
+        asyncio.run(_run())
+    logged = "\n".join(_warnings(caplog))
+    assert logged
+    assert secret_words not in logged
+    assert "sk-supersecret" not in logged
