@@ -110,10 +110,11 @@ Cross-package checks only:
 
 - `tests/contract/test_mcp_contract.py` — live FastMCP names, argument names, and required fields match `agentic_odi_core.contract.TOOL_SPECS`.
 - `tests/contract/test_cli_contract.py` — the CLI local-handler keys are a subset of `TOOL_NAMES`.
+- `tests/test_architecture.py` — the package diagram in the [architecture index](README.md#dependency-direction), the `[project] dependencies` each member declares, and the imports the source actually contains must all agree.
 - `tests/test_worker_security_headers.py` — the Living Studio Worker sends its security headers.
 - `tests/scripts/test_dev.py`, `test_dev_main.py` — `scripts/dev.py` startup, ports, signals, and shutdown.
 - `tests/scripts/test_doc_check.py` — documentation drift: commands, paths, routes, env vars, and README layout.
-- `tests/scripts/test_roadmap_check.py` — the roadmap gate for new capabilities.
+- `tests/scripts/test_assistant_ui_ledger.py` — the assistant-ui ledger (issue #429): adopted rows cite a merged delivery and name an existing file, counts and the Living Studio projection match the rows.
 - `tests/scripts/test_pr_body_gate.py` — CI refuses a branch without a described pull request.
 - `tests/scripts/test_release_instructions.py` — release-note section generation.
 - `tests/scripts/test_version_sync.py` — the declared version matches the release.

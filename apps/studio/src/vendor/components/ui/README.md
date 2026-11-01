@@ -9,8 +9,10 @@ What may live here:
   no store reads, no API calls.
 - Anything whose licence allows it, recorded in `apps/studio/vendor.lock.json`
   with upstream, commit, date, and SPDX id.
-- A provenance header on every file: `// vendored: <url>@<commit> — <SPDX> —
-  local edits: <none | what>`.
+- A provenance header on every file: `// vendored: <source> — <SPDX> —
+  retrieved <date> — local edits: <what>` (or the `<!-- vendored: … -->` form
+  in a copied document), mirrored in `apps/studio/vendor.lock.json`, which
+  adds the integrity handle to re-copy against.
 
 What may not:
 

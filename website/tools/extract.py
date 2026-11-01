@@ -411,7 +411,7 @@ TOOL_PURPOSES: dict[str, str] = {
     "get_step": "Fetch one step by id.",
     "update_step": "Rename a step or move it in the order.",
     "delete_step": "Delete a step.",
-    "add_outcome": "Record a desired outcome with importance and satisfaction.",
+    "add_outcome": "Record a desired outcome; a score must carry its claim_check.",
     "get_outcomes": "List the desired outcomes of a Job or step, one page at a time.",
     "get_outcome": "Fetch one desired outcome by id.",
     "update_outcome": "Edit an outcome's statement or scores.",
