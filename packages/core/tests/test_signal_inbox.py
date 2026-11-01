@@ -18,6 +18,7 @@ from agentic_odi_core import (
     SignalKind,
     SignalNotFoundError,
 )
+from agentic_odi_core.services import _opportunity_crossing
 
 STATEMENT = "Minimize the time it takes to deploy a release during an incident"
 STAGES = list(JobStage)
@@ -105,14 +106,16 @@ def test_crossing_ten_upward_is_urgent_and_downward_is_a_notice() -> None:
     service.update_outcome(outcome.id, {"importance": 9.0, "satisfaction": 2.0})
     up = next(s for s in service.list_signals() if s.kind is SignalKind.OPPORTUNITY_CROSSED)
     assert up.severity == "urgent"
-    assert "crossed 10 (up)" in up.title
+    assert "(up)" in up.title
+    assert "7.0 -> 16.0" in up.title
+    assert "crossed 10" not in up.title
     assert up.detail == "7.0 -> 16.0"
 
     _clear(service)
     service.update_outcome(outcome.id, {"importance": 6.0, "satisfaction": 6.0})
     down = next(s for s in service.list_signals() if s.kind is SignalKind.OPPORTUNITY_CROSSED)
     assert down.severity == "notice"
-    assert "crossed 10 (down)" in down.title
+    assert "(down)" in down.title
 
     _clear(service)
     service.update_outcome(outcome.id, {"importance": 5.0, "satisfaction": 5.0})
@@ -313,3 +316,59 @@ def test_the_feed_is_newest_first_and_honours_the_limit() -> None:
     feed = service.list_signals(limit=1000)
     assert [signal.title for signal in feed] == ["Job 3", "Job 2", "Job 1", "Job 0"]
     assert [signal.title for signal in service.list_signals(limit=2)] == ["Job 3", "Job 2"]
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "expected"),
+    [
+        (9.0, 10.0, None),
+        (10.0, 11.0, ("up", "urgent")),
+        (11.0, 10.0, ("down", "notice")),
+        (10.0, 9.0, None),
+        (9.0, 11.0, ("up", "urgent")),
+        (11.0, 9.0, ("down", "notice")),
+        (None, 11.0, ("up", "urgent")),
+        (11.0, None, ("down", "notice")),
+        (None, 9.0, None),
+        (9.0, None, None),
+        (11.0, 12.0, None),
+        (12.0, 11.0, None),
+        (None, None, None),
+    ],
+)
+def test_the_crossing_boundary_is_the_underserved_bucket(
+    before: float | None, after: float | None, expected: tuple[str, str] | None
+) -> None:
+    """Exactly 10 is appropriately served, so reaching it is not a crossing.
+
+    Expectations are literals, not recomputed through ``classify_opportunity``:
+    the point is that the two agree, and deriving one from the other would
+    prove nothing.
+    """
+    assert _opportunity_crossing(before, after) == expected
+
+
+def test_a_score_that_reaches_ten_is_a_change_and_not_a_crossing() -> None:
+    service = _service()
+    job_id = _job(service)
+    outcome = service.add_outcome(job_id, STATEMENT, importance=9.0, satisfaction=9.0)
+    _clear(service)
+
+    service.update_outcome(outcome.id, {"importance": 10.0, "satisfaction": 10.0})
+
+    assert _kinds(service) == ["outcome_scored"]
+
+
+def test_a_score_that_climbs_from_ten_to_eleven_crosses_as_urgent() -> None:
+    service = _service()
+    job_id = _job(service)
+    outcome = service.add_outcome(job_id, STATEMENT, importance=10.0, satisfaction=10.0)
+    _clear(service)
+
+    service.update_outcome(outcome.id, {"importance": 10.0, "satisfaction": 9.0})
+
+    kinds = _kinds(service)
+    assert "outcome_scored" in kinds
+    crossing = next(s for s in service.list_signals() if s.kind is SignalKind.OPPORTUNITY_CROSSED)
+    assert crossing.severity == "urgent"
+    assert crossing.detail == "10.0 -> 11.0"
