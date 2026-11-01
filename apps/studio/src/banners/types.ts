@@ -20,6 +20,8 @@ export type BannerDock = "top" | "corner";
 export type BannerKind =
   | "sidecar-down"
   | "model-offline"
+  | "edge-downloading"
+  | "edge-unlocked"
   | "update-available"
   | "update-ready"
   | "write-rejected"

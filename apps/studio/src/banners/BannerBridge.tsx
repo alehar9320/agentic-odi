@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 
 import { useStudio } from "../state/StudioContext";
+import { edgeManager } from "../edge/manager";
+import { tierById } from "../edge/ladder";
 import { useBanner } from "./BannerProvider";
 import type { BannerActionId } from "./types";
 
@@ -20,6 +22,7 @@ export function BannerBridge() {
     sidecarReachable,
     dismissedSidecarNotice,
     llmHealth,
+    settings,
   } = useStudio();
 
   useEffect(() => {
@@ -31,12 +34,42 @@ export function BannerBridge() {
   }, [sidecarReachable, dismissedSidecarNotice, raise, resolve]);
 
   useEffect(() => {
-    if (llmHealth.healthy === false) {
-      raise({ kind: "model-offline" });
-    } else {
-      resolve("model-offline");
-    }
-  }, [llmHealth.healthy, raise, resolve]);
+    // "No model is reachable" is only true when the browser can't answer
+    // either. A consented device with a cached tier gets to stay quiet.
+    let cancelled = false;
+    void edgeManager.canServe(settings, llmHealth.healthy === true).then((edgeServing) => {
+      if (cancelled) {
+        return;
+      }
+      if (llmHealth.healthy === false && !edgeServing) {
+        raise({ kind: "model-offline" });
+      } else {
+        resolve("model-offline");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [llmHealth.healthy, settings, raise, resolve]);
+
+  useEffect(() => {
+    edgeManager.setListener((notice) => {
+      if (notice.kind === "downloading") {
+        const percent = Math.round(notice.progress.percent * 100);
+        raise({
+          kind: "edge-downloading",
+          body: `Fetching ${tierById(notice.tier).label} (${percent}%) — this browser's next voice.`,
+        });
+      } else {
+        resolve("edge-downloading");
+        raise({
+          kind: "edge-unlocked",
+          body: `${tierById(notice.tier).label} is answering in this browser now — free.`,
+        });
+      }
+    });
+    return () => edgeManager.setListener(null);
+  }, [raise, resolve]);
 
   return null;
 }

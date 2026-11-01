@@ -1,14 +1,21 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BannerBridge, useBannerActionDispatcher } from "./BannerBridge";
 import { BannerProvider, useBanner } from "./BannerProvider";
 import { BannerStack } from "./BannerStack";
+import type { EdgeNotice } from "../edge/manager";
 
 const studio = vi.hoisted(() => ({
   sidecarReachable: true as boolean | null,
   llmHealth: { healthy: true as boolean | null, message: "" },
   dismissedSidecarNotice: false,
+  settings: {
+    base_url: "http://localhost:8001/v1",
+    api_key: "",
+    model_name: "",
+    mcp_url: "http://localhost:8000/mcp",
+  },
   dismissSidecarNotice: vi.fn(),
   recheckConnections: vi.fn(),
   openSetup: vi.fn(),
@@ -18,6 +25,20 @@ const studio = vi.hoisted(() => ({
 
 vi.mock("../state/StudioContext", () => ({
   useStudio: () => studio,
+}));
+
+const edge = vi.hoisted(() => ({
+  canServe: vi.fn(async () => false),
+  noticeListener: null as ((notice: EdgeNotice) => void) | null,
+}));
+
+vi.mock("../edge/manager", () => ({
+  edgeManager: {
+    canServe: (...args: unknown[]) => edge.canServe(...(args as [])),
+    setListener: (listener: ((notice: EdgeNotice) => void) | null) => {
+      edge.noticeListener = listener;
+    },
+  },
 }));
 
 /** The real shell wiring: bridge in, dispatcher out. */
@@ -49,6 +70,8 @@ describe("BannerBridge", () => {
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: true, message: "" };
     studio.dismissedSidecarNotice = false;
+    edge.canServe = vi.fn(async () => false);
+    edge.noticeListener = null;
   });
 
   it("raises nothing while the sidecar is reachable and the model is healthy", () => {
@@ -98,11 +121,23 @@ describe("BannerBridge", () => {
     expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
   });
 
-  it("raises a working-by-hand strip when no model is reachable", () => {
+  it("raises a working-by-hand strip when no model is reachable", async () => {
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: false, message: "no model" };
     renderShell();
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Working by hand/i)).toBeInTheDocument());
+  });
+
+  it("keeps the working-by-hand strip away when the browser can answer instead", async () => {
+    edge.canServe = vi.fn(async () => true);
+    studio.sidecarReachable = true;
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() => expect(edge.canServe).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
   });
 
   it("rechecks the sidecar through the real dispatcher", () => {
@@ -157,5 +192,63 @@ describe("BannerBridge", () => {
     });
 
     expect(studio.dismissSidecarNotice).toHaveBeenCalledTimes(1);
+  });
+
+  it("raises one strip per download and updates it in place as progress arrives", async () => {
+    renderShell();
+    await act(async () => {});
+    expect(edge.noticeListener).toBeTruthy();
+
+    act(() => {
+      edge.noticeListener?.({
+        kind: "downloading",
+        tier: "t2",
+        progress: { phase: "download", percent: 0.42, text: "42%" },
+      });
+    });
+    expect(screen.getByText(/Making this browser smarter, quietly/i)).toBeInTheDocument();
+    expect(screen.getByText(/Fetching Llama 3.2 3B \(42%\)/)).toBeInTheDocument();
+
+    act(() => {
+      edge.noticeListener?.({
+        kind: "downloading",
+        tier: "t2",
+        progress: { phase: "download", percent: 0.7, text: "70%" },
+      });
+    });
+    expect(screen.getByText(/Fetching Llama 3.2 3B \(70%\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/42%/)).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Making this browser smarter, quietly/i),
+    ).toHaveLength(1);
+  });
+
+  it("clears the download strip and celebrates when a tier unlocks", async () => {
+    renderShell();
+    await act(async () => {});
+
+    act(() => {
+      edge.noticeListener?.({
+        kind: "downloading",
+        tier: "t2",
+        progress: { phase: "download", percent: 0.5, text: "50%" },
+      });
+    });
+    expect(screen.getByText(/Making this browser smarter, quietly/i)).toBeInTheDocument();
+
+    act(() => {
+      edge.noticeListener?.({ kind: "unlocked", tier: "t2" });
+    });
+    expect(screen.queryByText(/Making this browser smarter, quietly/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Your replies just got smarter/i)).toBeInTheDocument();
+    expect(screen.getByText(/Llama 3.2 3B is answering in this browser now/i)).toBeInTheDocument();
+  });
+
+  it("unsubscribes from edge notices when the bridge unmounts", () => {
+    const { unmount } = renderShell();
+    expect(edge.noticeListener).toBeTruthy();
+
+    unmount();
+    expect(edge.noticeListener).toBeNull();
   });
 });

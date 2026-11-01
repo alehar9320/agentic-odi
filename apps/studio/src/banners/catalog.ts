@@ -37,6 +37,23 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
       { label: "Set your context", action: "open-setup", tone: "ghost" },
     ],
   },
+  "edge-downloading": {
+    severity: "info",
+    life: "persistent",
+    dock: "top",
+    title: "Making this browser smarter, quietly.",
+    body: "Downloading the next model while your device is idle. Replies keep flowing meanwhile.",
+    dismissible: true,
+  },
+  "edge-unlocked": {
+    severity: "success",
+    life: "transient",
+    dock: "corner",
+    title: "Your replies just got smarter.",
+    body: "A stronger model is answering in this browser now — free.",
+    durationMs: 10000,
+    dismissible: true,
+  },
   "update-available": {
     severity: "info",
     life: "persistent",

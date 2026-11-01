@@ -6,6 +6,8 @@ import type { BannerKind } from "./types";
 const ALL_KINDS: BannerKind[] = [
   "sidecar-down",
   "model-offline",
+  "edge-downloading",
+  "edge-unlocked",
   "update-available",
   "update-ready",
   "write-rejected",
@@ -49,6 +51,24 @@ describe("BANNER_CATALOG", () => {
       expect(BANNER_CATALOG[kind].life).toBe("transient");
       expect(BANNER_CATALOG[kind].dock).toBe("corner");
     }
+  });
+
+  it("treats an edge download as a calm top strip that updates in place", () => {
+    const entry = BANNER_CATALOG["edge-downloading"];
+    expect(entry.severity).toBe("info");
+    expect(entry.life).toBe("persistent");
+    expect(entry.dock).toBe("top");
+    const first = resolveSpec({ kind: "edge-downloading", body: "40%" });
+    const later = resolveSpec({ kind: "edge-downloading", body: "70%" });
+    expect(first.kind).toBe(later.kind);
+    expect(later.body).toBe("70%");
+  });
+
+  it("treats an unlocked tier as a success toast that expires on its own", () => {
+    const entry = BANNER_CATALOG["edge-unlocked"];
+    expect(entry.severity).toBe("success");
+    expect(entry.life).toBe("transient");
+    expect(entry.durationMs).toBeGreaterThan(0);
   });
 });
 
