@@ -43,7 +43,10 @@ describe("edgeTurn frame contract", () => {
       "delta",
       "message",
     ]);
-    expect(events[0].data.phase).toBe("model");
+    // The opening `status` frame is how the transcript learns which brain is
+    // answering: `phase: "edge"` is what puts "Answered in this browser" on
+    // this reply and nothing else.
+    expect(events[0].data.phase).toBe("edge");
     expect(events.at(-1)?.data.content).toBe("Free local models.");
     expect(events.at(-1)?.data.claims).toBeUndefined();
   });

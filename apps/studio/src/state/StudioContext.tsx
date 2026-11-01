@@ -338,6 +338,12 @@ export interface StudioContextValue {
    * the one answer it describes instead of every answer on screen.
    */
   offlineReplyFor: string | null;
+  /**
+   * The reply this browser's own model produced, by message id. A person who
+   * pays nothing and runs nothing server-side deserves to know which brain
+   * answered — the same reason the offline label exists, pointing the other way.
+   */
+  edgeReplyFor: string | null;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
   addOutcome: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
   createJob: (payload: { name: string; description?: string }) => Promise<string | null>;
@@ -549,6 +555,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   // hint once the studio has answered something, from /start, or from Settings.
   const [setupOpen, setSetupOpen] = useState(false);
   const [offlineReplyFor, setOfflineReplyFor] = useState<string | null>(null);
+  const [edgeReplyFor, setEdgeReplyFor] = useState<string | null>(null);
   const [canvasState, setCanvasState] = useState<CanvasState>(() => {
     const cached = loadCanvasCache();
     return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
@@ -1361,6 +1368,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setStreaming(true);
       setThinkingPhase("health_check");
       setOfflineReplyFor(null);
+      setEdgeReplyFor(null);
       setToolActivity([]);
 
       const controller = new AbortController();
@@ -1473,6 +1481,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             setThinkingPhase(phase);
             if (phase === "offline") {
               setOfflineReplyFor(assistantId);
+            }
+            if (phase === "edge") {
+              setEdgeReplyFor(assistantId);
             }
             break;
           }
@@ -1892,6 +1903,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setStreaming(false);
     setThinkingPhase(null);
     setOfflineReplyFor(null);
+    setEdgeReplyFor(null);
     setConversationId(null);
     void apiCreateConversation()
       .then((conversation) =>
@@ -2071,6 +2083,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
+      edgeReplyFor,
       addStep,
       addOutcome,
       promoteEvidence,
@@ -2184,6 +2197,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
+      edgeReplyFor,
       addStep,
       addOutcome,
       promoteEvidence,

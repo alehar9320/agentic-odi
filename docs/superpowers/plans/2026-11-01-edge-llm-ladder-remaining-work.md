@@ -4,9 +4,10 @@
 to `main`'s current tip — see "Merged with `main`" below.
 **Status:** the engine, the ladder, the routing seam, the progression scheduler
 and the banners are built and tested, **a person can turn the feature on** —
-the offer strip asks once — **and that answer can now be changed from
-Settings**, with the tiers on disk listed and freeable. What is left is the
-first-run copy and verification on real hardware.
+the offer strip asks once — **that answer can now be changed from Settings**,
+with the tiers on disk listed and freeable, and **every reply says which brain
+produced it**. What is left is the first-run intro copy and verification on real
+hardware.
 
 This file exists because the branch was cut short for review and the working
 environment it was built in is temporary. Nothing here may survive only in a
@@ -45,6 +46,12 @@ than a second owner of its state. The checkbox is the `edgeModel` flag; the
 consent answer moves through the same `grantAndStart()` / `decline()` calls as
 the banner, and a yes that starts nothing reports that, in the same words.
 
+Once it is answering, the transcript keeps the person in no doubt about who is
+doing the work: a reply the tab produced carries *"Answered in this browser"* on
+itself, in the same slot and the same kind of button as *"Local draft, no model
+connected"* carries on a reply no model produced. Two brains, one line, never
+both on one reply.
+
 Until the previous iteration the two ends were missing — nothing granted
 consent, and nothing fetched Tier 1 (`noteTurn()` climbed only *from* a hosted
 tier). Both now exist, which is the difference between infrastructure and a
@@ -63,11 +70,13 @@ absent.
 | `f39c3fa` | 6 | `edge/scheduler.ts` — ten served answers earn the next tier, consent-locked, idle/visible/SaveData-gated, single-engine-across-tabs |
 | `fd0bfe4` | 7 | `edge-downloading` / `edge-unlocked` banner kinds; the bridge subscribes to edge notices and stops claiming "Working by hand" while the edge answers |
 | `d34d8e5` | 9 (first half) | `EdgeScheduler.bootstrap()` (rung zero), `EdgeManager.offerFor / grantAndStart / decline / isBusy`, the `ready` and `consent-changed` notices, and the `edge-offer` / `edge-ready` banners with both buttons wired through the dispatcher. `docs/local-llm.md` now describes a reachable feature. Landed out of plan order, before the Settings section, because nothing else on this branch matters while no person can switch it on. |
-| this commit | 8 | `components/EdgeModelSection.tsx` — Settings → *Answers in this browser*: the flag switch, a consent answer that can be changed and withdrawn, per-tier status with device reasons, free-a-tier storage, the progression meter, the quota line. `EdgeManager.panelState()` and `freeTier()` (with `EdgeLLMEngine.evict`, the only Settings path that may pull in the WebLLM chunk), the notice seam turned multi-subscriber so the strip and Settings both react, and the section mounted in `SettingsPanel`. |
+| `3a1f633` | 8 | `components/EdgeModelSection.tsx` — Settings → *Answers in this browser*: the flag switch, a consent answer that can be changed and withdrawn, per-tier status with device reasons, free-a-tier storage, the progression meter, the quota line. `EdgeManager.panelState()` and `freeTier()` (with `EdgeLLMEngine.evict`, the only Settings path that may pull in the WebLLM chunk), the notice seam turned multi-subscriber so the strip and Settings both react, and the section mounted in `SettingsPanel`. |
+| `f475509` | merge | `origin/main` merged forward; see "Merged with `main`" below for the four conflicts and what each one cost this feature. |
+| this commit | 9 (second half) | The reply names its brain: `edge/turn.ts` opens with `status` `phase: "edge"`, `StudioContext` records `edgeReplyFor` beside the existing `offlineReplyFor`, and `Conversation.tsx` renders one provenance tag per reply — *"Answered in this browser"* — with the edge answer taking precedence over the draft label. Plus the capability prose in `docs/local-llm.md` and `docs/living-studio.md`. |
 
-Everything the branch changes on top of `main` as merged: 37 files, 3,916 lines
-added, 45 deleted, and 102 added test-case lines in the browser suite, which now
-runs 916 tests across 97 files, plus one amended Python security-header test.
+Everything the branch changes on top of `main` as merged: 39 files, 4,043 lines
+added, 50 deleted, and 105 added browser test cases, which now run 919 tests
+across 97 files, plus one amended Python security-header test.
 
 ## Merged with `main` (this merge commit)
 
@@ -150,16 +159,23 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
       jargon, no dead end, in the same words as the strip. Zero-config stays
       intact: rule-based answers keep working until Tier 1 lands, and the edge
       takes over the moment it is cached.
-- [ ] `edge-active` marker on an edge reply in the transcript, so a person can
-      tell which brain answered.
+- [x] `edge-active` marker on an edge reply in the transcript, so a person can
+      tell which brain answered. (Delivered in this commit: `edge/turn.ts` now
+      opens its stream with `status` `phase: "edge"`, `StudioContext` records that
+      as `edgeReplyFor` the same way it already records `offlineReplyFor`, and
+      `Conversation` puts *"Answered in this browser"* on the reply — one button,
+      opens Settings, never both labels on one reply.)
 - [x] `docs/local-llm.md` §"The browser tier" rewritten for what actually
       shipped, including what has never been run on real hardware. (Done in `d34d8e5`.)
 - [x] Add the capability to `README.md` and — per `.agents/rules` line 159,
       which routes a new conversation capability there — to the capability table
       in `docs/living-studio.md`. Both name the conversation-turns-only
-      boundary. (Done in this commit.)
-- [ ] State the divergence honestly: `router.py:1199` and `worker.ts:57` keep
-      `browser-model: false` server-side — a server cannot see a client GPU.
+      boundary. (Done in `3a1f633`.)
+- [x] State the divergence honestly: `apps/studio-api/.../studio/router.py:1220`
+      and `infra/cloudflare/worker.ts:57` keep `browser-model` at
+      `available: false` — a server cannot see a client GPU — while the client's
+      own capability registry reports the truth. Verified against both manifests
+      and said in `docs/local-llm.md` §"The browser tier".
 
 ### 10 — Verification a reviewer can repeat
 
@@ -196,6 +212,12 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
   freed tier reads stale until something here emits one. BroadcastChannel or a
   storage event would close both, and would let the losing tab hear about the
   lock it never got.
+- **The provenance label lives for the session.** *"Answered in this browser"*
+  and *"Local draft, no model connected"* both come from a `status` frame in the
+  live stream, so a reply re-read from history next visit carries no label. That
+  is `main`'s existing mechanism, unchanged and shared; giving a message its own
+  stored provenance means a new field on the persisted message and a second
+  consumer in `assistant/convert.ts`, which this branch deliberately did not do.
 - **Edge turns never reach the server conversation tree** while the sidecar is up.
   A backfill through `POST /api/conversations/{id}/turns` is an explicit non-goal
   for v1 and must stay documented, not discovered.
@@ -222,18 +244,19 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
 git fetch origin && git checkout alehar9320/flyingfish
 npm --prefix apps/studio install
 npm --prefix apps/studio run typecheck
-npm --prefix apps/studio test -- --run     # 97 files, 916 tests
+npm --prefix apps/studio test -- --run     # 97 files, 919 tests
 npm --prefix apps/studio run lint          # 0 errors, 5 pre-existing warnings
 npm --prefix apps/studio run build
 uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 330 passed
 uv run pytest -q                           # 1824 passed (repo-wide)
 ```
 
-Then start at iteration 9's remaining items if you want a first-run visitor to
-meet the browser model in the intro flow and to see which brain answered in the
-transcript, at the cross-tab gap if you want the Settings snapshot to be live in
-every tab, or at iteration 10 if you want to prove it on a GPU. A first real
-user can already reach the feature and control it; none of those is required for
-that.
+Then start at iteration 9's last open item if you want a first-run visitor to
+meet the browser model in the intro flow (the offer strip already does this job
+after the studio has opened; the context conversation is what is left), at the
+cross-tab gap if you want the Settings snapshot to be live in every tab, or at
+iteration 10 if you want to prove it on a GPU. A first real user can already
+reach the feature, control it, and see which brain answered; none of those is
+required for that.
 
 Every iteration ends with that block green, one commit, and this file updated.

@@ -176,7 +176,10 @@ Studio says so in one place and keeps going:
   answered yet — nobody spins for a connection they are not trying to make.
 - A reply that no model produced carries one line, on that reply: **Local draft,
   no model connected**. It is a button, and it opens Settings. It never repeats
-  on the replies around it, and nothing about it covers the thread.
+  on the replies around it, and nothing about it covers the thread. The mirror
+  case carries the opposite line — **Answered in this browser**, on the reply the
+  tab's own model produced — same spot, same button, and never both at once:
+  exactly one brain answered the reply you are looking at.
 - The work still happens. `apps/studio/src/bff` is the studio's own BFF running
   in the browser: the conversation, the canvas, and memory are read and written
   in IndexedDB, and the deterministic assistant answers ODI questions, creates

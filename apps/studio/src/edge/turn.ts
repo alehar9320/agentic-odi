@@ -37,7 +37,9 @@ export async function edgeTurn(
   onEvent: (event: RawSseEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  onEvent({ event: "status", data: { phase: "model" } });
+  // `phase: "edge"` rather than `"model"`: the transcript names the brain that
+  // answered from this frame, and a reply earned its label honestly or not at all.
+  onEvent({ event: "status", data: { phase: "edge" } });
   const messages = buildEdgeMessages(request, deps.canvasDigest);
   let content = "";
   try {

@@ -1102,6 +1102,23 @@ describe("StudioContext edge routing", () => {
     expect(chatAttempts).toBe(1);
     const assistant = result.current.messages.filter((message) => message.role === "assistant").at(-1);
     expect(assistant?.content).toBe("Hi");
+    // The marker tracks the brain that answered, not the feature being switched on.
+    expect(result.current.edgeReplyFor).toBeNull();
+  });
+
+  it("names the browser as the brain, on the reply it produced", async () => {
+    const { result } = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("what should I dig into next?");
+    });
+
+    const assistant = result.current.messages
+      .filter((message) => message.role === "assistant")
+      .at(-1);
+    expect(result.current.edgeReplyFor).toBe(assistant?.id);
+    // Not a local draft: a model did produce this, just not one that cost money.
+    expect(result.current.offlineReplyFor).toBeNull();
   });
 
   it("leaves a denied consent decision untouched: real endpoint or nothing", async () => {

@@ -119,7 +119,11 @@ to. Then a strip appears above the composer — *"This browser can answer, free.
 — naming the model and its one-time download size, with **Answer in this
 browser** and **Not now**. Yes records consent and starts the fetch the next
 time the tab is idle; the strip becomes progress, then a
-one-line celebration, and every turn after that is answered in the tab. "Not
+one-line celebration, and every turn after that is answered in the tab. Each of
+those replies says so on itself — *"Answered in this browser"* — in the same
+place, and as the same kind of button, as the reply that no model produced
+(*"Local draft, no model connected"*), so which brain answered is never a guess.
+One reply, one brain: the two lines never appear together. "Not
 now" is durable: the studio never asks again, and the answer can be changed in
 Settings. Once it is answering, the browser earns its next rung — ten served
 turns, or fifteen minutes of streamed output, buys the bigger model in the

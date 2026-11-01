@@ -14,6 +14,7 @@ const harness = vi.hoisted(() => ({
     thinkingPhase: null as string | null,
     toolActivity: [] as unknown[],
     offlineReplyFor: null as string | null,
+    edgeReplyFor: null as string | null,
     openPanel: vi.fn<(panel: string) => void>(),
     canvas: null,
     regenerateFrom: vi.fn(),
@@ -292,7 +293,7 @@ describe("Conversation", () => {
   });
 });
 
-describe("Conversation offline context", () => {
+describe("Conversation provenance", () => {
   it("names the provenance on the one reply that needs it and offers the fix", () => {
     harness.state.offlineReplyFor = "m-2";
     const { container } = renderTurn([
@@ -321,6 +322,57 @@ describe("Conversation offline context", () => {
 
     harness.state.offlineReplyFor = null;
     harness.state.openPanel.mockClear();
+  });
+
+  it("says so on a reply the browser answered, and points at the switch", () => {
+    harness.state.edgeReplyFor = "m-2";
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "From the model.",
+        parts: [{ kind: "text", text: "From the model." }],
+      },
+      {
+        id: "m-2",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [{ kind: "text", text: "From this browser." }],
+      },
+    ]);
+
+    const chips = container.querySelectorAll("button.message__tag");
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent("Answered in this browser");
+
+    fireEvent.click(chips[0] as HTMLButtonElement);
+    expect(harness.state.openPanel).toHaveBeenCalledWith("settings");
+
+    harness.state.edgeReplyFor = null;
+    harness.state.openPanel.mockClear();
+  });
+
+  it("names one brain per reply: an edge answer is never also a local draft", () => {
+    harness.state.edgeReplyFor = "m-1";
+    harness.state.offlineReplyFor = "m-1";
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "From this browser.",
+        parts: [{ kind: "text", text: "From this browser." }],
+      },
+    ]);
+
+    const chips = container.querySelectorAll("button.message__tag");
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent("Answered in this browser");
+
+    harness.state.edgeReplyFor = null;
+    harness.state.offlineReplyFor = null;
   });
 });
 
