@@ -23,13 +23,15 @@ uv run bandit -c pyproject.toml -r apps packages website/
 
 ## Documentation Checks
 
-`scripts/doc_check.py` keeps the living docs honest against the code. In a pull
-request it also refuses a new public capability with no roadmap entry:
+`scripts/doc_check.py` keeps the living docs honest against the code:
 
 ```bash
 uv run python scripts/doc_check.py
-uv run python scripts/doc_check.py --changed-files $(git diff --name-only main...HEAD)
 ```
+
+`docs/roadmap.md` is maintained by hand. No check requires a new capability to
+add a roadmap line, because a shared file every change had to edit conflicted
+with every other change.
 
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,
@@ -336,7 +338,7 @@ uv run pytest \
 | `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, connectors, and startup performance |
 | `packages/connectors/tests/` | Catalog presets, registry persistence, factory, MCP and REST connectors, evidence mapping, and sink |
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
-| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift and roadmap gates |
+| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |

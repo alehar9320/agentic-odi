@@ -19,3 +19,9 @@
 - path: "apps/studio/src/components/notices/SidecarNotice.tsx"
   issue: 264
   reason: "Replaced by the unified banner bridge in PR #264."
+- path: "tests/scripts/test_roadmap_check.py"
+  issue: 497
+  reason: >-
+    Tests the roadmap gate that PR #497 removes, so the test goes with it. The
+    gate required every new capability to add a line to docs/roadmap.md, which
+    made every agent PR edit one shared file and conflict with every other.

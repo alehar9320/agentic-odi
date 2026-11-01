@@ -530,19 +530,31 @@ def test_the_default_config_documents_the_thresholds() -> None:
     assert "uv.lock" in config["generated_exclusions"]
 
 
-def test_the_allowlist_only_approves_banner_component_replacements() -> None:
+def test_the_allowlist_only_approves_reviewed_deletions() -> None:
+    """Every approved deletion is named here, grouped by the change that made it.
+
+    Pinning the exact paths per issue keeps the allowlist from growing silently:
+    a new entry fails this test until someone adds it deliberately.
+    """
     import yaml
 
     allowlist = yaml.safe_load(ALLOWLIST.read_text(encoding="utf-8"))
 
-    assert {entry["path"] for entry in allowlist} == {
-        "apps/studio/src/components/Toasts.test.tsx",
-        "apps/studio/src/components/Toasts.tsx",
-        "apps/studio/src/components/chat/OfflineNotice.tsx",
-        "apps/studio/src/components/notices/SidecarNotice.test.tsx",
-        "apps/studio/src/components/notices/SidecarNotice.tsx",
+    approved: dict[int, set[str]] = {}
+    for entry in allowlist:
+        approved.setdefault(entry["issue"], set()).add(entry["path"])
+
+    assert approved == {
+        264: {
+            "apps/studio/src/components/Toasts.test.tsx",
+            "apps/studio/src/components/Toasts.tsx",
+            "apps/studio/src/components/chat/OfflineNotice.tsx",
+            "apps/studio/src/components/notices/SidecarNotice.test.tsx",
+            "apps/studio/src/components/notices/SidecarNotice.tsx",
+        },
+        497: {"tests/scripts/test_roadmap_check.py"},
     }
-    assert all(entry["issue"] == 264 and entry["reason"] for entry in allowlist)
+    assert all(entry["reason"] for entry in allowlist)
 
 
 def test_the_template_asks_for_experience_verification_and_scope() -> None:
