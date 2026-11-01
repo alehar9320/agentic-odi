@@ -206,7 +206,9 @@ nothing on screen can claim otherwise before the person has asked for something.
 - The stage paints from local data: the canvas, the thread you left, and the
   composer. The request for sidecar defaults is a convenience that may fill in
   settings later; a slow or absent sidecar cannot hold the first screen behind
-  it, and its failure is silent.
+  it, and its failure is silent. A proxy that accepts the connection and never
+  answers is bounded at 1,200 ms, so boot carries on with the defaults it already
+  has rather than waiting on a reply that may never come.
 - Health, connector, and capability probes wait until the browser is idle (or
   two seconds), and are given up entirely if you send a message first. A negative
   they find keeps the studio **unknown** rather than **down**.

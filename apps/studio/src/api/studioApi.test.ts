@@ -56,6 +56,33 @@ describe("fetchConfig", () => {
       model_name: "m",
     });
   });
+
+  it("gives up on a request that never answers instead of hanging forever", async () => {
+    // A proxy that accepts the connection and never replies. Boot cannot wait on
+    // that; the request is bounded so the caller can fall back to its defaults.
+    let aborted = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_input: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              aborted = true;
+              const error = new Error("The operation was aborted.");
+              error.name = "AbortError";
+              reject(error);
+            });
+          }),
+      ),
+    );
+    vi.useFakeTimers();
+    const pending = fetchConfig();
+    const assertion = expect(pending).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(1_200);
+    await assertion;
+    expect(aborted).toBe(true);
+    vi.useRealTimers();
+  });
 });
 
 describe("fetchChangelog", () => {
