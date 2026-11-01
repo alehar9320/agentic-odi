@@ -114,8 +114,9 @@ Where it lives, and why each piece:
   integration reads.
 - `scripts/pr_guards.py body-truth` — the mechanical half, advisory only.
 - **No ADR.** ADRs in `docs/architecture/adr/` record architecture decisions; this
-  changes no boundary, and the policy doc plus the gate are the durable artefacts. If a
-  later task turns the advisory warning into a blocker, that is the ADR.
+  changes no boundary, and the policy doc plus the gate are the durable artefacts. The
+  sequence runs to 0004, and 0002 already owns the workspace-edge rule this policy
+  defers to. If a later task turns the advisory warning into a blocker, that is 0005.
 
 **Form of the guidance, chosen from the baseline failure.** The failure is not
 skipping a rule under pressure — it is producing the wrong shape after a correct
@@ -204,7 +205,8 @@ the design was for, and it is the difference between this skill and a reminder.
 - **Fixing the audit's eight instances.** Each is its own pull request; the policy says
   so in as many words. Landing a rule and a 2,000-line refactor together is how both
   get reverted.
-- **Turning the advisory `Reuses:` warning into a blocker,** if warnings prove ignored.
+- **Turning the advisory `Reuses:` warning into a blocker,** if warnings prove ignored —
+  ADR 0005, per *Decisions*.
 - **The `apps/studio/node_modules` friction:** both verification runs had to symlink it
   out of the main workspace to run vitest in a worktree. Unrelated to reuse, worth a
   task of its own.
