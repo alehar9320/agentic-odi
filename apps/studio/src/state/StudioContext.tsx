@@ -1889,12 +1889,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined);
   }, []);
 
-  // First paint shows the person's own work. Nothing that nobody asked for gets
-  // to declare the studio broken.
+  // First paint shows the person's own work; nothing that nobody asked for gets
+  // to declare the studio broken. Boot order, and why nothing on the first
+  // screen waits on the network:
+  //   1. Local data first — the canvas, memory, and the latest conversation read
+  //      from IndexedDB and paint the person's own work one tick after mount.
+  //   2. Config alongside it, never a gate. `fetchConfig` bounds itself, so a
+  //      request that hangs cannot hold anything behind it; boot carries on with
+  //      the defaults it already has.
+  //   3. Everything else last — connectors, presets, featured, and the capability
+  //      probes (which ride along with the health survey) belong to Settings and
+  //      the tour, not the stage, so they wait for idle.
   useEffect(() => {
     let cancelled = false;
 
-    // The board and the thread are local data: they read from IndexedDB and never
+    // (1) The board and the thread are local data: they read from IndexedDB and never
     // wait on a server that may not exist. They land one tick after mount, so the
     // first thing painted is the shell and not a render inside a render.
     const loadLocalData = async () => {
