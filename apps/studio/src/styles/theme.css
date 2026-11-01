@@ -1415,6 +1415,18 @@ a {
   opacity: 0.8;
 }
 
+/* A silent run says so in words. No pulse, no spinner: the text is the state. */
+.stall {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stall__line {
+  margin: 0;
+}
+
 .caret {
   display: inline-block;
   width: 8px;
