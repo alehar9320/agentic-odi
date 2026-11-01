@@ -4,7 +4,9 @@
  * assistant-ui owns the message list, the message parts, and the branch picker;
  * this file decides what each of those looks like in the Studio. Everything it
  * renders comes from one place — `assistant/convert.ts` — so a new part type is
- * added in exactly two files.
+ * added in exactly two files. Because calls are grouped into a run row, each
+ * part type is named in the renderer's switch: a type it does not mention
+ * renders nothing rather than raw JSON.
  */
 
 import { useMemo } from "react";
@@ -16,6 +18,7 @@ import {
   ComposerPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  groupPartByType,
   useAuiState,
 } from "@assistant-ui/react";
 
@@ -32,11 +35,13 @@ import {
   ToolPart,
   TypingPart,
 } from "../../assistant/parts";
+import { summarizeRun } from "../../assistant/runSummary";
 import { useStudio } from "../../state/StudioContext";
 import type { StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon } from "../icons";
+import { RunRow } from "./RunRow";
 import { Markdown } from "./Markdown";
 
 const PHASE_LABEL: Record<string, string> = {
@@ -52,6 +57,22 @@ function phaseLabel(phase: string | null): string {
   return PHASE_LABEL[phase] ?? "Thinking";
 }
 
+/**
+ * Whether a run is still being written.
+ *
+ * Our converter gives every tool part a result, so the runtime reports the
+ * calls in a streaming turn as complete and the group's own tally says
+ * nothing is running. The turn is the dependable signal: a group that ends the
+ * message while the message still runs is the call the model is waiting on.
+ */
+function isLiveRun(
+  group: { counts: { running: number }; indices: readonly number[] },
+  contentLength: number,
+  streaming: boolean,
+): boolean {
+  return group.counts.running > 0 || (streaming && group.indices.at(-1) === contentLength - 1);
+}
+
 function AssistantMessage() {
   const { thinkingPhase, offlineReply, sendMessage } = useStudio();
   const running = useAuiState((state) => state.message.status?.type === "running");
@@ -59,6 +80,9 @@ function AssistantMessage() {
   const hasText = useAuiState((state) =>
     state.message.content.some((part) => part.type === "text" && part.text.trim().length > 0),
   );
+  // A group carries indices, not parts, so the row reads the message's own
+  // content to count what the turn did.
+  const content = useAuiState((state) => state.message.content);
   const error = useAuiState(
     (state) => state.message.metadata.custom?.error as StudioError | undefined,
   );
@@ -74,16 +98,53 @@ function AssistantMessage() {
       <div className="message__body">
         {offlineReply ? <span className="message__tag">Local guidance</span> : null}
 
-        <MessagePrimitive.Parts
-          components={{
-            Text: TextPart,
-            Reasoning: ReasoningPart,
-            Source: SourcePart,
-            File: FilePart,
-            data: { by_name: { [SURFACE_PART]: SurfacePart, [CLAIMS_PART]: ClaimsPart } },
-            tools: { Fallback: ToolPart },
+        <MessagePrimitive.GroupedParts
+          indicator="never"
+          groupBy={groupPartByType({ "tool-call": ["group-run"] })}
+        >
+          {({ part, children }) => {
+            switch (part.type) {
+              case "group-run": {
+                const calls = part.indices
+                  .map((index) => content[index])
+                  .filter((entry) => entry?.type === "tool-call");
+                return (
+                  <RunRow
+                    summary={summarizeRun(calls)}
+                    running={isLiveRun(part, content.length, running)}
+                    requiresAction={part.counts.requiresAction > 0}
+                  >
+                    {children}
+                  </RunRow>
+                );
+              }
+
+              case "text":
+                return <TextPart />;
+
+              case "reasoning":
+                return <ReasoningPart />;
+
+              case "source":
+                return <SourcePart />;
+
+              case "file":
+                return <FilePart />;
+
+              case "data":
+                if (part.name === SURFACE_PART) {
+                  return <SurfacePart />;
+                }
+                return part.name === CLAIMS_PART ? <ClaimsPart /> : null;
+
+              case "tool-call":
+                return <ToolPart {...part} />;
+
+              default:
+                return null;
+            }
           }}
-        />
+        </MessagePrimitive.GroupedParts>
 
         {running && !hasText ? <TypingPart label={phaseLabel(thinkingPhase)} /> : null}
         {running && hasText ? <span className="caret" aria-hidden="true" /> : null}

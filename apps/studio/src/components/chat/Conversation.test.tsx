@@ -410,3 +410,180 @@ describe("Conversation failures", () => {
     expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
   });
 });
+
+describe("Conversation run rows", () => {
+  it("collapses a settled turn's calls into one row that expands into the cards", () => {
+    harness.state.streaming = false;
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "Scored.",
+        parts: [
+          { kind: "text", text: "Scored." },
+          { kind: "tool", id: "call-1", name: "list_jobs", status: "ok" },
+          { kind: "tool", id: "call-2", name: "add_outcome", status: "ok" },
+        ],
+      },
+    ]);
+
+    expect(container.querySelectorAll(".run-summary")).toHaveLength(1);
+    const toggle = container.querySelector(".run-summary__toggle") as HTMLElement;
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle.textContent).toContain("2 calls · 1 write");
+    expect(container.querySelectorAll(".tool-trace")).toHaveLength(2);
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(container.querySelector(".run-summary__panel")).not.toHaveAttribute("hidden");
+  });
+
+  it("renders no row for a turn that made no calls", () => {
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "No tools here.",
+        parts: [{ kind: "text", text: "No tools here." }],
+      },
+    ]);
+
+    expect(container.querySelector(".run-summary")).toBeNull();
+    expect(container.querySelector(".conversation")).toHaveTextContent("No tools here.");
+  });
+
+  it("keeps the row open while the turn streams", () => {
+    harness.state.streaming = true;
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [{ kind: "tool", id: "call-1", name: "list_jobs", status: "running" }],
+      },
+    ]);
+
+    expect(container.querySelector(".run-summary__toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+
+    harness.state.streaming = false;
+  });
+
+  it("will not hide a call that is still asking", () => {
+    harness.state.streaming = false;
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [
+          {
+            kind: "tool",
+            id: "call-1",
+            name: "add_job",
+            status: "running",
+            approval: { id: "ap-1", prompt: "Write this to your board?" },
+          },
+        ],
+      },
+    ]);
+
+    expect(container.querySelector(".approval")).not.toBeNull();
+    expect(container.querySelector(".run-summary__panel")).not.toHaveAttribute("hidden");
+    const toggle = container.querySelector(".run-summary__toggle") as HTMLElement;
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAttribute("disabled");
+  });
+
+  it("keeps prose and surfaces in order around the rows", () => {
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "Before. After.",
+        parts: [
+          { kind: "text", text: "Before." },
+          { kind: "tool", id: "call-1", name: "list_jobs", status: "ok" },
+          { kind: "text", text: "After." },
+        ],
+      },
+    ]);
+
+    const text = (container.querySelector(".conversation") as HTMLElement).textContent ?? "";
+    expect(text.indexOf("Before.")).toBeLessThan(text.indexOf("1 call"));
+    expect(text.indexOf("1 call")).toBeLessThan(text.indexOf("After."));
+  });
+});
+
+describe("Conversation markup without calls", () => {
+  /** Markup plus prose, with none of the generated ids that differ per render. */
+  function shape(body: HTMLElement): string {
+    const tags = [...body.querySelectorAll("*")]
+      .map((el) => `${el.tagName.toLowerCase()} ${el.getAttribute("class") ?? ""}`)
+      .join("\n");
+    return `${tags}\ntext: ${body.textContent}`;
+  }
+
+  it("renders a call-free turn exactly as the transcript did before the run row", () => {
+    harness.state.streaming = false;
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "Before.",
+        parts: [
+          { kind: "text", text: "Before." },
+          { kind: "ui", id: "ui-1", node: outcomeCard(true) },
+          { kind: "source", id: "s-1", title: "Call with Acme", mediaType: "text/markdown" },
+        ],
+      },
+    ]);
+
+    expect(shape(container.querySelector(".message__body") as HTMLElement)).toMatchInlineSnapshot(`
+      "div md
+      p md-paragraph
+      div ui-surface
+      article ui-card ui-card--outcome ui-card--urgent
+      header ui-card__head
+      span ui-card__id
+      span ui-pill ui-pill--warning
+      p ui-card__statement
+      div ui-card__meters
+      div ui-meter
+      div ui-meter__head
+      span 
+      span ui-meter__value
+      div ui-meter__track
+      span ui-meter__fill ui-tone-bg--info
+      div ui-meter
+      div ui-meter__head
+      span 
+      span ui-meter__value
+      div ui-meter__track
+      span ui-meter__fill ui-tone-bg--warning
+      p ui-card__formula
+      b 
+      div ui-actions
+      button ui-action ui-action--primary
+      button ui-action ui-action--ghost
+      span source-chip
+      span source-chip__label
+      span source-chip__title
+      div message__actions
+      button quiet-action
+      svg 
+      rect 
+      path 
+      button quiet-action
+      text: Before.O-1Underserved · 15.0Minimize the time it takes to propagate secretsImportance9/10Satisfaction today3/10Opportunity = importance + max(importance − satisfaction, 0) = 15.0Simulate this betFind evidenceSourceCall with AcmeCopyRegenerate"
+    `);
+  });
+});
