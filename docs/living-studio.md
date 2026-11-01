@@ -155,12 +155,14 @@ reply: say "skip", "not now", or "show me the landscape" and it reacts instead
 of recording it as an answer. When a brief exists, it opens on a review and asks
 what changed rather than asking everything again.
 
-After the first exchange, `lib/guidance.ts` picks at most one hint worth showing:
-context the studio does not have, or the customer evidence a score is missing.
-Context outranks evidence because it makes every later answer better. Dismissals
-are permanent (`localStorage["studio.guidance"]`), and with nothing useful to say
-the line does not render at all — a hint system that keeps finding things to say
-becomes the modal it replaced.
+After every assistant turn, `lib/nextMove.ts` computes exactly one recommended
+move from state the store already holds — no brief, a fresh score with no linked
+evidence, an urgent signal, an incomplete job map, or an underserved outcome with
+no recorded decision. Each card states the move, why now, and what evidence would
+change it, and offers one action. Dismissing hides that move for that turn only;
+the next turn computes a new id. Nothing is written to `localStorage`, because
+"not now" is not consent to silence the studio forever. With no assistant turn
+yet, the card does not render: the empty stage already extends one invitation.
 
 ### Without a model
 

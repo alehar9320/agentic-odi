@@ -51,8 +51,8 @@ export function rail(page: Page) {
 
 /** The docked view (the "lens") that a rail item opens. */
 export function lens(page: Page) {
-  // The guidance line is also an `aside` with an accessible name, so it is
-  // complementary too; scope to the docked lens itself.
+  // The recommended-move card is also an `aside` with an accessible name, so
+  // it is complementary too; scope to the docked lens itself.
   return page.getByRole("complementary").and(page.locator(".lens"));
 }
 

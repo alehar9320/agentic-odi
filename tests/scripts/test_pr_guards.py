@@ -530,7 +530,7 @@ def test_the_default_config_documents_the_thresholds() -> None:
     assert "uv.lock" in config["generated_exclusions"]
 
 
-def test_the_allowlist_only_approves_banner_component_replacements() -> None:
+def test_the_allowlist_only_approves_named_replacements() -> None:
     import yaml
 
     allowlist = yaml.safe_load(ALLOWLIST.read_text(encoding="utf-8"))
@@ -541,8 +541,13 @@ def test_the_allowlist_only_approves_banner_component_replacements() -> None:
         "apps/studio/src/components/chat/OfflineNotice.tsx",
         "apps/studio/src/components/notices/SidecarNotice.test.tsx",
         "apps/studio/src/components/notices/SidecarNotice.tsx",
+        "apps/studio/src/lib/guidance.ts",
+        "apps/studio/src/lib/guidance.test.ts",
+        "apps/studio/src/components/chat/GuidanceHint.tsx",
     }
-    assert all(entry["issue"] == 264 and entry["reason"] for entry in allowlist)
+    # Every deletion names the issue that decided it and why.
+    assert {entry["issue"] for entry in allowlist} == {264, 343}
+    assert all(entry["reason"] for entry in allowlist)
 
 
 def test_the_template_asks_for_experience_verification_and_scope() -> None:

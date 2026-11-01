@@ -454,42 +454,69 @@ a {
   text-decoration-color: currentColor;
 }
 
-/* One next thing, under the thread and above the composer. */
-.guidance {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 0 2px 8px;
-  font-size: 0.78rem;
+/* One recommended move, under the thread and above the composer. */
+.next-move {
+  display: grid;
+  gap: 4px;
+  margin: 0 2px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
 }
 
-.guidance__line {
-  flex: 1;
-  min-width: 0;
+.next-move__kind {
   margin: 0;
   color: var(--faint);
-  line-height: 1.5;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.guidance__action {
-  flex: none;
+.next-move__move {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.next-move__why,
+.next-move__expected {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.next-move__expected span {
+  color: var(--faint);
+}
+
+.next-move__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.next-move__action {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--muted);
-  font-size: inherit;
-  text-decoration: underline;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 3px;
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.guidance__action:hover {
-  color: var(--text);
+.next-move__action:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.guidance__dismiss {
-  flex: none;
+.next-move__dismiss {
+  margin-left: auto;
   padding: 0 2px;
   border: 0;
   background: transparent;
@@ -499,7 +526,7 @@ a {
   opacity: 0.7;
 }
 
-.guidance__dismiss:hover {
+.next-move__dismiss:hover {
   color: var(--muted);
   opacity: 1;
 }
@@ -2839,13 +2866,8 @@ input[type="range"] {
     padding-inline: 12px;
   }
 
-  .guidance {
-    flex-wrap: wrap;
-    gap: 4px 10px;
-  }
-
-  .guidance__line {
-    flex: 1 1 100%;
+  .next-move {
+    padding-inline: 10px;
   }
 
   .hero__aside {
