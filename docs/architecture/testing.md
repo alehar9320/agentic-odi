@@ -208,7 +208,7 @@ The browser-level suite lives in `apps/studio/e2e/` and runs with
 real sidecar and MCP server — no mocked network calls — so it covers the
 seams that neither pytest nor vitest can: the SPA's assumptions about the
 sidecar's response shapes, the sidecar's hydration of the canvas, and the
-first-run wizard's ordering relative to the rest of the app.
+first-run tour's ordering relative to the rest of the app.
 
 ```bash
 npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist

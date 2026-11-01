@@ -1,22 +1,24 @@
-import { GOALS, GOAL_STEP_INDEX, STEPS, type GoalId } from "./content";
+import { SCENES } from "./content";
 import {
   ONBOARDING_VERSION,
   createOnboardingState,
   type OnboardingState,
   type OnboardingStatus,
+  type SkipReason,
 } from "./machine";
 
 /**
- * Versioned, defensive persistence for the tour. A malformed or outdated record
- * behaves exactly like a first run, never like a crash.
+ * Versioned, defensive persistence for the tour. A malformed, outdated, or
+ * differently-shaped record behaves exactly like a first run, never like a
+ * crash — including the four-step shape an older build wrote.
  */
 
 export const ONBOARDING_STORAGE_KEY = "studio.onboarding";
 
 export type OnboardingStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
-const STATUSES: OnboardingStatus[] = ["pending", "active", "done", "skipped"];
-const GOAL_IDS = new Set<string>(GOALS.map((goal) => goal.id));
+const STATUSES: OnboardingStatus[] = ["pending", "open", "done", "skipped"];
+const SKIP_REASONS: SkipReason[] = ["not-now", "dismissed"];
 
 function browserStorage(): OnboardingStorage | null {
   if (typeof window === "undefined") {
@@ -29,8 +31,8 @@ function browserStorage(): OnboardingStorage | null {
   }
 }
 
-function isGoalId(value: unknown): value is GoalId {
-  return typeof value === "string" && GOAL_IDS.has(value);
+function isSkipReason(value: unknown): value is SkipReason {
+  return typeof value === "string" && (SKIP_REASONS as string[]).includes(value);
 }
 
 function parseState(raw: string): OnboardingState | null {
@@ -52,25 +54,26 @@ function parseState(raw: string): OnboardingState | null {
     return null;
   }
   if (
-    typeof candidate.step !== "number" ||
-    !Number.isInteger(candidate.step) ||
-    candidate.step < 0 ||
-    candidate.step >= STEPS.length
+    typeof candidate.scene !== "number" ||
+    !Number.isInteger(candidate.scene) ||
+    candidate.scene < 0 ||
+    candidate.scene >= SCENES.length
   ) {
     return null;
   }
-  if (candidate.goal !== null && !isGoalId(candidate.goal)) {
-    return null;
-  }
-  // Past the starting-point step, the tour always has a chosen goal.
-  if (candidate.step > GOAL_STEP_INDEX && !isGoalId(candidate.goal)) {
+  // Only a skipped tour carries a reason; anything else is malformed.
+  if (candidate.status === "skipped") {
+    if (!isSkipReason(candidate.reason)) {
+      return null;
+    }
+  } else if (candidate.reason !== null) {
     return null;
   }
 
   return createOnboardingState({
     status: candidate.status as OnboardingStatus,
-    step: candidate.step,
-    goal: (candidate.goal as GoalId | null) ?? null,
+    scene: candidate.scene,
+    reason: isSkipReason(candidate.reason) ? candidate.reason : null,
   });
 }
 
@@ -114,4 +117,3 @@ export function clearOnboardingState(
     // Nothing to do.
   }
 }
-

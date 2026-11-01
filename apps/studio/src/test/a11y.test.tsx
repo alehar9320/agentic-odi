@@ -245,7 +245,7 @@ describe("axe sweep", () => {
     await expectAccessible(container);
   });
 
-  it("passes the first-run wizard", async () => {
+  it("passes every scene of the first-run tour", async () => {
     const { container } = render(
       <UpdateProvider service={updateService}>
         <OnboardingProvider enabled>
@@ -258,6 +258,11 @@ describe("axe sweep", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Show me around" }));
 
+    // Each scene is its own surface, so each gets its own axe pass.
+    await expectAccessible(container);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await expectAccessible(container);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await expectAccessible(container);
   });
 
