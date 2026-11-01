@@ -1,5 +1,5 @@
 /**
- * The optional product tour for The Living Studio.
+ * The optional product tour for the studio.
  *
  * Nothing here opens by itself: the home stage and Settings ask the provider
  * for it. The app needs only the provider and the wizard; everything else stays

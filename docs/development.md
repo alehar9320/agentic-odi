@@ -151,6 +151,21 @@ uv run --directory website pytest tests/
 The site is generated at CI time and never committed. CI runs `build_site.py` to
 produce `_site` and uploads it as the `website-site` artifact for review.
 
+The landing page's primary call to action points at the **sample workspace**,
+`website/sample/index.html`. Unlike the rest of the site it *is* committed, so
+it survives an API outage and can be linked from the README. It is generated
+from `website/content/sample-study.json` by `website/tools/build_sample.py`;
+regenerate it after editing the fixture or `website/templates/sample.html`:
+
+```bash
+uv run python website/tools/build_sample.py          # write the committed page
+uv run python website/tools/build_sample.py --check  # fail when it is stale
+```
+
+`website/tests/test_content_sync.py` runs the same comparison, so the page
+cannot drift from the fixture, and it greps the committed file for an external
+reference so the no-network rule is enforced rather than promised.
+
 Publishing happens in `.github/workflows/pages.yml`: it runs those tests,
 builds `_site` from `website/`, and deploys the artifact with
 `actions/deploy-pages` on every push to `main`. There is no `gh-pages` branch,
@@ -310,6 +325,47 @@ CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
 repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
 `continue-on-error` on the job keeps a failure from turning CI red.
 
+## Cold-open budget
+
+A study at scale must reach an interactive screen in under a second, or a PM
+batches their work instead of checking something. The reference study is 1,500
+outcomes over 30 jobs, each with a complete eight-step job map and one customer
+quote per outcome (3,270 events). It is generated deterministically by
+`agentic_odi_core.corpus.build_corpus`, so the number is comparable between runs
+and machines:
+
+```bash
+uv run python scripts/gen_corpus.py --out /tmp/corpus.db
+```
+
+The number is measured per segment, because the fix differs per segment, and the
+regression tests live with the segment they cover:
+
+```bash
+uv run pytest packages/core -k perf --no-header -q
+npm --prefix apps/studio test -- --run src/components/canvas/opportunityLandscape.perf.test.tsx
+```
+
+**Reference environment:** AMD EPYC 9B14, 4 vCPU, 15 GiB RAM, Linux, Python
+3.13.15, `uv` 0.13.5, median of seven cold-open runs.
+
+| Segment | Before | After | Fix |
+|---|---|---|---|
+| Store open (`_load_snapshot` replay) | 32 ms | 27 ms | Unchanged; replay itself was never the bottleneck. |
+| Canvas assembly (`fetch_local_canvas`) | 1,146 ms | 23 ms | `_sync` now reads only events appended since the last apply (`get_stream(after_id=…)`) instead of re-parsing the whole log on every read. One assembly read 206,010 rows; it now reads 3,270. |
+| First interactive render (SPA matrix) | 590 ms | 162 ms | The landscape plots the 200 highest-opportunity outcomes above the fold and offers "Plot all"; 8,957 DOM nodes became 1,709. |
+
+Cold open, end to end, is store open plus assembly plus first render: **32 + 1,146
++ 590 ≈ 1,768 ms before, 27 + 23 + 162 ≈ 212 ms after.**
+
+The Python bounds in `packages/core/tests/test_perf_cold_open.py` are deliberately
+loose (2 s per segment — roughly an order of magnitude over the reference number).
+A tight wall-clock bound on a shared runner fails on a busy box and gets deleted
+within a month. The deterministic guard is
+`test_perf_canvas_assembly_does_not_rescan_the_whole_log`: it counts rows read
+rather than seconds, and a return to the full rescan (206,010 rows) fails it on
+any machine.
+
 ## Test Coverage
 
 CI runs the suite on Python **3.10, 3.11, and 3.12** and uploads one combined
@@ -365,7 +421,7 @@ uv run pytest \
 
 | Area | What it covers |
 |---|---|
-| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, and repository factory |
+| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, and the per-segment cold-open budget |
 | `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
 | `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, and step/outcome passthrough |
 | `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, connectors, and startup performance |
@@ -375,7 +431,7 @@ uv run pytest \
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, OG art reproducibility, and README sync |
+| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, OG art reproducibility, and README sync |
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the

@@ -79,7 +79,7 @@ describe("UpdateBanner", () => {
     });
     act(() => push?.({ received: 5, total: 10 }));
 
-    expect(screen.getByText("Getting Living Studio 0.12.0 ready")).toBeInTheDocument();
+    expect(screen.getByText("Downloading version 0.12.0")).toBeInTheDocument();
     expect(screen.getByText(/keep working/i)).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
     expect(screen.getByText("50%")).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe("UpdateBanner", () => {
       await service.check();
     });
 
-    expect(screen.getByText("Living Studio 0.12.0 is ready")).toBeInTheDocument();
+    expect(screen.getByText("Version 0.12.0 is ready")).toBeInTheDocument();
     expect(screen.getByText(/next time you open the studio/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
@@ -132,7 +132,7 @@ describe("UpdateBanner", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss update notice" }));
 
-    expect(screen.queryByText("Living Studio 0.12.0 is ready")).toBeNull();
+    expect(screen.queryByText("Version 0.12.0 is ready")).toBeNull();
     expect(service.getSnapshot().installed).toBe(true);
   });
 
@@ -157,7 +157,7 @@ describe("UpdateBanner", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(
-      await screen.findByText("Living Studio 0.12.0 is ready"),
+      await screen.findByText("Version 0.12.0 is ready"),
     ).toBeInTheDocument();
   });
 });

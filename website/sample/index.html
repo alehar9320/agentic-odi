@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sample workspace — Agentic ODI</title>
+  <meta name="description" content="A read-only sample workspace: a job, its steps, scored outcomes, and the evidence behind them. Every row is labelled a sample.">
+  <meta name="color-scheme" content="dark light">
+  <style>
+    :root {
+      --bg: #0a0b0e; --bg-raised: #0e1014; --text: #f1f2f4; --muted: #a2a7b3;
+      --accent: #8b8cf8; --line: rgba(255, 255, 255, 0.1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6; -webkit-font-smoothing: antialiased;
+    }
+    header.banner { border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; background: var(--bg-raised); }
+    .banner__label { margin: 0 0 6px; font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
+    h1 { margin: 0 0 8px; font-size: clamp(1.75rem, 4vw, 2.5rem); letter-spacing: -0.02em; }
+    h2 { margin: 40px 0 12px; font-size: 1.25rem; }
+    p { margin: 0 0 12px; color: var(--muted); }
+    a { color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; margin: 0 0 8px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .marker {
+      display: inline-block; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--bg); background: var(--accent); border-radius: 999px; padding: 2px 9px;
+    }
+    .num { font-variant-numeric: tabular-nums; }
+    .date { color: var(--muted); font-size: 0.875rem; }
+    footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <header class="banner">
+    <p class="banner__label">Sample workspace</p>
+    <h1>A job, its outcomes, and the evidence behind them.</h1>
+    <p>
+      This is a read-only sample. Every row is labelled a sample, and the whole page
+      is generated from a committed fixture — it is what the product produces, shown
+      without installing anything. It renders with no network: no external font,
+      script, image, or stylesheet is referenced.
+    </p>
+    <p class="date">Generated <time datetime="2026-10-31">2026-10-31</time>.</p>
+  </header>
+
+  <main id="main">
+    <h2>The job</h2>
+    <table>
+      <thead>
+        <tr><th>Id</th><th>Job</th><th>Origin</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>JOB-SAMPLE</td>
+          <td>Reconcile invoices — Finance leads closing the month without matching every line by hand.</td>
+          <td><span class="marker">Sample</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Steps</h2>
+    <table>
+      <thead>
+        <tr><th>Order</th><th>Step</th><th>Origin</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num">1</td>
+          <td>Collect the statements</td>
+          <td><span class="marker">Sample</span></td>
+        </tr>
+        <tr>
+          <td class="num">2</td>
+          <td>Match each line</td>
+          <td><span class="marker">Sample</span></td>
+        </tr>
+        <tr>
+          <td class="num">3</td>
+          <td>Review the exceptions</td>
+          <td><span class="marker">Sample</span></td>
+        </tr>
+        <tr>
+          <td class="num">4</td>
+          <td>File and close</td>
+          <td><span class="marker">Sample</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Outcomes, ranked by opportunity</h2>
+    <table>
+      <thead>
+        <tr><th>Id</th><th>Outcome</th><th>Importance</th><th>Satisfaction</th><th>Opportunity</th><th>Origin</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>OUT-1</td>
+          <td>Reconcile invoices without manual effort</td>
+          <td class="num">8</td>
+          <td class="num">3</td>
+          <td class="num">13.0</td>
+          <td><span class="marker">Sample</span></td>
+        </tr>
+        <tr>
+          <td>OUT-2</td>
+          <td>Catch a failed payment before it churns</td>
+          <td class="num">9</td>
+          <td class="num">6</td>
+          <td class="num">12.0</td>
+          <td><span class="marker">Sample</span></td>
+        </tr>
+        <tr>
+          <td>OUT-3</td>
+          <td>Hand a refund back in one step</td>
+          <td class="num">6</td>
+          <td class="num">5</td>
+          <td class="num">7.0</td>
+          <td><span class="marker">Sample</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Evidence</h2>
+    <table>
+      <thead>
+        <tr><th>Source</th><th>Quote</th><th>Origin</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Support call</td>
+          <td>I spend every Friday matching invoices to receipts. It is the part of the job I dread.</td>
+          <td><span class="marker">Sample</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+
+  <footer>
+    <p>
+      Nothing here is live and nothing here is yours — it is a sample. Load a demo
+      workspace of your own, or read the <a href="../docs/">documentation</a>.
+    </p>
+    <p><a href="../">Back to Agentic ODI</a></p>
+  </footer>
+</body>
+</html>

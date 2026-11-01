@@ -464,6 +464,24 @@ def test_the_404_page_is_self_contained():
     assert "<img" not in html
 
 
+def test_the_sample_page_is_self_contained():
+    # The sample workspace is the landing page's primary call to action. It
+    # must render with no network, so it carries its own style and references
+    # nothing external. This is the same contract as the 404 page, asserted the
+    # same way.
+    html = read_page("sample/index.html")
+    assert 'lang="en"' in html
+    assert '<meta charset="utf-8">' in html
+    assert "width=device-width" in html
+    assert html.count("<h1") == 1
+    assert "<main" in html and "<footer" in html
+    assert "<link" not in html
+    assert "<script" not in html
+    assert "<img" not in html
+    assert not EMOJI.search(html)
+    assert not QUARTER.search(html) and not MONTH_YEAR.search(html)
+
+
 # ---------------------------------------------------------------- weight & links
 
 

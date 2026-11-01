@@ -5,6 +5,7 @@
  * can never disagree about whether an update is available, downloading, or
  * waiting for a restart.
  */
+import { updateTitle } from "../lib/brand";
 import type { UpdateEvent, UpdateSnapshot } from "./types";
 
 export const INITIAL_SNAPSHOT: UpdateSnapshot = {
@@ -278,24 +279,25 @@ export function statusLine(snapshot: UpdateSnapshot, now: number): string {
 
   if (snapshot.phase === "downloading") {
     const percent = progressPercent(snapshot);
+    const downloading = updateTitle(version ?? "", "downloading");
     return percent === null
-      ? `Downloading Living Studio ${version ?? ""}…`
-      : `Downloading Living Studio ${version ?? ""} — ${Math.round(percent * 100)}%`;
+      ? `${downloading}…`
+      : `${downloading} — ${Math.round(percent * 100)}%`;
   }
 
   if (snapshot.phase === "installing") {
-    return `Installing Living Studio ${version ?? ""}…`;
+    return `${updateTitle(version ?? "", "installing")}…`;
   }
 
   if (snapshot.phase === "ready") {
     if (snapshot.pendingInstall) {
-      return `Living Studio ${version ?? ""} is downloaded. Updating restarts the app.`;
+      return `Version ${version ?? ""} is downloaded. Updating restarts the app.`;
     }
-    return `Living Studio ${version ?? ""} is ready. Restart to finish.`;
+    return updateTitle(version ?? "", "ready");
   }
 
   if (version && version === snapshot.skippedVersion) {
-    return `Living Studio ${version} is skipped. You will be offered the next release.`;
+    return `Version ${version} is skipped. You will be offered the next release.`;
   }
 
   if (snapshot.phase === "up-to-date") {
