@@ -45,9 +45,9 @@ feature; merge it, if it merges, as infrastructure.
 | `f39c3fa` | 6 | `edge/scheduler.ts` — ten served answers earn the next tier, consent-locked, idle/visible/SaveData-gated, single-engine-across-tabs |
 | `fd0bfe4` | 7 | `edge-downloading` / `edge-unlocked` banner kinds; the bridge subscribes to edge notices and stops claiming "Working by hand" while the edge answers |
 
-Total across the seven commits, counting only the code diff and excluding this
-document: 29 files, 2,465 lines added, 48 deleted, 60 new test cases across
-7 test files.
+Total for the seven feature commits, counting the code and docs they changed and
+excluding this document: 29 files, 2,465 lines added, 48 deleted, 60 new test
+cases across 9 browser test files plus one amended Python security-header test.
 
 ## Remaining iterations
 
