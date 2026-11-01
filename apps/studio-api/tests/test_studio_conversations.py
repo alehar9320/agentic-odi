@@ -233,3 +233,87 @@ def test_the_tree_endpoint_restores_claims_with_their_labels() -> None:
     claims = body["messages"][0]["claims"]
     assert [claim["status"] for claim in claims] == ["cited", "hypothesis"]
     assert claims[0]["evidence"] == [{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}]
+
+
+def test_conversations_list_newest_first_with_turn_counts() -> None:
+    memory = _memory()
+    older = memory.create_conversation("older")
+    newer = memory.create_conversation("newer")
+
+    memory.append_turn(older.id, "user", "list jobs", "o-1", None)
+    memory.append_turn(older.id, "assistant", "here they are", "o-2", "o-1")
+    # A later turn bumps the newer conversation's updated_at above the older one.
+    memory.append_turn(newer.id, "user", "a different thread", "n-1", None)
+
+    listed = memory.list_conversations()
+
+    assert [conversation.id for conversation in listed] == [newer.id, older.id]
+    counts = {conversation.id: conversation.turn_count for conversation in listed}
+    assert counts == {newer.id: 1, older.id: 2}
+    assert [conversation.head_id for conversation in listed] == ["n-1", "o-2"]
+
+
+def test_a_conversation_with_no_turns_lists_with_a_zero_count() -> None:
+    memory = _memory()
+    empty = memory.create_conversation()
+
+    [listed] = memory.list_conversations()
+
+    assert listed.id == empty.id
+    assert listed.turn_count == 0
+    assert listed.title == ""
+    assert listed.head_id is None
+
+
+def test_list_conversations_caps_and_pages() -> None:
+    memory = _memory()
+    for index in range(5):
+        memory.create_conversation(f"thread {index}")
+
+    first_page = memory.list_conversations(limit=2)
+    second_page = memory.list_conversations(limit=2, offset=2)
+
+    assert len(first_page) == 2
+    assert len(second_page) == 2
+    assert {c.id for c in first_page}.isdisjoint({c.id for c in second_page})
+
+
+def test_the_conversations_endpoint_lists_newest_first() -> None:
+    memory = _memory()
+    older = memory.create_conversation("older")
+    newer = memory.create_conversation("newer")
+    memory.append_turn(older.id, "user", "hello", "o-1", None)
+    memory.append_turn(newer.id, "user", "later", "n-1", None)
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=memory))
+
+    response = client.get("/api/conversations")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["id"] for item in body] == [newer.id, older.id]
+    # Reading back re-normalises timestamps, so fetch fresh expected values.
+    expected = memory.list_conversations()[0].to_dict()
+    assert body[0] == expected
+    assert body[0]["turn_count"] == 1
+    assert body[1]["turn_count"] == 1
+
+
+def test_the_conversations_endpoint_is_empty_without_500() -> None:
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=_memory()))
+
+    response = client.get("/api/conversations")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_the_conversations_endpoint_clamps_and_rejects_bad_pages() -> None:
+    memory = _memory()
+    for index in range(3):
+        memory.create_conversation(f"thread {index}")
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=memory))
+
+    assert len(client.get("/api/conversations", params={"limit": 2}).json()) == 2
+    assert client.get("/api/conversations", params={"limit": 0}).status_code == 422
+    assert client.get("/api/conversations", params={"offset": -1}).status_code == 422
+    assert client.get("/api/conversations", params={"limit": 10_000}).status_code == 422
