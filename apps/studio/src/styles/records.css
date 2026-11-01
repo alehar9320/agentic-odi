@@ -1,81 +1,92 @@
 /* ------------------------------------------------------------------ */
-/* Records lens */
+/* Records lens                                                        */
 /* ------------------------------------------------------------------ */
 .records {
-display: flex;
-flex-direction: column;
-gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
+
 .records__sections {
-display: flex;
-flex-direction: column;
-gap: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
 }
+
 .records__section {
-display: flex;
-flex-direction: column;
-gap: 8px;
-min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
+
 .records__heading {
-display: flex;
-align-items: baseline;
-gap: 8px;
-margin: 0;
-color: var(--text);
-font-size: 0.82rem;
-font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
 }
+
 .records__count {
-padding: 1px 7px;
-border: 1px solid var(--line);
-border-radius: 999px;
-color: var(--faint);
-font-size: 0.68rem;
-font-weight: 600;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--faint);
+  font-size: 0.68rem;
+  font-weight: 600;
 }
+
 .records__table {
-width: 100%;
-border-collapse: collapse;
-font-size: 0.78rem;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
 }
+
 .records__table th,
 .records__table td {
-padding: 7px 10px;
-border-bottom: 1px solid var(--line);
-text-align: left;
-vertical-align: top;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
 }
+
 .records__table th {
-color: var(--faint);
-font-size: 0.68rem;
-font-weight: 600;
-letter-spacing: 0.06em;
-text-transform: uppercase;
-white-space: nowrap;
+  color: var(--faint);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
+
 .records__table tbody tr:last-child td {
-border-bottom: 0;
+  border-bottom: 0;
 }
+
 .records__id {
-color: var(--muted);
-font-family: var(--mono);
-font-size: 0.72rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72rem;
 }
+
 .records__provenance {
-display: inline-block;
-width: fit-content;
-margin: 0;
-padding: 4px 10px;
-border: 1px solid var(--line-strong);
-border-radius: 999px;
-color: var(--faint);
-font-size: 0.7rem;
-letter-spacing: 0.08em;
+  display: inline-block;
+  width: fit-content;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--faint);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
 }
+
 .records__cap,
 .records__empty {
-margin: 0;
-color: var(--faint);
-font-size: 0.75rem;
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.75rem;
 }
