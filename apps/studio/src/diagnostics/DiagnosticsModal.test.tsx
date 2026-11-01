@@ -59,7 +59,12 @@ function stubContext(): StudioContextValue {
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     refreshPresets: vi.fn().mockResolvedValue(undefined),
     refreshCapabilities: vi.fn().mockResolvedValue(undefined),
-    recheckConnections: vi.fn().mockResolvedValue(undefined),
+    surveyConnections: vi.fn().mockResolvedValue({
+      sidecarReachable: false,
+      mcpReachable: false,
+      llmHealthy: false,
+      llmMessage: "no sidecar",
+    }),
     capabilities: [],
     toasts: [],
     pushToast: vi.fn(),

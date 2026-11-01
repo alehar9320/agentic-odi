@@ -512,6 +512,21 @@ export class ChatOrchestrator {
     signal?: AbortSignal,
   ): Promise<void> {
     let assistantTurn: string;
+    // A saved address the browser cannot reach — mixed-content blocked, refused by
+    // CORS, a laptop moved off the network its Ollama lives on — should not cost the
+    // person the answer they asked for. Nothing may have reached the transcript or the
+    // canvas yet, so a failure that early is answered locally instead of reported.
+    let started = false;
+    const watched = (event: RawSseEvent): void => {
+      if (
+        event.event === "delta" ||
+        event.event === "message" ||
+        event.event === "tool_result"
+      ) {
+        started = true;
+      }
+      onEvent(event);
+    };
 
     try {
       const history: Array<Record<string, unknown>> = [
@@ -535,11 +550,11 @@ export class ChatOrchestrator {
         history,
         TOOLS,
         true,
-        onEvent,
+        watched,
         signal,
       );
       if (first.toolCalls.length) {
-        await this.executeToolCalls(first.toolCalls, onEvent);
+        await this.executeToolCalls(first.toolCalls, watched);
         const second = await this.callOpenAI(
           request,
           [
@@ -553,7 +568,7 @@ export class ChatOrchestrator {
           ],
           TOOLS,
           true,
-          onEvent,
+          watched,
           signal,
         );
         assistantTurn = second.content;
@@ -564,8 +579,27 @@ export class ChatOrchestrator {
       if (error instanceof Error && error.name === "AbortError") {
         throw error;
       }
-      const problem = asStudioError(error);
-      emit({ event: "error", data: { error: problem } }, onEvent);
+      if (started) {
+        // Some of the answer, or some of the work, is already in front of them.
+        emit({ event: "error", data: { error: asStudioError(error) } }, onEvent);
+        return;
+      }
+      if (error instanceof BffError && error.studioError.code === "provider_error") {
+        // The endpoint answered — badly. A rejected key or a model that does not exist
+        // is a thing the person can fix, so it gets said rather than hidden behind a
+        // local draft that looks like a reply from the model they asked for.
+        emit({ event: "error", data: { error: asStudioError(error) } }, onEvent);
+        return;
+      }
+      // The request never left the browser: mixed content blocked, CORS refused, a
+      // laptop off the network its model lives on. Their question is still worth an
+      // answer, and the local responder has one.
+      emit({ event: "status", data: { phase: "offline" } }, onEvent);
+      const lastMessage = request.messages[request.messages.length - 1];
+      await this.streamDeterministic(
+        lastMessage && lastMessage.role === "user" ? lastMessage : undefined,
+        onEvent,
+      );
       return;
     }
 

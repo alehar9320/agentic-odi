@@ -41,12 +41,28 @@ describe("model endpoint configuration", () => {
   });
 
   it("treats the sidecar proxy default as no endpoint of its own", () => {
-    expect(isEndpointConfigured(endpoint({ base_url: "http://localhost:8001/v1", api_key: "" }))).toBe(
-      false,
-    );
+    // Every shape a person may write it in, including the one docs/local-llm.md
+    // tells them to use, and with a key — the sidecar is not a model server the
+    // browser may talk model-to.
+    for (const base_url of [
+      "http://localhost:8001/v1",
+      "http://localhost:8001/v1/",
+      "http://127.0.0.1:8001/v1",
+      "http://[::1]:8001/v1",
+      "HTTP://localhost:8001/V1",
+    ]) {
+      expect(isEndpointConfigured(endpoint({ base_url, api_key: "" }))).toBe(false);
+      expect(isEndpointConfigured(endpoint({ base_url, api_key: "local" }))).toBe(false);
+    }
+  });
+
+  it("does not mistake another server on port 8001 for the sidecar", () => {
     expect(
-      isEndpointConfigured(endpoint({ base_url: "http://localhost:8001/v1/", api_key: "" })),
-    ).toBe(false);
+      isEndpointConfigured(endpoint({ base_url: "http://192.168.1.9:8001/v1", api_key: "" })),
+    ).toBe(true);
+    expect(
+      isEndpointConfigured(endpoint({ base_url: "http://localhost:9000/v1", api_key: "" })),
+    ).toBe(true);
   });
 
   it("needs both an address and a model name", () => {

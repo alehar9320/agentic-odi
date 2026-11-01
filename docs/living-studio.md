@@ -169,7 +169,11 @@ Studio says so in one place and keeps going:
 
 - The bar's model chip reads **Local**, and its accessible name and tooltip say
   *Answering from your device. No model connected.* That is read straight from
-  your settings — it needs no probe, so it is true on the first paint.
+  your settings — it needs no probe, so it is true on the first paint. A measured
+  answer outranks the guess: when the sidecar vouches for a model the chip reads
+  **Live**, and when it reports the model is not there, **Local mode**.
+  **Connecting** is reserved for an endpoint that is configured and has not
+  answered yet — nobody spins for a connection they are not trying to make.
 - A reply that no model produced carries one line, on that reply: **Local draft,
   no model connected**. It is a button, and it opens Settings. It never repeats
   on the replies around it, and nothing about it covers the thread.
@@ -180,8 +184,10 @@ Studio says so in one place and keeps going:
   all.
 - A warning strip appears only for something that actually broke: a model or
   sidecar that this session reached and then lost, or a check you asked for by
-  opening Settings, pressing **Recheck**, or running the tour's live step.
-  Background health polls may retire a warning, never raise one.
+  pressing **Recheck** or running the tour's live step. Opening Settings measures
+  the connections for its own rows and keeps the answer to itself — reading a
+  settings panel is not an outage to announce across the window. Background health
+  polls may retire a warning, never raise one.
 - Settings → Base URL and Model reconnect the assistant whenever you are ready.
   A keyless server on your own network (Ollama, LM Studio, anything on loopback
   or a private address) counts as configured; a public URL without a key does
@@ -206,7 +212,12 @@ nothing on screen can claim otherwise before the person has asked for something.
   they find keeps the studio **unknown** rather than **down**.
 - Sending a message is not gated on a server. The request goes to the sidecar,
   and when nothing answers at the transport level the same turn is carried by the
-  browser BFF. You get an answer, labelled for what it is.
+  browser BFF. You get an answer, labelled for what it is. The same is true of a
+  model address the browser simply cannot reach — a blocked mixed-content call, a
+  laptop off the network its Ollama lives on: the turn is answered on the device
+  rather than failing on the first try. An endpoint that *did* answer badly (a
+  rejected key) is reported, not hidden behind a local draft that looks like the
+  model you asked for.
 - The **sidecar isn't running** strip is for the loss of a sidecar this session
   was talking to: the assistant paused and live data froze is only said when both
   are true. It offers **Recheck** and **Start the sidecar**, is dismissible for

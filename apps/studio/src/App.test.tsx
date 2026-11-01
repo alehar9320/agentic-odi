@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { healthLlm } from "./api/studioApi";
+import { fetchConfig, healthLlm } from "./api/studioApi";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -92,6 +92,13 @@ const BRIEF = {
   job_id: "JOB-402",
 };
 
+const SIDECAR_CONFIG = {
+  base_url: "http://localhost:8001/v1",
+  api_key: "local",
+  model_name: "local-tools-model",
+  mcp_url: "http://localhost:8000/mcp",
+};
+
 beforeEach(() => {
   for (const key of [
     "studio.brief",
@@ -111,6 +118,7 @@ beforeEach(() => {
   // The old five-field panel is the subject of its own suite below.
   window.localStorage.setItem("studio.flags.firstRunIntro", "off");
   window.localStorage.setItem("studio.brief", JSON.stringify(BRIEF));
+  vi.mocked(fetchConfig).mockResolvedValue(SIDECAR_CONFIG);
   vi.mocked(healthLlm).mockResolvedValue({
     healthy: true,
     message: "LLM backend is reachable.",
@@ -290,6 +298,72 @@ describe("studio shell", () => {
 
     expect(screen.queryByText(/working by hand/i)).toBeNull();
     expect(screen.queryByText(/sidecar isn.t running/i)).toBeNull();
+  });
+
+  it.each(["dark", "light"])(
+    "opens a browser-only first run with no banner in the %s theme",
+    async (theme) => {
+      // #309's acceptance test: the initial DOM carries no apology. Nobody has asked
+      // for the sidecar or the model yet, so nothing may be reported as broken — not in
+      // the theme the studio opens in, and not in the other one either.
+      window.localStorage.setItem(
+        "studio.settings",
+        JSON.stringify({ base_url: "", api_key: "", model_name: "", mcp_url: "", theme }),
+      );
+      const { fetchConfig, healthLlm } = await import("./api/studioApi");
+      vi.mocked(fetchConfig).mockRejectedValueOnce(new Error("no sidecar"));
+      vi.mocked(healthLlm).mockRejectedValueOnce(new Error("no sidecar"));
+
+      render(<App />);
+
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
+      await screen.findByRole("textbox", { name: /message the studio/i });
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
+    },
+  );
+
+  it("is still quiet after the deferred probe and the health poll have run", async () => {
+    // The probes are deferred, not cancelled: two seconds after the paint the studio
+    // measures what it can reach, and every thirty seconds after that. On a hosted page
+    // with no sidecar every one of those measurements is a refusal, and none of them is
+    // a strip across the top of the window.
+    vi.mocked(fetchConfig).mockRejectedValue(new Error("no sidecar"));
+    vi.mocked(healthLlm).mockRejectedValue(new Error("no sidecar"));
+    vi.useFakeTimers();
+    try {
+      render(<App />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(90_000);
+      });
+
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does say so when a sidecar it had been reaching stops answering", async () => {
+    // The control for the two tests above: the strips are deferred, never missing. A
+    // studio that was talking to a sidecar and then was not has a real outage to name.
+    vi.useFakeTimers();
+    try {
+      render(<App />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4_000);
+      });
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
+
+      vi.mocked(fetchConfig).mockRejectedValue(new Error("the sidecar went away"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31_000);
+      });
+
+      const banners = document.querySelectorAll(".banner");
+      expect(banners.length).toBeGreaterThan(0);
+      expect(banners[0].textContent).toMatch(/sidecar/i);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops a running stream on Escape before closing the workspace", async () => {

@@ -77,6 +77,12 @@ const state = vi.hoisted(() => ({
   modelsMessage: null,
   refreshModels: vi.fn(async () => undefined),
   checkConnections: vi.fn(async () => ({ llmHealthy: true })),
+  surveyConnections: vi.fn(async () => ({
+    sidecarReachable: true,
+    mcpReachable: true,
+    llmHealthy: true,
+    llmMessage: "ok",
+  })),
   recheckConnections: vi.fn(async () => undefined),
   // Chat
   messages: [] as unknown[],

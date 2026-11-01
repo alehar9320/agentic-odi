@@ -17,12 +17,23 @@ export interface ModelEndpointConfig {
 }
 
 /**
- * The sidecar's own proxy default.
- *
- * It names a loopback address, but it is the sidecar rather than a model server the
- * browser may call directly, so it never counts as a configured endpoint.
+ * The sidecar's own proxy, in the shapes a person may actually write it: localhost or
+ * 127.0.0.1 or ::1, any case, with or without a trailing slash. It names a loopback
+ * address, but it is the sidecar rather than a model server the browser may call
+ * directly, so it never counts as a configured endpoint.
  */
-const SIDECAR_PROXY_URL = "http://localhost:8001/v1";
+function isSidecarProxy(baseUrl: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    return false;
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const loopback = host === "localhost" || host === "::1" || host.startsWith("127.");
+  const path = url.pathname.replace(/\/+$/, "").toLowerCase();
+  return loopback && url.port === "8001" && path === "/v1";
+}
 
 function isPrivateHost(hostname: string): boolean {
   const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
@@ -45,7 +56,7 @@ export function isEndpointConfigured(config: ModelEndpointConfig): boolean {
   if (!baseUrl || !config.model.trim()) {
     return false;
   }
-  if (baseUrl.replace(/\/$/, "") === SIDECAR_PROXY_URL) {
+  if (isSidecarProxy(baseUrl)) {
     return false;
   }
   if (config.api_key.trim()) {

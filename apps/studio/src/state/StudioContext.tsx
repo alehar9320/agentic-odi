@@ -57,7 +57,6 @@ import {
 import type { RawSseEvent } from "../api/sse";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import { loadSession, saveSession, type StudioSession } from "../lib/session";
-import { isEndpointConfiguredForSettings } from "../lib/modelEndpoint";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -266,6 +265,7 @@ export interface ConnectionReport {
   sidecarReachable: boolean;
   mcpReachable: boolean;
   llmHealthy: boolean;
+  llmMessage: string;
 }
 
 export interface StudioContextValue {
@@ -303,6 +303,8 @@ export interface StudioContextValue {
   dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
+  /** Measure the same three connections for one panel, without changing what the studio believes. */
+  surveyConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
   streaming: boolean;
   thinkingPhase: string | null;
@@ -928,26 +930,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Probe the sidecar, MCP server, and model.
+   * Measure the sidecar, the MCP server, and the model without recording the result.
    *
-   * `mode` decides what a negative answer is allowed to do. "evidence" — what a
-   * person gets when they asked, by opening Settings or pressing Recheck — records
-   * the whole truth, including a refusal. "recovery" is for background work nobody
-   * requested: it records a refusal only when it contradicts something the studio
-   * already believed, because that is a thing that just broke mid-session.
-   *
-   * The reason is the first minute. A browser-only visitor has no sidecar and often
-   * no model, which is the design working, not an outage — and a red strip that
-   * appears on its own half a minute after the page loads blames their studio for
-   * being offline when nothing they did needed it to be online.
+   * A panel that owes the person looking at it fresh numbers calls this. Nothing here
+   * changes what the rest of the studio believes, so reading a settings panel cannot
+   * turn into a red strip across the window about a connection nobody was using.
    */
-  const checkConnections = useCallback(
-    async (
-      override: Partial<StudioConfig> = {},
-      mode: "evidence" | "recovery" = "evidence",
-    ): Promise<ConnectionReport> => {
+  const surveyConnections = useCallback(
+    async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
       const target = { ...settings, ...override };
-      const endpointConfigured = isEndpointConfiguredForSettings(target);
       const [sidecar, mcp, llm] = await Promise.all([
         fetchConfig()
           .then(() => true)
@@ -964,6 +955,40 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           message: (error as Error).message || "The model did not answer.",
         })),
       ]);
+      void refreshCapabilities();
+      return {
+        sidecarReachable: sidecar,
+        mcpReachable: mcp,
+        llmHealthy: llm.healthy,
+        llmMessage: llm.message,
+      };
+    },
+    [settings, refreshCapabilities],
+  );
+
+  /**
+   * Probe the sidecar, MCP server, and model, and let the studio act on it.
+   *
+   * `mode` decides what a negative answer is allowed to do. "evidence" — what a
+   * person gets when they asked, by pressing Recheck or walking the setup — records
+   * the whole truth, including a refusal. "recovery" is for background work nobody
+   * requested: it records a refusal only when the sidecar itself witnessed it, or
+   * when it contradicts something the studio already believed, because that is a
+   * thing that just broke mid-session.
+   *
+   * The reason is the first minute. A browser-only visitor has no sidecar and often
+   * no model, which is the design working, not an outage — and a red strip that
+   * appears on its own half a minute after the page loads blames their studio for
+   * being offline when nothing they did needed it to be online.
+   */
+  const checkConnections = useCallback(
+    async (
+      override: Partial<StudioConfig> = {},
+      mode: "evidence" | "recovery" = "evidence",
+    ): Promise<ConnectionReport> => {
+      const report = await surveyConnections(override);
+      const sidecar = report.sidecarReachable;
+      const llm = { healthy: report.llmHealthy, message: report.llmMessage };
 
       if (sidecar) {
         setSidecarReachable(true);
@@ -972,19 +997,23 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       } else {
         setSidecarReachable((previous) => (previous === true ? false : previous));
       }
-      setMcpReachable(mcp);
-      if (llm.healthy || mode === "evidence") {
+      setMcpReachable(report.mcpReachable);
+      // A model that answers is always news. A model that does not is news only when
+      // the sidecar took part in the check — the browser asks it to reach the model, so
+      // a negative it reports is measured rather than guessed — or when we previously
+      // believed the model was alive and it has since stopped. On a hosted first run the
+      // sidecar is absent too, and its silence is not a message about the model.
+      if (llm.healthy || mode === "evidence" || sidecar) {
         setLlmHealth(llm);
-      } else if (endpointConfigured) {
+      } else {
         setLlmHealth((previous) => (previous.healthy === true ? llm : previous));
       }
-      void refreshCapabilities();
       if (sidecar) {
         setDismissedSidecarNotice(false);
       }
-      return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
+      return report;
     },
-    [settings, refreshCapabilities],
+    [surveyConnections],
   );
 
   // Re-probe after the user acted on the sidecar notice (e.g. started the
@@ -2003,6 +2032,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSidecarNotice,
       recheckConnections,
       checkConnections,
+      surveyConnections,
       messages,
       streaming,
       thinkingPhase,
@@ -2115,6 +2145,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSidecarNotice,
       recheckConnections,
       checkConnections,
+      surveyConnections,
       messages,
       streaming,
       thinkingPhase,

@@ -24,6 +24,7 @@ export function StudioBar({
   const {
     llmHealth,
     messages,
+    sidecarReachable,
     unreadSignalCount,
     openPanel,
     openCustomize,
@@ -66,25 +67,26 @@ export function StudioBar({
     pushToast("success", "Conversation exported as Markdown.");
   }
 
-  // Whether an endpoint is configured is knowable from the settings alone, so a
-  // browser-only visitor is told the truth — "Local" — instead of a spinner for a
-  // connection nobody is trying to make. "Connecting" is reserved for a configured
-  // endpoint whose answer has not arrived yet.
+  // A measured answer outranks an inference from the settings. The shipped desktop
+  // default points at the sidecar's own proxy — a loopback address the browser cannot
+  // talk model-to — so guessing from the endpoint alone would read "no model connected"
+  // forever on a machine where the model is in fact answering. "Connecting" is for a
+  // connection somebody is trying to make and has not yet heard back from.
   const endpointConfigured = isEndpointConfiguredForSettings({
     base_url: settings.base_url,
     api_key: settings.api_key,
     model_name: settings.model_name,
   });
-  const status = !endpointConfigured
-    ? "Local"
-    : llmHealth.healthy === null
-      ? "Connecting"
-      : llmHealth.healthy
-        ? "Live"
-        : "Local mode";
-  const statusDetail = !endpointConfigured
-    ? "Answering from your device. No model connected."
-    : llmHealth.message;
+  const status =
+    llmHealth.healthy === true
+      ? "Live"
+      : llmHealth.healthy === false
+        ? "Local mode"
+        : endpointConfigured || sidecarReachable === true
+          ? "Connecting"
+          : "Local";
+  const statusDetail =
+    status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
   const updateReady = update.phase === "ready";
   const versionLabel = updateReady
     ? "Update ready"

@@ -54,6 +54,7 @@ let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
+let llmUnhealthy = false;
 let signalFetches = 0;
 let configHangs = false;
 let approvalCalls: Record<string, unknown>[] = [];
@@ -186,7 +187,11 @@ function route(
   }
   if (url === "/api/health/llm") {
     llmHealthFetches += 1;
-    return json({ healthy: true, message: "ok" });
+    return json(
+      llmUnhealthy
+        ? { healthy: false, message: "connection refused" }
+        : { healthy: true, message: "ok" },
+    );
   }
   if (url.startsWith("/api/signals/unread-count")) {
     return json({ count: 0 });
@@ -519,6 +524,7 @@ describe("StudioContext first run in a browser with no server", () => {
   beforeEach(() => {
     configFails = true;
     configHangs = false;
+    llmUnhealthy = false;
     localStorage.clear();
     chatBody = null;
     chatStream = null;
@@ -536,6 +542,7 @@ describe("StudioContext first run in a browser with no server", () => {
 
   afterEach(() => {
     configHangs = false;
+    llmUnhealthy = false;
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -603,6 +610,104 @@ describe("StudioContext first run in a browser with no server", () => {
 
     expect(chatAttempts).toBe(1);
     expect(llmHealthFetches).toBe(0);
+  });
+
+  it("says nothing about a model the sidecar never got to speak for", async () => {
+    // A hosted studio cannot reach a sidecar, so its health probe cannot reach the
+    // model either. That refusal says nothing about the model, and must not be
+    // recorded as one — otherwise the amber "model offline" strip appears on a page
+    // that is working exactly as designed.
+    llmUnhealthy = true;
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    expect(llmHealthFetches).toBeGreaterThan(0);
+    expect(result.current.llmHealth.healthy).toBeNull();
+
+    await act(async () => {
+      await result.current.recheckConnections();
+    });
+    expect(result.current.llmHealth.healthy).toBe(false);
+  });
+
+  it("asks the browser for idle time, and gives it up when the person types", async () => {
+    // The branch every real browser takes — jsdom has no requestIdleCallback, so the
+    // timer fallback above is the one those tests exercise. The survey is scheduled for
+    // idle time with a deadline, and a person who starts talking ends it.
+    const requestIdle = vi.fn(() => 7);
+    const cancelIdle = vi.fn();
+    vi.stubGlobal("requestIdleCallback", requestIdle);
+    vi.stubGlobal("cancelIdleCallback", cancelIdle);
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(requestIdle).toHaveBeenCalledWith(expect.any(Function), { timeout: 2_000 });
+    expect(llmHealthFetches).toBe(0);
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    expect(cancelIdle).toHaveBeenCalledWith(7);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(llmHealthFetches).toBe(0);
+  });
+});
+
+describe("StudioContext on a desktop install whose model is down", () => {
+  beforeEach(() => {
+    llmUnhealthy = true;
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    llmUnhealthy = false;
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("believes the sidecar when it reports the model is not there", async () => {
+    // The bar, the composer, and the offline panels all read this value. The shipped
+    // desktop default is the sidecar's own proxy address, which no setting can judge —
+    // so a refusal the sidecar witnessed has to be what lands. Without it a laptop with
+    // Ollama switched off sits at "not checked" forever and never reaches the offline
+    // path that is designed for exactly this.
+    localStorage.setItem(
+      "studio.settings",
+      JSON.stringify({
+        base_url: "http://localhost:8001/v1",
+        api_key: "local",
+        model_name: "local-tools-model",
+        mcp_url: "http://localhost:8000/mcp",
+        theme: "dark",
+      }),
+    );
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    expect(result.current.sidecarReachable).toBe(true);
+    expect(result.current.llmHealth.healthy).toBe(false);
+    expect(result.current.llmHealth.message).toBe("connection refused");
   });
 });
 

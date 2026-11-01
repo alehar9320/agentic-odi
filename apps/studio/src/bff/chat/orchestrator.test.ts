@@ -124,10 +124,10 @@ describe("ChatOrchestrator provider choice", () => {
     expect(firstPhase(events)).toBe("offline");
   });
 
-  it("routes a keyless model on the local network to the endpoint", async () => {
-    // Ollama and LM Studio answer with no key at all. Treating them as
-    // unconfigured made the browser write a local draft when a real model
-    // was sitting on the same laptop.
+  it("tries a keyless model on the local network before admitting it cannot", async () => {
+    // Ollama and LM Studio answer with no key at all, so the address is a real
+    // endpoint and the turn starts as a model turn. But a hosted page cannot reach a
+    // laptop's LAN address, and the person who typed it still deserves an answer.
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -146,6 +146,39 @@ describe("ChatOrchestrator provider choice", () => {
     );
 
     expect(firstPhase(events)).toBe("streaming");
+    const phases = events
+      .filter((event) => event.event === "status")
+      .map((event) => event.data.phase);
+    expect(phases).toContain("offline");
+    expect(events.some((event) => event.event === "error")).toBe(false);
+    const message = events.find((event) => event.event === "message");
+    expect(String(message?.data.content)).toMatch(/canvas has/);
+  });
+
+  it("reports an endpoint that answered rather than hiding it in a local draft", async () => {
+    // A rejected key is a thing the person can fix. Papering over it with an answer
+    // that came from their device would look like the model replied.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: { message: "Invalid API key" } }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    const { events, onEvent } = collectEvents();
+    await makeBff().stream(
+      {
+        ...streamRequest("how many jobs?"),
+        base_url: "https://api.example.com/v1",
+        api_key: "sk-wrong",
+        model: "gpt",
+      },
+      onEvent,
+    );
+
     expect(events.some((event) => event.event === "error")).toBe(true);
+    expect(events.some((event) => event.event === "message")).toBe(false);
   });
 });
