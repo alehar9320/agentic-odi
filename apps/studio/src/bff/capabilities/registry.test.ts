@@ -2,6 +2,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { capabilityRegistry } from "./registry";
 
+const settings = {
+  base_url: "http://localhost:8001/v1",
+  api_key: "local",
+  model_name: "local-tools-model",
+  mcp_url: "http://localhost:8000/mcp",
+  theme: "dark",
+} as const;
+
+const stubbedKeys = new Map<string, PropertyDescriptor | undefined>();
+
+function stubNavigator(key: string, value: unknown): void {
+  if (!stubbedKeys.has(key)) {
+    stubbedKeys.set(key, Object.getOwnPropertyDescriptor(navigator, key));
+  }
+  Object.defineProperty(navigator, key, { value, configurable: true });
+}
+
+function webgpuStub(f16: boolean): void {
+  stubNavigator("gpu", {
+    requestAdapter: async () => ({ features: { has: (name: string) => f16 && name === "shader-f16" } }),
+  });
+}
+
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
@@ -11,6 +34,14 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  for (const [key, descriptor] of stubbedKeys) {
+    if (descriptor) {
+      Object.defineProperty(navigator, key, descriptor);
+    } else {
+      delete (navigator as unknown as Record<string, unknown>)[key];
+    }
+  }
+  stubbedKeys.clear();
 });
 
 describe("CapabilityRegistry", () => {
@@ -126,5 +157,30 @@ describe("CapabilityRegistry", () => {
       "sidecar-import",
     ]);
     expect(statuses).toHaveLength(9);
+  });
+
+  it("explains why the browser model is out of reach without WebGPU", async () => {
+    const statuses = await capabilityRegistry.statuses(settings);
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["browser-model"].status).toBe("unavailable");
+    expect(byId["browser-model"].reason).toMatch(/browser doesn't support GPU/i);
+  });
+
+  it("reports the browser model available on a WebGPU device with f16", async () => {
+    webgpuStub(true);
+    stubNavigator("deviceMemory", 8);
+    const statuses = await capabilityRegistry.statuses(settings);
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["browser-model"].status).toBe("available");
+    expect(byId["browser-model"].reason).toBeUndefined();
+  });
+
+  it("says the 16-bit format is missing when the GPU lacks shader-f16", async () => {
+    webgpuStub(false);
+    stubNavigator("deviceMemory", 8);
+    const statuses = await capabilityRegistry.statuses(settings);
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["browser-model"].status).toBe("unavailable");
+    expect(byId["browser-model"].reason).toMatch(/16-bit/i);
   });
 });
