@@ -10,6 +10,11 @@ vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 
+// The browser-model section fills itself in after a storage read, which would
+// put an async update outside every assertion in this file. It has its own
+// suite, and the axe sweep renders it inside this panel.
+vi.mock("./EdgeModelSection", () => ({ EdgeModelSection: () => null }));
+
 import { useStudio } from "../state/StudioContext";
 import type { StudioContextValue } from "../state/StudioContext";
 

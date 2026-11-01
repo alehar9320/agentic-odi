@@ -46,8 +46,11 @@ vi.mock("../edge/manager", () => ({
     decline: () => edge.decline(),
     servedTier: () => edge.servedTier(),
     isBusy: () => edge.isBusy(),
-    setListener: (listener: ((notice: EdgeNotice) => void) | null) => {
+    addNoticeListener: (listener: (notice: EdgeNotice) => void) => {
       edge.noticeListener = listener;
+      return () => {
+        edge.noticeListener = null;
+      };
     },
   },
 }));

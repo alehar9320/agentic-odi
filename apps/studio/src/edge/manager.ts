@@ -8,7 +8,7 @@
 import type { RawSseEvent } from "../api/sse";
 import type { ChatStreamRequest, StudioConfig } from "../types";
 import { isFeatureEnabled } from "../features/flags";
-import { EDGE_TIERS, collectDeviceSignals, computeEligibility, firstEligibleTier, tierById } from "./ladder";
+import { EDGE_TIERS, PROGRESSION, collectDeviceSignals, computeEligibility, firstEligibleTier, tierById } from "./ladder";
 import { EdgeScheduler, type SchedulerEnvironment } from "./scheduler";
 import { openEdgeState, type EdgeStateService } from "./storage";
 import { edgeTurn } from "./turn";
@@ -18,16 +18,20 @@ import type {
   EdgeTierId,
   Eligibility,
   LoadProgress,
+  TierStatus,
 } from "./types";
 
-/** What the page can react to without knowing anything about WebLLM.
- * The banner layer (next iteration) subscribes to these. */
+/** What the page can react to without knowing anything about WebLLM. The
+ * banner layer and the Settings section both subscribe; neither may assume it
+ * is the only listener. */
 export type EdgeNotice =
   | { kind: "downloading"; tier: EdgeTierId; progress: LoadProgress }
   /** The first tier landed: this browser can answer now. */
   | { kind: "ready"; tier: EdgeTierId }
   /** A stronger tier landed on top of one that already answered. */
   | { kind: "unlocked"; tier: EdgeTierId }
+  /** The person freed a tier's storage, so it has to be fetched again. */
+  | { kind: "tier-freed"; tier: EdgeTierId }
   /** The person answered the consent question, either way. */
   | { kind: "consent-changed" };
 
@@ -36,6 +40,25 @@ export interface EdgeOffer {
   tier: EdgeTierId;
   label: string;
   approxBytes: number;
+}
+
+/** Everything the Settings section shows, from one read. */
+export interface EdgePanelState {
+  flagEnabled: boolean;
+  consent: ConsentState;
+  tiers: Array<{
+    id: EdgeTierId;
+    label: string;
+    approxBytes: number;
+    status: TierStatus;
+    eligible: boolean;
+    reason: string | null;
+  }>;
+  /** What this browser has already served, and what the next tier still wants. */
+  usage: { edgeTurns: number; streamedSeconds: number; turnsToNext: number; secondsToNext: number };
+  /** False when no tier fits this device, which is the honest reason the
+   * consent control cannot do anything. */
+  downloadable: boolean;
 }
 
 export interface EdgeDecision {
@@ -84,7 +107,7 @@ export class EdgeManager {
   private state: EdgeStateService | null = null;
   private loadedTier: EdgeTierId | null = null;
   private scheduler: EdgeScheduler | null = null;
-  private listener: ((notice: EdgeNotice) => void) | null = null;
+  private listeners: Set<(notice: EdgeNotice) => void> = new Set();
   private environment: SchedulerEnvironment | null = null;
   private fetching = false;
 
@@ -103,10 +126,20 @@ export class EdgeManager {
     this.environment = env;
   }
 
-  /** The seam the banner layer subscribes to. One subscriber by design: the
-   * banner host owns the notices and re-emits them into the dock. */
-  setListener(listener: ((notice: EdgeNotice) => void) | null): void {
-    this.listener = listener;
+  /** The seam the banner layer and Settings subscribe to. Several listeners on
+   * purpose: the strip and the control panel both react, and neither owns the
+   * other's rendering. */
+  addNoticeListener(listener: (notice: EdgeNotice) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private emit(notice: EdgeNotice): void {
+    for (const listener of [...this.listeners]) {
+      listener(notice);
+    }
   }
 
   /** Drop the cached engine and state so the next call re-opens everything.
@@ -137,12 +170,12 @@ export class EdgeManager {
         state,
         engine: () => this.getEngine(),
         eligibility: () => this.eligibilityFactory(),
-        onProgress: (tier, progress) => this.listener?.({ kind: "downloading", tier, progress }),
+        onProgress: (tier, progress) => this.emit({ kind: "downloading", tier, progress }),
         onUnlocked: (tier, origin) => {
           // The prefetch loaded through this tab's engine, so the next turn
           // starts already on the stronger tier.
           this.loadedTier = tier;
-          this.listener?.({ kind: origin === "bootstrap" ? "ready" : "unlocked", tier });
+          this.emit({ kind: origin === "bootstrap" ? "ready" : "unlocked", tier });
         },
         env: this.environment ?? undefined,
       });
@@ -203,7 +236,7 @@ export class EdgeManager {
     // From this instant this tab is working on an answer, so "no model is
     // reachable" has stopped being true. The banner layer asks `isBusy`.
     this.fetching = true;
-    this.listener?.({ kind: "consent-changed" });
+    this.emit({ kind: "consent-changed" });
     try {
       return await (await this.ensureScheduler()).bootstrap();
     } finally {
@@ -220,7 +253,68 @@ export class EdgeManager {
   async decline(): Promise<void> {
     const state = await this.ensureState();
     await state.setConsent("denied");
-    this.listener?.({ kind: "consent-changed" });
+    this.emit({ kind: "consent-changed" });
+  }
+
+  /** Everything the Settings section renders, from one read. Deliberately a
+   * snapshot rather than live bindings: the section re-reads after each action
+   * and on notices, so it never has to know how tiers are stored. */
+  async panelState(): Promise<EdgePanelState> {
+    const state = await this.ensureState();
+    const [tierStates, usage, consent, eligibility] = await Promise.all([
+      state.getTierStates(),
+      state.getUsage(),
+      state.getConsent(),
+      this.eligibilityFactory(),
+    ]);
+    // A device without WebGPU has no per-tier story — only the one reason the
+    // whole ladder is out of reach.
+    const onlyReason = eligibility.webgpu ? null : (eligibility.reasons[0] ?? null);
+    // Exactly one tier is answering: the strongest one on disk. Older tiers
+    // that once served stay "on this device" rather than claiming a role they
+    // no longer have.
+    const serving = await this.servedTier();
+    const statusOf = (id: EdgeTierId): TierStatus => {
+      const stored = tierStates[id].status;
+      if (id === serving) {
+        return stored === "empty" ? "empty" : "active";
+      }
+      return stored === "active" ? "cached" : stored;
+    };
+    return {
+      flagEnabled: isFeatureEnabled("edgeModel"),
+      consent,
+      tiers: eligibility.tiers.map((decision) => ({
+        id: decision.tier.id,
+        label: decision.tier.label,
+        approxBytes: decision.tier.approxBytes,
+        status: statusOf(decision.tier.id),
+        eligible: decision.eligible,
+        reason: decision.reason ?? onlyReason,
+      })),
+      usage: {
+        edgeTurns: usage.edgeTurns,
+        streamedSeconds: Math.round(usage.streamedSeconds),
+        turnsToNext: Math.max(0, PROGRESSION.edgeTurns - usage.edgeTurns),
+        secondsToNext: Math.max(0, Math.round(PROGRESSION.streamedSeconds - usage.streamedSeconds)),
+      },
+      downloadable: firstEligibleTier(eligibility) !== null,
+    };
+  }
+
+  /** Give the storage back. The weights themselves are WebLLM's to delete, so
+   * this is the one Settings action that may pull in the engine chunk — and
+   * the honest price of a tier this tab has never streamed. */
+  async freeTier(tier: EdgeTierId): Promise<void> {
+    const state = await this.ensureState();
+    if ((await state.getTierStates())[tier].status !== "empty") {
+      await (await this.getEngine()).evict(tierById(tier).modelId);
+    }
+    if (this.loadedTier === tier) {
+      this.loadedTier = null;
+    }
+    await state.setTierState(tier, { status: "empty", cachedAt: null });
+    this.emit({ kind: "tier-freed", tier });
   }
 
   /** Load (or reload into this tab) the tier that should answer, then stream

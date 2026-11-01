@@ -81,7 +81,7 @@ export function BannerBridge() {
   }, [llmHealth.healthy, settings, edgeRevision, raise, resolve]);
 
   useEffect(() => {
-    edgeManager.setListener((notice) => {
+    const unsubscribe = edgeManager.addNoticeListener((notice) => {
       if (notice.kind === "downloading") {
         const percent = Math.round(notice.progress.percent * 100);
         raise({
@@ -104,7 +104,7 @@ export function BannerBridge() {
       }
       setEdgeRevision((revision) => revision + 1);
     });
-    return () => edgeManager.setListener(null);
+    return unsubscribe;
   }, [raise, resolve]);
 
   return null;

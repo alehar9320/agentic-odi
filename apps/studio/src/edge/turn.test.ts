@@ -70,6 +70,7 @@ describe("edgeTurn frame contract", () => {
       },
       load: async () => {},
       unload: async () => {},
+      evict: async () => {},
       async *stream() {
         yield "start";
         controller.abort();

@@ -8,7 +8,7 @@
 
 import { createRef } from "react";
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../assistant/StudioRuntime";
@@ -235,6 +235,10 @@ describe("axe sweep", () => {
       </Surface>,
     );
 
+    // The browser-model section fills itself in after a storage read, so sweep
+    // the panel only once its switch, tiers and meter are on screen.
+    await screen.findByText(/no model key set/i);
+    await act(async () => {});
     await expectAccessible(container);
   });
 

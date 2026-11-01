@@ -13,6 +13,7 @@ import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
+import { EdgeModelSection } from "./EdgeModelSection";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
 import { detectPlatform } from "../updater/platform";
 
@@ -340,6 +341,8 @@ export function SettingsPanel() {
           </li>
         ))}
       </ul>
+
+      <EdgeModelSection />
 
       {sidecarReachable === false ? (
         <p className="muted">

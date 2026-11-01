@@ -122,11 +122,23 @@ Settings. Once it is answering, the browser earns its next rung — ten served
 turns, or fifteen minutes of streamed output, buys the bigger model in the
 background (1B → 3B → 8B, capped by what the device could actually host).
 
+**Settings → Answers in this browser** is where that answer stops being
+one-way. A switch turns the capability off — nothing downloaded, nothing run —
+and the consent underneath it can be changed: *"Stop answering here"* withdraws
+it, and one button names the weakest tier this device could host with its size
+(*"Download Llama 3.2 1B — about 1.3 GB, once"*) and fetches it through the same
+call the banner button makes, including the honest notice when another tab holds
+the engine or the moment is not quiet. Each tier is then listed with its size and
+what it is doing ("answering", "on this device", "not downloaded"), and when a
+tier is missing a device requirement the reason sits on that row ("Needs about a
+8 GB-class device; this one reports 4 GB."). Anything on disk can be freed for
+its storage back, which rewrites the ladder's truth rather than hiding it. A
+meter counts the answers served here toward the next tier, and a line reports how
+much of the site's storage quota the weights are using.
+
 Two honest caveats: nothing in CI has WebGPU, so the engine itself has only
 ever been driven through a fake engine, and the real-GPU path is an unchecked
 box in `docs/superpowers/plans/2026-11-01-edge-llm-ladder-remaining-work.md`.
-There is also no Settings control for the ladder yet — revoking consent or
-freeing the storage a tier occupies is not possible from the UI.
 The engine never reaches the `browser-model` capability from the
 server manifests — a server cannot see a client GPU — so the Worker and
 sidecar keep reporting it `available: false`; only the browser's capability

@@ -5,7 +5,7 @@
  * `EdgeLLMEngine` in ./types.ts.
  */
 
-import { CreateMLCEngine } from "@mlc-ai/web-llm";
+import { CreateMLCEngine, deleteModelAllInfoInCache } from "@mlc-ai/web-llm";
 import type { InitProgressReport, MLCEngineInterface } from "@mlc-ai/web-llm";
 
 import type {
@@ -89,6 +89,14 @@ export function createWebLLMEngine(): EdgeLLMEngine {
         await engine.unload();
       }
       loadedModelId = null;
+    },
+
+    async evict(modelId) {
+      if (engine && loadedModelId === modelId) {
+        await engine.unload();
+        loadedModelId = null;
+      }
+      await deleteModelAllInfoInCache(modelId);
     },
   };
 }

@@ -2,10 +2,10 @@
 
 **Branch:** `alehar9320/flyingfish` **Base:** `main` (`58a125d`)
 **Status:** the engine, the ladder, the routing seam, the progression scheduler
-and the banners are built and tested, **and a person can now turn the feature
-on** — the offer strip asks once, and the answer starts the first download.
-What is left is a Settings control for changing that answer later, the
-first-run copy, and verification on real hardware.
+and the banners are built and tested, **a person can turn the feature on** —
+the offer strip asks once — **and that answer can now be changed from
+Settings**, with the tiers on disk listed and freeable. What is left is the
+first-run copy and verification on real hardware.
 
 This file exists because the branch was cut short for review and the working
 environment it was built in is temporary. Nothing here may survive only in a
@@ -34,10 +34,20 @@ can actually host. If the yes finds a hidden tab, a Save Data connection, or
 another tab holding the engine lock, nothing was fetched and the strip says so
 rather than pretending.
 
-Until this iteration the two ends were missing — nothing granted consent, and
-nothing fetched Tier 1 (`noteTurn()` climbed only *from* a hosted tier). Both
-now exist, which is the difference between infrastructure and a feature. The
-rest of this file is what a reviewer should still expect to be absent.
+**Settings → Answers in this browser** (`apps/studio/src/components/EdgeModelSection.tsx`)
+is the second place to give that answer, and the only place to take it back.
+It reads one snapshot (`edgeManager.panelState()`) and re-reads it on every
+settled edge notice — a tier landing, a tier freed, consent changing — while
+ignoring the per-percent download ticks, so it stays a view of the ladder rather
+than a second owner of its state. The checkbox is the `edgeModel` flag; the
+consent answer moves through the same `grantAndStart()` / `decline()` calls as
+the banner, and a yes that starts nothing reports that, in the same words.
+
+Until the previous iteration the two ends were missing — nothing granted
+consent, and nothing fetched Tier 1 (`noteTurn()` climbed only *from* a hosted
+tier). Both now exist, which is the difference between infrastructure and a
+feature. The rest of this file is what a reviewer should still expect to be
+absent.
 
 ## What is built (commit map)
 
@@ -51,28 +61,49 @@ rest of this file is what a reviewer should still expect to be absent.
 | `f39c3fa` | 6 | `edge/scheduler.ts` — ten served answers earn the next tier, consent-locked, idle/visible/SaveData-gated, single-engine-across-tabs |
 | `fd0bfe4` | 7 | `edge-downloading` / `edge-unlocked` banner kinds; the bridge subscribes to edge notices and stops claiming "Working by hand" while the edge answers |
 | `d34d8e5` | 9 (first half) | `EdgeScheduler.bootstrap()` (rung zero), `EdgeManager.offerFor / grantAndStart / decline / isBusy`, the `ready` and `consent-changed` notices, and the `edge-offer` / `edge-ready` banners with both buttons wired through the dispatcher. `docs/local-llm.md` now describes a reachable feature. Landed out of plan order, before the Settings section, because nothing else on this branch matters while no person can switch it on. |
+| this commit | 8 | `components/EdgeModelSection.tsx` — Settings → *Answers in this browser*: the flag switch, a consent answer that can be changed and withdrawn, per-tier status with device reasons, free-a-tier storage, the progression meter, the quota line. `EdgeManager.panelState()` and `freeTier()` (with `EdgeLLMEngine.evict`, the only Settings path that may pull in the WebLLM chunk), the notice seam turned multi-subscriber so the strip and Settings both react, and the section mounted in `SettingsPanel`. |
 
-Total for the eight feature commits, counting the code and docs they changed
-and excluding this document: 28 files, 3,009 lines added, 49 deleted, 83 new
-browser test cases plus one amended Python security-header test.
+Everything the branch has changed since its base, counting code and docs and
+excluding this document: 35 files, 3,798 lines added, 50 deleted, 101 new
+browser test cases (the suite now stands at 853 tests across 89 files) plus one
+amended Python security-header test.
 
 ## Remaining iterations
 
-### 8 — Settings `EdgeModelSection` (the control surface)
+### 8 — Settings `EdgeModelSection` (the control surface) — DONE
 
-Pattern to follow: the existing About section in the Settings panel.
+Pattern followed: the existing About section in the Settings panel.
 
-- [ ] Enable/disable toggle bound to the `edgeModel` flag.
-- [ ] **Consent control** — the place to *change* the answer the offer strip
-      recorded: `setConsent("granted" | "denied")`, worded in the size of the
-      download ("Answer in this browser — about 1.3 GB, once"). Granting it here
-      should fetch Tier 1 through `EdgeManager.grantAndStart()`, exactly as the
-      banner button does.
-- [ ] Tier cards: label, on-disk size, state (`empty` / `cached` / `active`).
-- [ ] **Delete a tier** to free storage (`setTierState(id, {status:"empty"})` plus
-      the WebLLM cache eviction), and a storage usage meter from
-      `navigator.storage.estimate()`.
-- [ ] Tests: a tier card per state; revoke-consent stops edge turns.
+- [x] Enable/disable toggle bound to the `edgeModel` flag (`setFeatureOverride`,
+      so it writes the same `localStorage` key the URL-parameter and diagnostics
+      paths read).
+- [x] **Consent control** — the place to *change* the answer the offer strip
+      recorded. With nothing on disk it is one button in the size of the
+      download ("Download Llama 3.2 1B — about 1.3 GB, once") that goes through
+      `EdgeManager.grantAndStart()`, exactly as the banner button does; with a
+      tier answering it is "Stop answering here" → `decline()`. A granted consent
+      that a paid key currently outranks says so instead of implying the browser
+      is answering.
+- [x] Tier rows: label, on-disk size, state (`not downloaded` / `on this device`
+      / `answering`), and the device reason on any tier that this hardware could
+      not host.
+- [x] **Delete a tier** to free storage — `EdgeManager.freeTier()` clears our
+      IndexedDB state and, for a tier that was actually fetched, calls the new
+      `EdgeLLMEngine.evict()` (WebLLM's `deleteModelAllInfoInCache`). Plus a
+      storage line from `navigator.storage.estimate()`.
+- [x] Tests: 12 in `EdgeModelSection.test.tsx` (a row per state, the flag
+      round-trip, revoke-consent, free-a-tier, the meter, the honest
+      nothing-started notice, unsubscribe on unmount) and 6 more in
+      `manager.test.ts` for the snapshot and the eviction rules — including that
+      freeing a tier that was never fetched touches neither the engine nor its
+      cache.
+
+What that cost in the existing code, so a reviewer knows where to look: the
+notice seam went from one listener to many (`addNoticeListener` returns an
+unsubscribe) because the strip and Settings now both react; `panelState()`
+reports exactly one tier as `answering` — the strongest on disk — and demotes
+stored-but-superseded tiers to `on this device`; `evict` was added to the engine
+interface, which is why `turn.test.ts`'s inline fake gained a no-op.
 
 ### 9 — Light it up: first-run copy, bootstrap download, docs
 
@@ -90,8 +121,10 @@ Pattern to follow: the existing About section in the Settings panel.
       tell which brain answered.
 - [x] `docs/local-llm.md` §"The browser tier" rewritten for what actually
       shipped, including what has never been run on real hardware. (Done in `d34d8e5`.)
-- [ ] Add the capability to the `README.md` capability table; update
-      `docs/living-studio.md` and `.agents/rules` if they list capabilities.
+- [x] Add the capability to `README.md` and — per `.agents/rules` line 159,
+      which routes a new conversation capability there — to the capability table
+      in `docs/living-studio.md`. Both name the conversation-turns-only
+      boundary. (Done in this commit.)
 - [ ] State the divergence honestly: `router.py:1199` and `worker.ts:57` keep
       `browser-model: false` server-side — a server cannot see a client GPU.
 
@@ -121,7 +154,10 @@ Pattern to follow: the existing About section in the Settings panel.
 - **A yes in one tab is not noticed live in another.** A tab that lost the
   engine lock has no event that re-runs its strip decision; the download the
   other tab finished shows up at the next turn's routing check, not the moment
-  it lands. BroadcastChannel or a storage event would close it.
+  it lands. The same gap now has a second surface: Settings → *Answers in this
+  browser* re-reads on this tab's own notices, so another tab's consent or freed
+  tier reads stale until something in this tab emits one. BroadcastChannel or a
+  storage event would close both.
 - **Edge turns never reach the server conversation tree** while the sidecar is up.
   A backfill through `POST /api/conversations/{id}/turns` is an explicit non-goal
   for v1 and must stay documented, not discovered.
@@ -148,15 +184,17 @@ Pattern to follow: the existing About section in the Settings panel.
 git fetch origin && git checkout alehar9320/flyingfish
 npm --prefix apps/studio install
 npm --prefix apps/studio run typecheck
-npm --prefix apps/studio test -- --run     # 88 files, 835 tests
+npm --prefix apps/studio test -- --run     # 89 files, 853 tests
 npm --prefix apps/studio run lint          # 0 errors, 5 pre-existing warnings
 npm --prefix apps/studio run build
 uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 318 passed
 ```
 
-Then start at iteration 8's consent control if you want the ladder
-controllable from Settings, or iteration 10 if you want to prove it on a GPU.
-A first real user can already reach the feature; neither of those is required
-for that.
+Then start at iteration 9's remaining items if you want a first-run visitor to
+meet the browser model in the intro flow and to see which brain answered in the
+transcript, at the cross-tab gap if you want the Settings snapshot to be live in
+every tab, or at iteration 10 if you want to prove it on a GPU. A first real
+user can already reach the feature and control it; none of those is required for
+that.
 
 Every iteration ends with that block green, one commit, and this file updated.

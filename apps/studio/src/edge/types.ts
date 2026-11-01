@@ -85,4 +85,6 @@ export interface EdgeLLMEngine {
     signal?: AbortSignal,
   ): AsyncIterable<string>;
   unload(): Promise<void>;
+  /** Drop the weights this browser kept for `modelId`, freeing the storage. */
+  evict(modelId: string): Promise<void>;
 }

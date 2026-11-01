@@ -23,6 +23,7 @@ export interface FakeEngineOptions {
 
 export class FakeEdgeEngine implements EdgeLLMEngine {
   loads: string[] = [];
+  evictions: string[] = [];
   private options: FakeEngineOptions;
 
   constructor(options: FakeEngineOptions = {}) {
@@ -69,5 +70,9 @@ export class FakeEdgeEngine implements EdgeLLMEngine {
 
   async unload(): Promise<void> {
     // Nothing to release.
+  }
+
+  async evict(modelId: string): Promise<void> {
+    this.evictions.push(modelId);
   }
 }

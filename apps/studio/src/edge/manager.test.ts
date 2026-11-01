@@ -29,6 +29,15 @@ const noWebGPU: Eligibility = computeEligibility({
   saveData: false,
 });
 
+const midDevice: Eligibility = computeEligibility({
+  webgpu: true,
+  shaderF16: true,
+  vramGB: null,
+  deviceMemoryGB: 4,
+  freeStorageBytes: 40_000_000_000,
+  saveData: false,
+});
+
 function idleQueue(): { env: SchedulerEnvironment; queue: Array<() => void> } {
   const queue: Array<() => void> = [];
   return {
@@ -201,7 +210,7 @@ describe("EdgeManager", () => {
     manager.setSchedulerEnvironment(env);
     manager.setEligibilityFactory(async () => healthyDesktop);
     const notices: string[] = [];
-    manager.setListener((notice) =>
+    const listen = manager.addNoticeListener((notice) =>
       notices.push(notice.kind === "consent-changed" ? notice.kind : `${notice.kind}:${notice.tier}`),
     );
 
@@ -221,7 +230,92 @@ describe("EdgeManager", () => {
 
     await manager.stream(baseRequest, () => {});
     expect(engine.loads).toEqual([EDGE_TIERS[0].modelId, EDGE_TIERS[1].modelId]);
-    manager.setListener(null);
+    listen();
+  });
+
+  describe("the Settings snapshot", () => {
+    it("says which tier is answering, which is only on disk, and why one is out of reach", async () => {
+      manager.setEligibilityFactory(async () => midDevice);
+      await prime({ consent: "granted", cachedTiers: ["t1", "t2"] });
+
+      const panel = await manager.panelState();
+
+      expect(panel.flagEnabled).toBe(true);
+      expect(panel.consent).toBe("granted");
+      expect(panel.downloadable).toBe(true);
+      expect(panel.tiers.map((tier) => [tier.id, tier.status, tier.eligible])).toEqual([
+        ["t1", "cached", true],
+        ["t2", "active", true],
+        ["t3", "empty", false],
+      ]);
+      expect(panel.tiers[2].reason).toMatch(/8 GB-class device/);
+      expect(panel.tiers[0].label).toBe(EDGE_TIERS[0].label);
+    });
+
+    it("counts what the next tier still wants", async () => {
+      const before = await manager.panelState();
+      expect(before.usage).toEqual({
+        edgeTurns: 0,
+        streamedSeconds: 0,
+        turnsToNext: 10,
+        secondsToNext: 900,
+      });
+
+      await manager.stream(baseRequest, () => {});
+
+      expect((await manager.panelState()).usage.edgeTurns).toBe(1);
+    });
+
+    it("offers nothing when this browser can host no tier", async () => {
+      manager.setEligibilityFactory(async () => noWebGPU);
+
+      const panel = await manager.panelState();
+
+      expect(panel.downloadable).toBe(false);
+      expect(panel.tiers.every((tier) => !tier.eligible)).toBe(true);
+      expect(panel.tiers[0].reason).toMatch(/doesn't support GPU-accelerated models/);
+    });
+  });
+
+  describe("freeing a tier", () => {
+    it("evicts its weights, forgets it, and tells the page", async () => {
+      await prime({ consent: "granted", cachedTiers: ["t1", "t2"] });
+      const freed: string[] = [];
+      const listen = manager.addNoticeListener((notice) => {
+        if (notice.kind === "tier-freed") {
+          freed.push(notice.tier);
+        }
+      });
+
+      await manager.freeTier("t2");
+      listen();
+
+      expect(engine.evictions).toEqual([tierById("t2").modelId]);
+      expect(freed).toEqual(["t2"]);
+      const store = await EdgeStateStore.open();
+      const states = await store.getTierStates();
+      expect(states.t2.status).toBe("empty");
+      expect(states.t1.status).toBe("cached");
+      store.close();
+      expect(await manager.servedTier()).toBe("t1");
+    });
+
+    it("does not touch the engine for a tier that was never fetched", async () => {
+      await manager.freeTier("t3");
+
+      expect(engine.evictions).toEqual([]);
+      expect(engine.loads).toEqual([]);
+    });
+
+    it("lets a refetched tier load again after this tab freed the one it was running", async () => {
+      await manager.stream(baseRequest, () => {});
+      await manager.freeTier("t1");
+      await prime({ consent: "granted", cachedTiers: ["t1"] });
+
+      await manager.stream(baseRequest, () => {});
+
+      expect(engine.loads).toEqual([tierById("t1").modelId, tierById("t1").modelId]);
+    });
   });
 
   describe("the one-time offer", () => {
@@ -270,7 +364,7 @@ describe("EdgeManager", () => {
       const { env, queue } = idleQueue();
       manager.setSchedulerEnvironment(env);
       const notices: string[] = [];
-      manager.setListener((notice) =>
+      const listen = manager.addNoticeListener((notice) =>
         notices.push(notice.kind === "consent-changed" ? notice.kind : `${notice.kind}:${notice.tier}`),
       );
 
@@ -291,7 +385,7 @@ describe("EdgeManager", () => {
       expect(await store.getConsent()).toBe("granted");
       expect((await store.getTierStates()).t1.status).toBe("active");
       store.close();
-      manager.setListener(null);
+      listen();
     });
 
     it("records a refusal so nothing is downloaded and nothing is asked again", async () => {
