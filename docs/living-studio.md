@@ -182,6 +182,13 @@ Studio says so in one place and keeps going:
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
   all.
+- The outbox is shared by every tab in the origin, so two tabs would otherwise
+  drain it and send each record twice. `apps/studio/src/bff/outbox.ts` takes a
+  drain guard for the length of a run: `navigator.locks` where the browser has
+  it, and a lease row in the store's `meta` store — with an expiry, renewed
+  while the drain runs — where it does not. A tab that loses the race leaves the
+  records pending and picks them up on the next trigger, so a closed tab's queue
+  resumes instead of stalling.
 - A warning strip appears only for something that actually broke: a model or
   sidecar that this session reached and then lost, or a check you asked for by
   pressing **Recheck** or running the tour's live step. Opening Settings measures

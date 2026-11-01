@@ -48,6 +48,48 @@ export interface StoredTurn extends ConversationTurn {
   parent_id: string | null;
 }
 
+export type OutboxKind = "create" | "update" | "delete";
+export type OutboxEntity = "job" | "step" | "outcome" | "evidence";
+export type OutboxState =
+  | "pending"
+  | "sending"
+  | "acknowledged"
+  | "failed"
+  | "conflict";
+
+/**
+ * One queued write. `id` doubles as the idempotency key so a retry replays the
+ * same intent; `local_id`/`server_id` let the drain rewrite a child's parent
+ * reference once the parent is acknowledged.
+ */
+export interface OutboxRecord {
+  id: string;
+  kind: OutboxKind;
+  entity: OutboxEntity;
+  local_id: string | null;
+  server_id: string | null;
+  payload: unknown;
+  depends_on: string[];
+  state: OutboxState;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
+  acknowledged_at: string | null;
+}
+
+/** The single-holder claim a drain takes when `navigator.locks` is missing. */
+export interface DrainLease {
+  holder: string;
+  expires_at: number;
+}
+
+export function byCreated<T extends { created_at: string; id: string }>(
+  left: T,
+  right: T,
+): number {
+  return left.created_at.localeCompare(right.created_at) || left.id.localeCompare(right.id);
+}
+
 export interface WorkspaceSnapshot {
   version: number;
   jobs: StoredJob[];
@@ -84,6 +126,23 @@ export interface LocalStore {
   putObservation(observation: Observation): Promise<void>;
   deleteObservation(id: string): Promise<void>;
   clearObservations(): Promise<void>;
+  enqueueOutbox(record: OutboxRecord): Promise<void>;
+  getOutbox(id: string): Promise<OutboxRecord | undefined>;
+  putOutbox(record: OutboxRecord): Promise<void>;
+  deleteOutbox(id: string): Promise<void>;
+  listOutbox(): Promise<OutboxRecord[]>;
+  clearOutbox(): Promise<void>;
+  /**
+   * Claim the drain for `holder`, or return the live lease when someone else
+   * holds it. A lease past `now` is stale and is replaced. The read and the
+   * write happen in one transaction so two tabs cannot both claim it.
+   */
+  claimDrainLease(holder: string, now: number, ttlMs: number): Promise<DrainLease | null>;
+  /** Extend a lease this holder owns; false when it was reclaimed or released. */
+  renewDrainLease(holder: string, now: number, ttlMs: number): Promise<boolean>;
+  /** Release a lease this holder owns; false when it was already gone. */
+  releaseDrainLease(holder: string): Promise<boolean>;
+  getDrainLease(): Promise<DrainLease | null>;
   listConversations(): Promise<StoredConversation[]>;
   getConversation(id: string): Promise<StoredConversation | undefined>;
   putConversation(conversation: StoredConversation): Promise<void>;
