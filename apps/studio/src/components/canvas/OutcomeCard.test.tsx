@@ -27,6 +27,17 @@ const outcome = {
   opportunity_score: 16,
 };
 
+describe("OutcomeCard score preview", () => {
+  // The read-only card shows one decimal; the preview under "Adjust scores"
+  // showed two, so 16 read as "16.0" above and "16.00" below on the same card.
+  it("shows the adjusted opportunity score to one decimal", () => {
+    const { container } = render(<OutcomeCard outcome={outcome} />);
+    fireEvent.click(screen.getByRole("button", { name: "Adjust scores" }));
+
+    expect(container.querySelector(".score-preview b")?.textContent).toBe("16.0");
+  });
+});
+
 describe("OutcomeCard copy", () => {
   afterEach(() => {
     vi.restoreAllMocks();
