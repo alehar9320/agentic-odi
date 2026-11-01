@@ -21,6 +21,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agentic_odi_core.errors import StoreCorrupt
+from agentic_odi_core.integrity import ensure_intact
+
 from agentic_odi_studio_api.studio.claims import (
     Claim,
     EvidenceSnapshot,
@@ -308,24 +311,51 @@ class StudioMemory:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._lock = threading.RLock()
+        self._closed = False
         self._connection = sqlite3.connect(
             ":memory:" if self._memory else str(self.db_path),
             check_same_thread=False,
         )
         self._connection.row_factory = sqlite3.Row
-        self._connection.execute("PRAGMA foreign_keys = ON")
-        if not self._memory:
-            self._connection.execute("PRAGMA journal_mode = WAL")
-            # Another process may be mid-write; wait for it briefly rather
-            # than failing the turn with "database is locked".
-            self._connection.execute("PRAGMA busy_timeout = 5000")
-        with self._connection:
-            self._connection.executescript(_SCHEMA)
-            _migrate(self._connection)
+        try:
+            if not self._memory:
+                # Same gate as the ODI store, but a distinct label: losing the
+                # conversation history is recoverable in a way the canvas is
+                # not, and the message should say so.
+                ensure_intact(self._connection, str(self.db_path), label="Your Studio memory")
+            self._connection.execute("PRAGMA foreign_keys = ON")
+            if not self._memory:
+                self._connection.execute("PRAGMA journal_mode = WAL")
+                # Another process may be mid-write; wait for it briefly rather
+                # than failing the turn with "database is locked".
+                self._connection.execute("PRAGMA busy_timeout = 5000")
+            with self._connection:
+                self._connection.executescript(_SCHEMA)
+                _migrate(self._connection)
+        except sqlite3.DatabaseError as exc:
+            self._connection.close()
+            raise StoreCorrupt(str(self.db_path), [str(exc)], label="Your Studio memory") from exc
+        except BaseException:
+            self._connection.close()
+            raise
 
     def close(self) -> None:
         with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            if not self._memory:
+                # Fold the write-ahead log back so a clean stop leaves no
+                # sidecar for the next process to recover.
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             self._connection.close()
+
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """Fold the write-ahead log back into the database file."""
+        with self._lock:
+            if self._memory or self._closed:
+                return
+            self._connection.execute(f"PRAGMA wal_checkpoint({mode})")
 
     # -- conversations -----------------------------------------------------
 

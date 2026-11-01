@@ -46,6 +46,7 @@ class SQLiteRepository(Repository):
             db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
+        self.db_path = db_path
         self._workspace_id = workspace_id or os.environ.get(
             "AGENTIC_ODI_WORKSPACE", DEFAULT_WORKSPACE
         )
@@ -838,6 +839,16 @@ class SQLiteRepository(Repository):
         """Flush any open transaction in the event store to disk."""
         with self._lock:
             self.store.commit()
+
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """Fold the write-ahead log back into the database file."""
+        with self._lock:
+            self.store.checkpoint(mode)
+
+    @property
+    def integrity(self) -> str:
+        """The boot check result: ``ok`` or ``deferred``."""
+        return self.store.integrity.status
 
     def close(self) -> None:
         """Close the event store and let SQLite clean up its journal files."""

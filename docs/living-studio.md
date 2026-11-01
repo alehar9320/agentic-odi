@@ -245,6 +245,23 @@ Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 `{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
 …"}}` with `X-Request-ID` echoed for support.
 
+### When the database failed its check
+
+A store that is *reachable* but *damaged* is a different condition from a sidecar
+that is down, and it is shown differently. The sidecar runs a bounded
+`PRAGMA quick_check` when it opens the store; when that check fails it refuses
+every data route with one `{"error": {"code": "store_corrupt", …}}` body and
+leaves the file exactly as it found it. `/health` reports `degraded` with
+`reason: store_corrupt`, while `/api/diagnostics` and `/health` stay
+reachable so the failure can still be read and copied.
+
+The SPA answers that one code with a full-page failure instead of the shell:
+it names the file, shows the last backup it can find under
+`AGENTIC_ODI_BACKUP_DIR` (`~/.agentic-odi/backups`), says the damaged file was
+left untouched, and offers **Recheck the database** for after the person has
+restored a copy. It never offers to delete or overwrite anything — that decision
+belongs to the person.
+
 ### What the canvas is made of
 
 Every canvas response carries its provenance: `live` when the sidecar read your

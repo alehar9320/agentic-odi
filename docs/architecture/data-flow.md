@@ -113,6 +113,26 @@ server is a normal state the picker explains.
 The studio memory is a separate SQLite file, not an ODI repository. It never
 feeds the canvas; it only supplies bounded context to the next chat turn.
 
+### Store open and close
+
+Both SQLite files are gated the same way at open. `IntentStore` and
+`StudioMemory` run a bounded `PRAGMA quick_check` (a budget of SQLite VM opcodes
+spent through a progress handler) before anything else touches the file; a
+damaged file raises `StoreCorrupt` instead of letting a bare
+`sqlite3.DatabaseError` escape. The `Repository` protocol carries the result as
+`integrity` and exposes `checkpoint(mode)`; `InMemoryRepository` answers `ok` and
+no-ops.
+
+The sidecar turns that failure into one structured `store_corrupt` body and
+serves a boot failure page; `/health` reports `degraded` while `/health` and
+`/api/diagnostics` stay reachable. A damaged file is never deleted or
+overwritten.
+
+On a clean stop, the app's lifespan shutdown checkpoints each store
+(`wal_checkpoint(TRUNCATE)`) and closes it, so no `-wal` is left for the next
+process to recover. Between stops, `AGENTIC_ODI_CHECKPOINT_SECONDS` (default
+60, `0` disables) runs a passive checkpoint on a timer.
+
 The SPA sends `mcp_url` with every data request for compatibility. In `local` mode the sidecar ignores it; in `mcp` mode it is required for canvas and mutations.
 
 ### Connectors
@@ -198,6 +218,8 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_MCP_TIMEOUT` | CLI MCP client calls | `30` seconds |
 | `AGENTIC_ODI_MCP_KEEPALIVE` | MCP session keepalive interval | `15` seconds (`0` disables) |
 | `AGENTIC_ODI_STUDIO_DB` | Studio API memory | `~/.agentic-odi/studio.db` |
+| `AGENTIC_ODI_BACKUP_DIR` | core recovery, boot failure message | `~/.agentic-odi/backups` |
+| `AGENTIC_ODI_CHECKPOINT_SECONDS` | Studio API idle checkpoint interval | `60` seconds (`0` disables) |
 | `AGENTIC_ODI_CONNECTORS_CONFIG` | connectors registry (CLI, Studio, MCP) | `~/.config/agentic-odi/connectors.json` |
 | `AGENTIC_ODI_CONNECTOR_TIMEOUT` | connector health/ingest calls | `30` seconds |
 | `AGENTIC_ODI_STUDIO_DIST` | Studio API, dev launcher | `apps/studio/dist` |

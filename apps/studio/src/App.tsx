@@ -4,6 +4,7 @@ import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge"
 import { BannerProvider, useBanner } from "./banners/BannerProvider";
 import { BannerStack } from "./banners/BannerStack";
 import { BannerToasts } from "./banners/BannerToasts";
+import { BootFailurePage } from "./components/BootFailurePage";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
@@ -34,6 +35,8 @@ function StudioShell() {
     closeCustomize,
     streaming,
     stopStreaming,
+    bootError,
+    recheckBoot,
   } = useStudio();
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
@@ -66,6 +69,13 @@ function StudioShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closePanel, streaming, stopStreaming]);
+
+  // A damaged database is not a broken screen: the file is intact on disk and
+  // the only honest thing to show is that failure, not a zeroed-out studio.
+  // This return sits after every hook so the hook order never changes.
+  if (bootError) {
+    return <BootFailurePage error={bootError} onRecheck={() => void recheckBoot()} />;
+  }
 
   return (
     <div className="studio-app">

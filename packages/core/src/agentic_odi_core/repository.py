@@ -208,6 +208,9 @@ class Repository(Protocol):
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
+    def checkpoint(self, mode: str = "TRUNCATE") -> None: ...
+    @property
+    def integrity(self) -> str: ...
     def close(self) -> None: ...
     def health(self) -> bool: ...
 
@@ -613,6 +616,14 @@ class InMemoryRepository:
 
     def commit(self) -> None:
         """No-op: an in-memory store has nothing to flush."""
+
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """No-op: an in-memory store has no write-ahead log."""
+
+    @property
+    def integrity(self) -> str:
+        """An in-memory store is created fresh, so it is always intact."""
+        return "ok"
 
     def close(self) -> None:
         """No-op: an in-memory store holds no resources."""

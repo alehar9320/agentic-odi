@@ -32,6 +32,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_schema.py` — schema creation and migration.
 - `test_events.py` — event-store schema and legacy-database backfill.
 - `test_intent_store.py` — append-only Intent Store ordering.
+- `test_sqlite_integrity.py` — the boot integrity gate, the bounded check, and the clean-shutdown checkpoint.
 - `test_pagination.py` — list pagination across both repositories and the service.
 - `test_errors.py` — the ODI error hierarchy and its messages.
 - `test_evidence_not_found.py` — actionable evidence-not-found errors.
@@ -71,6 +72,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_studio_ui_spec.py` — catalog-driven UI validation.
 - `test_studio_router.py` — passthrough responses from the Studio router.
 - `test_app_spa.py` — static SPA fallback and the local server entrypoint.
+- `test_boot_integrity.py` — the boot failure page, the idle checkpoint, and the clean shutdown that closes both stores.
 - `conftest.py` — shared `InMemoryRepository` fixtures.
 
 ### `apps/cli/tests/`
