@@ -81,6 +81,84 @@ describe("fetchMemory fallback", () => {
   });
 });
 
+describe("the hosted Worker's own answer", () => {
+  /**
+   * The Worker's own answer for a deployment with `SIDECAR_URL` unset — GET
+   * https://agentic-odi.alehar.workers.dev/api/canvas returned this shape at
+   * 502 on 2026-11-01, carrying `mcp_unreachable` until this PR renamed the code
+   * it emits. A structured body is the trap: it is how the studio says "I heard
+   * you and refused", so the code is the only thing that can say whether a
+   * sidecar refused the request or no sidecar exists at all.
+   */
+  const WORKER_ANSWER = {
+    error: {
+      code: "sidecar_unavailable",
+      message: "The studio sidecar isn't configured.",
+      suggestion: "Set SIDECAR_URL and redeploy.",
+      retryable: false,
+      request_id: null,
+    },
+  };
+
+  it("is a transport failure, because nothing downstream can take the request", () => {
+    expect(
+      isTransportFailure(
+        new StudioApiError(
+          {
+            code: "sidecar_unavailable",
+            message: "The studio sidecar isn't configured.",
+            retryable: false,
+          },
+          502,
+          true,
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("hands the canvas to the browser store rather than showing a failure", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(WORKER_ANSWER, 502));
+    vi.mocked(bff.data.fetchCanvas).mockResolvedValueOnce({
+      jobs: [],
+      steps: [],
+      outcomes: [],
+      source: "local",
+    });
+
+    const canvas = await fetchCanvas("http://mcp");
+
+    expect(canvas.source).toBe("local");
+    expect(bff.data.fetchCanvas).toHaveBeenCalled();
+  });
+
+  it("hands the turn to the browser assistant", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(WORKER_ANSWER, 502));
+    vi.mocked(bff.chat.stream).mockResolvedValueOnce(undefined);
+
+    await streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {});
+
+    expect(bff.chat.stream).toHaveBeenCalled();
+  });
+
+  it("still treats the sidecar's own unreachable-MCP answer as a real failure", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: {
+            code: "mcp_unreachable",
+            message: "The MCP server could not be reached.",
+            retryable: true,
+          },
+        },
+        502,
+      ),
+    );
+
+    await expect(fetchCanvas("http://mcp")).rejects.toThrow();
+    expect(bff.data.fetchCanvas).not.toHaveBeenCalled();
+  });
+});
+
 describe("streamChat fallback", () => {
   it("falls back to the local BFF when the sidecar returns 502", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "SIDECAR_URL is not configured" }, 502));

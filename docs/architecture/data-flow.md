@@ -249,16 +249,22 @@ MCP tool result (text)
   or customer quote can reach the log.
 - **Two layers of error shaping.** The sidecar (and the Worker that proxies it)
   return the server-shaped `StudioError` over HTTP, so the SPA reads it whole.
-  When the sidecar never answers at all — a network failure in the browser — the
-  SPA classifies the failure client-side (`TypeError` → `mcp_unreachable`) and
-  surfaces the same `sidecar-down` banner strip plus a non-retryable in-thread
-  notice, instead of a generic "something went wrong".
+  A structured body means "the studio answered and refused", so the SPA only
+  treats a failure as a *transport* one — the kind it can serve from the browser
+  store — when the code is `sidecar_unavailable`, or when nobody answered at all
+  (`TypeError`, or a bare 502/503/504 with no structured body). A structured
+  `mcp_unreachable` is never swallowed by that fallback: a sidecar that heard the
+  request and could not reach its MCP server is a real problem, and the SPA
+  reports it — the `sidecar-down` banner strip plus a non-retryable in-thread
+  notice — instead of a generic "something went wrong".
 - **CLI hints.** `BackendError(message, suggestion)` is rendered as `Error: …` on
   stderr with a trailing `Hint: …` line, so a `BackendError("could not reach MCP
   server …")` tells the user exactly what to start.
 - **Hosted proxied path.** The free Cloudflare Worker forwards `/api/*` to
-  `SIDECAR_URL`; a missing/unreachable sidecar is reported to the browser as
-  `{"error": mcp_unreachable}` with a suggestion to start the sidecar and with
-  `X-Request-ID` echoed for support. It is logged on the Worker but never leaks
-  internals.
+  `SIDECAR_URL`. When it has no sidecar to forward to — not configured, or
+  configured and unreachable — it answers for itself with
+  `{"error": sidecar_unavailable}` and a suggestion, echoing `X-Request-ID` for
+  support. That code is the signal for the browser to run the request locally,
+  so a hosted visitor with no sidecar gets a working studio rather than an
+  apology. It is logged on the Worker but never leaks internals.
 
