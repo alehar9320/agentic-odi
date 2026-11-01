@@ -14,6 +14,7 @@ from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     TOOL_SPECS,
+    ClaimCheckError,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
@@ -167,10 +168,39 @@ def get_job_map(job_id: str, limit: int | None = None, offset: int = 0) -> str:
 def add_outcome(
     job_id: str,
     statement: str,
-    importance: float,
-    satisfaction: float,
+    importance: float | None = None,
+    satisfaction: float | None = None,
     step_id: str | None = None,
+    claim_check: dict[str, Any] | None = None,
 ) -> str:
+    """Add a desired Outcome to a Job.
+
+    A score needs the questions behind it. When you supply ``importance`` or
+    ``satisfaction`` you must also supply ``claim_check`` — the questions you
+    asked the customer and what came back::
+
+        {
+          "asked": ["How often does this happen?", "What do you do today?"],
+          "answers": ["Weekly", "A spreadsheet"],
+          "skips": [{"question": "What does it cost?", "reason": "never measured"}]
+        }
+
+    Each skip needs a reason. To record an outcome before you have asked, omit
+    both scores: an unscored outcome is legal, a bare number is not.
+    """
+    if service.get_job(job_id) is None:
+        return f"Error: Job with ID {job_id} not found."
+    for score in (importance, satisfaction):
+        if score is not None and not (1.0 <= score <= 10.0):
+            return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    scored = importance is not None or satisfaction is not None
+    if scored and claim_check is None:
+        return (
+            "Error: add_outcome cannot record a score without a claim_check. "
+            "Ask the customer the questions that produce this number, then pass "
+            "claim_check with asked/answers/skips (each skip needs a reason). "
+            "To record an outcome before asking, omit importance and satisfaction."
+        )
     try:
         outcome = service.add_outcome(
             job_id=job_id,
@@ -178,6 +208,7 @@ def add_outcome(
             importance=importance,
             satisfaction=satisfaction,
             step_id=step_id,
+            claim_check=claim_check,
         )
     except JobNotFoundError:
         return f"Error: Job with ID {job_id} not found."
@@ -185,6 +216,8 @@ def add_outcome(
         return _step_not_found(step_id)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    except ClaimCheckError as exc:
+        return f"Error: {exc}"
     except OutcomeStatementError as exc:
         return f"Error: {exc}"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
