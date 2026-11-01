@@ -143,6 +143,15 @@ its storage back, which rewrites the ladder's truth rather than hiding it. A
 meter counts the answers served here toward the next tier, and a line reports how
 much of the site's storage quota the weights are using.
 
+Open tabs agree without asking. A consent answer, a tier that landed, or one that
+was freed is announced on a `BroadcastChannel`, and every other tab re-reads
+storage and re-decides: its strip stops offering, Settings updates, and the next
+turn is routed on the new fact rather than the one it last saw. The message is
+deliberately contentless — a tab that did not download a model does not celebrate
+one it did not fetch — and download progress is never broadcast, because only the
+tab doing the work renders it. A browser with no channel (private browsing) just
+keeps the ladder to itself.
+
 Two honest caveats: nothing in CI has WebGPU, so the engine itself has only
 ever been driven through a fake engine, and the real-GPU path is an unchecked
 box in `docs/superpowers/plans/2026-11-01-edge-llm-ladder-remaining-work.md`.

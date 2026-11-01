@@ -5,9 +5,9 @@ to `main`'s current tip — see "Merged with `main`" below.
 **Status:** the engine, the ladder, the routing seam, the progression scheduler
 and the banners are built and tested, **a person can turn the feature on** —
 the offer strip asks once — **that answer can now be changed from Settings**,
-with the tiers on disk listed and freeable, and **every reply says which brain
-produced it**. What is left is the first-run intro copy and verification on real
-hardware.
+with the tiers on disk listed and freeable, **every reply says which brain
+produced it**, and **two open tabs agree without being asked**. What is left is
+the first-run intro copy and verification on real hardware.
 
 This file exists because the branch was cut short for review and the working
 environment it was built in is temporary. Nothing here may survive only in a
@@ -73,10 +73,12 @@ absent.
 | `3a1f633` | 8 | `components/EdgeModelSection.tsx` — Settings → *Answers in this browser*: the flag switch, a consent answer that can be changed and withdrawn, per-tier status with device reasons, free-a-tier storage, the progression meter, the quota line. `EdgeManager.panelState()` and `freeTier()` (with `EdgeLLMEngine.evict`, the only Settings path that may pull in the WebLLM chunk), the notice seam turned multi-subscriber so the strip and Settings both react, and the section mounted in `SettingsPanel`. |
 | `f475509` | merge | `origin/main` merged forward; see "Merged with `main`" below for the four conflicts and what each one cost this feature. |
 | `748e817` | 9 (second half) | The reply names its brain: `edge/turn.ts` opens with `status` `phase: "edge"`, `StudioContext` records `edgeReplyFor` beside the existing `offlineReplyFor`, and `Conversation.tsx` renders one provenance tag per reply — *"Answered in this browser"* — with the edge answer taking precedence over the draft label. Plus the capability prose in `docs/local-llm.md` and `docs/living-studio.md`. |
+| `634d927` | 9 (second half) | The other half of the claim, tested: a turn handed to a healthy endpoint earns *neither* provenance label, so the marker provably follows the routing rather than the feature flag. |
+| this commit | 9 (cross-tab) | `edge/bus.ts` — the ladder tells its other tabs. `EdgeNotice` gains `{ kind: "changed" }`, `EdgeManager` publishes on settled notices only, `reset()` closes the channel, and `src/test/fakeBroadcastChannel.ts` doubles the browser API for the suites that need two tabs. |
 
-Everything the branch changes on top of `main` as merged: 39 files, 4,044 lines
-added, 50 deleted, and 105 added browser test cases, which now run 919 tests
-across 97 files, plus one amended Python security-header test.
+Everything the branch changes on top of `main` as merged: 41 files, 4,349 lines
+added, 50 deleted, and 114 added browser test cases, which now run 928 tests
+across 98 files, plus one amended Python security-header test.
 
 ## Merged with `main` (this merge commit)
 
@@ -165,6 +167,19 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
       as `edgeReplyFor` the same way it already records `offlineReplyFor`, and
       `Conversation` puts *"Answered in this browser"* on the reply — one button,
       opens Settings, never both labels on one reply.)
+- [x] Cross-tab ladder sync: a yes, a landed tier, or a freed tier in one tab
+      reaches the other tabs immediately. `edge/bus.ts` opens a
+      `BroadcastChannel("agentic-odi-edge-ladder")` and `EdgeManager` publishes
+      on every settled notice — never on a download tick — while the receive path
+      re-reads storage and emits `{ kind: "changed" }` to this page's listeners
+      only. Deliberately contentless, and deliberately not a replay: a tab that
+      did not fetch a model does not announce one as *"answering in this tab
+      now"*. The channel is opened when a page starts caring
+      (`addNoticeListener`, or the provider's mount-time `sync()`), so a tab that
+      only ever reads still hears; where `BroadcastChannel` is missing or refused
+      (private browsing) the bus is silent and the ladder keeps working in one
+      tab. `BannerBridge` and Settings needed no changes: both already react to
+      any non-progress notice.
 - [x] `docs/local-llm.md` §"The browser tier" rewritten for what actually
       shipped, including what has never been run on real hardware. (Done in `d34d8e5`.)
 - [x] Add the capability to `README.md` and — per `.agents/rules` line 159,
@@ -200,18 +215,13 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
   jank the UI. The worker path (`engine.worker.ts` +
   `SimpleWorkerMLCEngineHandler`) is the scheduled upgrade, and `EdgeLLMEngine`
   exists so the swap touches one file.
-- **A yes in one tab is not noticed live in another.** A tab that lost the
-  engine lock has no event that re-runs its strip decision; the download the
-  other tab finished shows up at the next turn's routing check, not the moment
-  it lands. The snapshot that decision reads made this boundary explicit rather
-  than creating it — cross-tab, a change routes the turn *after* the re-read that
-  noticed it, so normally one more answer still goes the old way before the
-  switch. Within one tab the notices refresh it immediately, which is the case a
-  person actually hits. Settings → *Answers in this browser* has the same
-  staleness: it re-reads on this tab's own notices, so another tab's consent or
-  freed tier reads stale until something here emits one. BroadcastChannel or a
-  storage event would close both, and would let the losing tab hear about the
-  lock it never got.
+- **One-turn staleness is gone; one real-hardware question remains.** Cross-tab
+  consent, tier state and the Settings snapshot now travel over the ladder bus
+  (iteration 9 above), so a tab never answers a turn from a fact another tab
+  invalidated a minute ago. What the bus cannot prove from a test runner is
+  `navigator.locks` on a real GPU with two tabs both reaching for the engine: the
+  losing tab gets no notice of the lock it never acquired, only the news that
+  the ladder moved. That check is on the iteration-10 manual list.
 - **The provenance label lives for the session.** *"Answered in this browser"*
   and *"Local draft, no model connected"* both come from a `status` frame in the
   live stream, so a reply re-read from history next visit carries no label. That
@@ -244,7 +254,7 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
 git fetch origin && git checkout alehar9320/flyingfish
 npm --prefix apps/studio install
 npm --prefix apps/studio run typecheck
-npm --prefix apps/studio test -- --run     # 97 files, 919 tests
+npm --prefix apps/studio test -- --run     # 98 files, 928 tests
 npm --prefix apps/studio run lint          # 0 errors, 5 pre-existing warnings
 npm --prefix apps/studio run build
 uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 330 passed
@@ -253,10 +263,9 @@ uv run pytest -q                           # 1824 passed (repo-wide)
 
 Then start at iteration 9's last open item if you want a first-run visitor to
 meet the browser model in the intro flow (the offer strip already does this job
-after the studio has opened; the context conversation is what is left), at the
-cross-tab gap if you want the Settings snapshot to be live in every tab, or at
+after the studio has opened; the context conversation is what is left), or at
 iteration 10 if you want to prove it on a GPU. A first real user can already
-reach the feature, control it, and see which brain answered; none of those is
-required for that.
+reach the feature, control it, see which brain answered, and have two tabs agree
+on both; none of those is required for that.
 
 Every iteration ends with that block green, one commit, and this file updated.

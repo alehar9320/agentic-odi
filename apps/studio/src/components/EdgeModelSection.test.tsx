@@ -257,6 +257,26 @@ describe("EdgeModelSection", () => {
     expect(edge.reads).toBeGreaterThan(before);
   });
 
+  it("shows another tab's yes the moment it hears about it", async () => {
+    // Settings is open in this tab, the person clicked yes in the other one.
+    // Nothing here asked the manager for anything — the notice is the only way
+    // this panel could know.
+    render(<EdgeModelSection />);
+    await screen.findByRole("checkbox");
+    const before = edge.reads;
+
+    edge.panel = panelState({
+      consent: "granted",
+      tiers: [tierState("t1", { status: "active" })],
+    });
+    await act(async () => {
+      edge.listener?.({ kind: "changed" });
+    });
+
+    expect(edge.reads).toBeGreaterThan(before);
+    expect(screen.getByText(/answering · about 1.3 GB/)).toBeInTheDocument();
+  });
+
   it("says when nothing started instead of leaving a yes hanging", async () => {
     edge.grantAndStart = vi.fn(async () => null);
     render(<EdgeModelSection />);

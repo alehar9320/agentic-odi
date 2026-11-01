@@ -219,6 +219,35 @@ describe("BannerBridge", () => {
     expect(screen.getByText(/Llama 3.2 1B is answering in this tab now/i)).toBeInTheDocument();
   });
 
+  it("goes and looks again when another tab moved the ladder, without cheering someone else's download", async () => {
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+
+    // The other tab said yes and fetched it. This tab's job is to find that
+    // out, stop asking, and claim none of the credit for the download.
+    edge.canServe = vi.fn(() => true);
+    edge.offerFor = vi.fn(async () => null);
+    const readsBefore = edge.sync.mock.calls.length;
+    act(() => {
+      edge.noticeListener?.({ kind: "changed" });
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByText(/This browser can answer, free/i)).not.toBeInTheDocument(),
+    );
+    expect(edge.sync.mock.calls.length).toBeGreaterThan(readsBefore);
+    expect(screen.queryByText(/answering in this tab now/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+  });
+
   it("says so when a yes does not start a download", async () => {
     edge.offerFor = vi.fn(async () => ({
       tier: "t1",

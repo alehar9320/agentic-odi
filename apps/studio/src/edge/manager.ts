@@ -10,6 +10,7 @@ import type { ChatStreamRequest, StudioConfig } from "../types";
 import { isEndpointConfiguredForSettings } from "../lib/modelEndpoint";
 import { isFeatureEnabled } from "../features/flags";
 import { EDGE_TIERS, PROGRESSION, collectDeviceSignals, computeEligibility, firstEligibleTier, tierById } from "./ladder";
+import { createLadderBus, type LadderBus } from "./bus";
 import { EdgeScheduler, type SchedulerEnvironment } from "./scheduler";
 import { openEdgeState, type EdgeStateService } from "./storage";
 import { edgeTurn } from "./turn";
@@ -34,7 +35,13 @@ export type EdgeNotice =
   /** The person freed a tier's storage, so it has to be fetched again. */
   | { kind: "tier-freed"; tier: EdgeTierId }
   /** The person answered the consent question, either way. */
-  | { kind: "consent-changed" };
+  | { kind: "consent-changed" }
+  /**
+   * Another tab moved the ladder — consent given there, a tier fetched or
+   * freed there. Deliberately without details: this tab did not do it, so the
+   * honest news is "go and look", not a claim about a model it never fetched.
+   */
+  | { kind: "changed" };
 
 /** The one-time ask, in the two numbers that matter: which model, how big. */
 export interface EdgeOffer {
@@ -108,6 +115,7 @@ export class EdgeManager {
   private loadedTier: EdgeTierId | null = null;
   private scheduler: EdgeScheduler | null = null;
   private listeners: Set<(notice: EdgeNotice) => void> = new Set();
+  private bus: LadderBus | null = null;
   private environment: SchedulerEnvironment | null = null;
   private fetching = false;
   /** What this tab last read of consent and the tiers on disk. A person's
@@ -136,20 +144,41 @@ export class EdgeManager {
 
   /** The seam the banner layer and Settings subscribe to. Several listeners on
    * purpose: the strip and the control panel both react, and neither owns the
-   * other's rendering. */
+   * other's rendering. Subscribing is also the moment this tab starts caring
+   * about the ladder, so it opens the channel to the other tabs here. */
   addNoticeListener(listener: (notice: EdgeNotice) => void): () => void {
     this.listeners.add(listener);
+    this.ensureBus();
     return () => {
       this.listeners.delete(listener);
     };
   }
 
+  private ensureBus(): LadderBus {
+    this.bus ??= createLadderBus(() => this.onLadderChange());
+    return this.bus;
+  }
+
+  /** A tab that only ever read storage still has to learn when it changed.
+   * Subscribing at mount is what warms the channel for a page that never
+   * downloads anything itself. */
+  private onLadderChange(): void {
+    // Re-read first, then tell this page — its listeners are how the strip and
+    // Settings find out, and the read that follows is best-effort and async.
+    this.reread();
+    for (const listener of [...this.listeners]) {
+      listener({ kind: "changed" });
+    }
+  }
+
   private emit(notice: EdgeNotice): void {
     // Everything but a progress tick changed what storage says about the
     // ladder — consent given, a tier hosted or freed — so the routing snapshot
-    // follows the notice. A tick changes nothing anyone could decide on.
+    // follows the notice, and so do the other tabs. A tick changes nothing
+    // anyone could decide on, and would flood the channel.
     if (notice.kind !== "downloading") {
       this.reread();
+      this.ensureBus().publish();
     }
     for (const listener of [...this.listeners]) {
       listener(notice);
@@ -165,6 +194,8 @@ export class EdgeManager {
     this.state = null;
     this.loadedTier = null;
     this.fetching = false;
+    this.bus?.close();
+    this.bus = null;
     this.snapshot = { consent: "unset", servedTier: null };
   }
 
@@ -214,6 +245,10 @@ export class EdgeManager {
   /** Refresh the snapshot a turn's routing decision is read from. Await it when
    * the answer has to be current; fire it when a person is waiting. */
   async sync(): Promise<void> {
+    // The provider calls this at mount, before anyone has emitted anything: it
+    // is also what puts this tab on the channel, so a yes typed in another tab
+    // is noticed here rather than at the next turn.
+    this.ensureBus();
     const state = await this.ensureState();
     const [consent, servedTier] = await Promise.all([state.getConsent(), this.servedTier()]);
     this.snapshot = { consent, servedTier };

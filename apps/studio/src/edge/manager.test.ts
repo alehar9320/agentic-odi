@@ -9,6 +9,7 @@ import type { SchedulerEnvironment } from "./scheduler";
 import { EdgeStateStore } from "./storage";
 import { EdgeManager, hasModelEndpoint, shouldUseEdge } from "./manager";
 import { FakeEdgeEngine } from "../test/edgeFake";
+import { installFakeBroadcastChannel } from "../test/fakeBroadcastChannel";
 import type { Eligibility } from "./types";
 
 const healthyDesktop: Eligibility = computeEligibility({
@@ -234,7 +235,7 @@ describe("EdgeManager", () => {
     manager.setEligibilityFactory(async () => healthyDesktop);
     const notices: string[] = [];
     const listen = manager.addNoticeListener((notice) =>
-      notices.push(notice.kind === "consent-changed" ? notice.kind : `${notice.kind}:${notice.tier}`),
+      notices.push("tier" in notice ? `${notice.kind}:${notice.tier}` : notice.kind),
     );
 
     for (let turn = 0; turn < 10; turn += 1) {
@@ -388,7 +389,7 @@ describe("EdgeManager", () => {
       manager.setSchedulerEnvironment(env);
       const notices: string[] = [];
       const listen = manager.addNoticeListener((notice) =>
-        notices.push(notice.kind === "consent-changed" ? notice.kind : `${notice.kind}:${notice.tier}`),
+        notices.push("tier" in notice ? `${notice.kind}:${notice.tier}` : notice.kind),
       );
 
       const started = manager.grantAndStart();
@@ -425,6 +426,73 @@ describe("EdgeManager", () => {
       // The refusal reaches the routing decision the same way the yes does — the
       // turn after the read that noticed it, not one still standing in the queue.
       await vi.waitFor(() => expect(manager.canServe(noEndpoint, false)).toBe(false));
+    });
+  });
+
+  describe("when a second tab moves the ladder", () => {
+    let uninstall: () => void;
+    let other: EdgeManager;
+
+    beforeEach(async () => {
+      uninstall = installFakeBroadcastChannel();
+      await prime({ consent: "unset", cachedTiers: [] });
+      manager.setEligibilityFactory(async () => healthyDesktop);
+      other = new EdgeManager();
+      other.setEngineFactory(async () => engine);
+      other.setEligibilityFactory(async () => healthyDesktop);
+    });
+
+    afterEach(() => {
+      other.reset();
+      uninstall();
+    });
+
+    it("passes on the news worth re-reading for, and stays quiet about a progress tick", async () => {
+      const { env, queue } = idleQueue();
+      other.setSchedulerEnvironment(env);
+      const heard: string[] = [];
+      const listen = manager.addNoticeListener((notice) => heard.push(notice.kind));
+
+      const started = other.grantAndStart();
+      await vi.waitFor(() => expect(queue).toHaveLength(1));
+      queue.shift()?.();
+      await started;
+
+      // Consent given, then the tier that landed: two facts this tab's banner,
+      // Settings and routing decision all need. Every percent of the download is
+      // not one — a tab must not be woken dozens of times for a number that only
+      // the fetcher's own strip renders.
+      expect(heard).toEqual(["changed", "changed"]);
+      listen();
+    });
+
+    it("does not bounce the news back and forth between the tabs", async () => {
+      const here: string[] = [];
+      const there: string[] = [];
+      const a = manager.addNoticeListener((notice) => here.push(notice.kind));
+      const b = other.addNoticeListener((notice) => there.push(notice.kind));
+
+      await manager.decline();
+
+      expect(here).toEqual(["consent-changed"]);
+      expect(there).toEqual(["changed"]);
+      a();
+      b();
+    });
+
+    it("tells a tab that only ever listened, and stops once it lets go", async () => {
+      // The point of the whole bus: this tab opened the page, asked nothing, and
+      // still knows the moment the other one says yes.
+      const heard: string[] = [];
+      const listen = manager.addNoticeListener((notice) => heard.push(notice.kind));
+      await other.decline();
+      await vi.waitFor(() => expect(heard).toEqual(["changed"]));
+
+      manager.reset();
+      await other.decline();
+
+      expect(heard).toEqual(["changed"]);
+      listen();
     });
   });
 });
