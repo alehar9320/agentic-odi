@@ -56,7 +56,13 @@ import {
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
-import { loadSession, saveSession, type StudioSession } from "../lib/session";
+import {
+  loadSession,
+  loadStoredConversationId,
+  saveSession,
+  saveStoredConversationId,
+  type StudioSession,
+} from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -458,6 +464,7 @@ function sessionForSubject(kind: SignalSubjectKind, id: string): StudioSession {
     job_id: kind === "job" ? id : null,
     step_id: kind === "step" ? id : null,
     outcome_id: kind === "outcome" ? id : null,
+    conversation_id: null,
   };
 }
 
@@ -1841,21 +1848,41 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       void refreshPresets();
       void refreshFeatured();
       void refreshMemory();
-      void fetchLatestConversation()
-        .then(async ({ conversation }) => {
-          if (cancelled || !conversation) {
+      async function restoreConversation() {
+        // Reopen the conversation the person last had active, if it still
+        // exists. Otherwise fall back to the most recent one.
+        const storedId = loadStoredConversationId();
+        if (storedId) {
+          try {
+            const tree = await fetchConversationTree(storedId);
+            if (cancelled) {
+              return;
+            }
+            setConversationId(storedId);
+            setMessages(turnsToMessages(tree.messages, tree.head_id));
             return;
+          } catch {
+            /* stored conversation no longer exists; fall back below */
           }
-          setConversationId(conversation.id);
-          // The tree, not the flat turn list: a conversation with branches
-          // must open on the branch that was visible when it was left.
-          const tree = await fetchConversationTree(conversation.id);
-          if (cancelled) {
-            return;
-          }
-          setMessages(turnsToMessages(tree.messages, tree.head_id));
-        })
-        .catch(() => undefined);
+        }
+        if (cancelled) {
+          return;
+        }
+        void fetchLatestConversation()
+          .then(async ({ conversation }) => {
+            if (cancelled || !conversation) {
+              return;
+            }
+            setConversationId(conversation.id);
+            const tree = await fetchConversationTree(conversation.id);
+            if (cancelled) {
+              return;
+            }
+            setMessages(turnsToMessages(tree.messages, tree.head_id));
+          })
+          .catch(() => undefined);
+      }
+      void restoreConversation();
       void healthMcp(settings.mcp_url)
         .then((result) => {
           if (!cancelled) {
@@ -1882,6 +1909,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Persist the open conversation so a reload reopens the same thread.
+  useEffect(() => {
+    if (conversationId) {
+      void saveStoredConversationId(conversationId);
+    }
+  }, [conversationId]);
 
   // Health polling: the studio must notice that the model or the MCP server
   // came back without a reload, so the bar leaves "Local mode" on its own.
