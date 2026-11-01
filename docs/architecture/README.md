@@ -114,6 +114,7 @@ Start here, then take the one that answers your question.
 | [Studio banners](banners.md) | The Studio's unified notice system. |
 | [Vendor alley](vendor.md) | What may be copied into `src/vendor`, and how the boundary is enforced. |
 | [Testing](testing.md) | Test layout, commands, and what each suite is responsible for. |
+| [Agent assignment](../agents.md) | Which agents can take an issue, how a claim is recorded, and what expires. |
 | [Decisions (ADRs)](adr/README.md) | Why the architecture looks the way it does. |
 
 ## Related

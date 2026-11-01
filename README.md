@@ -191,6 +191,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
+| [Agent assignment](docs/agents.md) | Which agents take issues, how they claim one, and when a claim expires |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
 
 Every guide is also published on the

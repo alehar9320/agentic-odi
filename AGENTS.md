@@ -203,6 +203,7 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
 ## Project Instructions
 
 - Read `.agents/rules/agent_instructions.md` for the ODI domain guardrails, MCP conventions, testing strategy, and README maintenance rules.
+- Which agents can take a GitHub issue, how a claim is recorded, and when it expires: `docs/agents.md`.
 - Keep `README.md` current in the same task whenever code, commands, dependencies, or capabilities change.
 - Architecture and data-flow details live in `docs/architecture/`; update them when the package graph or runtime boundaries change.
 - Superpowers artifacts belong under `docs/superpowers/`: designs in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, plans in `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.
