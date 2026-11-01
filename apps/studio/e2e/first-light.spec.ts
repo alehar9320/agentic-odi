@@ -90,7 +90,9 @@ test.describe("Pillar 0 · Arrive — a stranger gets value in five minutes", ()
     await expect(log).toContainText(sentence);
     const reply = await lastReply(page);
     expect(reply.length).toBeGreaterThan(0);
-    expect(reply).toContain("no model is reachable");
+    // Case-insensitive: the same sentence opens the reply on its own line, so
+    // its first letter is capitalised, and the copy may be reworded above it.
+    expect(reply.toLowerCase()).toContain("no model is reachable");
   });
 
   test("promise 3 · the empty canvas teaches the next step and invents nothing", async ({
