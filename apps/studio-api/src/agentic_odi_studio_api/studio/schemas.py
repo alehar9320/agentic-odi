@@ -307,6 +307,16 @@ class ConversationModel(BaseModel):
     head_id: str | None = None
 
 
+class ConversationSummaryModel(ConversationModel):
+    """A conversation in the history list: its metadata plus how much is in it."""
+
+    turn_count: int = 0
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationSummaryModel] = Field(default_factory=list)
+
+
 class ConversationResponse(BaseModel):
     conversation: ConversationModel
 

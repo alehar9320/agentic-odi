@@ -106,6 +106,28 @@ class Conversation:
 
 
 @dataclass
+class ConversationSummary:
+    """A conversation as the history switcher sees it: metadata plus a count."""
+
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+    head_id: str | None
+    turn_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "head_id": self.head_id,
+            "turn_count": self.turn_count,
+        }
+
+
+@dataclass
 class Turn:
     id: int
     conversation_id: str
@@ -369,6 +391,32 @@ class StudioMemory:
                 "SELECT * FROM conversations ORDER BY updated_at DESC, created_at DESC LIMIT 1"
             ).fetchone()
         return None if row is None else self._conversation_from_row(row)
+
+    def list_conversations(self) -> list[ConversationSummary]:
+        """Every conversation, most recently touched first, with its turn count."""
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT conversations.id, conversations.title,
+                       conversations.created_at, conversations.updated_at,
+                       conversations.head_id,
+                       (SELECT COUNT(*) FROM turns
+                         WHERE turns.conversation_id = conversations.id) AS turn_count
+                  FROM conversations
+                 ORDER BY conversations.updated_at DESC, conversations.created_at DESC
+                """
+            ).fetchall()
+        return [
+            ConversationSummary(
+                id=row["id"],
+                title=row["title"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                head_id=row["head_id"],
+                turn_count=row["turn_count"],
+            )
+            for row in rows
+        ]
 
     def append_turn(
         self,

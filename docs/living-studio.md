@@ -189,6 +189,11 @@ Studio says so in one place and keeps going:
   settings panel is not an outage to announce across the window. Background health
   polls may retire a warning, never raise one.
 - Settings → Base URL and Model reconnect the assistant whenever you are ready.
+  Each field saves when it is left, and the section says **Saved** once an edit
+  lands; a value the studio cannot use (a URL that is not an address, an empty
+  model name) is refused beside the field with the reason and the last good value
+  stays in effect. There is no Save button and no way for one section's edit to
+  discard another's.
   A keyless server on your own network (Ollama, LM Studio, anything on loopback
   or a private address) counts as configured; a public URL without a key does
   not, and `isEndpointConfigured` in `apps/studio/src/lib/modelEndpoint.ts` is
@@ -383,6 +388,9 @@ cites the issue or PR that landed it.
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
+| `apps/studio/src/components/settings/SavedField.tsx` | A field that saves when it is left, states **Saved** in its section, and refuses an unusable value beside itself with the reason. |
+| `apps/studio/src/components/settings/sections/` | The Model and Studio bridge sections, each a module with its own fields and save line. |
+| `apps/studio/src/components/settings/validation.ts` | What Settings accepts before it writes: a full http(s) URL, and a non-empty model name. |
 
 The sidecar remains the source of truth for what happened. Its additions are
 opt-in and additive: `reasoning`, `source`, and `approval` stream events;
