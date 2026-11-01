@@ -302,6 +302,7 @@ class ConversationModel(BaseModel):
     created_at: str
     updated_at: str
     head_id: str | None = None
+    turn_count: int = 0
 
 
 class ConversationResponse(BaseModel):
