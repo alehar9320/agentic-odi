@@ -2,6 +2,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ONBOARDING_STORAGE_KEY } from "./storage";
+import {
+  SAMPLE_COMPARISON_IDS,
+  SAMPLE_EVIDENCE_ID,
+  SAMPLE_JOB_ID,
+  SAMPLE_OUTCOME_ID,
+  SAMPLE_OUTCOME_IDS,
+  SAMPLE_STEP_ID,
+} from "../lib/sampleLoop";
 
 const studio = vi.hoisted(() => ({
   settings: {
@@ -19,6 +27,12 @@ const studio = vi.hoisted(() => ({
   openSetup: vi.fn(),
   closeSetup: vi.fn(),
   sendMessage: vi.fn(),
+  canvasState: { kind: "ready", data: null } as unknown as { kind: string; data: unknown },
+  deleteEvidence: vi.fn<(id: string) => Promise<void>>(async () => {}),
+  deleteOutcome: vi.fn<(id: string) => Promise<void>>(async () => {}),
+  deleteStep: vi.fn<(id: string) => Promise<void>>(async () => {}),
+  deleteJob: vi.fn<(id: string) => Promise<void>>(async () => {}),
+  refreshCanvas: vi.fn(async () => {}),
 }));
 
 vi.mock("../state/StudioContext", () => ({
@@ -73,6 +87,15 @@ function continueButton() {
   return screen.getByRole("button", { name: "Continue" });
 }
 
+/** Walk the whole tour to scene three: choose a goal, clear readiness. */
+function walkToLand() {
+  fireEvent.click(continueButton());
+  fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
+  fireEvent.click(continueButton());
+  fireEvent.click(continueButton());
+  expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Where it lands.");
+}
+
 describe("FirstRunWizard", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -90,6 +113,12 @@ describe("FirstRunWizard", () => {
     studio.openSetup.mockClear();
     studio.closeSetup.mockClear();
     studio.sendMessage.mockClear();
+    studio.canvasState = { kind: "ready", data: null };
+    studio.deleteEvidence.mockClear();
+    studio.deleteOutcome.mockClear();
+    studio.deleteStep.mockClear();
+    studio.deleteJob.mockClear();
+    studio.refreshCanvas.mockClear();
   });
 
   it("never opens by itself, even on a fresh run", () => {
@@ -108,7 +137,7 @@ describe("FirstRunWizard", () => {
     expect(heading).toHaveFocus();
   });
 
-  it("walks from a chosen starting point to the matching surface", async () => {
+  it("lands on the outcome, then starts the chosen surface", async () => {
     renderWizard();
 
     fireEvent.click(continueButton());
@@ -126,12 +155,10 @@ describe("FirstRunWizard", () => {
     );
     fireEvent.click(continueButton());
 
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Your first move.");
-    expect(
-      screen.getByText("We start in the conversation. Tell me what you already know."),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Where it lands.");
+    expect(screen.getByText("Opportunity map")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Find my next opportunity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(studio.sendMessage).toHaveBeenCalledWith(
@@ -147,22 +174,113 @@ describe("FirstRunWizard", () => {
     });
   });
 
-  it("starts the conversation from the chosen door", () => {
+  it("lands on the outcome, then starts the conversation from the chosen door", async () => {
     renderWizard();
 
     fireEvent.click(continueButton());
     fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
     fireEvent.click(continueButton());
     fireEvent.click(continueButton());
-    fireEvent.click(screen.getByRole("button", { name: "Sharpen my opportunity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 
-    expect(studio.closeSetup).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(studio.closeSetup).toHaveBeenCalledTimes(1));
     expect(studio.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining("I have an opportunity in mind"),
     );
     expect(studio.openSetup).not.toHaveBeenCalled();
     expect(studio.openPanel).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("highlights the scored sample outcome in the plot", () => {
+    renderWizard();
+    walkToLand();
+
+    expect(screen.getByRole("img", { name: "Opportunity map" })).toBeInTheDocument();
+    // The sample outcome is named in the scene and marked as sample data.
+    expect(screen.getByText("Sample")).toBeInTheDocument();
+    expect(screen.getByText(SAMPLE_OUTCOME_ID)).toBeInTheDocument();
+
+    const highlighted = document.querySelectorAll(".matrix-node--highlighted");
+    expect(highlighted).toHaveLength(1);
+    expect(highlighted[0]).toHaveAttribute("data-highlighted", "true");
+    expect(highlighted[0]).toHaveAccessibleName(new RegExp(`^${SAMPLE_OUTCOME_ID},`));
+    // The comparisons are on the plot but not highlighted.
+    for (const comparison of SAMPLE_COMPARISON_IDS) {
+      const node = document.querySelector(`.matrix-node[aria-label^="${comparison},"]`);
+      expect(node).not.toBeNull();
+      expect(node).not.toHaveAttribute("data-highlighted");
+    }
+  });
+
+  it("removes every sample record when she starts her own job", async () => {
+    renderWizard();
+    walkToLand();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    const removed = [
+      ...studio.deleteEvidence.mock.calls.map((call) => call[0]),
+      ...studio.deleteOutcome.mock.calls.map((call) => call[0]),
+      ...studio.deleteStep.mock.calls.map((call) => call[0]),
+      ...studio.deleteJob.mock.calls.map((call) => call[0]),
+    ];
+    const expected = [
+      SAMPLE_EVIDENCE_ID,
+      ...SAMPLE_OUTCOME_IDS,
+      SAMPLE_STEP_ID,
+      SAMPLE_JOB_ID,
+    ];
+    expect([...removed].sort()).toEqual([...expected].sort());
+    // No sample id survives the choice.
+    for (const id of expected) {
+      expect(removed).toContain(id);
+    }
+  });
+
+  it("keeps the marked sample when she keeps it", async () => {
+    renderWizard();
+    walkToLand();
+
+    // The sample is marked before the choice and left marked after it.
+    expect(screen.getByText("Sample")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep the sample to poke at" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(studio.deleteOutcome).not.toHaveBeenCalled();
+    expect(studio.deleteEvidence).not.toHaveBeenCalled();
+    expect(studio.deleteStep).not.toHaveBeenCalled();
+    expect(studio.deleteJob).not.toHaveBeenCalled();
+    expect(studio.openPanel).toHaveBeenCalledWith("landscape");
+    expect(stored()).toMatchObject({ status: "done", step: 3 });
+  });
+
+  it("only removes the sample ids the tour made", async () => {
+    // A canvas that also holds a job a person made. Cleanup must leave it.
+    studio.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [
+          { id: SAMPLE_JOB_ID, name: "Sample brief" },
+          { id: "JOB-MINE", name: "A job I made" },
+        ],
+        steps: [{ id: SAMPLE_STEP_ID, job_id: SAMPLE_JOB_ID, name: "Sample step" }],
+        outcomes: [{ id: SAMPLE_OUTCOME_ID, job_id: SAMPLE_JOB_ID, statement: "Sample" }],
+        evidence: [{ id: SAMPLE_EVIDENCE_ID, content: "Sample" }],
+        source: "local",
+      },
+    };
+    renderWizard();
+    walkToLand();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    const jobsRemoved = studio.deleteJob.mock.calls.map((call) => call[0]);
+    expect(jobsRemoved).toContain(SAMPLE_JOB_ID);
+    expect(jobsRemoved).not.toContain("JOB-MINE");
   });
 
   it("skips on request and remembers it", () => {

@@ -2,7 +2,7 @@ import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CanvasState } from "../../types";
-import { OpportunityLandscape } from "./OpportunityLandscape";
+import { OpportunityLandscape, OpportunityPlot } from "./OpportunityLandscape";
 
 // Mock StudioContext
 const mockCanvasData = {
@@ -282,5 +282,43 @@ describe("OpportunityLandscape canvas states", () => {
     const { container } = render(<OpportunityLandscape />);
 
     expect(container.textContent).not.toContain("Active Job Map Contexts");
+  });
+});
+
+describe("OpportunityPlot highlight", () => {
+  const outcomes = mockCanvasData.outcomes;
+
+  it("marks exactly the highlighted outcome and no other", () => {
+    const { container } = render(
+      <OpportunityPlot
+        outcomes={outcomes}
+        selectedOutcomeId={null}
+        highlightedOutcomeId="O-101"
+        onSelectOutcome={() => {}}
+        onHoverOutcome={() => {}}
+        activeOutcome={null}
+        compact
+      />,
+    );
+
+    const highlighted = container.querySelectorAll(".matrix-node--highlighted");
+    expect(highlighted).toHaveLength(1);
+    expect(highlighted[0]).toHaveAttribute("data-highlighted", "true");
+    expect(highlighted[0]).toHaveAccessibleName(/^O-101,/);
+  });
+
+  it("marks nothing when no outcome is highlighted", () => {
+    const { container } = render(
+      <OpportunityPlot
+        outcomes={outcomes}
+        selectedOutcomeId={null}
+        onSelectOutcome={() => {}}
+        onHoverOutcome={() => {}}
+        activeOutcome={null}
+        compact
+      />,
+    );
+
+    expect(container.querySelectorAll(".matrix-node--highlighted")).toHaveLength(0);
   });
 });

@@ -402,7 +402,7 @@ describe("first-run tour", () => {
       await screen.findByText("A quick look at your instruments."),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Make it real" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
@@ -422,7 +422,7 @@ describe("first-run tour", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByText("A quick look at your instruments.");
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Find my next opportunity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 
     expect(
       await screen.findByText(/I need to find the next opportunity worth chasing/),

@@ -430,6 +430,61 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Step 4 — where it lands                                            */
+/* ------------------------------------------------------------------ */
+
+.wizard-land {
+  display: grid;
+  gap: 16px;
+}
+
+.wizard-land__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.wizard-land__note .badge {
+  flex: none;
+  margin-top: 1px;
+}
+
+.wizard-land__plot {
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(9, 10, 14, 0.5);
+}
+
+.wizard-land__missing {
+  padding: 12px 16px;
+  border-left: 2px solid rgba(251, 191, 36, 0.6);
+  border-radius: 0 10px 10px 0;
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.wizard-land__missing-label {
+  margin: 0 0 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.wizard-land__missing-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ */
 /* Footer                                                             */
 /* ------------------------------------------------------------------ */
 
