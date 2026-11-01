@@ -35,6 +35,9 @@ Open pull requests that change a capability this milestone cares about. Each
 links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
+- [ ] **`odi doctor`** — one read-only report that explains a Studio that will not start, with a remedy per failure ([PR #421](https://github.com/alehar9320/agentic-odi/pull/421)).
+
+- [ ] **Resume the last job, step, or outcome after a reload** — the Studio keeps its place in browser storage ([PR #299](https://github.com/alehar9320/agentic-odi/pull/299)).
 - [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
 - [ ] **Agents reuse before they write** — the cost-ordered ladder and its bounds in `docs/architecture/reuse.md`, the behaviour skill in `.agents/skills/reuse-first/`, the Studio vendor ledger that `docs/architecture/vendor.md` promised but never had, and an advisory `Reuses:` check in `scripts/pr_guards.py body-truth`. The eight duplicates the audit named stay open as ordinary refactoring, one pull request each ([PR #602](https://github.com/alehar9320/agentic-odi/pull/602)).
 - [ ] **The landing page points at the sample** — the site's primary call to action opens a committed, read-only sample workspace generated from a fixture, labelled a sample on every row and rendering with no network ([PR #469](https://github.com/alehar9320/agentic-odi/pull/469)).

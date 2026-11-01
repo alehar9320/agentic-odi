@@ -70,6 +70,21 @@ app.add_typer(
 app.command(name="score")(score)
 
 
+@app.command(name="doctor")
+def doctor_command(
+    json_output: bool = typer.Option(
+        False, "--json", help="Write one JSON object to stdout and nothing else."
+    ),
+    offline: bool = typer.Option(False, "--offline", help="Skip the network checks."),
+    timeout: float = typer.Option(2.0, "--timeout", help="Seconds per network check."),
+) -> None:
+    """Diagnose why the Studio will not start. Read-only."""
+    # Imported here so `agentic-odi --version` never pays for httpx.
+    from agentic_odi_cli.doctor import run_cli
+
+    run_cli(json_output=json_output, offline=offline, timeout=timeout)
+
+
 def _version_callback(ctx: typer.Context, value: bool) -> None:
     if value:
         if ctx.params.get("verbose"):
