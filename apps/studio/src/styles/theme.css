@@ -1800,6 +1800,25 @@ a {
   line-height: 1.45;
 }
 
+.field__save {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.settings__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings__save {
+  margin: 0;
+  color: var(--green);
+  font-size: 0.7rem;
+}
+
 .settings__model-state {
   display: flex;
   flex-wrap: wrap;
