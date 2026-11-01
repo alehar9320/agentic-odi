@@ -311,6 +311,7 @@ export interface StudioBrief {
  * stage; a lens makes room for itself and never replaces the thread.
  */
 export type WorkspacePanelId =
+  | "records"
   | "landscape"
   | "jobmap"
   | "segments"
@@ -430,6 +431,11 @@ export interface Conversation {
   updated_at: string;
   /** The visible branch head turn, when the conversation has branches. */
   head_id?: string | null;
+}
+
+/** A conversation as the history list shows it: enough to name it and size it. */
+export interface ConversationSummary extends Conversation {
+  turn_count: number;
 }
 
 export interface ConversationTurn {

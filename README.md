@@ -12,11 +12,13 @@ desired outcomes, and opportunity scores that rank them.
 [![Open the Living Studio](https://img.shields.io/badge/Open%20the%20Living%20Studio-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://agentic-odi.alehar.workers.dev/)
 [![Run it locally](https://img.shields.io/badge/Run%20it%20locally-1e293b?style=for-the-badge&logo=gnubash&logoColor=white)](#quick-start)
 
-**Try it now — nothing to install.** The Studio opens in your browser; live data
-and chat need the local sidecar below. Want to see what it produces first?
-[Open the sample workspace](https://alehar9320.github.io/agentic-odi/sample/) —
-a read-only job, its scored outcomes, and the evidence behind them, generated
-from a committed fixture and labelled a sample on every row.
+**Try it now — nothing to install.** The Studio opens in your browser and works
+from the first minute: the canvas, the thread, and the assistant all run on your
+device. Add the local sidecar below for live MCP data and your own model. Want to
+see what it produces first? [Open the sample
+workspace](https://alehar9320.github.io/agentic-odi/sample/) — a read-only job,
+its scored outcomes, and the evidence behind them, generated from a committed
+fixture and labelled a sample on every row.
 
 **Or install the CLI in one line** (Linux, macOS):
 
@@ -142,9 +144,10 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its
-  sidecar-owned transcript, with attachments, tool traces, approvals, and
-  branch-aware editing and regeneration. Settings → About also offers an
-  opt-in, redacted local diagnostics preview; no report is uploaded. See
+  sidecar-owned transcript, with attachments, tool traces, opt-in approvals for
+  chat writes and unknown tools, and branch-aware editing and regeneration.
+  Settings → About also offers an opt-in, redacted local diagnostics preview; no
+  report is uploaded. See
   [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
@@ -186,11 +189,13 @@ soon". See [External Connectors](docs/connectors.md).
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Reuse First](docs/architecture/reuse.md) | The ladder agents walk before writing code: reuse what exists, adopt what is declared, copy with provenance, then build |
 | [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
+| [Agent assignment](docs/agents.md) | Which agents take issues, how they claim one, and when a claim expires |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
 
 Every guide is also published on the
@@ -204,7 +209,10 @@ A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
 shared tooling at the root. Packages live in `packages/`, runnable services in
 `apps/`, and deployment assets in `infra/`. The
 [architecture index](docs/architecture/README.md) explains how the pieces fit
-together and where each contract is enforced:
+together and where each contract is enforced; its Dependency Direction diagram
+is a contract of its own — `tests/test_architecture.py` checks the drawn arrows
+against the declared dependencies and the real imports, so the picture cannot
+drift from the workspace. The distributions are:
 
 | Path | Distribution | Description |
 |---|---|---|
@@ -227,7 +235,7 @@ request:
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy apps packages && uv run pytest
-uv run python scripts/doc_check.py   # documented commands, paths, routes, and env vars exist
+uv run python scripts/doc_check.py   # documented commands, paths, routes, env vars, and the assistant-ui ledger hold up
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage

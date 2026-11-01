@@ -91,9 +91,27 @@ class Conversation:
     updated_at: str
     #: The visible leaf of the branch tree. ``None`` until a turn is persisted.
     head_id: str | None = None
-    #: How many turns the conversation holds. ``0`` unless a list query asked
-    #: for it; the count is never stored, only computed on demand.
-    turn_count: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "head_id": self.head_id,
+        }
+
+
+@dataclass
+class ConversationSummary:
+    """A conversation as the history switcher sees it: metadata plus a count."""
+
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+    head_id: str | None
+    turn_count: int
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -344,29 +362,31 @@ class StudioMemory:
             ).fetchone()
         return None if row is None else self._conversation_from_row(row)
 
-    def list_conversations(self, limit: int | None = None, offset: int = 0) -> list[Conversation]:
-        """Every conversation, newest first, with a cheap turn count.
-
-        The count is a correlated subquery rather than a stored column, so it
-        can never drift from the turns it counts. ``limit``/``offset`` page the
-        result for a switcher that cannot load the whole history at once.
-        """
-        query = (
-            "SELECT c.*, "
-            "(SELECT COUNT(*) FROM turns t WHERE t.conversation_id = c.id) AS turn_count "
-            "FROM conversations c "
-            "ORDER BY c.updated_at DESC, c.created_at DESC"
-        )
-        params: tuple[Any, ...] = ()
-        if limit is not None:
-            query += " LIMIT ? OFFSET ?"
-            params = (limit, offset)
-        elif offset:
-            query += " LIMIT -1 OFFSET ?"
-            params = (offset,)
+    def list_conversations(self) -> list[ConversationSummary]:
+        """Every conversation, most recently touched first, with its turn count."""
         with self._lock:
-            rows = self._connection.execute(query, params).fetchall()
-        return [self._conversation_from_row(row) for row in rows]
+            rows = self._connection.execute(
+                """
+                SELECT conversations.id, conversations.title,
+                       conversations.created_at, conversations.updated_at,
+                       conversations.head_id,
+                       (SELECT COUNT(*) FROM turns
+                         WHERE turns.conversation_id = conversations.id) AS turn_count
+                  FROM conversations
+                 ORDER BY conversations.updated_at DESC, conversations.created_at DESC
+                """
+            ).fetchall()
+        return [
+            ConversationSummary(
+                id=row["id"],
+                title=row["title"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                head_id=row["head_id"],
+                turn_count=row["turn_count"],
+            )
+            for row in rows
+        ]
 
     def append_turn(
         self,
@@ -694,7 +714,6 @@ class StudioMemory:
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             head_id=row["head_id"] if "head_id" in keys else None,
-            turn_count=row["turn_count"] if "turn_count" in keys else 0,
         )
 
     @staticmethod

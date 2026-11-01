@@ -7,6 +7,22 @@ function makeStore() {
   return new MemoryLocalStore();
 }
 
+/** A thread with timestamps the wall clock cannot move. */
+async function seed(
+  store: MemoryLocalStore,
+  id: string,
+  title: string,
+  updatedAt: string,
+): Promise<void> {
+  await store.putConversation({
+    id,
+    title,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: updatedAt,
+    head_id: null,
+  });
+}
+
 describe("LocalMemoryService observations", () => {
   it("adds and lists confirmed observations", async () => {
     const store = makeStore();
@@ -125,5 +141,33 @@ describe("LocalMemoryService conversations", () => {
 
     const latest = await memory.latestConversation();
     expect([first.id, second.id]).toContain(latest.conversation?.id);
+  });
+
+  it("lists conversations by the touch that came last", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    await seed(store, "c-revisited", "Quarterly review", "2026-02-09T00:00:00Z");
+    await seed(store, "c-untouched", "Activation model", "2026-02-05T00:00:00Z");
+
+    const listed = await memory.listConversations();
+
+    expect(listed.map((item) => item.id)).toEqual(["c-revisited", "c-untouched"]);
+    expect(listed[0].title).toBe("Quarterly review");
+  });
+
+  it("reports how many turns each conversation holds", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    await seed(store, "c-talked", "Scored", "2026-02-09T00:00:00Z");
+    await seed(store, "c-quiet", "Blank", "2026-02-05T00:00:00Z");
+    await memory.appendTurn("c-talked", "user", "How do I score this?", "m-1", null);
+    await memory.appendTurn("c-talked", "assistant", "By importance.", "m-2", "m-1");
+
+    const listed = await memory.listConversations();
+
+    expect(Object.fromEntries(listed.map((item) => [item.id, item.turn_count]))).toEqual({
+      "c-talked": 2,
+      "c-quiet": 0,
+    });
   });
 });
