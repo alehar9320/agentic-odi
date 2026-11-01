@@ -53,6 +53,13 @@ export class StudioApiError extends Error {
 /** Network or sidecar-proxy failures are transport failures; application errors are not. */
 export function isTransportFailure(error: unknown): boolean {
   if (error instanceof StudioApiError) {
+    // The Worker answers for itself when it has no sidecar to forward to, and
+    // does so with a structured body — the same shape a sidecar uses to refuse
+    // a request it did receive. Only the code separates "nobody is there" from
+    // "the studio said no", and only the first one belongs to the browser.
+    if (error.error.code === "sidecar_unavailable") {
+      return true;
+    }
     return (
       (error.status === 502 || error.status === 503 || error.status === 504) &&
       !error.fromSidecar
@@ -81,6 +88,7 @@ function codeForStatus(status: number): string {
 
 const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
   mcp_unreachable: "The studio sidecar isn't reachable.",
+  sidecar_unavailable: "This studio has no sidecar behind it.",
   not_found: "That resource wasn't found.",
   validation: "The request was invalid.",
   conflict: "That conflicts with the current state.",
@@ -91,6 +99,8 @@ const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
 const SUGGESTION_FOR_CODE: Partial<Record<string, string>> = {
   mcp_unreachable:
     "Start the studio sidecar with `python scripts/dev.py` (or `npm --prefix apps/studio run dev:full`), then click Recheck.",
+  sidecar_unavailable:
+    "Nothing is broken: this studio runs from your browser. Add a sidecar when you want live MCP data.",
   not_found: "Check the identifier and try again.",
   validation: "Fix the input and try again.",
   conflict: "Reload and try again.",
