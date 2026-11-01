@@ -23,13 +23,15 @@ uv run bandit -c pyproject.toml -r apps packages website/
 
 ## Documentation Checks
 
-`scripts/doc_check.py` keeps the living docs honest against the code. In a pull
-request it also refuses a new public capability with no roadmap entry:
+`scripts/doc_check.py` keeps the living docs honest against the code:
 
 ```bash
 uv run python scripts/doc_check.py
-uv run python scripts/doc_check.py --changed-files $(git diff --name-only main...HEAD)
 ```
+
+`docs/roadmap.md` is maintained by hand. No check requires a new capability to
+add a roadmap line, because a shared file every change had to edit conflicted
+with every other change.
 
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,
@@ -104,9 +106,13 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
 | `apps/studio/src/diagnostics/` | Recursive secret/URL/path redaction, 256 KiB cap, opt-in memory-only capture, local-only metadata fetch, and accessible diagnostics preview/export |
 | `apps/studio-api/tests/test_studio_diagnostics.py` | Metadata-only diagnostics response, safe database basename/counts, integrity state, and absence of row contents/config |
+| `apps/studio-api/tests/test_studio_chat_stream.py` | Streaming chat, opt-in approval decisions for contract writes and unknown tools, and read-only/local-tool classification |
 | `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
+| `apps/studio/src/assistant/quote.test.ts`, `src/components/chat/SelectionToolbar.test.tsx` | Quoting a passage verbatim with its attribution, one copy only, and no toolbar until text is selected |
 | `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
+| `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
 | `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
+| `apps/studio/src/components/chat/ThreadComposer.test.tsx` | Recall of previously sent messages with `ArrowUp`/`ArrowDown`, draft restoration, and the editing and sending keys it must not break |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
 | `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
 | `apps/studio/src/assistant/starterCopy.test.ts` | The first-run starter lint: situation-first titles, material-first prompts, a promised artifact, no quality adjectives, no claim literal, and the untouched returning-user swaps |
@@ -423,7 +429,7 @@ uv run pytest \
 | `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, connectors, and startup performance |
 | `packages/connectors/tests/` | Catalog presets, registry persistence, factory, MCP and REST connectors, evidence mapping, and sink |
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
-| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift and roadmap gates |
+| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |

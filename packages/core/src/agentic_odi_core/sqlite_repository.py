@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
+from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
@@ -59,6 +60,7 @@ class SQLiteRepository(Repository):
         self.jobs: dict[str, Job] = {}
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
+        self.proposals: dict[str, OutcomeProposal] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
@@ -213,6 +215,10 @@ class SQLiteRepository(Repository):
             self.strategies[p["id"]] = Strategy.model_validate(p)
         elif et == "STRATEGY_UPDATED":
             self._merge_updates(self.strategies, p, Strategy)
+        elif et == "PROPOSAL_CREATED":
+            self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
+        elif et == "PROPOSAL_UPDATED":
+            self._merge_updates(self.proposals, p, OutcomeProposal)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -220,7 +226,7 @@ class SQLiteRepository(Repository):
         entity = entities.get(p["id"])
         if entity is None:
             return
-        current = entity.model_dump(exclude_unset=True)
+        current = entity.model_dump(mode="json", exclude_unset=True)
         current.update(p.get("updates", {}))
         try:
             entities[p["id"]] = model.model_validate(current)
@@ -335,6 +341,53 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return True
+
+    def list_steps(self, limit: int | None = None, offset: int = 0) -> list[Step]:
+        with self._lock:
+            self._sync()
+            return page(list(self.steps.values()), limit, offset)
+
+    def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal:
+        with self._lock:
+            self.store.append(
+                "PROPOSAL_CREATED",
+                proposal.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return proposal
+
+    def get_proposal(self, proposal_id: str) -> OutcomeProposal | None:
+        with self._lock:
+            self._sync()
+            return self.proposals.get(proposal_id)
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
+        with self._lock:
+            self._sync()
+            props = list(self.proposals.values())
+            if status is not None:
+                props = [p for p in props if p.status == status]
+            return props
+
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None:
+        with self._lock:
+            self._sync()
+            proposal = self.proposals.get(proposal_id)
+            if not proposal:
+                return None
+            current = proposal.model_dump(mode="json", exclude_unset=True)
+            current.update(updates)
+            new_proposal = OutcomeProposal.model_validate(current)
+            self.store.append(
+                "PROPOSAL_UPDATED",
+                {"id": proposal_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_proposal
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
         with self._lock:

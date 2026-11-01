@@ -7,6 +7,7 @@
 
 import type { RawSseEvent } from "../api/sse";
 import type { ChatStreamRequest, StudioConfig } from "../types";
+import { isEndpointConfiguredForSettings } from "../lib/modelEndpoint";
 import { isFeatureEnabled } from "../features/flags";
 import { EDGE_TIERS, PROGRESSION, collectDeviceSignals, computeEligibility, firstEligibleTier, tierById } from "./ladder";
 import { EdgeScheduler, type SchedulerEnvironment } from "./scheduler";
@@ -80,13 +81,12 @@ export function shouldUseEdge(input: EdgeDecision): boolean {
   );
 }
 
-export function hasRemoteEndpoint(settings: StudioConfig): boolean {
-  return Boolean(
-    settings.base_url &&
-      settings.api_key &&
-      settings.model_name &&
-      settings.base_url !== "http://localhost:8001/v1",
-  );
+/** Whether some server is already answering — the studio's one rule for that
+ * lives in `lib/modelEndpoint`, and the browser tier defers to it. A keyless
+ * model on the person's own network counts just as a paid key does; standing
+ * down is the correct answer either way. */
+export function hasModelEndpoint(settings: StudioConfig): boolean {
+  return isEndpointConfiguredForSettings(settings);
 }
 
 async function defaultEngineFactory(): Promise<EdgeLLMEngine> {
@@ -110,6 +110,14 @@ export class EdgeManager {
   private listeners: Set<(notice: EdgeNotice) => void> = new Set();
   private environment: SchedulerEnvironment | null = null;
   private fetching = false;
+  /** What this tab last read of consent and the tiers on disk. A person's
+   * message is never made to wait on a storage read to learn who is answering
+   * it, so the routing decision reads this and the read that follows corrects
+   * the next turn. */
+  private snapshot: { consent: ConsentState; servedTier: EdgeTierId | null } = {
+    consent: "unset",
+    servedTier: null,
+  };
 
   /** The seam tests and e2e use to drive an edge turn without WebGPU. */
   setEngineFactory(factory: () => Promise<EdgeLLMEngine>): void {
@@ -137,6 +145,12 @@ export class EdgeManager {
   }
 
   private emit(notice: EdgeNotice): void {
+    // Everything but a progress tick changed what storage says about the
+    // ladder — consent given, a tier hosted or freed — so the routing snapshot
+    // follows the notice. A tick changes nothing anyone could decide on.
+    if (notice.kind !== "downloading") {
+      this.reread();
+    }
     for (const listener of [...this.listeners]) {
       listener(notice);
     }
@@ -151,6 +165,7 @@ export class EdgeManager {
     this.state = null;
     this.loadedTier = null;
     this.fetching = false;
+    this.snapshot = { consent: "unset", servedTier: null };
   }
 
   private async ensureState(): Promise<EdgeStateService> {
@@ -196,14 +211,30 @@ export class EdgeManager {
     return null;
   }
 
-  async canServe(settings: StudioConfig, llmHealthy: boolean): Promise<boolean> {
+  /** Refresh the snapshot a turn's routing decision is read from. Await it when
+   * the answer has to be current; fire it when a person is waiting. */
+  async sync(): Promise<void> {
     const state = await this.ensureState();
+    const [consent, servedTier] = await Promise.all([state.getConsent(), this.servedTier()]);
+    this.snapshot = { consent, servedTier };
+  }
+
+  /** A read that fails leaves the decision working from what it last knew —
+   * the state before the change, which is a smaller fault than throwing in
+   * front of someone who just pressed send. */
+  private reread(): void {
+    void this.sync().catch(() => undefined);
+  }
+
+  canServe(settings: StudioConfig, llmHealthy: boolean): boolean {
+    // Keep the next turn better informed without delaying this one.
+    this.reread();
     return shouldUseEdge({
       flagEnabled: isFeatureEnabled("edgeModel"),
-      endpointConfigured: hasRemoteEndpoint(settings),
+      endpointConfigured: hasModelEndpoint(settings),
       llmHealthy,
-      consent: await state.getConsent(),
-      servedTier: await this.servedTier(),
+      consent: this.snapshot.consent,
+      servedTier: this.snapshot.servedTier,
     });
   }
 
@@ -214,7 +245,7 @@ export class EdgeManager {
    * the person has never said yes or no.
    */
   async offerFor(settings: StudioConfig, llmHealthy: boolean): Promise<EdgeOffer | null> {
-    if (!isFeatureEnabled("edgeModel") || llmHealthy || hasRemoteEndpoint(settings)) {
+    if (!isFeatureEnabled("edgeModel") || llmHealthy || hasModelEndpoint(settings)) {
       return null;
     }
     const state = await this.ensureState();

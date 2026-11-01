@@ -1,5 +1,53 @@
 # Data Flow
 
+## The Shape
+
+Connectors are the only way data enters from outside the local store. Reads
+project the same repository three ways, and every write emits signals.
+
+```mermaid
+flowchart LR
+    subgraph inbound["The only path in from outside"]
+        SOURCE["Connector endpoint: MCP client or REST call"]
+        BATCH["IngestBatch — normalized records"]
+        SINK["IngestSink — in-process, dies with the command"]
+        DRAFT["EvidenceDraft — connectors mapping"]
+        SOURCE --> BATCH --> SINK -->|drafts_from_batch| DRAFT
+    end
+
+    DOMAIN["ODIService — validation, dedupe, idempotent promotion"]
+    STORE[("SQLiteRepository — append-only event log + snapshots")]
+    DRAFT -->|add_evidence| DOMAIN --> STORE
+
+    GATE{"Approval gate — sidecar chat only"}
+    CHAT["Chat tool loop — /api/chat"]
+    LLM["OpenAI-compatible LLM"]
+    SPA["Studio SPA"]
+    CLI["CLI"]
+    MCP["MCP tools"]
+
+    CHAT <--> LLM
+    SPA -->|"/api/chat"| CHAT
+    GATE -.->|an approval card pauses the turn| CHAT
+    CHAT -->|local backend direct, mcp backend via MCP| DOMAIN
+    CLI -->|local or mcp| DOMAIN
+    MCP --> DOMAIN
+    SPA -->|"/api/canvas, /steps, /outcomes"| DOMAIN
+
+    STORE -->|read-through state| PROJ["Pydantic models — outcomes ranked by opportunity score"]
+    PROJ --> SPA
+    PROJ --> CLI
+    PROJ --> MCP
+
+    DOMAIN -->|every write| SIGNAL["Signals — record_signal"]
+    SIGNAL --> FEED["CatchUpFeed — odi signals unread"]
+
+    STORE -.->|turn citations name evidence ids, no foreign key| MEMDB[("studio.db — PM memory")]
+    MEMDB -.->|bounded context| CHAT
+```
+
+The detail is below; this is the shape the rest of the document explains.
+
 ## Sources of Truth
 
 | Layer | Owns | Persists |

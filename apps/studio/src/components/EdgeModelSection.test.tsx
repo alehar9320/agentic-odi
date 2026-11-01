@@ -29,7 +29,7 @@ const edge = vi.hoisted(() => ({
   listener: null as ((notice: EdgeNotice) => void) | null,
 }));
 
-// Only the manager is doubled: `hasRemoteEndpoint` stays real, because which
+// Only the manager is doubled: `hasModelEndpoint` stays real, because which
 // endpoint counts as paid is the routing rule this section has to describe. The
 // flag read inside `panelState` is the real one, so the switch is tested through
 // the storage it actually writes.
@@ -144,7 +144,7 @@ describe("EdgeModelSection", () => {
     render(<EdgeModelSection />);
 
     expect(
-      await screen.findByText(/your model key is answering for now/i),
+      await screen.findByText(/model endpoint is answering for now/),
     ).toBeInTheDocument();
   });
 

@@ -7,7 +7,7 @@ import type { ChatStreamRequest, StudioConfig } from "../types";
 import { EDGE_TIERS, computeEligibility, tierById } from "./ladder";
 import type { SchedulerEnvironment } from "./scheduler";
 import { EdgeStateStore } from "./storage";
-import { EdgeManager, hasRemoteEndpoint, shouldUseEdge } from "./manager";
+import { EdgeManager, hasModelEndpoint, shouldUseEdge } from "./manager";
 import { FakeEdgeEngine } from "../test/edgeFake";
 import type { Eligibility } from "./types";
 
@@ -100,16 +100,25 @@ describe("shouldUseEdge", () => {
   });
 });
 
-describe("hasRemoteEndpoint", () => {
-  it("needs url, key and model together, and never counts the local sidecar", () => {
-    expect(hasRemoteEndpoint(noEndpoint)).toBe(false);
-    expect(hasRemoteEndpoint({ ...noEndpoint, api_key: "sk", model_name: "gpt" })).toBe(false);
+describe("hasModelEndpoint", () => {
+  it("is the studio's one endpoint rule, so the browser tier defers to it", () => {
+    expect(hasModelEndpoint(noEndpoint)).toBe(false);
+    expect(hasModelEndpoint({ ...noEndpoint, api_key: "sk", model_name: "gpt" })).toBe(false);
     expect(
-      hasRemoteEndpoint({
+      hasModelEndpoint({
         ...noEndpoint,
         base_url: "https://api.openai.com/v1",
         api_key: "sk",
         model_name: "gpt",
+      }),
+    ).toBe(true);
+    // A keyless server on the person's own network is a model that is already
+    // answering; the tab should not fetch a gigabyte to compete with it.
+    expect(
+      hasModelEndpoint({
+        ...noEndpoint,
+        base_url: "http://192.168.1.20:11434/v1",
+        model_name: "llama3",
       }),
     ).toBe(true);
   });
@@ -154,12 +163,26 @@ describe("EdgeManager", () => {
   });
 
   it("reports it cannot serve before consent, or with nothing cached", async () => {
-    expect(await manager.canServe(noEndpoint, false)).toBe(true);
+    await manager.sync();
+    expect(manager.canServe(noEndpoint, false)).toBe(true);
     await prime({ consent: "denied", cachedTiers: ["t1"] });
-    expect(await manager.canServe(noEndpoint, false)).toBe(false);
+    await manager.sync();
+    expect(manager.canServe(noEndpoint, false)).toBe(false);
     await prime({ consent: "granted", cachedTiers: [] });
-    expect(await manager.canServe(noEndpoint, false)).toBe(false);
-    expect(await manager.canServe(noEndpoint, true)).toBe(false);
+    await manager.sync();
+    expect(manager.canServe(noEndpoint, false)).toBe(false);
+    expect(manager.canServe(noEndpoint, true)).toBe(false);
+  });
+
+  it("decides a turn from what this tab already knows, never from a storage read", async () => {
+    // Deliberate: a message a person typed is not made to wait on a disk to learn
+    // who is answering it. The cost is that a change made elsewhere shows up on
+    // the turn after the read that noticed it, not this one.
+    await manager.sync();
+    await prime({ consent: "denied", cachedTiers: ["t1"] });
+    expect(manager.canServe(noEndpoint, false)).toBe(true);
+    await manager.sync();
+    expect(manager.canServe(noEndpoint, false)).toBe(false);
   });
 
   it("loads the cached model once, streams frames, and records the answered turn", async () => {
@@ -379,7 +402,9 @@ describe("EdgeManager", () => {
       expect(notices).toContain("ready:t1");
       expect(engine.loads).toEqual([EDGE_TIERS[0].modelId]);
       expect(await manager.servedTier()).toBe("t1");
-      expect(await manager.canServe(noEndpoint, false)).toBe(true);
+      // Saying yes reaches the routing decision on its own: the notice the ladder
+      // emits refreshes what the next turn reads, with nobody calling sync().
+      await vi.waitFor(() => expect(manager.canServe(noEndpoint, false)).toBe(true));
 
       const store = await EdgeStateStore.open();
       expect(await store.getConsent()).toBe("granted");
@@ -389,12 +414,17 @@ describe("EdgeManager", () => {
     });
 
     it("records a refusal so nothing is downloaded and nothing is asked again", async () => {
+      await prime({ consent: "granted", cachedTiers: ["t1"] });
+      await manager.sync();
+      expect(manager.canServe(noEndpoint, false)).toBe(true);
       await manager.decline();
       const store = await EdgeStateStore.open();
       expect(await store.getConsent()).toBe("denied");
       store.close();
       expect(engine.loads).toEqual([]);
-      expect(await manager.canServe(noEndpoint, false)).toBe(false);
+      // The refusal reaches the routing decision the same way the yes does — the
+      // turn after the read that noticed it, not one still standing in the queue.
+      await vi.waitFor(() => expect(manager.canServe(noEndpoint, false)).toBe(false));
     });
   });
 });

@@ -14,15 +14,18 @@ from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     TOOL_SPECS,
+    ClaimCheckError,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
+    InvalidOutcomeStatementError,
     JobNotFoundError,
     JobStage,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
+    ProposalStatus,
     ScheduledWorkNotFoundError,
     SignalNotFoundError,
     StepNotFoundError,
@@ -165,10 +168,39 @@ def get_job_map(job_id: str, limit: int | None = None, offset: int = 0) -> str:
 def add_outcome(
     job_id: str,
     statement: str,
-    importance: float,
-    satisfaction: float,
+    importance: float | None = None,
+    satisfaction: float | None = None,
     step_id: str | None = None,
+    claim_check: dict[str, Any] | None = None,
 ) -> str:
+    """Add a desired Outcome to a Job.
+
+    A score needs the questions behind it. When you supply ``importance`` or
+    ``satisfaction`` you must also supply ``claim_check`` — the questions you
+    asked the customer and what came back::
+
+        {
+          "asked": ["How often does this happen?", "What do you do today?"],
+          "answers": ["Weekly", "A spreadsheet"],
+          "skips": [{"question": "What does it cost?", "reason": "never measured"}]
+        }
+
+    Each skip needs a reason. To record an outcome before you have asked, omit
+    both scores: an unscored outcome is legal, a bare number is not.
+    """
+    if service.get_job(job_id) is None:
+        return f"Error: Job with ID {job_id} not found."
+    for score in (importance, satisfaction):
+        if score is not None and not (1.0 <= score <= 10.0):
+            return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    scored = importance is not None or satisfaction is not None
+    if scored and claim_check is None:
+        return (
+            "Error: add_outcome cannot record a score without a claim_check. "
+            "Ask the customer the questions that produce this number, then pass "
+            "claim_check with asked/answers/skips (each skip needs a reason). "
+            "To record an outcome before asking, omit importance and satisfaction."
+        )
     try:
         outcome = service.add_outcome(
             job_id=job_id,
@@ -176,6 +208,7 @@ def add_outcome(
             importance=importance,
             satisfaction=satisfaction,
             step_id=step_id,
+            claim_check=claim_check,
         )
     except JobNotFoundError:
         return f"Error: Job with ID {job_id} not found."
@@ -183,6 +216,8 @@ def add_outcome(
         return _step_not_found(step_id)
     except ValueOutOfRangeError:
         return "Error: importance and satisfaction must be between 1.0 and 10.0"
+    except ClaimCheckError as exc:
+        return f"Error: {exc}"
     except OutcomeStatementError as exc:
         return f"Error: {exc}"
     return f"Outcome created successfully: {outcome.model_dump_json()}"
@@ -721,6 +756,72 @@ def propose_strategy(job_id: str | None = None) -> str:
     except OdiError as exc:
         return f"Error: {invalid_strategy_request(str(exc))}"
     return json.dumps(strategy.model_dump(mode="json"))
+
+
+@mcp.tool
+def propose_outcome(evidence_id: str) -> str:
+    """Propose a desired outcome mined from an evidence record (Stage 2).
+
+    The default heuristic strategy (deterministic, offline, no LLM) reads the
+    evidence, routes it to a job and step, extracts a candidate ODI-format
+    statement, and suggests importance/satisfaction. Nothing is written to the
+    ODI store until the proposal is approved via approve_proposal.
+    """
+    try:
+        proposal = service.propose_outcome_from_evidence(evidence_id)
+    except EvidenceNotFoundError:
+        return f"Error: evidence {evidence_id} not found."
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    return json.dumps(proposal.model_dump(mode="json"))
+
+
+@mcp.tool
+def list_proposals(status: str | None = None) -> str:
+    """List outcome proposals, optionally filtered by status.
+
+    Status values: proposed, approved, rejected, edited. Omit status to list
+    all proposals.
+    """
+    try:
+        proposal_status = ProposalStatus(status) if status is not None else None
+    except ValueError:
+        return f"Error: invalid status '{status}'. Use proposed, approved, rejected, or edited."
+    proposals = service.list_proposals(status=proposal_status)
+    return json.dumps([p.model_dump(mode="json") for p in proposals])
+
+
+@mcp.tool
+def approve_proposal(
+    proposal_id: str,
+    statement: str | None = None,
+    importance: float | None = None,
+    satisfaction: float | None = None,
+) -> str:
+    """Approve a proposal and write it as an Outcome through add_outcome.
+
+    If statement is provided, the edited statement is validated before writing.
+    Importance/satisfaction default to the proposal's suggested values.
+    """
+    try:
+        outcome = service.approve_proposal(
+            proposal_id, statement=statement, importance=importance, satisfaction=satisfaction
+        )
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    except InvalidOutcomeStatementError as exc:
+        return f"Error: {exc}"
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def reject_proposal(proposal_id: str) -> str:
+    """Reject a proposal. Nothing is written to the ODI store."""
+    try:
+        proposal = service.reject_proposal(proposal_id)
+    except ValidationError as exc:
+        return f"Error: {exc}"
+    return json.dumps(proposal.model_dump(mode="json"))
 
 
 DEFAULT_PORT = 8000

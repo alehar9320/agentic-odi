@@ -11,7 +11,7 @@ const harness = vi.hoisted(() => ({
     streaming: false,
     thinkingPhase: null as string | null,
     toolActivity: [] as unknown[],
-    offlineReply: false,
+    offlineReplyFor: null as string | null,
     sendMessage: vi.fn<(text: string) => Promise<void>>(),
     regenerateFrom: vi.fn<(messageId: string | null) => Promise<void>>(),
     editFrom: vi.fn<(messageId: string | null, text: string) => Promise<void>>(),

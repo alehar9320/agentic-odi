@@ -49,8 +49,11 @@ export function BannerBridge() {
     let cancelled = false;
     void (async () => {
       // Past the guard above the remote model is confirmed unreachable, which
-      // is exactly what the two edge questions below want to be told.
-      const serving = await edgeManager.canServe(settings, false);
+      // is exactly what the two edge questions below want to be told. A strip is
+      // not something a person typed into: read storage and decide after,
+      // instead of answering from what this tab last knew.
+      await edgeManager.sync();
+      const serving = edgeManager.canServe(settings, false);
       const offer = serving ? null : await edgeManager.offerFor(settings, false);
       if (cancelled) {
         return;

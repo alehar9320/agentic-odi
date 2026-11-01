@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { formatGB, PROGRESSION } from "../edge/ladder";
-import { edgeManager, hasRemoteEndpoint, type EdgePanelState } from "../edge/manager";
+import { edgeManager, hasModelEndpoint, type EdgePanelState } from "../edge/manager";
 import { setFeatureOverride } from "../features/flags";
 import { useStudio } from "../state/StudioContext";
 import { MeterBar } from "../ui/primitives";
@@ -106,8 +106,8 @@ export function EdgeModelSection() {
         <span>Let this browser run a model</span>
       </label>
       <p className="muted">
-        With no model key set, replies are generated on this device. Nothing is sent to anyone
-        else.
+        With no model endpoint answering, replies are generated on this device. Nothing is sent to
+        anyone else.
       </p>
 
       {panel === null ? (
@@ -121,8 +121,8 @@ export function EdgeModelSection() {
           ) : panel.consent === "granted" ? (
             <div className="settings__edge-consent">
               <p className="muted">
-                You said yes. {hasRemoteEndpoint(settings)
-                  ? "Your model key is answering for now, so this waits until the key is cleared."
+                You said yes. {hasModelEndpoint(settings)
+                  ? "Your model endpoint is answering for now; clear it and this takes over."
                   : "Replies run here as soon as a tier is on this device."}
               </p>
               <button

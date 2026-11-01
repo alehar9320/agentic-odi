@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { fetchDiagnostics } from "../api/studioApi";
 import type { SidecarDiagnostics } from "../api/studioApi";
@@ -11,6 +11,7 @@ import { DiagnosticsModal } from "../diagnostics/DiagnosticsModal";
 import { PRODUCT_NAME } from "../lib/brand";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
+import type { ConnectionReport } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
 import { EdgeModelSection } from "./EdgeModelSection";
@@ -160,9 +161,35 @@ export function SettingsPanel() {
     openCustomize,
     sidecarReachable,
     capabilities,
+    surveyConnections,
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // Opening Settings is the person asking what is connected, which is the first moment
+  // a probe is owed to them. The answer is kept here, in the panel that asked: a passive
+  // read of a settings page must not restyle the window, because the hosted studio
+  // cannot reach a sidecar by design and its silence is not an outage to announce.
+  const [survey, setSurvey] = useState<ConnectionReport | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void surveyConnections()
+      .then((report) => {
+        if (!cancelled) {
+          setSurvey(report);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // Once per open: typing a URL must not re-probe per keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const modelHealthy = survey ? survey.llmHealthy : llmHealth.healthy;
+  const sidecarKnown = survey ? survey.sidecarReachable : sidecarReachable;
+  const mcpKnown = survey ? survey.mcpReachable : mcpReachable;
 
   function update<K extends keyof StudioConfig>(key: K, value: StudioConfig[K]): void {
     saveSettings({ ...settings, [key]: value });
@@ -295,28 +322,32 @@ export function SettingsPanel() {
       <ul className="connection-list">
         <li>
           <span
-            className={`status-dot${llmHealth.healthy === false ? " is-warn" : ""}${
-              llmHealth.healthy === null ? " is-unknown" : ""
+            className={`status-dot${modelHealthy === false ? " is-warn" : ""}${
+              modelHealthy === null ? " is-unknown" : ""
             }`}
           />
           <span>Model</span>
           <span className="connection-list__value">
-            {llmHealth.healthy === false ? "offline" : "reachable"}
+            {modelHealthy === false
+              ? "offline"
+              : modelHealthy === null
+                ? "not checked"
+                : "reachable"}
           </span>
         </li>
         <li>
           <span
-            className={`status-dot${sidecarReachable === false ? " is-warn" : sidecarReachable === null ? " is-unknown" : ""}`}
+            className={`status-dot${sidecarKnown === false ? " is-warn" : sidecarKnown === null ? " is-unknown" : ""}`}
           />
           <span>Sidecar</span>
           <span className="connection-list__value">
-            {sidecarReachable === false ? "unavailable" : sidecarReachable === null ? "unknown" : "reachable"}
+            {sidecarKnown === false ? "unavailable" : sidecarKnown === null ? "unknown" : "reachable"}
           </span>
         </li>
         <li>
-          <span className={`status-dot${mcpReachable ? "" : " is-unknown"}`} />
+          <span className={`status-dot${mcpKnown ? "" : " is-unknown"}`} />
           <span>Local FastMCP server</span>
-          <span className="connection-list__value">{mcpReachable ? "connected" : "offline"}</span>
+          <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
         </li>
       </ul>
       <p className="muted">
@@ -344,7 +375,7 @@ export function SettingsPanel() {
 
       <EdgeModelSection />
 
-      {sidecarReachable === false ? (
+      {sidecarKnown === false ? (
         <p className="muted">
           Connectors require the local sidecar. Data and conversation still work
           without it; connect a sidecar to add MCP or REST data sources.

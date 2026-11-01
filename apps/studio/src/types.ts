@@ -311,6 +311,7 @@ export interface StudioBrief {
  * stage; a lens makes room for itself and never replaces the thread.
  */
 export type WorkspacePanelId =
+  | "records"
   | "landscape"
   | "jobmap"
   | "segments"

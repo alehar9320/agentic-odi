@@ -54,6 +54,13 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
+    # The agent vendors whose docs the assignment guide cites as sources.
+    "https://docs.openhands.dev",
+    "https://kiro.dev",
+    "https://kilo.ai",
+    "https://docs.qoder.com",
+    "https://docs.github.com",
+    "https://www.theverge.com",
     # A placeholder in the connector documentation. It is not routable, and
     # it is shown as an example of what a connector URL looks like.
     "https://mcp.internal.example",
@@ -90,6 +97,7 @@ EMOJI = re.compile("[\u2600-\u27bf\U0001f300-\U0001faff]")
 # The pages rendered verbatim from the repository's guides. Their prose is
 # the maintainers', so the site's own copy rules do not apply to them.
 MIRRORED_GUIDES = {
+    "docs/agents/index.html",
     "docs/architecture/index.html",
     "docs/cli/index.html",
     "docs/connectors/index.html",
@@ -505,5 +513,7 @@ def test_page_weights_are_within_budget(page: str):
     # list tool and each entity we add. The V2MOM entity, the five
     # scheduled-work tools, and the three signal tools bring the page to ~78 KB;
     # the four Stage 5 and 6 tools (segment_market, get_segments, get_strategy,
-    # propose_strategy) bring it to ~80 KB.
-    assert size <= 84 * 1024, f"{page}: {size} bytes"
+    # propose_strategy) bring it to ~80 KB; the four outcome-proposal tools
+    # (propose_outcome, list_proposals, approve_proposal, reject_proposal)
+    # bring it to ~85 KB.
+    assert size <= 88 * 1024, f"{page}: {size} bytes"

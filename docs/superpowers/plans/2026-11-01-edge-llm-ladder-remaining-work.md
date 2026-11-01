@@ -1,6 +1,7 @@
 # Edge LLM Ladder — Remaining Work
 
-**Branch:** `alehar9320/flyingfish` **Base:** `main` (`58a125d`)
+**Branch:** `alehar9320/flyingfish` **Base:** `main` (`58a125d`), merged forward
+to `main`'s current tip — see "Merged with `main`" below.
 **Status:** the engine, the ladder, the routing seam, the progression scheduler
 and the banners are built and tested, **a person can turn the feature on** —
 the offer strip asks once — **and that answer can now be changed from
@@ -13,8 +14,9 @@ scratch checkout, so the whole gap list lives on the branch.
 
 ## Read this first: how a person reaches it today
 
-With no paid endpoint configured and the health probe reporting the model
-unreachable, the top dock shows *"This browser can answer, free."* naming the
+With nothing answering for the Studio — no model endpoint the client counts as
+configured, and the health probe reporting the model unreachable — the top dock
+shows *"This browser can answer, free."* naming the
 model and its one-time size, with two buttons:
 
 - **Answer in this browser** → `EdgeManager.grantAndStart()`
@@ -57,16 +59,47 @@ absent.
 | `b91bdc0` | 2 | `browser-model` capability probe reports WebGPU and ladder truth instead of only `window.ai` |
 | `76d8bd9` | 3 | `edge/webllmEngine.ts`, `@mlc-ai/web-llm` dependency, Worker CSP for wasm + weight origins |
 | `c9fbdf6` | 4 | `edge/turn.ts`, `edge/prompt.ts` — an edge turn emitted as the exact `RawSseEvent` frames the transcript already consumes |
-| `dc7988d` | 5 | `edge/manager.ts` + the `runTurn` seam and the relaxed sidecar guard |
+| `dc7988d` | 5 | `edge/manager.ts` + the `runTurn` seam and the relaxed sidecar guard — that guard is gone now, deleted by `main`'s "never refuse to send"; the seam is what remains |
 | `f39c3fa` | 6 | `edge/scheduler.ts` — ten served answers earn the next tier, consent-locked, idle/visible/SaveData-gated, single-engine-across-tabs |
 | `fd0bfe4` | 7 | `edge-downloading` / `edge-unlocked` banner kinds; the bridge subscribes to edge notices and stops claiming "Working by hand" while the edge answers |
 | `d34d8e5` | 9 (first half) | `EdgeScheduler.bootstrap()` (rung zero), `EdgeManager.offerFor / grantAndStart / decline / isBusy`, the `ready` and `consent-changed` notices, and the `edge-offer` / `edge-ready` banners with both buttons wired through the dispatcher. `docs/local-llm.md` now describes a reachable feature. Landed out of plan order, before the Settings section, because nothing else on this branch matters while no person can switch it on. |
 | this commit | 8 | `components/EdgeModelSection.tsx` — Settings → *Answers in this browser*: the flag switch, a consent answer that can be changed and withdrawn, per-tier status with device reasons, free-a-tier storage, the progression meter, the quota line. `EdgeManager.panelState()` and `freeTier()` (with `EdgeLLMEngine.evict`, the only Settings path that may pull in the WebLLM chunk), the notice seam turned multi-subscriber so the strip and Settings both react, and the section mounted in `SettingsPanel`. |
 
-Everything the branch has changed since its base, counting code and docs and
-excluding this document: 35 files, 3,798 lines added, 50 deleted, 101 new
-browser test cases (the suite now stands at 853 tests across 89 files) plus one
-amended Python security-header test.
+Everything the branch changes on top of `main` as merged: 37 files, 3,916 lines
+added, 45 deleted, and 102 added test-case lines in the browser suite, which now
+runs 916 tests across 97 files, plus one amended Python security-header test.
+
+## Merged with `main` (this merge commit)
+
+`main` moved under the branch and PR #608 went CONFLICTING. Four files carried
+real conflicts. What changed, in the shape a reviewer can check:
+
+- **One endpoint rule.** `apps/studio/src/lib/modelEndpoint.ts` is now the
+  studio's single definition of *"a server is answering"*, and it counts a
+  keyless model on the person's own network. The browser tier defers to it
+  through `hasModelEndpoint()` (`edge/manager.ts`), which delegates instead of
+  re-deriving — a fallback that talked over a working Ollama would be a bug, not
+  a fallback. `bff/capabilities/registry.ts` reads the same function.
+- **A refusal to delete.** `main` removed the guard that blocked a turn when the
+  sidecar was known-down ("sending is the only evidence that matters"), so the
+  relaxation iteration 5 made at that call site went with it. The seam it opened
+  survives, and its job is now exactly one thing: *which brain answers*, not
+  *whether to answer at all*.
+- **The routing decision reads a snapshot.** A turn no longer awaits a storage
+  read to learn who will answer it. `EdgeManager` keeps `{consent, servedTier}`
+  in memory, warms it when the provider mounts, refreshes it after every
+  non-progress edge notice, and fires a best-effort re-read at each decision —
+  so nobody's message is queued behind IndexedDB. The cost, said plainly: a
+  change made elsewhere lands on the turn *after* the read that noticed it.
+  `sync()` is the awaitable form for surfaces that can wait, and the banner strip
+  uses it before deciding. This was not a style preference: awaiting the read
+  hung the whole `StudioContext` suite, because fake-indexeddb schedules its
+  transactions on the very timers those tests fake.
+- **The survey is idle-scheduled.** `main` waits for an idle moment (or 2s)
+  before probing anything, and a background probe that finds nothing no longer
+  reports the sidecar down. The edge-routing tests were rewritten against those
+  rules — they call `recheckConnections()` when they need a fact about the
+  server, and wait for the person's own history to paint before typing.
 
 ## Remaining iterations
 
@@ -154,10 +187,15 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
 - **A yes in one tab is not noticed live in another.** A tab that lost the
   engine lock has no event that re-runs its strip decision; the download the
   other tab finished shows up at the next turn's routing check, not the moment
-  it lands. The same gap now has a second surface: Settings → *Answers in this
-  browser* re-reads on this tab's own notices, so another tab's consent or freed
-  tier reads stale until something in this tab emits one. BroadcastChannel or a
-  storage event would close both.
+  it lands. The snapshot that decision reads made this boundary explicit rather
+  than creating it — cross-tab, a change routes the turn *after* the re-read that
+  noticed it, so normally one more answer still goes the old way before the
+  switch. Within one tab the notices refresh it immediately, which is the case a
+  person actually hits. Settings → *Answers in this browser* has the same
+  staleness: it re-reads on this tab's own notices, so another tab's consent or
+  freed tier reads stale until something here emits one. BroadcastChannel or a
+  storage event would close both, and would let the losing tab hear about the
+  lock it never got.
 - **Edge turns never reach the server conversation tree** while the sidecar is up.
   A backfill through `POST /api/conversations/{id}/turns` is an explicit non-goal
   for v1 and must stay documented, not discovered.
@@ -184,10 +222,11 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
 git fetch origin && git checkout alehar9320/flyingfish
 npm --prefix apps/studio install
 npm --prefix apps/studio run typecheck
-npm --prefix apps/studio test -- --run     # 89 files, 853 tests
+npm --prefix apps/studio test -- --run     # 97 files, 916 tests
 npm --prefix apps/studio run lint          # 0 errors, 5 pre-existing warnings
 npm --prefix apps/studio run build
-uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 318 passed
+uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 330 passed
+uv run pytest -q                           # 1824 passed (repo-wide)
 ```
 
 Then start at iteration 9's remaining items if you want a first-run visitor to

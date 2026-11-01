@@ -29,7 +29,8 @@ vi.mock("../state/StudioContext", () => ({
 }));
 
 const edge = vi.hoisted(() => ({
-  canServe: vi.fn(async () => false),
+  sync: vi.fn(async () => undefined),
+  canServe: vi.fn(() => false),
   offerFor: vi.fn(async () => null as EdgeOffer | null),
   grantAndStart: vi.fn(async () => "t1" as EdgeTierId | null),
   decline: vi.fn(async () => undefined),
@@ -40,6 +41,7 @@ const edge = vi.hoisted(() => ({
 
 vi.mock("../edge/manager", () => ({
   edgeManager: {
+    sync: () => edge.sync(),
     canServe: (...args: unknown[]) => edge.canServe(...(args as [])),
     offerFor: (...args: unknown[]) => edge.offerFor(...(args as [])),
     grantAndStart: () => edge.grantAndStart(),
@@ -84,7 +86,8 @@ describe("BannerBridge", () => {
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: true, message: "" };
     studio.dismissedSidecarNotice = false;
-    edge.canServe = vi.fn(async () => false);
+    edge.sync = vi.fn(async () => undefined);
+    edge.canServe = vi.fn(() => false);
     edge.offerFor = vi.fn(async () => null);
     edge.grantAndStart = vi.fn(async () => "t1");
     edge.decline = vi.fn(async () => undefined);
@@ -148,7 +151,7 @@ describe("BannerBridge", () => {
   });
 
   it("keeps the working-by-hand strip away when the browser can answer instead", async () => {
-    edge.canServe = vi.fn(async () => true);
+    edge.canServe = vi.fn(() => true);
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: false, message: "no model" };
     renderShell();
@@ -205,7 +208,7 @@ describe("BannerBridge", () => {
       expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
     );
 
-    edge.canServe = vi.fn(async () => true);
+    edge.canServe = vi.fn(() => true);
     edge.offerFor = vi.fn(async () => null);
     act(() => {
       edge.noticeListener?.({ kind: "ready", tier: "t1" });
