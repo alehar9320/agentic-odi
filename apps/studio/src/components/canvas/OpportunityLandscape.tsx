@@ -96,6 +96,10 @@ export function OpportunityLandscape() {
     });
   }, [outcomes, underservedOnly, searchQuery]);
 
+  // One rule for every score on this canvas: compare the stored number, display the
+  // rounded one. The sort, the underserved filter and the average all read
+  // `opportunity_score` as stored, because two outcomes that both print "13.0" still have
+  // an order. Rounding happens once, where a score becomes text.
   const sortedOutcomes = useMemo(() => {
     return [...filteredOutcomes].sort(
       (a, b) => (b.opportunity_score ?? -Infinity) - (a.opportunity_score ?? -Infinity),
