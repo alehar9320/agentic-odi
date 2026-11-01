@@ -189,6 +189,11 @@ Studio says so in one place and keeps going:
   settings panel is not an outage to announce across the window. Background health
   polls may retire a warning, never raise one.
 - Settings → Base URL and Model reconnect the assistant whenever you are ready.
+  Each field saves when it is left, and the section says **Saved** once an edit
+  lands; a value the studio cannot use (a URL that is not an address, an empty
+  model name) is refused beside the field with the reason and the last good value
+  stays in effect. There is no Save button and no way for one section's edit to
+  discard another's.
   A keyless server on your own network (Ollama, LM Studio, anything on loopback
   or a private address) counts as configured; a public URL without a key does
   not, and `isEndpointConfigured` in `apps/studio/src/lib/modelEndpoint.ts` is
@@ -299,6 +304,65 @@ without giving up the message model the sidecar already understands.
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 
+#### What the runtime gives us, and what we did not take
+
+The full coverage ledger — every assistant-ui capability and its one honest
+state — is authored in [Development](development.md),
+and `scripts/doc_check.py` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
+narrower than the library offers (Partial). A row is Adopted only when a test
+proves a person can use it, the named file exists, and the Delivered column
+cites the issue or PR that landed it.
+
+| Capability | Status | What it means here | Delivered |
+|---|---|---|---|
+| `useExternalStoreRuntime` | Adopted | The bridge: the sidecar's store, presented as a thread. | #238 |
+| `AssistantRuntimeProvider` | Adopted | One provider, whole app. | #238 |
+| `convertMessage` (`toThreadMessageLike`) | Adopted | The only mapping between our messages and runtime messages. | #238 |
+| `isRunning` | Adopted | Driven by `streaming`. | #238 |
+| `setMessages` (branch switch) | Adopted | Branch switch swaps the visible path; the sidecar keeps `head_id`. | #238 |
+| `onNew` | Adopted | Sending a message. | #238 |
+| `onEdit` | Adopted | Editing a user turn keeps the old path as a branch. | #238 |
+| `onReload` (regenerate) | Adopted | Regenerating a reply as a sibling branch. | #238 |
+| `onCancel` | Adopted | The stop button. | #238 |
+| `onRespondToToolApproval` | Adopted | Allow/Decline on a pending write. | #238 |
+| `adapters.attachments` | Adopted | Text capped at 20k chars, images at 5 MB, refusals explained. | #238 |
+| runtime `suggestions` | Adopted | Starter suggestions computed from canvas state. | #238 |
+| `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works; the dedicated adapter is unused, branches are inferred from parent ids. | — |
+| `ThreadPrimitive.Root` | Adopted | The transcript's shell. | #238 |
+| `ThreadPrimitive.Viewport` | Adopted | Scrolling and the latest-message affordance. | #238 |
+| `ThreadPrimitive.Messages` | Adopted | The message map. | #238 |
+| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data is adopted; the pills are hand-rolled because they carry the artifact-preview copy. | — |
+| `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
+| `MessagePrimitive.Attachments` | Adopted | User turns show what was sent. | #238 |
+| `MessagePrimitive.Root` | Partial | The wrapper is a hand-written article carrying `aria-busy` and the avatar. | — |
+| `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
+| `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Custom text/file renderers, because claim chips and extraction state need them. | — |
+| `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
+| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter. | #238 |
+| `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works through the composer's own handlers with the same accept rules. | — |
+| `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | The quote shows above the input and can be cleared before send. | #435 |
+| `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | The microphone, hidden where unsupported. | #433 |
+| `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | Quote and dictation state are read today; queue and in-transit state arrive with the follow-up lane. | — |
+| `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | The reply's own controls. | #238 |
+| `ActionBarPrimitive.ExportMarkdown` | Partial | Whole-conversation export is stronger than the per-reply primitive. | — |
+| `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | Alternative N of M, shown only when a branch exists. | #238 |
+| Attachment adapter (`AttachmentAdapter`) | Adopted | Browser-side extraction; nothing is stored server-side. | #238 |
+| Drop and paste | Adopted | The composer accepts exactly what the input accepts. | #238 |
+| `SelectionToolbarPrimitive.Root` / `.Quote` | Adopted | Selecting prose in a reply offers Quote. | #435 |
+| `data-aui-quote-selectable="false"` | Adopted | Tool traces and generated surfaces are marked non-prose. | #435 |
+| `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | The quote persists in the turn's metadata. | #435 |
+| Structured turn failure | Adopted | The failure panel with retry copy. | #129 |
+| `unstable_useMessageStallDetection` | Adopted | "Still working · no new output for Ns", only when output stops moving. | #431 |
+| `useAuiState` | Adopted | Runtime state read across the transcript and composer. | #238 |
+| `useAui` | Adopted | Imperative composer actions. | #238 |
+| `AuiIf` | Adopted | The conditional idiom in use. | #238 |
+| `unstable_useComposerInputHistory` | Adopted | Up-arrow recalls what you sent last. | #430 |
+| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the latest-message affordance. | #245 |
+| Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
+| Tool result rendering | Adopted | Each MCP call is a trace chip. | #238 |
+| `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
+| ODI surfaces as `data` parts | Adopted | A validated `UiNode` rides the transcript and renders through `UiRenderer`. | #55 |
+
 #### Where the bridge lives
 
 | File | Role |
@@ -311,6 +375,9 @@ without giving up the message model the sidecar already understands.
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
+| `apps/studio/src/components/settings/SavedField.tsx` | A field that saves when it is left, states **Saved** in its section, and refuses an unusable value beside itself with the reason. |
+| `apps/studio/src/components/settings/sections/` | The Model and Studio bridge sections, each a module with its own fields and save line. |
+| `apps/studio/src/components/settings/validation.ts` | What Settings accepts before it writes: a full http(s) URL, and a non-empty model name. |
 
 The sidecar remains the source of truth for what happened. Its additions are
 opt-in and additive: `reasoning`, `source`, and `approval` stream events;
