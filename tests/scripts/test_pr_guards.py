@@ -309,6 +309,47 @@ def test_natural_language_rules_never_fail_the_build() -> None:
     assert result.errors == []
 
 
+def test_a_new_source_file_with_no_reuse_report_warns() -> None:
+    result = _truth("Adds a retry helper.", added_paths=["packages/core/retry.py"])
+
+    assert result.errors == []
+    assert any("Reuses" in warning for warning in result.warnings)
+
+
+def test_a_reuse_report_silences_the_new_source_warning() -> None:
+    body = "Adds a retry helper.\n\nReuses: apps/cli/cli.py\n"
+
+    result = _truth(body, added_paths=["packages/core/retry.py"])
+
+    assert result.warnings == []
+
+
+def test_a_bolded_reuse_label_counts_as_a_report() -> None:
+    result = _truth(
+        "**Reuses:** nothing available", added_paths=["apps/studio/lib/relativeTime.ts"]
+    )
+
+    assert result.warnings == []
+
+
+def test_a_new_test_or_document_owes_no_reuse_report() -> None:
+    added = ["tests/test_retry.py", "docs/architecture/reuse.md"]
+
+    result = _truth("Adds coverage.", added_paths=added)
+
+    assert result.warnings == []
+
+
+def test_several_new_source_files_are_named_once_in_the_warning() -> None:
+    result = _truth("", added_paths=["a.py", "b.py", "c.py", "d.py", "e.py", "f.py"])
+
+    warnings = [warning for warning in result.warnings if "Reuses" in warning]
+
+    assert len(warnings) == 1
+    assert "6 new source file(s)" in warnings[0]
+    assert "f.py" not in warnings[0]
+
+
 # --- Body truth: machine-readable JSON block (failure) -----------------------
 
 

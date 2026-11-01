@@ -197,6 +197,10 @@ export class MemoryLocalStore implements LocalStore {
       .sort((left, right) => left.id - right.id);
   }
 
+  async countTurns(conversationId: string): Promise<number> {
+    return this.turns.filter((turn) => turn.conversation_id === conversationId).length;
+  }
+
   async appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn> {
     this.turnId += 1;
     const stored = { ...turn, id: this.turnId };
