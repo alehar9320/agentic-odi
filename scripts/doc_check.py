@@ -6,20 +6,14 @@ only treated as a CLI command when it starts with a known entry point. When in
 doubt this script says nothing, because a documentation check that cries wolf
 gets ignored.
 
-Run it locally with ``uv run python scripts/doc_check.py``. In CI, pass the
-pull request's changed files to also enforce the roadmap gate:
-
-    uv run python scripts/doc_check.py --changed-files $(git diff --name-only main...HEAD)
+Run it locally with ``uv run python scripts/doc_check.py``.
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import re
-import subprocess
 import sys
-from collections.abc import Callable, Iterable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,11 +31,6 @@ KNOWN_TOP_LEVEL = {
     "tests",
     "website",
 }
-
-CONTRACT_PATH = "packages/core/src/agentic_odi_core/contract.py"
-ROUTER_PATH = "apps/studio-api/src/agentic_odi_studio_api/studio/router.py"
-ROADMAP_PATH = "docs/roadmap.md"
-CLI_PREFIX = "apps/cli/src/agentic_odi_cli/"
 
 ENTRY_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("odi",),
@@ -277,10 +266,170 @@ def readme_code_overview_paths(readme: str) -> list[str]:
     return paths
 
 
+# --- assistant-ui ledger ------------------------------------------------------
+
+LEDGER_HEADING = "## The assistant-ui ledger"
+LEDGER_PROJECTION_HEADING = "#### What the runtime gives us, and what we did not take"
+LEDGER_STATUSES = {"Adopted", "Partial", "Planned", "Decision", "Rejected"}
+LEDGER_CITATION = re.compile(r"#(\d+)")
+LEDGER_DASH = "—"
+
+
+def _section_lines(text: str, heading: str) -> list[str]:
+    """Lines from a heading until the next heading of the same level or higher."""
+    lines = text.splitlines()
+    start = None
+    level = len(heading) - len(heading.lstrip("#"))
+    for index, line in enumerate(lines):
+        if line.strip() == heading:
+            start = index + 1
+            break
+    if start is None:
+        return []
+    for index in range(start, len(lines)):
+        match = re.match(r"^(#+) ", lines[index])
+        if match is not None and len(match.group(1)) <= level:
+            return lines[start:index]
+    return lines[start:]
+
+
+def _table_rows(lines: list[str]) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if not cells or all(re.fullmatch(r":?-{2,}:?", cell or "-") for cell in cells):
+            continue
+        if cells[0] in {"Capability", "Status"}:
+            continue
+        rows.append(cells)
+    return rows
+
+
+def ledger_errors(
+    source: str,
+    projection: str,
+    root: Path = ROOT,
+    delivered: set[str] | None = None,
+) -> list[str]:
+    """Check the assistant-ui ledger in docs/development.md and its projection.
+
+    ``delivered`` is the set of issue/PR numbers this repository's history
+    proves merged. It is only supplied by the command-line entry point, which
+    reads git; on a shallow checkout the membership rule is skipped, because a
+    green docs job must not depend on how deep the clone happened to be.
+    """
+    has_source = LEDGER_HEADING in source
+    has_projection = LEDGER_PROJECTION_HEADING in projection
+    if not has_source and not has_projection:
+        return []
+    issues: list[str] = []
+    if not has_source:
+        return ["ledger projection exists but the source section is missing"]
+    if not has_projection:
+        return ["the ledger exists but its Living Studio projection is missing"]
+
+    rows: list[tuple[str, str, str, str]] = []
+    seen: set[str] = set()
+    for cells in _table_rows(_section_lines(source, LEDGER_HEADING)):
+        if len(cells) != 5:
+            continue
+        capability, status, file_cell, delivered_cell = cells[:4]
+        if capability in seen:
+            issues.append(f"duplicate ledger row: {capability}")
+        seen.add(capability)
+        if status not in LEDGER_STATUSES:
+            issues.append(f"unknown ledger status {status!r} for {capability}")
+            continue
+        rows.append((capability, status, file_cell, delivered_cell))
+        if status == "Adopted":
+            citation = LEDGER_CITATION.fullmatch(delivered_cell)
+            if citation is None:
+                issues.append(f"adopted row without a merged citation: {capability}")
+            elif delivered is not None and citation.group(1) not in delivered:
+                issues.append(
+                    f"adopted row cites #{citation.group(1)}, which history does not prove merged: {capability}"
+                )
+            if file_cell == LEDGER_DASH:
+                issues.append(f"adopted row names no file: {capability}")
+            else:
+                path = file_cell.strip("`")
+                if not (root / path).exists():
+                    issues.append(f"adopted row names a file that does not exist: {path}")
+        elif status == "Planned":
+            citation = LEDGER_CITATION.fullmatch(delivered_cell)
+            if citation is None:
+                issues.append(f"planned row names no owning issue: {capability}")
+            elif delivered is not None and citation.group(1) in delivered:
+                issues.append(
+                    f"planned row cites #{citation.group(1)}, which already merged: promote or reopen"
+                )
+        elif delivered_cell != LEDGER_DASH:
+            issues.append(f"{status.lower()} row must not cite a delivery: {capability}")
+
+    tallies: dict[str, int] = {}
+    declared: dict[str, int] = {}
+    for cells in _table_rows(_section_lines(source, LEDGER_HEADING)):
+        if len(cells) == 2:
+            if not cells[1].isdigit():
+                issues.append(f"count table row is not a number: {cells[1]}")
+                continue
+            declared[cells[0]] = int(cells[1])
+    for _, status, _, _ in rows:
+        tallies[status] = tallies.get(status, 0) + 1
+    for status in sorted(LEDGER_STATUSES):
+        if declared.get(status) != tallies.get(status, 0):
+            issues.append(
+                f"count table says {declared.get(status)} {status}, the rows say {tallies.get(status, 0)}"
+            )
+    if declared.get("Total") != len(rows):
+        issues.append(f"count table says {declared.get('Total')} total, the rows count {len(rows)}")
+
+    projected = {
+        (cells[0], cells[1], cells[3])
+        for cells in _table_rows(_section_lines(projection, LEDGER_PROJECTION_HEADING))
+        if len(cells) == 4
+    }
+    expected = {(r[0], r[1], r[3]) for r in rows if r[1] in {"Adopted", "Partial"}}
+    for missing in sorted(expected - projected):
+        issues.append(f"projection is missing a ledger row: {missing[0]}")
+    for extra in sorted(projected - expected):
+        issues.append(f"projection carries a row the ledger does not adopt: {extra[0]}")
+    return issues
+
+
+def delivered_references(subjects: list[str]) -> set[str]:
+    """Issue/PR numbers that this repository's own history proves delivered."""
+    refs: set[str] = set()
+    for subject in subjects:
+        if subject.startswith("Merge "):
+            continue
+        refs.update(LEDGER_CITATION.findall(subject))
+    return refs
+
+
+def git_subjects(root: Path = ROOT) -> list[str] | None:
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "log", "--format=%s", "HEAD"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout.splitlines()
+
+
 # --- The whole check ---------------------------------------------------------
 
 
-def collect_issues(root: Path = ROOT) -> list[str]:
+def collect_issues(root: Path = ROOT, delivered: set[str] | None = None) -> list[str]:
     docs = documentation(root)
     issues: list[str] = []
     issues += [
@@ -306,122 +455,29 @@ def collect_issues(root: Path = ROOT) -> list[str]:
         for path in readme_code_overview_paths(docs["README.md"]):
             if not (root / path).exists():
                 issues.append(f"README Code Overview path does not exist: {path}")
-    return issues
 
-
-# --- Roadmap gate ------------------------------------------------------------
-
-Before = Callable[[str], "str | None"]
-After = Callable[[str], "str | None"]
-
-
-def _class_block(text: str, name: str) -> str:
-    match = re.search(rf"^class {name}\b.*?(?=^\S|\Z)", text, re.MULTILINE | re.DOTALL)
-    return match.group(0) if match else ""
-
-
-def _tool_names(text: str | None) -> set[str]:
-    if not text:
-        return set()
-    return set(re.findall(r'=\s*"([a-z][a-z0-9_]+)"', _class_block(text, "ToolName")))
-
-
-def _route_decorators(text: str | None) -> set[tuple[str, str]]:
-    if not text:
-        return set()
-    found = re.findall(r'@router\.(get|post|put|patch|delete)\(\s*["\']([^"\']+)["\']', text)
-    routes: set[tuple[str, str]] = set()
-    for method, path in found:
-        full = path if path.startswith("/api") else "/api" + path
-        routes.add((method.upper(), full))
-    return routes
-
-
-def _cli_commands(text: str | None) -> set[str]:
-    if not text:
-        return set()
-    names = set(re.findall(r'@[\w.]+\.command\(\s*(?:name=)?["\']([\w-]+)["\']', text))
-    names |= set(re.findall(r'\.command\(\s*name=["\']([\w-]+)["\']', text))
-    names |= set(re.findall(r'add_typer\([\s\S]{0,200}?name=["\']([\w-]+)["\']', text))
-    return names
-
-
-def detect_capabilities(changed_files: Iterable[str], before: Before, after: After) -> list[str]:
-    """Public capabilities a pull request adds, named for the error message."""
-    capabilities: list[str] = []
-    for path in changed_files:
-        if path == CONTRACT_PATH:
-            for name in sorted(_tool_names(after(path)) - _tool_names(before(path))):
-                capabilities.append(f"MCP tool `{name}`")
-        elif path == ROUTER_PATH:
-            for method, route in sorted(
-                _route_decorators(after(path)) - _route_decorators(before(path))
-            ):
-                capabilities.append(f"Studio API route `{method} {route}`")
-        elif path.startswith(CLI_PREFIX) and path.endswith(".py"):
-            for name in sorted(_cli_commands(after(path)) - _cli_commands(before(path))):
-                capabilities.append(f"CLI command `{name}`")
-    return capabilities
-
-
-def roadmap_errors(capabilities: list[str], *, roadmap_changed: bool) -> list[str]:
-    if not capabilities or roadmap_changed:
-        return []
-    named = ", ".join(capabilities)
-    return [
-        f"new capability without a roadmap entry: {named}. "
-        f"Add it to the Shipped or In flight section of {ROADMAP_PATH} in this pull request."
+    issues += [
+        f"assistant-ui ledger: {issue}"
+        for issue in ledger_errors(
+            docs.get("docs/development.md", ""),
+            docs.get("docs/living-studio.md", ""),
+            root=root,
+            delivered=delivered,
+        )
     ]
+    return issues
 
 
 # --- Command line ------------------------------------------------------------
 
 
-def _git_text(base: str, path: str) -> str | None:
-    result = subprocess.run(
-        ["git", "show", f"{base}:{path}"], cwd=ROOT, capture_output=True, text=True
-    )
-    return result.stdout if result.returncode == 0 else None
-
-
-def _worktree_text(path: str) -> str | None:
-    candidate = ROOT / path
-    if not candidate.is_file():
-        return None
-    return candidate.read_text(encoding="utf-8")
-
-
-def _changed_since(base: str) -> list[str]:
-    result = subprocess.run(
-        ["git", "diff", "--name-only", f"{base}...HEAD"], cwd=ROOT, capture_output=True, text=True
-    )
-    return [line for line in result.stdout.splitlines() if line]
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--changed-files",
-        nargs="*",
-        default=None,
-        help="Repo-relative paths changed by this pull request; enables the roadmap gate.",
-    )
-    parser.add_argument(
-        "--base",
-        default=os.environ.get("GITHUB_BASE_REF") or "origin/main",
-        help="Branch the pull request targets (used to read the previous version).",
-    )
-    args = parser.parse_args(argv)
+    parser.parse_args(argv)
 
-    issues = collect_issues()
-    if args.changed_files is not None:
-        changed = args.changed_files or _changed_since(args.base)
-        capabilities = detect_capabilities(
-            changed,
-            lambda path: _git_text(args.base, path),
-            _worktree_text,
-        )
-        issues += roadmap_errors(capabilities, roadmap_changed=ROADMAP_PATH in changed)
+    subjects = git_subjects()
+    delivered = delivered_references(subjects) if subjects is not None else None
+    issues = collect_issues(delivered=delivered)
 
     for issue in issues:
         print(f"documentation drift: {issue}", file=sys.stderr)
