@@ -147,6 +147,21 @@ uv run --directory website pytest tests/
 The site is generated at CI time and never committed. CI runs `build_site.py` to
 produce `_site` and uploads it as the `website-site` artifact for review.
 
+The landing page's primary call to action points at the **sample workspace**,
+`website/sample/index.html`. Unlike the rest of the site it *is* committed, so
+it survives an API outage and can be linked from the README. It is generated
+from `website/content/sample-study.json` by `website/tools/build_sample.py`;
+regenerate it after editing the fixture or `website/templates/sample.html`:
+
+```bash
+uv run python website/tools/build_sample.py          # write the committed page
+uv run python website/tools/build_sample.py --check  # fail when it is stale
+```
+
+`website/tests/test_content_sync.py` runs the same comparison, so the page
+cannot drift from the fixture, and it greps the committed file for an external
+reference so the no-network rule is enforced rather than promised.
+
 Publishing happens in `.github/workflows/pages.yml`: it runs those tests,
 builds `_site` from `website/`, and deploys the artifact with
 `actions/deploy-pages` on every push to `main`. There is no `gh-pages` branch,
@@ -412,7 +427,7 @@ uv run pytest \
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, OG art reproducibility, and README sync |
+| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, OG art reproducibility, and README sync |
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the
