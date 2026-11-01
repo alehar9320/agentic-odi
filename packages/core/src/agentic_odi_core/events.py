@@ -42,6 +42,7 @@ class EventStore(Protocol):
         *,
         workspace_id: str | None = None,
         after_server_seq: int = 0,
+        after_id: int = 0,
         unsynced_only: bool = False,
         replay_order: bool = False,
     ) -> list[Event]: ...

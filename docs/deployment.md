@@ -16,6 +16,26 @@ by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml).
   returns 404.
 - The `github-pages` environment only allows deployments from `main`.
 
+### The sample workspace
+
+The site's primary call to action on the landing page points at
+**`website/sample/index.html`**, a read-only sample workspace served at
+`/sample/`. It is generated from `website/content/sample-study.json` by
+`website/tools/build_sample.py` and committed, so it is part of the deployed
+artifact and keeps working when the API is down.
+
+- Regenerate it after editing the fixture or the template:
+  `uv run python website/tools/build_sample.py`.
+- `uv run python website/tools/build_sample.py --check` fails when the committed
+  page disagrees with a fresh render; `test_content_sync.py` runs the same
+  comparison, so the page cannot drift from the fixture.
+- The page is self-contained: no external font, script, image, or stylesheet.
+  `test_content_sync.py` greps the committed file for an external reference, so
+  the no-network rule is enforced rather than promised.
+- Every row carries a sample marker, and every numeral on the page is read from
+  the fixture — the build refuses to publish a number the fixture does not
+  contain.
+
 ## Hosted MCP Server
 
 The server is deployed via **[Horizon Prefect](https://www.prefect.io/horizon)**,

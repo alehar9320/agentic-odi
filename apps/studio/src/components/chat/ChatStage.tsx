@@ -16,6 +16,7 @@ import { SetupConversation } from "../setup/SetupConversation";
 import { Conversation } from "./Conversation";
 import { GuidanceHint } from "./GuidanceHint";
 import { Hero } from "./Hero";
+import { SelectionToolbar } from "./SelectionToolbar";
 import { ThreadComposer } from "./ThreadComposer";
 
 const VIEW_COMMANDS = new Set<string>(["landscape", "jobmap", "segments", "evidence", "settings"]);
@@ -171,6 +172,9 @@ export function ChatStage() {
 
   return (
     <ThreadPrimitive.Root className="chat" aria-label="Studio conversation">
+      {/* Outside the viewport, so the toolbar is never clipped by the scroll
+          frame; absent on the empty stage because there is nothing to quote. */}
+      <SelectionToolbar />
       <div className="chat__transcript">
         <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
           <div className="chat__thread">

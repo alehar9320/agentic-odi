@@ -1,5 +1,53 @@
 # Data Flow
 
+## The Shape
+
+Connectors are the only way data enters from outside the local store. Reads
+project the same repository three ways, and every write emits signals.
+
+```mermaid
+flowchart LR
+    subgraph inbound["The only path in from outside"]
+        SOURCE["Connector endpoint: MCP client or REST call"]
+        BATCH["IngestBatch — normalized records"]
+        SINK["IngestSink — in-process, dies with the command"]
+        DRAFT["EvidenceDraft — connectors mapping"]
+        SOURCE --> BATCH --> SINK -->|drafts_from_batch| DRAFT
+    end
+
+    DOMAIN["ODIService — validation, dedupe, idempotent promotion"]
+    STORE[("SQLiteRepository — append-only event log + snapshots")]
+    DRAFT -->|add_evidence| DOMAIN --> STORE
+
+    GATE{"Approval gate — sidecar chat only"}
+    CHAT["Chat tool loop — /api/chat"]
+    LLM["OpenAI-compatible LLM"]
+    SPA["Studio SPA"]
+    CLI["CLI"]
+    MCP["MCP tools"]
+
+    CHAT <--> LLM
+    SPA -->|"/api/chat"| CHAT
+    GATE -.->|an approval card pauses the turn| CHAT
+    CHAT -->|local backend direct, mcp backend via MCP| DOMAIN
+    CLI -->|local or mcp| DOMAIN
+    MCP --> DOMAIN
+    SPA -->|"/api/canvas, /steps, /outcomes"| DOMAIN
+
+    STORE -->|read-through state| PROJ["Pydantic models — outcomes ranked by opportunity score"]
+    PROJ --> SPA
+    PROJ --> CLI
+    PROJ --> MCP
+
+    DOMAIN -->|every write| SIGNAL["Signals — record_signal"]
+    SIGNAL --> FEED["CatchUpFeed — odi signals unread"]
+
+    STORE -.->|turn citations name evidence ids, no foreign key| MEMDB[("studio.db — PM memory")]
+    MEMDB -.->|bounded context| CHAT
+```
+
+The detail is below; this is the shape the rest of the document explains.
+
 ## Sources of Truth
 
 | Layer | Owns | Persists |
@@ -117,6 +165,7 @@ The SPA owns the visible path; the sidecar owns the record. Turns persist with
 `message_id` and `parent_id`, and the conversation stores `head_id`:
 
 ```text
+GET   /api/conversations                       -> every thread, last touch first
 GET   /api/conversations/latest                -> thread + turns (resume)
 GET   /api/conversations/{id}/tree             -> branch tree + head
 PATCH /api/conversations/{id} {"head_id"}      -> record the visible branch
@@ -200,6 +249,12 @@ MCP tool result (text)
 - **The canvas is a union.** `CanvasState` is `loading | ready | empty |
   error`. An empty canvas is an invitation; a failed canvas is a failure panel
   with Retry. The two never look the same.
+- **The saved copy is drawn, not hidden.** A canvas read from the browser cache
+  is initial state with `kind: "loading"`, so the boards draw it and caption it
+  "Saved …" from the cache's `generated_at` instead of covering it with a
+  skeleton. The skeleton is kept only for a genuinely empty store, and the
+  caption claims no freshness the timestamp does not support. `canvasCached`
+  tells a board whether the data on screen came from the cache.
 - **The turn log is safe.** One JSON line per turn carries the request id, the
   model, the round and tool counts, the error count, the duration, and the
   outcome. Sensitive keys are dropped rather than redacted, so no token, key,

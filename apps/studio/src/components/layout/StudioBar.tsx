@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
+import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
+import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
@@ -23,6 +25,7 @@ export function StudioBar({
   const {
     llmHealth,
     messages,
+    sidecarReachable,
     unreadSignalCount,
     openPanel,
     openCustomize,
@@ -65,10 +68,28 @@ export function StudioBar({
     pushToast("success", "Conversation exported as Markdown.");
   }
 
+  // A measured answer outranks an inference from the settings. The shipped desktop
+  // default points at the sidecar's own proxy — a loopback address the browser cannot
+  // talk model-to — so guessing from the endpoint alone would read "no model connected"
+  // forever on a machine where the model is in fact answering. "Connecting" is for a
+  // connection somebody is trying to make and has not yet heard back from.
+  const endpointConfigured = isEndpointConfiguredForSettings({
+    base_url: settings.base_url,
+    api_key: settings.api_key,
+    model_name: settings.model_name,
+  });
   const status =
-    llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
+    llmHealth.healthy === true
+      ? "Live"
+      : llmHealth.healthy === false
+        ? "Local mode"
+        : endpointConfigured || sidecarReachable === true
+          ? "Connecting"
+          : "Local";
+  const statusDetail =
+    status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
   const updateReady = update.phase === "ready";
-  const versionLabel = updateReady
+  const versionText = updateReady
     ? "Update ready"
     : update.currentVersion
       ? `v${update.currentVersion}`
@@ -81,13 +102,13 @@ export function StudioBar({
           type="button"
           className="brand brand--home"
           onClick={onHome}
-          aria-label="Go to home"
+          aria-label={`${PRODUCT_NAME}, go to home`}
           title="Home"
         >
           <span className="brand__mark" aria-hidden="true">
             <OdiMascot size={32} />
           </span>
-          <span className="brand__wordmark">Living Studio</span>
+          <span className="brand__wordmark">{PRODUCT_NAME}</span>
         </button>
       </div>
 
@@ -151,29 +172,29 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
-          aria-label={`Model status: ${status}. ${llmHealth.message}`}
-          title={llmHealth.message}
+          aria-label={`Model status: ${status}. ${statusDetail}`}
+          title={statusDetail}
         >
           <span
-            className={`status-dot${llmHealth.healthy === false ? " is-warn" : ""}${
-              llmHealth.healthy === null ? " is-unknown" : ""
+            className={`status-dot${status === "Local mode" ? " is-warn" : ""}${
+              status === "Connecting" ? " is-unknown" : ""
             }`}
           />
           {status}
         </button>
 
-        {versionLabel && (
+        {versionText && (
           <button
             type="button"
             className={`bar__version${updateReady ? " is-accent" : ""}`}
             onClick={() => openPanel("settings")}
             title={
               update.currentVersion
-                ? `Living Studio ${update.currentVersion} — open software update settings`
+                ? `${versionLabel(update.currentVersion)}, open software update settings`
                 : "Open software update settings"
             }
           >
-            {versionLabel}
+            {versionText}
           </button>
         )}
 

@@ -33,6 +33,12 @@ from agentic_odi_core.evaluation import (
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
+from agentic_odi_core.mapping import (
+    HeuristicProposalStrategy,
+    OutcomeProposal,
+    ProposalStatus,
+    ProposalStrategy,
+)
 from agentic_odi_core.messages import (
     CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
@@ -51,6 +57,8 @@ from agentic_odi_core.models import (
     V2MOM,
     BusinessImpactCategory,
     BusinessValue,
+    ClaimCheck,
+    ClaimSkip,
     CustomerOutcome,
     CustomerValue,
     Direction,
@@ -81,7 +89,7 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
-from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
+from agentic_odi_core.router import LocalOpenAIEngine, ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.segmentation import (
     MIN_OUTCOMES_PER_SEGMENT,
@@ -91,6 +99,7 @@ from agentic_odi_core.segmentation import (
     unclustered_outcomes,
 )
 from agentic_odi_core.services import (
+    ClaimCheckError,
     CustomerOutcomeNotFoundError,
     EvidenceNotFoundError,
     InvalidOutcomeStatementError,
@@ -105,6 +114,8 @@ from agentic_odi_core.services import (
     StepNotFoundError,
     StrategyNotFoundError,
     ValueOutOfRangeError,
+    manual_claim_check,
+    require_claim_check,
 )
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
@@ -134,6 +145,9 @@ __all__ = [
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
+    "ClaimCheck",
+    "ClaimCheckError",
+    "ClaimSkip",
     "ConflictError",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
@@ -155,10 +169,15 @@ __all__ = [
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",
     "OdiError",
+    "OnDeviceLLMEngine",
     "Outcome",
     "OutcomeNotFoundError",
+    "OutcomeProposal",
     "OutcomeStatementError",
-    "OnDeviceLLMEngine",
+    "ProposalStatus",
+    "ProposalStrategy",
+    "HeuristicProposalStrategy",
+    "LocalOpenAIEngine",
     "RateLimitError",
     "RoutingMode",
     "SerializationError",
@@ -196,9 +215,11 @@ __all__ = [
     "invalid_strategy_request",
     "job_not_found",
     "job_stage_catalog",
+    "manual_claim_check",
     "odi_schema",
     "outcome_not_found",
     "parse_tool_result",
+    "require_claim_check",
     "statement_to_dict",
     "step_not_found",
     "tool_result_text",

@@ -537,6 +537,7 @@ def test_connectors_ingest_maps_records_to_evidence(tmp_path: Path, monkeypatch)
             "gong",
             "--job-id",
             job_id,
+            "--apply",
             "--config",
             str(config),
         ],

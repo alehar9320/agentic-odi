@@ -232,6 +232,9 @@ const HEALTH_POLL_INTERVAL_MS = 30_000;
 /** How often a focused window re-reads the signal inbox from the store. */
 const SIGNAL_POLL_INTERVAL_MS = 60_000;
 
+/** How long the studio waits before probing what it is connected to. */
+const PROBE_IDLE_TIMEOUT_MS = 2_000;
+
 /** The lens that can show a signal's subject. Unwired kinds navigate nowhere. */
 const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = {
   job: "jobmap",
@@ -268,6 +271,7 @@ export interface ConnectionReport {
   sidecarReachable: boolean;
   mcpReachable: boolean;
   llmHealthy: boolean;
+  llmMessage: string;
 }
 
 export interface StudioContextValue {
@@ -305,6 +309,8 @@ export interface StudioContextValue {
   dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
+  /** Measure the same three connections for one panel, without changing what the studio believes. */
+  surveyConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
   streaming: boolean;
   thinkingPhase: string | null;
@@ -331,7 +337,11 @@ export interface StudioContextValue {
   deleteObservation: (observationId: string) => Promise<void>;
   clearMemory: () => Promise<void>;
   pushNotice: (text: string) => void;
-  offlineReply: boolean;
+  /**
+   * The reply that no model produced, by message id — so the honest label sits on
+   * the one answer it describes instead of every answer on screen.
+   */
+  offlineReplyFor: string | null;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
   addOutcome: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
   createJob: (payload: { name: string; description?: string }) => Promise<string | null>;
@@ -542,7 +552,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   // The context conversation is never a gate. It opens from the stage, from a
   // hint once the studio has answered something, from /start, or from Settings.
   const [setupOpen, setSetupOpen] = useState(false);
-  const [offlineReply, setOfflineReply] = useState(false);
+  const [offlineReplyFor, setOfflineReplyFor] = useState<string | null>(null);
   const [canvasState, setCanvasState] = useState<CanvasState>(() => {
     const cached = loadCanvasCache();
     return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
@@ -596,6 +606,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  /** The deferred connectivity probe, until the person speaks or the view unmounts. */
+  const idleProbeRef = useRef<{ cancel: () => void } | null>(null);
   const persistedConversation = useRef<string | null>(conversationId);
 
   // Whichever way the thread changes — a stream's answer, a new chat, a
@@ -934,7 +946,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     ]);
   }, []);
 
-  const checkConnections = useCallback(
+  /**
+   * Measure the sidecar, the MCP server, and the model without recording the result.
+   *
+   * A panel that owes the person looking at it fresh numbers calls this. Nothing here
+   * changes what the rest of the studio believes, so reading a settings panel cannot
+   * turn into a red strip across the window about a connection nobody was using.
+   */
+  const surveyConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
       const target = { ...settings, ...override };
       const [sidecar, mcp, llm] = await Promise.all([
@@ -953,17 +972,65 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           message: (error as Error).message || "The model did not answer.",
         })),
       ]);
-
-      setSidecarReachable(sidecar);
-      setMcpReachable(mcp);
-      setLlmHealth(llm);
       void refreshCapabilities();
+      return {
+        sidecarReachable: sidecar,
+        mcpReachable: mcp,
+        llmHealthy: llm.healthy,
+        llmMessage: llm.message,
+      };
+    },
+    [settings, refreshCapabilities],
+  );
+
+  /**
+   * Probe the sidecar, MCP server, and model, and let the studio act on it.
+   *
+   * `mode` decides what a negative answer is allowed to do. "evidence" — what a
+   * person gets when they asked, by pressing Recheck or walking the setup — records
+   * the whole truth, including a refusal. "recovery" is for background work nobody
+   * requested: it records a refusal only when the sidecar itself witnessed it, or
+   * when it contradicts something the studio already believed, because that is a
+   * thing that just broke mid-session.
+   *
+   * The reason is the first minute. A browser-only visitor has no sidecar and often
+   * no model, which is the design working, not an outage — and a red strip that
+   * appears on its own half a minute after the page loads blames their studio for
+   * being offline when nothing they did needed it to be online.
+   */
+  const checkConnections = useCallback(
+    async (
+      override: Partial<StudioConfig> = {},
+      mode: "evidence" | "recovery" = "evidence",
+    ): Promise<ConnectionReport> => {
+      const report = await surveyConnections(override);
+      const sidecar = report.sidecarReachable;
+      const llm = { healthy: report.llmHealthy, message: report.llmMessage };
+
+      if (sidecar) {
+        setSidecarReachable(true);
+      } else if (mode === "evidence") {
+        setSidecarReachable(false);
+      } else {
+        setSidecarReachable((previous) => (previous === true ? false : previous));
+      }
+      setMcpReachable(report.mcpReachable);
+      // A model that answers is always news. A model that does not is news only when
+      // the sidecar took part in the check — the browser asks it to reach the model, so
+      // a negative it reports is measured rather than guessed — or when we previously
+      // believed the model was alive and it has since stopped. On a hosted first run the
+      // sidecar is absent too, and its silence is not a message about the model.
+      if (llm.healthy || mode === "evidence" || sidecar) {
+        setLlmHealth(llm);
+      } else {
+        setLlmHealth((previous) => (previous.healthy === true ? llm : previous));
+      }
       if (sidecar) {
         setDismissedSidecarNotice(false);
       }
-      return { sidecarReachable: sidecar, mcpReachable: mcp, llmHealthy: llm.healthy };
+      return report;
     },
-    [settings, refreshCapabilities],
+    [surveyConnections],
   );
 
   // Re-probe after the user acted on the sidecar notice (e.g. started the
@@ -971,6 +1038,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const recheckConnections = useCallback(async () => {
     await checkConnections();
   }, [checkConnections]);
+
+  /**
+   * Give up the probe scheduled at boot. A person who is already talking does not
+   * need the studio finishing its survey of what it can reach.
+   */
+  const cancelScheduledProbes = useCallback(() => {
+    const handle = idleProbeRef.current;
+    idleProbeRef.current = null;
+    handle?.cancel();
+  }, []);
 
   const dismissSidecarNotice = useCallback(() => {
     setDismissedSidecarNotice(true);
@@ -1263,13 +1340,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // The sidecar is confirmed down: don't start a doomed stream. The notice
-      // above the composer already explains what's wrong; just surface a quiet
-      // heads-up in-thread and stop.
-      if (sidecarReachable === false) {
-        pushNotice("The studio sidecar isn't running — live replies are paused. Start it from Settings.");
-        return;
-      }
+      // Sending is the only evidence that matters here. streamChat asks the
+      // sidecar first and the browser second, so the first message of a first run
+      // is answered whether or not a local server exists. Refusing to try at all
+      // because a background probe once said "down" is what made a working studio
+      // look broken before the person had done anything.
+      cancelScheduledProbes();
 
       const userMessage: ChatMessage = existingUserMessage ?? {
         id: crypto.randomUUID(),
@@ -1292,7 +1368,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       ]);
       setStreaming(true);
       setThinkingPhase("health_check");
-      setOfflineReply(false);
+      setOfflineReplyFor(null);
       setToolActivity([]);
 
       const controller = new AbortController();
@@ -1404,7 +1480,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             const phase = String(event.data.phase ?? "");
             setThinkingPhase(phase);
             if (phase === "offline") {
-              setOfflineReply(true);
+              setOfflineReplyFor(assistantId);
             }
             break;
           }
@@ -1632,8 +1708,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversationId,
       refreshCanvas,
       refreshConnectors,
-      sidecarReachable,
-      pushNotice,
+      cancelScheduledProbes,
     ],
   );
 
@@ -1822,7 +1897,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setToolActivity([]);
     setStreaming(false);
     setThinkingPhase(null);
-    setOfflineReply(false);
+    setOfflineReplyFor(null);
     setConversationId(null);
     void apiCreateConversation()
       .then((conversation) =>
@@ -1831,103 +1906,102 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined);
   }, []);
 
-  // Initial hydration: env defaults, canvas, health probes.
+  // First paint shows the person's own work. Nothing that nobody asked for gets
+  // to declare the studio broken.
   useEffect(() => {
     let cancelled = false;
 
-    async function boot() {
-      try {
-        const defaults = await fetchConfig();
-        if (!cancelled) {
-          setSidecarReachable(true);
-          if (localStorage.getItem(SETTINGS_KEY) === null) {
-            saveSettings(defaults);
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setSidecarReachable(false);
-        }
-      }
-      if (cancelled) {
-        return;
-      }
-      void refreshCapabilities();
+    // The board and the thread are local data: they read from IndexedDB and never
+    // wait on a server that may not exist. They land one tick after mount, so the
+    // first thing painted is the shell and not a render inside a render.
+    const loadLocalData = async () => {
+      await Promise.resolve();
       void refreshCanvas();
-      void refreshConnectors();
-      void refreshPresets();
-      void refreshFeatured();
       void refreshMemory();
       // Reopen what the person left. A stored thread this machine no longer has
       // is not a failure worth a notice: fall back to the newest one quietly.
-      async function restoreThread(): Promise<void> {
-        const storedId = loadConversationId();
-        if (storedId) {
-          try {
-            const tree = await fetchConversationTree(storedId);
-            if (!cancelled) {
-              setConversationId(tree.conversation.id);
-              setMessages(turnsToMessages(tree.messages, tree.head_id));
-            }
-            return;
-          } catch {
-            if (!cancelled) {
-              setConversationId(null);
-            }
-          }
-        }
+      const storedId = loadConversationId();
+      if (storedId) {
         try {
-          const { conversation } = await fetchLatestConversation();
-          if (cancelled || !conversation) {
-            return;
+          const tree = await fetchConversationTree(storedId);
+          if (!cancelled) {
+            setConversationId(tree.conversation.id);
+            setMessages(turnsToMessages(tree.messages, tree.head_id));
           }
-          setConversationId(conversation.id);
-          // The tree, not the flat turn list: a conversation with branches
-          // must open on the branch that was visible when it was left.
-          const tree = await fetchConversationTree(conversation.id);
-          if (cancelled) {
-            return;
-          }
-          setMessages(turnsToMessages(tree.messages, tree.head_id));
+          return;
         } catch {
-          /* no sidecar, no thread: the composer starts empty */
+          if (!cancelled) {
+            setConversationId(null);
+          }
         }
       }
+      const { conversation } = await fetchLatestConversation();
+      if (cancelled || !conversation) {
+        return;
+      }
+      setConversationId(conversation.id);
+      // The tree, not the flat turn list: a conversation with branches
+      // must open on the branch that was visible when it was left.
+      const tree = await fetchConversationTree(conversation.id);
+      if (cancelled) {
+        return;
+      }
+      setMessages(turnsToMessages(tree.messages, tree.head_id));
+    };
+    void loadLocalData().catch(() => undefined);
 
-      void restoreThread();
-      void healthMcp(settings.mcp_url)
-        .then((result) => {
-          if (!cancelled) {
-            setMcpReachable(result.reachable);
-          }
-        })
-        .catch(() => undefined);
-      void healthLlm({
-        base_url: settings.base_url,
-        api_key: settings.api_key,
-        model: settings.model_name,
+    // Configuration is a convenience, not a gate. It may fill defaults for a
+    // browser that has none; a failure is silent, because a hosted studio with no
+    // sidecar configured answers 502 by design and that is not an outage.
+    fetchConfig()
+      .then((defaults) => {
+        if (cancelled) {
+          return;
+        }
+        setSidecarReachable(true);
+        if (localStorage.getItem(SETTINGS_KEY) === null) {
+          saveSettings(defaults);
+        }
       })
-        .then((result) => {
-          if (!cancelled) {
-            setLlmHealth(result);
-          }
-        })
-        .catch(() => undefined);
+      .catch(() => undefined);
+
+    // Status rows, capabilities, and the connector list are read in Settings and
+    // in the tour, not on the stage. Let the first screen settle; give the probes
+    // up entirely if the person starts talking before the browser is idle.
+    const probe = () => {
+      idleProbeRef.current = null;
+      if (cancelled) {
+        return;
+      }
+      void checkConnections({}, "recovery");
+      void refreshConnectors();
+      void refreshPresets();
+      void refreshFeatured();
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(probe, { timeout: PROBE_IDLE_TIMEOUT_MS });
+      idleProbeRef.current = { cancel: () => window.cancelIdleCallback(handle) };
+    } else {
+      const timer = window.setTimeout(probe, PROBE_IDLE_TIMEOUT_MS);
+      idleProbeRef.current = { cancel: () => window.clearTimeout(timer) };
     }
 
-    void boot();
     return () => {
       cancelled = true;
+      const handle = idleProbeRef.current;
+      idleProbeRef.current = null;
+      handle?.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Health polling: the studio must notice that the model or the MCP server
   // came back without a reload, so the bar leaves "Local mode" on its own.
+  // Recovery-only: this may retire a warning, never raise one.
   useEffect(() => {
     const poll = () => {
       if (document.visibilityState === "visible") {
-        void checkConnections();
+        void checkConnections({}, "recovery");
       }
     };
 
@@ -1992,6 +2066,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSidecarNotice,
       recheckConnections,
       checkConnections,
+      surveyConnections,
       messages,
       streaming,
       thinkingPhase,
@@ -2012,7 +2087,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteObservation,
       clearMemory,
       pushNotice,
-      offlineReply,
+      offlineReplyFor,
       addStep,
       addOutcome,
       promoteEvidence,
@@ -2104,6 +2179,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSidecarNotice,
       recheckConnections,
       checkConnections,
+      surveyConnections,
       messages,
       streaming,
       thinkingPhase,
@@ -2124,7 +2200,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteObservation,
       clearMemory,
       pushNotice,
-      offlineReply,
+      offlineReplyFor,
       addStep,
       addOutcome,
       promoteEvidence,

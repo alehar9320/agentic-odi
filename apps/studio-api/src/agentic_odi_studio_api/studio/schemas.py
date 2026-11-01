@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from agentic_odi_core import BusinessValue, CustomerValue
+from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
 from agentic_odi_core.models import JobStage
 from pydantic import BaseModel, Field
 
@@ -52,8 +52,11 @@ class AddOutcomeRequest(BaseModel):
     mcp_url: str
     job_id: str
     statement: str
-    importance: float = Field(ge=1.0, le=10.0)
-    satisfaction: float = Field(ge=1.0, le=10.0)
+    importance: float | None = Field(default=None, ge=1.0, le=10.0)
+    satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
+    #: The questions behind the score. Required when either score is set; a
+    #: score without it is refused by the MCP tool.
+    claim_check: ClaimCheck | None = None
 
 
 class CreateJobRequest(BaseModel):
@@ -304,6 +307,16 @@ class ConversationModel(BaseModel):
     head_id: str | None = None
 
 
+class ConversationSummaryModel(ConversationModel):
+    """A conversation in the history list: its metadata plus how much is in it."""
+
+    turn_count: int = 0
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationSummaryModel] = Field(default_factory=list)
+
+
 class ConversationResponse(BaseModel):
     conversation: ConversationModel
 
@@ -425,3 +438,47 @@ class PromoteEvidenceRequest(BaseModel):
     importance: float | None = None
     satisfaction: float | None = None
     mcp_url: str = ""
+
+
+class ProposeOutcomeRequest(BaseModel):
+    """Propose a desired outcome from an evidence record."""
+
+    evidence_id: str
+    mcp_url: str = ""
+
+
+class ApproveProposalRequest(BaseModel):
+    """Approve a proposal, optionally with edits."""
+
+    statement: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    mcp_url: str = ""
+
+
+class RejectProposalRequest(BaseModel):
+    """Reject a proposal."""
+
+    mcp_url: str = ""
+
+
+class ProposalOut(BaseModel):
+    """Serialized OutcomeProposal for the API."""
+
+    id: str
+    evidence_id: str
+    job_id: str | None = None
+    step_id: str | None = None
+    statement: str
+    direction: str
+    unit_of_measure: str | None = None
+    object_of_control: str | None = None
+    contextual_clarifier: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    confidence: float
+    rationale: str
+    quote: str | None = None
+    source_name: str
+    status: str
+    created_at: str
