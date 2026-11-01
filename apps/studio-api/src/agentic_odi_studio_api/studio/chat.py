@@ -22,12 +22,14 @@ from contextlib import AsyncExitStack
 from typing import Any
 
 from agentic_odi_core import ModelRouter, ModelTier, ODIService, RoutingMode
+from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
     parse_tool_result,
     tool_result_text,
 )
+from agentic_odi_core.steve_jobs import generate_steve_jobs_response
 from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
@@ -59,22 +61,9 @@ log = logging.getLogger(__name__)
 #: missing must not be able to loop forever.
 MAX_TOOL_ROUNDS = 3
 
-#: Tool names that change stored data. Everything else is a read, a surface, or
-#: a memory note — none of which needs a confirmation the user would learn to
-#: click through.
-MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
-    "add_",
-    "create_",
-    "update_",
-    "delete_",
-    "ingest_",
-    "remove_",
-)
-
-#: Writes whose names do not follow the verb-prefix convention.
-MUTATING_TOOLS: frozenset[str] = frozenset(
-    {"promote_evidence", "segment_market", "propose_strategy"}
-)
+#: Local tools deliberately handled without a write approval: rendering a UI
+#: and suggesting a memory observation retain their existing conversation flow.
+_LOCAL_UNGATED_TOOLS = frozenset({"remember", RENDER_UI_TOOL})
 
 #: Attachments are context, not a corpus: five files, and a bounded slice of each.
 MAX_ATTACHMENTS = 5
@@ -86,7 +75,10 @@ MAX_SOURCE_PREVIEW = 160
 
 def is_mutating_tool(name: str) -> bool:
     """Whether a tool call changes stored data and should be confirmed."""
-    return name in MUTATING_TOOLS or name.startswith(MUTATING_TOOL_PREFIXES)
+    if name in _LOCAL_UNGATED_TOOLS:
+        return False
+    spec = TOOL_SPECS.get(name)
+    return spec is None or spec.effect != ToolEffect.READ
 
 
 SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.
@@ -148,52 +140,16 @@ def _brief_block(brief: StudioBrief | None) -> str:
 def offline_fallback(user_input: str, brief: StudioBrief | None = None) -> str:
     """Deterministic, honest guidance when no LLM backend is reachable.
 
-    No fabricated customer data, no invented scores: the studio says what it can
-    do by hand and points at the surface that does it.
+    Single Tier-0 implementation: delegates to ``generate_steve_jobs_response``.
+    No fabricated customer data, no invented scores.
     """
-    lower_inp = user_input.lower()
-    context = ""
-    if brief is not None and brief.job_statement.strip():
-        context = (
-            f"\n\n**Working job:** {brief.job_statement.strip()}"
-            if not brief.product_name.strip()
-            else f"\n\n**{brief.product_name.strip()}** — {brief.job_statement.strip()}"
-        )
-
-    if "guideline" in lower_inp or "framework" in lower_inp or "stage" in lower_inp:
-        return (
-            "### ODI, stage by stage\n\n"
-            "1. **Define the job** — the functional progress a person is trying to make.\n"
-            "2. **Capture desired outcomes** — `[direction] + [unit of measure] + [object of control] + [context]`.\n"
-            "3. **Score the opportunity** — `importance + max(importance - satisfaction, 0)`; above 10 is underserved.\n"
-            "4. **Map the job** — Define, Locate, Prepare, Confirm, Execute, Monitor, Modify, Conclude.\n\n"
-            "Type `/capture` to record an outcome, `/jobmap` to walk the phases, "
-            "and `/landscape` to see what is underserved." + context
-        )
-    if "simulate" in lower_inp or "bet" in lower_inp or "impact" in lower_inp:
-        return (
-            "### Simulate the bet by hand\n\n"
-            "Open **`/impact`** and pick the outcome you want to test. The simulation "
-            "shows before/after friction; it no longer invents a result when no model "
-            "is connected." + context
-        )
-    if "evidence" in lower_inp or "call" in lower_inp or "quote" in lower_inp:
-        return (
-            "### Evidence needs a source\n\n"
-            "No connector is wired up, so there is no live transcript to quote. "
-            "Capture the signal you already have in **`/capture`** — the evidence field "
-            "is stored with the outcome." + context
-        )
-    return (
-        "I can't reason about that right now — no model is reachable. "
-        "The studio still works by hand:\n\n"
-        "- `/start` — set or correct your context\n"
-        "- `/capture` — record an outcome with importance and satisfaction\n"
-        "- `/jobmap` — add or edit the steps of the job\n"
-        "- `/landscape` — review what is underserved\n\n"
-        "Type `/help` for every command, or point Settings at a local model to "
-        "bring the assistant back." + context
-    )
+    context: dict[str, str] = {}
+    if brief is not None:
+        if brief.product_name and brief.product_name.strip():
+            context["product_name"] = brief.product_name.strip()
+        if brief.job_statement and brief.job_statement.strip():
+            context["job_statement"] = brief.job_statement.strip()
+    return generate_steve_jobs_response(user_input, context=context or None)
 
 
 def _sse(event: str, data: dict[str, Any]) -> str:
@@ -598,16 +554,29 @@ async def _turn_frames(
 
     routing_mode = _routing_mode(request.routing_mode)
     router = ModelRouter(mode=routing_mode)
-    target_tier = router.resolve_tier(remote_available=healthy)
-    if target_tier == ModelTier.ON_DEVICE_LLM and routing_mode == RoutingMode.AUTO:
-        # Automatic routing keeps the studio's own deterministic guidance as the
-        # floor: honest, useful answers beat a placeholder model's guess.
-        target_tier = ModelTier.RULE_BASED
-    if target_tier == ModelTier.REMOTE_LLM and not healthy:
-        # A forced remote tier still has to answer when the backend is down.
-        target_tier = ModelTier.RULE_BASED
+    local_available = router.local_engine.is_available()
+    target_tier = router.resolve_tier(remote_available=healthy, local_available=local_available)
 
-    if target_tier == ModelTier.RULE_BASED:
+    # Report which tier answered so the UI can show an honest indicator.
+    yield frame(
+        "status",
+        {"phase": "tier", "tier": target_tier.value, "local_available": local_available},
+    )
+
+    if target_tier == ModelTier.REMOTE_LLM and not healthy:
+        # A forced remote tier still has to answer when the backend is down:
+        # demote honestly and say so.
+        target_tier = ModelTier.DETERMINISTIC
+        yield frame(
+            "status",
+            {
+                "phase": "tier_demoted",
+                "tier": target_tier.value,
+                "reason": "remote backend unreachable",
+            },
+        )
+
+    if target_tier == ModelTier.DETERMINISTIC:
         yield frame("status", {"phase": "offline"})
         reply = offline_fallback(last_user, request.brief)
         yield frame("delta", {"text": reply})
@@ -622,12 +591,27 @@ async def _turn_frames(
         )
         return
 
-    if target_tier == ModelTier.ON_DEVICE_LLM:
+    if target_tier == ModelTier.LOCAL_LLM:
         yield frame("status", {"phase": "fallback_tier", "tier": target_tier.value})
         chunks: list[str] = []
-        async for chunk in router.generate_fallback_stream(last_user, target_tier):
-            chunks.append(chunk)
-            yield frame("delta", {"text": chunk})
+        try:
+            async for chunk in router.generate_fallback_stream(last_user, target_tier):
+                chunks.append(chunk)
+                yield frame("delta", {"text": chunk})
+        except Exception:  # noqa: BLE001
+            log.exception("Local tier failed mid-stream (request_id=%s)", request_id)
+            # Local tier failed mid-stream: demote to deterministic and say so.
+            yield frame(
+                "status",
+                {
+                    "phase": "tier_demoted",
+                    "tier": ModelTier.DETERMINISTIC.value,
+                    "reason": "local model stopped responding",
+                },
+            )
+            reply = offline_fallback(last_user, request.brief)
+            yield frame("delta", {"text": reply})
+            chunks.append(reply)
         reply = "".join(chunks)
         yield frame("message", {"content": reply})
         _persist_turn(

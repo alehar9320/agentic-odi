@@ -85,9 +85,14 @@ the source name, source kind, item type, content, URL when one is present, the
 raw payload, and the link.
 
 Without a target id nothing enters the ODI store: the batch lives only in the
-in-process sink and is lost when the process exits. The mapping is
-field-for-field — it does not summarize, score, infer confidence, or dedupe.
-See [Evidence mapping](architecture/evidence-mapping.md) for the contract.
+in-process sink and is lost when the process exits.
+
+With `--propose` (the default), each evidence draft becomes a scored,
+approvable outcome proposal instead of being written directly. The proposal
+routes the record to a job and step, extracts a candidate ODI-format outcome
+statement, suggests importance/satisfaction with confidence, and shows its
+rationale. Nothing is written to the ODI store until a human approves the
+proposal. Pass `--apply` to write outcomes directly (opt-in, destructive).
 
 Pass `--dry-run` to fetch and normalize without writing anything: it prints the
 record count, the first normalized record, and — when `--job-id`, `--step-id`,
@@ -96,7 +101,27 @@ or `--outcome-id` is given — how many evidence drafts the ingest would create.
 Every evidence draft is an `EvidenceDraft` model, so construction raises before
 a record that crossed a process boundary can reach the ODI store with a missing
 or mistyped field. `validate_evidence_draft()` applies the same check to a draft
-that arrives as a plain dict; the CLI path builds the model directly.
+that arrives as a plain dict; the CLI path builds the model directly. Drafts
+carry a `discriminator` (the stable key of the source record) so re-ingesting
+the same source record does not create a duplicate proposal.
+
+### Ingest rate limit
+
+The sink admits records through a token bucket so a burst cannot grow the
+in-process buffer without bound. `IngestSink.append` asks for one token per
+record and raises `RateLimitExceededError` when the bucket is empty; the CLI
+prints that as `Error: Rate limit exceeded: …` and exits 1. An empty batch does
+not consume tokens.
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| Records admitted per second | `AGENTIC_ODI_INGEST_RATE` | `100` |
+| Burst (max tokens held) | one second's worth | `100` for the default rate |
+
+Invalid or non-positive values fall back to 100. The limiter never blocks: a
+burst is shed with a typed error instead of being queued in memory, which is the
+failure mode this guard exists to prevent. Construct `IngestSink` with an
+explicit `RateLimiter` to override the rate or the burst in-process.
 
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.

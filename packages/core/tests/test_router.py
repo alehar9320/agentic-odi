@@ -1,74 +1,95 @@
 import pytest
-from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
+from agentic_odi_core.router import LocalOpenAIEngine, ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.steve_jobs import (
-    format_opportunity_score_insight,
     generate_steve_jobs_response,
 )
 
 
-def test_steve_jobs_formatting():
-    res = generate_steve_jobs_response("calculate score 9.0 3.0")
-    assert "Breakthrough Opportunity" in res
-    assert "15.00" in res
-
-    res_guidelines = generate_steve_jobs_response("what are the guidelines")
-    assert "Outcome-Driven Innovation (ODI)" in res_guidelines
-    assert "Stage 1" in res_guidelines
-
-    res_sim = generate_steve_jobs_response("simulate impact")
-    assert "Impact Simulation" in res_sim
+def test_model_tier_names():
+    assert ModelTier.DETERMINISTIC.value == "deterministic"
+    assert ModelTier.LOCAL_LLM.value == "local"
+    assert ModelTier.REMOTE_LLM.value == "remote"
 
 
-def test_model_router_tier_resolution():
+def test_model_router_tier_resolution_auto():
     router = ModelRouter(mode=RoutingMode.AUTO)
-    assert router.resolve_tier(remote_available=True) == ModelTier.REMOTE_LLM
-    assert router.resolve_tier(remote_available=False) == ModelTier.ON_DEVICE_LLM
+    # No remote, no local -> deterministic (honest floor)
+    assert (
+        router.resolve_tier(remote_available=False, local_available=False)
+        == ModelTier.DETERMINISTIC
+    )
+    # Remote wins in AUTO
+    assert router.resolve_tier(remote_available=True, local_available=False) == ModelTier.REMOTE_LLM
+    # Local beats deterministic when remote is down
+    assert router.resolve_tier(remote_available=False, local_available=True) == ModelTier.LOCAL_LLM
 
-    router_forced_rule = ModelRouter(mode=RoutingMode.FORCE_RULE_BASED)
-    assert router_forced_rule.resolve_tier(remote_available=True) == ModelTier.RULE_BASED
+
+def test_model_router_forced_modes():
+    router_forced_det = ModelRouter(mode=RoutingMode.FORCE_DETERMINISTIC)
+    assert (
+        router_forced_det.resolve_tier(remote_available=True, local_available=True)
+        == ModelTier.DETERMINISTIC
+    )
+
+    router_forced_local = ModelRouter(mode=RoutingMode.FORCE_LOCAL)
+    assert (
+        router_forced_local.resolve_tier(remote_available=True, local_available=True)
+        == ModelTier.LOCAL_LLM
+    )
 
     router_forced_remote = ModelRouter(mode=RoutingMode.FORCE_REMOTE)
-    assert router_forced_remote.resolve_tier(remote_available=False) == ModelTier.REMOTE_LLM
+    assert (
+        router_forced_remote.resolve_tier(remote_available=True, local_available=False)
+        == ModelTier.REMOTE_LLM
+    )
+
+
+def test_local_engine_is_available_returns_false_when_unreachable():
+    engine = LocalOpenAIEngine(base_url="http://127.0.0.1:1/v1", timeout=0.5, ttl_seconds=0)
+    assert engine.is_available() is False
+
+
+def test_local_engine_caches_probe_with_ttl():
+    engine = LocalOpenAIEngine(base_url="http://127.0.0.1:1/v1", timeout=0.5, ttl_seconds=0)
+    # ttl_seconds=0 means cache expires immediately; probe runs each time
+    first = engine.is_available()
+    second = engine.is_available()
+    assert first is False
+    assert second is False
+
+
+def test_local_engine_reports_endpoint_and_model():
+    engine = LocalOpenAIEngine(base_url="http://localhost:8001/v1", model_name="my-local-model")
+    assert engine.base_url == "http://localhost:8001/v1"
+    assert engine.model_name == "my-local-model"
+
+
+def test_steve_jobs_formatting():
+    res = generate_steve_jobs_response("what are the guidelines")
+    assert "ODI, stage by stage" in res
+    assert "Define the job" in res
+
+
+def test_steve_jobs_no_fabricated_score():
+    """Tier 0 must not fabricate opportunity scores or invented data."""
+    res = generate_steve_jobs_response("hello")
+    assert "15.3" not in res
+    assert "Opportunity Score of 15.3" not in res
+    assert "3,000 hours" not in res
+
+
+def test_steve_jobs_points_at_compute_opportunity():
+    """Tier 0 points at compute_opportunity instead of computing scores itself."""
+    res = generate_steve_jobs_response("calculate score 9.0 3.0")
+    assert "Breakthrough Opportunity" not in res  # no fabricated scoring verdict
+    assert "15.00" not in res
 
 
 @pytest.mark.asyncio
 async def test_fallback_stream():
     router = ModelRouter(mode=RoutingMode.AUTO)
     chunks = []
-    async for chunk in router.generate_fallback_stream("hello", ModelTier.RULE_BASED):
+    async for chunk in router.generate_fallback_stream("hello", ModelTier.DETERMINISTIC):
         chunks.append(chunk)
     full_text = "".join(chunks)
-    assert 'I received your intent: **"hello"**.' in full_text
-
-
-@pytest.mark.asyncio
-async def test_steve_jobs_full_branches():
-    router = ModelRouter(mode=RoutingMode.AUTO)
-    # Test formula formatting
-    res1 = format_opportunity_score_insight(10.0, 10.0, "Maintain outcome")
-    assert "Appropriately Served" in res1
-    assert "Maintain outcome" in res1
-
-    res2 = format_opportunity_score_insight(6.0, 9.0)
-    assert "Overserved Target" in res2
-
-    # Test Steve Jobs generator keyword paths
-    assert "Causal Lineage" in generate_steve_jobs_response("evidence from calls")
-    assert "Outcome-Driven Innovation" in generate_steve_jobs_response(
-        "how does this stage framework work"
-    )
-    assert "Impact Simulation" in generate_steve_jobs_response("simulate friction bet")
-
-    # Test OnDeviceLLMEngine stream
-    engine = OnDeviceLLMEngine()
-    assert engine.is_available() is True
-    chunks = []
-    async for c in engine.generate_stream("hi"):
-        chunks.append(c)
-    assert len(chunks) > 0
-
-    # Test fallback stream for ON_DEVICE_LLM tier
-    on_device_chunks = []
-    async for c in router.generate_fallback_stream("test on device", ModelTier.ON_DEVICE_LLM):
-        on_device_chunks.append(c)
-    assert len(on_device_chunks) > 0
+    assert "I received your intent" in full_text or "ODI" in full_text

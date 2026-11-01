@@ -1,9 +1,17 @@
 import { useMemo, type ReactNode } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
+import { buildRecords } from "../../lib/records";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
-import { ClusterIcon, CompassIcon, RouteIcon, SignalIcon, SparkIcon } from "../icons";
+import {
+  ClusterIcon,
+  CompassIcon,
+  RouteIcon,
+  SignalIcon,
+  SparkIcon,
+  TableIcon,
+} from "../icons";
 
 interface RailItem {
   id: WorkspacePanelId;
@@ -28,8 +36,18 @@ export function WorkbenchRail() {
     const outcomes = canvas?.outcomes ?? [];
     const steps = canvas?.steps ?? [];
     const evidence = outcomes.filter((outcome) => outcome.evidence?.trim()).length;
+    const records = buildRecords(canvas);
 
     const rail: RailItem[] = [];
+    if (records.length > 0) {
+      rail.push({
+        id: "records",
+        label: "Records",
+        count: records.length,
+        noun: records.length === 1 ? "record" : "records",
+        icon: <TableIcon size={14} />,
+      });
+    }
     if (outcomes.length > 0) {
       rail.push({
         id: "landscape",

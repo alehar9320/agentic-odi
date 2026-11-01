@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import posixpath
 import re
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -52,12 +53,23 @@ def _highlight_code(code: str, language: str) -> str:
 
 
 def _fence_renderer(markdown: MarkdownIt) -> None:
-    """Render fenced code with server-side syntax highlighting."""
+    """Render fenced code with server-side syntax highlighting.
+
+    A ``mermaid`` fence is the exception. It is not code to colour but a
+    diagram's source, and colouring it would be wrong twice over: the reader
+    wants the picture, and the pygments mermaid lexer is not the renderer. The
+    source is emitted escaped, so a page whose script never loads still shows
+    the diagram as text, and ``assets/diagrams.js`` replaces it with the drawing
+    where it does. That is the one place the site spends client-side JavaScript,
+    and only pages with a diagram ask for it.
+    """
 
     def render(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
         token = tokens[index]
         info = (token.info or "").strip()
         language = info.split()[0] if info else ""
+        if language == "mermaid":
+            return f'<pre class="mermaid">{escape(token.content)}</pre>'
         markup = _highlight_code(token.content, language)
         if not markup:
             return ""

@@ -1,106 +1,119 @@
-"""Steve Jobs Pass experience and rule-based fallback generator.
+"""Steve Jobs Pass experience and rule-based fallback generator (Tier 0).
 
 Delivers clear, elegant, human-centric responses focused on customer intent,
 causality, and eliminating backlog friction.
+
+Tier 0 never fabricates numbers, scores, quotes, or customer names. When the
+user asks for an opportunity score, it points at ``compute_opportunity``
+instead of computing one itself.
 """
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 
-def format_opportunity_score_insight(
-    importance: float, satisfaction: float, statement: str | None = None
+def generate_steve_jobs_response(
+    user_input: str,
+    context: dict[str, Any] | None = None,
 ) -> str:
-    """Format an opportunity score calculation with Steve Jobs clarity."""
-    gap = max(importance - satisfaction, 0.0)
-    score = importance + gap
+    """Generate an honest, zero-latency response (Tier 0 deterministic tier).
 
-    if score > 10.0:
-        verdict = "**Breakthrough Opportunity** (Underserved Need)"
-        action = "Focus product strategy here. Customers are dissatisfied relative to importance."
-    elif score == 10.0:
-        verdict = "**Appropriately Served**"
-        action = "Maintain current quality. Do not over-engineer."
-    else:
-        verdict = "**Overserved Target**"
-        action = "Potential candidate for disruptive, low-cost alternatives."
-
-    stmt_header = (
-        f'### Outcome Analysis: *"{statement}"*\n\n'
-        if statement
-        else "### Opportunity Score Calculation\n\n"
-    )
-
-    return (
-        f"{stmt_header}"
-        f"- **Importance**: {importance:.1f}/10\n"
-        f"- **Satisfaction**: {satisfaction:.1f}/10\n"
-        f"- **Formula**: `Importance + max(Importance - Satisfaction, 0)`\n"
-        f"- **Opportunity Score**: **{score:.2f}** → {verdict}\n\n"
-        f"**Strategic Imperative**: {action}"
-    )
-
-
-def generate_steve_jobs_response(user_input: str, context: dict[str, Any] | None = None) -> str:
-    """Generate a zero-latency, highly polished response passing the Steve Jobs Pass."""
+    Never fabricates customer data, scores, or quotes. Lists things the person
+    can actually do — the tool names and surfaces — and points at
+    ``compute_opportunity`` for scoring rather than inventing a number.
+    """
     lowered = user_input.lower().strip()
-
-    # Calculate Opportunity score directly if numbers are detected
-    numbers = re.findall(r"\b([0-9]|10)(?:\.0)?\b", lowered)
-    if ("score" in lowered or "opportunity" in lowered or "calculate" in lowered) and len(
-        numbers
-    ) >= 2:
-        try:
-            imp, sat = float(numbers[0]), float(numbers[1])
-            return format_opportunity_score_insight(imp, sat)
-        except ValueError:
-            pass
+    ctx = ""
+    if context:
+        parts = []
+        if context.get("product_name"):
+            parts.append(f"**{context['product_name']}**")
+        if context.get("job_statement"):
+            parts.append(context["job_statement"])
+        if parts:
+            ctx = "\n\n**Working context:** " + " — ".join(parts)
 
     if any(
         k in lowered for k in ["guideline", "framework", "stage", "process", "how does this work"]
     ):
         return (
-            "### 📖 Outcome-Driven Innovation (ODI) Process Guidelines\n\n"
-            "Products change. Features rot. **Human jobs remain constant.** Here is how we build what people actually need:\n\n"
-            "1. **Stage 1: Define Intent (Job-to-be-Done)**\n"
-            "   - Stop writing Jira cards. Identify the core functional human goal.\n"
-            "2. **Stage 2: Capture Desired Outcomes**\n"
-            "   - Measure success with standard syntax:\n"
-            "     `[Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]`\n"
-            "3. **Stage 3: Compute Opportunity Scores**\n"
-            "   - `Opportunity Score = Importance + max(Importance - Satisfaction, 0)`\n"
-            "   - Anything **> 10.0** is an underserved market opportunity waiting for design leadership.\n"
-            "4. **Stage 4: Universal Job Map**\n"
-            "   - Chronological flow: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify ➔ Conclude.\n\n"
-            "*Every line of code you write should directly elevate customer satisfaction or collapse execution time.*"
+            "### ODI, stage by stage\n\n"
+            "1. **Define the job** — the functional progress a person is trying to make.\n"
+            "2. **Capture desired outcomes** — `[direction] + [unit of measure] + [object of control] + [context]`.\n"
+            "3. **Score the opportunity** — `importance + max(importance - satisfaction, 0)`; above 10 is underserved.\n"
+            "4. **Map the job** — Define, Locate, Prepare, Confirm, Execute, Monitor, Modify, Conclude.\n\n"
+            "Use `/capture` to record an outcome, `/jobmap` to walk the phases, "
+            "and `/landscape` to see what is underserved." + ctx
         )
 
     if any(k in lowered for k in ["simulate", "bet", "impact", "friction", "time-to-value"]):
         return (
-            "### ⚡ WYSIWYG Impact Simulation Result\n\n"
-            "- **Target Outcome**: O-1 (*Minimize time taken to propagate secrets*)\n"
-            "- **Proposed Bet**: Automated Secret Sync Daemon\n"
-            "- **Before**: 45 minutes of manual copy-paste across 400 developer pipelines.\n"
-            "- **After**: Under 30 seconds ambient zero-touch sync.\n"
-            "- **Time-to-Value Shift**: **-90% friction reduction**.\n"
-            "- **Human Impact**: 3,000 hours of developer agony eliminated every month. Build it."
+            "### Simulate the bet by hand\n\n"
+            "Open `/impact` and pick the outcome you want to test. The simulation "
+            "shows before/after friction; it no longer invents a result when no "
+            "model is connected." + ctx
         )
 
     if any(
         k in lowered for k in ["evidence", "call", "quote", "transcript", "research", "lineage"]
     ):
         return (
-            "### 🔍 Causal Lineage: Real-Time Evidence\n\n"
-            "- **Signal Source**: Gong Call #104 (Enterprise Team Alpha)\n"
-            "- **Customer Voice**: *'We lost two hours on deploy day because someone missed a database config key.'*\n"
-            "- **Telemetry**: 400 microservices impacted weekly; 14% failed build rate attributed to config drift."
+            "### Evidence needs a source\n\n"
+            "No connector is wired up, so there is no live transcript to quote. "
+            "Capture the signal you already have in `/capture` — the evidence field "
+            "is stored with the outcome." + ctx
+        )
+
+    if any(k in lowered for k in ["score", "opportunity", "calculate"]):
+        return (
+            "### Opportunity score\n\n"
+            "I can't compute a score without a model connected. Use "
+            "`compute_opportunity(importance, satisfaction)` — "
+            "`importance + max(importance - satisfaction, 0)` — above 10 is "
+            "underserved. Type the two numbers and I'll point you at the right "
+            "surface." + ctx
         )
 
     return (
-        f'I received your intent: **"{user_input.strip()}"**.\n\n'
-        "In The Living Studio, every idea is evaluated against human outcomes rather than story points. "
-        "Notice how our highest opportunity outcome (`O-1: Minimize propagation time`) has an **Opportunity Score of 15.3**, "
-        "signaling severe market underservice. Tap **'Simulate Impact'** on the canvas or type `Simulate Auto-Sync Bet` to test causality."
+        f'I received your intent: **"{user_input.strip()}"**.'
+        + ctx
+        + "\n\nNo model is reachable right now, so I'm running in deterministic "
+        "mode. I can't reason about that with a model, but the studio still "
+        "works by hand:\n\n"
+        "- `/start` — set or correct your context\n"
+        "- `/capture` — record an outcome with importance and satisfaction\n"
+        "- `/jobmap` — add or edit the steps of the job\n"
+        "- `/landscape` — review what is underserved\n\n"
+        "Type `/help` for every command, or point Settings at a local model to "
+        "bring the assistant back."
+    )
+
+
+# Deprecated: Tier 0 must not compute or present opportunity scores.
+# Kept for backward compatibility only; callers should use compute_opportunity
+# from agentic_odi_core.models instead.
+def format_opportunity_score_insight(
+    importance: float, satisfaction: float, statement: str | None = None
+) -> str:
+    """Format an opportunity score calculation (deprecated in Tier 0)."""
+    gap = max(importance - satisfaction, 0.0)
+    score = importance + gap
+
+    if score > 10.0:
+        verdict = "underserved"
+    elif score == 10.0:
+        verdict = "appropriately served"
+    else:
+        verdict = "overserved"
+
+    stmt_header = (
+        f'Outcome: "{statement}"\n\n' if statement else "Opportunity Score Calculation\n\n"
+    )
+    return (
+        f"{stmt_header}"
+        f"Importance: {importance:.1f}/10\n"
+        f"Satisfaction: {satisfaction:.1f}/10\n"
+        f"Formula: Importance + max(Importance - Satisfaction, 0)\n"
+        f"Score: {score:.2f} → {verdict}"
     )

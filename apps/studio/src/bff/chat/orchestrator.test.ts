@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryLocalStore } from "../store/memoryStore";
 import { LocalDataService } from "../data/localDataService";
@@ -106,5 +106,79 @@ describe("ChatOrchestrator deterministic mode", () => {
     const conversation = events.find((e) => e.event === "conversation");
     expect(conversation).toBeDefined();
     expect(conversation!.data.id).toBeTruthy();
+  });
+});
+
+describe("ChatOrchestrator provider choice", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const firstPhase = (events: RawSseEvent[]) =>
+    events.find((event) => event.event === "status")?.data.phase;
+
+  it("calls an answer no model produced by its real name", async () => {
+    const { events, onEvent } = collectEvents();
+    await makeBff().stream(streamRequest("how many jobs?"), onEvent);
+
+    expect(firstPhase(events)).toBe("offline");
+  });
+
+  it("tries a keyless model on the local network before admitting it cannot", async () => {
+    // Ollama and LM Studio answer with no key at all, so the address is a real
+    // endpoint and the turn starts as a model turn. But a hosted page cannot reach a
+    // laptop's LAN address, and the person who typed it still deserves an answer.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+    const { events, onEvent } = collectEvents();
+    await makeBff().stream(
+      {
+        ...streamRequest("how many jobs?"),
+        base_url: "http://127.0.0.1:11434/v1",
+        api_key: "",
+        model: "qwen3:8b",
+      },
+      onEvent,
+    );
+
+    expect(firstPhase(events)).toBe("streaming");
+    const phases = events
+      .filter((event) => event.event === "status")
+      .map((event) => event.data.phase);
+    expect(phases).toContain("offline");
+    expect(events.some((event) => event.event === "error")).toBe(false);
+    const message = events.find((event) => event.event === "message");
+    expect(String(message?.data.content)).toMatch(/canvas has/);
+  });
+
+  it("reports an endpoint that answered rather than hiding it in a local draft", async () => {
+    // A rejected key is a thing the person can fix. Papering over it with an answer
+    // that came from their device would look like the model replied.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: { message: "Invalid API key" } }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    const { events, onEvent } = collectEvents();
+    await makeBff().stream(
+      {
+        ...streamRequest("how many jobs?"),
+        base_url: "https://api.example.com/v1",
+        api_key: "sk-wrong",
+        model: "gpt",
+      },
+      onEvent,
+    );
+
+    expect(events.some((event) => event.event === "error")).toBe(true);
+    expect(events.some((event) => event.event === "message")).toBe(false);
   });
 });

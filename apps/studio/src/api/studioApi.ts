@@ -12,6 +12,7 @@ import type {
   ConnectorOperationResponse,
   ConnectorPreset,
   Conversation,
+  ConversationSummary,
   ConversationTree,
   CreateJobPayload,
   Job,
@@ -623,6 +624,17 @@ export function clearMemory(): Promise<{ ok: boolean }> {
   return withLocal(
     () => deleteJson<{ ok: boolean }>("/api/memory"),
     async (bff) => bff.memory.clearMemory(),
+  );
+}
+
+/** Every thread the PM can reopen, most recently touched first. */
+export async function listConversations(): Promise<ConversationSummary[]> {
+  return withLocal(
+    () =>
+      getJson<{ conversations: ConversationSummary[] }>("/api/conversations").then(
+        (body) => body.conversations,
+      ),
+    (bff) => bff.memory.listConversations(),
   );
 }
 

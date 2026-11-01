@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { healthLlm } from "./api/studioApi";
+import { fetchConfig, healthLlm } from "./api/studioApi";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -92,6 +92,13 @@ const BRIEF = {
   job_id: "JOB-402",
 };
 
+const SIDECAR_CONFIG = {
+  base_url: "http://localhost:8001/v1",
+  api_key: "local",
+  model_name: "local-tools-model",
+  mcp_url: "http://localhost:8000/mcp",
+};
+
 beforeEach(() => {
   for (const key of [
     "studio.brief",
@@ -100,13 +107,18 @@ beforeEach(() => {
     "studio.displayName",
     "studio.setupDismissed",
     "studio.setupDraft",
+    "studio.setupStep",
+    "studio.intro",
     "studio.onboarding",
   ]) {
     window.localStorage.removeItem(key);
   }
   // Shell tests are not about onboarding: keep the tour out of their way.
   window.localStorage.setItem("studio.flags.firstRunWizard", "off");
+  // The old five-field panel is the subject of its own suite below.
+  window.localStorage.setItem("studio.flags.firstRunIntro", "off");
   window.localStorage.setItem("studio.brief", JSON.stringify(BRIEF));
+  vi.mocked(fetchConfig).mockResolvedValue(SIDECAR_CONFIG);
   vi.mocked(healthLlm).mockResolvedValue({
     healthy: true,
     message: "LLM backend is reachable.",
@@ -267,15 +279,91 @@ describe("studio shell", () => {
     expect(await screen.findByText(/handled here/i, { selector: "p" })).toBeInTheDocument();
   });
 
-  it("shows manual work when the model is offline", async () => {
+  it("carries a browser-only first visit without apologising for what it never needed", async () => {
+    // #309. No sidecar, no model: the studio answers from the device and says
+    // nothing about what is missing until the person asks or something breaks.
+    const { fetchConfig } = await import("./api/studioApi");
+    vi.mocked(fetchConfig).mockRejectedValueOnce(new Error("no sidecar"));
     vi.mocked(healthLlm).mockResolvedValueOnce({ healthy: false, message: "offline" });
     render(<App />);
 
-    expect(await screen.findByText(/working by hand/i)).toBeInTheDocument();
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
     expect(
-      screen.getAllByRole("button", { name: /capture an outcome/i }).length,
-    ).toBeGreaterThan(0);
-    expect(screen.getByText("Local guidance")).toBeInTheDocument();
+      screen.getByRole("button", { name: /turn 40 interview notes into one bet/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(composer, { target: { value: "Where do I start?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+    expect(await screen.findByText(/Start with the/)).toBeInTheDocument();
+
+    expect(screen.queryByText(/working by hand/i)).toBeNull();
+    expect(screen.queryByText(/sidecar isn.t running/i)).toBeNull();
+  });
+
+  it.each(["dark", "light"])(
+    "opens a browser-only first run with no banner in the %s theme",
+    async (theme) => {
+      // #309's acceptance test: the initial DOM carries no apology. Nobody has asked
+      // for the sidecar or the model yet, so nothing may be reported as broken — not in
+      // the theme the studio opens in, and not in the other one either.
+      window.localStorage.setItem(
+        "studio.settings",
+        JSON.stringify({ base_url: "", api_key: "", model_name: "", mcp_url: "", theme }),
+      );
+      const { fetchConfig, healthLlm } = await import("./api/studioApi");
+      vi.mocked(fetchConfig).mockRejectedValueOnce(new Error("no sidecar"));
+      vi.mocked(healthLlm).mockRejectedValueOnce(new Error("no sidecar"));
+
+      render(<App />);
+
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
+      await screen.findByRole("textbox", { name: /message the studio/i });
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
+    },
+  );
+
+  it("is still quiet after the deferred probe and the health poll have run", async () => {
+    // The probes are deferred, not cancelled: two seconds after the paint the studio
+    // measures what it can reach, and every thirty seconds after that. On a hosted page
+    // with no sidecar every one of those measurements is a refusal, and none of them is
+    // a strip across the top of the window.
+    vi.mocked(fetchConfig).mockRejectedValue(new Error("no sidecar"));
+    vi.mocked(healthLlm).mockRejectedValue(new Error("no sidecar"));
+    vi.useFakeTimers();
+    try {
+      render(<App />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(90_000);
+      });
+
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does say so when a sidecar it had been reaching stops answering", async () => {
+    // The control for the two tests above: the strips are deferred, never missing. A
+    // studio that was talking to a sidecar and then was not has a real outage to name.
+    vi.useFakeTimers();
+    try {
+      render(<App />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4_000);
+      });
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
+
+      vi.mocked(fetchConfig).mockRejectedValue(new Error("the sidecar went away"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31_000);
+      });
+
+      const banners = document.querySelectorAll(".banner");
+      expect(banners.length).toBeGreaterThan(0);
+      expect(banners[0].textContent).toMatch(/sidecar/i);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops a running stream on Escape before closing the workspace", async () => {
@@ -321,7 +409,7 @@ describe("studio shell", () => {
     render(<App />);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /tell me what you're building/i }),
+      await screen.findByRole("button", { name: /start with you and your team/i }),
     );
     expect(
       await screen.findByText("What are you building?", { selector: "strong" }),
@@ -435,7 +523,7 @@ describe("first run", () => {
 
     // The stage first; the interview is an answer, not a gate.
     fireEvent.click(
-      await screen.findByRole("button", { name: /tell me what you're building/i }),
+      await screen.findByRole("button", { name: /start with you and your team/i }),
     );
     expect(
       await screen.findByText("What are you building?", { selector: "strong" }),
@@ -525,7 +613,7 @@ describe("first run", () => {
     render(<App />);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /tell me what you're building/i }),
+      await screen.findByRole("button", { name: /start with you and your team/i }),
     );
     expect(
       await screen.findByText("What are you building?", { selector: "strong" }),
@@ -543,6 +631,57 @@ describe("first run", () => {
       await screen.findByRole("heading", { name: "What do you want to win?" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
+  });
+
+  it("introduces itself in the person's own words and keeps the brief", async () => {
+    window.localStorage.removeItem("studio.brief");
+    window.localStorage.setItem("studio.flags.firstRunIntro", "on");
+    render(<App />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /start with you and your team/i }),
+    );
+    expect(
+      await screen.findByText("What are you working on, and what's your part in it?", {
+        selector: "strong",
+      }),
+    ).toBeInTheDocument();
+
+    const replies = [
+      "I'm the PM for the deploy tool; the team is four engineers and a designer.",
+      "The on-call platform engineer at 2am",
+      "Ship a service without hand-copying config",
+      "A missed key costs a deploy day",
+      "Nine onboarding calls, a very angry ticket, and a Slack thread",
+    ];
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    for (const reply of replies) {
+      fireEvent.change(composer, { target: { value: reply } });
+      fireEvent.keyDown(composer, { key: "Enter" });
+    }
+
+    expect(
+      await screen.findByRole("heading", { name: "Does this look like you?" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Looks like me" }));
+
+    await waitFor(() => {
+      const saved = JSON.parse(window.localStorage.getItem("studio.brief") ?? "null");
+      expect(saved).toMatchObject({
+        role: replies[0],
+        team: "four engineers and a designer",
+        target_user: replies[1],
+        job_statement: replies[2],
+        core_problem: replies[3],
+        evidence_at_hand: [
+          "Nine onboarding calls",
+          "a very angry ticket",
+          "a Slack thread",
+        ],
+      });
+    });
+    expect(await screen.findByRole("button", { name: "Edit context" })).toBeInTheDocument();
   });
 
   it("edits an existing context as a conversation", async () => {

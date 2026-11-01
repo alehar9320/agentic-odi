@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { CanvasData } from "../types";
-import { canvasStatus, isSimulatedCanvas } from "./canvasProvenance";
+import {
+  canvasHasRecords,
+  canvasStatus,
+  isSimulatedCanvas,
+  savedAtTime,
+  savedCopyCaption,
+} from "./canvasProvenance";
 
 function canvas(overrides: Partial<CanvasData> = {}): CanvasData {
   return {
@@ -54,5 +60,55 @@ describe("canvas provenance", () => {
   it("has no label for live, empty, or missing canvases", () => {
     expect(canvasStatus(canvas({ source: "mcp" }))).toBeNull();
     expect(canvasStatus(null)).toBeNull();
+  });
+});
+
+describe("canvas records", () => {
+  it("is true only when the canvas holds something to draw", () => {
+    expect(canvasHasRecords(null)).toBe(false);
+    expect(canvasHasRecords(canvas())).toBe(false);
+    expect(canvasHasRecords(canvas({ jobs: [{ id: "JOB-1", name: "Deploy" }] }))).toBe(true);
+    expect(canvasHasRecords(canvas({ steps: [{ id: "S-1", name: "Define" }] }))).toBe(true);
+    expect(
+      canvasHasRecords(canvas({ outcomes: [{ id: "O-1", statement: "Minimize the wait" }] })),
+    ).toBe(true);
+  });
+});
+
+describe("saved copy caption", () => {
+  const now = Date.parse("2026-11-01T12:00:00.000Z");
+  const saved = (generatedAt: string) =>
+    canvas({
+      provenance: {
+        kind: "live",
+        reason: "store",
+        generated_at: generatedAt,
+        record_counts: { jobs: 1, steps: 0, outcomes: 0, evidence: 0 },
+      },
+    });
+
+  it("reads the timestamp from the canvas provenance", () => {
+    expect(savedAtTime(saved("2026-11-01T11:56:00.000Z"))).toBe(now - 4 * 60_000);
+    expect(savedAtTime(canvas())).toBeNull();
+    expect(savedAtTime(null)).toBeNull();
+  });
+
+  it("names minutes, hours, and days", () => {
+    expect(savedCopyCaption(saved("2026-11-01T11:56:00.000Z"), now)).toBe("Saved 4 minutes ago");
+    expect(savedCopyCaption(saved("2026-11-01T11:00:00.000Z"), now)).toBe("Saved 1 hour ago");
+    expect(savedCopyCaption(saved("2026-10-30T12:00:00.000Z"), now)).toBe("Saved 2 days ago");
+  });
+
+  it("says just now for a copy saved under a minute ago", () => {
+    expect(savedCopyCaption(saved("2026-11-01T11:59:30.000Z"), now)).toBe("Saved just now");
+  });
+
+  it("claims no time the cache does not carry", () => {
+    expect(savedCopyCaption(canvas(), now)).toBe("Saved copy on this device");
+    expect(savedCopyCaption(saved("not-a-date"), now)).toBe("Saved copy on this device");
+  });
+
+  it("never claims a copy from the future is fresh", () => {
+    expect(savedCopyCaption(saved("2026-11-01T13:00:00.000Z"), now)).toBe("Saved just now");
   });
 });

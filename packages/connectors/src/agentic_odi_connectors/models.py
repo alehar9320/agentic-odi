@@ -22,6 +22,20 @@ class ConfigurationError(ValueError):
         super().__init__(f"Invalid connector config: {joined}")
 
 
+class RateLimitExceededError(Exception):
+    """Raised when an ingest burst would exceed the configured rate.
+
+    Attributes:
+        rate: Configured records per second.
+        requested: Number of records the rejected call asked to admit.
+    """
+
+    def __init__(self, *, rate: float, requested: int) -> None:
+        self.rate = rate
+        self.requested = requested
+        super().__init__(f"Rate limit exceeded: {rate:g} records/second (requested {requested})")
+
+
 ItemType = Literal["resource", "tool_result", "catalog"]
 McpAuthMode = Literal["none", "oauth"]
 EvidenceItemType = Literal["catalog", "resource", "tool_result", "manual", "note"]
@@ -62,6 +76,10 @@ class McpConnectorSettings(BaseModel):
     auth: McpAuthMode = "none"
     headers: dict[str, str] = Field(default_factory=dict)
     env_vars: list[str] = Field(default_factory=list)
+    tool_args: dict[str, dict] = Field(
+        default_factory=dict,
+        description="Per-tool argument overrides passed to call_tool.",
+    )
 
 
 class PaginationSettings(BaseModel):
