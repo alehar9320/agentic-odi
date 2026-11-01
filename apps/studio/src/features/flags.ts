@@ -12,7 +12,7 @@
  * can never silently change behaviour.
  */
 
-export type FeatureFlagName = "firstRunWizard";
+export type FeatureFlagName = "firstRunWizard" | "firstRunIntro";
 
 export interface FeatureFlagDefinition {
   name: FeatureFlagName;
@@ -26,6 +26,13 @@ export const FEATURE_FLAGS: Record<FeatureFlagName, FeatureFlagDefinition> = {
     name: "firstRunWizard",
     description: "The optional four-step product tour, opened from the home stage or Settings.",
     envVar: "VITE_STUDIO_FIRST_RUN_WIZARD",
+    defaultEnabled: true,
+  },
+  firstRunIntro: {
+    name: "firstRunIntro",
+    description:
+      "The conversational first-run introduction, in place of the five-field setup form.",
+    envVar: "VITE_STUDIO_FIRST_RUN_INTRO",
     defaultEnabled: true,
   },
 };
