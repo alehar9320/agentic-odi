@@ -37,6 +37,14 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
       { label: "Set your context", action: "open-setup", tone: "ghost" },
     ],
   },
+  "offline": {
+    severity: "info",
+    life: "persistent",
+    dock: "top",
+    title: "You're offline.",
+    body: "The Studio still opens, and your canvas, conversations, and settings are on this device. Answers come from what is stored here until a connection is back.",
+    dismissible: true,
+  },
   "update-available": {
     severity: "info",
     life: "persistent",

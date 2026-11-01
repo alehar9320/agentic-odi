@@ -83,6 +83,19 @@ thing, and the system stays legible because it does not absorb everything.
   raised from `BannerBridge`. Dismissing it records a session-long choice, so the
   next failed probe cannot bring it back.
 - `components/chat/OfflineNotice.tsx` — replaced by the `model-offline` kind.
+- The `offline` kind (browser connectivity, #546) is raised from `BannerBridge`
+  off `navigator.onLine`. While the browser is offline it is the only strip: the
+  `sidecar-down` and `model-offline` kinds are held back, because their copy and
+  their Recheck action assume a network. Each resumes when the connection does.
+
+## The offline page and the worker
+
+`offline.html` (in `public/`) is the one page the service worker serves for a
+navigation it cannot answer, so the `offline` kind above is the in-app half of the
+same story. `src/sw.ts` owns the fallback and answers `/api/**` with nothing at
+all; `src/lib/swRouting.ts` holds the routing rules and `respondToNavigation` so
+both are unit-testable without a service-worker global. The shell precache and
+cache-first asset rules are #545's work, not this worker's.
 
 ## Verification
 
