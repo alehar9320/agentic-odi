@@ -230,4 +230,51 @@ describe("IntroConversation", () => {
     expect(harness.state.clearChat).toHaveBeenCalledTimes(1);
     expect(window.localStorage.getItem(INTRO_DRAFT_KEY)).toBeNull();
   });
+
+  /**
+   * The wizard keeps the typed context when the job write fails — losing an
+   * answer was worse than a missing row. What it must not do is call that
+   * outcome a clean save: the person then reads a board with no job and a
+   * message that said it would be there.
+   */
+  it("names the job it could not create instead of reporting a clean save", async () => {
+    harness.state.createJob.mockRejectedValueOnce(new Error("The studio sidecar isn't reachable."));
+    seedDraft(COMPLETE);
+    render(<IntroConversation />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Looks like me" }));
+
+    await waitFor(() => expect(harness.state.saveBrief).toHaveBeenCalledTimes(1));
+    expect(harness.state.pushToast).toHaveBeenCalledWith(
+      "error",
+      expect.stringContaining("job wasn't created"),
+    );
+    expect(harness.state.pushToast).not.toHaveBeenCalledWith(
+      "success",
+      expect.stringContaining("Context saved"),
+    );
+  });
+
+  it("names a rename that did not take, rather than a clean update", async () => {
+    harness.state.brief = {
+      product_name: "Deploys",
+      job_id: "JOB-1",
+      job_statement: WIN,
+    };
+    harness.state.updateJob.mockRejectedValueOnce(new Error("Job name cannot be empty."));
+    seedDraft(COMPLETE);
+    render(<IntroConversation />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Looks like me" }));
+
+    await waitFor(() => expect(harness.state.saveBrief).toHaveBeenCalledTimes(1));
+    expect(harness.state.pushToast).toHaveBeenCalledWith(
+      "error",
+      expect.stringContaining("job wasn't renamed"),
+    );
+    expect(harness.state.pushToast).not.toHaveBeenCalledWith(
+      "success",
+      expect.stringContaining("Context updated"),
+    );
+  });
 });

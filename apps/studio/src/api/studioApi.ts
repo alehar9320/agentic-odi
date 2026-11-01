@@ -54,6 +54,13 @@ export class StudioApiError extends Error {
 /** Network or sidecar-proxy failures are transport failures; application errors are not. */
 export function isTransportFailure(error: unknown): boolean {
   if (error instanceof StudioApiError) {
+    // The Worker answers for itself when it has no sidecar to forward to, and
+    // does so with a structured body — the same shape a sidecar uses to refuse
+    // a request it did receive. Only the code separates "nobody is there" from
+    // "the studio said no", and only the first one belongs to the browser.
+    if (error.error.code === "sidecar_unavailable") {
+      return true;
+    }
     return (
       (error.status === 502 || error.status === 503 || error.status === 504) &&
       !error.fromSidecar
@@ -82,6 +89,7 @@ function codeForStatus(status: number): string {
 
 const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
   mcp_unreachable: "The studio sidecar isn't reachable.",
+  sidecar_unavailable: "This studio has no sidecar behind it.",
   not_found: "That resource wasn't found.",
   validation: "The request was invalid.",
   conflict: "That conflicts with the current state.",
@@ -92,6 +100,8 @@ const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
 const SUGGESTION_FOR_CODE: Partial<Record<string, string>> = {
   mcp_unreachable:
     "Start the studio sidecar with `python scripts/dev.py` (or `npm --prefix apps/studio run dev:full`), then click Recheck.",
+  sidecar_unavailable:
+    "Nothing is broken: this studio runs from your browser. Add a sidecar when you want live MCP data.",
   not_found: "Check the identifier and try again.",
   validation: "Fix the input and try again.",
   conflict: "Reload and try again.",
@@ -304,28 +314,56 @@ export function fetchModels(config: {
   return postJson<ModelList>("/api/models", config);
 }
 
+/**
+ * Every sidecar payload names the server to write to. The browser store is the
+ * machine this code is already running on, so that field means nothing there —
+ * and passing it through would make the local path look like it, too, had a
+ * server to address.
+ */
+function withoutMcpUrl<T extends object>(payload: T): Omit<T, "mcp_url"> {
+  const rest = { ...payload };
+  delete (rest as Record<string, unknown>).mcp_url;
+  return rest;
+}
+
 export function addStep(payload: AddStepPayload): Promise<Step> {
-  return postJson<Step>("/api/steps", payload);
+  return withLocal(
+    () => postJson<Step>("/api/steps", payload),
+    (bff) => bff.data.addStep(withoutMcpUrl(payload)),
+  );
 }
 
 export function addOutcome(payload: AddOutcomePayload): Promise<Outcome> {
-  return postJson<Outcome>("/api/outcomes", payload);
+  return withLocal(
+    () => postJson<Outcome>("/api/outcomes", payload),
+    (bff) => bff.data.addOutcome(withoutMcpUrl(payload)),
+  );
 }
 
 export function createJob(payload: CreateJobPayload): Promise<Job> {
-  return postJson<Job>("/api/jobs", payload);
+  return withLocal(
+    () => postJson<Job>("/api/jobs", payload),
+    (bff) => bff.data.createJob(withoutMcpUrl(payload)),
+  );
 }
 
 export function updateJob(
   jobId: string,
   payload: { name?: string; description?: string; mcp_url: string },
 ): Promise<Job> {
-  return sendJson<Job>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload);
+  return withLocal(
+    () => sendJson<Job>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload),
+    (bff) => bff.data.updateJob(jobId, withoutMcpUrl(payload)),
+  );
 }
 
 export function deleteJob(jobId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/jobs/${encodeURIComponent(jobId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return withLocal(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/jobs/${encodeURIComponent(jobId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.data.deleteJob(jobId),
   );
 }
 
@@ -333,12 +371,19 @@ export function updateStep(
   stepId: string,
   payload: { name?: string; order?: number; mcp_url: string },
 ): Promise<Step> {
-  return sendJson<Step>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload);
+  return withLocal(
+    () => sendJson<Step>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload),
+    (bff) => bff.data.updateStep(stepId, withoutMcpUrl(payload)),
+  );
 }
 
 export function deleteStep(stepId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/steps/${encodeURIComponent(stepId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return withLocal(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/steps/${encodeURIComponent(stepId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.data.deleteStep(stepId),
   );
 }
 
@@ -346,16 +391,19 @@ export function updateOutcome(
   outcomeId: string,
   payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
 ): Promise<Outcome> {
-  return sendJson<Outcome>(
-    "PATCH",
-    `/api/outcomes/${encodeURIComponent(outcomeId)}`,
-    payload,
+  return withLocal(
+    () => sendJson<Outcome>("PATCH", `/api/outcomes/${encodeURIComponent(outcomeId)}`, payload),
+    (bff) => bff.data.updateOutcome(outcomeId, withoutMcpUrl(payload)),
   );
 }
 
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return withLocal(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.data.deleteOutcome(outcomeId),
   );
 }
 
