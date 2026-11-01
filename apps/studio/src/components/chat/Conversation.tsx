@@ -165,7 +165,7 @@ function UserMessage() {
           const size = ready ? formatFileSize(ready.size) : "";
 
           return (
-            <span className="attachment-chip">
+            <span className="attachment-chip" data-aui-quote-selectable="false">
               {ready?.dataUrl ? (
                 <img className="attachment-chip__thumb" src={ready.dataUrl} alt="" />
               ) : null}
