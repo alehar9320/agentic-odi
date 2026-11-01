@@ -150,6 +150,12 @@ download, and install), `transport.test.ts` (Tauri boundary), and the
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
+The outbox drain guard in `apps/studio/src/bff/outbox.ts` is covered by
+`outbox.test.ts`, which races two drains twice: once with a `navigator.locks`
+stub and once with `navigator.locks` deleted so the lease row runs. Both assert
+exactly one send per record, and the lease path also proves a crashed holder's
+lease is reclaimed only after it expires and that a running drain renews it.
+
 Copied UI is guarded structurally: `src/vendor/boundary.test.ts` reads every
 `.ts` and `.tsx` file under `apps/studio/src/vendor/` and fails on a specifier
 that resolves into a product slice (`state`, `api`, `assistant`, `bff`). It is

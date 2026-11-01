@@ -3,8 +3,11 @@ import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { Observation } from "../../types";
 import { nowIso } from "../id";
 import {
+  byCreated,
   bySeq,
+  type DrainLease,
   type LocalStore,
+  type OutboxRecord,
   type StoredConversation,
   type StoredJob,
   type StoredOutcome,
@@ -14,10 +17,13 @@ import {
 } from "./types";
 
 const DB_NAME = "agentic-odi-studio";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+const DRAIN_LEASE_KEY = "drain_lease";
+
+type MetaValue = number | DrainLease;
 
 interface StudioDb extends DBSchema {
-  meta: { key: string; value: { key: string; value: number } };
+  meta: { key: string; value: { key: string; value: MetaValue } };
   jobs: { key: string; value: StoredJob; indexes: { "by-seq": number } };
   steps: {
     key: string;
@@ -33,6 +39,11 @@ interface StudioDb extends DBSchema {
     key: string;
     value: Observation;
     indexes: { "by-created": string };
+  };
+  outbox: {
+    key: string;
+    value: OutboxRecord;
+    indexes: { "by-state": string; "by-created": string };
   };
   conversations: {
     key: string;
@@ -56,29 +67,36 @@ export class IndexedDbLocalStore implements LocalStore {
 
   static async open(): Promise<IndexedDbLocalStore> {
     const db = await openDB<StudioDb>(DB_NAME, DB_VERSION, {
-      upgrade(database) {
-        database.createObjectStore("meta", { keyPath: "key" });
-        const jobs = database.createObjectStore("jobs", { keyPath: "id" });
-        jobs.createIndex("by-seq", "seq");
-        const steps = database.createObjectStore("steps", { keyPath: "id" });
-        steps.createIndex("by-job", "job_id");
-        steps.createIndex("by-seq", "seq");
-        const outcomes = database.createObjectStore("outcomes", { keyPath: "id" });
-        outcomes.createIndex("by-job", "job_id");
-        outcomes.createIndex("by-seq", "seq");
-        const observations = database.createObjectStore("observations", {
-          keyPath: "id",
-        });
-        observations.createIndex("by-created", "created_at");
-        const conversations = database.createObjectStore("conversations", {
-          keyPath: "id",
-        });
-        conversations.createIndex("by-updated", "updated_at");
-        const turns = database.createObjectStore("turns", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        turns.createIndex("by-conversation", "conversation_id");
+      upgrade(database, oldVersion) {
+        if (oldVersion < 1) {
+          database.createObjectStore("meta", { keyPath: "key" });
+          const jobs = database.createObjectStore("jobs", { keyPath: "id" });
+          jobs.createIndex("by-seq", "seq");
+          const steps = database.createObjectStore("steps", { keyPath: "id" });
+          steps.createIndex("by-job", "job_id");
+          steps.createIndex("by-seq", "seq");
+          const outcomes = database.createObjectStore("outcomes", { keyPath: "id" });
+          outcomes.createIndex("by-job", "job_id");
+          outcomes.createIndex("by-seq", "seq");
+          const observations = database.createObjectStore("observations", {
+            keyPath: "id",
+          });
+          observations.createIndex("by-created", "created_at");
+          const conversations = database.createObjectStore("conversations", {
+            keyPath: "id",
+          });
+          conversations.createIndex("by-updated", "updated_at");
+          const turns = database.createObjectStore("turns", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+          turns.createIndex("by-conversation", "conversation_id");
+        }
+        if (oldVersion < 2) {
+          const outbox = database.createObjectStore("outbox", { keyPath: "id" });
+          outbox.createIndex("by-state", "state");
+          outbox.createIndex("by-created", "created_at");
+        }
       },
     });
     return new IndexedDbLocalStore(db);
@@ -86,8 +104,8 @@ export class IndexedDbLocalStore implements LocalStore {
 
   async nextSeq(): Promise<number> {
     const tx = this.db.transaction("meta", "readwrite");
-    const current = (await tx.store.get("seq"))?.value ?? 0;
-    const next = current + 1;
+    const current = (await tx.store.get("seq"))?.value;
+    const next = (typeof current === "number" ? current : 0) + 1;
     await tx.store.put({ key: "seq", value: next });
     await tx.done;
     return next;
@@ -165,6 +183,87 @@ export class IndexedDbLocalStore implements LocalStore {
 
   async clearObservations(): Promise<void> {
     await this.db.clear("observations");
+  }
+
+  async enqueueOutbox(record: OutboxRecord): Promise<void> {
+    await this.db.put("outbox", record);
+  }
+
+  async getOutbox(id: string): Promise<OutboxRecord | undefined> {
+    return this.db.get("outbox", id);
+  }
+
+  async putOutbox(record: OutboxRecord): Promise<void> {
+    await this.db.put("outbox", record);
+  }
+
+  async deleteOutbox(id: string): Promise<void> {
+    await this.db.delete("outbox", id);
+  }
+
+  async listOutbox(): Promise<OutboxRecord[]> {
+    const records = await this.db.getAllFromIndex("outbox", "by-created");
+    return records.sort(byCreated);
+  }
+
+  async clearOutbox(): Promise<void> {
+    await this.db.clear("outbox");
+  }
+
+  async claimDrainLease(
+    holder: string,
+    now: number,
+    ttlMs: number,
+  ): Promise<DrainLease | null> {
+    // One readwrite transaction over `meta` makes read-then-write atomic, so
+    // two tabs cannot both see an empty lease and both claim it.
+    const tx = this.db.transaction("meta", "readwrite");
+    const existing = (await tx.store.get(DRAIN_LEASE_KEY))?.value;
+    const lease = isLease(existing) ? existing : null;
+    if (lease && lease.holder !== holder && lease.expires_at > now) {
+      await tx.done;
+      return lease;
+    }
+    await tx.store.put({
+      key: DRAIN_LEASE_KEY,
+      value: { holder, expires_at: now + ttlMs },
+    });
+    await tx.done;
+    return null;
+  }
+
+  async renewDrainLease(holder: string, now: number, ttlMs: number): Promise<boolean> {
+    const tx = this.db.transaction("meta", "readwrite");
+    const existing = (await tx.store.get(DRAIN_LEASE_KEY))?.value;
+    const lease = isLease(existing) ? existing : null;
+    if (!lease || lease.holder !== holder) {
+      await tx.done;
+      return false;
+    }
+    await tx.store.put({
+      key: DRAIN_LEASE_KEY,
+      value: { holder, expires_at: now + ttlMs },
+    });
+    await tx.done;
+    return true;
+  }
+
+  async releaseDrainLease(holder: string): Promise<boolean> {
+    const tx = this.db.transaction("meta", "readwrite");
+    const existing = (await tx.store.get(DRAIN_LEASE_KEY))?.value;
+    const lease = isLease(existing) ? existing : null;
+    if (!lease || lease.holder !== holder) {
+      await tx.done;
+      return false;
+    }
+    await tx.store.delete(DRAIN_LEASE_KEY);
+    await tx.done;
+    return true;
+  }
+
+  async getDrainLease(): Promise<DrainLease | null> {
+    const existing = (await this.db.get("meta", DRAIN_LEASE_KEY))?.value;
+    return isLease(existing) ? existing : null;
   }
 
   async listConversations(): Promise<StoredConversation[]> {
@@ -305,6 +404,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "steps",
         "outcomes",
         "observations",
+        "outbox",
         "conversations",
         "turns",
       ],
@@ -316,6 +416,7 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("steps").clear(),
       tx.objectStore("outcomes").clear(),
       tx.objectStore("observations").clear(),
+      tx.objectStore("outbox").clear(),
       tx.objectStore("conversations").clear(),
       tx.objectStore("turns").clear(),
     ]);
@@ -325,4 +426,13 @@ export class IndexedDbLocalStore implements LocalStore {
   close(): void {
     this.db.close();
   }
+}
+
+function isLease(value: MetaValue | undefined): value is DrainLease {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as DrainLease).holder === "string" &&
+    typeof (value as DrainLease).expires_at === "number"
+  );
 }
