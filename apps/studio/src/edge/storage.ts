@@ -10,6 +10,71 @@ import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { ConsentState, EdgeTierId, EdgeUsage, TierState } from "./types";
 import { EDGE_TIERS } from "./ladder";
 
+export interface EdgeStateService {
+  getTierStates(): Promise<Record<EdgeTierId, TierState>>;
+  setTierState(id: EdgeTierId, state: TierState): Promise<void>;
+  getUsage(): Promise<EdgeUsage>;
+  recordEdgeTurn(streamedSeconds: number): Promise<EdgeUsage>;
+  getConsent(): Promise<ConsentState>;
+  setConsent(state: ConsentState): Promise<void>;
+  reset(): Promise<void>;
+}
+
+/** Session-scoped fallback for environments without IndexedDB; mirrors
+ * `bff/store/openStore.ts`, which keeps the deterministic assistant alive
+ * the same way. */
+class MemoryEdgeState implements EdgeStateService {
+  private tiers = new Map<EdgeTierId, TierState>();
+  private usage: EdgeUsage = { edgeTurns: 0, streamedSeconds: 0 };
+  private consent: ConsentState = "unset";
+
+  async getTierStates(): Promise<Record<EdgeTierId, TierState>> {
+    const states = {} as Record<EdgeTierId, TierState>;
+    for (const tier of EDGE_TIERS) {
+      states[tier.id] = this.tiers.get(tier.id) ?? { status: "empty", cachedAt: null };
+    }
+    return states;
+  }
+
+  async setTierState(id: EdgeTierId, state: TierState): Promise<void> {
+    this.tiers.set(id, state);
+  }
+
+  async getUsage(): Promise<EdgeUsage> {
+    return { ...this.usage };
+  }
+
+  async recordEdgeTurn(streamedSeconds: number): Promise<EdgeUsage> {
+    this.usage = {
+      edgeTurns: this.usage.edgeTurns + 1,
+      streamedSeconds: this.usage.streamedSeconds + Math.max(0, streamedSeconds),
+    };
+    return { ...this.usage };
+  }
+
+  async getConsent(): Promise<ConsentState> {
+    return this.consent;
+  }
+
+  async setConsent(state: ConsentState): Promise<void> {
+    this.consent = state;
+  }
+
+  async reset(): Promise<void> {
+    this.tiers.clear();
+    this.usage = { edgeTurns: 0, streamedSeconds: 0 };
+    this.consent = "unset";
+  }
+}
+
+export async function openEdgeState(): Promise<EdgeStateService> {
+  try {
+    return await EdgeStateStore.open();
+  } catch {
+    return new MemoryEdgeState();
+  }
+}
+
 const DB_NAME = "agentic-odi-edge";
 const DB_VERSION = 1;
 

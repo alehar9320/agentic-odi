@@ -1,7 +1,11 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
+import { EdgeStateStore } from "../edge/storage";
+import { edgeManager } from "../edge/manager";
+import { FakeEdgeEngine } from "../test/edgeFake";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -52,6 +56,7 @@ let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
+let llmHealthy = true;
 let signalFetches = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
@@ -178,7 +183,7 @@ function route(
   }
   if (url === "/api/health/llm") {
     llmHealthFetches += 1;
-    return json({ healthy: true, message: "ok" });
+    return json({ healthy: llmHealthy, message: llmHealthy ? "ok" : "no model endpoint" });
   }
   if (url.startsWith("/api/signals/unread-count")) {
     return json({ count: 0 });
@@ -808,5 +813,109 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext edge routing", () => {
+  let engine: FakeEdgeEngine;
+
+  beforeEach(async () => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    llmHealthy = false;
+    engine = new FakeEdgeEngine();
+    edgeManager.reset();
+    edgeManager.setEngineFactory(async () => engine);
+    const store = await EdgeStateStore.open();
+    await store.reset();
+    await store.setConsent("granted");
+    await store.setTierState("t1", { status: "cached", cachedAt: "2026-01-01T00:00:00.000Z" });
+    store.close();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    edgeManager.reset();
+    llmHealthy = true;
+  });
+
+  it("answers a keyless turn in the browser without touching /api/chat", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await act(async () => {
+      await result.current.sendMessage("what should I dig into next?");
+    });
+
+    expect(chatAttempts).toBe(0);
+    expect(result.current.streaming).toBe(false);
+    const assistant = result.current.messages.filter((message) => message.role === "assistant").at(-1);
+    expect(assistant?.content).toBe("Hello from the edge.");
+
+    const store = await EdgeStateStore.open();
+    expect((await store.getUsage()).edgeTurns).toBe(1);
+    expect((await store.getTierStates()).t1.status).toBe("active");
+    store.close();
+  });
+
+  it("carries on when the sidecar itself is down", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init, true)),
+    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.sidecarReachable).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage("still working?");
+    });
+
+    expect(chatAttempts).toBe(0);
+    expect(
+      result.current.messages.some(
+        (message) => message.role === "notice" && message.content.includes("sidecar isn't running"),
+      ),
+    ).toBe(false);
+    const assistant = result.current.messages.filter((message) => message.role === "assistant").at(-1);
+    expect(assistant?.content).toBe("Hello from the edge.");
+  });
+
+  it("goes back to /api/chat the moment the endpoint is healthy again", async () => {
+    llmHealthy = true;
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.llmHealth.healthy).toBe(true));
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    expect(chatAttempts).toBe(1);
+    const assistant = result.current.messages.filter((message) => message.role === "assistant").at(-1);
+    expect(assistant?.content).toBe("Hi");
+  });
+
+  it("leaves a denied consent decision untouched: real endpoint or nothing", async () => {
+    const store = await EdgeStateStore.open();
+    await store.setConsent("denied");
+    store.close();
+    edgeManager.reset();
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    expect(chatAttempts).toBe(1);
   });
 });

@@ -55,12 +55,14 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
+import { edgeManager } from "../edge/manager";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import { loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
+  ChatStreamRequest,
   CanvasData,
   CanvasState,
   ChatAttachment,
@@ -1246,10 +1248,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // The sidecar is confirmed down: don't start a doomed stream. The notice
-      // above the composer already explains what's wrong; just surface a quiet
-      // heads-up in-thread and stop.
-      if (sidecarReachable === false) {
+      // Decide the provider before touching state: a visitor with no paid
+      // endpoint and a cached browser model is answered in-tab, even when the
+      // sidecar itself is down.
+      const useEdge = await edgeManager.canServe(settings, llmHealth.healthy === true);
+
+      // The sidecar is confirmed down and there is no edge reply to offer:
+      // don't start a doomed stream. The notice above the composer already
+      // explains what's wrong; just surface a quiet heads-up in-thread and
+      // stop.
+      if (sidecarReachable === false && !useEdge) {
         pushNotice("The studio sidecar isn't running — live replies are paused. Start it from Settings.");
         return;
       }
@@ -1552,23 +1560,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       };
 
       try {
-        await streamChat(
-          {
-            base_url: settings.base_url,
-            api_key: settings.api_key,
-            model: settings.model_name,
-            mcp_url: settings.mcp_url,
-            messages: history,
-            brief,
-            ui_catalog: catalogManifest(),
-            conversation_id: conversationId,
-            attachments,
-            approvals: true,
-            assistant_id: assistantId,
-          },
-          handleEvent,
-          controller.signal,
-        );
+        const turnRequest: ChatStreamRequest = {
+          base_url: settings.base_url,
+          api_key: settings.api_key,
+          model: settings.model_name,
+          mcp_url: settings.mcp_url,
+          messages: history,
+          brief,
+          ui_catalog: catalogManifest(),
+          conversation_id: conversationId,
+          attachments,
+          approvals: true,
+          assistant_id: assistantId,
+        };
+        if (useEdge) {
+          await edgeManager.stream(turnRequest, handleEvent, controller.signal);
+        } else {
+          await streamChat(turnRequest, handleEvent, controller.signal);
+        }
       } catch (error) {
         const aborted = (error as Error).name === "AbortError";
         if (aborted) {
@@ -1616,6 +1625,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshCanvas,
       refreshConnectors,
       sidecarReachable,
+      llmHealth,
       pushNotice,
     ],
   );
