@@ -9,16 +9,26 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from pydantic import ValidationError as PydanticValidationError
+
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.mapping import (
+    HeuristicProposalStrategy,
+    OutcomeProposal,
+    ProposalStatus,
+    ProposalStrategy,
+)
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     BusinessValue,
+    ClaimCheck,
+    ClaimSkip,
     CustomerOutcome,
     CustomerValue,
     Evidence,
@@ -176,6 +186,69 @@ class InvalidOutcomeStatementError(OutcomeStatementError):
 
     def __init__(self, verdict: dict[str, Any]) -> None:
         super().__init__(verdict)
+
+
+class ClaimCheckError(ValidationError):
+    """A claim check does not record the questions behind a score.
+
+    Raised when a check is empty, an answer has no question behind it, or a
+    skip carries no reason. Each message names the fix so the agent can ask
+    again instead of writing the score anyway.
+    """
+
+
+def require_claim_check(check: ClaimCheck | dict[str, Any] | None) -> ClaimCheck | None:
+    """Validate a claim check, or pass ``None`` through unchanged.
+
+    ``None`` is legal: an outcome may be captured unscored or without a
+    recorded interrogation. A check that *is* supplied must be honest — it
+    names at least one question, every answer rests on a question that was
+    asked, and every skip carries a reason. A malformed check is reported as a
+    :class:`ClaimCheckError` naming the fix, not as a raw model error.
+    """
+    if check is None:
+        return None
+    if not isinstance(check, ClaimCheck):
+        try:
+            check = ClaimCheck.model_validate(check)
+        except PydanticValidationError as exc:
+            raise ClaimCheckError(
+                "claim_check is malformed; pass asked/answers/skips with each skip "
+                f"carrying a reason. {exc}"
+            ) from exc
+    if not check.asked and not check.answers and not check.skips:
+        raise ClaimCheckError(
+            "A claim check must record at least one question; ask the customer before scoring."
+        )
+    if len(check.answers) > len(check.asked):
+        raise ClaimCheckError(
+            "Every answer must answer a question that was asked; "
+            "do not invent answers to satisfy the check."
+        )
+    for answer in check.answers:
+        if not answer.strip():
+            raise ClaimCheckError("An answer cannot be blank.")
+    for skip in check.skips:
+        if not skip.reason.strip():
+            raise ClaimCheckError(
+                f"A skip needs a reason: the question {skip.question!r} was skipped with none."
+            )
+    return check
+
+
+def manual_claim_check(
+    reason: str = "Score entered by hand; no customer questions were asked.",
+) -> ClaimCheck:
+    """The provenance of a by-hand score: a skip with its reason.
+
+    A person typing two numbers into a form is not an interview. Recording
+    that honestly keeps a manual score from borrowing the confidence of an
+    interrogated one: nothing was ``asked``, the verification is skipped, and
+    the reason says why.
+    """
+    return ClaimCheck(
+        skips=[ClaimSkip(question="Was this score produced by asking the customer?", reason=reason)]
+    )
 
 
 def _first_line(text: str) -> str:
@@ -445,24 +518,31 @@ class ODIService:
         self,
         job_id: str,
         statement: str,
-        importance: float,
-        satisfaction: float,
+        importance: float | None = None,
+        satisfaction: float | None = None,
         step_id: str | None = None,
         validate_statement: bool = True,
+        claim_check: ClaimCheck | dict[str, Any] | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
         if step_id is not None and self.repo.get_step(step_id) is None:
             raise StepNotFoundError(step_id)
-        if not (1.0 <= importance <= 10.0):
+        if importance is not None and not (1.0 <= importance <= 10.0):
             raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
-        if not (1.0 <= satisfaction <= 10.0):
+        if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
         if validate_statement:
             verdict = evaluate_outcome_statement(statement)
             if not verdict["valid"]:
                 raise InvalidOutcomeStatementError(verdict)
-        opportunity_score = compute_opportunity_score(importance, satisfaction)
+        check = require_claim_check(claim_check)
+        #: Unscored outcomes stay legal: a score is optional, and an outcome
+        #: without one carries no opportunity_score to stand behind.
+        if importance is not None and satisfaction is not None:
+            opportunity_score: float | None = compute_opportunity_score(importance, satisfaction)
+        else:
+            opportunity_score = None
         outcome = Outcome(
             id=str(uuid.uuid4()),
             job_id=job_id,
@@ -471,6 +551,7 @@ class ODIService:
             importance=importance,
             satisfaction=satisfaction,
             opportunity_score=opportunity_score,
+            claim_check=check,
         )
         return self.repo.add_outcome(outcome)
 
@@ -690,6 +771,120 @@ class ODIService:
             )
             return outcome
         raise ValidationError(f"Unknown promotion target: {target}")
+
+    def propose_outcome_from_evidence(self, evidence_id: str) -> OutcomeProposal:
+        """Propose a desired outcome from one evidence record.
+
+        Uses the default heuristic strategy (deterministic, offline, no LLM).
+        Returns the proposal; nothing is written to the ODI store until the
+        proposal is approved.
+        """
+        strategy: ProposalStrategy = HeuristicProposalStrategy()
+        evidence = self.repo.get_evidence(evidence_id)
+        if evidence is None:
+            raise EvidenceNotFoundError(
+                evidence_id,
+                "List the stored records with list_evidence() to find a valid id.",
+            )
+        jobs = self.repo.list_jobs()
+        steps = self.repo.list_steps()
+        proposal = strategy.propose(evidence, jobs, steps)
+        if proposal is None:
+            raise ValidationError(
+                f"No candidate outcome could be extracted from evidence {evidence_id}. "
+                "The record does not contain a recognizable customer problem."
+            )
+        # Persist the proposal so it can be approved/rejected later.
+        return self.repo.add_proposal(proposal)
+
+    def propose_outcomes_from_batch(self, evidence_ids: list[str]) -> list[OutcomeProposal]:
+        """Propose desired outcomes from a batch of evidence records.
+
+        Each record is proposed independently. Records that yield no candidate
+        outcome are skipped (not raised) so a batch can contain mixed content.
+        """
+        proposals: list[OutcomeProposal] = []
+        strategy: ProposalStrategy = HeuristicProposalStrategy()
+        jobs = self.repo.list_jobs()
+        steps = self.repo.list_steps()
+        for evidence_id in evidence_ids:
+            evidence = self.repo.get_evidence(evidence_id)
+            if evidence is None:
+                continue
+            proposal = strategy.propose(evidence, jobs, steps)
+            if proposal is not None:
+                proposals.append(self.repo.add_proposal(proposal))
+        return proposals
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
+        """List all proposals, optionally filtered by status."""
+        return self.repo.list_proposals(status=status)
+
+    def approve_proposal(
+        self,
+        proposal_id: str,
+        statement: str | None = None,
+        importance: float | None = None,
+        satisfaction: float | None = None,
+    ) -> Outcome:
+        """Approve a proposal and write it as an Outcome through add_outcome.
+
+        If ``statement`` is provided, the edited statement is validated before
+        writing. Importance/satisfaction defaults come from the proposal.
+        """
+        proposal = self.repo.get_proposal(proposal_id)
+        if proposal is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        if proposal.status != ProposalStatus.PROPOSED:
+            raise ValidationError(
+                f"Proposal {proposal_id} is already {proposal.status.value}; "
+                "cannot approve a non-proposed proposal."
+            )
+
+        final_statement = statement or proposal.statement
+        # Validate the (possibly edited) statement through the same path as any
+        # other outcome write.
+        verdict = evaluate_outcome_statement(final_statement)
+        if not verdict["valid"]:
+            raise InvalidOutcomeStatementError(verdict)
+
+        final_importance = proposal.importance if importance is None else importance
+        final_satisfaction = proposal.satisfaction if satisfaction is None else satisfaction
+        if final_importance is None or final_satisfaction is None:
+            raise ValidationError(
+                f"Proposal {proposal_id} has no scored importance or satisfaction; "
+                "approve it with explicit importance and satisfaction values."
+            )
+
+        if proposal.job_id is None:
+            raise ValidationError(f"Proposal {proposal_id} has no routed job; cannot approve.")
+
+        outcome = self.add_outcome(
+            proposal.job_id,
+            final_statement,
+            importance=final_importance,
+            satisfaction=final_satisfaction,
+            step_id=proposal.step_id,
+        )
+        # Mark the proposal as approved (or edited if statement changed).
+        new_status = ProposalStatus.EDITED if statement is not None else ProposalStatus.APPROVED
+        self.repo.update_proposal(proposal_id, {"status": new_status, "outcome_id": outcome.id})
+        return outcome
+
+    def reject_proposal(self, proposal_id: str) -> OutcomeProposal:
+        """Reject a proposal. Nothing is written to the ODI store."""
+        proposal = self.repo.get_proposal(proposal_id)
+        if proposal is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        if proposal.status != ProposalStatus.PROPOSED:
+            raise ValidationError(
+                f"Proposal {proposal_id} is already {proposal.status.value}; "
+                "cannot reject a non-proposed proposal."
+            )
+        rejected = self.repo.update_proposal(proposal_id, {"status": ProposalStatus.REJECTED})
+        if rejected is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        return rejected
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:
         return compute_opportunity_score(importance, satisfaction)

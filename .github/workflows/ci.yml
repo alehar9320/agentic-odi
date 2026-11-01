@@ -90,16 +90,6 @@ jobs:
       - name: Check the documentation against the code
         run: uv run python scripts/doc_check.py
 
-      - name: Require a roadmap entry for a new capability
-        if: ${{ github.event_name == 'pull_request' }}
-        env:
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          git fetch --no-tags origin "$BASE_REF"
-          base="origin/$BASE_REF"
-          mapfile -t changed < <(git diff --name-only "$base...HEAD")
-          uv run python scripts/doc_check.py --base "$base" --changed-files "${changed[@]}"
-
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 10

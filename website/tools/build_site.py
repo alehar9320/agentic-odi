@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import build_sample
 import extract
 import markdown_render
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -29,6 +30,10 @@ TEMPLATES = SITE / "templates"
 CONTENT = SITE / "content"
 ASSETS = SITE / "assets"
 OUT_DIR = SITE / "dist"
+# The committed sample page. It is rendered from its fixture by build_sample.py
+# and served at /sample/ so the landing page's primary call to action points at
+# a page that keeps working when the API is down.
+SAMPLE_OUTPUT = "sample/index.html"
 
 PAGES_URL = "https://alehar9320.github.io/agentic-odi/"
 
@@ -279,6 +284,7 @@ def _render_docs(env: Environment, nav: dict[str, Any], context: dict[str, Any])
             # The guide's own top-level heading is its title.
             page_context["page"]["title"] = own_title
         page_context["page"]["body"] = body
+        page_context["page"]["has_diagram"] = 'class="mermaid"' in body
         page_context["page"]["toc"] = toc
         page_context["prefix"] = "../../"
         rendered[output] = env.get_template("doc.html").render(**page_context)
@@ -363,6 +369,11 @@ def _render_pages(env: Environment) -> dict[str, str]:
 
     rendered["docs/index.html"] = _render_docs_index(env, nav, context)
     rendered.update(_render_docs(env, nav, context))
+
+    # The sample workspace is generated from its own fixture, not from the
+    # docs pipeline. Re-render it here so the site always serves a page that
+    # agrees with website/content/sample-study.json.
+    rendered[SAMPLE_OUTPUT] = build_sample.render()
 
     not_found = env.get_template("404.html").render(**context)
     rendered["404.html"] = not_found

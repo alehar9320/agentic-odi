@@ -75,6 +75,10 @@ async def test_evaluate_outcome_includes_existing_job_outcomes():
                 "statement": "Minimize the time to first value when releasing",
                 "importance": 8,
                 "satisfaction": 4,
+                "claim_check": {
+                    "asked": ["How long until first value?"],
+                    "answers": ["About a day"],
+                },
             },
         )
 

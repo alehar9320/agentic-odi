@@ -264,6 +264,7 @@ class IntentStore:
         *,
         workspace_id: str | None = None,
         after_server_seq: int = 0,
+        after_id: int = 0,
         unsynced_only: bool = False,
         replay_order: bool = False,
     ) -> list[Event]:
@@ -272,6 +273,11 @@ class IntentStore:
         if workspace_id is not None:
             clauses.append("workspace_id = ?")
             params.append(workspace_id)
+        if after_id:
+            # The rowid is the append order, so this is a covering range scan
+            # from the last event already applied rather than a full replay.
+            clauses.append("id > ?")
+            params.append(after_id)
         if after_server_seq:
             clauses.append("server_seq IS NOT NULL AND server_seq > ?")
             params.append(after_server_seq)
