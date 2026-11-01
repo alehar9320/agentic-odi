@@ -236,9 +236,13 @@ nothing on screen can claim otherwise before the person has asked for something.
 On the CLI, the same condition is `BackendError("could not reach MCP server …")`,
 rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
 agentic_odi_mcp_server)…`. When the Studio is reached through the free
-Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
-`{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
-…"}}` with `X-Request-ID` echoed for support.
+Cloudflare Worker proxy, a missing or unreachable `SIDECAR_URL` is reported to
+the browser as `{"error": {"code": "sidecar_unavailable", "suggestion": "Set
+SIDECAR_URL and redeploy."}}` with `X-Request-ID` echoed for support. That code
+says "there is no sidecar here", not "the studio refused", so the browser serves
+the request from its own store instead of showing a failure — and a structured
+`mcp_unreachable`, which only a live sidecar can send, is still reported as the
+real problem it is.
 
 ### What the canvas is made of
 

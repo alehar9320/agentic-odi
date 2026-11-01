@@ -662,6 +662,90 @@ describe("StudioContext first run in a browser with no server", () => {
   });
 });
 
+describe("StudioContext on the hosted studio, whose Worker has no sidecar", () => {
+  /**
+   * What `GET https://agentic-odi.alehar.workers.dev/api/canvas` answers with
+   * when `SIDECAR_URL` is unset — 502 carrying a structured error, captured
+   * 2026-11-01 at a code the Worker renames in this change. The shape is the
+   * trap: a structured body is how the studio says "I heard you and refused", so
+   * a visitor's own data and their first reply stayed behind a failure panel
+   * until the code itself said nobody is there.
+   */
+  function workerAnswer(): Response {
+    return new Response(
+      JSON.stringify({
+        error: {
+          code: "sidecar_unavailable",
+          message: "The studio sidecar isn't configured.",
+          suggestion: "Set SIDECAR_URL and redeploy.",
+          retryable: false,
+          request_id: null,
+        },
+      }),
+      { status: 502, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        // The Worker answers its own capabilities locally, which is how the
+        // browser knows the studio can run without a server.
+        if (url.includes("/api/capabilities")) {
+          return json({ capabilities: [] });
+        }
+        return workerAnswer();
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("paints the visitor's own board instead of a failed canvas", async () => {
+    const { getStudioBff } = await import("../bff/index");
+    const bff = await getStudioBff();
+    await bff.data.createJob({ name: "Get a service from commit to production" });
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+    expect(result.current.canvasState.kind).toBe("ready");
+    expect((result.current.canvas?.jobs ?? []).map((job) => job.name)).toContain(
+      "Get a service from commit to production",
+    );
+    expect(result.current.canvas?.source).toBe("local");
+  });
+
+  it("carries the first turn from the browser, not from a refusal", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.sendMessage("what should I work on first?");
+    });
+
+    const last = result.current.messages.at(-1);
+    expect(last?.role).toBe("assistant");
+    expect(last?.error).toBeUndefined();
+    expect(last?.content.trim().length).toBeGreaterThan(0);
+    expect(result.current.offlineReplyFor).toBe(last?.id);
+  });
+
+  it("reads a Worker with no sidecar as an absent server, never a broken one", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    // Nothing has been proved about a server that was never there, so the
+    // banner bridge still has no outage to raise.
+    expect(result.current.sidecarReachable).toBeNull();
+  });
+});
+
 describe("StudioContext on a desktop install whose model is down", () => {
   beforeEach(() => {
     llmUnhealthy = true;
