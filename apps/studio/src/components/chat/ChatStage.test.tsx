@@ -239,4 +239,20 @@ describe("ChatStage", () => {
     expect(screen.getByRole("textbox")).toBeInTheDocument();
     expect(errorLog).not.toHaveBeenCalled();
   });
+
+  it("docks the records lens when the palette runs /records", () => {
+    harness.state.openPanel.mockClear();
+
+    render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "/records" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(harness.state.openPanel).toHaveBeenCalledWith("records");
+  });
 });
