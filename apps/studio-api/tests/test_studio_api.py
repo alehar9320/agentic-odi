@@ -21,11 +21,17 @@ OFFLINE = {
 
 
 def _client() -> TestClient:
-    return TestClient(create_app(InMemoryRepository()))
+    app = create_app(InMemoryRepository())
+    client = TestClient(app)
+    client.headers.update({"Authorization": f"Bearer {app.state.studio_token}"})
+    return client
 
 
 def _mcp_client() -> TestClient:
-    return TestClient(create_app(InMemoryRepository(), backend="mcp"))
+    app = create_app(InMemoryRepository(), backend="mcp")
+    client = TestClient(app)
+    client.headers.update({"Authorization": f"Bearer {app.state.studio_token}"})
+    return client
 
 
 def _closed_port() -> int:
