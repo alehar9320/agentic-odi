@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { LOCAL_BOARD_NOTE } from "../../lib/canvasProvenance";
 import { HELP_TEXT, type StudioCommand } from "../../lib/commands";
 import {
   QUESTION_COUNT,
@@ -118,6 +119,7 @@ export function SetupConversation() {
   const {
     brief,
     canvas,
+    boardStoredLocally,
     saveBrief,
     createJob,
     updateJob,
@@ -370,7 +372,9 @@ export function SetupConversation() {
       "success",
       editing
         ? "Context updated — I will use it from here."
-        : "Context saved. Every reply now starts from your job.",
+        : boardStoredLocally
+          ? `Context saved. ${LOCAL_BOARD_NOTE} Every reply now starts from your job.`
+          : "Context saved. Every reply now starts from your job.",
     );
   }
 

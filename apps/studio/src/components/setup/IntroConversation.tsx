@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { LOCAL_BOARD_NOTE } from "../../lib/canvasProvenance";
 import { HELP_TEXT, type StudioCommand } from "../../lib/commands";
 import {
   INTRO_TURNS,
@@ -176,6 +177,7 @@ export function IntroConversation() {
   const {
     brief,
     canvas,
+    boardStoredLocally,
     saveBrief,
     createJob,
     updateJob,
@@ -403,7 +405,9 @@ export function IntroConversation() {
       "success",
       editing
         ? "Context updated — I will use it from here."
-        : "Context saved. Every reply now starts from what you told me.",
+        : boardStoredLocally
+          ? `Context saved. ${LOCAL_BOARD_NOTE} Every reply now starts from what you told me.`
+          : "Context saved. Every reply now starts from what you told me.",
     );
   }
 
