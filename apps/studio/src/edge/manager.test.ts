@@ -1,0 +1,498 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import "fake-indexeddb/auto";
+
+import type { RawSseEvent } from "../api/sse";
+import type { ChatStreamRequest, StudioConfig } from "../types";
+import { EDGE_TIERS, computeEligibility, tierById } from "./ladder";
+import type { SchedulerEnvironment } from "./scheduler";
+import { EdgeStateStore } from "./storage";
+import { EdgeManager, hasModelEndpoint, shouldUseEdge } from "./manager";
+import { FakeEdgeEngine } from "../test/edgeFake";
+import { installFakeBroadcastChannel } from "../test/fakeBroadcastChannel";
+import type { Eligibility } from "./types";
+
+const healthyDesktop: Eligibility = computeEligibility({
+  webgpu: true,
+  shaderF16: true,
+  vramGB: null,
+  deviceMemoryGB: 16,
+  freeStorageBytes: 40_000_000_000,
+  saveData: false,
+});
+
+const noWebGPU: Eligibility = computeEligibility({
+  webgpu: false,
+  shaderF16: false,
+  vramGB: null,
+  deviceMemoryGB: 16,
+  freeStorageBytes: 40_000_000_000,
+  saveData: false,
+});
+
+const midDevice: Eligibility = computeEligibility({
+  webgpu: true,
+  shaderF16: true,
+  vramGB: null,
+  deviceMemoryGB: 4,
+  freeStorageBytes: 40_000_000_000,
+  saveData: false,
+});
+
+function idleQueue(): { env: SchedulerEnvironment; queue: Array<() => void> } {
+  const queue: Array<() => void> = [];
+  return {
+    queue,
+    env: {
+      requestIdle(callback) {
+        queue.push(callback);
+        return () => {
+          const index = queue.indexOf(callback);
+          if (index >= 0) {
+            queue.splice(index, 1);
+          }
+        };
+      },
+      visible: () => true,
+      saveData: () => false,
+    },
+  };
+}
+
+const noEndpoint: StudioConfig = {
+  base_url: "http://localhost:8001/v1",
+  api_key: "",
+  model_name: "",
+  mcp_url: "http://localhost:9000/mcp",
+};
+
+const baseRequest: ChatStreamRequest = {
+  base_url: "",
+  api_key: "",
+  model: "",
+  mcp_url: "",
+  messages: [{ id: "m-0", parentId: null, role: "user", content: "hi" }],
+  brief: null,
+};
+
+function decision(overrides: Partial<Parameters<typeof shouldUseEdge>[0]> = {}) {
+  return shouldUseEdge({
+    flagEnabled: true,
+    endpointConfigured: false,
+    llmHealthy: false,
+    consent: "granted",
+    servedTier: "t1",
+    ...overrides,
+  });
+}
+
+describe("shouldUseEdge", () => {
+  it("serves on the edge only for a keyless, unhealthy, consented device with a cached tier", () => {
+    expect(decision()).toBe(true);
+  });
+
+  it("every gate that fails turns the edge off", () => {
+    expect(decision({ flagEnabled: false })).toBe(false);
+    expect(decision({ endpointConfigured: true })).toBe(false);
+    expect(decision({ llmHealthy: true })).toBe(false);
+    expect(decision({ consent: "unset" })).toBe(false);
+    expect(decision({ consent: "denied" })).toBe(false);
+    expect(decision({ servedTier: null })).toBe(false);
+  });
+});
+
+describe("hasModelEndpoint", () => {
+  it("is the studio's one endpoint rule, so the browser tier defers to it", () => {
+    expect(hasModelEndpoint(noEndpoint)).toBe(false);
+    expect(hasModelEndpoint({ ...noEndpoint, api_key: "sk", model_name: "gpt" })).toBe(false);
+    expect(
+      hasModelEndpoint({
+        ...noEndpoint,
+        base_url: "https://api.openai.com/v1",
+        api_key: "sk",
+        model_name: "gpt",
+      }),
+    ).toBe(true);
+    // A keyless server on the person's own network is a model that is already
+    // answering; the tab should not fetch a gigabyte to compete with it.
+    expect(
+      hasModelEndpoint({
+        ...noEndpoint,
+        base_url: "http://192.168.1.20:11434/v1",
+        model_name: "llama3",
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("EdgeManager", () => {
+  async function prime(options: {
+    consent?: "unset" | "granted" | "denied";
+    cachedTiers?: string[];
+  }) {
+    const store = await EdgeStateStore.open();
+    await store.reset();
+    if (options.consent) {
+      await store.setConsent(options.consent);
+    }
+    for (const id of options.cachedTiers ?? []) {
+      await store.setTierState(id as "t1" | "t2" | "t3", {
+        status: "cached",
+        cachedAt: "2026-01-01T00:00:00.000Z",
+      });
+    }
+    store.close();
+  }
+
+  let manager: EdgeManager;
+  let engine: FakeEdgeEngine;
+
+  beforeEach(async () => {
+    window.localStorage.clear();
+    manager = new EdgeManager();
+    manager.reset();
+    engine = new FakeEdgeEngine();
+    manager.setEngineFactory(async () => engine);
+    await prime({ consent: "granted", cachedTiers: ["t1"] });
+  });
+
+  it("prefers the strongest cached tier", async () => {
+    await prime({ consent: "granted", cachedTiers: ["t1", "t3"] });
+    expect(await manager.servedTier()).toBe("t3");
+    await prime({ consent: "granted", cachedTiers: ["t1", "t2"] });
+    expect(await manager.servedTier()).toBe("t2");
+  });
+
+  it("reports it cannot serve before consent, or with nothing cached", async () => {
+    await manager.sync();
+    expect(manager.canServe(noEndpoint, false)).toBe(true);
+    await prime({ consent: "denied", cachedTiers: ["t1"] });
+    await manager.sync();
+    expect(manager.canServe(noEndpoint, false)).toBe(false);
+    await prime({ consent: "granted", cachedTiers: [] });
+    await manager.sync();
+    expect(manager.canServe(noEndpoint, false)).toBe(false);
+    expect(manager.canServe(noEndpoint, true)).toBe(false);
+  });
+
+  it("decides a turn from what this tab already knows, never from a storage read", async () => {
+    // Deliberate: a message a person typed is not made to wait on a disk to learn
+    // who is answering it. The cost is that a change made elsewhere shows up on
+    // the turn after the read that noticed it, not this one.
+    await manager.sync();
+    await prime({ consent: "denied", cachedTiers: ["t1"] });
+    expect(manager.canServe(noEndpoint, false)).toBe(true);
+    await manager.sync();
+    expect(manager.canServe(noEndpoint, false)).toBe(false);
+  });
+
+  it("loads the cached model once, streams frames, and records the answered turn", async () => {
+    const events: RawSseEvent[] = [];
+    await manager.stream(baseRequest, (event) => events.push(event));
+    await manager.stream(baseRequest, (event) => events.push(event));
+
+    expect(engine.loads).toEqual([tierById("t1").modelId]);
+    expect(events.filter((event) => event.event === "message")).toHaveLength(2);
+    expect(events.map((event) => event.event)).toContain("delta");
+
+    const store = await EdgeStateStore.open();
+    expect((await store.getUsage()).edgeTurns).toBe(2);
+    expect((await store.getTierStates()).t1.status).toBe("active");
+    store.close();
+  });
+
+  it("does not credit a turn that failed mid-stream", async () => {
+    manager.setEngineFactory(async () => new FakeEdgeEngine({ failWith: new Error("device lost") }));
+    const events: RawSseEvent[] = [];
+    await manager.stream(baseRequest, (event) => events.push(event));
+
+    expect(events.map((event) => event.event)).toEqual(["status", "error"]);
+    const store = await EdgeStateStore.open();
+    expect((await store.getUsage()).edgeTurns).toBe(0);
+    store.close();
+  });
+
+  it("refuses to stream with nothing cached, rather than downloading silently", async () => {
+    await prime({ consent: "granted", cachedTiers: [] });
+    await expect(manager.stream(baseRequest, () => {})).rejects.toThrow(/no cached tier/);
+  });
+
+  it("switches engines when the ladder moves the served tier up", async () => {
+    await manager.stream(baseRequest, () => {});
+    const before = engine.loads.length;
+    await prime({ consent: "granted", cachedTiers: ["t1", "t2"] });
+    await manager.stream(baseRequest, () => {});
+    expect(before).toBe(1);
+    expect(engine.loads).toEqual([
+      EDGE_TIERS[0].modelId,
+      EDGE_TIERS[1].modelId,
+    ]);
+  });
+
+  it("ten served turns earn the next tier: it prefetches in background, then answers on it", async () => {
+    const { env, queue } = idleQueue();
+    manager.setSchedulerEnvironment(env);
+    manager.setEligibilityFactory(async () => healthyDesktop);
+    const notices: string[] = [];
+    const listen = manager.addNoticeListener((notice) =>
+      notices.push("tier" in notice ? `${notice.kind}:${notice.tier}` : notice.kind),
+    );
+
+    for (let turn = 0; turn < 10; turn += 1) {
+      await manager.stream(baseRequest, () => {});
+    }
+    // Nine turns earned nothing; the tenth queues a prefetch but nothing is
+    // fetched until the device is idle.
+    await vi.waitFor(() => expect(queue).toHaveLength(1));
+    expect(engine.loads).toEqual([EDGE_TIERS[0].modelId]);
+    queue.shift()?.();
+    await vi.waitFor(() => expect(notices).toContain("unlocked:t2"));
+
+    const store = await EdgeStateStore.open();
+    expect((await store.getTierStates()).t2.status).toBe("active");
+    store.close();
+
+    await manager.stream(baseRequest, () => {});
+    expect(engine.loads).toEqual([EDGE_TIERS[0].modelId, EDGE_TIERS[1].modelId]);
+    listen();
+  });
+
+  describe("the Settings snapshot", () => {
+    it("says which tier is answering, which is only on disk, and why one is out of reach", async () => {
+      manager.setEligibilityFactory(async () => midDevice);
+      await prime({ consent: "granted", cachedTiers: ["t1", "t2"] });
+
+      const panel = await manager.panelState();
+
+      expect(panel.flagEnabled).toBe(true);
+      expect(panel.consent).toBe("granted");
+      expect(panel.downloadable).toBe(true);
+      expect(panel.tiers.map((tier) => [tier.id, tier.status, tier.eligible])).toEqual([
+        ["t1", "cached", true],
+        ["t2", "active", true],
+        ["t3", "empty", false],
+      ]);
+      expect(panel.tiers[2].reason).toMatch(/8 GB-class device/);
+      expect(panel.tiers[0].label).toBe(EDGE_TIERS[0].label);
+    });
+
+    it("counts what the next tier still wants", async () => {
+      const before = await manager.panelState();
+      expect(before.usage).toEqual({
+        edgeTurns: 0,
+        streamedSeconds: 0,
+        turnsToNext: 10,
+        secondsToNext: 900,
+      });
+
+      await manager.stream(baseRequest, () => {});
+
+      expect((await manager.panelState()).usage.edgeTurns).toBe(1);
+    });
+
+    it("offers nothing when this browser can host no tier", async () => {
+      manager.setEligibilityFactory(async () => noWebGPU);
+
+      const panel = await manager.panelState();
+
+      expect(panel.downloadable).toBe(false);
+      expect(panel.tiers.every((tier) => !tier.eligible)).toBe(true);
+      expect(panel.tiers[0].reason).toMatch(/doesn't support GPU-accelerated models/);
+    });
+  });
+
+  describe("freeing a tier", () => {
+    it("evicts its weights, forgets it, and tells the page", async () => {
+      await prime({ consent: "granted", cachedTiers: ["t1", "t2"] });
+      const freed: string[] = [];
+      const listen = manager.addNoticeListener((notice) => {
+        if (notice.kind === "tier-freed") {
+          freed.push(notice.tier);
+        }
+      });
+
+      await manager.freeTier("t2");
+      listen();
+
+      expect(engine.evictions).toEqual([tierById("t2").modelId]);
+      expect(freed).toEqual(["t2"]);
+      const store = await EdgeStateStore.open();
+      const states = await store.getTierStates();
+      expect(states.t2.status).toBe("empty");
+      expect(states.t1.status).toBe("cached");
+      store.close();
+      expect(await manager.servedTier()).toBe("t1");
+    });
+
+    it("does not touch the engine for a tier that was never fetched", async () => {
+      await manager.freeTier("t3");
+
+      expect(engine.evictions).toEqual([]);
+      expect(engine.loads).toEqual([]);
+    });
+
+    it("lets a refetched tier load again after this tab freed the one it was running", async () => {
+      await manager.stream(baseRequest, () => {});
+      await manager.freeTier("t1");
+      await prime({ consent: "granted", cachedTiers: ["t1"] });
+
+      await manager.stream(baseRequest, () => {});
+
+      expect(engine.loads).toEqual([tierById("t1").modelId, tierById("t1").modelId]);
+    });
+  });
+
+  describe("the one-time offer", () => {
+    beforeEach(async () => {
+      await prime({ consent: "unset", cachedTiers: [] });
+      manager.setEligibilityFactory(async () => healthyDesktop);
+    });
+
+    it("names the entry tier and its size when a keyless device has never been asked", async () => {
+      const offer = await manager.offerFor(noEndpoint, false);
+      expect(offer).not.toBeNull();
+      expect(offer?.tier).toBe("t1");
+      expect(offer?.approxBytes).toBe(EDGE_TIERS[0].approxBytes);
+      expect(offer?.label).toBe(EDGE_TIERS[0].label);
+    });
+
+    it("stays quiet when the browser cannot host a model at all", async () => {
+      manager.setEligibilityFactory(async () => noWebGPU);
+      expect(await manager.offerFor(noEndpoint, false)).toBeNull();
+    });
+
+    it("stays quiet when a paid endpoint answers, or a tier is already cached", async () => {
+      expect(await manager.offerFor(noEndpoint, true)).toBeNull();
+      expect(
+        await manager.offerFor({ ...noEndpoint, base_url: "https://api.openai.com/v1", api_key: "sk", model_name: "gpt" }, false),
+      ).toBeNull();
+      await prime({ consent: "unset", cachedTiers: ["t1"] });
+      expect(await manager.offerFor(noEndpoint, false)).toBeNull();
+    });
+
+    it("asks once: an answer either way retires the offer", async () => {
+      await manager.decline();
+      expect(await manager.offerFor(noEndpoint, false)).toBeNull();
+      await prime({ consent: "granted", cachedTiers: [] });
+      expect(await manager.offerFor(noEndpoint, false)).toBeNull();
+    });
+  });
+
+  describe("grantAndStart", () => {
+    beforeEach(async () => {
+      await prime({ consent: "unset", cachedTiers: [] });
+      manager.setEligibilityFactory(async () => healthyDesktop);
+    });
+
+    it("consents, fetches the entry tier in a quiet moment, and is then ready to serve", async () => {
+      const { env, queue } = idleQueue();
+      manager.setSchedulerEnvironment(env);
+      const notices: string[] = [];
+      const listen = manager.addNoticeListener((notice) =>
+        notices.push("tier" in notice ? `${notice.kind}:${notice.tier}` : notice.kind),
+      );
+
+      const started = manager.grantAndStart();
+      await vi.waitFor(() => expect(queue).toHaveLength(1));
+      expect(engine.loads).toEqual([]);
+      queue.shift()?.();
+      expect(await started).toBe("t1");
+
+      expect(notices).toContain("consent-changed");
+      expect(notices).toContain("downloading:t1");
+      expect(notices).toContain("ready:t1");
+      expect(engine.loads).toEqual([EDGE_TIERS[0].modelId]);
+      expect(await manager.servedTier()).toBe("t1");
+      // Saying yes reaches the routing decision on its own: the notice the ladder
+      // emits refreshes what the next turn reads, with nobody calling sync().
+      await vi.waitFor(() => expect(manager.canServe(noEndpoint, false)).toBe(true));
+
+      const store = await EdgeStateStore.open();
+      expect(await store.getConsent()).toBe("granted");
+      expect((await store.getTierStates()).t1.status).toBe("active");
+      store.close();
+      listen();
+    });
+
+    it("records a refusal so nothing is downloaded and nothing is asked again", async () => {
+      await prime({ consent: "granted", cachedTiers: ["t1"] });
+      await manager.sync();
+      expect(manager.canServe(noEndpoint, false)).toBe(true);
+      await manager.decline();
+      const store = await EdgeStateStore.open();
+      expect(await store.getConsent()).toBe("denied");
+      store.close();
+      expect(engine.loads).toEqual([]);
+      // The refusal reaches the routing decision the same way the yes does — the
+      // turn after the read that noticed it, not one still standing in the queue.
+      await vi.waitFor(() => expect(manager.canServe(noEndpoint, false)).toBe(false));
+    });
+  });
+
+  describe("when a second tab moves the ladder", () => {
+    let uninstall: () => void;
+    let other: EdgeManager;
+
+    beforeEach(async () => {
+      uninstall = installFakeBroadcastChannel();
+      await prime({ consent: "unset", cachedTiers: [] });
+      manager.setEligibilityFactory(async () => healthyDesktop);
+      other = new EdgeManager();
+      other.setEngineFactory(async () => engine);
+      other.setEligibilityFactory(async () => healthyDesktop);
+    });
+
+    afterEach(() => {
+      other.reset();
+      uninstall();
+    });
+
+    it("passes on the news worth re-reading for, and stays quiet about a progress tick", async () => {
+      const { env, queue } = idleQueue();
+      other.setSchedulerEnvironment(env);
+      const heard: string[] = [];
+      const listen = manager.addNoticeListener((notice) => heard.push(notice.kind));
+
+      const started = other.grantAndStart();
+      await vi.waitFor(() => expect(queue).toHaveLength(1));
+      queue.shift()?.();
+      await started;
+
+      // Consent given, then the tier that landed: two facts this tab's banner,
+      // Settings and routing decision all need. Every percent of the download is
+      // not one — a tab must not be woken dozens of times for a number that only
+      // the fetcher's own strip renders.
+      expect(heard).toEqual(["changed", "changed"]);
+      listen();
+    });
+
+    it("does not bounce the news back and forth between the tabs", async () => {
+      const here: string[] = [];
+      const there: string[] = [];
+      const a = manager.addNoticeListener((notice) => here.push(notice.kind));
+      const b = other.addNoticeListener((notice) => there.push(notice.kind));
+
+      await manager.decline();
+
+      expect(here).toEqual(["consent-changed"]);
+      expect(there).toEqual(["changed"]);
+      a();
+      b();
+    });
+
+    it("tells a tab that only ever listened, and stops once it lets go", async () => {
+      // The point of the whole bus: this tab opened the page, asked nothing, and
+      // still knows the moment the other one says yes.
+      const heard: string[] = [];
+      const listen = manager.addNoticeListener((notice) => heard.push(notice.kind));
+      await other.decline();
+      await vi.waitFor(() => expect(heard).toEqual(["changed"]));
+
+      manager.reset();
+      await other.decline();
+
+      expect(heard).toEqual(["changed"]);
+      listen();
+    });
+  });
+});

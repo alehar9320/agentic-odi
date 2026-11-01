@@ -22,11 +22,21 @@ REQUIRED_HEADERS = {
 
 REQUIRED_CSP_DIRECTIVES = {
     "default-src 'self'",
-    "script-src 'self'",
+    # 'wasm-unsafe-eval' lets the edge model engine compile WebGPU shader
+    # modules; script-src stays locked to 'self' otherwise.
+    "script-src 'self' 'wasm-unsafe-eval'",
     "connect-src 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
+}
+
+# The edge model engine's wasm and quantized-weight fetches must survive the
+# hosted CSP, so their origins are curated in the Worker.
+REQUIRED_EDGE_MODEL_ORIGINS = {
+    "https://huggingface.co",
+    "https://raw.githubusercontent.com",
+    "https://cdn.jsdelivr.net",
 }
 
 
@@ -52,6 +62,12 @@ def test_the_content_security_policy_covers_the_studio() -> None:
     source = _source()
     for directive in REQUIRED_CSP_DIRECTIVES:
         assert directive in source, f"{directive} is missing from the CSP"
+
+
+def test_the_csp_lets_the_edge_model_fetch_its_weights() -> None:
+    source = _source()
+    for origin in REQUIRED_EDGE_MODEL_ORIGINS:
+        assert origin in source, f"{origin} is missing from connect-src"
 
 
 def test_every_response_path_applies_the_headers() -> None:

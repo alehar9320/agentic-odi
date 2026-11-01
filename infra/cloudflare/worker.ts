@@ -101,20 +101,28 @@ const DEFAULT_LLM_ORIGINS = [
   "http://127.0.0.1:*",
 ];
 
+/** Origins the edge model engine fetches from: wasm modules and quantized
+ * model weights (see apps/studio/src/edge/). */
+const EDGE_MODEL_ORIGINS = [
+  "https://huggingface.co",
+  "https://raw.githubusercontent.com",
+  "https://cdn.jsdelivr.net",
+];
+
 function buildConnectSrc(env: Env): string {
   const configured = env.LLM_ORIGINS
     ? String(env.LLM_ORIGINS)
         .split(/[,;\s]+/)
         .filter(Boolean)
     : [];
-  return [...DEFAULT_LLM_ORIGINS, ...configured].join(" ");
+  return [...DEFAULT_LLM_ORIGINS, ...EDGE_MODEL_ORIGINS, ...configured].join(" ");
 }
 
 function securityHeaders(env: Env): Record<string, string> {
   return {
     "Content-Security-Policy": [
       "default-src 'self'",
-      "script-src 'self'",
+      "script-src 'self' 'wasm-unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       `connect-src 'self' ${buildConnectSrc(env)}`.replace(/\s+/g, " ").trim(),
       "img-src 'self' data: blob:",

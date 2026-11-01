@@ -14,6 +14,7 @@ import { useStudio } from "../state/StudioContext";
 import type { ConnectionReport } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
+import { EdgeModelSection } from "./EdgeModelSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ModelSection } from "./settings/sections/ModelSection";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
@@ -384,6 +385,8 @@ export function SettingsPanel() {
             </>
           )}
       </ConnectionsSection>
+
+      <EdgeModelSection />
 
       <div className="settings__actions">
         <button

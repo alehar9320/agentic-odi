@@ -10,6 +10,13 @@ vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 
+// The browser-model section fills itself in after a storage read, which would
+// put an async update outside every assertion in this file. It has its own
+// suite, and the axe sweep renders it inside this panel. It is mocked with a
+// marker rather than `null` so one case below can prove this panel still hosts
+// it — a section refactor that drops it should fail loudly, not quietly.
+vi.mock("./EdgeModelSection", () => ({ EdgeModelSection: () => "edge-model-section" }));
+
 import { useStudio } from "../state/StudioContext";
 import type { StudioContextValue } from "../state/StudioContext";
 
@@ -283,6 +290,19 @@ describe("SettingsPanel capabilities", () => {
     const llmRow = screen.getByText(/sidecar model proxy/i).closest("li");
     expect(llmRow).toBeInTheDocument();
     expect(llmRow).toHaveTextContent(/unavailable/);
+  });
+});
+
+describe("SettingsPanel browser-model section", () => {
+  it("is mounted in the panel that replaced the flat connection list", () => {
+    // Merging main moved Settings into `settings/sections/*`. This is the
+    // cheap pin that says the browser-model controls came out of that move
+    // still reachable, rather than silently dropped on the cutting room floor.
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    expect(screen.getByText("edge-model-section")).toBeInTheDocument();
   });
 });
 

@@ -41,9 +41,19 @@ import { Markdown } from "./Markdown";
 import { StallNotice } from "./StallNotice";
 
 const PHASE_LABEL: Record<string, string> = {
+  edge: "Thinking in this browser",
   health_check: "Waking the model",
   mcp_tools: "Opening your studio tools",
   model: "Thinking",
+};
+
+/**
+ * Which brain answered, in the words a person meets elsewhere in the studio:
+ * "no model connected" is the dead end, "in this browser" is the free one.
+ */
+const PROVENANCE_TAG: Record<"offline" | "edge", string> = {
+  edge: "Answered in this browser",
+  offline: "Local draft, no model connected",
 };
 
 function phaseLabel(phase: string | null): string {
@@ -53,9 +63,26 @@ function phaseLabel(phase: string | null): string {
   return PHASE_LABEL[phase] ?? "Thinking";
 }
 
+/** One brain per reply, and the answer that was earned locally is the one that
+ *  gets said — a browser reply is never also the "no model connected" draft. */
+function provenanceTagFor(
+  id: string,
+  edgeReplyFor: string | null,
+  offlineReplyFor: string | null,
+): string | null {
+  if (edgeReplyFor === id) {
+    return PROVENANCE_TAG.edge;
+  }
+  if (offlineReplyFor === id) {
+    return PROVENANCE_TAG.offline;
+  }
+  return null;
+}
+
 function AssistantMessage() {
-  const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
+  const { edgeReplyFor, offlineReplyFor, thinkingPhase, sendMessage, openPanel } = useStudio();
   const id = useAuiState((state) => state.message.id);
+  const provenance = provenanceTagFor(id, edgeReplyFor, offlineReplyFor);
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
   const hasText = useAuiState((state) =>
@@ -76,13 +103,13 @@ function AssistantMessage() {
       <div className="message__body">
         {/* Named on the reply it describes, never on every reply on screen, and
             said once instead of warned about in a strip above the work. */}
-        {offlineReplyFor === id ? (
+        {provenance ? (
           <button
             type="button"
             className="message__tag"
             onClick={() => openPanel("settings")}
           >
-            Local draft, no model connected
+            {provenance}
           </button>
         ) : null}
 

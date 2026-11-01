@@ -2106,6 +2106,16 @@ input[type="range"] {
   border-top: 1px solid var(--line);
 }
 
+.settings__edge-consent {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.settings__edge-consent p {
+  margin: 0;
+}
+
 .diagnostics-about h4,
 .diagnostics-about p {
   margin: 0;

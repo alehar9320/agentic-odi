@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
+import { EdgeStateStore } from "../edge/storage";
+import { edgeManager } from "../edge/manager";
+import { FakeEdgeEngine } from "../test/edgeFake";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -975,5 +978,162 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext edge routing", () => {
+  let engine: FakeEdgeEngine;
+
+  beforeEach(async () => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    llmUnhealthy = true;
+    // The visitor these tests are about: the shipped address with nothing behind
+    // it and no key. Written before the page loads, so the sidecar's own defaults
+    // — which in this fixture do carry a key — cannot arrive and answer over the
+    // top of the browser tier.
+    localStorage.setItem(
+      "studio.settings",
+      JSON.stringify({
+        base_url: "http://localhost:8001/v1",
+        api_key: "",
+        model_name: "",
+        mcp_url: "http://localhost:9000/mcp",
+        theme: "dark",
+      }),
+    );
+    engine = new FakeEdgeEngine();
+    edgeManager.reset();
+    edgeManager.setEngineFactory(async () => engine);
+    const store = await EdgeStateStore.open();
+    await store.reset();
+    await store.setConsent("granted");
+    await store.setTierState("t1", { status: "cached", cachedAt: "2026-01-01T00:00:00.000Z" });
+    store.close();
+    // A turn is routed from what this tab has read, not from a read it is still
+    // waiting on. On a real page that read happens at mount; here it is the
+    // thing under test, so the ladder's state is read before anyone types.
+    await edgeManager.sync();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    edgeManager.reset();
+    llmUnhealthy = false;
+  });
+
+  /** A page shows the person's own history before they can type, and a turn
+   * appends to it. Waiting for that load keeps a routing assertion reading the
+   * reply this turn produced instead of the one that arrived from storage. */
+  async function openStudio() {
+    const view = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(view.result.current.messages).toHaveLength(2));
+    return view;
+  }
+
+  it("answers a keyless turn in the browser without touching /api/chat", async () => {
+    const { result } = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("what should I dig into next?");
+    });
+
+    expect(chatAttempts).toBe(0);
+    expect(result.current.streaming).toBe(false);
+    const assistant = result.current.messages.filter((message) => message.role === "assistant").at(-1);
+    expect(assistant?.content).toBe("Hello from the edge.");
+
+    const store = await EdgeStateStore.open();
+    expect((await store.getUsage()).edgeTurns).toBe(1);
+    expect((await store.getTierStates()).t1.status).toBe("active");
+    store.close();
+  });
+
+  it("carries on when the sidecar itself is down", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init, true)),
+    );
+    const { result } = await openStudio();
+    // A background survey that finds no server says nothing about it; the person
+    // asking is what makes "down" a fact. Then the browser still answers.
+    await act(async () => {
+      await result.current.recheckConnections();
+    });
+    expect(result.current.sidecarReachable).toBe(false);
+
+    await act(async () => {
+      await result.current.sendMessage("still working?");
+    });
+
+    expect(chatAttempts).toBe(0);
+    expect(
+      result.current.messages.some(
+        (message) => message.role === "notice" && message.content.includes("sidecar isn't running"),
+      ),
+    ).toBe(false);
+    const assistant = result.current.messages.filter((message) => message.role === "assistant").at(-1);
+    expect(assistant?.content).toBe("Hello from the edge.");
+  });
+
+  it("goes back to /api/chat the moment the endpoint is healthy again", async () => {
+    llmUnhealthy = false;
+    const { result } = await openStudio();
+    await act(async () => {
+      await result.current.recheckConnections();
+    });
+    expect(result.current.llmHealth.healthy).toBe(true);
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    expect(chatAttempts).toBe(1);
+    const assistant = result.current.messages.filter((message) => message.role === "assistant").at(-1);
+    expect(assistant?.content).toBe("Hi");
+    // The marker tracks the brain that answered, not the feature being switched on.
+    expect(result.current.edgeReplyFor).toBeNull();
+    expect(result.current.offlineReplyFor).toBeNull();
+  });
+
+  it("names the browser as the brain, on the reply it produced", async () => {
+    const { result } = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("what should I dig into next?");
+    });
+
+    const assistant = result.current.messages
+      .filter((message) => message.role === "assistant")
+      .at(-1);
+    expect(result.current.edgeReplyFor).toBe(assistant?.id);
+    // Not a local draft: a model did produce this, just not one that cost money.
+    expect(result.current.offlineReplyFor).toBeNull();
+  });
+
+  it("leaves a denied consent decision untouched: real endpoint or nothing", async () => {
+    const store = await EdgeStateStore.open();
+    await store.setConsent("denied");
+    store.close();
+    edgeManager.reset();
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    expect(chatAttempts).toBe(1);
   });
 });
