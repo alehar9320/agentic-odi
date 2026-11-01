@@ -20,7 +20,9 @@ export type BannerDock = "top" | "corner";
 export type BannerKind =
   | "sidecar-down"
   | "model-offline"
+  | "edge-offer"
   | "edge-downloading"
+  | "edge-ready"
   | "edge-unlocked"
   | "update-available"
   | "update-ready"
@@ -36,7 +38,9 @@ export type BannerActionId =
   | "open-capture"
   | "open-jobmap"
   | "install-update"
-  | "restart";
+  | "restart"
+  | "enable-edge-model"
+  | "decline-edge-model";
 
 export interface BannerAction {
   label: string;

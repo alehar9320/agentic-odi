@@ -37,12 +37,33 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
       { label: "Set your context", action: "open-setup", tone: "ghost" },
     ],
   },
+  "edge-offer": {
+    severity: "info",
+    life: "persistent",
+    dock: "top",
+    title: "This browser can answer, free.",
+    body: "No model key needed, nothing sent to anyone else. One download, then your replies run in this tab.",
+    dismissible: false,
+    actions: [
+      { label: "Answer in this browser", action: "enable-edge-model", tone: "primary" },
+      { label: "Not now", action: "decline-edge-model", tone: "ghost" },
+    ],
+  },
   "edge-downloading": {
     severity: "info",
     life: "persistent",
     dock: "top",
     title: "Making this browser smarter, quietly.",
     body: "Downloading the next model while your device is idle. Replies keep flowing meanwhile.",
+    dismissible: true,
+  },
+  "edge-ready": {
+    severity: "success",
+    life: "transient",
+    dock: "corner",
+    title: "Your browser has a voice now.",
+    body: "Replies are running in this tab — free, and they keep getting stronger as you use Studio.",
+    durationMs: 10000,
     dismissible: true,
   },
   "edge-unlocked": {

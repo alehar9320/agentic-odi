@@ -109,15 +109,24 @@ and model name, and test the connection with **Find models**. The CLI's
 
 ### The browser tier (edge models)
 
-Conversation turns in the Studio client have a fourth option on the way that
-runs no server at all: quantized models executed on the visitor's own GPU via
-WebLLM (`apps/studio/src/edge/`). It is designed to engage only when no healthy
-paid endpoint is configured, after a one-time consent, and to climb a ladder
-(1B → 3B → 8B) as the device proves capable and the user keeps working in
-the tab. **Not yet reachable by a person:** the consent control and the first
-download have no UI, so nothing sets consent or hosts Tier 1 and every turn
-still goes the existing way. See
-`docs/superpowers/plans/2026-11-01-edge-llm-ladder-remaining-work.md`.
+Conversation turns in the Studio client have a fourth option that runs no
+server at all: a quantized model executed on the visitor's own GPU via WebLLM
+(`apps/studio/src/edge/`). It engages only when no healthy paid endpoint is
+configured. Then a strip appears above the composer — *"This browser can
+answer, free."* — naming the model and its one-time download size, with
+**Answer in this browser** and **Not now**. Yes records consent and starts the
+fetch the next time the tab is idle; the strip becomes progress, then a
+one-line celebration, and every turn after that is answered in the tab. "Not
+now" is durable: the studio never asks again, and the answer can be changed in
+Settings. Once it is answering, the browser earns its next rung — ten served
+turns, or fifteen minutes of streamed output, buys the bigger model in the
+background (1B → 3B → 8B, capped by what the device could actually host).
+
+Two honest caveats: nothing in CI has WebGPU, so the engine itself has only
+ever been driven through a fake engine, and the real-GPU path is an unchecked
+box in `docs/superpowers/plans/2026-11-01-edge-llm-ladder-remaining-work.md`.
+There is also no Settings control for the ladder yet — revoking consent or
+freeing the storage a tier occupies is not possible from the UI.
 The engine never reaches the `browser-model` capability from the
 server manifests — a server cannot see a client GPU — so the Worker and
 sidecar keep reporting it `available: false`; only the browser's capability

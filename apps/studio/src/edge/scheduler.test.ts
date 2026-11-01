@@ -264,3 +264,78 @@ describe("EdgeScheduler", () => {
     h.cleanup();
   });
 });
+
+const noWebGPU: Eligibility = computeEligibility({
+  webgpu: false,
+  shaderF16: false,
+  vramGB: null,
+  deviceMemoryGB: 16,
+  freeStorageBytes: 40_000_000_000,
+  saveData: false,
+});
+
+describe("EdgeScheduler.bootstrap — rung zero", () => {
+  it("fetches the entry tier the moment consent arrives, with nothing earned yet", async () => {
+    await prime({ consent: "granted", hosted: [] });
+    const h = harness();
+    const started = h.scheduler.bootstrap();
+    await h.fireIdle();
+
+    expect(await started).toBe("t1");
+    expect(h.engine.loads).toEqual([EDGE_TIERS[0].modelId]);
+    expect(h.unlocked).toEqual(["t1"]);
+    const store = await EdgeStateStore.open();
+    expect((await store.getTierStates()).t1.status).toBe("active");
+    store.close();
+    h.cleanup();
+  });
+
+  it("offers the smallest tier a weak device can host, not the biggest", async () => {
+    await prime({ consent: "granted", hosted: [] });
+    const h = harness({ eligibility: twoGigabyteDevice });
+    const started = h.scheduler.bootstrap();
+    await h.fireIdle();
+    expect(await started).toBe("t1");
+    h.cleanup();
+  });
+
+  it("leaves a device that already hosts a tier alone", async () => {
+    await prime({ consent: "granted", hosted: [["t2", "cached"]] });
+    const h = harness();
+    expect(await h.scheduler.bootstrap()).toBeNull();
+    expect(h.queue).toHaveLength(0);
+    expect(h.engine.loads).toEqual([]);
+    h.cleanup();
+  });
+
+  it("respects a refusal and an unanswered question alike", async () => {
+    await prime({ consent: "denied", hosted: [] });
+    const refused = harness();
+    expect(await refused.scheduler.bootstrap()).toBeNull();
+
+    await prime({ consent: "unset", hosted: [] });
+    const unanswered = harness();
+    expect(await unanswered.scheduler.bootstrap()).toBeNull();
+    expect(refused.queue).toHaveLength(0);
+    expect(unanswered.queue).toHaveLength(0);
+    refused.cleanup();
+    unanswered.cleanup();
+  });
+
+  it("does not promise a download a WebGPU-less browser cannot run", async () => {
+    await prime({ consent: "granted", hosted: [] });
+    const h = harness({ eligibility: noWebGPU });
+    expect(await h.scheduler.bootstrap()).toBeNull();
+    expect(h.queue).toHaveLength(0);
+    h.cleanup();
+  });
+
+  it("keeps the quiet-moment rules for the first tier too", async () => {
+    await prime({ consent: "granted", hosted: [] });
+    const hidden = harness();
+    hidden.moment.visible = false;
+    expect(await hidden.scheduler.bootstrap()).toBeNull();
+    expect(hidden.engine.loads).toEqual([]);
+    hidden.cleanup();
+  });
+});

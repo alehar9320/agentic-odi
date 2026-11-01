@@ -4,11 +4,50 @@ import "fake-indexeddb/auto";
 
 import type { RawSseEvent } from "../api/sse";
 import type { ChatStreamRequest, StudioConfig } from "../types";
-import { EDGE_TIERS, tierById } from "./ladder";
+import { EDGE_TIERS, computeEligibility, tierById } from "./ladder";
 import type { SchedulerEnvironment } from "./scheduler";
 import { EdgeStateStore } from "./storage";
 import { EdgeManager, hasRemoteEndpoint, shouldUseEdge } from "./manager";
 import { FakeEdgeEngine } from "../test/edgeFake";
+import type { Eligibility } from "./types";
+
+const healthyDesktop: Eligibility = computeEligibility({
+  webgpu: true,
+  shaderF16: true,
+  vramGB: null,
+  deviceMemoryGB: 16,
+  freeStorageBytes: 40_000_000_000,
+  saveData: false,
+});
+
+const noWebGPU: Eligibility = computeEligibility({
+  webgpu: false,
+  shaderF16: false,
+  vramGB: null,
+  deviceMemoryGB: 16,
+  freeStorageBytes: 40_000_000_000,
+  saveData: false,
+});
+
+function idleQueue(): { env: SchedulerEnvironment; queue: Array<() => void> } {
+  const queue: Array<() => void> = [];
+  return {
+    queue,
+    env: {
+      requestIdle(callback) {
+        queue.push(callback);
+        return () => {
+          const index = queue.indexOf(callback);
+          if (index >= 0) {
+            queue.splice(index, 1);
+          }
+        };
+      },
+      visible: () => true,
+      saveData: () => false,
+    },
+  };
+}
 
 const noEndpoint: StudioConfig = {
   base_url: "http://localhost:8001/v1",
@@ -158,23 +197,13 @@ describe("EdgeManager", () => {
   });
 
   it("ten served turns earn the next tier: it prefetches in background, then answers on it", async () => {
-    const queue: Array<() => void> = [];
-    const env: SchedulerEnvironment = {
-      requestIdle(callback) {
-        queue.push(callback);
-        return () => {
-          const index = queue.indexOf(callback);
-          if (index >= 0) {
-            queue.splice(index, 1);
-          }
-        };
-      },
-      visible: () => true,
-      saveData: () => false,
-    };
+    const { env, queue } = idleQueue();
     manager.setSchedulerEnvironment(env);
+    manager.setEligibilityFactory(async () => healthyDesktop);
     const notices: string[] = [];
-    manager.setListener((notice) => notices.push(`${notice.kind}:${notice.tier}`));
+    manager.setListener((notice) =>
+      notices.push(notice.kind === "consent-changed" ? notice.kind : `${notice.kind}:${notice.tier}`),
+    );
 
     for (let turn = 0; turn < 10; turn += 1) {
       await manager.stream(baseRequest, () => {});
@@ -193,5 +222,85 @@ describe("EdgeManager", () => {
     await manager.stream(baseRequest, () => {});
     expect(engine.loads).toEqual([EDGE_TIERS[0].modelId, EDGE_TIERS[1].modelId]);
     manager.setListener(null);
+  });
+
+  describe("the one-time offer", () => {
+    beforeEach(async () => {
+      await prime({ consent: "unset", cachedTiers: [] });
+      manager.setEligibilityFactory(async () => healthyDesktop);
+    });
+
+    it("names the entry tier and its size when a keyless device has never been asked", async () => {
+      const offer = await manager.offerFor(noEndpoint, false);
+      expect(offer).not.toBeNull();
+      expect(offer?.tier).toBe("t1");
+      expect(offer?.approxBytes).toBe(EDGE_TIERS[0].approxBytes);
+      expect(offer?.label).toBe(EDGE_TIERS[0].label);
+    });
+
+    it("stays quiet when the browser cannot host a model at all", async () => {
+      manager.setEligibilityFactory(async () => noWebGPU);
+      expect(await manager.offerFor(noEndpoint, false)).toBeNull();
+    });
+
+    it("stays quiet when a paid endpoint answers, or a tier is already cached", async () => {
+      expect(await manager.offerFor(noEndpoint, true)).toBeNull();
+      expect(
+        await manager.offerFor({ ...noEndpoint, base_url: "https://api.openai.com/v1", api_key: "sk", model_name: "gpt" }, false),
+      ).toBeNull();
+      await prime({ consent: "unset", cachedTiers: ["t1"] });
+      expect(await manager.offerFor(noEndpoint, false)).toBeNull();
+    });
+
+    it("asks once: an answer either way retires the offer", async () => {
+      await manager.decline();
+      expect(await manager.offerFor(noEndpoint, false)).toBeNull();
+      await prime({ consent: "granted", cachedTiers: [] });
+      expect(await manager.offerFor(noEndpoint, false)).toBeNull();
+    });
+  });
+
+  describe("grantAndStart", () => {
+    beforeEach(async () => {
+      await prime({ consent: "unset", cachedTiers: [] });
+      manager.setEligibilityFactory(async () => healthyDesktop);
+    });
+
+    it("consents, fetches the entry tier in a quiet moment, and is then ready to serve", async () => {
+      const { env, queue } = idleQueue();
+      manager.setSchedulerEnvironment(env);
+      const notices: string[] = [];
+      manager.setListener((notice) =>
+        notices.push(notice.kind === "consent-changed" ? notice.kind : `${notice.kind}:${notice.tier}`),
+      );
+
+      const started = manager.grantAndStart();
+      await vi.waitFor(() => expect(queue).toHaveLength(1));
+      expect(engine.loads).toEqual([]);
+      queue.shift()?.();
+      expect(await started).toBe("t1");
+
+      expect(notices).toContain("consent-changed");
+      expect(notices).toContain("downloading:t1");
+      expect(notices).toContain("ready:t1");
+      expect(engine.loads).toEqual([EDGE_TIERS[0].modelId]);
+      expect(await manager.servedTier()).toBe("t1");
+      expect(await manager.canServe(noEndpoint, false)).toBe(true);
+
+      const store = await EdgeStateStore.open();
+      expect(await store.getConsent()).toBe("granted");
+      expect((await store.getTierStates()).t1.status).toBe("active");
+      store.close();
+      manager.setListener(null);
+    });
+
+    it("records a refusal so nothing is downloaded and nothing is asked again", async () => {
+      await manager.decline();
+      const store = await EdgeStateStore.open();
+      expect(await store.getConsent()).toBe("denied");
+      store.close();
+      expect(engine.loads).toEqual([]);
+      expect(await manager.canServe(noEndpoint, false)).toBe(false);
+    });
   });
 });

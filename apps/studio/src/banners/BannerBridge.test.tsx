@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BannerBridge, useBannerActionDispatcher } from "./BannerBridge";
 import { BannerProvider, useBanner } from "./BannerProvider";
 import { BannerStack } from "./BannerStack";
-import type { EdgeNotice } from "../edge/manager";
+import type { EdgeNotice, EdgeOffer } from "../edge/manager";
+import type { EdgeTierId } from "../edge/types";
 
 const studio = vi.hoisted(() => ({
   sidecarReachable: true as boolean | null,
@@ -29,12 +30,22 @@ vi.mock("../state/StudioContext", () => ({
 
 const edge = vi.hoisted(() => ({
   canServe: vi.fn(async () => false),
+  offerFor: vi.fn(async () => null as EdgeOffer | null),
+  grantAndStart: vi.fn(async () => "t1" as EdgeTierId | null),
+  decline: vi.fn(async () => undefined),
+  servedTier: vi.fn(async () => null as EdgeTierId | null),
+  isBusy: vi.fn(() => false),
   noticeListener: null as ((notice: EdgeNotice) => void) | null,
 }));
 
 vi.mock("../edge/manager", () => ({
   edgeManager: {
     canServe: (...args: unknown[]) => edge.canServe(...(args as [])),
+    offerFor: (...args: unknown[]) => edge.offerFor(...(args as [])),
+    grantAndStart: () => edge.grantAndStart(),
+    decline: () => edge.decline(),
+    servedTier: () => edge.servedTier(),
+    isBusy: () => edge.isBusy(),
     setListener: (listener: ((notice: EdgeNotice) => void) | null) => {
       edge.noticeListener = listener;
     },
@@ -71,6 +82,11 @@ describe("BannerBridge", () => {
     studio.llmHealth = { healthy: true, message: "" };
     studio.dismissedSidecarNotice = false;
     edge.canServe = vi.fn(async () => false);
+    edge.offerFor = vi.fn(async () => null);
+    edge.grantAndStart = vi.fn(async () => "t1");
+    edge.decline = vi.fn(async () => undefined);
+    edge.servedTier = vi.fn(async () => null);
+    edge.isBusy = vi.fn(() => false);
     edge.noticeListener = null;
   });
 
@@ -138,6 +154,143 @@ describe("BannerBridge", () => {
       await Promise.resolve();
     });
     expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+  });
+
+  it("asks for consent instead of working by hand, on a device that could host a tier", async () => {
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/about 1.3 GB, once/)).toBeInTheDocument();
+    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+  });
+
+  it("never offers the browser model to a device that could not host one", async () => {
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() => expect(screen.getByText(/Working by hand/i)).toBeInTheDocument());
+    expect(screen.queryByText(/This browser can answer, free/i)).not.toBeInTheDocument();
+  });
+
+  it("goes quiet instead of claiming no model is reachable while the consented fetch runs", async () => {
+    edge.isBusy = vi.fn(() => true);
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() => expect(edge.canServe).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/This browser can answer, free/i)).not.toBeInTheDocument();
+  });
+
+  it("celebrates the first tier landing, then stops asking", async () => {
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+
+    edge.canServe = vi.fn(async () => true);
+    edge.offerFor = vi.fn(async () => null);
+    act(() => {
+      edge.noticeListener?.({ kind: "ready", tier: "t1" });
+    });
+    await waitFor(() =>
+      expect(screen.queryByText(/This browser can answer, free/i)).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Llama 3.2 1B is answering in this tab now/i)).toBeInTheDocument();
+  });
+
+  it("says so when a yes does not start a download", async () => {
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    edge.grantAndStart = vi.fn(async () => null);
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+
+    act(() => {
+      screen.getByRole("button", { name: "Answer in this browser" }).click();
+    });
+    await waitFor(() =>
+      expect(screen.getByText(/That download didn't start/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("stays quiet when a yes finds the model already on its way from another tab", async () => {
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    edge.grantAndStart = vi.fn(async () => null);
+    edge.servedTier = vi.fn(async () => "t1");
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+
+    act(() => {
+      screen.getByRole("button", { name: "Answer in this browser" }).click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(/didn't start/i)).not.toBeInTheDocument();
+  });
+
+  it("sends a \"Not now\" to durable consent, so the studio asks once", async () => {
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+
+    act(() => {
+      screen.getByRole("button", { name: "Not now" }).click();
+    });
+    expect(edge.decline).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends \"Answer in this browser\" to consent plus the first download", async () => {
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+
+    act(() => {
+      screen.getByRole("button", { name: "Answer in this browser" }).click();
+    });
+    expect(edge.grantAndStart).toHaveBeenCalledTimes(1);
   });
 
   it("rechecks the sidecar through the real dispatcher", () => {

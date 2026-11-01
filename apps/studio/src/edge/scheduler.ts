@@ -6,9 +6,12 @@
  * download itself waits for a quiet moment — an idle callback, a visible
  * tab, no Save Data request, and a device the user said yes to. A gigabyte
  * should never arrive while the device is busy or being economised.
+ *
+ * One rung is free: `bootstrap()` fetches the entry tier as soon as consent
+ * arrives, because a browser with nothing on disk has no voice at all.
  */
 
-import { PROGRESSION, nextEligibleTier, tierById } from "./ladder";
+import { PROGRESSION, firstEligibleTier, nextEligibleTier, tierById } from "./ladder";
 import { withEngineLock } from "./storage";
 import type { EdgeStateService } from "./storage";
 import type { EdgeLLMEngine, EdgeTierId, Eligibility, LoadProgress, TierState } from "./types";
@@ -20,12 +23,14 @@ export interface SchedulerEnvironment {
   saveData(): boolean;
 }
 
+export type TierOrigin = "bootstrap" | "climb";
+
 export interface SchedulerDeps {
   state: EdgeStateService;
   engine(): Promise<EdgeLLMEngine>;
   eligibility(): Promise<Eligibility>;
   onProgress(tier: EdgeTierId, progress: LoadProgress): void;
-  onUnlocked(tier: EdgeTierId): void;
+  onUnlocked(tier: EdgeTierId, origin: TierOrigin): void;
   env?: SchedulerEnvironment;
 }
 
@@ -94,15 +99,38 @@ export class EdgeScheduler {
     if (next === null || states[next.id].status !== "empty") {
       return null;
     }
-    return this.prefetch(next.id);
+    return this.prefetch(next.id, "climb");
   }
 
-  /** Wait for a quiet moment, win the engine lock, then pull the tier. */
-  prefetch(tier: EdgeTierId): Promise<EdgeTierId | null> {
+  /** Rung zero. Nothing is earned here: the person just said yes, and a
+   * browser with no model on disk has nothing to answer with. Fetch the
+   * weakest tier this device could host, under the same quiet-moment and
+   * single-engine rules as any other download. */
+  async bootstrap(): Promise<EdgeTierId | null> {
     if (this.pending) {
       return this.pending;
     }
-    this.pending = this.run(tier).finally(() => {
+    const { state } = this.deps;
+    if ((await state.getConsent()) !== "granted") {
+      return null;
+    }
+    const states = await state.getTierStates();
+    if (strongestHosted(states) !== null) {
+      return null;
+    }
+    const entry = firstEligibleTier(await this.deps.eligibility());
+    if (entry === null || states[entry.id].status !== "empty") {
+      return null;
+    }
+    return this.prefetch(entry.id, "bootstrap");
+  }
+
+  /** Wait for a quiet moment, win the engine lock, then pull the tier. */
+  prefetch(tier: EdgeTierId, origin: TierOrigin = "climb"): Promise<EdgeTierId | null> {
+    if (this.pending) {
+      return this.pending;
+    }
+    this.pending = this.run(tier, origin).finally(() => {
       this.pending = null;
     });
     return this.pending;
@@ -114,7 +142,7 @@ export class EdgeScheduler {
     this.cancelIdle = null;
   }
 
-  private async run(tier: EdgeTierId): Promise<EdgeTierId | null> {
+  private async run(tier: EdgeTierId, origin: TierOrigin): Promise<EdgeTierId | null> {
     if (!this.goodMoment()) {
       return null;
     }
@@ -139,7 +167,7 @@ export class EdgeScheduler {
       // before the next turn is routed.
       return null;
     }
-    this.deps.onUnlocked(tier);
+    this.deps.onUnlocked(tier, origin);
     return tier;
   }
 

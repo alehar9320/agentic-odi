@@ -8,23 +8,41 @@
 import type { RawSseEvent } from "../api/sse";
 import type { ChatStreamRequest, StudioConfig } from "../types";
 import { isFeatureEnabled } from "../features/flags";
-import { EDGE_TIERS, tierById } from "./ladder";
+import { EDGE_TIERS, collectDeviceSignals, computeEligibility, firstEligibleTier, tierById } from "./ladder";
 import { EdgeScheduler, type SchedulerEnvironment } from "./scheduler";
 import { openEdgeState, type EdgeStateService } from "./storage";
 import { edgeTurn } from "./turn";
-import type { EdgeLLMEngine, EdgeTierId, LoadProgress } from "./types";
+import type {
+  ConsentState,
+  EdgeLLMEngine,
+  EdgeTierId,
+  Eligibility,
+  LoadProgress,
+} from "./types";
 
 /** What the page can react to without knowing anything about WebLLM.
  * The banner layer (next iteration) subscribes to these. */
 export type EdgeNotice =
   | { kind: "downloading"; tier: EdgeTierId; progress: LoadProgress }
-  | { kind: "unlocked"; tier: EdgeTierId };
+  /** The first tier landed: this browser can answer now. */
+  | { kind: "ready"; tier: EdgeTierId }
+  /** A stronger tier landed on top of one that already answered. */
+  | { kind: "unlocked"; tier: EdgeTierId }
+  /** The person answered the consent question, either way. */
+  | { kind: "consent-changed" };
+
+/** The one-time ask, in the two numbers that matter: which model, how big. */
+export interface EdgeOffer {
+  tier: EdgeTierId;
+  label: string;
+  approxBytes: number;
+}
 
 export interface EdgeDecision {
   flagEnabled: boolean;
   endpointConfigured: boolean;
   llmHealthy: boolean;
-  consent: "unset" | "granted" | "denied";
+  consent: ConsentState;
   servedTier: EdgeTierId | null;
 }
 
@@ -53,18 +71,31 @@ async function defaultEngineFactory(): Promise<EdgeLLMEngine> {
   return createWebLLMEngine();
 }
 
+/** Read the device without importing the WebLLM chunk: deciding whether to
+ * *ask* for consent must not cost a megabyte of JavaScript. */
+async function defaultEligibility(): Promise<Eligibility> {
+  return computeEligibility(await collectDeviceSignals());
+}
+
 export class EdgeManager {
   private engine: EdgeLLMEngine | null = null;
   private engineFactory = defaultEngineFactory;
+  private eligibilityFactory = defaultEligibility;
   private state: EdgeStateService | null = null;
   private loadedTier: EdgeTierId | null = null;
   private scheduler: EdgeScheduler | null = null;
   private listener: ((notice: EdgeNotice) => void) | null = null;
   private environment: SchedulerEnvironment | null = null;
+  private fetching = false;
 
   /** The seam tests and e2e use to drive an edge turn without WebGPU. */
   setEngineFactory(factory: () => Promise<EdgeLLMEngine>): void {
     this.engineFactory = factory;
+  }
+
+  /** Pretend a class of device (tests, e2e, a "try it anyway" control). */
+  setEligibilityFactory(factory: () => Promise<Eligibility>): void {
+    this.eligibilityFactory = factory;
   }
 
   /** Override when a background download may start (tests, demos, e2e). */
@@ -86,6 +117,7 @@ export class EdgeManager {
     this.engine = null;
     this.state = null;
     this.loadedTier = null;
+    this.fetching = false;
   }
 
   private async ensureState(): Promise<EdgeStateService> {
@@ -104,13 +136,13 @@ export class EdgeManager {
       this.scheduler = new EdgeScheduler({
         state,
         engine: () => this.getEngine(),
-        eligibility: async () => (await this.getEngine()).probe(),
+        eligibility: () => this.eligibilityFactory(),
         onProgress: (tier, progress) => this.listener?.({ kind: "downloading", tier, progress }),
-        onUnlocked: (tier) => {
+        onUnlocked: (tier, origin) => {
           // The prefetch loaded through this tab's engine, so the next turn
           // starts already on the stronger tier.
           this.loadedTier = tier;
-          this.listener?.({ kind: "unlocked", tier });
+          this.listener?.({ kind: origin === "bootstrap" ? "ready" : "unlocked", tier });
         },
         env: this.environment ?? undefined,
       });
@@ -140,6 +172,55 @@ export class EdgeManager {
       consent: await state.getConsent(),
       servedTier: await this.servedTier(),
     });
+  }
+
+  /**
+   * The one question worth asking a person with no model: may this browser
+   * download one? Only asked when it would change the answer — the device can
+   * host a tier, nothing is on disk yet, no paid endpoint is answering, and
+   * the person has never said yes or no.
+   */
+  async offerFor(settings: StudioConfig, llmHealthy: boolean): Promise<EdgeOffer | null> {
+    if (!isFeatureEnabled("edgeModel") || llmHealthy || hasRemoteEndpoint(settings)) {
+      return null;
+    }
+    const state = await this.ensureState();
+    if ((await state.getConsent()) !== "unset" || (await this.servedTier()) !== null) {
+      return null;
+    }
+    const entry = firstEligibleTier(await this.eligibilityFactory());
+    return entry === null
+      ? null
+      : { tier: entry.id, label: entry.label, approxBytes: entry.approxBytes };
+  }
+
+  /** Say yes, then earn nothing: fetch the entry tier now so the next turn
+   * has a voice. Resolves to the tier hosted, or null when the moment was
+   * wrong or another tab is already doing it. */
+  async grantAndStart(): Promise<EdgeTierId | null> {
+    const state = await this.ensureState();
+    await state.setConsent("granted");
+    // From this instant this tab is working on an answer, so "no model is
+    // reachable" has stopped being true. The banner layer asks `isBusy`.
+    this.fetching = true;
+    this.listener?.({ kind: "consent-changed" });
+    try {
+      return await (await this.ensureScheduler()).bootstrap();
+    } finally {
+      this.fetching = false;
+    }
+  }
+
+  /** True while this tab has a first-tier download in flight. */
+  isBusy(): boolean {
+    return this.fetching;
+  }
+
+  /** Say no, durably. Settings can change it; the studio cannot ask twice. */
+  async decline(): Promise<void> {
+    const state = await this.ensureState();
+    await state.setConsent("denied");
+    this.listener?.({ kind: "consent-changed" });
   }
 
   /** Load (or reload into this tab) the tier that should answer, then stream

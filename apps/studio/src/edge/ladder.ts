@@ -50,7 +50,8 @@ export function tierById(id: EdgeTierId): EdgeTier {
   return tier;
 }
 
-function formatGB(bytes: number): string {
+/** Sizes in the units a person decides in: "about 1.3 GB, once". */
+export function formatGB(bytes: number): string {
   return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
 }
 
