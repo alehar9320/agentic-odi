@@ -70,7 +70,7 @@ the model, so they work when it is offline.
 | `/new` | New conversation |
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
-| `/landscape`, `/jobmap`, `/evidence`, `/settings` | Open that lens beside the conversation |
+| `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/settings` | Open that lens beside the conversation |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
 

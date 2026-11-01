@@ -119,6 +119,14 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     keywords: ["signals", "quotes"],
   },
   {
+    id: "records",
+    name: "/records",
+    label: "Records",
+    description: "Every job, step, outcome, and quote on the canvas, in one table.",
+    category: "Explore",
+    keywords: ["table", "all", "stored"],
+  },
+  {
     id: "capture",
     name: "/capture",
     label: "Capture an outcome",
