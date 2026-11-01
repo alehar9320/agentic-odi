@@ -36,7 +36,7 @@ links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
 - [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
-- [ ] **Agents reuse before they write** — parked research, not a built capability: notes in `docs/superpowers/specs/2026-11-01-reuse-first-agents-design.md` and the eight open gaps in the draft pull request (this change).
+- [ ] **Agents reuse before they write** — parked research, not a built capability: notes in `docs/superpowers/specs/2026-11-01-reuse-first-agents-design.md` and the eight open gaps in the draft pull request ([PR #602](https://github.com/alehar9320/agentic-odi/pull/602)).
 - [ ] **The landing page points at the sample** — the site's primary call to action opens a committed, read-only sample workspace generated from a fixture, labelled a sample on every row and rendering with no network ([PR #469](https://github.com/alehar9320/agentic-odi/pull/469)).
 - [ ] **Rate-limit the ingest sink** — a token bucket sheds a high-volume batch instead of exhausting memory ([PR #298](https://github.com/alehar9320/agentic-odi/pull/298)).
 - [ ] **Job validation at the model level** — name and description constraints live in `packages/core` ([PR #296](https://github.com/alehar9320/agentic-odi/pull/296)).
