@@ -185,9 +185,9 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.UPDATE_STEP.value: ToolSpec(
         name="update_step",
-        summary="Update a Step's name or order.",
+        summary="Update a Step's name, order, or stage.",
         effect=_derive_effect("update_step"),
-        arguments=("step_id", "name", "order"),
+        arguments=("step_id", "name", "order", "stage"),
         required=("step_id",),
         returns="The updated Step.",
         stage="3",

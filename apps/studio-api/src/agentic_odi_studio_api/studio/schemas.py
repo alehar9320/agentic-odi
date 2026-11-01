@@ -73,6 +73,7 @@ class UpdateJobRequest(BaseModel):
 class UpdateStepRequest(BaseModel):
     name: str | None = None
     order: int | None = None
+    stage: JobStage | None = None
     mcp_url: str = ""
 
 

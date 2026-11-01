@@ -134,11 +134,19 @@ agentic-odi steps add --job-id <job-id> --name "Prepare environment" --order 1
 agentic-odi steps add --job-id <job-id> --name "Execute" --order 5 --stage execute
 agentic-odi steps list --job-id <job-id>
 agentic-odi steps get <step-id>
-agentic-odi steps update <step-id> --order 2
+agentic-odi steps update <step-id> --order 5 --stage execute
 agentic-odi steps delete <step-id> --yes
 
 Capture a desired or customer outcome before adding a step. Use `--allow-empty-job-map`
 only when you intentionally need to stage a map before capturing outcomes.
+
+The eight stages are a fixed sequence, so `--order` and `--stage` are two names for
+the same position: `--order 3 --stage prepare` is accepted, `--order 3 --stage
+conclude` is refused and the error names both. A step with no `--stage` keeps an
+unset stage, which is not a claim about where it belongs. Steps written before
+stages existed are given the stage their order names the next time the store is
+opened, recorded as a `STEP_STAGE_BACKFILLED` event; a step whose order is outside
+1–8 acquires no invented stage.
 
 # Desired Outcomes
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4

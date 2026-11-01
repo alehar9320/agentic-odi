@@ -407,16 +407,25 @@ def delete_job(job_id: str) -> str:
 
 
 @mcp.tool
-def update_step(step_id: str, name: str | None = None, order: int | None = None) -> str:
+def update_step(
+    step_id: str,
+    name: str | None = None,
+    order: int | None = None,
+    stage: JobStage | None = None,
+) -> str:
     updates: dict = {}
     if name is not None:
         updates["name"] = name
     if order is not None:
         updates["order"] = order
+    if stage is not None:
+        updates["stage"] = stage
     try:
         step = service.update_step(step_id, updates)
     except StepNotFoundError:
         return _step_not_found(step_id)
+    except OdiError as exc:
+        return f"Error: {exc}"
     return f"Step updated successfully: {step.model_dump_json()}"
 
 

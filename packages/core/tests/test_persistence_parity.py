@@ -26,6 +26,7 @@ from agentic_odi_core.models import (
     Interview,
     InterviewQuote,
     Job,
+    JobStage,
     Outcome,
     OutcomeCandidate,
     Step,
@@ -74,7 +75,16 @@ def _snapshot(repo: Repository) -> Snapshot:
 def _seed(repo: Repository) -> None:
     """Write one of every entity and one cascade, through the repository API."""
     repo.add_job(Job(id="job-1", name="Onboard customers"))
-    repo.add_step(Step(id="step-1", job_id="job-1", name="Prepare", order=3))
+    repo.add_step(
+        Step(
+            id="step-1",
+            job_id="job-1",
+            name="Prepare",
+            order=3,
+            stage=JobStage.PREPARE,
+            stage_index=3,
+        )
+    )
     repo.add_outcome(
         Outcome(
             id="outcome-1",
