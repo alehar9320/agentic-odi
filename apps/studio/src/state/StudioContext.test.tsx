@@ -736,6 +736,40 @@ describe("StudioContext on the hosted studio, whose Worker has no sidecar", () =
     expect(result.current.offlineReplyFor).toBe(last?.id);
   });
 
+  it("keeps the capture a visitor made with no server to keep it", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let jobId = "";
+    await act(async () => {
+      jobId =
+        (await result.current.createJob({ name: "Get a service from commit to production" })) ?? "";
+    });
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time from merge to production",
+        importance: 9,
+        satisfaction: 3,
+      });
+    });
+
+    // The point of the first minute: a person writes one outcome down and it is
+    // on the board with its score, on a deployment that has no server to send it
+    // to. Nothing here is a demo, and nothing failed quietly.
+    await waitFor(() =>
+      expect(
+        (result.current.canvas?.outcomes ?? []).map((outcome) => outcome.statement),
+      ).toContain("Minimize the time from merge to production"),
+    );
+    const outcome = (result.current.canvas?.outcomes ?? []).find(
+      (candidate) => candidate.statement === "Minimize the time from merge to production",
+    );
+    expect(outcome?.opportunity_score).toBe(15);
+    expect(result.current.canvas?.source).toBe("local");
+    expect(result.current.canvasState.kind).toBe("ready");
+  });
+
   it("reads a Worker with no sidecar as an absent server, never a broken one", async () => {
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
