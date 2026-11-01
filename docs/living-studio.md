@@ -181,7 +181,12 @@ Studio says so in one place and keeps going:
   in the browser: the conversation, the canvas, and memory are read and written
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
-  all.
+  all. While that board is the browser's — `canvas.source === "local"`, which is
+  where `isBrowserCanvas` looks, because `provenance.kind` says *live* for both a
+  sidecar's board and yours — the receipt for a job, a step, an outcome, and the
+  first-run context ends with **Saved in this browser.** "Saved" alone would
+  promise a server that is not there, and the next machine would look like it
+  lost their work.
 - A warning strip appears only for something that actually broke: a model or
   sidecar that this session reached and then lost, or a check you asked for by
   pressing **Recheck** or running the tour's live step. Opening Settings measures

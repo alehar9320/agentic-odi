@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasData } from "../types";
 import {
+  LOCAL_BOARD_NOTE,
   canvasHasRecords,
   canvasStatus,
+  isBrowserCanvas,
   isSimulatedCanvas,
   savedAtTime,
   savedCopyCaption,
@@ -60,6 +62,34 @@ describe("canvas provenance", () => {
   it("has no label for live, empty, or missing canvases", () => {
     expect(canvasStatus(canvas({ source: "mcp" }))).toBeNull();
     expect(canvasStatus(null)).toBeNull();
+  });
+
+  /**
+   * A live board in IndexedDB and a live board on a sidecar both carry
+   * `provenance.kind === "live"`, so only `source` separates them — and the
+   * receipt that promises where a capture went has to read the one that does.
+   */
+  it("names the browser store from the source, not from liveness", () => {
+    expect(
+      isBrowserCanvas(
+        canvas({
+          source: "local",
+          provenance: {
+            kind: "live",
+            reason: "local_store",
+            generated_at: "2026-11-01T10:00:00+00:00",
+            record_counts: { jobs: 1, steps: 0, outcomes: 1, evidence: 0 },
+          },
+        }),
+      ),
+    ).toBe(true);
+    expect(isBrowserCanvas(canvas({ source: "mcp" }))).toBe(false);
+    expect(isBrowserCanvas(canvas({ source: "seed" }))).toBe(false);
+    expect(isBrowserCanvas(null)).toBe(false);
+  });
+
+  it("says the browser, in one clause every receipt can reuse", () => {
+    expect(LOCAL_BOARD_NOTE).toBe("Saved in this browser.");
   });
 });
 

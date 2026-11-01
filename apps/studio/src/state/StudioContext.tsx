@@ -56,6 +56,7 @@ import {
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
+import { LOCAL_BOARD_NOTE, isBrowserCanvas } from "../lib/canvasProvenance";
 import { loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
@@ -284,6 +285,8 @@ export interface StudioContextValue {
   canvasCached: boolean;
   /** What the canvas is: loading, ready, empty, or failed. */
   canvasState: CanvasState;
+  /** True when the board lives in this browser and no server holds a copy of it. */
+  boardStoredLocally: boolean;
   /** The failure behind `canvasState.kind === "error"`, if any. */
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
@@ -552,6 +555,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
   });
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
+  // Which store is keeping this board. On the hosted studio nothing else holds
+  // a copy, so a receipt that just says "saved" promises a server that isn't
+  // there — and a person who next opens the studio somewhere else reads it as
+  // their work going missing.
+  const boardStoredLocally = isBrowserCanvas(canvasState.data);
   const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
     healthy: null,
     message: "Health not checked yet.",
@@ -1072,13 +1080,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
       try {
         await apiAddStep({ ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Step added to Job Map!");
+        pushToast(
+          "success",
+          boardStoredLocally
+            ? `Step added to your board. ${LOCAL_BOARD_NOTE}`
+            : "Step added to Job Map!",
+        );
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Error adding step: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, boardStoredLocally],
   );
 
   const addOutcome = useCallback(
@@ -1086,20 +1099,30 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       // The form that asked for this shows the failure where the user typed
       // it, so the error travels up instead of disappearing into a toast.
       await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", "Outcome captured successfully!");
+      pushToast(
+        "success",
+        boardStoredLocally
+          ? `Outcome captured. ${LOCAL_BOARD_NOTE}`
+          : "Outcome captured successfully!",
+      );
       await refreshCanvas();
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, boardStoredLocally],
   );
 
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
       const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", `Job created: ${payload.name}`);
+      pushToast(
+        "success",
+        boardStoredLocally
+          ? `Job created: ${payload.name}. ${LOCAL_BOARD_NOTE}`
+          : `Job created: ${payload.name}`,
+      );
       await refreshCanvas();
       return job.id ?? null;
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, boardStoredLocally],
   );
 
   const updateJob = useCallback(
@@ -2019,6 +2042,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasLoading,
       canvasCached,
       canvasState,
+      boardStoredLocally,
       canvasError,
       refreshCanvas,
       llmHealth,
@@ -2132,6 +2156,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasLoading,
       canvasCached,
       canvasState,
+      boardStoredLocally,
       canvasError,
       refreshCanvas,
       llmHealth,

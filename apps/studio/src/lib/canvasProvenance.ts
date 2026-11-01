@@ -83,3 +83,16 @@ export function savedCopyCaption(
   const days = Math.round(elapsed / DAY);
   return `Saved ${days} day${days === 1 ? "" : "s"} ago`;
 }
+
+/**
+ * True when this board is the browser's own store and nobody else is keeping a
+ * copy. `source` is the storage signal: `provenance.kind` says live or seeded,
+ * which is about whether the work is the user's, not about where it lives — a
+ * sidecar board and an IndexedDB board both read `live`.
+ */
+export function isBrowserCanvas(data: CanvasData | null | undefined): boolean {
+  return data?.source === "local";
+}
+
+/** The one clause that names the store, so no receipt invents its own. */
+export const LOCAL_BOARD_NOTE = "Saved in this browser.";
