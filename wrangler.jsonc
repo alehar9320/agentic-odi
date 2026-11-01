@@ -5,6 +5,13 @@
   "name": "agentic-odi",
   "main": "./infra/cloudflare/worker.ts",
   "compatibility_date": "2026-10-19",
+  // The release identity the hosted Studio reports at GET /api/build. Set it to
+  // the tag being released; `scripts/check_version_parity.py` fails if it lags
+  // `.release-please-manifest.json`. It is a declared var, not a secret, so
+  // previews inherit it from this file rather than needing one per preview.
+  "vars": {
+    "RELEASE_VERSION": "0.14.0"
+  },
   "build": {
     "command": "npm --prefix apps/studio run build"
   },

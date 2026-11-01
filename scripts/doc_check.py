@@ -44,7 +44,11 @@ ENTRY_PREFIXES: tuple[tuple[str, ...], ...] = (
 
 CODE_SPAN = re.compile(r"`([^`\n]+)`")
 BASH_BLOCK = re.compile(r"```bash\n(.*?)```", re.DOTALL)
-ROUTE_SPAN = re.compile(r"^(GET|POST|PUT|PATCH|DELETE|HEAD)\s+(/api/\S+)$")
+HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")
+ROUTE_SPAN = re.compile(rf"^({'|'.join(HTTP_METHODS)})\s+(/api/\S+)$")
+ALL_METHODS = set(HTTP_METHODS)
+WORKER_PATHNAME = re.compile(r'url\.pathname === "(/api/[^"]+)"')
+WORKER_METHOD_ONLY = re.compile(r'request\.method !== "([A-Z]+)"')
 PATH_PARAM = re.compile(r"\{[^}]+\}")
 ENV_VAR = re.compile(r"\bAGENTIC_ODI_[A-Z0-9_]+\b")
 COMMAND_NAME = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -207,13 +211,43 @@ def studio_routes() -> set[tuple[str, str]]:
     return routes
 
 
-def missing_routes(docs: dict[str, str], routes: set[tuple[str, str]]) -> list[str]:
+def worker_routes(root: Path = ROOT) -> dict[str, set[str]]:
+    """Paths the Cloudflare Worker answers itself, and the methods it accepts.
+
+    The Worker is one `fetch` handler of `url.pathname ===` comparisons with no
+    router object to introspect, so both the paths and any method restriction
+    come out of its source text. A branch that takes only one method says so
+    with `request.method !== "GET"`, which is how `/api/build` reads.
+    """
+    try:
+        source = (root / "infra" / "cloudflare" / "worker.ts").read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    starts = list(WORKER_PATHNAME.finditer(source))
+    routes: dict[str, set[str]] = {}
+    for index, match in enumerate(starts):
+        end = starts[index + 1].start() if index + 1 < len(starts) else len(source)
+        only = WORKER_METHOD_ONLY.findall(source[match.end() : end])
+        routes[match.group(1).rstrip("/")] = set(only) if only else set(ALL_METHODS)
+    return routes
+
+
+def missing_routes(
+    docs: dict[str, str],
+    routes: set[tuple[str, str]],
+    worker: dict[str, set[str]] | None = None,
+) -> list[str]:
+    """Every documented route nothing serves, labelled `METHOD /path`."""
     normalized = {(method, PATH_PARAM.sub("{}", path)) for method, path in routes}
-    served_anywhere = {path for _, path in normalized}
+    served = worker or {}
+    served_anywhere = {path for _, path in normalized} | set(served)
     missing: list[str] = []
     for text in docs.values():
         for method, path in documented_routes(text):
-            found = path in served_anywhere if method == "ANY" else (method, path) in normalized
+            if method == "ANY":
+                found = path in served_anywhere
+            else:
+                found = (method, path) in normalized or method in served.get(path, set())
             label = f"{method} {path}" if method != "ANY" else path
             if not found and label not in missing:
                 missing.append(label)
@@ -445,7 +479,10 @@ def collect_issues(root: Path = ROOT, delivered: set[str] | None = None) -> list
                 issues.append(f"documented CLI command does not exist: {label}")
 
     routes = studio_routes()
-    issues += [f"documented route is not served: {label}" for label in missing_routes(docs, routes)]
+    worker = worker_routes(root)
+    issues += [
+        f"documented route is not served: {label}" for label in missing_routes(docs, routes, worker)
+    ]
     issues += [
         f"documented environment variable is never read: {name}"
         for name in missing_env_vars(docs, source_text(root))

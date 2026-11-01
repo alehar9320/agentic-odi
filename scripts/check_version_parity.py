@@ -6,6 +6,10 @@ release-please bumps the root pyproject and every ``extra-files`` entry in
 must agree with ``.release-please-manifest.json``. A drift here is the bug
 that shipped a desktop app reporting ``0.1.0`` at release ``0.12.0``.
 
+``wrangler.jsonc`` is not an ``extra-files`` entry, so nothing bumps the
+Worker's release identity automatically; its ``vars.RELEASE_VERSION`` is
+checked here instead.
+
 Parsed by hand rather than with ``tomllib`` because this must run on the
 test matrix's Python 3.10 floor, where that module does not exist.
 """
@@ -31,10 +35,14 @@ BUILD_INFO = "apps/cli/src/agentic_odi_cli/_build_info.py"
 STUDIO_PACKAGE_JSON = "apps/studio/package.json"
 TAURI_CONF = "apps/studio/src-tauri/tauri.conf.json"
 TAURI_CARGO = "apps/studio/src-tauri/Cargo.toml"
+WRANGLER_CONF = "wrangler.jsonc"
 
 _PROJECT_SECTION = re.compile(r"^\[project\]\s*$")
 _VERSION_LINE = re.compile(r'^version\s*=\s*"([^"]+)"\s*$')
 _BUILD_INFO_VERSION = re.compile(r'^VERSION\s*=\s*"([^"]+)"')
+# Unanchored, because the key sits inside `"vars": { ... }`, which may be
+# written on one line or spread over several.
+_WRANGLER_VERSION = re.compile(r'"RELEASE_VERSION"\s*:\s*"([^"]+)"')
 
 
 def _declared_version(pyproject: Path) -> str:
@@ -73,12 +81,17 @@ def _json_value(json_path: Path, key: str) -> str:
         raise AssertionError(f"no {key} in {json_path}") from exc
 
 
-def _build_info_version(path: Path) -> str:
+def _version_on_a_line(path: Path, pattern: re.Pattern[str], what: str) -> str:
+    """Return the version ``pattern`` captures from the first line it matches.
+
+    Uses ``search`` so a pattern anchors only where it says ``^``, which lets
+    one key inside a nested object sit on the same line as its opening brace.
+    """
     for line in path.read_text(encoding="utf-8").splitlines():
-        match = _BUILD_INFO_VERSION.match(line)
+        match = pattern.search(line)
         if match:
             return match.group(1)
-    raise AssertionError(f"no VERSION constant in {path}")
+    raise AssertionError(f"no {what} in {path}")
 
 
 def released_version(root: Path) -> str:
@@ -87,12 +100,22 @@ def released_version(root: Path) -> str:
 
 
 def declared_versions(root: Path) -> list[tuple[str, str]]:
-    """Every version release-please owns, as ``(relative_path, version)``."""
+    """Every version the workspace declares, as ``(relative_path, version)``."""
     declared = [(rel, _declared_version(root / rel)) for rel in PYPROJECTS]
-    declared.append((BUILD_INFO, _build_info_version(root / BUILD_INFO)))
+    declared.append(
+        (BUILD_INFO, _version_on_a_line(root / BUILD_INFO, _BUILD_INFO_VERSION, "VERSION"))
+    )
     declared.append((STUDIO_PACKAGE_JSON, _json_value(root / STUDIO_PACKAGE_JSON, "version")))
     declared.append((TAURI_CONF, _json_value(root / TAURI_CONF, "version")))
     declared.append((TAURI_CARGO, _toml_value(root / TAURI_CARGO, "package", "version")))
+    # Scanned line by line rather than with `_json_value`: wrangler.jsonc is
+    # JSONC, and `json.loads` rejects the comments that explain the config.
+    declared.append(
+        (
+            WRANGLER_CONF,
+            _version_on_a_line(root / WRANGLER_CONF, _WRANGLER_VERSION, "vars.RELEASE_VERSION"),
+        )
+    )
     return declared
 
 

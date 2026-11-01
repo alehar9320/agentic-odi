@@ -220,6 +220,24 @@ Workers Builds settings (Workers & Pages → your Worker → Settings → Builds
 A Worker has no run command: the Worker script runs on Cloudflare. Set `name` in
 `wrangler.jsonc` to the Worker you created before the first deploy.
 
+### Which release is live
+
+`GET /api/build` answers `{"version": "<tag>"}`, read from `vars.RELEASE_VERSION`
+in `wrangler.jsonc`. The Worker replies before the sidecar proxy, so a deployment
+without a tunnel still identifies itself, and any other method gets a 405 with
+`Allow: GET`. The body carries nothing but the version: no environment values,
+and never a deploy timestamp, so two deploys of one tag report the same string.
+
+`RELEASE_VERSION` is not a release-please `extra-files` entry, so cutting a release
+means editing it in the same commit as the tag. `scripts/check_version_parity.py`
+covers the miss and names `wrangler.jsonc` when the declared value drifts from
+`.release-please-manifest.json`.
+
+```bash
+curl -s https://agentic-odi.alehar.workers.dev/api/build
+uv run python scripts/check_version_parity.py
+```
+
 ### Pull request previews
 
 Workers Builds posts the build status and Preview URL to the pull request
