@@ -83,6 +83,11 @@ per-platform archives with SHA-256 checksums for a manual download. See
   the record behind it, or says it is a hypothesis.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
+- **Evidence becomes outcomes.** An ingested record is mined into a scored,
+  approvable outcome proposal — statement, direction, importance, satisfaction,
+  and a stated confidence, with its rationale and the quote it came from.
+  Approving writes it through the same validated path as any other outcome;
+  rejecting writes nothing. The mining is deterministic and offline.
 - **A catch-up that means something.** Writes emit signals — an outcome
   re-scored, evidence promoted, a job map completed — stored in the same
   event log and read by the CLI, any MCP client, and the Studio's bell.
@@ -203,9 +208,9 @@ together and where each contract is enforced:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
-| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, Segments, Strategy, and context tools over HTTP. SQLite by default. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |

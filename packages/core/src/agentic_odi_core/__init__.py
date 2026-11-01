@@ -33,6 +33,12 @@ from agentic_odi_core.evaluation import (
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
+from agentic_odi_core.mapping import (
+    HeuristicProposalStrategy,
+    OutcomeProposal,
+    ProposalStatus,
+    ProposalStrategy,
+)
 from agentic_odi_core.messages import (
     CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
@@ -155,9 +161,14 @@ __all__ = [
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",
     "OdiError",
+    "OnDeviceLLMEngine",
     "Outcome",
     "OutcomeNotFoundError",
+    "OutcomeProposal",
     "OutcomeStatementError",
+    "ProposalStatus",
+    "ProposalStrategy",
+    "HeuristicProposalStrategy",
     "LocalOpenAIEngine",
     "RateLimitError",
     "RoutingMode",

@@ -57,6 +57,10 @@ class ToolName(str, Enum):
     GET_SEGMENTS = "get_segments"
     GET_STRATEGY = "get_strategy"
     PROPOSE_STRATEGY = "propose_strategy"
+    PROPOSE_OUTCOME = "propose_outcome"
+    LIST_PROPOSALS = "list_proposals"
+    APPROVE_PROPOSAL = "approve_proposal"
+    REJECT_PROPOSAL = "reject_proposal"
 
 
 class ToolEffect(str, Enum):
@@ -491,6 +495,41 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("job_id",),
         returns="The Strategy, including every path it beat and why.",
         stage="6",
+    ),
+    ToolName.PROPOSE_OUTCOME.value: ToolSpec(
+        name="propose_outcome",
+        summary="Propose a desired outcome mined from an evidence record.",
+        effect=_derive_effect("propose_outcome"),
+        arguments=("evidence_id",),
+        required=("evidence_id",),
+        returns="An OutcomeProposal ready for human approval.",
+        stage="2",
+    ),
+    ToolName.LIST_PROPOSALS.value: ToolSpec(
+        name="list_proposals",
+        summary="List outcome proposals, optionally filtered by status.",
+        effect=_derive_effect("list_proposals"),
+        arguments=("status",),
+        returns="A list of OutcomeProposals.",
+        stage="2",
+    ),
+    ToolName.APPROVE_PROPOSAL.value: ToolSpec(
+        name="approve_proposal",
+        summary="Approve a proposal and write it as an Outcome.",
+        effect=_derive_effect("approve_proposal"),
+        arguments=("proposal_id", "statement", "importance", "satisfaction"),
+        required=("proposal_id",),
+        returns="The created Outcome.",
+        stage="2",
+    ),
+    ToolName.REJECT_PROPOSAL.value: ToolSpec(
+        name="reject_proposal",
+        summary="Reject a proposal; nothing is written to the ODI store.",
+        effect=_derive_effect("reject_proposal"),
+        arguments=("proposal_id",),
+        required=("proposal_id",),
+        returns="The rejected OutcomeProposal.",
+        stage="2",
     ),
 }
 

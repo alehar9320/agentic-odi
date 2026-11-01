@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
+from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
@@ -114,6 +115,7 @@ class Repository(Protocol):
     jobs: dict[str, Job]
     steps: dict[str, Step]
     outcomes: dict[str, Outcome]
+    proposals: dict[str, OutcomeProposal]
     customer_outcomes: dict[str, CustomerOutcome]
     evidence: dict[str, Evidence]
     signals: dict[str, Signal]
@@ -128,6 +130,7 @@ class Repository(Protocol):
     def delete_job(self, job_id: str) -> bool: ...
     def add_step(self, step: Step) -> Step: ...
     def get_step(self, step_id: str) -> Step | None: ...
+    def list_steps(self, limit: int | None = None, offset: int = 0) -> list[Step]: ...
     def get_steps_for_job(
         self, job_id: str, limit: int | None = None, offset: int = 0
     ) -> list[Step]: ...
@@ -197,6 +200,10 @@ class Repository(Protocol):
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
+    def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal: ...
+    def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None: ...
 
     def clear(self) -> None: ...
     def reload(self) -> None: ...
@@ -210,6 +217,7 @@ class InMemoryRepository:
         self.jobs: dict[str, Job] = {}
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
+        self.proposals: dict[str, OutcomeProposal] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
@@ -303,6 +311,32 @@ class InMemoryRepository:
                 current["step_id"] = None
                 self.evidence[key] = Evidence.model_validate(current)
         return True
+
+    def list_steps(self, limit: int | None = None, offset: int = 0) -> list[Step]:
+        return page(list(self.steps.values()), limit, offset)
+
+    def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal:
+        self.proposals[proposal.id] = proposal
+        return proposal
+
+    def get_proposal(self, proposal_id: str) -> OutcomeProposal | None:
+        return self.proposals.get(proposal_id)
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
+        props = list(self.proposals.values())
+        if status is not None:
+            props = [p for p in props if p.status == status]
+        return props
+
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None:
+        proposal = self.proposals.get(proposal_id)
+        if not proposal:
+            return None
+        current = proposal.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_proposal = OutcomeProposal.model_validate(current)
+        self.proposals[proposal_id] = new_proposal
+        return new_proposal
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
         self.outcomes[outcome.id] = outcome
