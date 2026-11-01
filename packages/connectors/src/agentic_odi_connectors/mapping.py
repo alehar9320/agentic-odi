@@ -3,6 +3,10 @@
 This module deliberately does not import the ODI store. It produces transport
 records shaped for ``core.Evidence``; the CLI (or any caller) owns persistence,
 so connector plumbing never leaks into the ODI repository.
+
+The draft is a transport shape, not a second domain model: it is kept equal to
+``Evidence`` by ``packages/connectors/tests/test_evidence_equivalence.py``, which
+is the only place allowed to read both.
 """
 
 from __future__ import annotations

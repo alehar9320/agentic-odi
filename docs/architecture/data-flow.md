@@ -136,6 +136,10 @@ The sink is a hand-off buffer, not storage: nothing survives the process, and
 `--dry-run` stops before both the sink append and the evidence writes. Evidence
 mapping is the only way connector data reaches the ODI repository, and it goes
 through the same `ODIService.add_evidence` path as a hand-entered record.
+`EvidenceDraft` is that path's transport shape, not a second domain model: it is
+held equal to `Evidence` by `packages/connectors/tests/test_evidence_equivalence.py`,
+which fails and names both files when either the fields or the `EvidenceItemType`
+vocabulary moves on one side only.
 
 ## The Conversation
 
