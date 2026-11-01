@@ -109,12 +109,16 @@ and model name, and test the connection with **Find models**. The CLI's
 
 ### The browser tier (edge models)
 
-Conversation turns in the Studio client have a fourth option that runs no
-server at all: quantized models executed on the visitor's own GPU via
-WebLLM (`apps/studio/src/edge/`). It engages only when no healthy paid
-endpoint is configured, after a one-time consent, and climbs a ladder
+Conversation turns in the Studio client have a fourth option on the way that
+runs no server at all: quantized models executed on the visitor's own GPU via
+WebLLM (`apps/studio/src/edge/`). It is designed to engage only when no healthy
+paid endpoint is configured, after a one-time consent, and to climb a ladder
 (1B → 3B → 8B) as the device proves capable and the user keeps working in
-the tab. The engine never reaches the `browser-model` capability from the
+the tab. **Not yet reachable by a person:** the consent control and the first
+download have no UI, so nothing sets consent or hosts Tier 1 and every turn
+still goes the existing way. See
+`docs/superpowers/plans/2026-11-01-edge-llm-ladder-remaining-work.md`.
+The engine never reaches the `browser-model` capability from the
 server manifests — a server cannot see a client GPU — so the Worker and
 sidecar keep reporting it `available: false`; only the browser's capability
 registry reports the truth. The hosted CSP admits `'wasm-unsafe-eval'` and
