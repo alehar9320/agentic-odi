@@ -284,7 +284,7 @@ export function OpportunityLandscape() {
           Capture an outcome to see it here.
         </p>
       ) : viewMode === "matrix" ? (
-        <OpportunityMatrixView
+        <OpportunityPlot
           outcomes={filteredOutcomes}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
@@ -350,13 +350,21 @@ export function OpportunityLandscape() {
   );
 }
 
-interface MatrixViewProps {
+interface PlotProps {
   outcomes: Outcome[];
   selectedOutcomeId: string | null;
+  /** The sample outcome the tour points at, drawn larger than the rest. */
+  highlightedOutcomeId?: string | null;
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
-  sample: boolean;
+  /** Labels the detail card as bundled sample data, not the reader's. */
+  sample?: boolean;
+  /**
+   * Drops the detail sidebar and stacks the plot, for a narrow container like
+   * the tour dialog. The panel keeps the full two-column layout.
+   */
+  compact?: boolean;
 }
 
 interface PlottedOutcome {
@@ -369,14 +377,16 @@ interface PlottedOutcome {
   cy: number;
 }
 
-function OpportunityMatrixView({
+export function OpportunityPlot({
   outcomes,
   selectedOutcomeId,
+  highlightedOutcomeId = null,
   onSelectOutcome,
   onHoverOutcome,
   activeOutcome,
-  sample,
-}: MatrixViewProps) {
+  sample = false,
+  compact = false,
+}: PlotProps) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -472,8 +482,12 @@ function OpportunityMatrixView({
 
   return (
     <div
-      className="opportunity-matrix"
-      style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}
+      className={`opportunity-matrix${compact ? " opportunity-matrix--compact" : ""}`}
+      style={{
+        display: "grid",
+        gridTemplateColumns: compact ? "1fr" : "1fr 320px",
+        gap: 16,
+      }}
     >
       {/* Interactive 2D Chart */}
       <div
@@ -559,6 +573,7 @@ function OpportunityMatrixView({
               const { outcome, cx, cy } = plot;
               const isSelected = selectedOutcomeId === outcome.id;
               const isHovered = activeOutcome?.id === outcome.id;
+              const isHighlighted = highlightedOutcomeId === outcome.id;
 
               let nodeColor = plot.underserved ? "#fbbf24" : "var(--studio-indigo)";
               if (plot.score >= 15) nodeColor = "#f87171";
@@ -595,20 +610,20 @@ function OpportunityMatrixView({
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={isSelected ? 9 : isHovered ? 8 : 6}
+                    r={isHighlighted ? 11 : isSelected ? 9 : isHovered ? 8 : 6}
                     fill={nodeColor}
-                    stroke="#0b0d13"
-                    strokeWidth="2"
-                    filter={plot.underserved || isSelected ? "url(#glowEffect)" : undefined}
+                    stroke={isHighlighted ? "#ffffff" : "#0b0d13"}
+                    strokeWidth={isHighlighted ? 3 : 2}
+                    filter={plot.underserved || isSelected || isHighlighted ? "url(#glowEffect)" : undefined}
                   />
 
                   {/* Node ID Label */}
                   <text
                     x={cx}
                     y={cy - 12}
-                    fill={isSelected || isHovered ? "#ffffff" : "var(--studio-muted)"}
-                    fontSize={isSelected ? "12" : "10"}
-                    fontWeight={isSelected || isHovered ? "700" : "500"}
+                    fill={isSelected || isHovered || isHighlighted ? "#ffffff" : "var(--studio-muted)"}
+                    fontSize={isSelected || isHighlighted ? "12" : "10"}
+                    fontWeight={isSelected || isHovered || isHighlighted ? "700" : "500"}
                     textAnchor="middle"
                   >
                     {outcome.id}
@@ -625,6 +640,7 @@ function OpportunityMatrixView({
               return null;
             }
             const isSelected = selectedOutcomeId === id;
+            const isHighlighted = highlightedOutcomeId === id;
             return (
               <button
                 key={id}
@@ -636,7 +652,8 @@ function OpportunityMatrixView({
                   }
                 }}
                 type="button"
-                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}`}
+                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}${isHighlighted ? " matrix-node--highlighted" : ""}`}
+                data-highlighted={isHighlighted ? "true" : undefined}
                 style={{ left: `${(plot.cx / 500) * 100}%`, top: `${(plot.cy / 360) * 100}%` }}
                 tabIndex={id === rovingId ? 0 : -1}
                 aria-pressed={isSelected}
@@ -679,27 +696,30 @@ function OpportunityMatrixView({
         </div>
       </div>
 
-      {/* Selected / Hovered Details Card Sidebar */}
-      <div>
-        {activeOutcome ? (
-          <div style={{ position: "sticky", top: 16 }}>
-            <OutcomeCard outcome={activeOutcome} sample={sample} />
-          </div>
-        ) : (
-          <div
-            style={{
-              padding: 24,
-              borderRadius: 12,
-              border: "1px dashed var(--studio-border)",
-              textAlign: "center",
-              color: "var(--studio-muted)",
-              fontSize: "0.88rem",
-            }}
-          >
-            Click or hover over any point in the Matrix to inspect detailed metrics, customer trace evidence, and simulate bet impact.
-          </div>
-        )}
-      </div>
+      {/* Selected / Hovered Details Card Sidebar. The compact plot is the
+          tour's: it shows the landing, not the inspection tools. */}
+      {compact ? null : (
+        <div>
+          {activeOutcome ? (
+            <div style={{ position: "sticky", top: 16 }}>
+              <OutcomeCard outcome={activeOutcome} sample={sample} />
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: 24,
+                borderRadius: 12,
+                border: "1px dashed var(--studio-border)",
+                textAlign: "center",
+                color: "var(--studio-muted)",
+                fontSize: "0.88rem",
+              }}
+            >
+              Click or hover over any point in the Matrix to inspect detailed metrics, customer trace evidence, and simulate bet impact.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
