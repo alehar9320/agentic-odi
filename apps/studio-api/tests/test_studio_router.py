@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from agentic_odi_core import InMemoryRepository
+from agentic_odi_core import InMemoryRepository, manual_claim_check
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from agentic_odi_studio_api.app import create_app
 from agentic_odi_studio_api.studio import router as router_module
@@ -66,6 +66,9 @@ def test_post_outcome_returns_the_normalized_result(monkeypatch) -> None:
                 "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8.5,
                 "satisfaction": 3.5,
+                # A by-hand score is recorded as unverified, with the reason it
+                # was not interrogated, rather than as an interrogated one.
+                "claim_check": manual_claim_check().model_dump(mode="json"),
             },
         )
     ]
@@ -117,6 +120,31 @@ def test_local_post_outcome_returns_the_outcome_object() -> None:
     assert body["id"]
     assert body["statement"] == "Minimize the time to ship a release when the build is green"
     assert body["opportunity_score"] == 12.0
+    # A by-hand score is unverified and says why, so it is never mistaken for
+    # an interrogated one.
+    assert body["claim_check"]["verified"] is False
+    assert body["claim_check"]["skips"][0]["reason"]
+
+
+def test_local_post_outcome_without_scores_carries_no_claim_check() -> None:
+    client = _client("local")
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+
+    response = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["importance"] is None
+    assert body["satisfaction"] is None
+    assert body["opportunity_score"] is None
+    assert body["claim_check"] is None
 
 
 def test_local_delete_returns_the_deleted_id() -> None:
