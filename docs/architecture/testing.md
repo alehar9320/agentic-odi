@@ -32,6 +32,8 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_schema.py` — schema creation and migration.
 - `test_events.py` — event-store schema and legacy-database backfill.
 - `test_intent_store.py` — append-only Intent Store ordering.
+- `test_schema_version.py` — the store's version gate: legacy migrate, current reopen
+  without a write, future-version refusal, and a failing migration rolling back.
 - `test_pagination.py` — list pagination across both repositories and the service.
 - `test_errors.py` — the ODI error hierarchy and its messages.
 - `test_evidence_not_found.py` — actionable evidence-not-found errors.

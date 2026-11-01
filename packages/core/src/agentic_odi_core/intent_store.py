@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from agentic_odi_core.errors import ConflictError, StoreError
+from agentic_odi_core.errors import ConflictError, SchemaVersionError, StoreError
 from agentic_odi_core.events import (
     DEFAULT_DEVICE,
     DEFAULT_WORKSPACE,
@@ -22,20 +23,150 @@ _COLUMNS = {
     "server_seq": "INTEGER",
 }
 
+CURRENT_SCHEMA_VERSION = 1
+
+Migration = Callable[[sqlite3.Connection], None]
+
+
+def _bootstrap_schema_meta(conn: sqlite3.Connection) -> None:
+    """v1: give the store a version table. Legacy databases are otherwise unchanged."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS schema_meta (
+            version INTEGER NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO schema_meta (version, updated_at) VALUES (?, ?)",
+        (1, datetime.now(timezone.utc).isoformat()),
+    )
+
+
+MIGRATIONS: dict[int, Migration] = {1: _bootstrap_schema_meta}
+
 
 class IntentStore:
     """SQLite implementation of the append-only event contract."""
 
     def __init__(self, db_path: str = "intent_store.db", check_same_thread: bool = True) -> None:
         self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
-        # WAL lets readers and one writer work at once; the busy timeout makes
-        # a second writer wait for the lock (the CLI, the sidecar, and a test
-        # can all hold a connection to the same file) instead of raising
-        # "database is locked" the moment the lock is taken.
-        self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA busy_timeout=5000;")
         self._closed = False
-        self._init_db()
+        self.schema_version = 0
+        try:
+            # The version gate runs before any write, including the WAL pragma
+            # below (which rewrites the file header): a refusal must leave the
+            # store's bytes untouched.
+            self.ensure_version()
+            try:
+                # WAL lets readers and one writer work at once; the busy timeout
+                # makes a second writer wait for the lock (the CLI, the sidecar,
+                # and a test can all hold a connection to the same file) instead
+                # of raising "database is locked" the moment the lock is taken.
+                self.conn.execute("PRAGMA journal_mode=WAL;")
+            except sqlite3.OperationalError as err:
+                raise StoreError(
+                    f"store file is not writable ({err}); the store needs write access "
+                    "to its file and directory"
+                ) from err
+            self._init_db()
+        except Exception:
+            self.conn.close()
+            self._closed = True
+            raise
+
+    def ensure_version(self) -> int:
+        """Read, migrate, or refuse the on-disk schema version. Called on open."""
+        version = self._read_stored_version()
+        if version > CURRENT_SCHEMA_VERSION:
+            raise SchemaVersionError(
+                f"database schema version {version} is newer than this build supports "
+                f"(version {CURRENT_SCHEMA_VERSION}); run `odi update` to upgrade, then retry"
+            )
+        if version == CURRENT_SCHEMA_VERSION:
+            self.schema_version = version
+            return version
+
+        missing = [
+            step
+            for step in range(version + 1, CURRENT_SCHEMA_VERSION + 1)
+            if step not in MIGRATIONS
+        ]
+        if missing:
+            raise SchemaVersionError(
+                f"database schema version {version} cannot reach version "
+                f"{CURRENT_SCHEMA_VERSION}: no registered migration for step {missing[0]}. "
+                f"Steps {missing} are missing from the registry; reinstall a build that "
+                "registers them or `odi update`"
+            )
+        # Python's implicit transaction handling only opens a transaction before
+        # DML, so a migration's CREATE/ALTER TABLE would commit on its own and
+        # survive a later step's failure. Drive BEGIN/COMMIT/ROLLBACK explicitly.
+        self._run_migrations(version)
+        self.schema_version = self._read_stored_version()
+        return self.schema_version
+
+    def _run_migrations(self, version: int) -> None:
+        previous_isolation = self.conn.isolation_level
+        self.conn.isolation_level = None
+        try:
+            try:
+                self.conn.execute("BEGIN")
+                for step in range(version + 1, CURRENT_SCHEMA_VERSION + 1):
+                    MIGRATIONS[step](self.conn)
+            except Exception as err:
+                self.conn.execute("ROLLBACK")
+                raise self._migration_error(version, err) from err
+            else:
+                self.conn.execute("COMMIT")
+        finally:
+            self.conn.isolation_level = previous_isolation
+
+    def _migration_error(self, version: int, err: Exception) -> StoreError:
+        if isinstance(err, sqlite3.OperationalError):
+            return SchemaVersionError(
+                f"store at version {version} needs a migration to version "
+                f"{CURRENT_SCHEMA_VERSION}, but the database file is not writable "
+                f"({err}); grant write permission to the store file or its directory"
+            )
+        return StoreError(
+            f"migration to version {CURRENT_SCHEMA_VERSION} failed: {err}; "
+            f"the store is unchanged at version {version}"
+        )
+
+    def _read_stored_version(self) -> int:
+        """0 for a legacy store that predates schema_meta; otherwise the stored version."""
+        has_meta = self.conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_meta'"
+        ).fetchone()
+        if not has_meta:
+            return 0
+        rows = self.conn.execute("SELECT version FROM schema_meta").fetchall()
+        if not rows:
+            raise SchemaVersionError(
+                "schema_meta table exists but records no version; the store is malformed. "
+                "Restore the database from a backup or open it with the version that created it"
+            )
+        if len(rows) != 1:
+            raise SchemaVersionError(
+                f"schema_meta records {len(rows)} versions; exactly one row is expected. "
+                "The store is malformed; restore the database from a backup"
+            )
+        version = rows[0][0]
+        if not isinstance(version, int) or isinstance(version, bool):
+            raise SchemaVersionError(
+                f"schema_meta records a non-integer version {version!r}; the store is "
+                "malformed. Restore the database from a backup"
+            )
+        if version < 1:
+            raise SchemaVersionError(
+                f"schema_meta records version {version}, which is not a valid schema "
+                "version (versions start at 1); the store is malformed. Restore the "
+                "database from a backup"
+            )
+        return int(version)
 
     def _init_db(self) -> None:
         with self.conn:
