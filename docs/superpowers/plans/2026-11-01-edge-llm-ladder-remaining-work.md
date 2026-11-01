@@ -50,7 +50,7 @@ rest of this file is what a reviewer should still expect to be absent.
 | `dc7988d` | 5 | `edge/manager.ts` + the `runTurn` seam and the relaxed sidecar guard |
 | `f39c3fa` | 6 | `edge/scheduler.ts` — ten served answers earn the next tier, consent-locked, idle/visible/SaveData-gated, single-engine-across-tabs |
 | `fd0bfe4` | 7 | `edge-downloading` / `edge-unlocked` banner kinds; the bridge subscribes to edge notices and stops claiming "Working by hand" while the edge answers |
-| this commit | 9 (first half) | `EdgeScheduler.bootstrap()` (rung zero), `EdgeManager.offerFor / grantAndStart / decline / isBusy`, the `ready` and `consent-changed` notices, and the `edge-offer` / `edge-ready` banners with both buttons wired through the dispatcher. `docs/local-llm.md` now describes a reachable feature. Landed out of plan order, before the Settings section, because nothing else on this branch matters while no person can switch it on. |
+| `d34d8e5` | 9 (first half) | `EdgeScheduler.bootstrap()` (rung zero), `EdgeManager.offerFor / grantAndStart / decline / isBusy`, the `ready` and `consent-changed` notices, and the `edge-offer` / `edge-ready` banners with both buttons wired through the dispatcher. `docs/local-llm.md` now describes a reachable feature. Landed out of plan order, before the Settings section, because nothing else on this branch matters while no person can switch it on. |
 
 Total for the eight feature commits, counting the code and docs they changed
 and excluding this document: 28 files, 3,009 lines added, 49 deleted, 83 new
@@ -78,9 +78,9 @@ Pattern to follow: the existing About section in the Settings panel.
 
 - [x] **Tier 1 bootstrap.** `EdgeScheduler.bootstrap()` fetches the weakest
       eligible tier as *first*, not only as *next*, and `EdgeManager` reaches it
-      from the consent answer. (Delivered in this commit.)
+      from the consent answer. (Delivered in `d34d8e5`.)
 - [x] A no-key visitor is offered the browser model in one sentence, with the
-      size, and has an explicit "Not now". (Delivered here as the `edge-offer`
+      size, and has an explicit "Not now". (Delivered in `d34d8e5` as the `edge-offer`
       strip; the intro-flow copy below is still open.)
 - [ ] First-run, no-key intro flow offers the browser model too — one consent, no
       jargon, no dead end, in the same words as the strip. Zero-config stays
@@ -89,7 +89,7 @@ Pattern to follow: the existing About section in the Settings panel.
 - [ ] `edge-active` marker on an edge reply in the transcript, so a person can
       tell which brain answered.
 - [x] `docs/local-llm.md` §"The browser tier" rewritten for what actually
-      shipped, including what has never been run on real hardware. (Done here.)
+      shipped, including what has never been run on real hardware. (Done in `d34d8e5`.)
 - [ ] Add the capability to the `README.md` capability table; update
       `docs/living-studio.md` and `.agents/rules` if they list capabilities.
 - [ ] State the divergence honestly: `router.py:1199` and `worker.ts:57` keep
