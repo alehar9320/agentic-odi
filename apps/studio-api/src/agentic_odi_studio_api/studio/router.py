@@ -34,6 +34,7 @@ from agentic_odi_core import (
     ValueOutOfRangeError,
     error_status,
     invalid_strategy_request,
+    manual_claim_check,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, Query, Request
@@ -637,16 +638,28 @@ async def delete_step(step_id: str, request: Request, mcp_url: str | None = Quer
 
 @router.post("/outcomes")
 async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
+    #: This endpoint is the by-hand capture path. A person typing two numbers is
+    #: not an interview, so a score with no supplied check is recorded as an
+    #: unverified one that says so — never as an interrogated score. The agent's
+    #: own writes go through the MCP tool directly and are gated there.
+    claim_check = body.claim_check
+    if claim_check is None and (body.importance is not None or body.satisfaction is not None):
+        claim_check = manual_claim_check()
+    arguments: dict[str, Any] = {
+        "job_id": body.job_id,
+        "statement": body.statement,
+    }
+    if body.importance is not None:
+        arguments["importance"] = body.importance
+    if body.satisfaction is not None:
+        arguments["satisfaction"] = body.satisfaction
+    if claim_check is not None:
+        arguments["claim_check"] = claim_check.model_dump(mode="json")
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.ADD_OUTCOME.value,
-            {
-                "job_id": body.job_id,
-                "statement": body.statement,
-                "importance": body.importance,
-                "satisfaction": body.satisfaction,
-            },
+            arguments,
         )
         return _payload_from_text(result)
     try:
@@ -655,6 +668,7 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             statement=body.statement,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            claim_check=claim_check,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
