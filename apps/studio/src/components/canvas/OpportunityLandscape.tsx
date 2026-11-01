@@ -81,6 +81,19 @@ export function OpportunityLandscape() {
     );
   }, [filteredOutcomes]);
 
+  // The count of sources behind each outcome, read from the canvas evidence
+  // list (which is `list_evidence()`), never a stored counter. The canvas
+  // refreshes, so the count moves with the records.
+  const sourceCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of canvas?.evidence ?? []) {
+      if (item.outcome_id) {
+        counts.set(item.outcome_id, (counts.get(item.outcome_id) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [canvas?.evidence]);
+
   function toggleOutcome(id: string) {
     const next = selectedOutcomeId === id ? null : id;
     setSelectedOutcomeId(next);
@@ -262,6 +275,7 @@ export function OpportunityLandscape() {
         <OpportunityTableView
           outcomes={sortedOutcomes}
           selectedOutcomeId={selectedOutcomeId}
+          sourceCounts={sourceCounts}
           onSelectOutcome={toggleOutcome}
         />
       ) : sortedOutcomes.length ? (
@@ -652,10 +666,12 @@ function OpportunityMatrixView({
 function OpportunityTableView({
   outcomes,
   selectedOutcomeId,
+  sourceCounts,
   onSelectOutcome,
 }: {
   outcomes: Outcome[];
   selectedOutcomeId: string | null;
+  sourceCounts: Map<string, number>;
   onSelectOutcome: (id: string) => void;
 }) {
   return (
@@ -668,6 +684,7 @@ function OpportunityTableView({
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Importance</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Satisfaction</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Opp. Score</th>
+            <th style={{ padding: "10px 14px", textAlign: "center" }}>Sources</th>
             <th style={{ padding: "10px 14px", textAlign: "center" }}>Status</th>
           </tr>
         </thead>
@@ -722,6 +739,9 @@ function OpportunityTableView({
                   }}
                 >
                   {opp.toFixed(1)}
+                </td>
+                <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                  {outcome.id ? (sourceCounts.get(outcome.id) ?? 0) : 0}
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span

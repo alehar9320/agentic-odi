@@ -121,6 +121,25 @@ describe("OpportunityLandscape Data Visualization", () => {
     fireEvent.click(checkbox);
     expect(checkbox).toBeChecked();
   });
+
+  it("counts the sources behind each outcome from the evidence list, not a stored counter", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        evidence: [
+          { id: "ev-1", outcome_id: "O-101", content: "One." },
+          { id: "ev-2", outcome_id: "O-101", content: "Two." },
+          { id: "ev-3", outcome_id: "O-102", content: "Three." },
+        ],
+      },
+    } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const row = screen.getByRole("row", { name: /Minimize time spent syncing secrets/i });
+    expect(row).toHaveTextContent("2");
+  });
 });
 
 describe("OpportunityLandscape accessibility", () => {

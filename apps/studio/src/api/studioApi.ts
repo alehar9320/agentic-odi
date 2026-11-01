@@ -14,6 +14,7 @@ import type {
   Conversation,
   ConversationTree,
   CreateJobPayload,
+  Evidence,
   Job,
   LatestConversation,
   LlmHealth,
@@ -355,6 +356,20 @@ export function updateOutcome(
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {
   return deleteJson<{ deleted: string }>(
     `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+/**
+ * The verbatim evidence behind one outcome. The count a surface shows is this
+ * list's length, never a stored counter, so it cannot drift from the records.
+ */
+export function fetchOutcomeEvidence(
+  outcomeId: string,
+  mcpUrl?: string,
+): Promise<{ ok: boolean; result: Evidence[] }> {
+  const query = mcpUrl ? `?mcp_url=${encodeURIComponent(mcpUrl)}` : "";
+  return getJson<{ ok: boolean; result: Evidence[] }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/evidence${query}`,
   );
 }
 

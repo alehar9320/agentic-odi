@@ -678,6 +678,30 @@ async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Re
     return outcome.model_dump(mode="json")
 
 
+@router.get("/outcomes/{outcome_id}/evidence")
+async def get_outcome_evidence(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """The verbatim evidence behind one outcome, read from ``list_evidence``.
+
+    The count a surface shows is the length of this list, never a stored
+    counter, so a second truth cannot drift from the first. An unknown outcome
+    is a not-found error, distinct from an outcome that simply has no evidence.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.LIST_EVIDENCE.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    service = _service(request)
+    if service.get_outcome(outcome_id) is None:
+        raise _as_http_error(OutcomeNotFoundError(outcome_id))
+    evidence = service.list_evidence(outcome_id=outcome_id)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in evidence]}
+
+
 @router.delete("/outcomes/{outcome_id}")
 async def delete_outcome(
     outcome_id: str, request: Request, mcp_url: str | None = Query(None)

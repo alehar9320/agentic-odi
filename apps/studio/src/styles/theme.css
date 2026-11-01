@@ -1583,6 +1583,29 @@ a {
   line-height: 1.5;
 }
 
+.card__evidence p {
+  margin: 0 0 6px;
+}
+
+.card__evidence-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card__evidence-list blockquote {
+  margin: 2px 0 0;
+  font-style: italic;
+}
+
+.card__evidence-source {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .card__actions {
   display: flex;
   flex-wrap: wrap;

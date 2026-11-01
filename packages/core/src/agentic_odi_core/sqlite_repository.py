@@ -235,6 +235,17 @@ class SQLiteRepository(Repository):
                 ]
             for candidate_id in candidate_cascade:
                 self.candidates.pop(candidate_id, None)
+            # Evidence is kept; only its quote pointer is nulled, so a decision
+            # made from the evidence survives the transcript being deleted.
+            evidence_cascade = p.get("cascaded_evidence_ids")
+            if evidence_cascade is None:
+                evidence_cascade = [
+                    k for k, v in self.evidence.items() if v.raw.get("interview_id") == interview_id
+                ]
+            for evidence_id in evidence_cascade:
+                evidence = self.evidence.get(evidence_id)
+                if evidence is not None:
+                    evidence.raw["quote_id"] = None
         elif et == "CANDIDATE_DELETED":
             self.candidates.pop(p["id"], None)
         elif et == "CUSTOMER_OUTCOME_DELETED":
@@ -869,12 +880,18 @@ class SQLiteRepository(Repository):
             cascaded_candidates = [
                 c for c, v in self.candidates.items() if v.interview_id == interview_id
             ]
+            # Evidence survives, but its quote pointer is nulled: record which
+            # rows changed so replay reproduces the nulling, not just the delete.
+            cascaded_evidence = [
+                k for k, v in self.evidence.items() if v.raw.get("interview_id") == interview_id
+            ]
             self.store.append(
                 "INTERVIEW_DELETED",
                 {
                     "id": interview_id,
                     "cascaded_quote_ids": cascaded,
                     "cascaded_candidate_ids": cascaded_candidates,
+                    "cascaded_evidence_ids": cascaded_evidence,
                 },
                 workspace_id=self._workspace_id,
                 device_id=self._device_id,
