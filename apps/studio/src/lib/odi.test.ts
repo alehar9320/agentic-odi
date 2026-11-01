@@ -5,6 +5,7 @@ import {
   isUnderserved,
   opportunityPill,
   opportunityScore,
+  UNDERSERVED_THRESHOLD,
 } from "./odi";
 
 describe("opportunityScore", () => {
@@ -28,6 +29,12 @@ describe("isUnderserved", () => {
   it("treats nullish scores as served", () => {
     expect(isUnderserved(null)).toBe(false);
     expect(isUnderserved(undefined)).toBe(false);
+  });
+
+  it("sits on the exported constant, not on a literal at the call site", () => {
+    expect(UNDERSERVED_THRESHOLD).toBe(10);
+    expect(isUnderserved(UNDERSERVED_THRESHOLD)).toBe(false);
+    expect(isUnderserved(UNDERSERVED_THRESHOLD + 0.1)).toBe(true);
   });
 });
 

@@ -64,3 +64,13 @@ describe("DirectCapture", () => {
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 });
+
+describe("DirectCapture score preview", () => {
+  // The capture form is where a score is born, and it showed two decimals while
+  // the card it produces shows one — "13.50" here, "13.5" there.
+  it("shows the computed opportunity score to one decimal", () => {
+    const { container } = render(<DirectCapture />);
+
+    expect(container.querySelector(".score-preview b")?.textContent).toBe("13.5");
+  });
+});

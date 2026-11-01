@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { asStudioError } from "../../api/studioApi";
-import { isUnderserved, opportunityScore } from "../../lib/odi";
+import { formatOpportunityScore, isUnderserved, opportunityScore } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { StudioError } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -154,7 +154,7 @@ export function DirectCapture() {
         </div>
 
         <p className="score-preview">
-          Opportunity <b>{calcOpp.toFixed(2)}</b>
+          Opportunity <b>{formatOpportunityScore(calcOpp)}</b>
           <span>{isUnderserved(calcOpp) ? "underserved" : "appropriately served"}</span>
         </p>
 

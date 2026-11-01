@@ -43,6 +43,7 @@ hand-edited record cannot disagree about what a valid outcome is.
 | Statements can be checked before writing | `evaluate_outcome` MCP tool, `odi desired-outcomes evaluate`, `odi evaluate` | Returns `valid`, direction, unit, object, clarifier, issues, suggestions |
 | The eight Universal Job Map stages are one constant | `JOB_STAGE_ORDER` and `job_stage_catalog()` (`models.py`), generated to `apps/studio/src/domain/jobStages.ts` | `scripts/gen_job_stages.py` regenerates the file; `tests/scripts/test_gen_job_stages.py` fails if it is stale |
 | Steps occupy a stage | `Step.stage_index` (`ge=1, le=8`) and `Step.stage` (`JobStage`) | Position is optional but bounded when present |
+| A score above 10 is "underserved" | `UNDERSERVED_SCORE` (`evaluation.py:13`) and `isUnderserved` with `UNDERSERVED_THRESHOLD` (`apps/studio/src/lib/odi.ts:9`) | `classify_opportunity` buckets strictly above the line, so exactly 10 reads as served; `tests/test_underserved_threshold_parity.py` fails if the Python and TypeScript numbers ever disagree |
 | Every adapter exposes the same tools | `ToolName` / `TOOL_SPECS` in `contract.py` | `tests/contract/test_mcp_contract.py` and `test_cli_contract.py` fail on drift |
 
 The statement checker is deliberately mechanical: it requires a leading
