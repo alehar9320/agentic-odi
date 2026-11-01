@@ -234,7 +234,7 @@ request:
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy apps packages && uv run pytest
-uv run python scripts/doc_check.py   # documented commands, paths, routes, and env vars exist
+uv run python scripts/doc_check.py   # documented commands, paths, routes, env vars, and the assistant-ui ledger hold up
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage
