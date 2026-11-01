@@ -385,49 +385,41 @@ describe("first-run tour", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { level: 2 })).toHaveTextContent(
-      "What do you want to win?",
+      "What is this person trying to get done?",
     );
+    // The sample is labelled where it appears, and nothing is written yet.
+    expect(within(dialog).getByText("Sample")).toBeInTheDocument();
+    expect(window.localStorage.getItem("studio.brief")).toBeNull();
   });
 
-  it("starts the boss-priority conversation from the tour", async () => {
+  it("rehearses the sample and leaves the store untouched", async () => {
+    prepareFreshRun();
+    const { createJob } = await import("./api/studioApi");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show me around" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // The tour is a rehearsal: it never creates a job from the sample.
+    expect(createJob).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("studio.brief")).toBeNull();
+  });
+
+  it("skips the tour in one click and does not nag again", async () => {
     prepareFreshRun();
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Show me around" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: /My boss handed me a priority/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip the tour" }));
 
-    expect(
-      await screen.findByText("A quick look at your instruments."),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Make it real" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog")).toBeNull();
-    });
-    expect(
-      await screen.findByText(/My boss handed me a priority\. Help me turn it/),
-    ).toBeInTheDocument();
-  });
-
-  it("starts the find-opportunity conversation from the tour", async () => {
-    prepareFreshRun();
-    render(<App />);
-
-    fireEvent.click(await screen.findByRole("button", { name: "Show me around" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: /Help me find the next one/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await screen.findByText("A quick look at your instruments.");
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Find my next opportunity" }));
-
-    expect(
-      await screen.findByText(/I need to find the next opportunity worth chasing/),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const stored = JSON.parse(
+      window.localStorage.getItem("studio.onboarding") ?? "null",
+    );
+    expect(stored).toMatchObject({ status: "skipped", reason: "not-now" });
   });
 });
 

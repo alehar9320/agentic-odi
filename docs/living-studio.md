@@ -38,7 +38,7 @@ The Studio opens as a conversation, not a dashboard.
 | Surface | What it does |
 |---|---|
 | **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
-| **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. |
+| **Product tour** | An optional three-scene rehearsal on one named sample brief: **hear** a customer quote, **score** the outcome it implies, and **place** it on the landscape. Every scene is labelled **Sample**, the sample is never stored or counted, and each scene has its own **Skip this scene** and **Skip the tour**. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. Leaving and returning resumes at the same scene. |
 | **Context conversation** | Opened when you ask for it — the **Start with you and your team** starter, the context hint, `/start`, or Settings. A five-turn introduction in the chat, led by the agent: who you are and your team, who feels the problem first, what they are trying to win, where it breaks, and what you already have. One question at a time, examples shown as muted text, with **Skip this question** and **Explore on my own** always available. The five answers come back as an editable card, in your words; skipping stores nothing, and progress is kept as a draft. |
 | **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
 | **Starter cards** | Above the composer, three canvas-aware conversation cards name a situation the person is actually in rather than one of our nouns: **Turn 40 interview notes into one bet**, **Find what the churn spike is telling you**, and **Inherit a roadmap without inheriting its assumptions**. An empty canvas always offers those three, in that order; once the canvas holds outcomes or jobs the second and third swap to **Pressure-test a bet** and **Capture what you heard**. Each card carries a subtitle and the artifact it produces (`artifact` on `StudioSuggestion`), which the card layout (#317) renders. Select one to start that prompt in the thread — the prompt is sent verbatim, and it opens with the material the person brings. **Opportunity landscape** remains a separate, quiet shortcut. |
@@ -79,20 +79,29 @@ Unknown commands produce a transcript notice pointing at `/help`.
 ### The product tour
 
 The stage is the front door; the tour is an answer to "show me around", not a
-gate. It is skippable at every step (`Skip the tour` or `Escape`), resumable
-(progress is stored after every transition in `localStorage["studio.onboarding"]`),
-and replayable from Settings. Nothing opens it automatically, and a fresh
-install writes no record until the person asks for it.
+gate. It rehearses the ODI loop in three scenes on one labelled sample brief
+(`apps/studio/src/lib/sampleLoop.ts`): hear a quote, score the outcome it
+implies, and see where it lands. Every scene shows **Skip this scene** and
+**Skip the tour**, and `Escape` is the same one click; leaving records why
+(`not-now` or `dismissed`) in the stored record. Progress is stored after every
+transition in `localStorage["studio.onboarding"]`, so a reload resumes at the
+same scene, and it is replayable from Settings. Nothing opens it automatically,
+and a fresh install writes no record until the person asks for it.
+
+The sample is data, not a store write: it carries `source: "sample"` and
+`simulated: true`, it is built once and frozen, and it never reaches
+IndexedDB, the canvas, the rail counts, or the landscape totals.
 
 Everything lives in `apps/studio/src/onboarding/`:
 
 | File | Role |
 |---|---|
-| `content.ts` | Steps and goal copy as typed data — the only place the words live |
-| `machine.ts` | Pure state transitions, no React or storage |
+| `content.ts` | The three scenes as typed data — the only place the words live |
+| `machine.ts` | Pure state transitions (`{ status, scene, reason }`), no React or storage |
 | `storage.ts` | Versioned, defensive `localStorage` persistence |
 | `OnboardingProvider.tsx` | Explicit opening, persistence, replay |
-| `FirstRunWizard.tsx`, `steps.tsx`, `onboarding.css` | The dialog |
+| `FirstRunWizard.tsx`, `steps.tsx`, `onboarding.css` | The dialog and the scene router |
+| `../lib/sampleLoop.ts` | The one sample brief the scenes rehearse on |
 | `../features/flags.ts` | The `firstRunWizard` toggle |
 
 `App.tsx` only wires the provider and the wizard around the existing shell;
