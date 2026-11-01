@@ -81,6 +81,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ClaimOut,
     ConnectorListItem,
     ConnectorOperationResponse,
+    ConversationModel,
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
@@ -1072,6 +1073,17 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
 @router.post("/conversations", response_model=ConversationResponse)
 def create_conversation(request: Request) -> ConversationResponse:
     return ConversationResponse(conversation=_memory(request).create_conversation().to_dict())
+
+
+@router.get("/conversations", response_model=list[ConversationModel])
+def list_conversations(
+    request: Request,
+    limit: int | None = Query(None, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> list[ConversationModel]:
+    """List all conversations, newest first, capped by ``limit``."""
+    conversations = _memory(request).list_conversations(limit=limit, offset=offset)
+    return [ConversationModel(**conversation.to_dict()) for conversation in conversations]
 
 
 @router.get("/conversations/{conversation_id}/tree", response_model=ConversationTreeResponse)
