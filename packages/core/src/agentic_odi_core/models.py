@@ -127,6 +127,44 @@ class Step(BaseModel):
     )
 
 
+class ClaimSkip(BaseModel):
+    """One question that went unanswered, and why it was skipped.
+
+    A skip without a reason is not a skip, it is a missing answer, so
+    ``reason`` is required and must not be blank.
+    """
+
+    question: str = Field(..., description="The question that was not answered")
+    reason: str = Field(..., description="Why it was skipped; never blank")
+
+
+class ClaimCheck(BaseModel):
+    """The questions behind a score: what was asked, answered, or skipped.
+
+    Two numbers are not provenance. A score that carries a claim check says
+    which questions produced it — ``asked`` — and what came back: the
+    ``answers`` the person gave and the ``skips`` with a recorded reason.
+
+    ``verified`` is derived, never typed in: a check is verified when at least
+    one question was answered by the person. A check of only skips is
+    unverified, so an outcome built on an assumption says so instead of
+    borrowing the confidence of a number.
+    """
+
+    asked: list[str] = Field(default_factory=list, description="The questions put to the person")
+    answers: list[str] = Field(
+        default_factory=list, description="The answers the person gave, in order"
+    )
+    skips: list[ClaimSkip] = Field(
+        default_factory=list, description="Questions skipped, each with a reason"
+    )
+
+    @computed_field
+    @property
+    def verified(self) -> bool:
+        return bool(self.answers)
+
+
 class Outcome(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str = Field(..., description="The ID of the Job this outcome relates to")
@@ -142,6 +180,9 @@ class Outcome(BaseModel):
     )
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
+    )
+    claim_check: ClaimCheck | None = Field(
+        None, description="The questions that produced the score, and what came back"
     )
 
 

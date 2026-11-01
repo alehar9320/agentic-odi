@@ -7,12 +7,14 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "agentic-odi-core",
+    "agentic-odi-connectors",
     "fastmcp>=4.1.0",
     "openai>=3.28.0",
 ]
 
 [tool.uv.sources]
 agentic-odi-core = { workspace = true }
+agentic-odi-connectors = { workspace = true }
 
 [project.scripts]
 agentic-odi-studio-api = "agentic_odi_studio_api.main:main"

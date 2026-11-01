@@ -9,17 +9,20 @@ Anthony W. Ulwick's *What is Outcome-Driven Innovation?* (committed under
 ## What it is
 
 ODI treats a product decision as a claim about a customer's job, and a claim is
-only useful if it can be measured and argued with. The contract has four parts:
+only useful if it can be measured and argued with. The contract has five parts:
 
 1. **A Job-to-be-Done** — a stable functional goal, not a product or a feature.
 2. **Desired outcomes** — the metrics a customer uses to judge success, written
    as `[Direction] + [Unit of Measure] + [Object of Control] + [Contextual Clarifier]`.
 3. **Two scores per outcome** — importance and satisfaction, both on a 1–10
-   scale.
+   scale. Both are optional: an unscored outcome is a legal record.
 4. **An opportunity score** — `importance + max(importance − satisfaction, 0)`,
    with **> 10 underserved**, **= 10 served**, **< 10 overserved**.
+5. **A claim check on a score** — a scored outcome carries the questions behind
+   the number: what was `asked`, the `answers` that came back, and any `skips`
+   with a reason. `verified` is derived from the answers, never typed in.
 
-Everything else (segments, strategy, the Job Map) is downstream of those four.
+Everything else (segments, strategy, the Job Map) is downstream of those five.
 
 ## Why it exists
 
@@ -35,6 +38,7 @@ hand-edited record cannot disagree about what a valid outcome is.
 |---|---|---|
 | Importance and satisfaction are 1–10 | `Outcome` fields (`packages/core/src/agentic_odi_core/models.py:116-121`) and `ODIService.add_outcome` (`services.py:411-414`) | Pydantic rejects out-of-range values; the service raises `ValueOutOfRangeError` before writing |
 | Opportunity score is computed, not supplied | `compute_opportunity_score` (`models.py:85-87`), called by `add_outcome` and the SQLite update path | A caller cannot store a hand-picked score |
+| A score carries the questions behind it | `ClaimCheck` on `Outcome` (`models.py`), `require_claim_check` and `ODIService.add_outcome` (`services.py`), the `add_outcome` MCP tool (`apps/mcp-server/.../mcp_server.py`) | The MCP tool refuses a score with no `claim_check`; the check records `asked`/`answers`/`skips` and derives `verified`. Unscored outcomes stay legal; a skip without a reason is rejected |
 | Outcome statements follow the ODI format | `evaluate_outcome_statement` (`evaluation.py:84-147`) via `ODIService.add_outcome(validate_statement=True)` | Invalid statements raise `InvalidOutcomeStatementError` with issues and suggestions |
 | Statements can be checked before writing | `evaluate_outcome` MCP tool, `odi desired-outcomes evaluate`, `odi evaluate` | Returns `valid`, direction, unit, object, clarifier, issues, suggestions |
 | The eight Universal Job Map stages are one constant | `JOB_STAGE_ORDER` and `job_stage_catalog()` (`models.py`), generated to `apps/studio/src/domain/jobStages.ts` | `scripts/gen_job_stages.py` regenerates the file; `tests/scripts/test_gen_job_stages.py` fails if it is stale |

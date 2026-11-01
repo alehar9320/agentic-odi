@@ -18,6 +18,7 @@ const mockCanvasData = {
 const harness = vi.hoisted(() => ({
   state: {
     canvasState: { kind: "ready", data: null } as unknown as CanvasState,
+    canvasCached: false,
     refreshCanvas: vi.fn(),
     requestSimulate: vi.fn(),
     openPanel: vi.fn(),
@@ -201,6 +202,10 @@ describe("OpportunityLandscape accessibility", () => {
 });
 
 describe("OpportunityLandscape canvas states", () => {
+  beforeEach(() => {
+    harness.state.canvasCached = false;
+  });
+
   it("shows the failure and a retry instead of the metrics when the canvas failed", () => {
     harness.state.canvasState = {
       kind: "error",
@@ -228,11 +233,15 @@ describe("OpportunityLandscape canvas states", () => {
       kind: "empty",
       data: { jobs: [], steps: [], outcomes: [], source: "local" },
     } as unknown as CanvasState;
+    harness.state.openPanel = vi.fn();
 
     render(<OpportunityLandscape />);
 
-    expect(screen.getByText(/no opportunities yet/i)).toBeInTheDocument();
+    expect(screen.getByText("No saved copy on this device")).toBeInTheDocument();
     expect(screen.queryByText("Active Job Map Contexts")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /capture an outcome/i }));
+    expect(harness.state.openPanel).toHaveBeenCalledWith("capture");
   });
 
   it("shows why the seed board is standing in when the canvas says so", () => {
@@ -273,7 +282,7 @@ describe("OpportunityLandscape canvas states", () => {
     expect(screen.queryByText(/demo data/i)).toBeNull();
   });
 
-  it("shows the skeleton while a warm canvas reloads", () => {
+  it("draws the held data on a warm reload instead of a skeleton", () => {
     harness.state.canvasState = {
       kind: "loading",
       data: mockCanvasData,
@@ -281,7 +290,63 @@ describe("OpportunityLandscape canvas states", () => {
 
     const { container } = render(<OpportunityLandscape />);
 
-    expect(container.textContent).not.toContain("Active Job Map Contexts");
+    expect(container.textContent).toContain("Active Job Map Contexts");
+    expect(container.querySelector(".skeleton")).toBeNull();
+  });
+
+  it("draws the saved copy and says when it was saved", () => {
+    harness.state.canvasState = {
+      kind: "loading",
+      data: {
+        ...mockCanvasData,
+        provenance: {
+          kind: "live",
+          reason: "store",
+          generated_at: new Date(Date.now() - 4 * 60_000).toISOString(),
+          record_counts: { jobs: 1, steps: 1, outcomes: 2, evidence: 0 },
+        },
+      },
+    } as unknown as CanvasState;
+    harness.state.canvasCached = true;
+
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.textContent).toContain("Active Job Map Contexts");
+    expect(container.querySelector(".skeleton")).toBeNull();
+    expect(screen.getByText("Saved 4 minutes ago")).toBeInTheDocument();
+  });
+
+  it("keeps the skeleton when a genuinely empty store is still loading", () => {
+    harness.state.canvasState = {
+      kind: "loading",
+      data: { jobs: [], steps: [], outcomes: [], source: "local" },
+    } as unknown as CanvasState;
+
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.querySelector(".skeleton")).not.toBeNull();
+  });
+
+  it("does not caption a saved copy that the warning strip has displaced", () => {
+    harness.state.canvasState = {
+      kind: "loading",
+      data: {
+        ...mockCanvasData,
+        warnings: ["MCP endpoint unreachable"],
+        provenance: {
+          kind: "seed",
+          reason: "mcp_unreachable",
+          generated_at: new Date(Date.now() - 4 * 60_000).toISOString(),
+          record_counts: { jobs: 1, steps: 1, outcomes: 2, evidence: 0 },
+        },
+      },
+    } as unknown as CanvasState;
+    harness.state.canvasCached = true;
+
+    render(<OpportunityLandscape />);
+
+    expect(screen.getByText(/mcp endpoint unreachable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/saved/i)).toBeNull();
   });
 });
 

@@ -1800,6 +1800,25 @@ a {
   line-height: 1.45;
 }
 
+.field__save {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.settings__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings__save {
+  margin: 0;
+  color: var(--green);
+  font-size: 0.7rem;
+}
+
 .settings__model-state {
   display: flex;
   flex-wrap: wrap;
@@ -2239,6 +2258,23 @@ input[type="range"] {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* The provenance chip is a sentence you can act on, not a badge: a whole
+   uppercase phrase is shouting, and a dead label wastes the one honest place
+   to offer the fix. */
+button.message__tag {
+  background: none;
+  cursor: pointer;
+  font-weight: 550;
+  font-size: 0.66rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+button.message__tag:hover {
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #f5c67a;
 }
 
 /* A failure shown in place of the thing that failed. */
@@ -3016,6 +3052,13 @@ input[type="range"] {
 
 .studio-empty__body {
   margin: 6px 0 0;
+  color: var(--studio-muted);
+  font-size: 0.8rem;
+}
+
+/* A board drawn from the saved copy says when that copy was saved. */
+.canvas-saved {
+  margin: 8px 0 0;
   color: var(--studio-muted);
   font-size: 0.8rem;
 }

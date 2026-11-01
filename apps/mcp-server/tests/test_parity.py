@@ -5,6 +5,11 @@ from agentic_odi_mcp_server import mcp
 from fastmcp import Client
 
 
+def _claim_check() -> dict:
+    """A minimal, honest claim check: a question and the answer it produced."""
+    return {"asked": ["How often does this happen?"], "answers": ["Every week"]}
+
+
 async def _new_job(client) -> str:
     res = await client.call_tool("add_job", {"name": "Job"})
     return json.loads(res.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
@@ -21,6 +26,7 @@ async def test_step_and_outcome_get_update_delete():
                 "statement": "Minimize the time it takes to deploy when releasing",
                 "importance": 8,
                 "satisfaction": 4,
+                "claim_check": _claim_check(),
             },
         )
         step = await client.call_tool("add_step", {"job_id": job_id, "name": "S", "order": 1})
@@ -39,6 +45,7 @@ async def test_step_and_outcome_get_update_delete():
                 "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8,
                 "satisfaction": 4,
+                "claim_check": _claim_check(),
             },
         )
         outcome_id = json.loads(out.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
@@ -117,6 +124,7 @@ async def test_update_outcome_out_of_range_returns_error_string():
                 "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8,
                 "satisfaction": 4,
+                "claim_check": _claim_check(),
             },
         )
         outcome_id = json.loads(out.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
