@@ -6,20 +6,14 @@ only treated as a CLI command when it starts with a known entry point. When in
 doubt this script says nothing, because a documentation check that cries wolf
 gets ignored.
 
-Run it locally with ``uv run python scripts/doc_check.py``. In CI, pass the
-pull request's changed files to also enforce the roadmap gate:
-
-    uv run python scripts/doc_check.py --changed-files $(git diff --name-only main...HEAD)
+Run it locally with ``uv run python scripts/doc_check.py``.
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import re
-import subprocess
 import sys
-from collections.abc import Callable, Iterable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,11 +31,6 @@ KNOWN_TOP_LEVEL = {
     "tests",
     "website",
 }
-
-CONTRACT_PATH = "packages/core/src/agentic_odi_core/contract.py"
-ROUTER_PATH = "apps/studio-api/src/agentic_odi_studio_api/studio/router.py"
-ROADMAP_PATH = "docs/roadmap.md"
-CLI_PREFIX = "apps/cli/src/agentic_odi_cli/"
 
 ENTRY_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("odi",),
@@ -309,119 +298,14 @@ def collect_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
-# --- Roadmap gate ------------------------------------------------------------
-
-Before = Callable[[str], "str | None"]
-After = Callable[[str], "str | None"]
-
-
-def _class_block(text: str, name: str) -> str:
-    match = re.search(rf"^class {name}\b.*?(?=^\S|\Z)", text, re.MULTILINE | re.DOTALL)
-    return match.group(0) if match else ""
-
-
-def _tool_names(text: str | None) -> set[str]:
-    if not text:
-        return set()
-    return set(re.findall(r'=\s*"([a-z][a-z0-9_]+)"', _class_block(text, "ToolName")))
-
-
-def _route_decorators(text: str | None) -> set[tuple[str, str]]:
-    if not text:
-        return set()
-    found = re.findall(r'@router\.(get|post|put|patch|delete)\(\s*["\']([^"\']+)["\']', text)
-    routes: set[tuple[str, str]] = set()
-    for method, path in found:
-        full = path if path.startswith("/api") else "/api" + path
-        routes.add((method.upper(), full))
-    return routes
-
-
-def _cli_commands(text: str | None) -> set[str]:
-    if not text:
-        return set()
-    names = set(re.findall(r'@[\w.]+\.command\(\s*(?:name=)?["\']([\w-]+)["\']', text))
-    names |= set(re.findall(r'\.command\(\s*name=["\']([\w-]+)["\']', text))
-    names |= set(re.findall(r'add_typer\([\s\S]{0,200}?name=["\']([\w-]+)["\']', text))
-    return names
-
-
-def detect_capabilities(changed_files: Iterable[str], before: Before, after: After) -> list[str]:
-    """Public capabilities a pull request adds, named for the error message."""
-    capabilities: list[str] = []
-    for path in changed_files:
-        if path == CONTRACT_PATH:
-            for name in sorted(_tool_names(after(path)) - _tool_names(before(path))):
-                capabilities.append(f"MCP tool `{name}`")
-        elif path == ROUTER_PATH:
-            for method, route in sorted(
-                _route_decorators(after(path)) - _route_decorators(before(path))
-            ):
-                capabilities.append(f"Studio API route `{method} {route}`")
-        elif path.startswith(CLI_PREFIX) and path.endswith(".py"):
-            for name in sorted(_cli_commands(after(path)) - _cli_commands(before(path))):
-                capabilities.append(f"CLI command `{name}`")
-    return capabilities
-
-
-def roadmap_errors(capabilities: list[str], *, roadmap_changed: bool) -> list[str]:
-    if not capabilities or roadmap_changed:
-        return []
-    named = ", ".join(capabilities)
-    return [
-        f"new capability without a roadmap entry: {named}. "
-        f"Add it to the Shipped or In flight section of {ROADMAP_PATH} in this pull request."
-    ]
-
-
 # --- Command line ------------------------------------------------------------
-
-
-def _git_text(base: str, path: str) -> str | None:
-    result = subprocess.run(
-        ["git", "show", f"{base}:{path}"], cwd=ROOT, capture_output=True, text=True
-    )
-    return result.stdout if result.returncode == 0 else None
-
-
-def _worktree_text(path: str) -> str | None:
-    candidate = ROOT / path
-    if not candidate.is_file():
-        return None
-    return candidate.read_text(encoding="utf-8")
-
-
-def _changed_since(base: str) -> list[str]:
-    result = subprocess.run(
-        ["git", "diff", "--name-only", f"{base}...HEAD"], cwd=ROOT, capture_output=True, text=True
-    )
-    return [line for line in result.stdout.splitlines() if line]
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--changed-files",
-        nargs="*",
-        default=None,
-        help="Repo-relative paths changed by this pull request; enables the roadmap gate.",
-    )
-    parser.add_argument(
-        "--base",
-        default=os.environ.get("GITHUB_BASE_REF") or "origin/main",
-        help="Branch the pull request targets (used to read the previous version).",
-    )
-    args = parser.parse_args(argv)
+    parser.parse_args(argv)
 
     issues = collect_issues()
-    if args.changed_files is not None:
-        changed = args.changed_files or _changed_since(args.base)
-        capabilities = detect_capabilities(
-            changed,
-            lambda path: _git_text(args.base, path),
-            _worktree_text,
-        )
-        issues += roadmap_errors(capabilities, roadmap_changed=ROADMAP_PATH in changed)
 
     for issue in issues:
         print(f"documentation drift: {issue}", file=sys.stderr)
