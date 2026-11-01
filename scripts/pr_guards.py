@@ -10,7 +10,8 @@ Three deterministic gates (failures):
   * JSON block      - the machine-readable diff summary must match the diff
 
 Two advisory gates (warnings):
-  * body truth      - natural-language claims about files and tests
+  * body truth      - natural-language claims about files and tests, and the
+                      ``Reuses:`` block a change adding new source owes
   * fabrication     - patterns that have shipped fabricated work before
   * branch freshness - a stale base is worth a rebase, not a block
 
@@ -312,6 +313,21 @@ def _strip_fenced_blocks(text: str) -> str:
     return _FENCE_RE.sub("", text)
 
 
+_SOURCE_SUFFIXES = (".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".css")
+_REUSE_REPORT_RE = re.compile(r"^\s*[-*+]?\s*\**\s*Reuses\s*\**\s*:", re.IGNORECASE | re.MULTILINE)
+
+
+def _new_source_files(added_paths: Sequence[str], config: GuardConfig) -> list[str]:
+    """Files this change creates that a reuse report owes an answer for."""
+    sources: list[str] = []
+    for path in added_paths:
+        if is_generated(path, config) or _is_prose_path(path) or _is_test_path(path):
+            continue
+        if path.endswith(_SOURCE_SUFFIXES):
+            sources.append(path)
+    return sources
+
+
 def _body_truth_warnings(
     body: str,
     title: str,
@@ -320,6 +336,9 @@ def _body_truth_warnings(
     changed_paths: Sequence[str],
     base_paths: Sequence[str],
     tolerance: float,
+    added_paths: Sequence[str] = (),
+    config: GuardConfig | None = None,
+    reuse_report_present: bool = False,
 ) -> list[str]:
     warnings: list[str] = []
 
@@ -353,6 +372,16 @@ def _body_truth_warnings(
                 "nor on the base branch."
             )
 
+    if config is not None:
+        new_source = _new_source_files(added_paths, config)
+        if new_source and not reuse_report_present:
+            warnings.append(
+                f"This change adds {len(new_source)} new source file(s) — "
+                f"{', '.join(new_source[:5])} — and the body names nothing it reuses. "
+                "Add a `Reuses:` block, or say which rung of the ladder failed "
+                "(docs/architecture/reuse.md)."
+            )
+
     return warnings
 
 
@@ -366,6 +395,7 @@ def check_body_truth(
     changed_paths: Sequence[str],
     base_paths: Sequence[str],
     config: GuardConfig,
+    added_paths: Sequence[str] = (),
 ) -> GuardResult:
     """Natural-language claims warn; the JSON block fails on a mismatch."""
     warnings = _body_truth_warnings(
@@ -376,6 +406,11 @@ def check_body_truth(
         changed_paths,
         base_paths,
         config.tolerance,
+        added_paths=added_paths,
+        config=config,
+        # The report is prose an author writes; a fenced block would hide it from
+        # the claim checks, so look for it in the body as submitted.
+        reuse_report_present=bool(_REUSE_REPORT_RE.search(body)),
     )
     errors: list[str] = []
     block = parse_json_block(body)
@@ -598,6 +633,7 @@ def _body_truth(args: object) -> int:
         changed_paths=[new for _change, new, _old in status],
         base_paths=base_paths,
         config=config,
+        added_paths=[new for change, new, _old in status if change == "A"],
     )
     for warning in result.warnings:
         _emit("warning", warning)

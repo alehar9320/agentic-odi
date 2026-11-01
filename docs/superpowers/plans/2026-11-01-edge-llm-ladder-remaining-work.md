@@ -74,13 +74,14 @@ absent.
 | `f475509` | merge | `origin/main` merged forward; see "Merged with `main`" below for the four conflicts and what each one cost this feature. |
 | `748e817` | 9 (second half) | The reply names its brain: `edge/turn.ts` opens with `status` `phase: "edge"`, `StudioContext` records `edgeReplyFor` beside the existing `offlineReplyFor`, and `Conversation.tsx` renders one provenance tag per reply — *"Answered in this browser"* — with the edge answer taking precedence over the draft label. Plus the capability prose in `docs/local-llm.md` and `docs/living-studio.md`. |
 | `634d927` | 9 (second half) | The other half of the claim, tested: a turn handed to a healthy endpoint earns *neither* provenance label, so the marker provably follows the routing rather than the feature flag. |
-| this commit | 9 (cross-tab) | `edge/bus.ts` — the ladder tells its other tabs. `EdgeNotice` gains `{ kind: "changed" }`, `EdgeManager` publishes on settled notices only, `reset()` closes the channel, and `src/test/fakeBroadcastChannel.ts` doubles the browser API for the suites that need two tabs. |
+| `1fec223` | 9 (cross-tab) | `edge/bus.ts` — the ladder tells its other tabs. `EdgeNotice` gains `{ kind: "changed" }`, `EdgeManager` publishes on settled notices only, `reset()` closes the channel, and `src/test/fakeBroadcastChannel.ts` doubles the browser API for the suites that need two tabs. |
+| this commit | merge | `origin/main` merged forward a second time (conversation list, saved canvas, per-field Settings saves, the assistant-ui ledger, the reuse-ladder agents doc). One file conflicted for real: `components/SettingsPanel.tsx`, because `main` moved the connection rows into `settings/sections/*`. Resolved by keeping `main`'s structure and re-mounting `<EdgeModelSection />` after `</ConnectionsSection>` — and pinned with a test, since a silent drop here would have been invisible. |
 
-Everything the branch changes on top of `main` as merged: 41 files, 4,349 lines
-added, 50 deleted, and 114 added browser test cases, which now run 928 tests
-across 98 files, plus one amended Python security-header test.
+Everything the branch changes on top of `main` as merged: 43 files, 4,658 lines
+added, 50 deleted, and 115 added browser test cases, which now run 965 tests
+across 101 files, plus one amended Python security-header test.
 
-## Merged with `main` (this merge commit)
+## Merged with `main` (twice)
 
 `main` moved under the branch and PR #608 went CONFLICTING. Four files carried
 real conflicts. What changed, in the shape a reviewer can check:
@@ -111,6 +112,18 @@ real conflicts. What changed, in the shape a reviewer can check:
   reports the sidecar down. The edge-routing tests were rewritten against those
   rules — they call `recheckConnections()` when they need a fact about the
   server, and wait for the person's own history to paint before typing.
+- **The second merge moved Settings under it.** `main`'s per-field save work
+  pulled the connection rows and the model controls into
+  `settings/sections/ConnectionsSection` and `ModelSection`, so
+  `SettingsPanel.tsx` was the only real conflict left. The resolution keeps
+  `main`'s layout and re-mounts `<EdgeModelSection />` immediately after
+  `</ConnectionsSection>` — the same position it held when the panel was flat:
+  below what the studio can reach, above what you can do about it. Nothing else
+  on the branch needed re-deriving: the edge section drives its own
+  feature-flag override (`features/flags.ts`), not `saveSettings`, so it never
+  touched the save path `main` reworked. That reposition was one line and could
+  have been dropped without any test noticing, so `SettingsPanel.test.tsx` now
+  mocks the section with a visible marker and asserts the panel renders it.
 
 ## Remaining iterations
 
@@ -254,7 +267,7 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
 git fetch origin && git checkout alehar9320/flyingfish
 npm --prefix apps/studio install
 npm --prefix apps/studio run typecheck
-npm --prefix apps/studio test -- --run     # 98 files, 928 tests
+npm --prefix apps/studio test -- --run     # 101 files, 965 tests
 npm --prefix apps/studio run lint          # 0 errors, 5 pre-existing warnings
 npm --prefix apps/studio run build
 uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 330 passed
