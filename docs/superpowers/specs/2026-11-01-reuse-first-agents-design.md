@@ -1,9 +1,11 @@
-# Reuse before you write: parked design notes
+# Reuse before you write: the design, its evidence, and what it enforces
 
 Date: 2026-11-01
-Status: **parked, unapproved, unfinished.** This is a hand-off record, not a design
-your partner signed. Nothing in it is built: no skill, no rule change, no ADR, no CI
-gate. Read the *Open gaps* section — that is the work.
+Status: **built on this branch.** It was first parked as notes in the draft of this pull
+request, then resumed: the eight open gaps are closed one by one under *Gap-by-gap*, and
+*Evidence* records the baseline runs that decided the shape of the guidance. No design
+conversation was ever held — the partner opted out of the brainstorming questions — so
+every choice below is mine and is labelled as such, not agreed.
 
 ## Intent and the why
 
@@ -14,12 +16,11 @@ implementation. The goal is speed, in the posture of the line the request quoted
 *good artists copy, great artists steal* — inside reasonable bounds (licence,
 maintenance, security, and the deliberate non-dependency decisions this repo has made).
 
-Why agents do it, as far as I got: nothing in the instruction layer tells them to look
-first. `.agents/rules/agent_instructions.md` says which libraries to use for a few named
-concerns (fastmcp, httpx, pydantic, assistant-ui) and forbids re-implementing the
-conversation runtime, but there is no step that says "before writing anything new,
-search for an existing implementation and report what you found". A rule that only names
-outcomes does not create a search habit.
+The first diagnosis here was wrong, and the baseline runs in *Evidence* corrected it. The
+hypothesis was that nothing tells agents to look, so no search habit exists. What actually
+happens is a search — a thorough one — followed by a third copy anyway, because a
+near-duplicate is easier to walk around than to consolidate. That is why the delivered
+guidance constrains the **report** rather than the effort.
 
 ## What is already here (verified this session)
 
@@ -59,87 +60,160 @@ written policy:
   binary, so a new Python dependency costs install size and lock churn. A reuse rule that
   ignores these would trade one failure mode for another.
 
-## Prior art found on the web (with verification status)
+## Prior art, as verified
 
-- `senior-engineering-partner` (bjgreenberg; 137 stars; listed on skillsllm.com) contains
-  a **"Reuse before you write"** rule — "search for an existing function/utility that
-  already does the job before adding a new one", plus a near-duplicate warning. Seen only
-  through the marketplace listing: **the repository itself, its licence, and the full text
-  are unverified.**
-- Stack Overflow, *Building shared coding guidelines for AI (and people too)*
-  (2026-03-26): the search snippet says agent guidelines need to be "more explicit,
-  demonstrative of patterns, and obvious". **The fetch returned 404, so the URL and the
-  content are unconfirmed.**
-- *Software Engineering at Google* ch. 20 (Dependencies) and ch. 21 (Vendoring), and
-  OpenSSF's component-evaluation guidance: **not examined at all.** These are the two
-  sources most likely to be worth citing for the dependency-acceptance bar.
-- Whether `obra/superpowers` upstream already ships a reuse skill: **not checked.** If it
-  does, import it rather than write our own.
+- **Imported, not rewritten:** `senior-engineering-partner` (bjgreenberg) at commit
+  `dc3e92227aee137ad48da8ccd9b0a44251ff7664`, **Apache-2.0**. Its `SKILL.md` carries the
+  rule this design was going to invent — "Search for an existing function/utility that
+  already does the job before adding a new one. A near-duplicate (same logic, slightly
+  different shape) is a refactor-to-share, not a second copy" — and
+  `references/foss-adoption.md`, the dependency-acceptance gate. The second file is
+  vendored verbatim under `.agents/skills/reuse-first/references/` with a provenance
+  header; the rule is quoted with attribution. The persona skill around it is *not*
+  imported: a reviewer persona is the wrong unit for this repo, which already has its
+  own review prompts.
+- `obra/superpowers` v7.0.1 — the newest tag at the time of writing — ships no
+  reuse-first rule: `skills/writing-plans/SKILL.md` at `main` has no reuse slot and a
+  code search for a `Reuses:` marker returns nothing. Related issue #2614 ("Reuse-first
+  planning") is closed but not reflected upstream. So there was nothing to `skills add`,
+  and this skill is written by hand for that reason.
+- OpenSSF Best Practices WG, *Concise Guide for Evaluating Open Source Software*
+  (2025-04-23 revision), <https://best.openssf.org/Concise-Guide-for-Evaluating-Open-Source-Software.html>.
+  Read in full. Its first rule is the whole argument: "evaluate whether the dependency
+  can be avoided by utilizing existing components."
+- *Software Engineering at Google* ch. 21, *Dependency Management*, section
+  "Considerations When Importing", <https://abseil.io/resources/swe-book/html/ch21.html>.
+  Read in full. **The chapter numbers in the first draft of these notes were wrong**:
+  ch. 20 is Static Analysis, and there is no vendoring chapter in the published edition
+  — which is why `docs/architecture/vendor.md` had to be this repository's own rule.
+  The digital copy is CC BY-NC-ND 4.0, so it is cited, never copied in.
+- **Dropped:** Stack Overflow, *Building shared coding guidelines for AI (and people
+  too)*. Every fetch 404'd and the URL could not be reconstructed, so it is not cited
+  anywhere in the delivered documentation. A citation you cannot open is not prior art.
 
-## Shape under consideration (a proposal, not a decision)
+## Decisions
 
 A ladder in ascending cost, entered at the top and stepped down only with a reason:
 
-1. **Reuse what is in the repo** — grep for the helper, component, model, or tool that
-   already does this; the vendored tree and existing packages count as found objects.
-2. **Adopt a declared dependency** — prefer a maintained library over new code when the
-   boundary allows it, declared properly.
-3. **Copy with a recorded boundary** — `docs/architecture/vendor.md`'s rules, extended
-   past studio markup: header, licence, upstream commit, what drifted.
-4. **Write it** — only when 1-3 are named and refused, in the plan or the design.
+1. **Reuse what is in the repo.**
+2. **Use a dependency the workspace already declares.**
+3. **Copy with a recorded boundary** — `docs/architecture/vendor.md`, now generalised.
+4. **Write it** — only when 1-3 are named and refused.
 
-Where that could live, in increasing weight: a row in the `using-superpowers` red-flag
-table in `AGENTS.md`; a `General Philosophy` bullet in
-`.agents/rules/agent_instructions.md`; a project skill under `.agents/skills/` that fires
-before implementation work (authored per `.agents/skills/writing-skills`); a policy doc
-alongside `docs/architecture/vendor.md` generalised to the whole repo; ADR 0005 recording
-"adopt before you write" as an architecture decision. Which of those, and how many, is
-open — see gaps 5 and 8.
+Where it lives, and why each piece:
 
-## Open gaps
+- `.agents/skills/reuse-first/SKILL.md` — the behaviour. 470 words, inside the
+  500-word budget `.agents/skills/writing-skills` sets, description = triggers only.
+- `docs/architecture/reuse.md` — the policy: the ladder, the canonical owners, the
+  bounds, the acceptance bar, the ledger table. Separated because the skill is loaded
+  by agents under pressure and the policy is read by a reviewer.
+- `.agents/rules/agent_instructions.md` §4 — one `General Philosophy` bullet, so the
+  ladder is in force for harnesses that never load the skill.
+- `AGENTS.md` Project Instructions — one bullet with the red-flag phrasing ("let me
+  write a small utility first"), because that file is the session-start surface every
+  integration reads.
+- `scripts/pr_guards.py body-truth` — the mechanical half, advisory only.
+- **No ADR.** ADRs in `docs/architecture/adr/` record architecture decisions; this
+  changes no boundary, and the policy doc plus the gate are the durable artefacts. If a
+  later task turns the advisory warning into a blocker, that is the ADR.
 
-Numbered so the PR body and this file can share one list. Each names the next action.
+**Form of the guidance, chosen from the baseline failure.** The failure is not
+skipping a rule under pressure — it is producing the wrong shape after a correct
+search. `.agents/skills/writing-skills` says prohibitions backfire on that failure
+("don't write a third copy" invites negotiation) and a recipe does not: state what the
+output *is*. Hence the four-line `Reuses:` block as a required slot, plus one CI warning
+that fires when the slot is empty.
 
-1. **Read the candidate upstream skills for real.** `gh api repos/bjgreenberg/senior-engineering-partner`
-   and fetch its `SKILL.md` and licence; check `obra/superpowers` for an existing reuse
-   skill first. Decide whether a reviewer-persona skill is the right import unit at all.
-2. **Confirm the citable sources.** SWE-at-Google ch. 20/21, OpenSSF component guidance,
-   the correct Stack Overflow URL. Until then, none of them may be cited as settled.
-3. **In-repo duplication audit — never ran.** Both `Explore` dispatches failed with
-   `Queuing failed. Try again later or enter /model to switch models`. Needed: hand-rolled
-   helpers where a library is already a dependency (`apps/studio/src`, `packages/*`,
-   `apps/*`), primitives duplicating `apps/studio/src/vendor/components/ui`, repeated
-   retry/poll/date/format logic in Python. Without named instances the rule reads as
-   advice, and the examples are the part agents follow.
-4. **Where the skill lives, and how it reaches every harness.** `.agents/skills/` is
-   lock-managed by `npx skills update`; `.opencode/skills/` holds the PM pack; Pi loads a
-   package; `AGENTS.md` is the Freebuff session-start surface. Unresolved: does a
-   hand-written local skill survive a `skills update`, and must it be registered in
-   `skills-lock.json`?
-5. **How it triggers unprompted.** The failure is that agents do not think to look.
-   Undecided: skill description keywords, a must-search-before-writing gate, where the
-   search results must be reported (plan? PR body?), and how it composes with
-   `brainstorming` and `test-driven-development` instead of fighting them.
-6. **The vendor policy's own loose ends.** `apps/studio/vendor.lock.json` — the ledger
-   `docs/architecture/vendor.md` rule three promises — does not exist, and the one copied
-   component uses a header in prose ("Copied from the shadcn registry… MIT licensed")
-   rather than the specified `// vendored: <url>@<commit> — <SPDX> — local edits:` form.
-   Rules one, three, four and five are prose only; rule two is the sole enforced one.
-   Decide whether to close these before generalising the policy, and whether to extend
-   `boundary.test.ts`-style enforcement to the header/ledger claim.
-7. **Reasonable bounds, written down.** The carve-outs above, plus a dependency-acceptance
-   bar: licence (SPDX), maintenance signal, CVE review, `uv.lock` and binary-size cost, and
-   the workspace-edge discipline in the package-diagram ADR under review on PR #456.
-8. **Then the build,** after a design is actually approved: author per
-   `.agents/skills/writing-skills`, land the guardrail line, pick the enforcement level
-   (prose, ADR 0005, or a CI gate), and update `README.md` plus `docs/` in the same task per
-   the README maintenance guardrail.
+## Gap-by-gap, what closed each one
 
-## How to resume
+1. **Upstream material** — fetched and read; Apache-2.0; one file vendored with a
+   header, one rule quoted. See *Prior art*.
+2. **Citable sources** — OpenSSF and SWE ch. 21 verified by fetch; the chapter numbers
+   in the earlier notes were wrong and are corrected above; the Stack Overflow article
+   is dropped as unrecoverable.
+3. **Duplication audit** — ran, and the instances became the canonical-owner table in
+   `docs/architecture/reuse.md`. The strongest: `@assistant-ui/react-markdown` is
+   declared in `apps/studio/package.json` and imported nowhere, while
+   `apps/studio/src/lib/markdown.ts` hand-parses Markdown for the transcript — the
+   duplicate that also slipped past §5 of the guardrails, which did not name rendering.
+   Others: `radix-ui` Dialog declared but used only under `src/vendor` while four
+   surfaces hand-build `role="dialog"` over `lib/useFocusTrap.ts`; `bff/id.ts newId()`
+   bypassed by inline id construction in `state/StudioContext.tsx`; `clamp()` in
+   `ui/primitives.tsx` re-inlined in `ui/cards.tsx` and
+   `components/canvas/OpportunityLandscape.tsx`; `urllib.request.urlopen` in
+   `packages/connectors/src/agentic_odi_connectors/rest/connector.py` and
+   `marketplace.py` beside the declared `ConnectorHTTPClient`; the same in
+   `apps/cli/src/agentic_odi_cli/update.py` while `apps/cli` declares `httpx`; manual
+   `strftime("%Y-%m-%dT%H:%M:%SZ")` in `apps/cli/src/agentic_odi_cli/profile.py` and
+   `flags.py` where `datetime.isoformat()` is used elsewhere. Honest negatives: the
+   banner system does use `@radix-ui/react-toast` rather than a hand-rolled live region,
+   `cn` exists once, and the Python `while True` loops are REPL and pagination, not
+   retry.
+4. **Where a hand-written skill survives** — tested, not assumed. In a scratch project
+   with this repo's `skills-lock.json`, `npx skills update brainstorming -y` rewrote the
+   tracked skill and left the untracked `reuse-first/` directory untouched. The CLI has
+   no prune in `update` (`remove --all` is explicit, `experimental_install` restores
+   only what the lock names). Conclusion: **stay out of `skills-lock.json`** — an entry
+   with no upstream `source` is how the next `experimental_install` deletes the skill.
+5. **How it triggers unprompted** — the report slot is the trigger: it is asked for by
+   the skill, the guardrail bullet, and the PR-body gate, and the gate is the only one
+   of the three that cannot be skipped by an agent that never loads a skill file.
+6. **The vendor policy's loose ends** — `apps/studio/vendor.lock.json` now exists, the
+   one copied component was rewritten into the canonical header form, and
+   `apps/studio/src/vendor/ledger.test.ts` fails the suite when a file in that tree is
+   undeclared or a header stops agreeing with its entry. Registry items have no commit,
+   so the checkable handle is the sha256 of the fetched artefact; the upstream JSON was
+   re-fetched to compute it, and the copied file diffed against it — one import line and
+   the header are the only drift, exactly as recorded.
+7. **Reasonable bounds** — written as conditionals in the skill and as *The bounds* in
+   the policy: `website/` (no third-party requests), `scripts/*.py` (stdlib only), the
+   packaged CLI binary (`uv.lock` and size), and the workspace-edge discipline. Rule one
+   of `docs/architecture/vendor.md` outranks the ladder: behaviour primitives stay
+   dependencies.
+8. **The build** — this PR.
 
-Read this file, then run gap 3 and gap 1 — the duplication audit and the upstream-skill
-fetch — because those two answers decide gaps 5 and 7 rather than merely informing them.
-Then restart the design conversation: this session skipped the brainstorming questions at
-the partner's request, so goals, non-goals, and anti-goals (what would make a reuse rule a
-failure even if it "works") have never been agreed. The session ended on a tool-model
-outage, not on a blocker in the idea.
+## Evidence
+
+Baseline (RED), before the skill existed, both tasks run in throwaway worktrees:
+
+- A Studio relative-time task searched, found `formatRelativeTime` in
+  `apps/studio/src/components/notifications/CatchUpFeed.tsx` and `describeCheckedAt` in
+  `apps/studio/src/updater/machine.ts`, then **created a new** `lib/relativeTime.ts`
+  beside both and left the duplicates standing.
+- A Python retry-and-backoff task found `ConnectorHTTPClient(retries=3)`,
+  `retryable_for_code()`, and `RateLimitError.retry_after`, then **created a new**
+  `studio/retry.py` plus nine tests, hand-rolling an exponential loop no dependency was
+  missing.
+
+With the skill in place, the same two prompts, dispatched fresh:
+
+- The Studio run produced the `Reuses:` block unprompted, named both near-duplicates,
+  and **refactored them to share one module**, deleting the private helper and making
+  `describeCheckedAt` delegate. Rung 2 was checked and closed on the record (no
+  date library declared).
+- The Python run **created no file at all.** It read the openai SDK's own retry and
+  backoff constants, found that the 2-second `asyncio.wait_for` was cancelling the
+  SDK's backoff, and fixed the deadline instead of writing a loop — while still naming
+  `ConnectorHTTPClient` and `retryable_for_code` and saying why neither applied.
+
+Both runs disclosed what they reused and what they nearly duplicated. That is the change
+the design was for, and it is the difference between this skill and a reminder.
+
+## Left as follow-up work, deliberately
+
+- **Fixing the audit's eight instances.** Each is its own pull request; the policy says
+  so in as many words. Landing a rule and a 2,000-line refactor together is how both
+  get reverted.
+- **Turning the advisory `Reuses:` warning into a blocker,** if warnings prove ignored.
+- **The `apps/studio/node_modules` friction:** both verification runs had to symlink it
+  out of the main workspace to run vitest in a worktree. Unrelated to reuse, worth a
+  task of its own.
+- **`.opencode/skills/` and the Pi package** carry the PM pack and Superpowers
+  respectively; neither was given this skill, since `AGENTS.md` and
+  `.agents/rules/agent_instructions.md` already reach those harnesses with the ladder.
+  If a harness turns out to miss it, the fix is its instructions file, not a second copy
+  of the skill.
+- **A second look at §5 of the guardrails.** It now names markdown rendering; the same
+  treatment may be owed to dialogs, which are duplicated four times against a declared
+  library.
+
