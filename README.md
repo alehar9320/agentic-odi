@@ -205,7 +205,10 @@ A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
 shared tooling at the root. Packages live in `packages/`, runnable services in
 `apps/`, and deployment assets in `infra/`. The
 [architecture index](docs/architecture/README.md) explains how the pieces fit
-together and where each contract is enforced:
+together and where each contract is enforced; its Dependency Direction diagram
+is a contract of its own — `tests/test_architecture.py` checks the drawn arrows
+against the declared dependencies and the real imports, so the picture cannot
+drift from the workspace. The distributions are:
 
 | Path | Distribution | Description |
 |---|---|---|
