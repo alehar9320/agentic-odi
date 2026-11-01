@@ -112,6 +112,14 @@ Pattern to follow: the existing About section in the Settings panel.
   tested; treat the caps as designed, not proven.
 - **Test coverage floors are Python-only** — `codecov.yml` ignores
   `apps/studio`, so none of this moves the backend coverage gate.
+- **The CSP may be moot on the hosted Studio, in its current form.** On the live
+  preview and on production `main`, `/` comes back as a Cloudflare edge-cache HIT
+  with **no** `Content-Security-Policy` header at all, so nothing in this branch
+  blocks WebLLM there — and equally, the app document ships with no CSP. The
+  header does apply to Worker-run responses (`/api/*` verified on the preview,
+  including `'wasm-unsafe-eval'` and the three weight origins). If the CSP is ever
+  made to cover cached documents, re-verify `worker-src`/`child-src` for WebLLM's
+  wasm loading, which this branch did not need to touch.
 
 ## Resume checklist (for whoever picks this up)
 
