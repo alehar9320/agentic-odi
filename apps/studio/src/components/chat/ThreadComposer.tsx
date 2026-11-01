@@ -19,6 +19,7 @@ import {
   isImageLike,
 } from "../../assistant/attachments";
 import { dictationSupported } from "../../assistant/dictation";
+import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
@@ -104,6 +105,8 @@ function ComposerBody({
 }) {
   const aui = useAui();
   const { llmHealth } = useStudio();
+  const history = useComposerHistory();
+  const [recall, setRecall] = useState("");
   // A page can mount more than one composer, so every id and description needs
   // to be unique per instance rather than a fixed string in the document.
   const attachmentHelpId = useId();
@@ -165,11 +168,28 @@ function ComposerBody({
       aui.composer.setText("");
       setDismissedFor("");
       onSlashCommand(text);
+      return;
+    }
+
+    // The palette owns the arrows while it is open; history must not fight it.
+    if (open || event.defaultPrevented) {
+      return;
+    }
+
+    const empty = text.trim() === "";
+    history.onKeyDown(event);
+    // The hook prevents the default only when it actually recalled a message.
+    // Announcing here keeps it to one status change per recall, never per key.
+    if (event.key === "ArrowUp" && empty && event.defaultPrevented) {
+      setRecall(recallAnnouncement(aui.composer.getState().text));
     }
   }
 
   return (
     <>
+      <p className="sr-only" role="status">
+        {recall}
+      </p>
       <SuggestionPills />
       <CommandPalette
         id={paletteId}
