@@ -191,6 +191,10 @@ export class LocalMemoryService {
     };
   }
 
+  async listConversations(): Promise<Conversation[]> {
+    return this.store.listConversations();
+  }
+
   async conversationTree(
     conversationId: string,
   ): Promise<{ conversation: StoredConversation; messages: StoredTurn[]; head_id: string | null }> {

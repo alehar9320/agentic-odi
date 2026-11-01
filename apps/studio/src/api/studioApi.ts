@@ -633,6 +633,14 @@ export function fetchLatestConversation(): Promise<LatestConversation> {
   );
 }
 
+/** Every stored conversation, newest first, for the drawer's history. */
+export function listConversations(): Promise<Conversation[]> {
+  return withLocal(
+    () => getJson<Conversation[]>("/api/conversations"),
+    async (bff) => bff.memory.listConversations(),
+  );
+}
+
 /** The whole branch tree, so a reload reopens the branch that was visible. */
 export async function fetchConversationTree(conversationId: string): Promise<ConversationTree> {
   return withLocal(

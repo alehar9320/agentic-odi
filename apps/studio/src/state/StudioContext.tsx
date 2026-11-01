@@ -33,6 +33,7 @@ import {
   fetchConversationTree,
   fetchFeatured,
   fetchLatestConversation,
+  listConversations,
   fetchMarketplace,
   fetchMemory,
   fetchModels,
@@ -78,6 +79,7 @@ import type {
   ConnectorListItem,
   ConnectorPreset,
   ConnectorSuggestion,
+  Conversation,
   CustomizeTarget,
   MarketplaceListing,
   MarketplaceSearch,
@@ -320,6 +322,12 @@ export interface StudioContextValue {
   stopStreaming: () => void;
   clearChat: () => void;
   conversationId: string | null;
+  /** Every stored conversation, newest first, for the drawer's history. */
+  conversations: Conversation[];
+  conversationsLoading: boolean;
+  refreshConversations: () => Promise<void>;
+  /** Open a stored conversation on the stage, cancelling any live turn. */
+  switchConversation: (conversationId: string) => Promise<void>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -561,6 +569,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -1745,6 +1755,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** The history the drawer lists. A failed read keeps the last list rather than blanking the drawer. */
+  const refreshConversations = useCallback(async () => {
+    setConversationsLoading(true);
+    try {
+      setConversations(await listConversations());
+    } catch {
+      setConversations([]);
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, []);
+
   const addObservation = useCallback(
     async (payload: AddObservationPayload) => {
       try {
@@ -1821,6 +1843,39 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined);
   }, []);
 
+  /**
+   * Open a stored conversation on the stage, cancelling any live turn.
+   *
+   * A running turn belongs to the thread it started in, so switching aborts it
+   * instead of letting the reply land in the thread the person just opened. A
+   * failed load leaves the current transcript intact.
+   */
+  const switchConversation = useCallback(
+    async (target: string) => {
+      if (target === conversationId) {
+        return;
+      }
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setStreaming(false);
+      setThinkingPhase(null);
+      setToolActivity([]);
+      setOfflineReply(false);
+      try {
+        const tree = await fetchConversationTree(target);
+        setConversationId(target);
+        setMessages(turnsToMessages(tree.messages, tree.head_id));
+        void refreshConversations();
+      } catch {
+        pushToast(
+          "error",
+          "That conversation could not be opened. Your current thread is unchanged.",
+        );
+      }
+    },
+    [conversationId, pushToast, refreshConversations],
+  );
+
   // Initial hydration: env defaults, canvas, health probes.
   useEffect(() => {
     let cancelled = false;
@@ -1848,6 +1903,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       void refreshPresets();
       void refreshFeatured();
       void refreshMemory();
+      // void refreshConversations(); — wired to the drawer; refreshed on demand
       async function restoreConversation() {
         // Reopen the conversation the person last had active, if it still
         // exists. Otherwise fall back to the most recent one.
@@ -1999,6 +2055,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       stopStreaming,
       clearChat,
       conversationId,
+      conversations,
+      conversationsLoading,
+      refreshConversations,
+      switchConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2111,6 +2171,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       stopStreaming,
       clearChat,
       conversationId,
+      conversations,
+      conversationsLoading,
+      refreshConversations,
+      switchConversation,
       memory,
       memoryLoading,
       refreshMemory,

@@ -47,7 +47,7 @@ describe("StudioBar", () => {
   it("shows the Odi mark at 32 pixels so the pixel art stays crisp", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext() as never);
     const { container } = render(
-      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />
     );
     const svg = container.querySelector(".brand__mark svg");
     expect(svg?.getAttribute("width")).toBe("32");
@@ -61,7 +61,7 @@ describe("StudioBar", () => {
         openPanel: vi.fn(),
       }) as never,
     );
-    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />);
 
     expect(
       screen.getByRole("button", { name: /model status: local mode\. no model is reachable\./i }),
@@ -71,7 +71,7 @@ describe("StudioBar", () => {
   it("keeps the brand mark decorative and labels the home control in text", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext() as never);
     const { container } = render(
-      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />
     );
     expect(container.querySelector(".brand__mark")?.getAttribute("aria-hidden")).toBe("true");
     expect(container.querySelector(".brand--home")?.getAttribute("aria-label")).toBe("Go to home");
@@ -81,7 +81,7 @@ describe("StudioBar", () => {
     const saveSettings = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }) as never);
     const { getByRole } = render(
-      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />
     );
 
     fireEvent.click(getByRole("button", { name: "Switch to light theme" }));
@@ -111,7 +111,7 @@ describe("StudioBar", () => {
       }) as never,
     );
 
-    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /export.*markdown/i }));
 
@@ -127,7 +127,7 @@ describe("StudioBar", () => {
       stubContext({ unreadSignalCount: 3, openPanel }) as never,
     );
     const { getByRole } = render(
-      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />
     );
 
     const bell = getByRole("button", { name: "Signal inbox: 3 unread" });
@@ -140,7 +140,7 @@ describe("StudioBar", () => {
 
   it("says the inbox is empty instead of showing a zero badge", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 0 }) as never);
-    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />);
 
     const bell = screen.getByRole("button", { name: "Signal inbox: no unread signals" });
     expect(bell.querySelector(".bell-badge")).toBeNull();
@@ -149,7 +149,7 @@ describe("StudioBar", () => {
   it("announces the unread count politely when it changes", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 0 }) as never);
     const { rerender } = render(
-      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />,
     );
 
     const status = screen.getByRole("status");
@@ -157,12 +157,12 @@ describe("StudioBar", () => {
     expect(status).toHaveTextContent("");
 
     vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 4 }) as never);
-    rerender(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    rerender(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />);
 
     expect(screen.getByRole("status")).toHaveTextContent("4 new notifications");
 
     vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 1 }) as never);
-    rerender(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    rerender(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />);
 
     expect(screen.getByRole("status")).toHaveTextContent("1 new notification");
   });
@@ -170,7 +170,7 @@ describe("StudioBar", () => {
   it("shows the running version and opens update settings", () => {
     const openPanel = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ openPanel }) as never);
-    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />);
 
     const version = screen.getByRole("button", { name: "v0.12.0" });
     fireEvent.click(version);
@@ -182,7 +182,7 @@ describe("StudioBar", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext() as never);
     vi.mocked(useUpdateSnapshot).mockReturnValue(stubSnapshot({ phase: "ready" }) as never);
 
-    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} onOpenNavigation={() => {}} />);
 
     expect(screen.getByRole("button", { name: "Update ready" })).toBeInTheDocument();
   });

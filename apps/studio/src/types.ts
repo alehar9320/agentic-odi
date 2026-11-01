@@ -430,6 +430,8 @@ export interface Conversation {
   updated_at: string;
   /** The visible branch head turn, when the conversation has branches. */
   head_id?: string | null;
+  /** Cheap turn count, computed by the store on list. Client fills from `custom`. */
+  turn_count?: number;
 }
 
 export interface ConversationTurn {

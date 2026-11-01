@@ -62,6 +62,8 @@ vi.mock("./api/studioApi", () => ({
     retryable: false,
   }),
   fetchLatestConversation: vi.fn(async () => ({ conversation: null, turns: [] })),
+  listConversations: vi.fn(async () => []),
+  fetchConversationTree: vi.fn(),
   createConversation: vi.fn(async () => ({
     id: "c-new",
     title: "",
@@ -353,6 +355,106 @@ describe("studio shell", () => {
 
     await waitFor(() => {
       expect(screen.queryByText("Where do I start?")).toBeNull();
+    });
+  });
+});
+
+describe("navigation drawer", () => {
+  beforeEach(() => {
+    window.localStorage.setItem("studio.brief", JSON.stringify(BRIEF));
+  });
+
+  it("opens from the studio bar and lists workspace panels", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open navigation/i }));
+
+    const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+    expect(within(drawer).getByRole("button", { name: "Landscape" })).toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: "Segments" })).toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: "Settings" })).toBeInTheDocument();
+  });
+
+  it("shows the empty state when there are no conversations", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open navigation/i }));
+
+    const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+    expect(
+      within(drawer).getByText(/Nothing saved yet/),
+    ).toBeInTheDocument();
+  });
+
+  it("opens a stored conversation from the history list", async () => {
+    const { listConversations } = await import("./api/studioApi");
+    vi.mocked(listConversations).mockResolvedValueOnce([
+      {
+        id: "c-saved",
+        title: "Saved chat",
+        created_at: "2026-10-21T10:00:00+00:00",
+        updated_at: "2026-10-21T11:00:00+00:00",
+        head_id: "turn-1",
+      },
+    ]);
+    const { fetchConversationTree } = await import("./api/studioApi");
+    vi.mocked(fetchConversationTree).mockResolvedValueOnce({
+      conversation: {
+        id: "c-saved",
+        title: "Saved chat",
+        created_at: "2026-10-21T10:00:00+00:00",
+        updated_at: "2026-10-21T11:00:00+00:00",
+        head_id: "turn-1",
+      },
+      messages: [
+        { id: "turn-1", parent_id: null, role: "user", content: "Hello from history", created_at: "2026-10-21T11:00:00+00:00" },
+      ],
+      head_id: "turn-1",
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open navigation/i }));
+
+    const drawer2 = await screen.findByRole("dialog", { name: "Navigation" });
+    fireEvent.click(
+      await within(drawer2).findByRole("button", { name: /Saved chat/i }),
+    );
+
+    // The drawer closes and the saved conversation opens on stage.
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull();
+    });
+    expect(await screen.findByText("Hello from history")).toBeInTheDocument();
+  });
+
+  it("starts a new conversation from the drawer's history list", async () => {
+    const { createConversation } = await import("./api/studioApi");
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open navigation/i }));
+
+    const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+    fireEvent.click(
+      await within(drawer).findByRole("button", { name: /new conversation/i }),
+    );
+
+    await waitFor(() => {
+      expect(createConversation).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull();
+  });
+
+  it("closes on Escape", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open navigation/i }));
+    await screen.findByRole("dialog", { name: "Navigation" });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull();
     });
   });
 });

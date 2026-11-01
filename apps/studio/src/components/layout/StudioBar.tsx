@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
-import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
+import { BellIcon, CompassIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 
 /**
@@ -15,10 +15,12 @@ export function StudioBar({
   onHome,
   onNew,
   onChangelog,
+  onOpenNavigation,
 }: {
   onHome: () => void;
   onNew: () => void;
   onChangelog: () => void;
+  onOpenNavigation: () => void;
 }) {
   const {
     llmHealth,
@@ -120,6 +122,16 @@ export function StudioBar({
           onClick={onNew}
         >
           <PlusIcon size={17} />
+        </button>
+
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Open navigation"
+          title="Open navigation"
+          onClick={onOpenNavigation}
+        >
+          <CompassIcon size={17} />
         </button>
 
         <button

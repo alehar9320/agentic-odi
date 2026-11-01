@@ -9,6 +9,7 @@ import { ChatStage } from "./components/chat/ChatStage";
 import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
 import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { NavigationDrawer } from "./components/layout/NavigationDrawer";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
@@ -38,6 +39,7 @@ function StudioShell() {
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   function goHome() {
     clearChat();
@@ -85,7 +87,9 @@ function StudioShell() {
         onHome={goHome}
         onNew={newConversation}
         onChangelog={() => setShowChangelog(true)}
+        onOpenNavigation={() => setDrawerOpen(true)}
       />
+      <NavigationDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <UpdateBanner />
       <main id="studio-stage" className="stage" tabIndex={-1}>
         {customizeOpen ? (
