@@ -60,8 +60,8 @@ close rung 2:
   statement.
 
 A new cross-package Python import also needs the workspace edge declared in the same
-task — the dependency in the consuming `pyproject.toml` and the direction in
-`docs/architecture/README.md` — or the next checkout fails to build.
+task, which is ADR 0002's three edits: the dependency in the consuming
+`pyproject.toml`, the arrow in `docs/architecture/README.md`, and `uv lock`.
 
 ## The acceptance bar for a new dependency
 
