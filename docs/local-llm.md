@@ -106,3 +106,17 @@ The Studio shows which tier answered via a status indicator, and the
 **Settings** panel's **Model** section lets you configure the base URL, API key,
 and model name, and test the connection with **Find models**. The CLI's
 `/status` command reports the tier in use.
+
+### The browser tier (edge models)
+
+Conversation turns in the Studio client have a fourth option that runs no
+server at all: quantized models executed on the visitor's own GPU via
+WebLLM (`apps/studio/src/edge/`). It engages only when no healthy paid
+endpoint is configured, after a one-time consent, and climbs a ladder
+(1B → 3B → 8B) as the device proves capable and the user keeps working in
+the tab. The engine never reaches the `browser-model` capability from the
+server manifests — a server cannot see a client GPU — so the Worker and
+sidecar keep reporting it `available: false`; only the browser's capability
+registry reports the truth. The hosted CSP admits `'wasm-unsafe-eval'` and
+the model-weight origins (`huggingface.co`, `raw.githubusercontent.com`,
+`cdn.jsdelivr.net`) this tier needs.
