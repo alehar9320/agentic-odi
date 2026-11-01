@@ -114,6 +114,29 @@ class V2MOM(BaseModel):
     measures: list[str] = Field(default_factory=list)
 
 
+class LinkOutcomeRequest(BaseModel):
+    """Link an outcome to one V2MOM method or measure.
+
+    ``text`` must match an entry the vision currently holds; unknown text is
+    refused rather than guessed.
+    """
+
+    field: Literal["method", "measure"]
+    text: str = Field(min_length=1)
+    mcp_url: str = ""
+
+
+class TraceabilityReportResponse(BaseModel):
+    """The three failures: orphans, unfunded objectives, and drift."""
+
+    objectives_defined: bool
+    message: str | None = None
+    orphans: list[str] = Field(default_factory=list)
+    unfunded: list[dict[str, str]] = Field(default_factory=list)
+    drift: list[dict[str, str]] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+
+
 class AddCustomerOutcomeRequest(BaseModel):
     mcp_url: str = ""
     job_id: str

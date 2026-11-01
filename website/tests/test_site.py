@@ -515,5 +515,7 @@ def test_page_weights_are_within_budget(page: str):
     # the four Stage 5 and 6 tools (segment_market, get_segments, get_strategy,
     # propose_strategy) bring it to ~80 KB; the four outcome-proposal tools
     # (propose_outcome, list_proposals, approve_proposal, reject_proposal)
-    # bring it to ~85 KB.
-    assert size <= 88 * 1024, f"{page}: {size} bytes"
+    # bring it to ~85 KB; the four traceability tools (link_outcome,
+    # unlink_outcome, get_outcome_alignments, get_traceability_report) and the
+    # OutcomeAlignment entity bring it to ~91 KB.
+    assert size <= 92 * 1024, f"{page}: {size} bytes"

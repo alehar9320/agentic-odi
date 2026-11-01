@@ -51,6 +51,7 @@ counted as done.
 - [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
 - [ ] **Evidence becomes outcome proposals** — a stored record is mined into a scored, approvable desired outcome, and only a human approval writes it ([PR #438](https://github.com/alehar9320/agentic-odi/pull/438)).
 - [ ] **Evidence from a file at the terminal** — `evidence add --file` reads text (or stdin) on the Studio's attachment cap ([PR #415](https://github.com/alehar9320/agentic-odi/pull/415)).
+- [ ] **A traceability report: orphans, unfunded, drift** — an outcome names the V2MOM method or measure it advances, the link is refused if the target does not exist, and a read-only report names the orphans, the unfunded objectives, and the links the vision dropped (issue [#591](https://github.com/alehar9320/agentic-odi/issues/591)).
 
 ## Next
 
