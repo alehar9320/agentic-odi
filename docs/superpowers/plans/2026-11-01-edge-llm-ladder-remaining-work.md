@@ -7,7 +7,7 @@ and the banners are built and tested, **a person can turn the feature on** —
 the offer strip asks once — **that answer can now be changed from Settings**,
 with the tiers on disk listed and freeable, **every reply says which brain
 produced it**, and **two open tabs agree without being asked**. What is left is
-the first-run intro copy and verification on real hardware.
+the end-to-end spec and verification on real hardware.
 
 This file exists because the branch was cut short for review and the working
 environment it was built in is temporary. Nothing here may survive only in a
@@ -16,9 +16,8 @@ scratch checkout, so the whole gap list lives on the branch.
 ## Read this first: how a person reaches it today
 
 With nothing answering for the Studio — no model endpoint the client counts as
-configured, and the health probe reporting the model unreachable — the top dock
-shows *"This browser can answer, free."* naming the
-model and its one-time size, with two buttons:
+configured, and no healthy model — the top dock shows *"This browser can answer,
+free."* naming the model and its one-time size, with two buttons:
 
 - **Answer in this browser** → `EdgeManager.grantAndStart()`
   (`apps/studio/src/edge/manager.ts`) records consent and calls the new
@@ -28,8 +27,15 @@ model and its one-time size, with two buttons:
   it lands, a `ready` notice replaces the strip with a toast and the next turn
   is answered in the tab.
 - **Not now** → durable `setConsent("denied")`. `offerFor()` never returns an
-  offer after that, so the studio asks exactly once, and `model-offline` comes
-  back because it is again the truth.
+  offer after that, so the studio asks exactly once.
+
+*Nothing answering* is the condition, deliberately not *a probe failed*: the
+studio's background survey will not call a model down for a visitor who never
+configured one, so waiting on that measurement would have kept the offer from
+exactly the person it is for. See the closed "First run, no key" item in
+iteration 9. The apology strip is narrower and stays where it was — it appears
+only for a refusal that was actually measured, which is why a browser-only first
+run with a device that could not host a tier shows nothing at all.
 
 The offer appears only where it would change the answer: flag on, no healthy
 remote endpoint, consent still `unset`, nothing on disk, and a device the ladder
@@ -75,7 +81,8 @@ absent.
 | `748e817` | 9 (second half) | The reply names its brain: `edge/turn.ts` opens with `status` `phase: "edge"`, `StudioContext` records `edgeReplyFor` beside the existing `offlineReplyFor`, and `Conversation.tsx` renders one provenance tag per reply — *"Answered in this browser"* — with the edge answer taking precedence over the draft label. Plus the capability prose in `docs/local-llm.md` and `docs/living-studio.md`. |
 | `634d927` | 9 (second half) | The other half of the claim, tested: a turn handed to a healthy endpoint earns *neither* provenance label, so the marker provably follows the routing rather than the feature flag. |
 | `1fec223` | 9 (cross-tab) | `edge/bus.ts` — the ladder tells its other tabs. `EdgeNotice` gains `{ kind: "changed" }`, `EdgeManager` publishes on settled notices only, `reset()` closes the channel, and `src/test/fakeBroadcastChannel.ts` doubles the browser API for the suites that need two tabs. |
-| this commit | merge | `origin/main` merged forward a second time (conversation list, saved canvas, per-field Settings saves, the assistant-ui ledger, the reuse-ladder agents doc). One file conflicted for real: `components/SettingsPanel.tsx`, because `main` moved the connection rows into `settings/sections/*`. Resolved by keeping `main`'s structure and re-mounting `<EdgeModelSection />` after `</ConnectionsSection>` — and pinned with a test, since a silent drop here would have been invisible. |
+| `a61e9d4` | merge | `origin/main` merged forward a second time (conversation list, saved canvas, per-field Settings saves, the assistant-ui ledger, the reuse-ladder agents doc). One file conflicted for real: `components/SettingsPanel.tsx`, because `main` moved the connection rows into `settings/sections/*`. Resolved by keeping `main`'s structure and re-mounting `<EdgeModelSection />` after `</ConnectionsSection>` — and pinned with a test, since a silent drop here would have been invisible. |
+| this commit | 9 (first run) | The offer reached the person it is for — found, not assumed. `App.test.tsx` renders the real shell for a no-key, no-sidecar, WebGPU-capable first visit and asserts the `edge-offer` strip is in the dock above the introduction; it failed, because the bridge gated the question on a health measurement that main's survey deliberately never makes for a browser-only visitor. `BannerBridge` now asks whenever nothing is answering (`llmHealth.healthy !== true && !hasModelEndpoint(settings)`) while `model-offline` keeps its measured-refusal condition. Plus the deliberate call, written down: the introduction stays model-free and grows no second consent. |
 
 Everything the branch changes on top of `main` as merged: 43 files, 4,658 lines
 added, 50 deleted, and 115 added browser test cases, which now run 965 tests
@@ -170,10 +177,36 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
 - [x] A no-key visitor is offered the browser model in one sentence, with the
       size, and has an explicit "Not now". (Delivered in `d34d8e5` as the `edge-offer`
       strip; the intro-flow copy below is still open.)
-- [ ] First-run, no-key intro flow offers the browser model too — one consent, no
-      jargon, no dead end, in the same words as the strip. Zero-config stays
-      intact: rule-based answers keep working until Tier 1 lands, and the edge
-      takes over the moment it is cached.
+- [x] **First run, no key.** Pinned by a test instead of prose — and the test
+      found the feature was not reachable, which is why this item is closed with
+      a fix rather than a paragraph.
+      - `App.test.tsx` now renders the real shell for a visitor with no brief, no
+        key, no sidecar, `firstRunIntro` on, and a device that reports WebGPU: the
+        `edge-offer` strip is present, in the dock, while the introduction owns the
+        stage, with both buttons and exactly one copy of the ask.
+      - **The defect it caught:** the bridge asked the consent question only when
+        `llmHealth.healthy === false`. Main's survey deliberately refuses to
+        record a model as down for a browser-only visitor (`checkConnections`
+        "recovery" mode — #309: no unrequested apology on a first run), so
+        `healthy` stays `null` there forever, and the offer was only ever shown to
+        someone who had a paid endpoint and lost it. The audience the tier exists
+        for never saw it.
+      - **The fix:** the strip's condition is now *nothing is answering* —
+        `llmHealth.healthy !== true && !hasModelEndpoint(settings)` — which is the
+        same deference the turn router already used. The apology keeps its old,
+        narrower condition: it is raised only when a refusal was actually
+        measured. So a first run with a capable device gets an offer, a first run
+        without one gets nothing at all, and a configured-but-dead endpoint still
+        gets "Working by hand". Two new `BannerBridge` cases hold those two halves
+        apart; the four pre-existing #309 "zero banners" cases still pass, which
+        is the proof the widening did not leak into the apology.
+      - **The decision, made deliberately:** the introduction itself stays
+        model-free and does *not* grow a second GB-scale consent. One ask, one
+        place, one time; the dock is app-level, so it is above the intro rather
+        than inside its script.
+      - `BannerBridge.test.tsx` mocks `edge/manager` but no longer mocks
+        `hasModelEndpoint`: the endpoint rule stays real, because a bridge tested
+        against a fake deference proves nothing about deferring.
 - [x] `edge-active` marker on an edge reply in the transcript, so a person can
       tell which brain answered. (Delivered in `748e817`: `edge/turn.ts` now
       opens its stream with `status` `phase: "edge"`, `StudioContext` records that

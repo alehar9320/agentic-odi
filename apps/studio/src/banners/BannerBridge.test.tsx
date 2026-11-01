@@ -39,23 +39,31 @@ const edge = vi.hoisted(() => ({
   noticeListener: null as ((notice: EdgeNotice) => void) | null,
 }));
 
-vi.mock("../edge/manager", () => ({
-  edgeManager: {
-    sync: () => edge.sync(),
-    canServe: (...args: unknown[]) => edge.canServe(...(args as [])),
-    offerFor: (...args: unknown[]) => edge.offerFor(...(args as [])),
-    grantAndStart: () => edge.grantAndStart(),
-    decline: () => edge.decline(),
-    servedTier: () => edge.servedTier(),
-    isBusy: () => edge.isBusy(),
-    addNoticeListener: (listener: (notice: EdgeNotice) => void) => {
-      edge.noticeListener = listener;
-      return () => {
-        edge.noticeListener = null;
-      };
+vi.mock("../edge/manager", async () => {
+  // The bridge defers to the studio's one endpoint rule, so the rule stays
+  // real here: mocking it would let this suite pass while production defers
+  // to something else. It lives in `lib/modelEndpoint`, not in the manager.
+  const { isEndpointConfiguredForSettings } = await import("../lib/modelEndpoint");
+  return {
+    hasModelEndpoint: (settings: { base_url: string; api_key: string; model_name: string }) =>
+      isEndpointConfiguredForSettings(settings),
+    edgeManager: {
+      sync: () => edge.sync(),
+      canServe: (...args: unknown[]) => edge.canServe(...(args as [])),
+      offerFor: (...args: unknown[]) => edge.offerFor(...(args as [])),
+      grantAndStart: () => edge.grantAndStart(),
+      decline: () => edge.decline(),
+      servedTier: () => edge.servedTier(),
+      isBusy: () => edge.isBusy(),
+      addNoticeListener: (listener: (notice: EdgeNotice) => void) => {
+        edge.noticeListener = listener;
+        return () => {
+          edge.noticeListener = null;
+        };
+      },
     },
-  },
-}));
+  };
+});
 
 /** The real shell wiring: bridge in, dispatcher out. */
 function Shell() {
@@ -175,6 +183,40 @@ describe("BannerBridge", () => {
     );
     expect(screen.getByText(/about 1.3 GB, once/)).toBeInTheDocument();
     expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+  });
+
+  it("asks a browser-only first run, which has no measurement to wait for", async () => {
+    // The defect this case pins: the studio's background survey deliberately
+    // refuses to record "the model is down" for a visitor who never configured
+    // a model (#309 — no apology on a first run). Gating the consent offer on
+    // that measurement meant the offer was only ever shown to someone who had
+    // a paid model and lost it. Nothing is answering, and that is enough.
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    studio.sidecarReachable = null;
+    studio.llmHealth = { healthy: null, message: "" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+  });
+
+  it("says nothing to a browser-only first run whose device could not host a tier", async () => {
+    // The other half: widening the offer question must not widen the apology.
+    // An unmeasured model is not a broken model.
+    studio.sidecarReachable = null;
+    studio.llmHealth = { healthy: null, message: "" };
+    renderShell();
+    await waitFor(() => expect(edge.canServe).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/This browser can answer, free/i)).not.toBeInTheDocument();
   });
 
   it("never offers the browser model to a device that could not host one", async () => {

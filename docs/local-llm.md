@@ -129,6 +129,19 @@ Settings. Once it is answering, the browser earns its next rung — ten served
 turns, or fifteen minutes of streamed output, buys the bigger model in the
 background (1B → 3B → 8B, capped by what the device could actually host).
 
+The ask happens once, in that strip, and nowhere else. It is an app-level
+notice, so a visitor who has never opened Settings and whose first screen is the
+introduction still sees it — above the introduction. The scripted first-run
+conversation deliberately does *not* grow its own download consent: one ask, one
+place, one time, and the introduction stays about their work. What triggers the
+ask is *nothing is answering*, not *a probe failed*. That distinction is load
+bearing: the studio's background survey refuses to record a model as down for a
+person who never configured one — an unrequested strip blaming a browser for an
+absence it chose — and gating consent on that measurement would have shown the
+offer only to someone who had a paid key and lost it. A device that could not
+host a tier sees neither strip: no offer, and no apology about a model it never
+needed.
+
 **Settings → Answers in this browser** is where that answer stops being
 one-way. A switch turns the capability off — nothing downloaded, nothing run —
 and the consent underneath it can be changed: *"Stop answering here"* withdraws

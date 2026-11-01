@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useStudio } from "../state/StudioContext";
-import { edgeManager } from "../edge/manager";
+import { edgeManager, hasModelEndpoint } from "../edge/manager";
 import { formatGB, tierById } from "../edge/ladder";
 import { useBanner } from "./BannerProvider";
 import type { BannerActionId } from "./types";
@@ -41,17 +41,30 @@ export function BannerBridge() {
   useEffect(() => {
     // Three states, and only one strip at a time: the browser is already
     // answering, it could answer if the person said yes, or it can't.
-    if (llmHealth.healthy !== false) {
-      resolve("model-offline");
+    //
+    // The question to ask is *"is anything answering for this studio?"* — not
+    // "did a probe fail?". A browser-only visitor has no server to probe, and
+    // main's survey deliberately refuses to record a refusal it did not witness
+    // (#309: no apology on a first run that needed nothing). Waiting for
+    // `healthy === false` here would mean the offer is only ever shown to
+    // someone who had a model and lost it — never to the person this feature
+    // exists for. So an endpoint that is configured, or that is answering,
+    // settles it; an unmeasured nothing is still a nothing.
+    if (llmHealth.healthy === true || hasModelEndpoint(settings)) {
+      if (llmHealth.healthy === false) {
+        raise({ kind: "model-offline" });
+      } else {
+        resolve("model-offline");
+      }
       resolve("edge-offer");
       return;
     }
     let cancelled = false;
     void (async () => {
-      // Past the guard above the remote model is confirmed unreachable, which
-      // is exactly what the two edge questions below want to be told. A strip is
-      // not something a person typed into: read storage and decide after,
-      // instead of answering from what this tab last knew.
+      // Past the guard above nothing is answering for this studio — measured
+      // down, or never measurable. A strip is not something a person typed
+      // into: read storage and decide after, instead of answering from what
+      // this tab last knew.
       await edgeManager.sync();
       const serving = edgeManager.canServe(settings, false);
       const offer = serving ? null : await edgeManager.offerFor(settings, false);
@@ -73,8 +86,13 @@ export function BannerBridge() {
           // Consent just arrived and the fetch is under way; the download
           // strip tells that story better than "no model is reachable".
           resolve("model-offline");
-        } else {
+        } else if (llmHealth.healthy === false) {
+          // A measured refusal. An unmeasured one is a browser with nothing to
+          // measure, and saying "no model is reachable" about it would blame
+          // the person's studio for a thing they never asked it to be.
           raise({ kind: "model-offline" });
+        } else {
+          resolve("model-offline");
         }
       }
     })();

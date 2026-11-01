@@ -515,6 +515,58 @@ describe("first-run tour", () => {
   });
 });
 
+describe("browser-model offer during the introduction", () => {
+  it("puts the one consent above a first-time visitor's introduction, not inside it", async () => {
+    // The promise iteration 9 made: a person with no key, no sidecar and no
+    // brief still gets asked, once, in plain words, whether this browser may
+    // answer. The ask lives in the app-level dock, so it does not have to be
+    // re-asked inside the scripted introduction — and it must survive that
+    // introduction covering the whole stage. If someone moves the dock inside
+    // the conversation, this is the test that fails.
+    window.localStorage.removeItem("studio.brief");
+    window.localStorage.setItem("studio.flags.firstRunIntro", "on");
+    window.localStorage.setItem(
+      "studio.settings",
+      JSON.stringify({ base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "dark" }),
+    );
+    const { fetchConfig, healthLlm } = await import("./api/studioApi");
+    vi.mocked(fetchConfig).mockRejectedValue(new Error("no sidecar"));
+    vi.mocked(healthLlm).mockResolvedValue({ healthy: false, message: "offline" });
+    // WebGPU is the one device fact the ladder refuses to guess at.
+    Object.defineProperty(navigator, "gpu", {
+      configurable: true,
+      value: { requestAdapter: async () => ({ features: { has: () => true } }) },
+    });
+
+    try {
+      // The connection survey is idle-scheduled, so "the model is unreachable"
+      // is a fact the studio earns about two seconds after the paint. Fast-forward
+      // to it rather than asserting against a state nobody is in yet.
+      vi.useFakeTimers();
+      render(<App />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4_000);
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /start with you and your team/i }));
+      expect(
+        screen.getByText("What are you working on, and what's your part in it?", {
+          selector: "strong",
+        }),
+      ).toBeInTheDocument();
+
+      const offer = screen.getByRole("button", { name: "Answer in this browser" });
+      expect(offer.closest(".banner")).not.toBeNull();
+      expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
+      // One ask, one place: the introduction itself never grows a second one.
+      expect(screen.getAllByRole("button", { name: "Answer in this browser" })).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      delete (navigator as unknown as { gpu?: unknown }).gpu;
+    }
+  });
+});
+
 describe("first run", () => {
   it("opens the context conversation from the stage and creates the job when accepted", async () => {
     window.localStorage.removeItem("studio.brief");
