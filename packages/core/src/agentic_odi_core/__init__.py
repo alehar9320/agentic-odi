@@ -24,6 +24,7 @@ from agentic_odi_core.errors import (
     OdiError,
     RateLimitError,
     SerializationError,
+    StoreCorrupt,
     StoreError,
     error_status,
 )
@@ -183,6 +184,7 @@ __all__ = [
     "SerializationError",
     "Step",
     "StepNotFoundError",
+    "StoreCorrupt",
     "StoreError",
     "Signal",
     "SignalBudget",

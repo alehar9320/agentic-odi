@@ -17,6 +17,7 @@ class StudioErrorCode(str, Enum):
     VALIDATION = "validation"
     OUT_OF_RANGE = "out_of_range"
     CONFLICT = "conflict"
+    STORE_CORRUPT = "store_corrupt"
     INTERNAL = "internal"
 
 
@@ -34,6 +35,7 @@ STATUS_FOR_CODE: dict[StudioErrorCode, int] = {
     StudioErrorCode.VALIDATION: 422,
     StudioErrorCode.OUT_OF_RANGE: 422,
     StudioErrorCode.CONFLICT: 409,
+    StudioErrorCode.STORE_CORRUPT: 500,
     StudioErrorCode.MCP_UNREACHABLE: 502,
     StudioErrorCode.LLM_UNREACHABLE: 502,
     StudioErrorCode.MCP_TOOL_FAILED: 500,
@@ -51,6 +53,7 @@ _MESSAGE_FOR_CODE: dict[StudioErrorCode, str] = {
     StudioErrorCode.VALIDATION: "Invalid input.",
     StudioErrorCode.OUT_OF_RANGE: "Value out of range.",
     StudioErrorCode.CONFLICT: "That conflicts with the current state.",
+    StudioErrorCode.STORE_CORRUPT: "The database failed its integrity check.",
     StudioErrorCode.MCP_TOOL_FAILED: "The operation did not complete.",
     StudioErrorCode.LLM_TOOL_ROUNDS_EXHAUSTED: "The assistant reached its tool limit for this turn.",
     StudioErrorCode.INTERNAL: "Something went wrong.",
@@ -66,6 +69,9 @@ _SUGGESTION_FOR_CODE: dict[StudioErrorCode, str | None] = {
     StudioErrorCode.VALIDATION: "Fix the input and try again.",
     StudioErrorCode.OUT_OF_RANGE: "Use a value inside the documented range.",
     StudioErrorCode.CONFLICT: "Reload and try again.",
+    StudioErrorCode.STORE_CORRUPT: (
+        "Restore a backup, then restart. The damaged file was left untouched."
+    ),
     StudioErrorCode.MCP_TOOL_FAILED: "Try again.",
     StudioErrorCode.LLM_TOOL_ROUNDS_EXHAUSTED: "Ask me to continue from here.",
     StudioErrorCode.INTERNAL: "Try again.",
