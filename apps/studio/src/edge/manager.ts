@@ -9,9 +9,16 @@ import type { RawSseEvent } from "../api/sse";
 import type { ChatStreamRequest, StudioConfig } from "../types";
 import { isFeatureEnabled } from "../features/flags";
 import { EDGE_TIERS, tierById } from "./ladder";
+import { EdgeScheduler, type SchedulerEnvironment } from "./scheduler";
 import { openEdgeState, type EdgeStateService } from "./storage";
 import { edgeTurn } from "./turn";
-import type { EdgeLLMEngine, EdgeTierId } from "./types";
+import type { EdgeLLMEngine, EdgeTierId, LoadProgress } from "./types";
+
+/** What the page can react to without knowing anything about WebLLM.
+ * The banner layer (next iteration) subscribes to these. */
+export type EdgeNotice =
+  | { kind: "downloading"; tier: EdgeTierId; progress: LoadProgress }
+  | { kind: "unlocked"; tier: EdgeTierId };
 
 export interface EdgeDecision {
   flagEnabled: boolean;
@@ -51,15 +58,31 @@ export class EdgeManager {
   private engineFactory = defaultEngineFactory;
   private state: EdgeStateService | null = null;
   private loadedTier: EdgeTierId | null = null;
+  private scheduler: EdgeScheduler | null = null;
+  private listener: ((notice: EdgeNotice) => void) | null = null;
+  private environment: SchedulerEnvironment | null = null;
 
   /** The seam tests and e2e use to drive an edge turn without WebGPU. */
   setEngineFactory(factory: () => Promise<EdgeLLMEngine>): void {
     this.engineFactory = factory;
   }
 
+  /** Override when a background download may start (tests, demos, e2e). */
+  setSchedulerEnvironment(env: SchedulerEnvironment | null): void {
+    this.environment = env;
+  }
+
+  /** The seam the banner layer subscribes to. One subscriber by design: the
+   * banner host owns the notices and re-emits them into the dock. */
+  setListener(listener: ((notice: EdgeNotice) => void) | null): void {
+    this.listener = listener;
+  }
+
   /** Drop the cached engine and state so the next call re-opens everything.
    * Tests isolate per-case; the page never calls it. */
   reset(): void {
+    this.scheduler?.stop();
+    this.scheduler = null;
     this.engine = null;
     this.state = null;
     this.loadedTier = null;
@@ -68,6 +91,31 @@ export class EdgeManager {
   private async ensureState(): Promise<EdgeStateService> {
     this.state ??= await openEdgeState();
     return this.state;
+  }
+
+  private async getEngine(): Promise<EdgeLLMEngine> {
+    this.engine ??= await this.engineFactory();
+    return this.engine;
+  }
+
+  private async ensureScheduler(): Promise<EdgeScheduler> {
+    if (!this.scheduler) {
+      const state = await this.ensureState();
+      this.scheduler = new EdgeScheduler({
+        state,
+        engine: () => this.getEngine(),
+        eligibility: async () => (await this.getEngine()).probe(),
+        onProgress: (tier, progress) => this.listener?.({ kind: "downloading", tier, progress }),
+        onUnlocked: (tier) => {
+          // The prefetch loaded through this tab's engine, so the next turn
+          // starts already on the stronger tier.
+          this.loadedTier = tier;
+          this.listener?.({ kind: "unlocked", tier });
+        },
+        env: this.environment ?? undefined,
+      });
+    }
+    return this.scheduler;
   }
 
   /** Cached-or-active tiers, strongest first. */
@@ -106,11 +154,9 @@ export class EdgeManager {
     if (!tier) {
       throw new Error("edge stream called with no cached tier");
     }
-    if (!this.engine) {
-      this.engine = await this.engineFactory();
-    }
+    const engine = await this.getEngine();
     if (this.loadedTier !== tier) {
-      await this.engine.load(tierById(tier).modelId, () => {});
+      await engine.load(tierById(tier).modelId, () => {});
       await state.setTierState(tier, {
         status: "active",
         cachedAt: (await state.getTierStates())[tier].cachedAt ?? new Date().toISOString(),
@@ -125,11 +171,17 @@ export class EdgeManager {
       }
       onEvent(event);
     };
-    await edgeTurn(request, { engine: this.engine, modelId: tierById(tier).modelId }, emit, signal);
+    await edgeTurn(request, { engine, modelId: tierById(tier).modelId }, emit, signal);
     // Failed and user-stopped turns don't count toward the next tier — the
     // ladder rewards a device that actually served the work.
     if (answered) {
       await state.recordEdgeTurn((Date.now() - startedAt) / 1000);
+      void (await this.ensureScheduler())
+        .noteTurn()
+        .catch(() => {
+          // A failed prefetch only means the next turn stays on the current
+          // tier; the person never sees a second error for the same fault.
+        });
     }
   }
 }

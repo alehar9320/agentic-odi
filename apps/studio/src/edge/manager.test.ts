@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import "fake-indexeddb/auto";
 
 import type { RawSseEvent } from "../api/sse";
 import type { ChatStreamRequest, StudioConfig } from "../types";
 import { EDGE_TIERS, tierById } from "./ladder";
+import type { SchedulerEnvironment } from "./scheduler";
 import { EdgeStateStore } from "./storage";
 import { EdgeManager, hasRemoteEndpoint, shouldUseEdge } from "./manager";
 import { FakeEdgeEngine } from "../test/edgeFake";
@@ -154,5 +155,43 @@ describe("EdgeManager", () => {
       EDGE_TIERS[0].modelId,
       EDGE_TIERS[1].modelId,
     ]);
+  });
+
+  it("ten served turns earn the next tier: it prefetches in background, then answers on it", async () => {
+    const queue: Array<() => void> = [];
+    const env: SchedulerEnvironment = {
+      requestIdle(callback) {
+        queue.push(callback);
+        return () => {
+          const index = queue.indexOf(callback);
+          if (index >= 0) {
+            queue.splice(index, 1);
+          }
+        };
+      },
+      visible: () => true,
+      saveData: () => false,
+    };
+    manager.setSchedulerEnvironment(env);
+    const notices: string[] = [];
+    manager.setListener((notice) => notices.push(`${notice.kind}:${notice.tier}`));
+
+    for (let turn = 0; turn < 10; turn += 1) {
+      await manager.stream(baseRequest, () => {});
+    }
+    // Nine turns earned nothing; the tenth queues a prefetch but nothing is
+    // fetched until the device is idle.
+    await vi.waitFor(() => expect(queue).toHaveLength(1));
+    expect(engine.loads).toEqual([EDGE_TIERS[0].modelId]);
+    queue.shift()?.();
+    await vi.waitFor(() => expect(notices).toContain("unlocked:t2"));
+
+    const store = await EdgeStateStore.open();
+    expect((await store.getTierStates()).t2.status).toBe("active");
+    store.close();
+
+    await manager.stream(baseRequest, () => {});
+    expect(engine.loads).toEqual([EDGE_TIERS[0].modelId, EDGE_TIERS[1].modelId]);
+    manager.setListener(null);
   });
 });
