@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from agentic_odi_core import BusinessValue, CustomerValue
+from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
 from agentic_odi_core.models import JobStage
 from pydantic import BaseModel, Field
 
@@ -52,8 +52,11 @@ class AddOutcomeRequest(BaseModel):
     mcp_url: str
     job_id: str
     statement: str
-    importance: float = Field(ge=1.0, le=10.0)
-    satisfaction: float = Field(ge=1.0, le=10.0)
+    importance: float | None = Field(default=None, ge=1.0, le=10.0)
+    satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
+    #: The questions behind the score. Required when either score is set; a
+    #: score without it is refused by the MCP tool.
+    claim_check: ClaimCheck | None = None
 
 
 class CreateJobRequest(BaseModel):
@@ -325,6 +328,16 @@ class ConversationModel(BaseModel):
     created_at: str
     updated_at: str
     head_id: str | None = None
+
+
+class ConversationSummaryModel(ConversationModel):
+    """A conversation in the history list: its metadata plus how much is in it."""
+
+    turn_count: int = 0
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationSummaryModel] = Field(default_factory=list)
 
 
 class ConversationResponse(BaseModel):

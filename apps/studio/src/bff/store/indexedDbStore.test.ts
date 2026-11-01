@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import "fake-indexeddb/auto";
 
 import { IndexedDbLocalStore } from "./indexedDbStore";
+import { MemoryLocalStore } from "./memoryStore";
 
 async function makeStore() {
   const store = await IndexedDbLocalStore.open();
@@ -152,4 +153,58 @@ describe("IndexedDbLocalStore", () => {
     expect(tree.messages.map((m) => m.message_id)).toEqual(["m-1"]);
     second.close();
   });
+
+  it("counts the turns a conversation holds", async () => {
+    const store = await makeStore();
+    await store.putConversation(conversation("c-1", "2026-01-01T00:00:00Z"));
+    await store.appendTurn(turn("c-1", "m-1"));
+    await store.appendTurn(turn("c-1", "m-2"));
+
+    expect(await store.countTurns("c-1")).toBe(2);
+    expect(await store.countTurns("c-none")).toBe(0);
+    store.close();
+  });
+
+  it("orders conversations the same way the in-memory store does", async () => {
+    const rows = [
+      conversation("c-middle", "2026-02-05T00:00:00Z"),
+      conversation("c-last", "2026-02-09T00:00:00Z"),
+      conversation("c-first", "2026-01-01T00:00:00Z"),
+    ];
+    const indexed = await makeStore();
+    const inMemory = new MemoryLocalStore();
+    for (const row of rows) {
+      await indexed.putConversation(row);
+      await inMemory.putConversation(row);
+    }
+
+    expect(await indexed.listConversations()).toEqual(await inMemory.listConversations());
+    expect((await indexed.listConversations()).map((row) => row.id)).toEqual([
+      "c-last",
+      "c-middle",
+      "c-first",
+    ]);
+    indexed.close();
+  });
 });
+
+function conversation(id: string, updatedAt: string) {
+  return {
+    id,
+    title: id,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: updatedAt,
+    head_id: null,
+  };
+}
+
+function turn(conversationId: string, messageId: string) {
+  return {
+    conversation_id: conversationId,
+    role: "user" as const,
+    content: "hi",
+    created_at: "2026-01-01T00:00:00Z",
+    message_id: messageId,
+    parent_id: null,
+  };
+}

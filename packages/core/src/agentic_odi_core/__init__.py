@@ -57,6 +57,8 @@ from agentic_odi_core.models import (
     V2MOM,
     BusinessImpactCategory,
     BusinessValue,
+    ClaimCheck,
+    ClaimSkip,
     CustomerOutcome,
     CustomerValue,
     Direction,
@@ -98,6 +100,7 @@ from agentic_odi_core.segmentation import (
     unclustered_outcomes,
 )
 from agentic_odi_core.services import (
+    ClaimCheckError,
     CustomerOutcomeNotFoundError,
     EvidenceNotFoundError,
     InvalidOutcomeStatementError,
@@ -112,6 +115,8 @@ from agentic_odi_core.services import (
     StepNotFoundError,
     StrategyNotFoundError,
     ValueOutOfRangeError,
+    manual_claim_check,
+    require_claim_check,
 )
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
@@ -150,6 +155,9 @@ __all__ = [
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
+    "ClaimCheck",
+    "ClaimCheckError",
+    "ClaimSkip",
     "ConflictError",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
@@ -225,9 +233,11 @@ __all__ = [
     "invalid_strategy_request",
     "job_not_found",
     "job_stage_catalog",
+    "manual_claim_check",
     "odi_schema",
     "outcome_not_found",
     "parse_tool_result",
+    "require_claim_check",
     "statement_to_dict",
     "step_not_found",
     "tool_result_text",
