@@ -27,3 +27,6 @@ decisions.
 | ADR | Title | Status |
 |---|---|---|
 | [0001](0001-mcp-http-transport.md) | Drive MCP over HTTP instead of stdio | accepted |
+| [0002](0002-package-diagram-as-contract.md) | Treat the package diagram as a dependency contract | accepted |
+| [0003](0003-consent-on-the-domain-path.md) | Put consent on the domain path, not the Studio's chat loop | proposed |
+| [0004](0004-two-stores-one-reference.md) | Two stores stay two stores; the reference between them becomes honest | proposed |

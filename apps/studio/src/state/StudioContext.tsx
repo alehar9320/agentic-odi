@@ -506,9 +506,15 @@ function loadBrief(): StudioBrief | null {
       target_user: String(parsed.target_user ?? ""),
       job_statement: String(parsed.job_statement ?? ""),
       core_problem: String(parsed.core_problem ?? ""),
+      role: parsed.role ? String(parsed.role) : undefined,
+      team: parsed.team ? String(parsed.team) : undefined,
+      evidence_at_hand: Array.isArray(parsed.evidence_at_hand)
+        ? parsed.evidence_at_hand.map(String)
+        : undefined,
       job_id: parsed.job_id ? String(parsed.job_id) : undefined,
+      v2mom: parsed.v2mom,
     };
-    return brief.product_name || brief.job_statement ? brief : null;
+    return brief.product_name || brief.job_statement || brief.role ? brief : null;
   } catch {
     return null;
   }

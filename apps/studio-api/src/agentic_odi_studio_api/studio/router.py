@@ -19,12 +19,15 @@ from agentic_odi_connectors.registry import (
 )
 from agentic_odi_core import (
     EvidenceNotFoundError,
+    InvalidOutcomeStatementError,
     JobNotFoundError,
     NoStrategyEvidenceError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
+    OutcomeProposal,
     OutcomeStatementError,
+    ProposalStatus,
     SegmentNotFoundError,
     StepNotFoundError,
     ToolName,
@@ -72,6 +75,7 @@ from agentic_odi_studio_api.studio.schemas import (
     AddStepRequest,
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
+    ApproveProposalRequest,
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
@@ -94,7 +98,10 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationResponse,
     ObservationUpdateRequest,
     PromoteEvidenceRequest,
+    ProposalOut,
+    ProposeOutcomeRequest,
     ProposeStrategyRequest,
+    RejectProposalRequest,
     ScheduleWorkRequest,
     SignalActionRequest,
     TurnNode,
@@ -1478,3 +1485,131 @@ async def promote_evidence(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True, "result": artifact.model_dump(mode="json")}
+
+
+def _proposal_out(proposal: OutcomeProposal) -> ProposalOut:
+    """Serialize one proposal for the Studio."""
+    return ProposalOut(
+        id=proposal.id,
+        evidence_id=proposal.evidence_id,
+        job_id=proposal.job_id,
+        step_id=proposal.step_id,
+        statement=proposal.statement,
+        direction=proposal.direction.value,
+        unit_of_measure=proposal.unit_of_measure,
+        object_of_control=proposal.object_of_control,
+        contextual_clarifier=proposal.contextual_clarifier,
+        importance=proposal.importance,
+        satisfaction=proposal.satisfaction,
+        confidence=proposal.confidence,
+        rationale=proposal.rationale,
+        quote=proposal.quote,
+        source_name=proposal.source_name,
+        status=proposal.status.value,
+        created_at=proposal.created_at.isoformat(),
+    )
+
+
+@router.post("/proposals")
+async def propose_outcome_api(body: ProposeOutcomeRequest, request: Request) -> dict:
+    """Mine one evidence record into a scored, approvable outcome proposal."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.PROPOSE_OUTCOME.value,
+            {"evidence_id": body.evidence_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposal = _service(request).propose_outcome_from_evidence(body.evidence_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": _proposal_out(proposal).model_dump(mode="json")}
+
+
+@router.get("/proposals")
+async def list_proposals_api(request: Request, status: str | None = Query(None)) -> dict:
+    """List outcome proposals, optionally filtered by status."""
+    try:
+        proposal_status = ProposalStatus(status) if status is not None else None
+    except ValueError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message=f"invalid status '{status}'. Use proposed, approved, rejected, or edited.",
+            ),
+            status_code=422,
+        ) from exc
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(request.query_params.get("mcp_url", "")),
+            ToolName.LIST_PROPOSALS.value,
+            {"status": status} if status else {},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposals = _service(request).list_proposals(status=proposal_status)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": [_proposal_out(p) for p in proposals],
+    }
+
+
+@router.post("/proposals/{proposal_id}/approve")
+async def approve_proposal_api(
+    proposal_id: str, body: ApproveProposalRequest, request: Request
+) -> dict:
+    """Approve a proposal and write it as an Outcome."""
+    if _uses_mcp(request):
+        args: dict[str, Any] = {"proposal_id": proposal_id}
+        if body.statement is not None:
+            args["statement"] = body.statement
+        if body.importance is not None:
+            args["importance"] = body.importance
+        if body.satisfaction is not None:
+            args["satisfaction"] = body.satisfaction
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.APPROVE_PROPOSAL.value,
+            args,
+        )
+        return {"ok": True, "result": result}
+    try:
+        outcome = _service(request).approve_proposal(
+            proposal_id,
+            statement=body.statement,
+            importance=body.importance,
+            satisfaction=body.satisfaction,
+        )
+    except InvalidOutcomeStatementError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            status_code=422,
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": outcome.model_dump(mode="json")}
+
+
+@router.post("/proposals/{proposal_id}/reject")
+async def reject_proposal_api(
+    proposal_id: str, body: RejectProposalRequest, request: Request
+) -> dict:
+    """Reject a proposal. Nothing is written to the ODI store."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.REJECT_PROPOSAL.value,
+            {"proposal_id": proposal_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposal = _service(request).reject_proposal(proposal_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": _proposal_out(proposal).model_dump(mode="json"),
+    }

@@ -15,6 +15,12 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.mapping import (
+    HeuristicProposalStrategy,
+    OutcomeProposal,
+    ProposalStatus,
+    ProposalStrategy,
+)
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
@@ -690,6 +696,120 @@ class ODIService:
             )
             return outcome
         raise ValidationError(f"Unknown promotion target: {target}")
+
+    def propose_outcome_from_evidence(self, evidence_id: str) -> OutcomeProposal:
+        """Propose a desired outcome from one evidence record.
+
+        Uses the default heuristic strategy (deterministic, offline, no LLM).
+        Returns the proposal; nothing is written to the ODI store until the
+        proposal is approved.
+        """
+        strategy: ProposalStrategy = HeuristicProposalStrategy()
+        evidence = self.repo.get_evidence(evidence_id)
+        if evidence is None:
+            raise EvidenceNotFoundError(
+                evidence_id,
+                "List the stored records with list_evidence() to find a valid id.",
+            )
+        jobs = self.repo.list_jobs()
+        steps = self.repo.list_steps()
+        proposal = strategy.propose(evidence, jobs, steps)
+        if proposal is None:
+            raise ValidationError(
+                f"No candidate outcome could be extracted from evidence {evidence_id}. "
+                "The record does not contain a recognizable customer problem."
+            )
+        # Persist the proposal so it can be approved/rejected later.
+        return self.repo.add_proposal(proposal)
+
+    def propose_outcomes_from_batch(self, evidence_ids: list[str]) -> list[OutcomeProposal]:
+        """Propose desired outcomes from a batch of evidence records.
+
+        Each record is proposed independently. Records that yield no candidate
+        outcome are skipped (not raised) so a batch can contain mixed content.
+        """
+        proposals: list[OutcomeProposal] = []
+        strategy: ProposalStrategy = HeuristicProposalStrategy()
+        jobs = self.repo.list_jobs()
+        steps = self.repo.list_steps()
+        for evidence_id in evidence_ids:
+            evidence = self.repo.get_evidence(evidence_id)
+            if evidence is None:
+                continue
+            proposal = strategy.propose(evidence, jobs, steps)
+            if proposal is not None:
+                proposals.append(self.repo.add_proposal(proposal))
+        return proposals
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
+        """List all proposals, optionally filtered by status."""
+        return self.repo.list_proposals(status=status)
+
+    def approve_proposal(
+        self,
+        proposal_id: str,
+        statement: str | None = None,
+        importance: float | None = None,
+        satisfaction: float | None = None,
+    ) -> Outcome:
+        """Approve a proposal and write it as an Outcome through add_outcome.
+
+        If ``statement`` is provided, the edited statement is validated before
+        writing. Importance/satisfaction defaults come from the proposal.
+        """
+        proposal = self.repo.get_proposal(proposal_id)
+        if proposal is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        if proposal.status != ProposalStatus.PROPOSED:
+            raise ValidationError(
+                f"Proposal {proposal_id} is already {proposal.status.value}; "
+                "cannot approve a non-proposed proposal."
+            )
+
+        final_statement = statement or proposal.statement
+        # Validate the (possibly edited) statement through the same path as any
+        # other outcome write.
+        verdict = evaluate_outcome_statement(final_statement)
+        if not verdict["valid"]:
+            raise InvalidOutcomeStatementError(verdict)
+
+        final_importance = proposal.importance if importance is None else importance
+        final_satisfaction = proposal.satisfaction if satisfaction is None else satisfaction
+        if final_importance is None or final_satisfaction is None:
+            raise ValidationError(
+                f"Proposal {proposal_id} has no scored importance or satisfaction; "
+                "approve it with explicit importance and satisfaction values."
+            )
+
+        if proposal.job_id is None:
+            raise ValidationError(f"Proposal {proposal_id} has no routed job; cannot approve.")
+
+        outcome = self.add_outcome(
+            proposal.job_id,
+            final_statement,
+            importance=final_importance,
+            satisfaction=final_satisfaction,
+            step_id=proposal.step_id,
+        )
+        # Mark the proposal as approved (or edited if statement changed).
+        new_status = ProposalStatus.EDITED if statement is not None else ProposalStatus.APPROVED
+        self.repo.update_proposal(proposal_id, {"status": new_status, "outcome_id": outcome.id})
+        return outcome
+
+    def reject_proposal(self, proposal_id: str) -> OutcomeProposal:
+        """Reject a proposal. Nothing is written to the ODI store."""
+        proposal = self.repo.get_proposal(proposal_id)
+        if proposal is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        if proposal.status != ProposalStatus.PROPOSED:
+            raise ValidationError(
+                f"Proposal {proposal_id} is already {proposal.status.value}; "
+                "cannot reject a non-proposed proposal."
+            )
+        rejected = self.repo.update_proposal(proposal_id, {"status": ProposalStatus.REJECTED})
+        if rejected is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        return rejected
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:
         return compute_opportunity_score(importance, satisfaction)

@@ -445,3 +445,47 @@ class PromoteEvidenceRequest(BaseModel):
     importance: float | None = None
     satisfaction: float | None = None
     mcp_url: str = ""
+
+
+class ProposeOutcomeRequest(BaseModel):
+    """Propose a desired outcome from an evidence record."""
+
+    evidence_id: str
+    mcp_url: str = ""
+
+
+class ApproveProposalRequest(BaseModel):
+    """Approve a proposal, optionally with edits."""
+
+    statement: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    mcp_url: str = ""
+
+
+class RejectProposalRequest(BaseModel):
+    """Reject a proposal."""
+
+    mcp_url: str = ""
+
+
+class ProposalOut(BaseModel):
+    """Serialized OutcomeProposal for the API."""
+
+    id: str
+    evidence_id: str
+    job_id: str | None = None
+    step_id: str | None = None
+    statement: str
+    direction: str
+    unit_of_measure: str | None = None
+    object_of_control: str | None = None
+    contextual_clarifier: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    confidence: float
+    rationale: str
+    quote: str | None = None
+    source_name: str
+    status: str
+    created_at: str

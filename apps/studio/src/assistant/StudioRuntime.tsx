@@ -20,6 +20,8 @@ import { useStudio } from "../state/StudioContext";
 import type { ChatMessage } from "../types";
 import { createAttachmentAdapter, preparedAttachments } from "./attachments";
 import { textOf, toThreadMessageLike } from "./convert";
+import { createDictationAdapter } from "./dictation";
+import { textWithQuote, type ComposerQuote } from "./quote";
 
 export interface StudioSuggestion {
   title: string;
@@ -142,6 +144,8 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
   } = useStudio();
 
   const attachments = useMemo(() => createAttachmentAdapter(), []);
+  // Null where speech recognition is missing, so the composer shows no mic.
+  const dictation = useMemo(() => createDictationAdapter(), []);
   const jobCount = canvas?.jobs.length ?? 0;
   const outcomeCount = canvas?.outcomes.length ?? 0;
   const suggestions = useMemo(
@@ -154,9 +158,15 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
     messages,
     convertMessage: toThreadMessageLike,
     suggestions,
-    adapters: { attachments },
+    adapters: { attachments, ...(dictation ? { dictation } : {}) },
     onNew: async (message) => {
-      await sendMessage(textOf(message), preparedAttachments(message.attachments));
+      // assistant-ui attaches the composer quote as message metadata. The turn
+      // carries it as a blockquote so the sidecar's stored text keeps it.
+      const quote = (message.metadata?.custom as { quote?: ComposerQuote } | undefined)?.quote;
+      await sendMessage(
+        textWithQuote(textOf(message), quote),
+        preparedAttachments(message.attachments),
+      );
     },
     onEdit: async (message) => {
       await editFrom(message.sourceId, textOf(message), preparedAttachments(message.attachments));

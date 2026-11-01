@@ -505,6 +505,42 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return artifact.model_dump()
 
+    def _propose_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import EvidenceNotFoundError, evidence_not_found
+
+        evidence_id = args["evidence_id"]
+        try:
+            proposal = self.service.propose_outcome_from_evidence(evidence_id)
+        except EvidenceNotFoundError as exc:
+            raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None
+        return proposal.model_dump()
+
+    def _list_proposals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import ProposalStatus
+
+        status = args.get("status")
+        try:
+            proposal_status = ProposalStatus(status) if status is not None else None
+        except ValueError:
+            raise BackendError(
+                f"Invalid proposal status '{status}'. Use proposed, approved, rejected, or edited."
+            ) from None
+        proposals = self.service.list_proposals(status=proposal_status)
+        return [proposal.model_dump() for proposal in proposals]
+
+    def _approve_proposal(self, args: dict[str, Any]) -> dict[str, Any]:
+        outcome = self.service.approve_proposal(
+            args["proposal_id"],
+            statement=args.get("statement"),
+            importance=args.get("importance"),
+            satisfaction=args.get("satisfaction"),
+        )
+        return outcome.model_dump()
+
+    def _reject_proposal(self, args: dict[str, Any]) -> dict[str, Any]:
+        proposal = self.service.reject_proposal(args["proposal_id"])
+        return proposal.model_dump()
+
     def _schedule_work(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import JobNotFoundError, job_not_found
 
@@ -699,6 +735,10 @@ _LOCAL_HANDLERS = {
     "list_evidence": LocalBackend._list_evidence,
     "delete_evidence": LocalBackend._delete_evidence,
     "promote_evidence": LocalBackend._promote_evidence,
+    "propose_outcome": LocalBackend._propose_outcome,
+    "list_proposals": LocalBackend._list_proposals,
+    "approve_proposal": LocalBackend._approve_proposal,
+    "reject_proposal": LocalBackend._reject_proposal,
     "schedule_work": LocalBackend._schedule_work,
     "get_scheduled_work": LocalBackend._get_scheduled_work,
     "list_scheduled_work": LocalBackend._list_scheduled_work,

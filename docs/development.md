@@ -63,6 +63,32 @@ filename instead of running every test in a browser. Browser mode needs Chromium
 locally: `npx playwright install chromium`. See
 [Deployment](deployment.md) for the project setup and budget rules.
 
+### Copied components (`src/vendor`)
+
+Tailwind v4 styles `src/vendor/**` and nothing else (issue #385). The stylesheet
+imports the theme and utility layers with `source(none)` and then rescans that
+directory alone, so no product class is ever generated and Tailwind's
+document-wide reset stays out of the bundle. The product keeps rendering from
+`src/styles/theme.css`, which `src/main.tsx` imports first; vendor utilities land
+in `@layer utilities`, and an unlayered product rule always outranks a layered
+utility, so the two can never fight over the same element.
+
+`components.json` points the shadcn CLI at that stylesheet and at the `@/` alias,
+which resolves to `src/vendor/` in the Vite config and in both tsconfigs. A copied
+file therefore keeps the import paths it shipped with:
+
+```bash
+npx --yes shadcn@latest add button   # → apps/studio/src/vendor/components/ui/button.tsx
+```
+
+Every copied file carries a header naming the registry and any edit made after the
+copy; refresh with the CLI instead of editing the markup by hand. Today that is one
+line: the registry items import their class merger from the `cn` package, and the
+vendor tree standardises on `src/vendor/lib/utils.ts`, so `npm rm cn` and point the
+import back at `@/lib/utils` after each add.
+`npm --prefix apps/studio test -- --run src/vendor` proves the scope by reading the
+compiled stylesheet.
+
 ### Conversational UI coverage
 
 The agent-composed surfaces, first-minute guidance, and the product tour are
@@ -72,13 +98,18 @@ control while following a streamed turn and returning to the live end:
 | File | What it covers |
 |---|---|
 | `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
+| `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
 | `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
 | `apps/studio/src/diagnostics/` | Recursive secret/URL/path redaction, 256 KiB cap, opt-in memory-only capture, local-only metadata fetch, and accessible diagnostics preview/export |
 | `apps/studio-api/tests/test_studio_diagnostics.py` | Metadata-only diagnostics response, safe database basename/counts, integrity state, and absence of row contents/config |
 | `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
+| `apps/studio/src/assistant/quote.test.ts`, `src/components/chat/SelectionToolbar.test.tsx` | Quoting a passage verbatim with its attribution, one copy only, and no toolbar until text is selected |
 | `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
+| `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
+| `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
+| `apps/studio/src/components/chat/ThreadComposer.test.tsx` | Recall of previously sent messages with `ArrowUp`/`ArrowDown`, draft restoration, and the editing and sending keys it must not break |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
 | `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
 | `apps/studio/src/assistant/starterCopy.test.ts` | The first-run starter lint: situation-first titles, material-first prompts, a promised artifact, no quality adjectives, no claim literal, and the untouched returning-user swaps |
@@ -101,7 +132,10 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
 | `apps/studio/src/lib/guidance.test.ts` | One hint at a time, context before evidence, silence before the first exchange, permanent dismissal, defensive storage |
-| `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests |
+| `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests, and a complete introduction that saves the brief |
+| `apps/studio/src/lib/intro.test.ts` | Introduction turns, parsing under empty, very long, and multi-fact replies, the proposed defaults, draft storage, and one-shot migration |
+| `apps/studio/src/components/setup/IntroConversation.test.tsx` | Five turns, skip, Escape, in-place summary edits, and the accepted brief with role, team, and evidence |
+| `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | The summary card as one Chromatic snapshot |
 
 ## Website Checks (GitHub Pages)
 
@@ -115,6 +149,21 @@ uv run --directory website pytest tests/
 
 The site is generated at CI time and never committed. CI runs `build_site.py` to
 produce `_site` and uploads it as the `website-site` artifact for review.
+
+The landing page's primary call to action points at the **sample workspace**,
+`website/sample/index.html`. Unlike the rest of the site it *is* committed, so
+it survives an API outage and can be linked from the README. It is generated
+from `website/content/sample-study.json` by `website/tools/build_sample.py`;
+regenerate it after editing the fixture or `website/templates/sample.html`:
+
+```bash
+uv run python website/tools/build_sample.py          # write the committed page
+uv run python website/tools/build_sample.py --check  # fail when it is stale
+```
+
+`website/tests/test_content_sync.py` runs the same comparison, so the page
+cannot drift from the fixture, and it greps the committed file for an external
+reference so the no-network rule is enforced rather than promised.
 
 Publishing happens in `.github/workflows/pages.yml`: it runs those tests,
 builds `_site` from `website/`, and deploys the artifact with
@@ -275,6 +324,47 @@ CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
 repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
 `continue-on-error` on the job keeps a failure from turning CI red.
 
+## Cold-open budget
+
+A study at scale must reach an interactive screen in under a second, or a PM
+batches their work instead of checking something. The reference study is 1,500
+outcomes over 30 jobs, each with a complete eight-step job map and one customer
+quote per outcome (3,270 events). It is generated deterministically by
+`agentic_odi_core.corpus.build_corpus`, so the number is comparable between runs
+and machines:
+
+```bash
+uv run python scripts/gen_corpus.py --out /tmp/corpus.db
+```
+
+The number is measured per segment, because the fix differs per segment, and the
+regression tests live with the segment they cover:
+
+```bash
+uv run pytest packages/core -k perf --no-header -q
+npm --prefix apps/studio test -- --run src/components/canvas/opportunityLandscape.perf.test.tsx
+```
+
+**Reference environment:** AMD EPYC 9B14, 4 vCPU, 15 GiB RAM, Linux, Python
+3.13.15, `uv` 0.13.5, median of seven cold-open runs.
+
+| Segment | Before | After | Fix |
+|---|---|---|---|
+| Store open (`_load_snapshot` replay) | 32 ms | 27 ms | Unchanged; replay itself was never the bottleneck. |
+| Canvas assembly (`fetch_local_canvas`) | 1,146 ms | 23 ms | `_sync` now reads only events appended since the last apply (`get_stream(after_id=…)`) instead of re-parsing the whole log on every read. One assembly read 206,010 rows; it now reads 3,270. |
+| First interactive render (SPA matrix) | 590 ms | 162 ms | The landscape plots the 200 highest-opportunity outcomes above the fold and offers "Plot all"; 8,957 DOM nodes became 1,709. |
+
+Cold open, end to end, is store open plus assembly plus first render: **32 + 1,146
++ 590 ≈ 1,768 ms before, 27 + 23 + 162 ≈ 212 ms after.**
+
+The Python bounds in `packages/core/tests/test_perf_cold_open.py` are deliberately
+loose (2 s per segment — roughly an order of magnitude over the reference number).
+A tight wall-clock bound on a shared runner fails on a busy box and gets deleted
+within a month. The deterministic guard is
+`test_perf_canvas_assembly_does_not_rescan_the_whole_log`: it counts rows read
+rather than seconds, and a return to the full rescan (206,010 rows) fails it on
+any machine.
+
 ## Test Coverage
 
 CI runs the suite on Python **3.10, 3.11, and 3.12** and uploads one combined
@@ -330,7 +420,7 @@ uv run pytest \
 
 | Area | What it covers |
 |---|---|
-| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, and repository factory |
+| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, and the per-segment cold-open budget |
 | `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
 | `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, and step/outcome passthrough |
 | `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, connectors, and startup performance |
@@ -340,7 +430,7 @@ uv run pytest \
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, OG art reproducibility, and README sync |
+| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, OG art reproducibility, and README sync |
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the

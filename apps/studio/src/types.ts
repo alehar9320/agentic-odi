@@ -313,6 +313,12 @@ export interface StudioBrief {
   target_user: string;
   job_statement: string;
   core_problem: string;
+  /** The person's own part in the work, from the first-run introduction. */
+  role?: string;
+  /** The team around them, when they named one. */
+  team?: string;
+  /** What they already have to work from: calls, tickets, threads. */
+  evidence_at_hand?: string[];
   job_id?: string;
   v2mom?: V2Mom;
 }

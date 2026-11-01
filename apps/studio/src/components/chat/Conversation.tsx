@@ -38,6 +38,7 @@ import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon } from "../icons";
 import { Markdown } from "./Markdown";
+import { StallNotice } from "./StallNotice";
 
 const PHASE_LABEL: Record<string, string> = {
   health_check: "Waking the model",
@@ -87,6 +88,10 @@ function AssistantMessage() {
 
         {running && !hasText ? <TypingPart label={phaseLabel(thinkingPhase)} /> : null}
         {running && hasText ? <span className="caret" aria-hidden="true" /> : null}
+
+        {/* Silence is not failure: a long tool call gets one honest line, and
+            a dropped run falls through to the failure panel instead. */}
+        <StallNotice />
 
         {error ? (
           <FailurePanel
@@ -165,7 +170,7 @@ function UserMessage() {
           const size = ready ? formatFileSize(ready.size) : "";
 
           return (
-            <span className="attachment-chip">
+            <span className="attachment-chip" data-aui-quote-selectable="false">
               {ready?.dataUrl ? (
                 <img className="attachment-chip__thumb" src={ready.dataUrl} alt="" />
               ) : null}
