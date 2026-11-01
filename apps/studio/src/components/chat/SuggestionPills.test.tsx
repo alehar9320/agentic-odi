@@ -49,11 +49,17 @@ describe("SuggestionPills starters", () => {
     expect(sendMessage).toHaveBeenCalledWith(NOTES_PROMPT);
   });
 
-  it("keeps the starters disabled while a reply streams", () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext({ streaming: true }));
+  it("enqueues a starter clicked while a reply streams", () => {
+    const sendMessage = vi.fn(async () => {});
+    vi.mocked(useStudio).mockReturnValue(stubContext({ streaming: true, sendMessage }));
 
     renderPills();
+    fireEvent.click(screen.getByRole("button", { name: FIRST_STARTER }));
 
-    expect(screen.getByRole("button", { name: FIRST_STARTER })).toBeDisabled();
+    // The pill stays live mid-answer (#410): the context puts the follow-up
+    // in the queue lane instead of the click being swallowed by a disabled
+    // button.
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(NOTES_PROMPT);
   });
 });

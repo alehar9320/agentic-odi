@@ -24,6 +24,7 @@ import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/com
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
+import { QueueLane } from "./QueueLane";
 import { ModelPicker } from "./ModelPicker";
 
 const acceptedAttachmentTypes = ATTACHMENT_ACCEPT.split(",");
@@ -171,6 +172,19 @@ function ComposerBody({
       return;
     }
 
+    // Enter is a send, not a race (#410): while a turn runs the follow-up
+    // joins the queue lane instead of interrupting the live answer.
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing &&
+      text.trim() !== ""
+    ) {
+      event.preventDefault();
+      aui.composer.send({ steer: false });
+      return;
+    }
+
     // The palette owns the arrows while it is open; history must not fight it.
     if (open || event.defaultPrevented) {
       return;
@@ -200,6 +214,7 @@ function ComposerBody({
         onChoose={choose}
       />
       <ConnectorChips />
+      <QueueLane />
       <AttachmentRow />
       {/* The live transcript is recognition output, not a draft: it is marked
           as interim and the primitive replaces it with the final sentence. */}

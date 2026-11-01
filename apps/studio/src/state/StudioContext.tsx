@@ -10,6 +10,12 @@ import {
   type ReactNode,
 } from "react";
 
+import type {
+  AppendMessage,
+  ExternalThreadQueueAdapter,
+  MessageQueueController,
+} from "@assistant-ui/react";
+
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -55,6 +61,10 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
+import { preparedAttachments } from "../assistant/attachments";
+import { textOf } from "../assistant/convert";
+import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
+import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import { loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
@@ -308,6 +318,11 @@ export interface StudioContextValue {
   messages: ChatMessage[];
   streaming: boolean;
   thinkingPhase: string | null;
+  /**
+   * Enter a turn through the follow-up queue (#410): idle, it starts now;
+   * mid-run, it waits its turn. The promise settles when the send is accepted,
+   * not when the answer arrives.
+   */
   sendMessage: (text: string, attachments?: ChatAttachment[]) => Promise<void>;
   /** Re-answer the turn that follows `messageId`, as a sibling branch. */
   regenerateFrom: (messageId: string | null) => Promise<void>;
@@ -318,6 +333,12 @@ export interface StudioContextValue {
   /** Answer a paused write. The turn resumes on its own stream. */
   respondToApproval: (approvalId: string, approved: boolean, reason?: string) => Promise<void>;
   stopStreaming: () => void;
+  /**
+   * Follow-ups typed while a reply is running (#410): a quiet lane that runs
+   * turns in order, never two streams at once. The composer renders it. Null
+   * until the queue controller mounts.
+   */
+  queue: ExternalThreadQueueAdapter | null;
   clearChat: () => void;
   conversationId: string | null;
   memory: Observation[];
@@ -600,6 +621,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  /** The id of the newest turn on the wire; a steered cut-in takes it over (#410). */
+  const liveTurnId = useRef<string | null>(null);
   /** The deferred connectivity probe, until the person speaks or the view unmounts. */
   const idleProbeRef = useRef<{ cancel: () => void } | null>(null);
 
@@ -1299,7 +1322,34 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return null;
   }, [focusedSubject, canvasState.data]);
 
+  // The queue owns the follow-up sequence. The controller is created in a
+  // mount effect — it reads refs at dispatch time, and doing that during
+  // render is exactly what the React compiler forbids — and mirrored into
+  // state so the runtime re-binds to its adapter once it exists. A stable
+  // ref handle lets the dispatch-time callers reach it without a render race.
+  const turnQueueRef = useRef<MessageQueueController | null>(null);
+  const queueDispatch = useRef<(message: AppendMessage) => Promise<void>>(
+    async () => undefined,
+  );
+  const [turnQueue, setTurnQueue] = useState<MessageQueueController | null>(null);
+  useEffect(() => {
+    const controller = createTurnQueue({
+      run: (message) => queueDispatch.current(message),
+      cancel: () => abortRef.current?.abort(),
+    });
+    turnQueueRef.current = controller;
+    setTurnQueue(controller);
+    return () => {
+      turnQueueRef.current = null;
+      controller.clear();
+    };
+  }, []);
+
   const stopStreaming = useCallback(() => {
+    // Stop takes down the live turn (#410), not the lane: pausing the sequence
+    // makes a queued follow-up wait for the next send instead of firing off
+    // in the wake of the stop.
+    turnQueueRef.current?.notifyCancelled();
     abortRef.current?.abort();
   }, []);
 
@@ -1319,7 +1369,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       existingUserMessage?: ChatMessage,
     ) => {
       const trimmed = text.trim();
-      if ((!trimmed && attachments.length === 0) || streaming) {
+      // Starting a turn is separate from a turn being running (#410): the
+      // queue serializes dispatches, so a settled stream never overlaps the
+      // next one. Direct sends check `streaming` before calling this.
+      if (!trimmed && attachments.length === 0) {
         return;
       }
 
@@ -1355,6 +1408,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setToolActivity([]);
 
       const controller = new AbortController();
+      liveTurnId.current = assistantId;
       abortRef.current = controller;
 
       let content = "";
@@ -1679,13 +1733,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           terminal: failure ? "failed" : stopped ? "stopped" : "completed",
           duration_ms: Math.max(0, Date.now() - turnStartedAt),
         });
-        setStreaming(false);
-        setThinkingPhase(null);
-        abortRef.current = null;
+        if (liveTurnId.current === assistantId) {
+          // Only the newest turn on the wire may clear the running state: a
+          // steered cut-in is already live while this one settles (#410).
+          liveTurnId.current = null;
+          setStreaming(false);
+          setThinkingPhase(null);
+          abortRef.current = null;
+        }
       }
     },
     [
-      streaming,
       settings,
       brief,
       conversationId,
@@ -1695,9 +1753,44 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     ],
   );
 
+  // The newest transcript and turn machinery, handed to the queue after every
+  // commit. No send can happen before the first commit's effects have run.
+  useEffect(() => {
+    queueDispatch.current = async (message) => {
+      const custom = message.metadata?.custom as
+        | { quote?: ComposerQuote; attachments?: ChatAttachment[] }
+        | undefined;
+      await runTurn(
+        messages,
+        textWithQuote(textOf(message), custom?.quote),
+        // A composer send carries file ids the attachment adapter can re-read; a
+        // studio send carries the prepared extraction itself (see #410's queue).
+        custom?.attachments ?? preparedAttachments(message.attachments),
+      );
+    };
+  });
+
   const sendMessage = useCallback(
-    (text: string, attachments: ChatAttachment[] = []) => runTurn(messages, text, attachments),
-    [messages, runTurn],
+    async (text: string, attachments: ChatAttachment[] = []) => {
+      const trimmed = text.trim();
+      if (!trimmed && attachments.length === 0) {
+        return;
+      }
+      // Every send enters through the queue (#410): idle, the controller
+      // dispatches it synchronously — the old direct path; mid-run, it joins
+      // the lane. A ref-read of "is a turn open" would race two same-tick
+      // sends; the controller's busy edge is the one that cannot. The promise
+      // settles when the send is accepted into the sequence, not when its
+      // turn answers.
+      turnQueue?.adapter.enqueue(
+        queuedUserMessage(
+          trimmed,
+          messages.length ? messages[messages.length - 1].id : null,
+          attachments,
+        ),
+      );
+    },
+    [messages, turnQueue],
   );
 
   /**
@@ -1706,6 +1799,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    */
   const regenerateFrom = useCallback(
     async (messageId: string | null) => {
+      if (streaming) {
+        return;
+      }
       const index = messageId
         ? messages.findIndex((message) => message.id === messageId)
         : messages.length - 1;
@@ -1730,11 +1826,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         question,
       );
     },
-    [messages, runTurn],
+    [messages, runTurn, streaming],
   );
 
   const editFrom = useCallback(
     async (messageId: string | null, text: string, attachments: ChatAttachment[] = []) => {
+      if (streaming) {
+        return;
+      }
       const index = messageId
         ? messages.findIndex((message) => message.id === messageId)
         : messages.length - 1;
@@ -1750,7 +1849,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       };
       await runTurn(messages.slice(0, index), edited.content, attachments, edited);
     },
-    [messages, runTurn],
+    [messages, runTurn, streaming],
   );
 
   const switchBranch = useCallback(
@@ -1876,6 +1975,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    // A fresh chat is also a fresh lane: follow-ups typed for the old
+    // conversation must not fire into the new one.
+    turnQueueRef.current?.clear();
     setMessages([]);
     setToolActivity([]);
     setStreaming(false);
@@ -2043,6 +2145,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       switchBranch,
       respondToApproval,
       stopStreaming,
+      queue: turnQueue?.adapter ?? null,
       clearChat,
       conversationId,
       memory,
@@ -2156,6 +2259,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       switchBranch,
       respondToApproval,
       stopStreaming,
+      turnQueue,
       clearChat,
       conversationId,
       memory,
