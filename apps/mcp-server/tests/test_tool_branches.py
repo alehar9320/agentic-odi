@@ -90,6 +90,31 @@ async def test_add_outcome_rejects_out_of_range_scores() -> None:
 
 
 @pytest.mark.asyncio
+async def test_add_outcome_rejects_a_skip_without_a_reason() -> None:
+    async with Client(mcp) as client:
+        await client.call_tool("add_job", {"name": "Onboard"})
+        jobs = json.loads(_text(await client.call_tool("get_jobs", {})))
+
+        result = await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": jobs[0]["id"],
+                "statement": "Minimize the time it takes to onboard when they sign up",
+                "importance": 8.0,
+                "satisfaction": 5.0,
+                "claim_check": {
+                    "asked": ["What does it cost?"],
+                    "skips": [{"question": "What does it cost?", "reason": ""}],
+                },
+            },
+        )
+
+    text = _text(result)
+    assert text.startswith("Error:")
+    assert "reason" in text
+
+
+@pytest.mark.asyncio
 async def test_add_customer_outcome_reports_validation_errors() -> None:
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Onboard"})
