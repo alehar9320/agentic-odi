@@ -51,6 +51,7 @@ counted as done.
 - [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
 - [ ] **Evidence becomes outcome proposals** — a stored record is mined into a scored, approvable desired outcome, and only a human approval writes it ([PR #438](https://github.com/alehar9320/agentic-odi/pull/438)).
 - [ ] **Evidence from a file at the terminal** — `evidence add --file` reads text (or stdin) on the Studio's attachment cap ([PR #415](https://github.com/alehar9320/agentic-odi/pull/415)).
+- [ ] **List conversations from the API** — the conversation switcher queries every stored conversation newest-first with turn counts ([PR #494](https://github.com/alehar9320/agentic-odi/pull/494)).
 
 ## Next
 
