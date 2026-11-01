@@ -243,6 +243,12 @@ MCP tool result (text)
 - **The canvas is a union.** `CanvasState` is `loading | ready | empty |
   error`. An empty canvas is an invitation; a failed canvas is a failure panel
   with Retry. The two never look the same.
+- **The saved copy is drawn, not hidden.** A canvas read from the browser cache
+  is initial state with `kind: "loading"`, so the boards draw it and caption it
+  "Saved …" from the cache's `generated_at` instead of covering it with a
+  skeleton. The skeleton is kept only for a genuinely empty store, and the
+  caption claims no freshness the timestamp does not support. `canvasCached`
+  tells a board whether the data on screen came from the cache.
 - **The turn log is safe.** One JSON line per turn carries the request id, the
   model, the round and tool counts, the error count, the duration, and the
   outcome. Sensitive keys are dropped rather than redacted, so no token, key,

@@ -3032,6 +3032,13 @@ button.message__tag:hover {
   font-size: 0.8rem;
 }
 
+/* A board drawn from the saved copy says when that copy was saved. */
+.canvas-saved {
+  margin: 8px 0 0;
+  color: var(--studio-muted);
+  font-size: 0.8rem;
+}
+
 /* Custom scrollbar for data density tables */
 ::-webkit-scrollbar {
   width: 8px;
