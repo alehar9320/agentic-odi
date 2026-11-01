@@ -1104,6 +1104,7 @@ describe("StudioContext edge routing", () => {
     expect(assistant?.content).toBe("Hi");
     // The marker tracks the brain that answered, not the feature being switched on.
     expect(result.current.edgeReplyFor).toBeNull();
+    expect(result.current.offlineReplyFor).toBeNull();
   });
 
   it("names the browser as the brain, on the reply it produced", async () => {

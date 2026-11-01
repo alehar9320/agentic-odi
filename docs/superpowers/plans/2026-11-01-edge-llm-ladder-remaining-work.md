@@ -72,9 +72,9 @@ absent.
 | `d34d8e5` | 9 (first half) | `EdgeScheduler.bootstrap()` (rung zero), `EdgeManager.offerFor / grantAndStart / decline / isBusy`, the `ready` and `consent-changed` notices, and the `edge-offer` / `edge-ready` banners with both buttons wired through the dispatcher. `docs/local-llm.md` now describes a reachable feature. Landed out of plan order, before the Settings section, because nothing else on this branch matters while no person can switch it on. |
 | `3a1f633` | 8 | `components/EdgeModelSection.tsx` — Settings → *Answers in this browser*: the flag switch, a consent answer that can be changed and withdrawn, per-tier status with device reasons, free-a-tier storage, the progression meter, the quota line. `EdgeManager.panelState()` and `freeTier()` (with `EdgeLLMEngine.evict`, the only Settings path that may pull in the WebLLM chunk), the notice seam turned multi-subscriber so the strip and Settings both react, and the section mounted in `SettingsPanel`. |
 | `f475509` | merge | `origin/main` merged forward; see "Merged with `main`" below for the four conflicts and what each one cost this feature. |
-| this commit | 9 (second half) | The reply names its brain: `edge/turn.ts` opens with `status` `phase: "edge"`, `StudioContext` records `edgeReplyFor` beside the existing `offlineReplyFor`, and `Conversation.tsx` renders one provenance tag per reply — *"Answered in this browser"* — with the edge answer taking precedence over the draft label. Plus the capability prose in `docs/local-llm.md` and `docs/living-studio.md`. |
+| `748e817` | 9 (second half) | The reply names its brain: `edge/turn.ts` opens with `status` `phase: "edge"`, `StudioContext` records `edgeReplyFor` beside the existing `offlineReplyFor`, and `Conversation.tsx` renders one provenance tag per reply — *"Answered in this browser"* — with the edge answer taking precedence over the draft label. Plus the capability prose in `docs/local-llm.md` and `docs/living-studio.md`. |
 
-Everything the branch changes on top of `main` as merged: 39 files, 4,043 lines
+Everything the branch changes on top of `main` as merged: 39 files, 4,044 lines
 added, 50 deleted, and 105 added browser test cases, which now run 919 tests
 across 97 files, plus one amended Python security-header test.
 
@@ -160,7 +160,7 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
       intact: rule-based answers keep working until Tier 1 lands, and the edge
       takes over the moment it is cached.
 - [x] `edge-active` marker on an edge reply in the transcript, so a person can
-      tell which brain answered. (Delivered in this commit: `edge/turn.ts` now
+      tell which brain answered. (Delivered in `748e817`: `edge/turn.ts` now
       opens its stream with `status` `phase: "edge"`, `StudioContext` records that
       as `edgeReplyFor` the same way it already records `offlineReplyFor`, and
       `Conversation` puts *"Answered in this browser"* on the reply — one button,
