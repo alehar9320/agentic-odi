@@ -141,7 +141,7 @@ describe("StudioBar", () => {
       <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
     );
     expect(container.querySelector(".brand__mark")?.getAttribute("aria-hidden")).toBe("true");
-    expect(container.querySelector(".brand--home")?.getAttribute("aria-label")).toBe("Go to home");
+    expect(container.querySelector(".brand--home")?.getAttribute("aria-label")).toBe("Living Studio, go to home");
   });
 
   it("switches to the light theme from the bar", () => {

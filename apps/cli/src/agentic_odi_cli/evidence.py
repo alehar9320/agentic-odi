@@ -7,8 +7,10 @@ later promoted into ODI artifacts.
 
 from __future__ import annotations
 
+import sys
 from enum import Enum
-from typing import Any
+from pathlib import Path
+from typing import Any, NoReturn
 
 import typer
 
@@ -24,17 +26,78 @@ evidence_app = typer.Typer(help="Manage evidence captured from connectors.")
 
 JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
 
+# The Studio caps how much of a text file the model sees; the CLI honours the
+# same number so a pasted quote and an attached file are the same size of record.
+MAX_EVIDENCE_FILE_CHARS = 20_000
+
+TEXT_SUFFIXES = (".txt", ".md", ".markdown", ".vtt", ".srt")
+
+# Parsers the CLI does not carry: no PDF or DOCX dependency exists in the
+# workspace, so refusing is honest where pretending to read would produce junk.
+UNREADABLE_SUFFIXES = (".pdf", ".docx")
+
+STUDIO_HINT = "not supported from the CLI yet — attach it in the Studio (issue #380)"
+
 
 class PromoteTarget(str, Enum):
     JOB = "job"
     OUTCOME = "outcome"
 
 
+def _fail(message: str) -> NoReturn:
+    typer.secho(f"Error: {message}", fg="red", err=True)
+    raise typer.Exit(1)
+
+
+def _read_file_text(file: str) -> str:
+    """The text behind ``--file``, or a user-facing refusal. Never a traceback."""
+    if file == "-":
+        return sys.stdin.read()
+
+    path = Path(file)
+    suffix = path.suffix.lower()
+    if suffix in UNREADABLE_SUFFIXES:
+        _fail(f"{path.name} is {STUDIO_HINT}")
+    if suffix not in TEXT_SUFFIXES:
+        _fail(f"{path.name} is not a text format the CLI reads ({', '.join(TEXT_SUFFIXES)}).")
+    if not path.is_file():
+        _fail(f"No such file: {file}")
+
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        _fail(f"Could not read {file}: {exc.strerror or exc}")
+
+
+def _evidence_content(content: str | None, file: str | None) -> str:
+    """Inline text or file text, capped the same way the Studio caps an attachment."""
+    if (content is None) == (file is None):
+        _fail("Provide exactly one of --content or --file.")
+    if content is not None:
+        return content
+    text = _read_file_text(str(file))
+    if not text.strip():
+        _fail("That file contains no text.")
+    if len(text) > MAX_EVIDENCE_FILE_CHARS:
+        typer.secho(
+            f"Kept {MAX_EVIDENCE_FILE_CHARS} of {len(text)} characters.",
+            fg="yellow",
+            err=True,
+        )
+    return text[:MAX_EVIDENCE_FILE_CHARS]
+
+
 @evidence_app.command("add")
 def add(
     source_name: str = typer.Option(..., help="Where the record came from"),
     name: str = typer.Option(..., help="Short label for the record"),
-    content: str = typer.Option(..., help="Normalized text content"),
+    content: str | None = typer.Option(
+        default=None, help="Normalized text content (provide this or --file)"
+    ),
+    file: str | None = typer.Option(
+        default=None,
+        help="Read the content from a .txt, .md, .markdown, .vtt, or .srt file, or - for stdin",
+    ),
     url: str | None = typer.Option(default=None, help="External link to evidence in source system"),
     source_kind: str = typer.Option("manual", help="Connector kind or 'manual'"),
     item_type: str = typer.Option(
@@ -51,7 +114,7 @@ def add(
         "source_kind": source_kind,
         "item_type": item_type,
         "name": name,
-        "content": content,
+        "content": _evidence_content(content, file),
     }
     if url is not None:
         args["url"] = url

@@ -185,6 +185,13 @@ agentic-odi evidence add \
   --content "Setup takes two days for every new engineer" \
   --job-id <job-id>
 
+# ...or from a text file (or '-' for stdin), on the same cap the Studio uses
+agentic-odi evidence add \
+  --source-name "interview" --name "Support lead" \
+  --file quote.md
+cat quote.txt | agentic-odi evidence add \
+  --source-name "interview" --name "Support lead" --file -
+
 # Read and delete
 agentic-odi evidence list --job-id <job-id>
 agentic-odi evidence list --job-id <job-id> --json
@@ -195,6 +202,11 @@ agentic-odi evidence delete <evidence-id> --yes
 agentic-odi evidence promote <evidence-id> --to job
 agentic-odi evidence promote <evidence-id> --to outcome --job-id <job-id>
 ```
+
+`--file` reads `.txt`, `.md`, `.markdown`, `.vtt`, and `.srt`, and takes exactly
+one of `--content` or `--file`. A file longer than 20,000 characters is truncated
+and the kept amount is reported. `.pdf` and `.docx` are refused: attach them in
+the Studio, which extracts their text.
 
 `connectors ingest --job-id <job-id>` maps every evidence-bearing record in the
 ingested batch into evidence in one step.

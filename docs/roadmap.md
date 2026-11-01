@@ -36,6 +36,7 @@ links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
 - [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
+- [ ] **The landing page points at the sample** — the site's primary call to action opens a committed, read-only sample workspace generated from a fixture, labelled a sample on every row and rendering with no network ([PR #469](https://github.com/alehar9320/agentic-odi/pull/469)).
 - [ ] **Rate-limit the ingest sink** — a token bucket sheds a high-volume batch instead of exhausting memory ([PR #298](https://github.com/alehar9320/agentic-odi/pull/298)).
 - [ ] **Job validation at the model level** — name and description constraints live in `packages/core` ([PR #296](https://github.com/alehar9320/agentic-odi/pull/296)).
 - [ ] **MCP connection limits** — timeout and pool settings so a hanging connection is bounded ([PR #294](https://github.com/alehar9320/agentic-odi/pull/294)).
@@ -46,7 +47,9 @@ counted as done.
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
 - [ ] **Outcome-based segments and the strategy they imply** — the scored outcomes group into segments, and the recorded path names the ones it beat ([PR #367](https://github.com/alehar9320/agentic-odi/pull/367)).
+- [ ] **A vendor tree that cannot rot into app code** — copied markup lives in `src/vendor`, with lint and a resolving test on its imports ([PR #417](https://github.com/alehar9320/agentic-odi/pull/417)).
 - [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
+- [ ] **Evidence from a file at the terminal** — `evidence add --file` reads text (or stdin) on the Studio's attachment cap ([PR #415](https://github.com/alehar9320/agentic-odi/pull/415)).
 
 ## Next
 

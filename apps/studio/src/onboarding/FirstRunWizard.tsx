@@ -225,7 +225,7 @@ export function FirstRunWizard() {
         onKeyDown={onKeyDown}
       >
         <header className="wizard-head">
-          <span className="wizard-wordmark">The Living Studio</span>
+          <span className="wizard-wordmark">{step.label}</span>
           <span className="wizard-count">
             {stepIndex + 1} / {STEPS.length}
           </span>
