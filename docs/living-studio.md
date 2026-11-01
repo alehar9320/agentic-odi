@@ -37,7 +37,7 @@ The Studio opens as a conversation, not a dashboard.
 
 | Surface | What it does |
 |---|---|
-| **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
+| **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step, and no warning about a server nothing you have done needs yet. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
 | **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. |
 | **Context conversation** | Opened when you ask for it — the **Start with you and your team** starter, the context hint, `/start`, or Settings. A five-turn introduction in the chat, led by the agent: who you are and your team, who feels the problem first, what they are trying to win, where it breaks, and what you already have. One question at a time, examples shown as muted text, with **Skip this question** and **Explore on my own** always available. The five answers come back as an editable card, in your words; skipping stores nothing, and progress is kept as a draft. |
 | **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
@@ -164,32 +164,64 @@ becomes the modal it replaced.
 
 ### Without a model
 
-When the LLM is unreachable the Studio keeps working:
+A browser with no model configured is the design working, not a failure. The
+Studio says so in one place and keeps going:
 
-- A **Working by hand** strip explains the state and offers capture, job map,
-  and context.
-- Messages still return deterministic ODI guidance from the sidecar, labelled
-  **Local guidance**.
-- Jobs can be created, renamed, and deleted; steps added, edited, and removed;
-  outcomes recorded, re-scored, and removed. All of it goes through the same
-  local repository the model uses.
+- The bar's model chip reads **Local**, and its accessible name and tooltip say
+  *Answering from your device. No model connected.* That is read straight from
+  your settings — it needs no probe, so it is true on the first paint. A measured
+  answer outranks the guess: when the sidecar vouches for a model the chip reads
+  **Live**, and when it reports the model is not there, **Local mode**.
+  **Connecting** is reserved for an endpoint that is configured and has not
+  answered yet — nobody spins for a connection they are not trying to make.
+- A reply that no model produced carries one line, on that reply: **Local draft,
+  no model connected**. It is a button, and it opens Settings. It never repeats
+  on the replies around it, and nothing about it covers the thread.
+- The work still happens. `apps/studio/src/bff` is the studio's own BFF running
+  in the browser: the conversation, the canvas, and memory are read and written
+  in IndexedDB, and the deterministic assistant answers ODI questions, creates
+  jobs, records and re-scores outcomes, and renders the board with no server at
+  all.
+- A warning strip appears only for something that actually broke: a model or
+  sidecar that this session reached and then lost, or a check you asked for by
+  pressing **Recheck** or running the tour's live step. Opening Settings measures
+  the connections for its own rows and keeps the answer to itself — reading a
+  settings panel is not an outage to announce across the window. Background health
+  polls may retire a warning, never raise one.
 - Settings → Base URL and Model reconnect the assistant whenever you are ready.
+  A keyless server on your own network (Ollama, LM Studio, anything on loopback
+  or a private address) counts as configured; a public URL without a key does
+  not, and `isEndpointConfigured` in `apps/studio/src/lib/modelEndpoint.ts` is
+  the single place that decides, for the chip, the capability probe, and the
+  chat provider.
 
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
 
 ### When the studio is not running
 
-The Living Studio is a local service, and it is the kind of thing that is easy to
-forget to start. When the sidecar is not reachable, the SPA does not pretend
-otherwise.
+The first minute of a first visit never depends on a local server being up, so
+nothing on screen can claim otherwise before the person has asked for something.
 
-- A **subtle strip** across the top of the window says the sidecar isn't running,
-  that the assistant is paused and live data is frozen, and offers **Recheck**
-  and **Start the sidecar** (opens Settings). It is dismissible for the session
-  and clears itself once the sidecar is reached again.
-- Sending a message does not fire off a doomed request: it drops a quiet in-thread
-  notice pointing to Settings, and the composer never spins.
+- The stage paints from local data: the canvas, the thread you left, and the
+  composer. The request for sidecar defaults is a convenience that may fill in
+  settings later; a slow or absent sidecar cannot hold the first screen behind
+  it, and its failure is silent.
+- Health, connector, and capability probes wait until the browser is idle (or
+  two seconds), and are given up entirely if you send a message first. A negative
+  they find keeps the studio **unknown** rather than **down**.
+- Sending a message is not gated on a server. The request goes to the sidecar,
+  and when nothing answers at the transport level the same turn is carried by the
+  browser BFF. You get an answer, labelled for what it is. The same is true of a
+  model address the browser simply cannot reach — a blocked mixed-content call, a
+  laptop off the network its Ollama lives on: the turn is answered on the device
+  rather than failing on the first try. An endpoint that *did* answer badly (a
+  rejected key) is reported, not hidden behind a local draft that looks like the
+  model you asked for.
+- The **sidecar isn't running** strip is for the loss of a sidecar this session
+  was talking to: the assistant paused and live data froze is only said when both
+  are true. It offers **Recheck** and **Start the sidecar**, is dismissible for
+  the session, and clears itself the moment the sidecar answers.
 - The canvas keeps showing the last thing it drew instead of going blank; a failed
   canvas is a failure panel with Retry, not an empty board. **Settings → About →
   Diagnostics** creates an opt-in, in-memory-only local bundle. It previews the
