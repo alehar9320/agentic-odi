@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { useOnlineStatus } from "../lib/onlineStatus";
 import { useStudio } from "../state/StudioContext";
 import { useBanner } from "./BannerProvider";
 import type { BannerActionId } from "./types";
@@ -21,22 +22,37 @@ export function BannerBridge() {
     dismissedSidecarNotice,
     llmHealth,
   } = useStudio();
+  const online = useOnlineStatus();
 
   useEffect(() => {
-    if (sidecarReachable === false && !dismissedSidecarNotice) {
+    // One sentence when the connection goes, resolved when it comes back. The
+    // stable kind means a flapping connection updates this row in place instead
+    // of stacking a copy per event, so it is not repeated on every action.
+    if (!online) {
+      raise({ kind: "offline" });
+    } else {
+      resolve("offline");
+    }
+  }, [online, raise, resolve]);
+
+  useEffect(() => {
+    // The offline strip is the one line while the browser has no network: this
+    // strip's Recheck and Start-the-sidecar actions could not succeed anyway.
+    if (sidecarReachable === false && !dismissedSidecarNotice && online) {
       raise({ kind: "sidecar-down" });
     } else {
       resolve("sidecar-down");
     }
-  }, [sidecarReachable, dismissedSidecarNotice, raise, resolve]);
+  }, [sidecarReachable, dismissedSidecarNotice, online, raise, resolve]);
 
   useEffect(() => {
-    if (llmHealth.healthy === false) {
+    // Same reason as the sidecar strip: the offline line says what still works.
+    if (llmHealth.healthy === false && online) {
       raise({ kind: "model-offline" });
     } else {
       resolve("model-offline");
     }
-  }, [llmHealth.healthy, raise, resolve]);
+  }, [llmHealth.healthy, online, raise, resolve]);
 
   return null;
 }
