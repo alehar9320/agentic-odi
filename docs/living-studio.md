@@ -317,6 +317,11 @@ opt-in and additive: `reasoning`, `source`, and `approval` stream events;
 is offline. A client that sends none of these sees exactly the stream it saw
 before, which is what the CLI and older clients do.
 
+When a chat request enables approvals, the sidecar uses the MCP contract to
+prompt for writes and unknown tools, while reads run without a prompt. The local
+`remember` suggestion and `render_ui` remain ungated. This is not authentication
+and does not gate direct CLI or MCP calls. See [Consent and approvals](architecture/consent.md).
+
 The approval gate is per-process and single-user by design. `ApprovalRegistry`
 waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a
 timeout (300 s) or a cancelled turn resolves as a declined write, so a turn can

@@ -7,6 +7,7 @@ import json
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from agentic_odi_studio_api.studio import chat
 from agentic_odi_studio_api.studio.approvals import (
     ApprovalDecision,
@@ -297,14 +298,49 @@ def test_an_expired_gate_tells_the_model_nothing_changed(monkeypatch) -> None:
     assert [name for name, _ in events if name in {"message", "error"}] == ["message"]
 
 
-def test_mutating_tools_are_named_by_prefix() -> None:
-    assert chat.is_mutating_tool("add_job")
-    assert chat.is_mutating_tool("delete_outcome")
-    assert chat.is_mutating_tool("ingest_notion")
-    assert chat.is_mutating_tool("promote_evidence")
+@pytest.mark.parametrize(
+    "name",
+    [
+        "schedule_work",
+        "trigger_scheduled_work",
+        "cancel_scheduled_work",
+        "mark_signal_read",
+        "dismiss_signal",
+        "unknown_tool",
+    ],
+)
+def test_declining_a_contract_write_or_unknown_tool_prevents_execution(monkeypatch, name) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call("{}", name)])]),
+            _FakeStream([_chunk(content="Nothing changed.")]),
+        ],
+    )
+    events = _parse(
+        _collect_answering(
+            _request(approvals=True), ApprovalRegistry(), ApprovalDecision(approved=False)
+        )
+    )
+    assert [data["name"] for event, data in events if event == "approval"] == [name]
+    assert _Mcp.calls == []
+
+
+def test_approval_classification_preserves_reads_and_local_surfaces(monkeypatch) -> None:
+    from agentic_odi_core.contract import TOOL_SPECS, ToolEffect, ToolSpec
+
     assert not chat.is_mutating_tool("get_jobs")
+    assert not chat.is_mutating_tool("compute_opportunity")
+    assert not chat.is_mutating_tool("evaluate_outcome")
     assert not chat.is_mutating_tool("remember")
     assert not chat.is_mutating_tool("render_ui")
+    assert chat.is_mutating_tool("add_connector")
+    monkeypatch.setitem(
+        TOOL_SPECS,
+        "get_future_write",
+        ToolSpec(name="get_future_write", summary="writes", effect=ToolEffect.WRITE),
+    )
+    assert chat.is_mutating_tool("get_future_write")
 
 
 def test_model_receives_visible_turn_history_in_order() -> None:
