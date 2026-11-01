@@ -1,8 +1,9 @@
 /**
- * The studio's last focused subject, kept in the browser so a refresh or a
- * closed tab reopens on the same job, step, or outcome. The schema mirrors the
- * three ODI entities a session can sit on; evidence has no slot, so focusing
- * evidence does not overwrite the stored context.
+ * The studio's last focused subject and the thread it was said in, kept in the
+ * browser so a refresh or a closed tab reopens on the same job, step, outcome —
+ * and the same conversation. The schema mirrors the three ODI entities a
+ * session can sit on; evidence has no slot, so focusing evidence does not
+ * overwrite the stored context.
  */
 export interface StudioSession {
   job_id: string | null;
@@ -11,6 +12,7 @@ export interface StudioSession {
 }
 
 export const SESSION_KEY = "studio.session";
+export const CONVERSATION_KEY = "studio.session.conversation";
 
 function asId(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
@@ -42,6 +44,19 @@ export function saveSession(session: StudioSession): void {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
+export function loadConversationId(): string | null {
+  return asId(localStorage.getItem(CONVERSATION_KEY));
+}
+
+export function saveConversationId(conversationId: string | null): void {
+  if (conversationId) {
+    localStorage.setItem(CONVERSATION_KEY, conversationId);
+    return;
+  }
+  localStorage.removeItem(CONVERSATION_KEY);
+}
+
 export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(CONVERSATION_KEY);
 }

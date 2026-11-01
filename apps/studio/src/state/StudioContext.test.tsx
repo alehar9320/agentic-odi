@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The browser BFF is the first-run answer path, and it lives in IndexedDB.
 import "fake-indexeddb/auto";
 
-import { SESSION_KEY } from "../lib/session";
+import { CONVERSATION_KEY, SESSION_KEY } from "../lib/session";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -59,6 +59,9 @@ let signalFetches = 0;
 let configHangs = false;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+/** Branch trees the fake sidecar serves for a conversation id other than c-1. */
+let storedTrees: Record<string, unknown> = {};
+let missingThreads: string[] = [];
 
 function route(
   input: RequestInfo | URL,
@@ -150,6 +153,20 @@ function route(
     headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
     return json({ conversation: CONVERSATION });
   }
+  if (url.endsWith("/tree")) {
+    const threadId = url.split("/")[3] ?? "";
+    if (missingThreads.includes(threadId)) {
+      return new Response(
+        JSON.stringify({
+          error: { code: "not_found", message: `Conversation ${threadId} not found`, retryable: false },
+        }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (storedTrees[threadId]) {
+      return json(storedTrees[threadId]);
+    }
+  }
   if (url === "/api/conversations/c-1/tree") {
     return json({
       conversation: CONVERSATION,
@@ -216,6 +233,8 @@ describe("StudioContext memory and resume", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    storedTrees = {};
+    missingThreads = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -450,6 +469,8 @@ describe("StudioContext failures", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    storedTrees = {};
+    missingThreads = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -849,6 +870,8 @@ describe("StudioContext canvas state", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    storedTrees = {};
+    missingThreads = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -885,6 +908,8 @@ describe("StudioContext stopped turns", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    storedTrees = {};
+    missingThreads = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -919,6 +944,8 @@ describe("StudioContext write approval and branches", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    storedTrees = {};
+    missingThreads = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -975,5 +1002,87 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext thread restore", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    storedTrees = {};
+    missingThreads = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reopens the thread the last session was in, not the newest one", async () => {
+    storedTrees["c-old"] = {
+      conversation: {
+        id: "c-old",
+        title: "Onboarding",
+        created_at: "2026-10-20T10:00:00+00:00",
+        updated_at: "2026-10-20T10:00:00+00:00",
+      },
+      messages: [
+        {
+          id: "o-1",
+          parent_id: null,
+          role: "user",
+          content: "Where does activation start?",
+          created_at: "2026-10-20T10:00:00+00:00",
+        },
+        {
+          id: "o-2",
+          parent_id: "o-1",
+          role: "assistant",
+          content: "At the first session.",
+          created_at: "2026-10-20T10:00:01+00:00",
+        },
+      ],
+      head_id: "o-2",
+    };
+    localStorage.setItem(CONVERSATION_KEY, "c-old");
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.messages.map((message) => message.id)).toEqual(["o-1", "o-2"]));
+    expect(result.current.conversationId).toBe("c-old");
+  });
+
+  it("falls back to the latest thread when the stored one is gone", async () => {
+    missingThreads = ["c-gone"];
+    localStorage.setItem(CONVERSATION_KEY, "c-gone");
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    expect(result.current.toasts.filter((toast) => toast.kind === "error")).toEqual([]);
+    expect(localStorage.getItem(CONVERSATION_KEY)).toBe("c-1");
+  });
+
+  it("remembers the thread the answer arrived in", async () => {
+    chatStream =
+      'event: conversation\ndata: {"id":"c-2","title":"hello"}\n\n' +
+      'event: message\ndata: {"content":"Hi"}\n\n';
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    await waitFor(() => expect(localStorage.getItem(CONVERSATION_KEY)).toBe("c-2"));
   });
 });
