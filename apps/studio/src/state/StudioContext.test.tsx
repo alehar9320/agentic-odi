@@ -50,6 +50,7 @@ const DEFAULT_CHAT_STREAM =
 
 let chatStream: string | null = null;
 let canvasFails = false;
+let bootCorrupt = false;
 let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
@@ -57,6 +58,10 @@ let llmHealthFetches = 0;
 let llmUnhealthy = false;
 let signalFetches = 0;
 let configHangs = false;
+let configAborts = 0;
+let catalogFetches = 0;
+let featuredFetches = 0;
+let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 
@@ -83,8 +88,33 @@ function route(
   if (url === "/api/config") {
     if (configHangs) {
       // A slow laptop, a cold sidecar: the request is in the air and nothing is
-      // known yet. This is the state a first-time visitor actually sits in.
-      return new Promise<Response>(() => undefined);
+      // known yet. This is the state a first-time visitor actually sits in. A
+      // caller that bounds the request hands us a signal; when it fires, the
+      // request fails the way a real aborted fetch does.
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          configAborts += 1;
+          const error = new Error("The operation was aborted.");
+          error.name = "AbortError";
+          reject(error);
+        });
+      });
+    }
+    if (bootCorrupt) {
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: "store_corrupt",
+            message:
+              "Your database failed its integrity check: /home/me/.odi.db. " +
+              "Last backup: 06:14 (odi-20260102T061400Z.db).",
+            detail: "database disk image is malformed",
+            suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
+            retryable: false,
+          },
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      );
     }
     if (configFails) {
       throw new TypeError("fetch failed");
@@ -103,13 +133,19 @@ function route(
     return json({ jobs: [], steps: [], outcomes: [], source: "local" });
   }
   if (url === "/api/connectors/catalog") {
+    catalogFetches += 1;
     return json([]);
   }
   if (url.startsWith("/api/marketplace/servers")) {
     return json({ listings: [], areas: {}, cached: false, types: [{ id: "mcp", label: "MCP servers", available: true }] });
   }
   if (url.startsWith("/api/marketplace/featured")) {
+    featuredFetches += 1;
     return json({ listings: [], areas: {}, cached: false, types: [] });
+  }
+  if (url === "/api/capabilities") {
+    capabilityProbes += 1;
+    return json({ capabilities: [] });
   }
   if (url === "/api/connectors") {
     if (init?.method === "POST") {
@@ -212,6 +248,7 @@ describe("StudioContext memory and resume", () => {
     chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -446,6 +483,7 @@ describe("StudioContext failures", () => {
     chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -532,7 +570,12 @@ describe("StudioContext first run in a browser with no server", () => {
     chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
+    configAborts = 0;
+    catalogFetches = 0;
+    featuredFetches = 0;
+    capabilityProbes = 0;
     llmHealthFetches = 0;
     vi.stubGlobal(
       "fetch",
@@ -547,13 +590,47 @@ describe("StudioContext first run in a browser with no server", () => {
     vi.unstubAllGlobals();
   });
 
-  it("paints the canvas while the sidecar has not answered", async () => {
+  it("bounds the config request so a black-holing proxy cannot freeze the shell", async () => {
+    // A proxy that accepts the connection and never answers. Without a bound the
+    // request stays in the air forever and the person waits on it. Boot must let
+    // it go at 1,200 ms and carry on with the defaults it already has.
+    configHangs = true;
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // Just before the bound the request is still ours to wait on.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_199);
+    });
+    expect(configAborts).toBe(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    // At 1,200 ms the request was given up rather than left hanging.
+    expect(configAborts).toBe(1);
+    // Boot completed: the person's own work is on screen, the shell is usable, and
+    // the sidecar stays unknown because config never answered.
+    expect(result.current.canvas).not.toBeNull();
+    expect(result.current.sidecarReachable).toBeNull();
+    expect(typeof result.current.sendMessage).toBe("function");
+  });
+
+  it("paints the canvas, memory, and the shell while the sidecar has not answered", async () => {
     // A cold laptop, a sidecar still starting: the request is in the air. The
     // person's own work is on screen from local storage, not behind that answer.
+    // Boot order: local data first (canvas, memory, the latest conversation),
+    // the config request alongside it and never a gate, and the off-screen reads
+    // last — so nothing on the first screen waits on /api/config.
     configHangs = true;
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
+    await waitFor(() => expect(result.current.memory).toHaveLength(1));
+    // The shell is up and usable, and the sidecar is still unknown.
+    expect(typeof result.current.sendMessage).toBe("function");
+    expect(result.current.settings).toBeDefined();
     expect(result.current.sidecarReachable).toBeNull();
   });
 
@@ -660,6 +737,39 @@ describe("StudioContext first run in a browser with no server", () => {
     });
     expect(llmHealthFetches).toBe(0);
   });
+
+  it("keeps the shell usable and the off-screen reads unrequested while the browser stays busy", async () => {
+    // Idle never comes: a browser under load, a background tab. The shell must
+    // still be interactive — canvas, memory, and the composer — and the reads for
+    // surfaces nobody opened (connectors, presets, featured, capabilities) must
+    // stay unrequested until there is idle time to spend on them.
+    const requestIdle = vi.fn(() => 7);
+    vi.stubGlobal("requestIdleCallback", requestIdle);
+    vi.stubGlobal("cancelIdleCallback", vi.fn());
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    // The idle callback was asked for and never fired, so the fallback timer did
+    // not run either — the deferred reads are still owed, not spent.
+    expect(requestIdle).toHaveBeenCalled();
+    expect(catalogFetches).toBe(0);
+    expect(featuredFetches).toBe(0);
+    expect(connectorFetches).toBe(0);
+    expect(capabilityProbes).toBe(0);
+    expect(llmHealthFetches).toBe(0);
+
+    // Usable regardless: the person's own work is painted and the composer is live.
+    expect(result.current.canvas).not.toBeNull();
+    expect(result.current.memory).toHaveLength(1);
+    expect(typeof result.current.sendMessage).toBe("function");
+
+    // Unmount while the idle stub is still installed: the effect cleanup hands the
+    // scheduled idle time back.
+    unmount();
+  });
 });
 
 describe("StudioContext on a desktop install whose model is down", () => {
@@ -719,6 +829,7 @@ describe("StudioContext health polling", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     vi.useFakeTimers();
@@ -799,6 +910,7 @@ describe("StudioContext theme", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
@@ -845,6 +957,7 @@ describe("StudioContext canvas state", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -881,6 +994,7 @@ describe("StudioContext stopped turns", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -915,6 +1029,7 @@ describe("StudioContext write approval and branches", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -975,5 +1090,54 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext boot failure", () => {
+  beforeEach(() => {
+    bootCorrupt = true;
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("surfaces a store-corrupt failure as bootError, not as a down sidecar", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.bootError).not.toBeNull());
+
+    expect(result.current.bootError?.code).toBe("store_corrupt");
+    expect(result.current.bootError?.message).toContain("/home/me/.odi.db");
+    // The sidecar answered, so it is reachable; the database is the problem.
+    expect(result.current.sidecarReachable).toBe(true);
+  });
+
+  it("clears the failure page once a restored store answers cleanly", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.bootError).not.toBeNull());
+
+    // The person restored a backup; the next probe answers cleanly.
+    bootCorrupt = false;
+    await act(async () => {
+      await result.current.recheckBoot();
+    });
+
+    expect(result.current.bootError).toBeNull();
+    expect(result.current.sidecarReachable).toBe(true);
   });
 });
