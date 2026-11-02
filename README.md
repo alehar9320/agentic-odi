@@ -227,6 +227,21 @@ drift from the workspace. The distributions are:
 | **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
 
+Inside `packages/core` there are four groups, and the rules between them are
+written down rather than implied — with `errors.py`, the exception hierarchy, open
+to every group. **Domain** (`models.py`, `evaluation.py`, `mapping.py`,
+`corpus.py`) is the vocabulary and imports no other group. **Persistence**
+(`repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`,
+`factory.py`) stores what the other groups decide and may not import methodology —
+`tests/test_architecture.py` enforces that one rule, and also refuses a new core
+module that belongs to no group. **Methodology** (`services.py`, `segmentation.py`,
+`strategy.py`, `router.py`, `messages.py`, `steve_jobs.py`) owns the service door,
+which is `services.py`. **Contract** (`contract.py`, `errors.py`, `remote.py`,
+`schema.py`, `connection.py`, `consent.py`) is the MCP wire protocol; anything may
+import it and it imports no persistence or methodology. The full table, and the
+reason `contract.py` is not its own package yet, is in
+[ADR 0005](docs/architecture/adr/0005-core-layers-and-the-contract-split.md).
+
 ## Contributing
 
 Contributions are welcome. Run the checks that CI runs before opening a pull
