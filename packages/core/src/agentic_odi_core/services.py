@@ -14,6 +14,7 @@ from pydantic import ValidationError as PydanticValidationError
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
+    classify_opportunity,
     evaluate_outcome_statement,
     require_outcome_statement,
 )
@@ -260,16 +261,18 @@ def _first_line(text: str) -> str:
 
 
 def _opportunity_crossing(before: float | None, after: float | None) -> tuple[str, str] | None:
-    """Did the opportunity score cross 10, and in which direction?
+    """Did the opportunity score enter or leave the underserved bucket?
 
-    Crossing up is urgent — a big unserved opportunity just surfaced;
-    crossing down is a notice.
+    The line is ``classify_opportunity``'s, not a second threshold: underserved
+    is strictly above 10, so a score that climbs onto exactly 10 has crossed
+    nothing and one that moves from 10 to 11 has. Entering is urgent — a real
+    unserved opportunity just surfaced; leaving is a notice.
     """
-    if before is None or after is None:
-        return None
-    if before < 10.0 <= after:
+    was = classify_opportunity(before)
+    now = classify_opportunity(after)
+    if was != "underserved" and now == "underserved":
         return ("up", "urgent")
-    if before >= 10.0 > after:
+    if was == "underserved" and now != "underserved":
         return ("down", "notice")
     return None
 
@@ -443,7 +446,8 @@ class ODIService:
             direction, severity = crossing
             self.record_signal(
                 SignalKind.OPPORTUNITY_CROSSED,
-                f'Opportunity score crossed 10 ({direction}): "{after.statement[:60]}"',
+                f"Opportunity score {before.opportunity_score} -> {after.opportunity_score} "
+                f'({direction}): "{after.statement[:60]}"',
                 subject_kind="outcome",
                 subject_id=after.id,
                 severity=severity,
