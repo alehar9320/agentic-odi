@@ -44,6 +44,7 @@ hand-edited record cannot disagree about what a valid outcome is.
 | The eight Universal Job Map stages are one constant | `JOB_STAGE_ORDER` and `job_stage_catalog()` (`models.py`), generated to `apps/studio/src/domain/jobStages.ts` | `scripts/gen_job_stages.py` regenerates the file; `tests/scripts/test_gen_job_stages.py` fails if it is stale |
 | Steps occupy a stage | `Step.stage_index` (`ge=1, le=8`) and `Step.stage` (`JobStage`) | Position is optional but bounded when present |
 | Every adapter exposes the same tools | `ToolName` / `TOOL_SPECS` in `contract.py` | `tests/contract/test_mcp_contract.py` and `test_cli_contract.py` fail on drift |
+| A record shown in full is only ever what was stored | `DETAIL_FIELDS` and the honesty sentences (`apps/studio/src/components/records/RecordDetail.tsx`) | The detail names the fields each kind really has and nothing else — `Outcome.telemetry` stays unshown because it has no defined shape — and says in words that no author or timestamp exists. A missing value renders `—`, an unscored outcome `unscored`; `Unknown`, `N/A`, and a guessed date are never rendered |
 
 The statement checker is deliberately mechanical: it requires a leading
 `Minimize`/`Maximize`, a known unit of measure (or a digit), an object after
