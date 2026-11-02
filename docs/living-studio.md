@@ -369,7 +369,7 @@ cites the issue or PR that landed it.
 | `apps/studio/src/assistant/StudioRuntime.tsx` | `useExternalStoreRuntime`: `onNew`, `onEdit`, `onReload`, `onCancel`, `setMessages`, `onRespondToToolApproval`, suggestions, attachments. |
 | `apps/studio/src/assistant/attachments.ts` | The attachment adapter and the browser-side text/image extraction. |
 | `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface, claims. |
-| `apps/studio/src/assistant/claims.ts` | Hides claim markers (including one split across streamed chunks), cuts the reply so every chip lands after its own sentence, and counts citations without a seeded demo. |
+| `apps/studio/src/assistant/claims.ts` | Hides claim markers (including one split across streamed chunks), cuts the reply so every chip lands after its own sentence, and counts citations without a seeded demo. The Markdown export reads a claim-bearing reply through this same parser, so the file cannot say something other than what the transcript showed. |
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
@@ -462,7 +462,11 @@ flight, and a restore failure simply leaves the room empty.
 The bar's overflow menu has **Export → Markdown**. The file labels every
 speaker, keeps the prose as Markdown, and writes each agent-composed surface as
 a fenced JSON block, so a thread can be pasted into a doc or a ticket without
-the reader needing the Studio.
+the reader needing the Studio. A reply that arrived with claims keeps them: each
+sentence carries the distinction the transcript drew beside it — *Hypothesis*,
+*Uncited*, or `Source · record name, record id` — the claim markers themselves
+never print outside code, and the labels state what the turn read when it was
+written rather than promising that the record is still there.
 
 **Diagnostics are separate from conversation export.** Settings → About →
 Diagnostics builds a local, opt-in bundle, then shows the exact pretty-printed
