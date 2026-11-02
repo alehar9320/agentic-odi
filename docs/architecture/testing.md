@@ -150,6 +150,12 @@ download, and install), `transport.test.ts` (Tauri boundary), and the
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
+Installability is covered the same way: `install.test.ts` drives the
+`beforeinstallprompt` lifecycle (offer, prompt, acceptance, dismissal, and
+`dispose`), `InstallPill.test.tsx` proves the control is absent until the
+browser has a prompt and never prompts on render, and `pwa.test.ts` pins the
+manifest's fields and checks that every icon it names exists on disk.
+
 Copied UI is guarded structurally: `src/vendor/boundary.test.ts` reads every
 `.ts` and `.tsx` file under `apps/studio/src/vendor/` and fails on a specifier
 that resolves into a product slice (`state`, `api`, `assistant`, `bff`). It is

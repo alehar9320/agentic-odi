@@ -3808,6 +3808,25 @@ button.message__tag:hover {
   box-shadow: 0 0 12px rgba(129, 140, 248, 0.25);
 }
 
+/* Install: the offer to open the Studio as its own window, not a tab. */
+.pill-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(74, 222, 128, 0.14);
+  color: #86efac;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pill-install:hover {
+  background: rgba(74, 222, 128, 0.24);
+  border-color: #4ade80;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.22);
+}
+
 .changelog-overlay {
   position: fixed;
   inset: 0;

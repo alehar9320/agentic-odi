@@ -88,17 +88,24 @@ drawn on.
 
 ---
 
-## The three variants
+## The variants
 
 | Variant | Contents | Where it is used |
 |---|---|---|
 | `head` | skull, ears, eyes, muzzle, nose, mouth | the base for the other two |
 | `mark` | the head on the `odi-tile` rounded square | app icon, favicon, studio brand mark |
+| `maskable` | a smaller head, full-bleed on the tile | the PWA maskable icon, cropped to a circle |
 | `bust` | head, shoulders, chest, and the spark | README hero, brand guide |
 
 The `mark` exists because operating-system icons want a filled shape (Windows
 `StoreLogo`, macOS `.icns`) while a browser tab and a toolbar want the
 character standing on its own. Both share the identical head.
+
+The `maskable` variant is the `mark` with the head drawn at 16 px wide instead
+of 22, so its outline stays inside the inner 80% of the tile — the safe zone a
+`purpose: "maskable"` icon may be cropped to. The tile fills the whole grid
+because the operating system supplies the mask; only the character has to
+survive the crop. `brand/tests/test_brand_assets.py` measures that.
 
 ---
 
@@ -139,6 +146,9 @@ the code that made it.
 - **Never place the head on a background other than `odi-tile`** in the `mark`
   variant. The bust is transparent and may sit on any dark surface.
 - **Keep clear space of one head width** around the mark.
+- **Keep the character inside the safe zone** in the `maskable` variant. A
+  maskable icon can be cropped to a circle, so the art is smaller than the
+  `mark` on purpose; do not scale it back up.
 - **The mascot is decoration.** It is never the only label of a control, and
   it is always `aria-hidden` where it appears in the UI.
 - **The spark is the signal.** It is the one element that carries the product's

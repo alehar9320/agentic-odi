@@ -7,6 +7,7 @@ import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
 import { OdiMascot } from "../OdiMascot";
+import { InstallPill } from "./InstallPill";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -132,6 +133,8 @@ export function StudioBar({
         >
           ✨ What's New
         </button>
+
+        <InstallPill />
 
         <button
           type="button"
