@@ -39,8 +39,11 @@
   --w-strong: 600;
   --w-display: 700;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Three motion steps and no more: dur-1 answers a click, dur-2 moves something
+     that is already on screen, dur-3 is a room arriving (the hero, the wizard). */
   --dur-1: 150ms;
   --dur-2: 250ms;
+  --dur-3: 400ms;
   /* The two widths a reading column takes: the one every surface in the thread
      shares, and the wider grid the connector catalogue needs. Surfaces sized to
      the shell — the lens drawer, the diagnostics table — are not columns. */
@@ -437,7 +440,7 @@ a {
   font-weight: var(--w-strong);
   line-height: 1.17;
   letter-spacing: -0.03em;
-  animation: hero-in 0.5s var(--ease-out);
+  animation: hero-in var(--dur-3) var(--ease-out);
 }
 
 .hero__sub {
@@ -543,8 +546,8 @@ a {
   color: var(--muted);
   font-size: var(--t-sm);
   cursor: pointer;
-  transition: background var(--dur-1) ease, color var(--dur-1) ease, transform var(--dur-1) ease,
-    border-color 0.15s ease;
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out);
 }
 
 .suggestion--card {
@@ -617,7 +620,7 @@ a {
   border-radius: var(--r-lg);
   background: var(--bg-raised);
   box-shadow: 0 24px 50px rgba(0, 0, 0, 0.42);
-  animation: fade-in 0.12s ease;
+  animation: fade-in var(--dur-1) var(--ease-out);
 }
 
 .palette__group-title {
@@ -694,7 +697,7 @@ a {
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.035);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
-  transition: border-color var(--dur-1) ease, box-shadow var(--dur-1) ease;
+  transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
 }
 
 .composer__shell:focus-within {
@@ -772,7 +775,7 @@ a {
   background: var(--text);
   color: #0b0c10;
   cursor: pointer;
-  transition: opacity var(--dur-1) ease, transform var(--dur-1) ease;
+  transition: opacity var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
 }
 
 .composer__send:hover:not(:disabled) {
@@ -1116,7 +1119,7 @@ a {
 .message {
   display: flex;
   gap: var(--s-3);
-  animation: fade-in var(--dur-2) ease;
+  animation: fade-in var(--dur-2) var(--ease-out);
 }
 
 .message--user {
@@ -1190,7 +1193,7 @@ a {
   gap: var(--s-1);
   margin-top: 6px;
   opacity: 0;
-  transition: opacity var(--dur-1) ease;
+  transition: opacity var(--dur-1) var(--ease-out);
 }
 
 .message:hover .message__actions,
@@ -1342,7 +1345,7 @@ a {
   content: "›";
   display: inline-block;
   color: var(--faint);
-  transition: transform var(--dur-1) ease;
+  transition: transform var(--dur-1) var(--ease-out);
 }
 
 .run--settled[open] .run__summary::before {
@@ -1640,7 +1643,7 @@ a {
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: rgba(255, 255, 255, 0.022);
-  transition: border-color var(--dur-1) ease, background var(--dur-1) ease;
+  transition: border-color var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out);
 }
 
 .card:hover {
@@ -1888,7 +1891,7 @@ input[type="range"] {
   color: var(--text);
   font-size: var(--t-sm);
   cursor: pointer;
-  transition: background var(--dur-1) ease;
+  transition: background var(--dur-1) var(--ease-out);
 }
 
 .button:hover:not(:disabled) {
@@ -2429,7 +2432,7 @@ button.message__tag:hover {
   gap: var(--s-1);
   margin-left: 38px;
   padding-bottom: 4px;
-  animation: fade-in 0.3s ease;
+  animation: fade-in var(--dur-2) var(--ease-out);
 }
 
 .suggestion--primary {
@@ -2587,7 +2590,7 @@ button.message__tag:hover {
   gap: var(--s-1);
   margin-left: auto;
   opacity: 0;
-  transition: opacity var(--dur-1) ease;
+  transition: opacity var(--dur-1) var(--ease-out);
 }
 
 .step:hover .step__actions,
@@ -2768,7 +2771,7 @@ button.message__tag:hover {
 .catchup-card {
   position: relative;
   cursor: pointer;
-  transition: all var(--dur-2) ease-in-out;
+  transition: all var(--dur-2) var(--ease-out);
 }
 
 /* Stretched over the card so the whole surface is one real button; the
@@ -2995,7 +2998,7 @@ button.message__tag:hover {
 }
 
 .studio-button {
-  transition: all var(--dur-1) ease-in-out;
+  transition: all var(--dur-1) var(--ease-out);
   font-weight: var(--w-regular);
   letter-spacing: -0.01em;
 }
@@ -3119,7 +3122,7 @@ button.message__tag:hover {
 /* Generated surfaces                                                 */
 /* ------------------------------------------------------------------ */
 .ui-surface {
-  animation: surface-enter 0.28s var(--ease-out) both;
+  animation: surface-enter var(--dur-2) var(--ease-out) both;
   min-width: 0;
 }
 
@@ -3348,7 +3351,7 @@ button.message__tag:hover {
   display: block;
   height: 100%;
   border-radius: var(--r-pill);
-  transition: width 0.4s var(--ease-out);
+  transition: width var(--dur-2) var(--ease-out);
 }
 
 .ui-tone-bg--neutral {
@@ -3491,8 +3494,8 @@ button.message__tag:hover {
   font-size: var(--t-sm);
   font-weight: var(--w-regular);
   cursor: pointer;
-  transition: background var(--dur-1) ease, border-color var(--dur-1) ease, color var(--dur-1) ease,
-    transform 0.1s ease;
+  transition: background var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
 }
 
 .ui-action--primary {
@@ -3825,7 +3828,7 @@ button.message__tag:hover {
   color: #a5b4fc;
   border: 1px solid rgba(129, 140, 248, 0.4);
   cursor: pointer;
-  transition: all var(--dur-2) ease;
+  transition: all var(--dur-2) var(--ease-out);
 }
 
 .pill-changelog:hover {
@@ -3923,7 +3926,7 @@ button.message__tag:hover {
   cursor: pointer;
   padding: 4px 8px;
   border-radius: var(--r-sm);
-  transition: color var(--dur-1) ease, background var(--dur-1) ease;
+  transition: color var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out);
 }
 
 .changelog-modal__close:hover {
@@ -4133,13 +4136,8 @@ button.message__tag:hover {
 }
 
 /* ================================================================== */
-/* PR #61 micro-interactions (reconciled onto main)                  */
+/* PR #61 micro-interactions (reconciled onto main)                    */
 /* ================================================================== */
-:root {
-  --ease-apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.22);
-  --ease-apple-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-tactile: cubic-bezier(0.2, 0.8, 0.2, 1);
-}
 
 /* 1. Glassmorphic Backdrop Blur & Vibrancy on elevated panels.
    Not .bar: a backdrop-filter makes the element a stacking context, which
@@ -4159,9 +4157,9 @@ input[type="range"] {
   appearance: none;
   background: rgba(255, 255, 255, 0.1);
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--r-pill);
   outline: none;
-  margin: 10px 0;
+  margin: var(--s-2) 0;
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -4173,7 +4171,7 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--accent);
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  transition: transform var(--dur-1) var(--ease-apple-spring), background var(--dur-1) var(--ease-out);
+  transition: transform var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
@@ -4195,7 +4193,7 @@ details summary {
   cursor: pointer;
   user-select: none;
   font-weight: var(--w-regular);
-  transition: color var(--dur-1) ease;
+  transition: color var(--dur-1) var(--ease-out);
 }
 
 details summary:hover {
@@ -4277,32 +4275,12 @@ details[open] summary {
   }
 }
 
-/* 17. Quick prompt button shimmer / pulse glow */
-.chat-quick-pills button {
-  position: relative;
-  overflow: hidden;
-}
-
-.chat-quick-pills button::after {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    60deg,
-    transparent,
-    rgba(255, 255, 255, 0.08),
-    transparent
-  );
-  transform: rotate(30deg) translateX(-100%);
-  transition: transform 0.6s ease;
-}
-
-.chat-quick-pills button:hover::after {
-  transform: rotate(30deg) translateX(100%);
-}
+/* 17. Quick prompt button shimmer — removed. A diagonal highlight was to sweep
+    the starter chips on hover, over 600ms and on its own easing. No component
+    renders `.chat-quick-pills` (grep the source: the class appears only here),
+    so this was decoration that never even reached the screen, plus the second
+    longest duration and the third easing in the file. The position/overflow pair
+    existed only to clip it. */
 
 /* 20. Accessibility & motion preference respect */
 @media (prefers-reduced-motion: reduce) {
@@ -4334,7 +4312,7 @@ details[open] summary {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur-1) ease;
+  transition: background var(--dur-1) var(--ease-out);
 }
 
 .brand--home:hover {
@@ -4351,7 +4329,7 @@ details[open] summary {
   font-weight: var(--w-strong);
   letter-spacing: -0.01em;
   white-space: nowrap;
-  transition: color var(--dur-1) ease;
+  transition: color var(--dur-1) var(--ease-out);
 }
 
 .brand__mark {
@@ -4379,8 +4357,8 @@ details[open] summary {
   color: var(--muted);
   cursor: pointer;
   transition:
-    background 0.14s ease,
-    color 0.14s ease;
+    background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out);
 }
 
 .icon-button:hover {
@@ -4445,7 +4423,7 @@ details[open] summary {
   list-style: none;
   overflow-x: auto;
   scrollbar-width: none;
-  animation: fade-in var(--dur-2) ease;
+  animation: fade-in var(--dur-2) var(--ease-out);
 }
 
 .rail__list::-webkit-scrollbar {
@@ -4465,9 +4443,9 @@ details[open] summary {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    color 0.14s ease,
-    background 0.14s ease,
-    border-color 0.14s ease;
+    color var(--dur-1) var(--ease-out),
+    background var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out);
 }
 
 .rail__chip:hover {
@@ -4509,7 +4487,7 @@ details[open] summary {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006)),
     var(--bg-raised);
-  animation: lens-in 0.22s var(--ease-out);
+  animation: lens-in var(--dur-2) var(--ease-out);
 }
 
 .lens__head {
@@ -4838,7 +4816,7 @@ details[open] summary {
 
 .reasoning__chevron {
   margin-left: auto;
-  transition: transform var(--dur-1) ease;
+  transition: transform var(--dur-1) var(--ease-out);
 }
 
 .reasoning__chevron.is-open {
@@ -5200,7 +5178,7 @@ details[open] summary {
   font: inherit;
   font-size: var(--t-xs);
   cursor: pointer;
-  transition: background var(--dur-1) ease, color var(--dur-1) ease, border-color var(--dur-1) ease;
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
 }
 
 .model-picker__trigger:hover {
@@ -5606,7 +5584,7 @@ details[open] summary {
 }
 
 .banner {
-  animation: bannerIn 0.28s var(--ease-out);
+  animation: bannerIn var(--dur-2) var(--ease-out);
 }
 
 /* Customize: the connector shelf                                     */
@@ -5616,7 +5594,7 @@ details[open] summary {
   align-items: center;
   gap: var(--s-1);
   cursor: pointer;
-  transition: all var(--dur-2) ease;
+  transition: all var(--dur-2) var(--ease-out);
 }
 
 .customize {
@@ -5677,7 +5655,7 @@ details[open] summary {
   font-size: var(--t-sm);
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all var(--dur-1) var(--ease-out);
 }
 
 .customize__type.is-active {
@@ -5871,7 +5849,7 @@ details[open] summary {
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--bg-raised);
-  transition: border-color 0.18s ease;
+  transition: border-color var(--dur-1) var(--ease-out);
 }
 
 .connector-card:hover {
@@ -6082,7 +6060,7 @@ details[open] summary {
     radial-gradient(120% 180% at 0% 0%, rgba(139, 140, 248, 0.12), transparent 62%),
     var(--bg-raised);
   overflow: hidden;
-  animation: updateBannerIn 0.34s var(--ease-out) both;
+  animation: updateBannerIn var(--dur-2) var(--ease-out) both;
 }
 
 @keyframes updateBannerIn {
@@ -6163,7 +6141,7 @@ details[open] summary {
   height: 100%;
   border-radius: 0 999px 999px 0;
   background: linear-gradient(90deg, var(--accent-strong), var(--accent));
-  transition: width 0.35s var(--ease-out);
+  transition: width var(--dur-2) var(--ease-out);
 }
 
 .update-banner__actions {
@@ -6192,7 +6170,7 @@ details[open] summary {
   font-size: var(--t-lg);
   line-height: 1;
   cursor: pointer;
-  transition: background var(--dur-1) ease, color var(--dur-1) ease;
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
 }
 
 .update-banner__dismiss:hover {
@@ -6210,7 +6188,7 @@ details[open] summary {
   font-size: var(--t-xs);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: color var(--dur-1) ease, background var(--dur-1) ease;
+  transition: color var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out);
 }
 
 .bar__version:hover {

@@ -15,7 +15,7 @@
     rgba(4, 5, 8, 0.88)
   );
   backdrop-filter: blur(14px) saturate(120%);
-  animation: wizard-fade 200ms ease-out both;
+  animation: wizard-fade var(--dur-2) var(--ease-out) both;
 }
 
 .wizard-panel {
@@ -33,7 +33,7 @@
     0 0 0 1px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   overflow: hidden;
-  animation: wizard-enter 320ms var(--ease-out) both;
+  animation: wizard-enter var(--dur-3) var(--ease-out) both;
 }
 
 .wizard-panel::before {
@@ -106,7 +106,7 @@
   padding: 20px 30px 10px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  animation: wizard-rise 280ms var(--ease-out) both;
+  animation: wizard-rise var(--dur-2) var(--ease-out) both;
 }
 
 .wizard-title {
@@ -204,9 +204,9 @@
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    transform 0.16s ease;
+    border-color var(--dur-1) var(--ease-out),
+    background var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
 }
 
 .wizard-goal:hover {

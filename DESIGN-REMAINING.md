@@ -16,6 +16,7 @@ not by reading the diff.
 | A8 changelog modal | fixed | Quote removed; "Mark all read" only exists when something is unread. |
 | A9 console errors | **left** | See below. |
 | A10 shared grid | fixed | One `--measure` for every reading column, `--measure-wide` for the catalogue. |
+| A11 one easing, three steps | fixed | Every transition and entrance animation now draws on `--ease-out` and `--dur-1/2/3`. |
 | PR #61 micro-interaction block | **left** | See below. |
 | Cold-visit connector prompt | **left** | See below. |
 | Light theme | **not audited** | See below. |
@@ -31,11 +32,16 @@ one. Production has no proxy and no 502s.
 
 ## The PR #61 "micro-interactions" block in `theme.css`
 
-Lines ~4130 onward predate this pass and carry a second set of easings, radii, and paddings that
-duplicate the A1 scale, plus glassmorphism applied to five panels. I removed only the `.bar`
-entry, because its `backdrop-filter` made the header a stacking context and the overflow menu
-became unclickable — a behavior bug, not a taste call. Sweeping the rest means restyling every
-panel at once, which is more than a single design batch should carry and would bury the
+Lines ~4135 onward predate this pass. A11 took the parts of it that contradicted the token scales:
+its three extra easing curves (one a byte-for-byte duplicate of `--ease-out`) are gone, so is the
+hover shine on `.chat-quick-pills`, a class no component renders, and the slider's `3px`/`10px`
+values are on the radius and spacing steps. The `.bar` `backdrop-filter` came out earlier for a
+different reason — it made the header a stacking context and the overflow menu became unclickable.
+
+What stays: the `backdrop-filter` on the four genuinely elevated panels (outcome card, settings
+drawer, banner, changelog) and the literal `rgba()` shadows in that block. Both are taste calls
+about depth rather than consistency violations — the audit decided shadows already have a clean
+token set and should not get a second palette — and restyling five panels at once would bury the
 first-impression work in a diff nobody can review.
 
 ## The connector prompt that interrupts a first visit

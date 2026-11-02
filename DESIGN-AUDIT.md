@@ -94,7 +94,7 @@ Extracted from `styles/theme.css` + `onboarding/onboarding.css` (declarations co
 | Radius | 12 values incl. 999px **and** 9999px | `--r-sm:6 --r-md:10 --r-lg:14 --r-pill:999px` (50% for circles) |
 | Font size | 20 distinct rem values (0.62…0.95) | `--t-xs:0.72 --t-sm:0.82 --t-md:0.92 --t-lg:1.1rem` per view max 4 steps + hero display |
 | Font weight | 600,700,500,550,620,650,560,800 | `--w-regular:400 --w-strong:600 --w-display:700` (≤2 per view) |
-| Motion | 0.14s/0.15s/0.16s/0.2s ease + 3 different cubic-beziers | `--ease-out:cubic-bezier(0.16,1,0.3,1) --dur-1:150ms --dur-2:250ms` app-wide |
+| Motion | 0.14s/0.15s/0.16s/0.2s ease + 3 different cubic-beziers | `--ease-out:cubic-bezier(0.16,1,0.3,1)` — one curve, and three steps: `--dur-1:150ms` answers a click, `--dur-2:250ms` moves what is already on screen, `--dur-3:400ms` is a room arriving |
 
 Colors and shadows already have a clean token set (`--bg/--text/--accent/--line/--surface`)
 — keep, don't invent a second palette.
@@ -139,3 +139,8 @@ shell), `.diagnostics-modal` (760 — a table, dev-only), popovers, tooltips and
     `--measure-wide`, and stop the changelog modal from carrying a 680px width of its own.
     Ranked last by impact on first impressions on purpose: a visitor never sees a grid, only
     the places where two surfaces that should share an edge do not.
+11. **A11 One easing, three steps** — A1 defined `--ease-out` and two durations but did not move
+    the file onto them: 28 transitions still said `ease`, the PR #61 block defined three more
+    curves (one of them a byte-for-byte duplicate of `--ease-out`), and eight entrance animations
+    ran on their own 0.22–0.5s values. One easing app-wide, `--dur-3` added for arrivals, and the
+    hover shine on a class no component renders deleted outright.
