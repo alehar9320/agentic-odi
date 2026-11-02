@@ -12,6 +12,7 @@ import type { LocalStore } from "../store/types";
 import { LocalDataService } from "../data/localDataService";
 import { LocalMemoryService } from "../memory/localMemoryService";
 import { createSseParser, type RawSseEvent } from "../../api/sse";
+import { opportunityScore } from "../../lib/odi";
 
 type Provider = "endpoint" | "deterministic";
 
@@ -821,7 +822,7 @@ export class ChatOrchestrator {
             const importance = Number(call.argumentsObj.importance);
             const satisfaction = Number(call.argumentsObj.satisfaction);
             output = {
-              score: importance + Math.max(importance - satisfaction, 0),
+              score: opportunityScore(importance, satisfaction),
             };
             break;
           }

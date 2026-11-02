@@ -4,30 +4,41 @@
 models enforce: ``importance + max(importance - satisfaction, 0)``. Every case
 below is an independently computed expectation, so a change to the formula --
 dropping the clamp, swapping the terms, or scaling the result -- fails a test.
+
+The cases live in ``tests/fixtures/opportunity-score.json`` and are read by both
+this test and ``apps/studio/src/lib/odi.test.ts``. One fixture, two languages:
+a drift between the Python service and the TypeScript client fails CI on the
+commit that caused it rather than on a customer's slide.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from agentic_odi_core.models import compute_opportunity_score
 
+FIXTURE = Path(__file__).parent / "fixtures" / "opportunity-score.json"
 
-@pytest.mark.parametrize(
-    ("importance", "satisfaction", "expected"),
-    [
-        (10.0, 1.0, 19.0),
-        (8.0, 4.0, 12.0),
-        (5.0, 5.0, 5.0),
-        (3.0, 9.0, 3.0),
-        (1.0, 1.0, 1.0),
-        (10.0, 10.0, 10.0),
-        (7.5, 2.5, 12.5),
-        (2.0, 1.5, 2.5),
-    ],
-)
-def test_adds_the_underserved_gap_to_importance(
-    importance: float, satisfaction: float, expected: float
-) -> None:
+
+def _load_cases() -> list[dict]:
+    with FIXTURE.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    return data["cases"]
+
+
+CASES = _load_cases()
+
+
+@pytest.mark.parametrize("case", CASES, ids=[c["name"] for c in CASES])
+def test_fixture_cases(case: dict) -> None:
+    importance = case["importance"]
+    satisfaction = case["satisfaction"]
+    expected = case["expected"]
+    if importance is None or satisfaction is None:
+        assert expected is None
+        return
     assert compute_opportunity_score(importance, satisfaction) == expected
 
 

@@ -1,10 +1,11 @@
 import type { CanvasData, Job, Outcome, Step } from "../../types";
 import { notFound, validation } from "../errors";
 import { newId, nowIso } from "../id";
+import { opportunityScore } from "../../lib/odi";
 import type { LocalStore, StoredJob, StoredOutcome, StoredStep } from "../store/types";
 
 export function computeOpportunityScore(importance: number, satisfaction: number): number {
-  return importance + Math.max(importance - satisfaction, 0);
+  return opportunityScore(importance, satisfaction);
 }
 
 function stripJob(job: StoredJob): Job {

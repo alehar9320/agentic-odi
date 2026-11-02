@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,7 +9,32 @@ import {
   opportunityScore,
 } from "./odi";
 
-describe("opportunityScore", () => {
+// The fixture is the contract between the Python service and the TypeScript
+// client. It lives at packages/core/tests/fixtures/opportunity-score.json and
+// is read by both this test and packages/core/tests/test_opportunity_score.py.
+// Vitest runs with the studio package as its working directory, so the path
+// from here is ../../packages/core/tests/fixtures/opportunity-score.json.
+const FIXTURE = join(process.cwd(), "..", "..", "packages", "core", "tests", "fixtures", "opportunity-score.json");
+const CASES = JSON.parse(readFileSync(FIXTURE, "utf8")).cases as Array<{
+  name: string;
+  importance: number | null;
+  satisfaction: number | null;
+  expected: number | null;
+}>;
+
+describe("opportunityScore (fixture-driven)", () => {
+  for (const c of CASES) {
+    it(`computes ${c.expected ?? "N/A"} for ${c.name}`, () => {
+      if (c.importance == null || c.satisfaction == null) {
+        expect(c.expected).toBeNull();
+        return;
+      }
+      expect(opportunityScore(c.importance, c.satisfaction)).toBeCloseTo(c.expected, 5);
+    });
+  }
+});
+
+describe("opportunityScore (regression)", () => {
   it("computes importance + max(importance - satisfaction, 0)", () => {
     expect(opportunityScore(9.2, 3.1)).toBeCloseTo(15.3, 5);
   });

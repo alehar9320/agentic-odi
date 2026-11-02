@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
-import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
+import { formatOpportunityScore, isUnderserved, opportunityScore } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -359,7 +359,7 @@ function OpportunityMatrixView({
   const plotted: PlottedOutcome[] = outcomes.map((outcome) => {
     const importance = Math.min(Math.max(outcome.importance ?? 5, 0), 10);
     const satisfaction = Math.min(Math.max(outcome.satisfaction ?? 5, 0), 10);
-    const score = outcome.opportunity_score ?? importance + Math.max(importance - satisfaction, 0);
+    const score = outcome.opportunity_score ?? opportunityScore(importance, satisfaction);
     return {
       outcome,
       importance,

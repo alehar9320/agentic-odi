@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { CanvasState } from "../../types";
+import { opportunityScore } from "../../lib/odi";
 import { OpportunityLandscape } from "./OpportunityLandscape";
 
 // The third cold-open segment: the SPA's first interactive render on the
@@ -14,15 +15,18 @@ const REFERENCE_OUTCOMES = 1500;
 const MATRIX_POINT_LIMIT = 200;
 
 function bigCanvas() {
-  const outcomes = Array.from({ length: REFERENCE_OUTCOMES }, (_, i) => ({
-    id: `OUT-${i}`,
-    job_id: `JOB-${i % 30}`,
-    statement: `Minimize the time it takes to finish study task ${i} when working`,
-    importance: 1 + (i % 10),
-    satisfaction: 1 + ((i * 7) % 10),
-    opportunity_score:
-      1 + (i % 10) + Math.max(1 + (i % 10) - (1 + ((i * 7) % 10)), 0),
-  }));
+  const outcomes = Array.from({ length: REFERENCE_OUTCOMES }, (_, i) => {
+    const importance = 1 + (i % 10);
+    const satisfaction = 1 + ((i * 7) % 10);
+    return {
+      id: `OUT-${i}`,
+      job_id: `JOB-${i % 30}`,
+      statement: `Minimize the time it takes to finish study task ${i} when working`,
+      importance,
+      satisfaction,
+      opportunity_score: opportunityScore(importance, satisfaction),
+    };
+  });
   return {
     jobs: Array.from({ length: 30 }, (_, i) => ({ id: `JOB-${i}`, name: `Job ${i}` })),
     steps: [],

@@ -96,9 +96,15 @@ def generate_steve_jobs_response(
 def format_opportunity_score_insight(
     importance: float, satisfaction: float, statement: str | None = None
 ) -> str:
-    """Format an opportunity score calculation (deprecated in Tier 0)."""
-    gap = max(importance - satisfaction, 0.0)
-    score = importance + gap
+    """Format an opportunity score calculation (deprecated in Tier 0).
+
+    The score itself is computed once, in ``compute_opportunity_score``; this
+    helper only formats the result, so the formula cannot drift between the
+    two sites.
+    """
+    from agentic_odi_core.models import compute_opportunity_score
+
+    score = compute_opportunity_score(importance, satisfaction)
 
     if score > 10.0:
         verdict = "underserved"
