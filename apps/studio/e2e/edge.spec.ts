@@ -115,15 +115,14 @@ test.describe("answering in the browser", () => {
     // ever saw the turn. Losing it here loses their research.
     await page.reload();
     await expect(page.getByRole("textbox", { name: COMPOSER })).toBeVisible();
-    // Named, not "the first one": the specs before this one chatted to the same
-    // sidecar, so a real reload shows their turns and this browser's own answer
-    // next to them — which is the merge, not a leak.
+    // The newest exchange, not "the only copy of that question": a reload merges
+    // this browser's rows into whatever the server holds, and an earlier visit
+    // against the same sidecar asked this same question remotely. Both are on
+    // screen because both happened — and this browser's answer is last, which is
+    // the ordering claim the merge has to keep.
     await expect(
-      page
-        .getByRole("log", { name: CONVERSATION })
-        .locator(".message--user")
-        .filter({ hasText: "Where do I start?" }),
-    ).toBeVisible();
+      page.getByRole("log", { name: CONVERSATION }).locator(".message--user").last(),
+    ).toContainText("Where do I start?");
     const remembered = reply(page);
     await expect(remembered).toContainText("Start with the job, then the outcome.");
     await expect(

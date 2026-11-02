@@ -301,9 +301,24 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
       and no second ask after a reload. Then decline → reload → never asked
       again. Then close the tab and come back: the answer the browser produced is
       still on screen and still labelled. Then a key appearing later handing the
-      turns back to the remote path. `--repeat-each=5` on the durability scenario,
-      because that is the one that was failing: 15 passed, not a flake that got
-      lucky.
+      turns back to the remote path. Re-run with `--repeat-each=5` at the merged
+      head, because a durability test that passes once can be a race that got
+      lucky — and four of five did fail. What failed was the assertion, not the
+      feature: it demanded exactly one user message reading *"Where do I start?"*
+      and the reopened thread legitimately holds two, because an earlier visit in
+      the same shared-sidecar run asked that question through the server and the
+      merge shows both. The DOM at the failure confirms the product put this
+      browser's answer last, with its label, so the check now names the *newest*
+      exchange instead of counting matches — an ordering claim, which is stronger
+      than the presence claim it replaced. `--repeat-each=5` on the whole file:
+      **20 passed.**
+      Unexplained, and worth a trace to whoever runs this on hardware: in a
+      repeated run every scenario takes ~13 s where its first pass takes ~5 s.
+      No assertion is failing and no fixed wait exists in `e2e/helpers.ts` beyond
+      the 2 s the connector-suggestion probe allows itself, so the extra seconds
+      are the app being slower to become interactive when it reopens a thread
+      that already has turns. That is a UX question, not a correctness one, and
+      nothing here proves it is *not* real.
       Run it with `npx playwright test --project=chromium` from `apps/studio`,
       after `npx vite build` — the sidecar serves `dist`.
 - [x] **What the reload scenario found, in the product.** Writing the transcript
