@@ -1,9 +1,16 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
+import { asStudioError, fetchOutcomeSearch, fetchThemes } from "../../api/studioApi";
+import { JOB_STAGES } from "../../domain/jobStages";
+import {
+  canvasHasRecords,
+  canvasStatus,
+  isSimulatedCanvas,
+  savedCopyCaption,
+} from "../../lib/canvasProvenance";
 import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome } from "../../types";
+import type { Outcome, OutcomeSearch, StudioError, Theme } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
@@ -19,6 +26,40 @@ type ViewMode = "matrix" | "cards" | "table";
  */
 const MATRIX_POINT_LIMIT = 200;
 
+/** How many narrowed rows the store hands back at a time. */
+const SEARCH_PAGE_SIZE = 50;
+
+/** The narrowing the person has asked the store for. Absent means not filtered. */
+interface Narrowing {
+  text?: string;
+  stage?: string;
+  themeIds?: string[];
+  confidence?: string;
+  minScore?: number;
+  maxScore?: number;
+}
+
+type SearchStatus = "loading" | "ready" | "error";
+
+const BLANK_NARROWING: Narrowing = {};
+
+function isNarrowing(query: Narrowing): boolean {
+  return Boolean(
+    query.text ||
+      query.stage ||
+      query.confidence ||
+      query.themeIds?.length ||
+      query.minScore !== undefined ||
+      query.maxScore !== undefined,
+  );
+}
+
+/** The stage's own words, without the ordinal the generated catalog numbers it with. */
+function stageLabel(stage: string): string {
+  const known = JOB_STAGES.find((entry) => entry.id === stage);
+  return known ? known.name.replace(/^\d+\.\s*/, "") : stage;
+}
+
 export function OpportunityLandscape() {
   const {
     canvasState,
@@ -26,20 +67,32 @@ export function OpportunityLandscape() {
     deleteThesis,
     openPanel,
     refreshCanvas,
+    settings,
     theses,
     focusedSubject,
     focusSubject,
   } = useStudio();
-  const [underservedOnly, setUnderservedOnly] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
     focusedSubject?.kind === "outcome" ? focusedSubject.id : null,
   );
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
+  const [draft, setDraft] = useState({ text: "", minScore: "", maxScore: "" });
+  const [narrowing, setNarrowing] = useState<Narrowing>(BLANK_NARROWING);
+  const [offset, setOffset] = useState(0);
+  // The board starts asking as soon as it can, so the first status is loading;
+  // only an action that re-asks sets it, because an effect may not set state
+  // about its own run.
+  const [status, setStatus] = useState<SearchStatus>("loading");
+  const [result, setResult] = useState<OutcomeSearch | null>(null);
+  const [searchError, setSearchError] = useState<StudioError | null>(null);
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [retryNonce, setRetryNonce] = useState(0);
+  /** Only the newest answer may draw the board; a late one is dropped here. */
+  const requestId = useRef(0);
 
   const canvas = canvasState.data;
-  const sample = canvas?.source === "seed";
+  const sample = isSimulatedCanvas(canvas);
   const jobs = useMemo(() => canvas?.jobs ?? [], [canvas]);
   const outcomes = useMemo(() => canvas?.outcomes ?? [], [canvas]);
   const evidence = useMemo(() => canvas?.evidence ?? [], [canvas]);
@@ -57,6 +110,59 @@ export function OpportunityLandscape() {
   // say when it was saved. A warm reload with live data draws it too but gets
   // no caption, because that data is not a saved copy.
   const savedCaption = canvasCached && hasRecords ? savedCopyCaption(canvas) : null;
+
+  // Narrowing asks the store, so it needs one to ask: the demo board is a
+  // fixture the sidecar handed over, and an empty or failed canvas has nothing
+  // to narrow. A canvas read straight from the sidecar's own store counts —
+  // the query runs there whatever transport brought the board here.
+  const canNarrow = !isFailed && !sample && hasRecords;
+  const narrowed = isNarrowing(narrowing);
+  // A canvas that came back with a new generation has new counts in it.
+  const canvasStamp = canvas?.provenance?.generated_at ?? null;
+
+  useEffect(() => {
+    if (!canNarrow) {
+      return;
+    }
+    const id = requestId.current + 1;
+    requestId.current = id;
+    fetchOutcomeSearch(settings.mcp_url, { ...narrowing, limit: SEARCH_PAGE_SIZE, offset })
+      .then((response) => {
+        if (requestId.current !== id) {
+          return;
+        }
+        setResult(response);
+        setSearchError(null);
+        setStatus("ready");
+      })
+      .catch((error: unknown) => {
+        if (requestId.current !== id) {
+          return;
+        }
+        setSearchError(asStudioError(error));
+        setStatus("error");
+      });
+  }, [canNarrow, narrowing, offset, canvasStamp, settings.mcp_url, retryNonce]);
+
+  /** Theme names come from the theme list; the facet row only labels what it is given. */
+  useEffect(() => {
+    if (!canNarrow) {
+      return;
+    }
+    let active = true;
+    fetchThemes(settings.mcp_url)
+      .then((list) => {
+        if (active) {
+          setThemes(list);
+        }
+      })
+      .catch(() => {
+        // A chip that says "t-1" instead of a name is still the right filter.
+      });
+    return () => {
+      active = false;
+    };
+  }, [canNarrow, settings.mcp_url]);
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -81,26 +187,115 @@ export function OpportunityLandscape() {
     return (total / outcomes.length).toFixed(1);
   }, [outcomes]);
 
-  const filteredOutcomes = useMemo(() => {
-    return outcomes.filter((outcome) => {
-      if (underservedOnly && !isUnderserved(outcome.opportunity_score)) {
-        return false;
-      }
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const stmt = outcome.statement?.toLowerCase() ?? "";
-        const id = outcome.id?.toLowerCase() ?? "";
-        return stmt.includes(query) || id.includes(query);
-      }
-      return true;
-    });
-  }, [outcomes, underservedOnly, searchQuery]);
-
-  const sortedOutcomes = useMemo(() => {
-    return [...filteredOutcomes].sort(
+  /**
+   * Who owns the rows. A narrowed board is the store's page, in the store's
+   * order — re-sorting it here would be a second ordering that can disagree
+   * with the pager beside it. An unnarrowed board is the whole library, which
+   * is ordered by opportunity as it always was.
+   */
+  const rows = useMemo(() => {
+    if (narrowed) {
+      return status === "ready" && result ? result.items : [];
+    }
+    return [...outcomes].sort(
       (a, b) => (b.opportunity_score ?? -Infinity) - (a.opportunity_score ?? -Infinity),
     );
-  }, [filteredOutcomes]);
+  }, [narrowed, status, result, outcomes]);
+
+  const page = Math.floor(offset / SEARCH_PAGE_SIZE) + 1;
+  const pages =
+    narrowed && result ? Math.max(1, Math.ceil(result.total / SEARCH_PAGE_SIZE)) : 1;
+
+  function submitDraft(event: React.FormEvent) {
+    event.preventDefault();
+    setStatus("loading");
+    setNarrowing({
+      ...narrowing,
+      text: draft.text.trim() || undefined,
+      minScore: draft.minScore === "" ? undefined : Number(draft.minScore),
+      maxScore: draft.maxScore === "" ? undefined : Number(draft.maxScore),
+    });
+    setOffset(0);
+  }
+
+  function ask(next: Narrowing) {
+    setStatus("loading");
+    setNarrowing(next);
+    setOffset(0);
+  }
+
+  function askPage(nextOffset: number) {
+    setStatus("loading");
+    setOffset(nextOffset);
+  }
+
+  function toggleFacet<K extends "stage" | "confidence">(key: K, value: NonNullable<Narrowing[K]>) {
+    ask({ ...narrowing, [key]: narrowing[key] === value ? undefined : value });
+  }
+
+  function toggleTheme(themeId: string) {
+    const current = narrowing.themeIds ?? [];
+    const next = current.includes(themeId)
+      ? current.filter((id) => id !== themeId)
+      : [...current, themeId];
+    ask({ ...narrowing, themeIds: next.length ? next : undefined });
+  }
+
+  function clearDimension(key: "text" | "stage" | "confidence") {
+    if (key === "text") {
+      setDraft((current) => ({ ...current, text: "" }));
+    }
+    ask({ ...narrowing, [key]: undefined });
+  }
+
+  /** The band is two fields and one filter, so it clears as one. */
+  function clearBand() {
+    setDraft((current) => ({ ...current, minScore: "", maxScore: "" }));
+    ask({ ...narrowing, minScore: undefined, maxScore: undefined });
+  }
+
+  function clearAll() {
+    setDraft({ text: "", minScore: "", maxScore: "" });
+    ask(BLANK_NARROWING);
+  }
+
+  const activeFilters: { dimension: string; label: string; onRemove: () => void }[] = [];
+  if (narrowing.text) {
+    activeFilters.push({
+      dimension: "text",
+      label: `text “${narrowing.text}”`,
+      onRemove: () => clearDimension("text"),
+    });
+  }
+  if (narrowing.stage) {
+    activeFilters.push({
+      dimension: "stage",
+      label: `stage ${stageLabel(narrowing.stage)}`,
+      onRemove: () => clearDimension("stage"),
+    });
+  }
+  for (const themeId of narrowing.themeIds ?? []) {
+    const theme = themes.find((entry) => entry.id === themeId);
+    activeFilters.push({
+      dimension: "theme",
+      label: `theme ${theme?.name ?? themeId}`,
+      onRemove: () => toggleTheme(themeId),
+    });
+  }
+  if (narrowing.confidence) {
+    activeFilters.push({
+      dimension: "confidence",
+      label: narrowing.confidence,
+      onRemove: () => clearDimension("confidence"),
+    });
+  }
+  if (narrowing.minScore !== undefined || narrowing.maxScore !== undefined) {
+    activeFilters.push({
+      dimension: "score",
+      label: `score ${narrowing.minScore ?? "any"} to ${narrowing.maxScore ?? "any"}`,
+      onRemove: clearBand,
+    });
+  }
 
   function toggleOutcome(id: string) {
     const next = selectedOutcomeId === id ? null : id;
@@ -114,8 +309,10 @@ export function OpportunityLandscape() {
     if (selectedOutcomeId) {
       return outcomes.find((o) => o.id === selectedOutcomeId) ?? null;
     }
-    return hoveredOutcome || sortedOutcomes[0] || null;
-  }, [selectedOutcomeId, outcomes, hoveredOutcome, sortedOutcomes]);
+    return hoveredOutcome || rows[0] || null;
+  }, [selectedOutcomeId, outcomes, hoveredOutcome, rows]);
+
+  const zeroMatches = narrowed && status === "ready" && result?.total === 0;
 
   return (
     <section className="fade-in">
@@ -232,60 +429,201 @@ export function OpportunityLandscape() {
         </div>
       )}
 
-      {/* Control Bar: Search & Filtering */}
+      {/* Narrowing: the field, the band, and the facet row all ask the store. */}
       {canvasState.kind === "error" ? null : (
-        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ flex: "1 1 240px" }}>
-            <label className="sr-only" htmlFor="opportunity-search">
-              Search outcomes
+        <div style={{ marginBottom: 16 }}>
+          <form
+            role="search"
+            onSubmit={submitDraft}
+            style={{ display: "flex", gap: 12, marginBottom: 8, flexWrap: "wrap", alignItems: "flex-end" }}
+          >
+            <div style={{ flex: "1 1 240px" }}>
+              <label className="sr-only" htmlFor="opportunity-search">
+                Search outcomes
+              </label>
+              <input
+                id="opportunity-search"
+                type="text"
+                className="studio-input"
+                placeholder="Search statements, theme names, and evidence…"
+                value={draft.text}
+                disabled={!canNarrow}
+                onChange={(event) => setDraft({ ...draft, text: event.target.value })}
+                style={{ width: "100%" }}
+              />
+            </div>
+            <label style={{ fontSize: "0.8rem", color: "var(--studio-muted)", display: "flex", flexDirection: "column", gap: 4 }}>
+              Minimum score
+              <input
+                type="number"
+                className="studio-input"
+                style={{ width: 120 }}
+                value={draft.minScore}
+                disabled={!canNarrow}
+                onChange={(event) => setDraft({ ...draft, minScore: event.target.value })}
+              />
             </label>
-            <input
-              id="opportunity-search"
-              type="text"
-              className="studio-input"
-              placeholder="Search opportunities / outcomes by statement or ID..."
-              value={searchQuery}
-              disabled={isLoading && !hasRecords}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: "100%" }}
-            />
-          </div>
-          <label style={{ fontSize: "0.85rem", color: "var(--studio-text)", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
-            <input
-              type="checkbox"
-              checked={underservedOnly}
-              disabled={isLoading && !hasRecords}
-              onChange={(event) => setUnderservedOnly(event.target.checked)}
-              style={{ accentColor: "var(--studio-indigo)" }}
-            />
-            Show Underserved Only (&gt;10)
-          </label>
-          {searchQuery || underservedOnly ? (
-            <button
-              type="button"
-              className="studio-button"
-              style={{ fontSize: "0.78rem", padding: "4px 10px" }}
-              disabled={isLoading && !hasRecords}
-              onClick={() => {
-                setSearchQuery("");
-                setUnderservedOnly(false);
-              }}
-            >
-              Clear Filters
+            <label style={{ fontSize: "0.8rem", color: "var(--studio-muted)", display: "flex", flexDirection: "column", gap: 4 }}>
+              Maximum score
+              <input
+                type="number"
+                className="studio-input"
+                style={{ width: 120 }}
+                value={draft.maxScore}
+                disabled={!canNarrow}
+                onChange={(event) => setDraft({ ...draft, maxScore: event.target.value })}
+              />
+            </label>
+            <button type="submit" className="studio-button" disabled={!canNarrow}>
+              Search
             </button>
+          </form>
+
+          {sample ? (
+            <p className="caption" role="status">
+              Narrowing asks the store, and this demo board is not in it.
+            </p>
+          ) : null}
+
+          {status === "error" && searchError ? (
+            <FailurePanel
+              error={searchError}
+              onRetry={() => {
+                setStatus("loading");
+                setRetryNonce((nonce) => nonce + 1);
+              }}
+              retryText="retry the search"
+            />
+          ) : canNarrow && result ? (
+            <>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start", marginTop: 8 }}>
+                <FacetGroup
+                  title="Job stage"
+                  entries={Object.entries(result.facets.stage).map(([value, count]) => ({
+                    key: value,
+                    label: stageLabel(value),
+                    count,
+                  }))}
+                  selected={narrowing.stage ? [narrowing.stage] : []}
+                  onToggle={(key) => toggleFacet("stage", key)}
+                />
+                <FacetGroup
+                  title="Theme"
+                  entries={Object.entries(result.facets.theme).map(([id, count]) => ({
+                    key: id,
+                    label: themes.find((theme) => theme.id === id)?.name ?? id,
+                    count,
+                  }))}
+                  selected={narrowing.themeIds ?? []}
+                  onToggle={toggleTheme}
+                />
+                <FacetGroup
+                  title="Score recorded"
+                  entries={Object.entries(result.facets.confidence).map(([level, count]) => ({
+                    key: level,
+                    label: level.charAt(0).toUpperCase() + level.slice(1),
+                    count,
+                  }))}
+                  selected={narrowing.confidence ? [narrowing.confidence] : []}
+                  onToggle={(key) => toggleFacet("confidence", key)}
+                />
+              </div>
+              <p className="caption" style={{ marginTop: 8 }} role="status">
+                {narrowed
+                  ? `${result.total} outcome${result.total === 1 ? "" : "s"} match${
+                      result.total === 1 ? "es" : ""
+                    } these filters`
+                  : `All ${result.total} outcomes in the library`}
+              </p>
+            </>
+          ) : null}
+
+          {activeFilters.length ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+              {activeFilters.map((filter) => (
+                <button
+                  type="button"
+                  key={`${filter.dimension}:${filter.label}`}
+                  className="studio-pill"
+                  style={{ fontSize: "0.75rem" }}
+                  aria-label={`Remove ${filter.dimension} filter`}
+                  onClick={filter.onRemove}
+                >
+                  {filter.label} ✕
+                </button>
+              ))}
+              <button
+                type="button"
+                className="quiet-action"
+                style={{ fontSize: "0.78rem" }}
+                onClick={clearAll}
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : null}
+
+          {narrowed && status !== "error" && result && pages > 1 ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+              <button
+                type="button"
+                className="studio-button"
+                style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+                disabled={offset === 0}
+                onClick={() => askPage(Math.max(0, offset - SEARCH_PAGE_SIZE))}
+              >
+                Previous page
+              </button>
+              <button
+                type="button"
+                className="studio-button"
+                style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+                disabled={page >= pages}
+                onClick={() => setOffset(offset + SEARCH_PAGE_SIZE)}
+              >
+                Next page
+              </button>
+              <p
+                className="caption"
+                role="status"
+                aria-label={`Page ${page} of ${pages}`}
+                style={{ margin: 0 }}
+              >
+                Page {page} of {pages}
+              </p>
+            </div>
           ) : null}
         </div>
       )}
 
-      {isLoading && !hasRecords ? (
+      {canvasState.kind === "error" ? null : isLoading && !hasRecords ? (
         <GhostOpportunityCards />
-      ) : canvasState.kind === "error" ? null : isEmpty ? (
+      ) : isEmpty ? (
         <p className="caption" style={{ padding: 24, textAlign: "center", background: "var(--studio-surface)", borderRadius: 8 }}>
           Capture an outcome to see it here.
         </p>
+      ) : narrowed && status === "loading" ? (
+        <>
+          <p
+            className="caption"
+            role="status"
+            aria-label="Searching the library"
+            style={{ padding: 24, textAlign: "center" }}
+          >
+            Searching the library…
+          </p>
+          <GhostOpportunityCards />
+        </>
+      ) : narrowed && status === "error" ? null : zeroMatches ? (
+        <div className="studio-empty" role="status">
+          <p className="studio-empty__title">Nothing matches these filters</p>
+          <p className="studio-empty__body">
+            Clear filters above, or widen one — a filter that excludes everything is still an answer.
+          </p>
+        </div>
       ) : viewMode === "matrix" ? (
         <OpportunityMatrixView
-          outcomes={filteredOutcomes}
+          outcomes={rows}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
           onHoverOutcome={setHoveredOutcome}
@@ -294,19 +632,19 @@ export function OpportunityLandscape() {
         />
       ) : viewMode === "table" ? (
         <OpportunityTableView
-          outcomes={sortedOutcomes}
+          outcomes={rows}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
         />
-      ) : sortedOutcomes.length ? (
+      ) : rows.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {sortedOutcomes.map((outcome, index) => (
+          {rows.map((outcome, index) => (
             <OutcomeCard outcome={outcome} sample={sample} key={outcome.id ?? index} />
           ))}
         </div>
       ) : (
         <p className="caption" style={{ padding: 24, textAlign: "center", background: "var(--studio-surface)", borderRadius: 8 }}>
-          No opportunities match the current filter criteria.
+          Nothing matches these filters.
         </p>
       )}
 
@@ -347,6 +685,65 @@ export function OpportunityLandscape() {
         </section>
       )}
     </section>
+  );
+}
+
+interface FacetEntry {
+  key: string;
+  label: string;
+  count: number;
+}
+
+/**
+ * One dimension of the facet row. The counts are the sidecar's own — the same
+ * query with this dimension removed — so a chip that says 7 means the store
+ * found 7, not that this page holds 7. A bucket with nothing in it stays
+ * visible and unreachable rather than vanishing after the last click.
+ */
+function FacetGroup({
+  title,
+  entries,
+  selected,
+  onToggle,
+}: {
+  title: string;
+  entries: FacetEntry[];
+  selected: string[];
+  onToggle: (key: string) => void;
+}) {
+  if (!entries.length) {
+    return null;
+  }
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+      <span className="caption" style={{ color: "var(--studio-muted)", fontSize: "0.75rem" }}>
+        {title}
+      </span>
+      {entries.map((entry) => {
+        const isActive = selected.includes(entry.key);
+        const reachable = entry.count > 0 || isActive;
+        return (
+          <button
+            key={entry.key}
+            type="button"
+            className="studio-pill"
+            style={{
+              fontSize: "0.75rem",
+              background: isActive ? "rgba(129, 140, 248, 0.18)" : "rgba(255, 255, 255, 0.05)",
+              color: isActive ? "var(--studio-indigo)" : "var(--studio-muted)",
+              border: "1px solid var(--studio-border)",
+              cursor: reachable ? "pointer" : "not-allowed",
+              opacity: reachable ? 1 : 0.5,
+            }}
+            disabled={!reachable}
+            aria-pressed={isActive}
+            onClick={() => onToggle(entry.key)}
+          >
+            {entry.label} {entry.count}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

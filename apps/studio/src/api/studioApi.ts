@@ -25,6 +25,7 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
+  OutcomeSearch,
   Segment,
   Signal,
   Step,
@@ -553,6 +554,64 @@ export async function fetchThemes(mcpUrl: string, jobId?: string): Promise<Theme
     params.set("job_id", jobId);
   }
   return getJson<Theme[]>(`/api/themes?${params.toString()}`);
+}
+
+/** The narrowing the landscape can ask for — the same dimensions as `OutcomeQuery`. */
+export interface OutcomeSearchFilters {
+  text?: string;
+  stage?: string;
+  themeIds?: string[];
+  confidence?: string;
+  minScore?: number;
+  maxScore?: number;
+  jobId?: string;
+  sort?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Narrow the library where it lives. A dimension that is not set is left out of
+ * the URL rather than sent empty, so "no filter" and "filter by nothing" stay
+ * different requests, and the envelope arrives exactly as the sidecar answered
+ * it: recomputing its counts here is how a facet row disputes its own results.
+ */
+export async function fetchOutcomeSearch(
+  mcpUrl: string,
+  filters: OutcomeSearchFilters = {},
+): Promise<OutcomeSearch> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (filters.text) {
+    params.set("text", filters.text);
+  }
+  if (filters.stage) {
+    params.set("stage", filters.stage);
+  }
+  for (const themeId of filters.themeIds ?? []) {
+    params.append("theme_ids", themeId);
+  }
+  if (filters.confidence) {
+    params.set("confidence", filters.confidence);
+  }
+  if (filters.minScore !== undefined) {
+    params.set("min_score", String(filters.minScore));
+  }
+  if (filters.maxScore !== undefined) {
+    params.set("max_score", String(filters.maxScore));
+  }
+  if (filters.jobId) {
+    params.set("job_id", filters.jobId);
+  }
+  if (filters.sort) {
+    params.set("sort", filters.sort);
+  }
+  if (filters.limit !== undefined) {
+    params.set("limit", String(filters.limit));
+  }
+  if (filters.offset) {
+    params.set("offset", String(filters.offset));
+  }
+  return getJson<OutcomeSearch>(`/api/outcomes/search?${params.toString()}`);
 }
 
 /** The recorded Stage 6 path, or null when no strategy has been proposed yet. */

@@ -4,6 +4,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { fetchConfig, healthLlm } from "./api/studioApi";
 
+// One outcome, told twice: the canvas the sidecar hands over and the page the
+// landscape's narrowing would answer with. Same row, so no test has to wonder
+// which of the two the board is drawing.
+const LANDSCAPE_OUTCOME = vi.hoisted(() => ({
+  id: "O-1",
+  job_id: "JOB-402",
+  statement: "Minimize the time it takes to propagate secrets",
+  importance: 9.2,
+  satisfaction: 3.1,
+  opportunity_score: 15.3,
+}));
+
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
     base_url: "http://localhost:8001/v1",
@@ -14,18 +26,15 @@ vi.mock("./api/studioApi", () => ({
   fetchCanvas: vi.fn(async () => ({
     jobs: [{ id: "JOB-402", name: "Propagate secrets" }],
     steps: [],
-    outcomes: [
-      {
-        id: "O-1",
-        job_id: "JOB-402",
-        statement: "Minimize the time it takes to propagate secrets",
-        importance: 9.2,
-        satisfaction: 3.1,
-        opportunity_score: 15.3,
-      },
-    ],
+    outcomes: [LANDSCAPE_OUTCOME],
     source: "local" as const,
   })),
+  fetchOutcomeSearch: vi.fn(async () => ({
+    items: [LANDSCAPE_OUTCOME],
+    total: 1,
+    facets: { stage: {}, theme: {}, confidence: {} },
+  })),
+  fetchThemes: vi.fn(async () => []),
   healthMcp: vi.fn(async () => ({ reachable: true })),
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend is reachable." })),
   addStep: vi.fn(async () => ({ ok: true, result: "created" })),

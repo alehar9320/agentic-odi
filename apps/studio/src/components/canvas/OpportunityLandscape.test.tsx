@@ -16,9 +16,12 @@ const mockCanvasData = {
 };
 
 const harness = vi.hoisted(() => ({
+  search: vi.fn(),
+  themes: vi.fn(),
   state: {
     canvasState: { kind: "ready", data: null } as unknown as CanvasState,
     canvasCached: false,
+    settings: { mcp_url: "http://mcp" },
     refreshCanvas: vi.fn(),
     requestSimulate: vi.fn(),
     openPanel: vi.fn(),
@@ -35,6 +38,25 @@ vi.mock("../../state/StudioContext", () => ({
   useStudio: () => harness.state,
 }));
 
+// Narrowing asks the store, which these board tests are not about: an empty
+// answer keeps the facet row quiet without touching what the board draws.
+vi.mock("../../api/studioApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api/studioApi")>()),
+  fetchOutcomeSearch: harness.search,
+  fetchThemes: harness.themes,
+}));
+
+beforeEach(() => {
+  harness.search.mockReset();
+  harness.search.mockResolvedValue({
+    items: [],
+    total: 0,
+    facets: { stage: {}, theme: {}, confidence: {} },
+  });
+  harness.themes.mockReset();
+  harness.themes.mockResolvedValue([]);
+});
+
 describe("OpportunityLandscape Data Visualization", () => {
   beforeEach(() => {
     harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
@@ -48,15 +70,6 @@ describe("OpportunityLandscape Data Visualization", () => {
     expect(screen.getByText("📊 Matrix")).toBeInTheDocument();
     expect(screen.getByText("🎴 Visual Cards")).toBeInTheDocument();
     expect(screen.getByText("📋 Table View")).toBeInTheDocument();
-  });
-
-  it("filters outcomes when searching", () => {
-    render(<OpportunityLandscape />);
-    const searchInput = screen.getByPlaceholderText(/Search opportunities/i);
-    fireEvent.change(searchInput, { target: { value: "drift" } });
-
-    // Table or Matrix details should reflect search filter
-    expect(searchInput).toHaveValue("drift");
   });
 
   it("switches to table view mode", () => {
@@ -73,8 +86,10 @@ describe("OpportunityLandscape Data Visualization", () => {
     harness.state.canvasState = { kind: "loading", data: null } as unknown as CanvasState;
     render(<OpportunityLandscape />);
 
-    expect(screen.getByPlaceholderText(/Search opportunities/i)).toBeDisabled();
-    expect(screen.getByLabelText(/Show Underserved Only/i)).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: /search outcomes/i })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: /minimum score/i })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: /maximum score/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
   });
 
   it("selects an outcome from a keyboard-focused table row", () => {
@@ -113,14 +128,6 @@ describe("OpportunityLandscape Data Visualization", () => {
 
     fireEvent.keyDown(row, { key: " " });
     expect(row).toHaveAttribute("aria-selected", "false");
-  });
-  it("toggles underserved filter checkbox", () => {
-    render(<OpportunityLandscape />);
-    const checkbox = screen.getByLabelText(/Show Underserved Only/i);
-    expect(checkbox).not.toBeChecked();
-
-    fireEvent.click(checkbox);
-    expect(checkbox).toBeChecked();
   });
 });
 

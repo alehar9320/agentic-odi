@@ -265,6 +265,16 @@ refresh, and polls once a minute while the window is visible. Connector rows in 
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
 
+Narrowing the landscape asks the store rather than filtering what already
+happens to be on screen. The search field, the stage, theme and score-recorded
+facets, the score band, and the pager all come from `GET /api/outcomes/search` —
+the same `OutcomeQuery` the CLI and the `search_outcomes` tool run — so the
+counts beside each facet are the sidecar's dimension-removed counts and not a
+count this browser derived. That query needs a store to run against, so a
+demonstration board says so in one line instead of answering with zero matches,
+and a sidecar that cannot be reached is reported as a failure with a retry
+rather than as an empty library.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront
