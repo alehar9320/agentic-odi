@@ -24,6 +24,8 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_models.py` — domain models and their validation rules.
 - `test_job_validation.py` — Job name and description constraints and `create_job()`.
 - `test_opportunity_score.py` — the ODI opportunity formula, its clamp, and its monotonicity.
+- `test_evaluation.py` — the outcome-statement format guard, and the harness that judges a service's scored outcomes by the shared fixture.
+- `test_evaluation_harness.py` — a service is judged by `packages/core/tests/fixtures/opportunity-score.json`: a wrong score fails with the id and both values; an unscored outcome stays allowed.
 - `test_service.py` — `ODIService` CRUD, Opportunity Score, and thesis rendering.
 - `test_repository.py` — `InMemoryRepository` behavior.
 - `test_sqlite_repository.py` — SQLite persistence and round-trips.
