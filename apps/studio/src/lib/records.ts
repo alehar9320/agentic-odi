@@ -134,3 +134,46 @@ export function buildRecords(canvas: CanvasData | null | undefined): RecordRow[]
 
   return rows;
 }
+
+/**
+ * RFC 4180: a value holding a quote, a comma or a line break is wrapped in quotes, and a
+ * quote inside it is doubled.
+ */
+function csvField(value: string | undefined): string {
+  const cell = value ?? "";
+  return /[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
+}
+
+/**
+ * The lens, as a file the person can take to a spreadsheet.
+ *
+ * One header line, then every section the screen would show, each introduced by the same
+ * label, in the same order — the shape of the table is the shape of the file. Cells are the
+ * stored strings, so `unscored` exports as the word `unscored`.
+ *
+ * Rows are exported whole rather than at the screen's `MAX_ROWS`, because the cap exists to
+ * keep one render cheap and a spreadsheet is exactly where the remainder belongs.
+ */
+export function toCsv(rows: RecordRow[]): string {
+  if (rows.length === 0) {
+    return "";
+  }
+
+  const lines: string[] = [RECORD_SECTIONS[0].columns.map(csvField).join(",")];
+  for (const section of RECORD_SECTIONS) {
+    const sectionRows = rows.filter((row) => row.kind === section.kind);
+    if (sectionRows.length === 0) {
+      continue;
+    }
+    lines.push(csvField(section.label));
+    for (const row of sectionRows) {
+      lines.push(
+        Array.from({ length: section.columns.length }, (_, index) => csvField(row.cells[index])).join(
+          ",",
+        ),
+      );
+    }
+  }
+
+  return lines.join("\r\n");
+}

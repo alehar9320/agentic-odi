@@ -132,4 +132,34 @@
   .outcome-card {
     margin-bottom: 6mm;
   }
+
+  /* The records lens on paper. The tables are the document here, so a header belongs on
+     every sheet, a row is never split in two, and the controls a reader cannot press on a
+     page are dropped along with the notice about what the screen hid. */
+  .records__heading {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .records__table thead {
+    display: table-header-group;
+  }
+
+  .records__table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* records.css already gives every cell a 1px bottom rule in --line, which is a
+     translucent white and invisible on paper. Only the colour changes here, to the
+     same paper value this stylesheet already uses for .lens and .md-code. */
+  .records__table th,
+  .records__table td {
+    border-color: #ccc;
+  }
+
+  .records__export,
+  .records__cap {
+    display: none;
+  }
 }

@@ -70,10 +70,15 @@ export function exportFilename(exportedAt: Date = new Date()): string {
   return `agentic-odi-conversation-${exportedAt.toISOString().slice(0, 10)}.md`;
 }
 
-/** Hand a Markdown file to the browser's save dialog. */
-export function downloadMarkdown(markdown: string, filename: string): void {
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
+/**
+ * Hand a text file to the browser's save dialog.
+ *
+ * Every export in the Studio ends here. The URL is released on the next tick rather
+ * than in the same turn as the click, so the browser has taken the blob before it
+ * disappears.
+ */
+export function downloadFile(text: string, filename: string, mime: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: mime }));
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
@@ -81,5 +86,10 @@ export function downloadMarkdown(markdown: string, filename: string): void {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** Hand a Markdown file to the browser's save dialog. */
+export function downloadMarkdown(markdown: string, filename: string): void {
+  downloadFile(markdown, filename, "text/markdown;charset=utf-8");
 }
