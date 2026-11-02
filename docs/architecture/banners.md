@@ -45,11 +45,15 @@ the layout still; `corner` is a fixed stack for events. Each dock is its own
 Radix viewport, so they never fight over one list, and the visible cap is applied
 per dock — top strips can never hide corner toasts. The top dock mounts only
 while it has something to show — at least one top banner, or the "+N more
-notices" row, which belongs to this dock — because a sticky viewport carries its
-own padding and an empty one is a banner-shaped gap above the bar. The 8px of
-breathing room at the top of the window belongs to `.studio-app`, not the dock,
-so the bar sits the same distance from the edge whether or not a banner is up.
-The corner dock is `position: fixed`, out of flow, and always mounted.
+notices" row, which belongs to this dock and not the corner one. An unmounted
+dock is not a cosmetic saving: Radix wraps the `<ol class="banner-dock">` it
+styles in its own `role="region"` element, and it is that wrapper that sits in
+`.studio-app`'s flex column, so an empty top dock cost 40px of layout above the
+bar with nothing in it. Trimming the `ol`'s padding alone would not have
+collapsed it. The 8px of breathing room at the top of the window belongs to
+`.studio-app`, not the dock, so the bar sits the same distance from the edge
+whether or not a banner is up. The corner dock is `position: fixed`, out of flow,
+and always mounted.
 
 **Severity drives urgency and ARIA.** `critical` and `warning` interrupt
 (`role="alert"`, `type="foreground"`); `info` and `success` wait
