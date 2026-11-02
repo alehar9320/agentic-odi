@@ -4134,8 +4134,10 @@ button.message__tag:hover {
   --ease-tactile: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* 1. Glassmorphic Backdrop Blur & Vibrancy on elevated panels */
-.bar,
+/* 1. Glassmorphic Backdrop Blur & Vibrancy on elevated panels.
+   Not .bar: a backdrop-filter makes the element a stacking context, which
+   traps the overflow menu's z-index inside the header and lets the chat pane
+   paint and hit-test over it. Nothing scrolls under the bar anyway. */
 .outcome-card,
 .settings-drawer,
 .banner,
