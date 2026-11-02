@@ -30,7 +30,14 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     title: "Working by hand.",
     body: "No model is reachable, so the assistant is paused. Every change still writes to your ODI repository.",
     dismissible: false,
-    actions: [{ label: "Capture an outcome", action: "open-capture", tone: "ghost" }],
+    // Both routes are ghost-toned, so the notice still reads as one calm line;
+    // what came out is "Set your context", which the bar's gear already serves.
+    // "Map the job" stays because a job with no steps has no rail chip, and this
+    // is then the only way onto the job map.
+    actions: [
+      { label: "Capture an outcome", action: "open-capture", tone: "ghost" },
+      { label: "Map the job", action: "open-jobmap", tone: "ghost" },
+    ],
   },
   "update-available": {
     severity: "info",

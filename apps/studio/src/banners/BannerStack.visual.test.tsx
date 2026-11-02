@@ -44,7 +44,7 @@ it("renders a critical top strip with its actions", async () => {
   await expect.element(screen.getByRole("button", { name: "Recheck" })).toBeVisible();
 });
 
-it("renders the warning strip with its one way to keep working", async () => {
+it("renders the warning strip with its two by-hand routes", async () => {
   const screen = await render(
     <Frame>
       <BannerStack banners={[banner("model-offline")]} />
@@ -55,8 +55,10 @@ it("renders the warning strip with its one way to keep working", async () => {
   await expect
     .element(screen.getByRole("button", { name: "Capture an outcome" }))
     .toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Map the job" })).toBeVisible();
+  // A4's removal: "Set your context" duplicated the bar's gear.
   const commands = [...screen.container.querySelectorAll("button")];
-  expect(commands.some((button) => button.textContent === "Map the job")).toBe(false);
+  expect(commands.some((button) => button.textContent === "Set your context")).toBe(false);
 
 });
 
