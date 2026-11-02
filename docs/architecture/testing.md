@@ -222,6 +222,10 @@ them: `chromium` for the local backend (the product default) and
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none.
 
+`first-paint.spec.ts` is the exception to "drives the real sidecar": it aborts
+the module bundle so it can read the pre-JavaScript shell in `index.html`, then
+compares the colour it painted against the `--bg` token for each theme.
+
 CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
 repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
 `continue-on-error` on the job keeps a failure from turning CI red.
