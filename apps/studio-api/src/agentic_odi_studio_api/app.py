@@ -16,6 +16,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from agentic_odi_studio_api.studio.approvals import ApprovalRegistry
 from agentic_odi_studio_api.studio.connectors import ConnectorService
@@ -39,6 +41,46 @@ CORS_ORIGINS = [
 ]
 
 DEFAULT_BACKEND = "local"
+
+CSP_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self'; "
+    "img-src 'self' data:; "
+    "connect-src 'self' http://localhost:5173 http://127.0.0.1:5173 "
+    "http://localhost:8100 http://127.0.0.1:8100 ws://localhost:5173; "
+    "font-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "frame-ancestors 'none'"
+)
+
+
+class CSPMiddleware:
+    """Attach a strict Content-Security-Policy to every HTTP response.
+
+    The policy refuses inline script, eval, and wildcard script sources so a
+    prompt-injected reply cannot execute in the served shell or the Tauri
+    window. Localhost origins are the development-only exception for the Vite
+    dev server and the sidecar itself; production serves from 'self'.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_csp(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                if "content-security-policy" not in headers:
+                    headers.append("content-security-policy", CSP_POLICY)
+            await send(message)
+
+        await self.app(scope, receive, send_with_csp)
 
 
 def default_spa_dist() -> Path:
@@ -93,6 +135,7 @@ def create_app(
         allow_headers=["*"],
     )
     app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(CSPMiddleware)
     register_error_handlers(app)
 
     @app.get("/health")

@@ -8,3 +8,4 @@ import pytest
 @pytest.fixture(autouse=True)
 def isolate_studio_memory(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AGENTIC_ODI_STUDIO_DB", str(tmp_path / "studio.db"))
+    monkeypatch.setenv("AGENTIC_ODI_STUDIO_TOKEN", str(tmp_path / "studio-token"))
