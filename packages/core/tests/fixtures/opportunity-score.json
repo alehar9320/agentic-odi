@@ -1,0 +1,47 @@
+{
+  "description": "One scoring fixture, read by Python and TypeScript, so the two can no longer disagree in silence. The expected score for each case is computed by hand from the ODI formula: importance + max(importance - satisfaction, 0).",
+  "cases": [
+    {
+      "name": "importance below satisfaction",
+      "importance": 3,
+      "satisfaction": 9,
+      "expected": 3
+    },
+    {
+      "name": "importance equal to satisfaction",
+      "importance": 5,
+      "satisfaction": 5,
+      "expected": 5
+    },
+    {
+      "name": "importance above satisfaction",
+      "importance": 8,
+      "satisfaction": 4,
+      "expected": 12
+    },
+    {
+      "name": "importance at the top of the scale",
+      "importance": 20,
+      "satisfaction": 1,
+      "expected": 39
+    },
+    {
+      "name": "importance zero with satisfaction zero",
+      "importance": 0,
+      "satisfaction": 0,
+      "expected": 0
+    },
+    {
+      "name": "negative gap is clamped to importance",
+      "importance": 4,
+      "satisfaction": 9,
+      "expected": 4
+    },
+    {
+      "name": "null importance and satisfaction",
+      "importance": null,
+      "satisfaction": null,
+      "expected": null
+    }
+  ]
+}
