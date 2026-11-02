@@ -142,28 +142,51 @@ offer only to someone who had a paid key and lost it. A device that could not
 host a tier sees neither strip: no offer, and no apology about a model it never
 needed.
 
+A download that stops is a different kind of news, and it gets its own strip in
+the same dock slot the progress was in. Weights fail for ordinary reasons — the
+network drops, a CDN refuses, the browser rejects the cache — and none of them is
+a question the studio may ask again, because the person already answered it. So
+the progress narration stops claiming a model is coming, says *"That download
+didn't finish"*, and puts the same download on its own button (*"Try the download
+again"*). Pressing it again and finding the moment wrong — hidden tab, Save Data,
+another tab holding the engine — is reported as that, and a fetch that threw is
+never described as someone else's win: the two answers a press can get are kept
+apart, because they need different sentences. A failure a second tab caused does
+not travel over the bus; nothing on disk moved, so no other tab has a fact to
+correct, and no other tab promised this person a download.
+
 **Settings → Answers in this browser** is where that answer stops being
 one-way. A switch turns the capability off — nothing downloaded, nothing run —
 and the consent underneath it can be changed: *"Stop answering here"* withdraws
 it, and one button names the weakest tier this device could host with its size
 (*"Download Llama 3.2 1B — about 1.3 GB, once"*) and fetches it through the same
 call the banner button makes, including the honest notice when another tab holds
-the engine or the moment is not quiet. Each tier is then listed with its size and
-what it is doing ("answering", "on this device", "not downloaded"), and when a
-tier is missing a device requirement the reason sits on that row ("Needs about a
-8 GB-class device; this one reports 4 GB."). Anything on disk can be freed for
-its storage back, which rewrites the ladder's truth rather than hiding it. A
-meter counts the answers served here toward the next tier, and a line reports how
-much of the site's storage quota the weights are using.
+the engine or the moment is not quiet. That button is also the only way back when
+a yes was answered and nothing landed — the fetching tab closed, the download
+failed — because the strip asks one question and never repeats it, so once
+consent is granted it has nothing more to say; if nothing is on disk and no
+endpoint is answering, Settings offers the same download again rather than
+leaving the person locked out of something they already agreed to. Each tier is
+then listed with its size and what it is doing ("answering", "on this device",
+"not downloaded"), and when a tier is missing a device requirement the reason
+sits on that row ("Needs about a 8 GB-class device; this one reports 4 GB.").
+Anything on disk can be freed for its storage back, which rewrites the ladder's
+truth rather than hiding it. A meter counts the answers served here toward the
+next tier, and a line reports how much of the site's storage quota the weights
+are using.
 
 Open tabs agree without asking. A consent answer, a tier that landed, or one that
 was freed is announced on a `BroadcastChannel`, and every other tab re-reads
 storage and re-decides: its strip stops offering, Settings updates, and the next
 turn is routed on the new fact rather than the one it last saw. The message is
 deliberately contentless — a tab that did not download a model does not celebrate
-one it did not fetch — and download progress is never broadcast, because only the
-tab doing the work renders it. A browser with no channel (private browsing) just
-keeps the ladder to itself.
+one it did not fetch, and the tab that *is* downloading keeps its own progress
+strip when the news comes from somewhere else — and download progress is never
+broadcast, because only the tab doing the work renders it. One fetch serves the
+whole browser: a second tab that asks for the engine while the first holds it is
+refused by `navigator.locks` and says so, and its turns are then answered from
+the weights the other tab pulled, with nothing leaving the tab. A browser with no
+channel (private browsing) just keeps the ladder to itself.
 
 An answer this browser produced is kept by this browser. The exchange — the
 question, the reply, and the fact that this browser's own model wrote it — goes

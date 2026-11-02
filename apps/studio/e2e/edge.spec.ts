@@ -1,24 +1,28 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { COMPOSER, CONVERSATION, dismissConnectorSuggestion, openStudio } from "./helpers";
-import { installEdgeDevice } from "./edgeDevice";
+import { failNextFetch, holdNextFetch, installEdgeDevice, releaseNextFetch } from "./edgeDevice";
 
 /**
  * The browser tier, end to end.
  *
  * What this proves: that the seams are wired — a first visit with no key gets
- * asked once, the yes starts a fetch the dock narrates, the answer that lands
- * is labelled as coming from this browser, a refusal is remembered, and a key
- * appearing later takes the turns back. It drives the real manager, scheduler,
- * IndexedDB state, notice bus, banner dock, composer routing and transcript
- * labelling in a real Chromium against a real sidecar.
+ * asked once, the yes starts a fetch the dock narrates, a fetch that throws says
+ * so and hands the same download back, the answer that lands is labelled as
+ * coming from this browser, a refusal is remembered, and a key appearing later
+ * takes the turns back. It drives the real manager, scheduler, IndexedDB state,
+ * notice bus, banner dock, composer routing and transcript labelling in a real
+ * Chromium against a real sidecar.
  *
  * What it does NOT prove: WebLLM. CI has no GPU and no model weights, so the
  * engine is the fake in `edgeDevice.ts`. The real-GPU path — a 1.3 GB download
- * actually landing, prefill jank, `navigator.locks` across two real tabs, the
- * memory ceiling on iOS — is the handoff list in
+ * actually landing, prefill jank, two tabs competing for a *loaded* model
+ * rather than for the fetch, the memory ceiling on iOS — is the handoff list in
  * `docs/superpowers/plans/2026-11-01-edge-llm-ladder-remaining-work.md`, not
- * something this file can assert.
+ * something this file can assert. What the last scenario does prove, in a real
+ * browser, is the two seams that used to be argued from a process-level test:
+ * `BroadcastChannel` between two live tabs, and `navigator.locks` refusing a
+ * second tab that asked for the engine while the first held it.
  */
 
 /** Record every `/api/chat` this page tries to send, so "who answered" is a fact. */
@@ -168,5 +172,119 @@ test.describe("answering in the browser", () => {
     await expect(reply(page).getByRole("button", { name: "Answered in this browser" })).toHaveCount(
       0,
     );
+  });
+
+  test("a download that did not land says so, and the retry it offers works", async ({ page }) => {
+    // Weights fail for ordinary reasons — the network drops, a CDN refuses, the
+    // browser rejects the cache. What the studio must not do is keep narrating a
+    // download that stopped, or retire the one ask and leave no way back.
+    await installEdgeDevice(page);
+    const sent = watchRemoteTurns(page);
+    await openStudio(page);
+
+    await failNextFetch(page);
+    await offerStrip(page)
+      .getByRole("button", { name: "Answer in this browser" })
+      .click();
+    await expect(dock(page).filter({ hasText: /Fetching Llama 3.2 1B/ })).toBeVisible();
+
+    // The fetch strip stops claiming, and the failure names itself once.
+    await expect(dock(page).filter({ hasText: /didn't finish/i })).toBeVisible();
+    await expect(dock(page).filter({ hasText: /Fetching Llama 3.2 1B/ })).toHaveCount(0);
+    // And the ask does not come back: the consent question is answered, whatever
+    // the download did.
+    await expect(offerStrip(page)).toHaveCount(0);
+
+    await dock(page)
+      .filter({ hasText: /didn't finish/i })
+      .getByRole("button", { name: "Try the download again" })
+      .click();
+    await expect(dock(page).filter({ hasText: "answering in this tab now" })).toBeVisible();
+
+    await dismissConnectorSuggestion(page);
+    await page.getByRole("textbox", { name: COMPOSER }).fill("Where do I start?");
+    await page.getByRole("button", { name: "Send message" }).click();
+
+    const answered = reply(page);
+    await expect(answered).toContainText("Start with the job, then the outcome.");
+    await expect(
+      answered.getByRole("button", { name: "Answered in this browser" }),
+    ).toBeVisible();
+    expect(sent).toEqual([]);
+  });
+
+  test("two tabs, one browser: one ask, one fetch, both answering", async ({ context }) => {
+    // Two pages in ONE context share an origin's storage and its
+    // `navigator.locks`, which is the whole reason this scenario exists: the
+    // cross-tab bus and the engine lock could previously only be exercised as
+    // two objects in one process. Here they are two pages in one Chromium.
+    const first = await context.newPage();
+    const second = await context.newPage();
+    await installEdgeDevice(first);
+    await installEdgeDevice(second);
+    const sentFromSecond = watchRemoteTurns(second);
+    await openStudio(first);
+    await openStudio(second);
+
+    // One consent question per browser, and both tabs are asking it, because
+    // both are reading the same unanswered record.
+    await expect(offerStrip(first)).toBeVisible();
+    await expect(offerStrip(second)).toBeVisible();
+
+    // The fetch is held open on purpose. The lock is only held while a model is
+    // loading, so without this the second tab would arrive after the download
+    // was over and meet no contention at all.
+    await holdNextFetch(first);
+    await offerStrip(first)
+      .getByRole("button", { name: "Answer in this browser" })
+      .click();
+    await expect(dock(first).filter({ hasText: /Fetching Llama 3.2 1B/ })).toBeVisible();
+
+    // The other tab is corrected with no reload, no turn and nothing typed: the
+    // yes travelled over a real BroadcastChannel between two real pages.
+    await expect(offerStrip(second)).toHaveCount(0);
+
+    // Now say yes a second time, in the second tab, while the first still holds
+    // the lock. The refusal is Chromium's own `navigator.locks` saying the name
+    // is taken — not a stubbed `acquired: false`.
+    //
+    // The connector suggestion is real product behavior and it is a modal, and
+    // this tab has been sitting idle through the other one's download, which is
+    // long enough for it to arrive. It intercepts clicks, so it gets dismissed
+    // the way a person would before anything else is pressed.
+    await dismissConnectorSuggestion(second);
+    await second.getByRole("button", { name: "Open settings" }).click();
+    const browserSection = second.getByRole("region", { name: "Answers in this browser" });
+    await browserSection
+      .getByRole("button", { name: "Download Llama 3.2 1B — about 1.3 GB, once" })
+      .click();
+    await expect(browserSection.getByText(/nothing started in this tab/i)).toBeVisible();
+
+    // Exactly one download for the pair: narrated where it is happening, and
+    // silent where it was refused.
+    await expect(dock(first).filter({ hasText: /Fetching Llama 3.2 1B/ })).toBeVisible();
+    await expect(dock(second).filter({ hasText: /Fetching Llama/ })).toHaveCount(0);
+
+    await releaseNextFetch(first);
+    await expect(dock(first).filter({ hasText: "answering in this tab now" })).toBeVisible();
+
+    // The second tab gets the state, not the celebration. It did not fetch
+    // anything, so a toast saying "answering in this tab" would be a lie; the
+    // tier row is the honest correction.
+    await expect(browserSection.getByText(/answering · about 1.3 GB/)).toBeVisible();
+    await expect(dock(second).filter({ hasText: "answering in this tab now" })).toHaveCount(0);
+
+    // And the point of the ladder: the weights one tab pulled answer in the
+    // other, without a byte leaving it.
+    await dismissConnectorSuggestion(second);
+    await second.getByRole("textbox", { name: COMPOSER }).fill("Where do I start?");
+    await second.getByRole("button", { name: "Send message" }).click();
+
+    const answered = reply(second);
+    await expect(answered).toContainText("Start with the job, then the outcome.");
+    await expect(
+      answered.getByRole("button", { name: "Answered in this browser" }),
+    ).toBeVisible();
+    expect(sentFromSecond).toEqual([]);
   });
 });
