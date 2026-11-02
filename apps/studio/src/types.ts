@@ -175,6 +175,23 @@ export interface McpHealth {
   reachable: boolean;
 }
 
+/** One component's state, as `GET /api/health` reports it. */
+export interface HealthCheck {
+  ok: boolean;
+  detail: string;
+  latency_ms: number;
+}
+
+/**
+ * The single health answer: the sidecar, the store, the MCP server, and the
+ * model. The SPA reads this instead of re-deriving health from a port.
+ */
+export interface HealthReport {
+  status: "ok" | "degraded" | "down";
+  checks: Record<string, HealthCheck>;
+  request_id: string;
+}
+
 export type ToolStatus = "running" | "ok" | "error" | "declined";
 
 export type ClaimStatus = "cited" | "hypothesis" | "uncited";

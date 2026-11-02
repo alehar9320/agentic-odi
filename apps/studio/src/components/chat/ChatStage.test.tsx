@@ -29,6 +29,7 @@ const harness = vi.hoisted(() => ({
     settings: { base_url: "http://llm", api_key: "k", model_name: "m", mcp_url: "http://mcp" },
     mcpReachable: true,
     llmHealth: { healthy: true, message: "ok" },
+    healthReport: null as unknown,
     connectorSuggestions: [] as string[],
     presets: [] as unknown[],
     dismissConnectorSuggestion: vi.fn(),
@@ -238,5 +239,34 @@ describe("ChatStage", () => {
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toBeInTheDocument();
     expect(errorLog).not.toHaveBeenCalled();
+  });
+
+  it("/status reports the model, the store, and the MCP server from the one health answer", async () => {
+    harness.state.healthReport = {
+      status: "degraded",
+      request_id: "req-1",
+      checks: {
+        sidecar: { ok: true, detail: "the sidecar is serving requests", latency_ms: 0 },
+        store: { ok: true, detail: "the store answers (/tmp/odi.db)", latency_ms: 1 },
+        mcp: { ok: false, detail: "http://mcp — not reachable", latency_ms: 2 },
+        llm: { ok: false, detail: "LLM server offline (Local Studio Mode enabled)", latency_ms: 3 },
+      },
+    };
+
+    render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "/status" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => expect(harness.state.pushNotice).toHaveBeenCalled());
+    const notice = String(harness.state.pushNotice.mock.calls.at(-1)?.[0] ?? "");
+    expect(notice).toContain("LLM server offline (Local Studio Mode enabled)");
+    expect(notice).toContain("the store answers (/tmp/odi.db)");
+    expect(notice).toContain("http://mcp — not reachable");
   });
 });

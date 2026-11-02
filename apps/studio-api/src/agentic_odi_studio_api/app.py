@@ -25,6 +25,7 @@ from agentic_odi_studio_api.studio.errors import (
     register_error_handlers,
     request_id_for,
 )
+from agentic_odi_studio_api.studio.health import collect_health
 from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.router import router as studio_router
@@ -96,8 +97,11 @@ def create_app(
     register_error_handlers(app)
 
     @app.get("/health")
-    def health() -> dict:
-        return {"status": "ok"}
+    async def health(request: Request) -> dict:
+        # The same report the Studio API serves under /api/health: a liveness
+        # stub beside a real health route would be two truths about one machine.
+        report = await collect_health(service.repo, request_id=request_id_for(request))
+        return report.model_dump(mode="json")
 
     @app.get("/capabilities")
     def capabilities() -> dict:

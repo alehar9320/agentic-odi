@@ -65,6 +65,27 @@
         }
       }
     },
+    "/api/diagnostics": {
+      "get": {
+        "summary": "Get Diagnostics",
+        "description": "Return diagnostic metadata only; never return database paths or records.",
+        "operationId": "get_diagnostics_api_diagnostics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Diagnostics Api Diagnostics Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/changelog": {
       "get": {
         "summary": "Get Changelog Route",
@@ -78,6 +99,85 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Get Changelog Route Api Changelog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Get Health",
+        "description": "The one health answer: sidecar, store, MCP, and model in one report.\n\n``GET`` because a browser, the Worker, and a monitor all issue one, and the\nquery overrides let Settings check an unsaved configuration. It never writes\nand always answers inside its budget, even when everything is down.",
+        "operationId": "get_health_api_health_get",
+        "parameters": [
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          },
+          {
+            "name": "base_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Base Url"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -3470,6 +3570,72 @@
         ],
         "title": "ChatRequest"
       },
+      "ClaimCitationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "ClaimCitationOut",
+        "description": "The record label a claim carries, snapshotted when the turn was stored."
+      },
+      "ClaimOut": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimCitationOut"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "text",
+          "status"
+        ],
+        "title": "ClaimOut",
+        "description": "One declarative sentence and what stands behind it."
+      },
       "ConnectorListItem": {
         "properties": {
           "name": {
@@ -3702,6 +3868,62 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HealthCheck": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "detail"
+        ],
+        "title": "HealthCheck",
+        "description": "One component's state, in the shape every surface reads."
+      },
+      "HealthReport": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ],
+            "title": "Status"
+          },
+          "checks": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HealthCheck"
+            },
+            "type": "object",
+            "title": "Checks"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "title": "HealthReport",
+        "description": "The single health answer: sidecar, store, MCP, and model.\n\n``status`` is ``ok``, ``degraded``, or ``down``; each check names what it\nfound so a person can act on it instead of guessing from a port."
       },
       "HealthStatus": {
         "properties": {
@@ -4516,6 +4738,13 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimOut"
+            },
+            "type": "array",
+            "title": "Claims"
           }
         },
         "type": "object",
@@ -4556,6 +4785,13 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimOut"
+            },
+            "type": "array",
+            "title": "Claims"
           }
         },
         "type": "object",

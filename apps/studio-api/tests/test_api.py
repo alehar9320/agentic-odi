@@ -8,7 +8,13 @@ def test_health():
     client = TestClient(app)
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json()["status"] == "ok"
+    body = r.json()
+    # The sidecar and the store are always healthy in this process; the model
+    # and the MCP server are not necessarily running, so the honest status is
+    # "degraded" rather than a claim that everything works.
+    assert body["checks"]["sidecar"]["ok"] is True
+    assert body["checks"]["store"]["ok"] is True
+    assert body["status"] in {"ok", "degraded"}
 
 
 def test_openapi_contract_describes_the_api_routes():

@@ -54,6 +54,7 @@ from agentic_odi_studio_api.studio.errors import (
     code_for_status,
     request_id_for,
 )
+from agentic_odi_studio_api.studio.health import collect_health
 from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.mcp_data import call_mcp_tool, fetch_canvas, fetch_local_canvas
 from agentic_odi_studio_api.studio.memory import (
@@ -86,6 +87,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
+    HealthReport,
     LatestConversationResponse,
     LlmHealthRequest,
     LlmProxyRequest,
@@ -286,6 +288,28 @@ def get_diagnostics(request: Request) -> dict[str, Any]:
 @router.get("/changelog")
 def get_changelog_route() -> dict:
     return get_changelog()
+
+
+@router.get("/health", response_model=HealthReport)
+async def get_health(
+    request: Request,
+    mcp_url: str | None = Query(None),
+    base_url: str | None = Query(None),
+    model: str | None = Query(None),
+) -> HealthReport:
+    """The one health answer: sidecar, store, MCP, and model in one report.
+
+    ``GET`` because a browser, the Worker, and a monitor all issue one, and the
+    query overrides let Settings check an unsaved configuration. It never writes
+    and always answers inside its budget, even when everything is down.
+    """
+    return await collect_health(
+        _service(request).repo,
+        mcp_url=mcp_url,
+        base_url=base_url,
+        model=model,
+        request_id=request_id_for(request),
+    )
 
 
 @router.post("/health/mcp")

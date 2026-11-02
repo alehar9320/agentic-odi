@@ -203,6 +203,28 @@ Studio says so in one place and keeps going:
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
 
+### One health answer
+
+`GET /api/health` is the single place the Studio answers "what is working right
+now". The legacy `/health` route returns the same report, so a probe and the
+person reading `/status` can never disagree.
+
+The report names four checks — `sidecar`, `store`, `mcp`, and `llm` — and each
+check carries `ok`, a human `detail`, and the `latency_ms` it took. `status` is
+`ok` when the sidecar and the store are healthy and every probe answered, `down`
+when the sidecar or the store is not, and `degraded` otherwise. A machine with
+no MCP server and no model therefore reports `degraded`, not `ok`: the model and
+the MCP server are listed as not working, with the URL that was probed in the
+detail, rather than being silently assumed healthy.
+
+The endpoint never fails a request to report a failure — a probe that throws is
+reported as a check with `ok: false` — and it never writes to the store, so it is
+safe to call on boot and from a monitor. The configuration under test can be
+passed as `mcp_url` and `base_url` query parameters; with none, the sidecar's own
+configuration is probed. The Studio's `/status` command reads the same report,
+so the model, the store, and the MCP server are each described by what was
+found, never by a guess from an open port.
+
 ### When the studio is not running
 
 The first minute of a first visit never depends on a local server being up, so
