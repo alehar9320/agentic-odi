@@ -37,7 +37,7 @@ The Studio opens as a conversation, not a dashboard.
 
 | Surface | What it does |
 |---|---|
-| **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
+| **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step, and no warning about a server nothing you have done needs yet. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
 | **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. |
 | **Context conversation** | Opened when you ask for it — the **Start with you and your team** starter, the context hint, `/start`, or Settings. A five-turn introduction in the chat, led by the agent: who you are and your team, who feels the problem first, what they are trying to win, where it breaks, and what you already have. One question at a time, examples shown as muted text, with **Skip this question** and **Explore on my own** always available. The five answers come back as an editable card, in your words; skipping stores nothing, and progress is kept as a draft. |
 | **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
@@ -164,16 +164,41 @@ becomes the modal it replaced.
 
 ### Without a model
 
-When the LLM is unreachable the Studio keeps working:
+A browser with no model configured is the design working, not a failure. The
+Studio says so in one place and keeps going:
 
-- A **Working by hand** strip explains the state and offers capture, job map,
-  and context.
-- Messages still return deterministic ODI guidance from the sidecar, labelled
-  **Local guidance**.
-- Jobs can be created, renamed, and deleted; steps added, edited, and removed;
-  outcomes recorded, re-scored, and removed. All of it goes through the same
-  local repository the model uses.
+- The bar's model chip reads **Local**, and its accessible name and tooltip say
+  *Answering from your device. No model connected.* That is read straight from
+  your settings — it needs no probe, so it is true on the first paint. A measured
+  answer outranks the guess: when the sidecar vouches for a model the chip reads
+  **Live**, and when it reports the model is not there, **Local mode**.
+  **Connecting** is reserved for an endpoint that is configured and has not
+  answered yet — nobody spins for a connection they are not trying to make.
+- A reply that no model produced carries one line, on that reply: **Local draft,
+  no model connected**. It is a button, and it opens Settings. It never repeats
+  on the replies around it, and nothing about it covers the thread.
+- The work still happens. `apps/studio/src/bff` is the studio's own BFF running
+  in the browser: the conversation, the canvas, and memory are read and written
+  in IndexedDB, and the deterministic assistant answers ODI questions, creates
+  jobs, records and re-scores outcomes, and renders the board with no server at
+  all.
+- A warning strip appears only for something that actually broke: a model or
+  sidecar that this session reached and then lost, or a check you asked for by
+  pressing **Recheck** or running the tour's live step. Opening Settings measures
+  the connections for its own rows and keeps the answer to itself — reading a
+  settings panel is not an outage to announce across the window. Background health
+  polls may retire a warning, never raise one.
 - Settings → Base URL and Model reconnect the assistant whenever you are ready.
+  Each field saves when it is left, and the section says **Saved** once an edit
+  lands; a value the studio cannot use (a URL that is not an address, an empty
+  model name) is refused beside the field with the reason and the last good value
+  stays in effect. There is no Save button and no way for one section's edit to
+  discard another's.
+  A keyless server on your own network (Ollama, LM Studio, anything on loopback
+  or a private address) counts as configured; a public URL without a key does
+  not, and `isEndpointConfigured` in `apps/studio/src/lib/modelEndpoint.ts` is
+  the single place that decides, for the chip, the capability probe, and the
+  chat provider.
 
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
@@ -202,16 +227,28 @@ found, never by a guess from an open port.
 
 ### When the studio is not running
 
-The Living Studio is a local service, and it is the kind of thing that is easy to
-forget to start. When the sidecar is not reachable, the SPA does not pretend
-otherwise.
+The first minute of a first visit never depends on a local server being up, so
+nothing on screen can claim otherwise before the person has asked for something.
 
-- A **subtle strip** across the top of the window says the sidecar isn't running,
-  that the assistant is paused and live data is frozen, and offers **Recheck**
-  and **Start the sidecar** (opens Settings). It is dismissible for the session
-  and clears itself once the sidecar is reached again.
-- Sending a message does not fire off a doomed request: it drops a quiet in-thread
-  notice pointing to Settings, and the composer never spins.
+- The stage paints from local data: the canvas, the thread you left, and the
+  composer. The request for sidecar defaults is a convenience that may fill in
+  settings later; a slow or absent sidecar cannot hold the first screen behind
+  it, and its failure is silent.
+- Health, connector, and capability probes wait until the browser is idle (or
+  two seconds), and are given up entirely if you send a message first. A negative
+  they find keeps the studio **unknown** rather than **down**.
+- Sending a message is not gated on a server. The request goes to the sidecar,
+  and when nothing answers at the transport level the same turn is carried by the
+  browser BFF. You get an answer, labelled for what it is. The same is true of a
+  model address the browser simply cannot reach — a blocked mixed-content call, a
+  laptop off the network its Ollama lives on: the turn is answered on the device
+  rather than failing on the first try. An endpoint that *did* answer badly (a
+  rejected key) is reported, not hidden behind a local draft that looks like the
+  model you asked for.
+- The **sidecar isn't running** strip is for the loss of a sidecar this session
+  was talking to: the assistant paused and live data froze is only said when both
+  are true. It offers **Recheck** and **Start the sidecar**, is dismissible for
+  the session, and clears itself the moment the sidecar answers.
 - The canvas keeps showing the last thing it drew instead of going blank; a failed
   canvas is a failure panel with Retry, not an empty board. **Settings → About →
   Diagnostics** creates an opt-in, in-memory-only local bundle. It previews the
@@ -285,6 +322,65 @@ without giving up the message model the sidecar already understands.
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 
+#### What the runtime gives us, and what we did not take
+
+The full coverage ledger — every assistant-ui capability and its one honest
+state — is authored in [Development](development.md),
+and `scripts/doc_check.py` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
+narrower than the library offers (Partial). A row is Adopted only when a test
+proves a person can use it, the named file exists, and the Delivered column
+cites the issue or PR that landed it.
+
+| Capability | Status | What it means here | Delivered |
+|---|---|---|---|
+| `useExternalStoreRuntime` | Adopted | The bridge: the sidecar's store, presented as a thread. | #238 |
+| `AssistantRuntimeProvider` | Adopted | One provider, whole app. | #238 |
+| `convertMessage` (`toThreadMessageLike`) | Adopted | The only mapping between our messages and runtime messages. | #238 |
+| `isRunning` | Adopted | Driven by `streaming`. | #238 |
+| `setMessages` (branch switch) | Adopted | Branch switch swaps the visible path; the sidecar keeps `head_id`. | #238 |
+| `onNew` | Adopted | Sending a message. | #238 |
+| `onEdit` | Adopted | Editing a user turn keeps the old path as a branch. | #238 |
+| `onReload` (regenerate) | Adopted | Regenerating a reply as a sibling branch. | #238 |
+| `onCancel` | Adopted | The stop button. | #238 |
+| `onRespondToToolApproval` | Adopted | Allow/Decline on a pending write. | #238 |
+| `adapters.attachments` | Adopted | Text capped at 20k chars, images at 5 MB, refusals explained. | #238 |
+| runtime `suggestions` | Adopted | Starter suggestions computed from canvas state. | #238 |
+| `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works; the dedicated adapter is unused, branches are inferred from parent ids. | — |
+| `ThreadPrimitive.Root` | Adopted | The transcript's shell. | #238 |
+| `ThreadPrimitive.Viewport` | Adopted | Scrolling and the latest-message affordance. | #238 |
+| `ThreadPrimitive.Messages` | Adopted | The message map. | #238 |
+| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data is adopted; the pills are hand-rolled because they carry the artifact-preview copy. | — |
+| `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
+| `MessagePrimitive.Attachments` | Adopted | User turns show what was sent. | #238 |
+| `MessagePrimitive.Root` | Partial | The wrapper is a hand-written article carrying `aria-busy` and the avatar. | — |
+| `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
+| `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Custom text/file renderers, because claim chips and extraction state need them. | — |
+| `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
+| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter. | #238 |
+| `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works through the composer's own handlers with the same accept rules. | — |
+| `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | The quote shows above the input and can be cleared before send. | #435 |
+| `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | The microphone, hidden where unsupported. | #433 |
+| `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | Quote and dictation state are read today; queue and in-transit state arrive with the follow-up lane. | — |
+| `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | The reply's own controls. | #238 |
+| `ActionBarPrimitive.ExportMarkdown` | Partial | Whole-conversation export is stronger than the per-reply primitive. | — |
+| `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | Alternative N of M, shown only when a branch exists. | #238 |
+| Attachment adapter (`AttachmentAdapter`) | Adopted | Browser-side extraction; nothing is stored server-side. | #238 |
+| Drop and paste | Adopted | The composer accepts exactly what the input accepts. | #238 |
+| `SelectionToolbarPrimitive.Root` / `.Quote` | Adopted | Selecting prose in a reply offers Quote. | #435 |
+| `data-aui-quote-selectable="false"` | Adopted | Tool traces and generated surfaces are marked non-prose. | #435 |
+| `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | The quote persists in the turn's metadata. | #435 |
+| Structured turn failure | Adopted | The failure panel with retry copy. | #129 |
+| `unstable_useMessageStallDetection` | Adopted | "Still working · no new output for Ns", only when output stops moving. | #431 |
+| `useAuiState` | Adopted | Runtime state read across the transcript and composer. | #238 |
+| `useAui` | Adopted | Imperative composer actions. | #238 |
+| `AuiIf` | Adopted | The conditional idiom in use. | #238 |
+| `unstable_useComposerInputHistory` | Adopted | Up-arrow recalls what you sent last. | #430 |
+| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the latest-message affordance. | #245 |
+| Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
+| Tool result rendering | Adopted | Each MCP call is a trace chip. | #238 |
+| `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
+| ODI surfaces as `data` parts | Adopted | A validated `UiNode` rides the transcript and renders through `UiRenderer`. | #55 |
+
 #### Where the bridge lives
 
 | File | Role |
@@ -297,6 +393,9 @@ without giving up the message model the sidecar already understands.
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
+| `apps/studio/src/components/settings/SavedField.tsx` | A field that saves when it is left, states **Saved** in its section, and refuses an unusable value beside itself with the reason. |
+| `apps/studio/src/components/settings/sections/` | The Model and Studio bridge sections, each a module with its own fields and save line. |
+| `apps/studio/src/components/settings/validation.ts` | What Settings accepts before it writes: a full http(s) URL, and a non-empty model name. |
 
 The sidecar remains the source of truth for what happened. Its additions are
 opt-in and additive: `reasoning`, `source`, and `approval` stream events;
@@ -306,6 +405,11 @@ opt-in and additive: `reasoning`, `source`, and `approval` stream events;
 /api/models`, which lists the configured backend's ids without raising when it
 is offline. A client that sends none of these sees exactly the stream it saw
 before, which is what the CLI and older clients do.
+
+When a chat request enables approvals, the sidecar uses the MCP contract to
+prompt for writes and unknown tools, while reads run without a prompt. The local
+`remember` suggestion and `render_ui` remain ungated. This is not authentication
+and does not gate direct CLI or MCP calls. See [Consent and approvals](architecture/consent.md).
 
 The approval gate is per-process and single-user by design. `ApprovalRegistry`
 waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a

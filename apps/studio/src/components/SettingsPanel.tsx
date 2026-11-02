@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { fetchDiagnostics } from "../api/studioApi";
 import type { SidecarDiagnostics } from "../api/studioApi";
@@ -11,8 +11,11 @@ import { DiagnosticsModal } from "../diagnostics/DiagnosticsModal";
 import { PRODUCT_NAME } from "../lib/brand";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
+import type { ConnectionReport } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
+import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
+import { ModelSection } from "./settings/sections/ModelSection";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
 import { detectPlatform } from "../updater/platform";
 
@@ -159,13 +162,34 @@ export function SettingsPanel() {
     openCustomize,
     sidecarReachable,
     capabilities,
+    surveyConnections,
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
-  const [showApiKey, setShowApiKey] = useState(false);
 
-  function update<K extends keyof StudioConfig>(key: K, value: StudioConfig[K]): void {
-    saveSettings({ ...settings, [key]: value });
-  }
+  // Opening Settings is the person asking what is connected, which is the first moment
+  // a probe is owed to them. The answer is kept here, in the panel that asked: a passive
+  // read of a settings page must not restyle the window, because the hosted studio
+  // cannot reach a sidecar by design and its silence is not an outage to announce.
+  const [survey, setSurvey] = useState<ConnectionReport | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void surveyConnections()
+      .then((report) => {
+        if (!cancelled) {
+          setSurvey(report);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // Once per open: typing a URL must not re-probe per keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const modelHealthy = survey ? survey.llmHealthy : llmHealth.healthy;
+  const sidecarKnown = survey ? survey.sidecarReachable : sidecarReachable;
+  const mcpKnown = survey ? survey.mcpReachable : mcpReachable;
 
   const presetGroups = PRESET_AREAS.map((area) => ({
     area,
@@ -208,226 +232,158 @@ export function SettingsPanel() {
         />
       </div>
 
-      <h3 className="settings__title">Model</h3>
-      <div className="field">
-        <label htmlFor="base-url">Base URL</label>
-        <input
-          id="base-url"
-          className="input"
-          value={settings.base_url}
-          spellCheck={false}
-          onChange={(event) => update("base_url", event.target.value)}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="api-key">API key</label>
-        <div className="field__row">
-          <input
-            id="api-key"
-            className="input"
-            type={showApiKey ? "text" : "password"}
-            autoComplete="off"
-            value={settings.api_key}
-            onChange={(event) => update("api_key", event.target.value)}
-          />
-          <button
-            type="button"
-            className="quiet-action"
-            aria-label={showApiKey ? "Hide API key" : "Show API key"}
-            onClick={() => setShowApiKey((visible) => !visible)}
-          >
-            {showApiKey ? "Hide" : "Show"}
-          </button>
-        </div>
-      </div>
-      <div className="field">
-        <label htmlFor="model-name">
-          Model <span className="field__hint">pick from your endpoint, or type one</span>
-        </label>
-        <input
-          id="model-name"
-          className="input"
-          list={models.length ? "studio-model-options" : undefined}
-          value={settings.model_name}
-          spellCheck={false}
-          onChange={(event) => update("model_name", event.target.value)}
-        />
-        {models.length ? (
-          <datalist id="studio-model-options">
-            {models.map((model) => (
-              <option key={model} value={model} />
-            ))}
-          </datalist>
-        ) : null}
-        <div className="settings__model-state">
-          <button
-            type="button"
-            className="quiet-action"
-            disabled={modelsLoading}
-            onClick={() => void refreshModels()}
-          >
-            {modelsLoading ? "Looking for models…" : "Find models"}
-          </button>
-          {models.length ? (
-            <span className="muted">
-              {models.length} model{models.length === 1 ? "" : "s"} available
-            </span>
-          ) : modelsMessage ? (
-            // The endpoint would not list what it serves; typing still works.
-            <span className="muted">Type the model name — {modelsMessage}</span>
-          ) : null}
-        </div>
-      </div>
+      <ModelSection
+        settings={settings}
+        saveSettings={saveSettings}
+        models={models}
+        modelsLoading={modelsLoading}
+        modelsMessage={modelsMessage}
+        refreshModels={refreshModels}
+      />
 
-      <h3 className="settings__title">Studio bridge</h3>
-      <div className="field">
-        <label htmlFor="mcp-url">MCP server URL</label>
-        <input
-          id="mcp-url"
-          className="input"
-          value={settings.mcp_url}
-          spellCheck={false}
-          onChange={(event) => update("mcp_url", event.target.value)}
-        />
-      </div>
-
-      <ul className="connection-list">
-        <li>
-          <span
-            className={`status-dot${llmHealth.healthy === false ? " is-warn" : ""}${
-              llmHealth.healthy === null ? " is-unknown" : ""
-            }`}
-          />
-          <span>Model</span>
-          <span className="connection-list__value">
-            {llmHealth.healthy === false ? "offline" : "reachable"}
-          </span>
-        </li>
-        <li>
-          <span
-            className={`status-dot${sidecarReachable === false ? " is-warn" : sidecarReachable === null ? " is-unknown" : ""}`}
-          />
-          <span>Sidecar</span>
-          <span className="connection-list__value">
-            {sidecarReachable === false ? "unavailable" : sidecarReachable === null ? "unknown" : "reachable"}
-          </span>
-        </li>
-        <li>
-          <span className={`status-dot${mcpReachable ? "" : " is-unknown"}`} />
-          <span>Local FastMCP server</span>
-          <span className="connection-list__value">{mcpReachable ? "connected" : "offline"}</span>
-        </li>
-      </ul>
-      <p className="muted">
-        Only the model and MCP server above are live. No data source is connected yet — add one
-        from the presets below.
-      </p>
-
-      <h3 className="settings__title">Capabilities</h3>
-      <ul className="connection-list">
-        {capabilities.map((capability) => (
-          <li key={capability.id}>
+      <ConnectionsSection settings={settings} saveSettings={saveSettings}>
+        <ul className="connection-list">
+          <li>
             <span
-              className={`status-dot${
-                capability.status === "available" ? "" : " is-warn"
+              className={`status-dot${modelHealthy === false ? " is-warn" : ""}${
+                modelHealthy === null ? " is-unknown" : ""
               }`}
             />
-            <span>{capability.label}</span>
+            <span>Model</span>
             <span className="connection-list__value">
-              {capability.status === "available" ? "available" : "unavailable"}
-              {capability.reason ? ` — ${capability.reason}` : ""}
+              {modelHealthy === false
+                ? "offline"
+                : modelHealthy === null
+                  ? "not checked"
+                  : "reachable"}
             </span>
           </li>
-        ))}
-      </ul>
-
-      {sidecarReachable === false ? (
+          <li>
+            <span
+              className={`status-dot${sidecarKnown === false ? " is-warn" : sidecarKnown === null ? " is-unknown" : ""}`}
+            />
+            <span>Sidecar</span>
+            <span className="connection-list__value">
+              {sidecarKnown === false ? "unavailable" : sidecarKnown === null ? "unknown" : "reachable"}
+            </span>
+          </li>
+          <li>
+            <span className={`status-dot${mcpKnown ? "" : " is-unknown"}`} />
+            <span>Local FastMCP server</span>
+            <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
+          </li>
+        </ul>
         <p className="muted">
-          Connectors require the local sidecar. Data and conversation still work
-          without it; connect a sidecar to add MCP or REST data sources.
+          Only the model and MCP server above are live. No data source is connected yet — add one
+          from the presets below.
         </p>
-      ) : (
-        <>
-          <h3 className="settings__title">Connectors</h3>
-          <button
-            type="button"
-            className="button settings__manage"
-            onClick={() => openCustomize()}
-          >
-            Manage connectors
-          </button>
-          {connectorsError ? (
-            <FailurePanel
-              error={connectorsError}
-              retryText="reload"
-              onRetry={() => void refreshConnectors()}
-            />
-          ) : connectors.length === 0 ? (
-            <p className="muted">No connectors registered. Pick a preset to add one.</p>
-          ) : (
-            <ul className="connection-list">
-              {connectors.map((connector) => (
-                <li key={connector.name}>
-                  <span className="connection-list__value">
-                    {connector.name} · {connector.kind}
-                    {connector.enabled ? "" : " (disabled)"}
-                  </span>
-                  <button
-                    type="button"
-                    className="button button--ghost"
-                    aria-label={`Remove ${connector.name}`}
-                    onClick={() => void deleteConnector(connector.name)}
+
+        <h3 className="settings__title">Capabilities</h3>
+        <ul className="connection-list">
+          {capabilities.map((capability) => (
+            <li key={capability.id}>
+              <span
+                className={`status-dot${
+                  capability.status === "available" ? "" : " is-warn"
+                }`}
+              />
+              <span>{capability.label}</span>
+              <span className="connection-list__value">
+                {capability.status === "available" ? "available" : "unavailable"}
+                {capability.reason ? ` — ${capability.reason}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        {sidecarKnown === false ? (
+          <p className="muted">
+            Connectors require the local sidecar. Data and conversation still work
+            without it; connect a sidecar to add MCP or REST data sources.
+          </p>
+        ) : (
+          <>
+            <h3 className="settings__title">Connectors</h3>
+            <button
+              type="button"
+              className="button settings__manage"
+              onClick={() => openCustomize()}
+            >
+              Manage connectors
+            </button>
+            {connectorsError ? (
+              <FailurePanel
+                error={connectorsError}
+                retryText="reload"
+                onRetry={() => void refreshConnectors()}
+              />
+            ) : connectors.length === 0 ? (
+              <p className="muted">No connectors registered. Pick a preset to add one.</p>
+            ) : (
+              <ul className="connection-list">
+                {connectors.map((connector) => (
+                  <li key={connector.name}>
+                    <span className="connection-list__value">
+                      {connector.name} · {connector.kind}
+                      {connector.enabled ? "" : " (disabled)"}
+                    </span>
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      aria-label={`Remove ${connector.name}`}
+                      onClick={() => void deleteConnector(connector.name)}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <h4 className="settings__title">Add a data source</h4>
+            {presetError ? (
+              <FailurePanel
+                error={presetError}
+                retryText="reload"
+                onRetry={() => void refreshPresets()}
+              />
+            ) : presetGroups.length === 0 ? (
+              <p className="muted">No presets available.</p>
+            ) : (
+              <div className="settings__presets">
+                {presetGroups.map((group) => (
+                  <section
+                    key={group.area}
+                    className="settings__preset-group"
+                    aria-label={group.label}
                   >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <h5 className="settings__preset-title">{group.label}</h5>
+                    <ul className="connection-list">
+                      {group.presets.map((preset) => (
+                        <li key={preset.id}>
+                          <span className="connection-list__value">
+                            {preset.label}{" "}
+                            <code className="settings__preset-id">{preset.id}</code>
+                            {" · "}
+                            {preset.auth === "oauth" ? "OAuth" : "No auth"}
+                          </span>
+                          <button
+                            type="button"
+                            className="button button--ghost"
+                            aria-label={`Connect ${preset.label}`}
+                            onClick={() => void addConnector({ preset: preset.id })}
+                          >
+                            Connect
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            )}
+            </>
           )}
-          <h4 className="settings__title">Add a data source</h4>
-          {presetError ? (
-            <FailurePanel
-              error={presetError}
-              retryText="reload"
-              onRetry={() => void refreshPresets()}
-            />
-          ) : presetGroups.length === 0 ? (
-            <p className="muted">No presets available.</p>
-          ) : (
-            <div className="settings__presets">
-              {presetGroups.map((group) => (
-                <section
-                  key={group.area}
-                  className="settings__preset-group"
-                  aria-label={group.label}
-                >
-                  <h5 className="settings__preset-title">{group.label}</h5>
-                  <ul className="connection-list">
-                    {group.presets.map((preset) => (
-                      <li key={preset.id}>
-                        <span className="connection-list__value">
-                          {preset.label}{" "}
-                          <code className="settings__preset-id">{preset.id}</code>
-                          {" · "}
-                          {preset.auth === "oauth" ? "OAuth" : "No auth"}
-                        </span>
-                        <button
-                          type="button"
-                          className="button button--ghost"
-                          aria-label={`Connect ${preset.label}`}
-                          onClick={() => void addConnector({ preset: preset.id })}
-                        >
-                          Connect
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          )}
-          </>
-      )}
+      </ConnectionsSection>
 
       <div className="settings__actions">
         <button

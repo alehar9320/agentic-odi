@@ -195,6 +195,7 @@ Update the relevant file whenever any of the following change:
 - When expanding the server to accept complex payloads or to query data, utilize these Pydantic models for built-in type validation and schema enforcement before the server processes the request.
 
 ### 4. General Philosophy
+- **Reuse before you write**: take the ladder in `docs/architecture/reuse.md` in cost order — something already in this repo, then a dependency the workspace already declares, then a copy with a ledger entry, then new. A near-duplicate is a refactor-to-share, not a second copy. Any plan or pull request that adds a source file states a `Reuses:` block; `.agents/skills/reuse-first/SKILL.md` is the short form.
 - **Separation of Concerns**: Isolate the ODI data logic/retrieval from the MCP server tooling logic.
 - **Agentic Purpose**: Remember that the tools being built are meant to be consumed by autonomous agents. Design tool interfaces that are intuitive for an LLM to call and interpret.
 - **External connectors**: Integrations live in the `packages/connectors` workspace package. New kinds implement `agentic_odi_connectors.protocol.Connector` and register via `register_kind`. Do not write ingested records into `jobs_db` / outcomes unless a later mapping task says so.
@@ -207,6 +208,12 @@ our own store; it is not a hand-rolled message list. Do not replace it, wrap it 
 a second one, or re-implement streaming, the composer, attachments, branches, or
 approval prompts beside it.
 
+- **Markdown is a dependency, not a file.** `@assistant-ui/react-markdown` is
+  declared in `apps/studio/package.json` and imported nowhere, while
+  `apps/studio/src/lib/markdown.ts` hand-parses a subset for the transcript. That
+  is the shape the reuse ladder forbids: a paid-for dependency plus a second
+  implementation beside it. New rendering work goes through the library;
+  collapsing the existing parser is its own task, not a reason to add a third.
 - **One bridge.** `apps/studio/src/assistant/convert.ts` is the only mapping
   between `ChatMessage`/`ChatPart` and assistant-ui parts. It is pure and tested
   without a runtime. A new part type is added there, rendered in `parts.tsx`, and

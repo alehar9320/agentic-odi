@@ -186,6 +186,7 @@ Start here, then take the one that answers your question.
 | [Trust boundaries](trust-boundaries.md) | What each process may reach, where credentials live, and what crosses the wire. |
 | [The generative UI protocol](ui-protocol.md) | The closed catalog, validation on both ends, limits, and the action model. |
 | [Studio banners](banners.md) | The Studio's unified notice system. |
+| [Reuse first](reuse.md) | The ladder an agent walks before writing new code, its bounds, and the ledger a copy-in must appear in. |
 | [Vendor alley](vendor.md) | What may be copied into `src/vendor`, and how the boundary is enforced. |
 | [Testing](testing.md) | Test layout, commands, and what each suite is responsible for. |
 | [Agent assignment](../agents.md) | Which agents can take an issue, how a claim is recorded, and what expires. |
