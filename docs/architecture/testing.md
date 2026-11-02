@@ -122,7 +122,9 @@ Cross-package checks only:
 ### `brand/tests/` and `website/tests/`
 
 - `brand/tests/test_brand_assets.py`, `test_generated_sources.py` — mascot art and generated brand sources.
-- `website/tests/` — static site integrity (`test_site.py`), docs rendering (`test_docs_render.py`), content sync with the repo (`test_content_sync.py`, `test_generated.py`), OG art reproducibility (`test_make_og.py`), the design system (`test_design_system.py`), and the Pages deploy (`test_pages_deploy.py`).
+- `website/tests/` — static site integrity (`test_site.py`), docs rendering (`test_docs_render.py`), content sync with the repo (`test_content_sync.py`, `test_generated.py`), OG art reproducibility (`test_make_og.py`), the design system (`test_design_system.py`), the Pages deploy (`test_pages_deploy.py`), and the CI wiring that runs this suite (`test_ci_required.py`).
+
+`test_ci_required.py` is the contract that keeps the site from shipping on faith. It asserts the `website` job in `ci.yml` runs `uv run --directory website pytest tests/`, carries no `continue-on-error`, and is both a `needs:` entry and an enforced result in the `CI green` aggregate — the status check the `main-requires-ci-green` ruleset requires. It also asserts the Pages `deploy` job waits on the tested `build`. The wiring has regressed before: the site's checks once lived in a `feature/gh-pages`-only workflow that never ran for a pull request into `main` (402f0a5).
 
 ## Isolation Rules
 
