@@ -13,7 +13,7 @@ import {
   type WorkspaceSnapshot,
 } from "./types";
 
-const DB_NAME = "agentic-odi-studio";
+export const DB_NAME = "agentic-odi-studio";
 const DB_VERSION = 1;
 
 interface StudioDb extends DBSchema {
@@ -202,6 +202,10 @@ export class IndexedDbLocalStore implements LocalStore {
 
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.db.getAllFromIndex("turns", "by-conversation", conversationId);
+  }
+
+  async countTurns(conversationId: string): Promise<number> {
+    return this.db.countFromIndex("turns", "by-conversation", conversationId);
   }
 
   async appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn> {

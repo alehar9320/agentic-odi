@@ -17,12 +17,34 @@ There are exactly six kinds, each tied to one emitter:
 |---|---|---|
 | `job_added` | `add_job` | info |
 | `outcome_scored` | an outcome's importance or satisfaction changed | info |
-| `opportunity_crossed` | an opportunity score crosses 10, up or down | urgent up, notice down |
+| `opportunity_crossed` | an opportunity score enters or leaves the `underserved` bucket | urgent on entry, notice on exit |
 | `evidence_ingested` | `add_evidence` | info |
 | `evidence_promoted` | `promote_evidence` turns evidence into an outcome | notice |
 | `job_map_completed` | a job map covers all eight stages | notice |
 
 Deletions emit nothing: removing a record is not news worth interrupting for.
+
+## Where 10 is the line
+
+`classify_opportunity` in `packages/core/src/agentic_odi_core/evaluation.py` is
+the one definition: **underserved is strictly above 10**, exactly 10 is
+appropriately served, and below 10 is overserved. `opportunity_crossed` reads
+that same bucket, so it fires on a change of bucket and nowhere else.
+
+| Move | Bucket change | Signal |
+|---|---|---|
+| 9 → 10 | overserved → appropriate | `outcome_scored` only |
+| 10 → 11 | appropriate → underserved | `outcome_scored` + urgent crossing |
+| 11 → 10 | underserved → appropriate | `outcome_scored` + notice crossing |
+| 10 → 9 | appropriate → overserved | `outcome_scored` only |
+
+Reaching exactly 10 is a real change and stays news as `outcome_scored`; it is
+not a crossing, because nothing became underserved. An unscored outcome that
+gets its first score above 10 does cross — the bucket changed — and one whose
+scores are removed leaves it.
+
+The title carries the direction and both scores (`Opportunity score 10.0 -> 11.0
+(up): …`) rather than naming the threshold it may never have touched.
 
 ## Why events, not a notifications table
 
