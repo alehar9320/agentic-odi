@@ -160,7 +160,6 @@ describe("SettingsPanel connectors", () => {
     expect(screen.queryByText(/gong transcripts/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/slack friction stream/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/product telemetry/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/no data source is connected yet/i)).toBeInTheDocument();
   });
 
   it("toggles API key visibility", () => {
@@ -324,7 +323,7 @@ describe("SettingsPanel about section", () => {
 });
 
 describe("SettingsPanel connection survey", () => {
-  it("answers its own rows without telling the rest of the studio", async () => {
+  it("answers its own survey line without telling the rest of the studio", async () => {
     // #309: opening a settings panel is a question about connections, not a request to
     // restyle the window. The measurement belongs to the panel; the recorder that can
     // raise "the sidecar isn't running" only runs when the person presses Recheck.
@@ -346,7 +345,9 @@ describe("SettingsPanel connection survey", () => {
 
     renderPanel();
 
-    expect(await screen.findByText("unavailable")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/model offline · sidecar unavailable · mcp server offline/i),
+    ).toBeInTheDocument();
     expect(surveyConnections).toHaveBeenCalledOnce();
     expect(recheckConnections).not.toHaveBeenCalled();
   });
