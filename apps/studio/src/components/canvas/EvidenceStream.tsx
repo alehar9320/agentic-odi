@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 
 import { asStudioError } from "../../api/studioApi";
 import { focusLastClaimChip } from "../../assistant/claims";
+import { savedCopyCaption } from "../../lib/canvasProvenance";
 import { formatOpportunityScore, opportunityPill } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Evidence, StudioError } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { GhostOpportunityCards } from "../Skeletons";
 import { SignalIcon } from "../icons";
 
 const ORDER_KEY = "agentic-odi.evidence-order";
@@ -28,7 +30,15 @@ function writeStoredOrder(ids: string[]) {
 }
 
 export function EvidenceStream() {
-  const { canvasState, closePanel, focusedEvidenceId, openPanel, promoteEvidence } = useStudio();
+  const {
+    canvasCached,
+    canvasState,
+    closePanel,
+    focusedEvidenceId,
+    openPanel,
+    promoteEvidence,
+    refreshCanvas,
+  } = useStudio();
   const evidence = useMemo(() => canvasState.data?.evidence ?? [], [canvasState.data]);
   const jobs = useMemo(() => canvasState.data?.jobs ?? [], [canvasState.data]);
   const [storedOrder, setStoredOrder] = useState<string[]>(readStoredOrder);
@@ -55,6 +65,11 @@ export function EvidenceStream() {
     () => new Map(jobs.map((job) => [job.id, job.name || job.id])),
     [jobs],
   );
+
+  // Rows reached this far, so they are on the screen: during a reload or after a
+  // failed one they are the previous copy, and the caption says so rather than
+  // letting them read as freshly confirmed.
+  const savedCaption = canvasCached ? savedCopyCaption(canvasState.data) : null;
 
   const outcomes = useMemo(() => canvasState.data?.outcomes ?? [], [canvasState.data]);
   const outcomeMap = useMemo(
@@ -157,6 +172,30 @@ export function EvidenceStream() {
   };
 
   if (ordered.length === 0) {
+    // A canvas that failed to answer is not a workspace with nothing in it, and
+    // one still in flight has not answered yet. Both must say so instead of
+    // claiming no evidence exists.
+    if (canvasState.kind === "error") {
+      return (
+        <section className="stack" aria-label="Customer evidence">
+          <FailurePanel
+            error={canvasState.error}
+            onRetry={() => void refreshCanvas()}
+            retryText="reload"
+          />
+        </section>
+      );
+    }
+    if (canvasState.kind === "loading") {
+      return (
+        <section className="stack" aria-label="Customer evidence">
+          <p className="caption" role="status">
+            Loading evidence…
+          </p>
+          <GhostOpportunityCards />
+        </section>
+      );
+    }
     return (
       <section className="stack" aria-label="Customer evidence">
         <div className="evidence-empty">
@@ -183,6 +222,19 @@ export function EvidenceStream() {
   return (
     <section className="stack" aria-label="Customer evidence">
       <p className="notice">Drag a record to reorder it, or focus one and press ↑ / ↓.</p>
+
+      {canvasState.kind === "error" ? (
+        <FailurePanel
+          error={canvasState.error}
+          onRetry={() => void refreshCanvas()}
+          retryText="reload"
+        />
+      ) : null}
+      {savedCaption ? (
+        <p className="canvas-saved" role="status">
+          {savedCaption}
+        </p>
+      ) : null}
 
       <ol className="stack" style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {ordered.map((item, index) => {

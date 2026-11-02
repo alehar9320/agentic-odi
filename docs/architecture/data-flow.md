@@ -249,7 +249,15 @@ MCP tool result (text)
   "Saved …" from the cache's `generated_at` instead of covering it with a
   skeleton. The skeleton is kept only for a genuinely empty store, and the
   caption claims no freshness the timestamp does not support. `canvasCached`
-  tells a board whether the data on screen came from the cache.
+  tells a board whether the data on screen came from the cache. `EvidenceStream`
+  follows both halves of that rule: it puts the same caption over rows that
+  survived a reload, and it reserves "No evidence captured yet" for a canvas
+  that really answered with nothing — while loading it shows a status line and a
+  card ghost, and on failure the `FailurePanel` with Retry wired to
+  `refreshCanvas`, over the retained rows when there are some and in their place
+  when there are none. Evidence empties independently of the workspace, so the
+  lens reads `canvasState.kind` itself rather than trusting the canvas-wide
+  `empty`, which can announce "nothing here" about a canvas full of jobs.
 - **The turn log is safe.** One JSON line per turn carries the request id, the
   model, the round and tool counts, the error count, the duration, and the
   outcome. Sensitive keys are dropped rather than redacted, so no token, key,
