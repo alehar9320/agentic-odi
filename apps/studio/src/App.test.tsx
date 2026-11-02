@@ -62,6 +62,7 @@ vi.mock("./api/studioApi", () => ({
     retryable: false,
   }),
   fetchLatestConversation: vi.fn(async () => ({ conversation: null, turns: [] })),
+  listConversations: vi.fn(async () => []),
   createConversation: vi.fn(async () => ({
     id: "c-new",
     title: "",

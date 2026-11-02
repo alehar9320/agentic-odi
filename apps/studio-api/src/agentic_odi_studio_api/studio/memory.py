@@ -46,6 +46,10 @@ MAX_CONTEXT_TEXT = 500
 MAX_CONTEXT_CHARS = 4_000
 MAX_SUGGESTED_IN_CONTEXT = 10
 
+#: How many threads the history list carries. The switcher's full UI (#408)
+#: owns paging; this slice shows the recent ones and stops.
+MAX_CONVERSATIONS = 20
+
 
 class MemoryError(ValueError):
     """Base class for recoverable memory errors."""
@@ -362,8 +366,13 @@ class StudioMemory:
             ).fetchone()
         return None if row is None else self._conversation_from_row(row)
 
-    def list_conversations(self) -> list[ConversationSummary]:
-        """Every conversation, most recently touched first, with its turn count."""
+    def list_conversations(self, limit: int = MAX_CONVERSATIONS) -> list[ConversationSummary]:
+        """The recent conversations, most recently touched first, with turn counts.
+
+        The title is whatever the first question set; a thread nobody has spoken
+        in yet carries an empty one. No turn bodies are read: the list is metadata
+        and a count, so a history strip never pays for the prose behind it.
+        """
         with self._lock:
             rows = self._connection.execute(
                 """
@@ -374,7 +383,9 @@ class StudioMemory:
                          WHERE turns.conversation_id = conversations.id) AS turn_count
                   FROM conversations
                  ORDER BY conversations.updated_at DESC, conversations.created_at DESC
-                """
+                 LIMIT ?
+                """,
+                (limit,),
             ).fetchall()
         return [
             ConversationSummary(
@@ -772,6 +783,7 @@ class StudioMemory:
 
 __all__ = [
     "MAX_CONTEXT_CHARS",
+    "MAX_CONVERSATIONS",
     "MAX_SUGGESTED_IN_CONTEXT",
     "OBSERVATION_KINDS",
     "OBSERVATION_STATUSES",
