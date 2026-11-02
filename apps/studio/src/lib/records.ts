@@ -46,7 +46,7 @@ export const RECORD_SECTIONS: RecordSection[] = [
 ];
 
 /** A missing field says so; it never renders as `undefined`. */
-function text(value: string | number | null | undefined): string {
+export function text(value: string | number | null | undefined): string {
   if (value === null || value === undefined) {
     return "—";
   }
@@ -55,7 +55,7 @@ function text(value: string | number | null | undefined): string {
 }
 
 /** A score is the number the sidecar returned, or the word for having none. */
-function score(value: number | null | undefined): string {
+export function score(value: number | null | undefined): string {
   return value === null || value === undefined ? "unscored" : String(value);
 }
 

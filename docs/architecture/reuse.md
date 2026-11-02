@@ -37,6 +37,7 @@ missing.
 | --- | --- | --- |
 | Markdown rendering | `@assistant-ui/react-markdown` (declared, imported nowhere) | `apps/studio/src/lib/markdown.ts` |
 | Dialog, focus trap, dismissal | `radix-ui` (declared; used only under `src/vendor`) | `apps/studio/src/lib/useFocusTrap.ts`, four hand-built `role="dialog"` surfaces |
+| Opportunity score wording | `apps/studio/src/lib/odi.ts` (`formatOpportunityScore`, `isUnderserved`, `UNDERSERVED_THRESHOLD`) | `apps/studio/src/lib/records.ts` prints the stored number as-is, on purpose — that table reports what the store returned |
 | Number clamping | `apps/studio/src/ui/primitives.tsx` | `apps/studio/src/ui/cards.tsx`, `apps/studio/src/components/canvas/OpportunityLandscape.tsx` |
 | Id minting | `apps/studio/src/bff/id.ts` | inline id construction in `apps/studio/src/state/StudioContext.tsx` |
 | HTTP with retries | `packages/connectors/src/agentic_odi_connectors/http.py` | `urllib.request.urlopen` in `rest/connector.py` and `marketplace.py` |
