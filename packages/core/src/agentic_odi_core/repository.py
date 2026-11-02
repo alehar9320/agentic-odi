@@ -18,6 +18,7 @@ from agentic_odi_core.models import (
     Signal,
     Step,
     Strategy,
+    Theme,
 )
 
 _Item = TypeVar("_Item")
@@ -122,6 +123,7 @@ class Repository(Protocol):
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    themes: dict[str, Theme]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -196,6 +198,14 @@ class Repository(Protocol):
     def get_segment(self, segment_id: str) -> Segment | None: ...
     def list_segments(self, job_id: str | None = None) -> list[Segment]: ...
     def update_segment(self, segment_id: str, updates: dict) -> Segment | None: ...
+    def add_theme(self, theme: Theme) -> Theme: ...
+    def get_theme(self, theme_id: str) -> Theme | None: ...
+    def list_themes(self, job_id: str | None = None) -> list[Theme]: ...
+    def update_theme(self, theme_id: str, updates: dict) -> Theme | None: ...
+    def delete_theme(self, theme_id: str) -> bool: ...
+    def change_theme_membership(
+        self, outcome_id: str, added: list[str], removed: list[str]
+    ) -> Outcome | None: ...
     def add_strategy(self, strategy: Strategy) -> Strategy: ...
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
@@ -224,6 +234,7 @@ class InMemoryRepository:
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.themes: dict[str, Theme] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -572,6 +583,57 @@ class InMemoryRepository:
         new_segment = segment.model_validate(current)
         self.segments[segment_id] = new_segment
         return new_segment
+
+    def add_theme(self, theme: Theme) -> Theme:
+        self.themes[theme.id] = theme
+        return theme
+
+    def get_theme(self, theme_id: str) -> Theme | None:
+        return self.themes.get(theme_id)
+
+    def list_themes(self, job_id: str | None = None) -> list[Theme]:
+        items = list(self.themes.values())
+        if job_id is not None:
+            items = [theme for theme in items if theme.job_id in (job_id, None)]
+        return items
+
+    def update_theme(self, theme_id: str, updates: dict) -> Theme | None:
+        theme = self.themes.get(theme_id)
+        if theme is None:
+            return None
+        current = theme.model_dump(exclude_unset=True)
+        current.update(updates)
+        #: exclude_unset drops a default-factory id, so revalidation would mint a
+        #: new uuid and orphan the themes/outcomes that reference this one.
+        current["id"] = theme_id
+        new_theme = theme.model_validate(current)
+        self.themes[theme_id] = new_theme
+        return new_theme
+
+    def delete_theme(self, theme_id: str) -> bool:
+        theme = self.themes.pop(theme_id, None)
+        if theme is None:
+            return False
+        for child in self.themes.values():
+            if child.parent_id == theme_id:
+                self.update_theme(child.id, {"parent_id": theme.parent_id})
+        for outcome in self.outcomes.values():
+            if theme_id in outcome.theme_ids:
+                remaining = [t for t in outcome.theme_ids if t != theme_id]
+                self.update_outcome(outcome.id, {"theme_ids": remaining})
+        return True
+
+    def change_theme_membership(
+        self, outcome_id: str, added: list[str], removed: list[str]
+    ) -> Outcome | None:
+        outcome = self.outcomes.get(outcome_id)
+        if outcome is None:
+            return None
+        current = [t for t in outcome.theme_ids if t not in removed]
+        for theme_id in added:
+            if theme_id not in current:
+                current.append(theme_id)
+        return self.update_outcome(outcome_id, {"theme_ids": current})
 
     def add_strategy(self, strategy: Strategy) -> Strategy:
         self.strategies[strategy.id] = strategy

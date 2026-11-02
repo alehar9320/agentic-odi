@@ -20,6 +20,7 @@ export interface Outcome {
   importance?: number | null;
   satisfaction?: number | null;
   opportunity_score?: number | null;
+  theme_ids?: string[];
   evidence?: string;
   telemetry?: string;
 }
@@ -70,6 +71,15 @@ export interface Segment {
   rationale: string;
   confidence: number;
   created_at: string;
+}
+
+export interface Theme {
+  id: string;
+  job_id?: string | null;
+  parent_id?: string | null;
+  name: string;
+  description?: string | null;
+  ordinal: number;
 }
 
 export type StrategyKind = "differentiated" | "disruptive" | "new_market";

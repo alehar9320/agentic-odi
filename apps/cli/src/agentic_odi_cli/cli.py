@@ -30,6 +30,7 @@ from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.strategy import strategy_app
+from agentic_odi_cli.themes import themes_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -60,6 +61,11 @@ app.add_typer(
     strategy_app,
     name="strategy",
     help="Stage 6: the innovation path the segments support, with the paths it beat.",
+)
+app.add_typer(
+    themes_app,
+    name="themes",
+    help="Group desired outcomes into a named theme tree (M2-01).",
 )
 app.add_typer(
     customer_outcomes_app,

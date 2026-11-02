@@ -699,6 +699,47 @@ class LocalBackend(Backend):
         segments = self.service.list_segments(job_id=args.get("job_id"))
         return [segment.model_dump(mode="json") for segment in segments]
 
+    def _add_theme(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, job_not_found
+
+        job_id = args.get("job_id")
+        try:
+            theme = self.service.add_theme(
+                name=args["name"],
+                job_id=job_id,
+                parent_id=args.get("parent_id"),
+                description=args.get("description"),
+                ordinal=args.get("ordinal", 0),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(job_id or "")) from None
+        return theme.model_dump(mode="json")
+
+    def _rename_theme(self, args: dict[str, Any]) -> dict[str, Any]:
+        theme = self.service.rename_theme(
+            args["theme_id"],
+            name=args.get("name"),
+            description=args.get("description"),
+            ordinal=args.get("ordinal"),
+            parent_id=args.get("parent_id"),
+        )
+        return theme.model_dump(mode="json")
+
+    def _delete_theme(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.delete_theme(args["theme_id"])
+
+    def _list_themes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        themes = self.service.list_themes(job_id=args.get("job_id"))
+        return [theme.model_dump(mode="json") for theme in themes]
+
+    def _assign_theme(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        outcomes = self.service.assign_theme(args["outcome_ids"], args["theme_id"])
+        return [outcome.model_dump(mode="json") for outcome in outcomes]
+
+    def _unassign_theme(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        outcomes = self.service.unassign_theme(args["outcome_ids"], args["theme_id"])
+        return [outcome.model_dump(mode="json") for outcome in outcomes]
+
     def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
         strategy = self.service.get_strategy()
         return None if strategy is None else strategy.model_dump(mode="json")
@@ -762,6 +803,12 @@ _LOCAL_HANDLERS = {
     "get_segments": LocalBackend._get_segments,
     "get_strategy": LocalBackend._get_strategy,
     "propose_strategy": LocalBackend._propose_strategy,
+    "add_theme": LocalBackend._add_theme,
+    "rename_theme": LocalBackend._rename_theme,
+    "delete_theme": LocalBackend._delete_theme,
+    "list_themes": LocalBackend._list_themes,
+    "assign_theme": LocalBackend._assign_theme,
+    "unassign_theme": LocalBackend._unassign_theme,
     "get_health": LocalBackend._get_health,
 }
 
