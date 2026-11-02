@@ -146,6 +146,7 @@ class OutcomeAlignment(BaseModel):
     key: str = Field(..., description="Frozen content key for the objective text")
     text: str = Field(..., description="The objective text as it read when the link was made")
 
+
 class ClaimSkip(BaseModel):
     """One question that went unanswered, and why it was skipped.
 

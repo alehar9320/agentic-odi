@@ -38,6 +38,11 @@ async def _seed(client: Client, *, with_vision: bool = True) -> str:
                 "statement": "Minimize the time it takes to onboard a new engineer when they join",
                 "importance": 8,
                 "satisfaction": 4,
+                "claim_check": {
+                    "asked": ["How long does onboarding take today?"],
+                    "answers": ["About eight weeks to first real task."],
+                    "skips": [],
+                },
             },
         )
     )
