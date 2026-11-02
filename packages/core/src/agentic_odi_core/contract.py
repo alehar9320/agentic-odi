@@ -61,6 +61,10 @@ class ToolName(str, Enum):
     LIST_PROPOSALS = "list_proposals"
     APPROVE_PROPOSAL = "approve_proposal"
     REJECT_PROPOSAL = "reject_proposal"
+    LINK_OUTCOME = "link_outcome"
+    UNLINK_OUTCOME = "unlink_outcome"
+    GET_OUTCOME_ALIGNMENTS = "get_outcome_alignments"
+    GET_TRACEABILITY_REPORT = "get_traceability_report"
 
 
 class ToolEffect(str, Enum):
@@ -537,6 +541,40 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("proposal_id",),
         returns="The rejected OutcomeProposal.",
         stage="2",
+    ),
+    ToolName.LINK_OUTCOME.value: ToolSpec(
+        name="link_outcome",
+        summary="Link an Outcome to the V2MOM method or measure it advances.",
+        effect=_derive_effect("link_outcome"),
+        arguments=("outcome_id", "field", "text"),
+        required=("outcome_id", "field", "text"),
+        returns="The updated Outcome, or a refusal naming the objectives that do exist.",
+        stage="6",
+    ),
+    ToolName.UNLINK_OUTCOME.value: ToolSpec(
+        name="unlink_outcome",
+        summary="Remove one V2MOM link from an Outcome.",
+        effect=_derive_effect("unlink_outcome"),
+        arguments=("outcome_id", "field", "key"),
+        required=("outcome_id", "field", "key"),
+        returns="The updated Outcome.",
+        stage="6",
+    ),
+    ToolName.GET_OUTCOME_ALIGNMENTS.value: ToolSpec(
+        name="get_outcome_alignments",
+        summary="List the V2MOM links recorded on Outcomes.",
+        effect=_derive_effect("get_outcome_alignments"),
+        arguments=("outcome_id",),
+        returns="A list of links, each naming the outcome, field, key, and text.",
+        stage="6",
+    ),
+    ToolName.GET_TRACEABILITY_REPORT.value: ToolSpec(
+        name="get_traceability_report",
+        summary="Report orphans, unfunded objectives, and links the vision dropped.",
+        effect=_derive_effect("get_traceability_report"),
+        arguments=(),
+        returns="The orphans, unfunded, and drift lists, or a note that no objectives exist.",
+        stage="6",
     ),
 }
 

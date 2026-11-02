@@ -38,6 +38,8 @@ READ_ONLY_TOOLS: frozenset[str] = frozenset(
         ToolName.COMPUTE_OPPORTUNITY.value,
         ToolName.GET_FRAMEWORK_GUIDELINES.value,
         ToolName.GET_CAPABILITIES.value,
+        ToolName.GET_OUTCOME_ALIGNMENTS.value,
+        ToolName.GET_TRACEABILITY_REPORT.value,
     }
 )
 

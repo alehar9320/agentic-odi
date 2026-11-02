@@ -67,6 +67,7 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
+    OutcomeAlignment,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -122,6 +123,15 @@ from agentic_odi_core.steve_jobs import (
     generate_steve_jobs_response,
 )
 from agentic_odi_core.strategy import propose_strategy
+from agentic_odi_core.traceability import (
+    Objective,
+    TraceabilityReport,
+    TraceLink,
+    compute_traceability_report,
+    normalize_objective,
+    objective_key,
+    objectives_from_v2mom,
+)
 
 __all__ = [
     "ScheduledWork",
@@ -171,9 +181,11 @@ __all__ = [
     "OdiError",
     "OnDeviceLLMEngine",
     "Outcome",
+    "OutcomeAlignment",
     "OutcomeNotFoundError",
     "OutcomeProposal",
     "OutcomeStatementError",
+    "Objective",
     "ProposalStatus",
     "ProposalStrategy",
     "HeuristicProposalStrategy",
@@ -190,6 +202,8 @@ __all__ = [
     "SignalNotFoundError",
     "StudioError",
     "StudioErrorCode",
+    "TraceLink",
+    "TraceabilityReport",
     "ValueMetric",
     "ValueOutOfRangeError",
     "InMemoryRepository",
@@ -202,6 +216,10 @@ __all__ = [
     "V2MOM",
     "capability_manifest",
     "capability_summary",
+    "compute_traceability_report",
+    "normalize_objective",
+    "objective_key",
+    "objectives_from_v2mom",
     "Repository",
     "build_repository",
     "compute_opportunity_score",

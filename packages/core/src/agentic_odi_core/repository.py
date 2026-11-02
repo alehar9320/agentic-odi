@@ -9,6 +9,7 @@ from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    V2MOM,
     CustomerOutcome,
     Evidence,
     Job,
@@ -21,6 +22,10 @@ from agentic_odi_core.models import (
 )
 
 _Item = TypeVar("_Item")
+
+#: A workspace has exactly one V2MOM, and the model carries no id, so the store
+#: keys it by this constant rather than a generated one.
+V2MOM_ID = "v2mom"
 
 
 def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
@@ -122,6 +127,7 @@ class Repository(Protocol):
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    v2mom: dict[str, V2MOM]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -204,6 +210,8 @@ class Repository(Protocol):
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
     def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
     def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None: ...
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM: ...
+    def get_v2mom(self) -> V2MOM | None: ...
 
     def clear(self) -> None: ...
     def reload(self) -> None: ...
@@ -224,6 +232,9 @@ class InMemoryRepository:
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        #: The store holds one vision; it is keyed by a fixed name rather than a
+        #: generated id because a workspace has exactly one V2MOM.
+        self.v2mom: dict[str, V2MOM] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -596,6 +607,13 @@ class InMemoryRepository:
         self.strategies[strategy_id] = new_strategy
         return new_strategy
 
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        self.v2mom[V2MOM_ID] = v2mom
+        return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        return next(iter(self.v2mom.values()), None)
+
     def clear(self) -> None:
         self.jobs.clear()
         self.scheduled_work.clear()
@@ -606,6 +624,7 @@ class InMemoryRepository:
         self.signals.clear()
         self.segments.clear()
         self.strategies.clear()
+        self.v2mom.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

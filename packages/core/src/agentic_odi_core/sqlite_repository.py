@@ -14,6 +14,7 @@ from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    V2MOM,
     CustomerOutcome,
     Evidence,
     Job,
@@ -26,6 +27,7 @@ from agentic_odi_core.models import (
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import (
+    V2MOM_ID,
     Repository,
     compute_evidence_fingerprint,
     page,
@@ -67,6 +69,7 @@ class SQLiteRepository(Repository):
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.v2mom: dict[str, V2MOM] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -219,6 +222,8 @@ class SQLiteRepository(Repository):
             self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
         elif et == "PROPOSAL_UPDATED":
             self._merge_updates(self.proposals, p, OutcomeProposal)
+        elif et == "V2MOM_UPDATED":
+            self.v2mom[V2MOM_ID] = V2MOM.model_validate(p)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -824,6 +829,22 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return new_strategy
+
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        with self._lock:
+            self.store.append(
+                "V2MOM_UPDATED",
+                v2mom.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        with self._lock:
+            self._sync()
+            return next(iter(self.v2mom.values()), None)
 
     def clear(self) -> None:
         with self._lock:
