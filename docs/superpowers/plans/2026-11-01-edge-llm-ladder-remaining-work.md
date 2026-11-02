@@ -1,18 +1,22 @@
 # Edge LLM Ladder — Remaining Work
 
-**Branch:** `alehar9320/flyingfish` **Base:** `main`, merged forward twice — the
-last merge took `main` at `7269ba2`, and `origin/main` has moved three commits
-since (see "Merged with `main`" below). I checked what those three are instead of
-assuming: dev-dependency version bumps — `ruff`, `pytest-asyncio`, `mypy` —
-landing only in `pyproject.toml` and `uv.lock`. No Studio source, no sidecar
-route, no Worker code, and the branch is still `MERGEABLE`. So the drift is
-Python tooling. Re-running the Python matrix is what a merge at the new tip
-owes; the browser-tier numbers below are unaffected.
+**Branch:** `alehar9320/flyingfish` **Base:** `main`, merged forward three times —
+the last merge took `main` at `fe8599c` and was clean, no conflict in a single
+file. What that merge brought is worth naming, because it lands in the two files
+this branch's durability work just edited: `fetchConfig` now aborts at 1,200 ms
+so a hanging proxy cannot freeze the first screen, and boot order is explicit —
+local data first, config never a gate, the off-screen reads at idle. The browser
+tier's merge-at-load reads are IndexedDB only, which is exactly what "local data
+first" now means, so the two changes agree; the suite says so at the merged head
+(999 vitest, 25 chromium scenarios). The Python matrix moved too — `ruff`,
+`pytest-asyncio`, `mypy` version bumps — and is green at `1848 passed`.
 **Status:** the engine, the ladder, the routing seam, the progression scheduler
 and the banners are built and tested, **a person can turn the feature on** —
 the offer strip asks once — **that answer can now be changed from Settings**,
 with the tiers on disk listed and freeable, **every reply says which brain
-produced it**, **a settled fact reaches the other open tabs** (tested at unit
+produced it and keeps saying it after the tab closes** (the exchange lives in
+this browser's own memory and is merged back in when the page reopens), **a
+settled fact reaches the other open tabs** (tested at unit
 level; two real tabs holding the engine is still a handoff item), and **the
 end-to-end shape of all of it is driven by Playwright against the built bundle**.
 What is left is verification on real hardware, which no CI browser can do.
@@ -92,32 +96,46 @@ absent.
 | `a61e9d4` | merge | `origin/main` merged forward a second time (conversation list, saved canvas, per-field Settings saves, the assistant-ui ledger, the reuse-ladder agents doc). One file conflicted for real: `components/SettingsPanel.tsx`, because `main` moved the connection rows into `settings/sections/*`. Resolved by keeping `main`'s structure and re-mounting `<EdgeModelSection />` after `</ConnectionsSection>` — and pinned with a test, since a silent drop here would have been invisible. |
 | `8b83406` | 9 (first run) | The offer reached the person it is for — found, not assumed. `App.test.tsx` renders the real shell for a no-key, no-sidecar, WebGPU-capable first visit and asserts the `edge-offer` strip is in the dock above the introduction; it failed, because the bridge gated the question on a health measurement that main's survey deliberately never makes for a browser-only visitor. `BannerBridge` now asks whenever nothing is answering (`llmHealth.healthy !== true && !hasModelEndpoint(settings)`) while `model-offline` keeps its measured-refusal condition. Plus the deliberate call, written down: the introduction stays model-free and grows no second consent. |
 | `50e953d` | 10 (e2e) | `e2e/edge.spec.ts` + `e2e/edgeDevice.ts` driving the shipped bundle through a page-installed engine factory (`window.__odiEdgeEngine`, read only in `defaultEngineFactory`), and the defect that suite found: a banner button that is an *answer* used to close the strip before the answer was written, so a reload re-asked. `BannerAction.durable` moves a durable answer's lifetime to the condition that raised it; `EdgeStateStore` writes now wait for the transaction's `done` rather than the put request. `dismissConnectorSuggestion` extracted into `e2e/helpers.ts` — the modal intercepts the composer again after a reload. |
+| `8758faf` | 10 (that suite's second defect) | The reload scenario found a worse one: an answer the browser streamed existed only in React state, so closing the tab lost the work *and* the claim about who produced it — the label, the transcript, both. `edge/transcript.ts` records the exchange through the same `LocalMemoryService` the deterministic BFF already writes to (`StoredTurn.provenance` is new, and browser-only — Python's SQLite has no such column); `studioApi.ts` merges those rows at read time, so `fetchConversationTree` shows the thread the person actually had and serves the browser's copy when the server has never seen the id (before, that `404` threw, `loadLocalData()` swallowed it, and they landed on an empty introduction), and `fetchLatestConversation` reopens the browser's thread only when it holds an answer its own model produced. `Conversation.tsx` then names the brain from the record, not only from a live `status` frame. |
+
+| `07e96e8` | merge | `origin/main` merged forward a third time (`fetchConfig` aborts at 1,200 ms, boot order made explicit, dev-dependency bumps). No conflicts; the durability reads are IndexedDB-only, which is the invariant that change is protecting. |
 
 Everything the branch changes on top of `main` as merged, measured the way the
 guardrail measures it (`git diff origin/main...HEAD`, generated lockfiles
-excluded from the line count): 48 changed files and 123 test functions added.
+excluded from the line count): 58 changed files and 149 test functions added.
 Those two hold across the documentation commits, because a docs commit edits a
-file already in the diff and adds no test. Net lines do not: 5,125 at `50e953d`,
-5,135 at `cdf2ea3`, and the number drifts by exactly the lines each later
-documentation commit writes. So treat the net figure as an indication of size
-and `diff-shape` as the authority — it is green at this head, and it is the
-command below, not this sentence, that a reviewer should run.
+file already in the diff and adds no test. Net lines do not: 6,032 at the
+merged head `07e96e8`, counted before the commit that writes this sentence, and
+the number drifts by exactly the lines each later documentation commit writes.
+So treat the net figure as an indication of size and `diff-shape` as the
+authority — it is green at this head, and it is the command below, not this
+sentence, that a reviewer should run.
 
-The studio's vitest suite runs 970 tests across 101 files, and Playwright drives
-the *built* bundle in 24 chromium scenarios — 3 of them this ladder, green in
-CI's `End-to-end` check. On the Python side the
+The studio's vitest suite runs 999 tests across 103 files at the merged head and
+Playwright drives the *built* bundle in 25 chromium scenarios — 4 of them this
+ladder; both are green locally at `07e96e8`, and CI's `End-to-end` and `studio`
+checks are the same commands against the same artifact. On the Python side the
 branch touches one file, `tests/test_worker_security_headers.py`, which asserts
 the CSP additions; `uv run pytest -q` is 1,848 passed.
 
 PR #608's body is kept in that same measured shape, including the `Reuses:`
-block the guardrail asks of a change this size; `PR guardrails` is green at
-`50e953d` and again at `cdf2ea3`, the head the full check suite is green on —
-`End-to-end`, `studio`, `smoke`, the 3.10/3.11/3.12 matrix, `tauri-build`, the
-Chromatic run and the Cloudflare preview build all passing, `updater-e2e`
-skipped as not applicable. `origin/main` has since moved; see the header for
-what that drift actually is rather than a warning about it.
+block the guardrail asks of a change this size. The last head the *full* check
+suite was read green on is `cdf2ea3` — `End-to-end`, `studio`, `smoke`, the
+3.10/3.11/3.12 matrix, `tauri-build`, the Chromatic run and the Cloudflare
+preview build all passing, `updater-e2e` skipped as not applicable, with `PR
+guardrails` green at both `50e953d` and `cdf2ea3`. What `8758faf`, the merge and
+this commit put in front of CI is new since that read, so re-run
+`gh pr checks 608` rather than trusting this sentence for the current head. The
+branch is level with `origin/main` as of this writing; see the header for what
+that merge brought and why it needed no conflict resolution.
 
-## Merged with `main` (twice)
+## Merged with `main` (three times, the third clean)
+
+The first two merges carried real conflicts and are what this section describes.
+The third — `07e96e8`, taking `main` at `fe8599c` — auto-merged every file,
+including the two this branch's durability work had just edited (`api/studioApi.ts`,
+`state/StudioContext.tsx`), and the suites were re-run at that head rather than
+assumed green.
 
 `main` moved under the branch and PR #608 went CONFLICTING. Four files carried
 real conflicts. What changed, in the shape a reviewer can check:
@@ -390,10 +408,10 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
 git fetch origin && git checkout alehar9320/flyingfish
 npm --prefix apps/studio install
 npm --prefix apps/studio run typecheck
-npm --prefix apps/studio test -- --run     # 101 files, 970 tests
+npm --prefix apps/studio test -- --run     # 103 files, 999 tests
 npm --prefix apps/studio run lint          # 0 errors, 5 pre-existing warnings
 npm --prefix apps/studio run build
-cd apps/studio && npx playwright test --project=chromium   # 24 scenarios; needs the build above
+cd apps/studio && npx playwright test --project=chromium   # 25 scenarios, 4 of them this ladder; needs the build above
 uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 336 passed
 uv run pytest -q                           # 1848 passed (repo-wide)
 uv run python scripts/pr_guards.py diff-shape          # --base-ref defaults to origin/main
