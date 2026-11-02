@@ -1,14 +1,16 @@
 # Edge LLM Ladder — Remaining Work
 
-**Branch:** `alehar9320/flyingfish` **Base:** `main` (`58a125d`), merged forward
-to `main`'s current tip — see "Merged with `main`" below.
+**Branch:** `alehar9320/flyingfish` **Base:** `main`, merged forward twice — the
+last merge took `main` at `7269ba2`, and `origin/main` has moved three commits
+since (see "Merged with `main`" below).
 **Status:** the engine, the ladder, the routing seam, the progression scheduler
 and the banners are built and tested, **a person can turn the feature on** —
 the offer strip asks once — **that answer can now be changed from Settings**,
 with the tiers on disk listed and freeable, **every reply says which brain
-produced it**, **two open tabs agree without being asked**, and **the end-to-end
-shape of all of it is driven by Playwright against the built bundle**. What is
-left is verification on real hardware, which no CI browser can do.
+produced it**, **a settled fact reaches the other open tabs** (tested at unit
+level; two real tabs holding the engine is still a handoff item), and **the
+end-to-end shape of all of it is driven by Playwright against the built bundle**.
+What is left is verification on real hardware, which no CI browser can do.
 
 This file exists because the branch was cut short for review and the working
 environment it was built in is temporary. Nothing here may survive only in a
@@ -84,14 +86,22 @@ absent.
 | `1fec223` | 9 (cross-tab) | `edge/bus.ts` — the ladder tells its other tabs. `EdgeNotice` gains `{ kind: "changed" }`, `EdgeManager` publishes on settled notices only, `reset()` closes the channel, and `src/test/fakeBroadcastChannel.ts` doubles the browser API for the suites that need two tabs. |
 | `a61e9d4` | merge | `origin/main` merged forward a second time (conversation list, saved canvas, per-field Settings saves, the assistant-ui ledger, the reuse-ladder agents doc). One file conflicted for real: `components/SettingsPanel.tsx`, because `main` moved the connection rows into `settings/sections/*`. Resolved by keeping `main`'s structure and re-mounting `<EdgeModelSection />` after `</ConnectionsSection>` — and pinned with a test, since a silent drop here would have been invisible. |
 | `8b83406` | 9 (first run) | The offer reached the person it is for — found, not assumed. `App.test.tsx` renders the real shell for a no-key, no-sidecar, WebGPU-capable first visit and asserts the `edge-offer` strip is in the dock above the introduction; it failed, because the bridge gated the question on a health measurement that main's survey deliberately never makes for a browser-only visitor. `BannerBridge` now asks whenever nothing is answering (`llmHealth.healthy !== true && !hasModelEndpoint(settings)`) while `model-offline` keeps its measured-refusal condition. Plus the deliberate call, written down: the introduction stays model-free and grows no second consent. |
-| this commit | 10 (e2e) | `e2e/edge.spec.ts` + `e2e/edgeDevice.ts` driving the shipped bundle through a page-installed engine factory (`window.__odiEdgeEngine`, read only in `defaultEngineFactory`), and the defect that suite found: a banner button that is an *answer* used to close the strip before the answer was written, so a reload re-asked. `BannerAction.durable` moves a durable answer's lifetime to the condition that raised it; `EdgeStateStore` writes now wait for the transaction's `done` rather than the put request. `dismissConnectorSuggestion` extracted into `e2e/helpers.ts` — the modal intercepts the composer again after a reload. |
+| `50e953d` | 10 (e2e) | `e2e/edge.spec.ts` + `e2e/edgeDevice.ts` driving the shipped bundle through a page-installed engine factory (`window.__odiEdgeEngine`, read only in `defaultEngineFactory`), and the defect that suite found: a banner button that is an *answer* used to close the strip before the answer was written, so a reload re-asked. `BannerAction.durable` moves a durable answer's lifetime to the condition that raised it; `EdgeStateStore` writes now wait for the transaction's `done` rather than the put request. `dismissConnectorSuggestion` extracted into `e2e/helpers.ts` — the modal intercepts the composer again after a reload. |
 
-Everything the branch changes on top of `main` as merged: 48 files, 5,012 lines
-added, 136 deleted. The studio's vitest suite runs 970 tests across 101 files,
-and Playwright drives the *built* bundle in 24 chromium scenarios — 3 of them
-this ladder. On the Python side the branch touches one file,
-`tests/test_worker_security_headers.py`, which asserts the CSP additions;
-`uv run pytest -q` is 1,848 passed.
+Everything the branch changes on top of `main` as merged, measured the way the
+guardrail measures it (`git diff origin/main...HEAD`, generated lockfiles
+excluded from the line count): 48 files, 5,177 lines added, 52 deleted, net
+5,125; 123 test functions added. The studio's vitest suite runs 970 tests across
+101 files, and Playwright drives the *built* bundle in 24 chromium scenarios — 3
+of them this ladder, green in CI's `End-to-end` check. On the Python side the
+branch touches one file, `tests/test_worker_security_headers.py`, which asserts
+the CSP additions; `uv run pytest -q` is 1,848 passed.
+
+PR #608's body is kept in that same measured shape, including the `Reuses:`
+block the guardrail asks of a change this size; `PR guardrails` is green at
+`50e953d`. The numbers above are the guard's, taken at this base — `origin/main`
+has moved since the last merge forward, so anyone who merges should re-run the
+gate at the new tip rather than trusting these figures.
 
 ## Merged with `main` (twice)
 
