@@ -405,6 +405,10 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface with zero violations; contrast is scoped to the token audit and documented there |
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
+| `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
+| `apps/studio/src/lib/theme.test.ts` | `resolveTheme`: the stored choice wins, the media query answers when nothing is stored, and dark is the last resort |
+| `apps/studio/src/lib/boot.test.ts` | `removeBootShell` clears the shell on mount and is a no-op without one |
+| `apps/studio/e2e/first-paint.spec.ts` | Playwright: the shell paints the token colour with JavaScript off and the bundle blocked, a stored theme wins over the system, and the handover to React keeps the colour |
 | `apps/studio/src/lib/guidance.test.ts` | One hint at a time, context before evidence, silence before the first exchange, permanent dismissal, defensive storage |
 | `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests, and a complete introduction that saves the brief |
 | `apps/studio/src/lib/intro.test.ts` | Introduction turns, parsing under empty, very long, and multi-fact replies, the proposed defaults, draft storage, and one-shot migration |

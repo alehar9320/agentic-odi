@@ -91,6 +91,7 @@ import type {
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
+import { resolveTheme } from "../lib/theme";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
 
 /**
@@ -244,7 +245,6 @@ export const EMPTY_CONFIG: StudioConfig = {
   api_key: "local",
   model_name: "local-tools-model",
   mcp_url: "http://localhost:8000/mcp",
-  theme: "dark",
 };
 
 export type ToastKind = "success" | "error" | "info";
@@ -540,7 +540,10 @@ function loadTheses(): Thesis[] {
 
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
-  const theme: StudioTheme = settings.theme === "light" ? "light" : "dark";
+  // The stored choice, or the operating system when there is none — the same
+  // resolution the inline bootstrap in index.html runs before React, so the
+  // class it painted and the class the app keeps are the same one.
+  const theme: StudioTheme = resolveTheme(settings.theme);
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   // The context conversation is never a gate. It opens from the stage, from a
