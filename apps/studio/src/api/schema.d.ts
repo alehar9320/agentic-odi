@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Diagnostics
+         * @description Return diagnostic metadata only; never return database paths or records.
+         */
+        get: operations["get_diagnostics_api_diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/changelog": {
         parameters: {
             query?: never;
@@ -455,6 +475,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/themes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Themes
+         * @description M2's theme tree, same records under both backends.
+         *
+         *     Empty until the agent has run ``add_theme``: a theme names groups of
+         *     outcomes, it is never typed into the canvas.
+         */
+        get: operations["get_themes_api_themes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategy": {
         parameters: {
             query?: never;
@@ -651,7 +694,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Conversations
+         * @description The history a switcher lists: every thread, most recent touch first.
+         */
+        get: operations["list_conversations_api_conversations_get"];
         put?: never;
         /** Create Conversation */
         post: operations["create_conversation_api_conversations_post"];
@@ -850,17 +897,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/{full_path}": {
+    "/api/proposals": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Spa Fallback */
-        get: operations["spa_fallback__full_path__get"];
+        /**
+         * List Proposals Api
+         * @description List outcome proposals, optionally filtered by status.
+         */
+        get: operations["list_proposals_api_api_proposals_get"];
         put?: never;
-        post?: never;
+        /**
+         * Propose Outcome Api
+         * @description Mine one evidence record into a scored, approvable outcome proposal.
+         */
+        post: operations["propose_outcome_api_api_proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals/{proposal_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Proposal Api
+         * @description Approve a proposal and write it as an Outcome.
+         */
+        post: operations["approve_proposal_api_api_proposals__proposal_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Proposal Api
+         * @description Reject a proposal. Nothing is written to the ODI store.
+         */
+        post: operations["reject_proposal_api_api_proposals__proposal_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -941,9 +1035,10 @@ export interface components {
             /** Statement */
             statement: string;
             /** Importance */
-            importance: number;
+            importance?: number | null;
             /** Satisfaction */
-            satisfaction: number;
+            satisfaction?: number | null;
+            claim_check?: components["schemas"]["ClaimCheck"] | null;
         };
         /** AddStepRequest */
         AddStepRequest: {
@@ -978,6 +1073,23 @@ export interface components {
             ok: boolean;
             /** Id */
             id: string;
+        };
+        /**
+         * ApproveProposalRequest
+         * @description Approve a proposal, optionally with edits.
+         */
+        ApproveProposalRequest: {
+            /** Statement */
+            statement?: string | null;
+            /** Importance */
+            importance?: number | null;
+            /** Satisfaction */
+            satisfaction?: number | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
         };
         /**
          * AttachmentRef
@@ -1091,6 +1203,89 @@ export interface components {
             /** Assistant Id */
             assistant_id?: string | null;
         };
+        /**
+         * ClaimCheck
+         * @description The questions behind a score: what was asked, answered, or skipped.
+         *
+         *     Two numbers are not provenance. A score that carries a claim check says
+         *     which questions produced it — ``asked`` — and what came back: the
+         *     ``answers`` the person gave and the ``skips`` with a recorded reason.
+         *
+         *     ``verified`` is derived, never typed in: a check is verified when at least
+         *     one question was answered by the person. A check of only skips is
+         *     unverified, so an outcome built on an assumption says so instead of
+         *     borrowing the confidence of a number.
+         */
+        ClaimCheck: {
+            /**
+             * Asked
+             * @description The questions put to the person
+             */
+            asked?: string[];
+            /**
+             * Answers
+             * @description The answers the person gave, in order
+             */
+            answers?: string[];
+            /**
+             * Skips
+             * @description Questions skipped, each with a reason
+             */
+            skips?: components["schemas"]["ClaimSkip"][];
+        };
+        /**
+         * ClaimCitationOut
+         * @description The record label a claim carries, snapshotted when the turn was stored.
+         */
+        ClaimCitationOut: {
+            /** Id */
+            id: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Source Name
+             * @default
+             */
+            source_name: string;
+        };
+        /**
+         * ClaimOut
+         * @description One declarative sentence and what stands behind it.
+         */
+        ClaimOut: {
+            /** Index */
+            index: number;
+            /** Text */
+            text: string;
+            /** Status */
+            status: string;
+            /** Evidence */
+            evidence?: components["schemas"]["ClaimCitationOut"][];
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * ClaimSkip
+         * @description One question that went unanswered, and why it was skipped.
+         *
+         *     A skip without a reason is not a skip, it is a missing answer, so
+         *     ``reason`` is required and must not be blank.
+         */
+        ClaimSkip: {
+            /**
+             * Question
+             * @description The question that was not answered
+             */
+            question: string;
+            /**
+             * Reason
+             * @description Why it was skipped; never blank
+             */
+            reason: string;
+        };
         /** ConnectorListItem */
         ConnectorListItem: {
             /** Name */
@@ -1110,6 +1305,11 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** ConversationListResponse */
+        ConversationListResponse: {
+            /** Conversations */
+            conversations?: components["schemas"]["ConversationSummaryModel"][];
+        };
         /** ConversationModel */
         ConversationModel: {
             /** Id */
@@ -1126,6 +1326,27 @@ export interface components {
         /** ConversationResponse */
         ConversationResponse: {
             conversation: components["schemas"]["ConversationModel"];
+        };
+        /**
+         * ConversationSummaryModel
+         * @description A conversation in the history list: its metadata plus how much is in it.
+         */
+        ConversationSummaryModel: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Head Id */
+            head_id?: string | null;
+            /**
+             * Turn Count
+             * @default 0
+             */
+            turn_count: number;
         };
         /** ConversationTreeResponse */
         ConversationTreeResponse: {
@@ -1455,6 +1676,19 @@ export interface components {
             mcp_url: string;
         };
         /**
+         * ProposeOutcomeRequest
+         * @description Propose a desired outcome from an evidence record.
+         */
+        ProposeOutcomeRequest: {
+            /** Evidence Id */
+            evidence_id: string;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
          * ProposeStrategyRequest
          * @description Body for ``POST /api/strategy/propose``.
          *
@@ -1464,6 +1698,17 @@ export interface components {
         ProposeStrategyRequest: {
             /** Job Id */
             job_id?: string | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
+         * RejectProposalRequest
+         * @description Reject a proposal.
+         */
+        RejectProposalRequest: {
             /**
              * Mcp Url
              * @default
@@ -1557,6 +1802,8 @@ export interface components {
             message_id?: string | null;
             /** Parent Id */
             parent_id?: string | null;
+            /** Claims */
+            claims?: components["schemas"]["ClaimOut"][];
         };
         /**
          * TurnNode
@@ -1573,6 +1820,8 @@ export interface components {
             content: string;
             /** Created At */
             created_at: string;
+            /** Claims */
+            claims?: components["schemas"]["ClaimOut"][];
         };
         /**
          * UiCatalogRequest
@@ -1750,6 +1999,28 @@ export interface operations {
         };
     };
     get_config_api_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_diagnostics_api_diagnostics_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2768,6 +3039,40 @@ export interface operations {
             };
         };
     };
+    get_themes_api_themes_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_strategy_api_strategy_get: {
         parameters: {
             query?: {
@@ -3316,6 +3621,26 @@ export interface operations {
             };
         };
     };
+    list_conversations_api_conversations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationListResponse"];
+                };
+            };
+        };
+    };
     create_conversation_api_conversations_post: {
         parameters: {
             query?: never;
@@ -3700,13 +4025,13 @@ export interface operations {
             };
         };
     };
-    spa_fallback__full_path__get: {
+    list_proposals_api_api_proposals_get: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                full_path: string;
+            query?: {
+                status?: string | null;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -3717,7 +4042,118 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_outcome_api_api_proposals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_proposal_api_api_proposals__proposal_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveProposalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_proposal_api_api_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectProposalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
