@@ -346,6 +346,30 @@ describe("paging", () => {
     expect(screen.getByRole("status", { name: /page 2 of 3/i })).toBeInTheDocument();
   });
 
+  it("answers a page change with the searching state, not the page it is leaving", async () => {
+    harness.search.mockResolvedValueOnce(pageOne).mockResolvedValueOnce(pageOne);
+    const pending = deferred();
+    harness.search.mockReturnValue(pending.promise);
+
+    render(<OpportunityLandscape />);
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: /^execute/i }));
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(2));
+    expect(renderedRows()).toEqual(["O-1", "O-2", "O-3"]);
+
+    fireEvent.click(screen.getByRole("button", { name: /next page/i }));
+
+    // Page one's rows answer a different query than the one just asked, so they
+    // are not the answer to this one: the board says it is searching.
+    expect(await screen.findByRole("status", { name: /searching the library/i })).toBeInTheDocument();
+
+    await act(async () => {
+      pending.resolve(pageTwo);
+    });
+    expect(renderedRows()).toEqual(["O-9", "O-1"]);
+  });
+
   it("returns to the first page with the filters still applied", async () => {
     harness.search.mockResolvedValueOnce(pageOne).mockResolvedValue(pageTwo);
 

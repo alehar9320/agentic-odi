@@ -579,7 +579,7 @@ export function OpportunityLandscape() {
                 className="studio-button"
                 style={{ fontSize: "0.78rem", padding: "4px 10px" }}
                 disabled={page >= pages}
-                onClick={() => setOffset(offset + SEARCH_PAGE_SIZE)}
+                onClick={() => askPage(offset + SEARCH_PAGE_SIZE)}
               >
                 Next page
               </button>
