@@ -664,7 +664,9 @@ def test_opening_a_store_with_an_unscored_outcome_records_nothing(tmp_path) -> N
     db = str(tmp_path / "odi.db")
     repo = SQLiteRepository(db_path=db)
     repo.add_job(Job(id="job-1", name="Rotate a leaked secret"))
-    repo.add_outcome(Outcome(id="o-1", job_id="job-1", statement="Rotate secrets without a runbook"))
+    repo.add_outcome(
+        Outcome(id="o-1", job_id="job-1", statement="Rotate secrets without a runbook")
+    )
 
     opened = SQLiteRepository(db_path=db)
 
@@ -678,7 +680,9 @@ def test_an_unscored_outcome_stays_unscored_through_a_reopen(tmp_path) -> None:
     db = str(tmp_path / "odi.db")
     repo = SQLiteRepository(db_path=db)
     repo.add_job(Job(id="job-1", name="Rotate a leaked secret"))
-    repo.add_outcome(Outcome(id="o-1", job_id="job-1", statement="Rotate secrets without a runbook"))
+    repo.add_outcome(
+        Outcome(id="o-1", job_id="job-1", statement="Rotate secrets without a runbook")
+    )
 
     reopened = SQLiteRepository(db_path=db)
     outcome = reopened.get_outcome("o-1")
