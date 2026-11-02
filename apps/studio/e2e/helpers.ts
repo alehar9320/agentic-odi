@@ -36,6 +36,17 @@ export async function openStudio(page: Page): Promise<void> {
   // The composer is present in both the empty and the active conversation
   // states, so it is the one landmark that means the Studio is ready.
   await expect(page.getByRole("textbox", { name: COMPOSER })).toBeVisible();
+  await dismissConnectorSuggestion(page);
+}
+
+/**
+ * Close the connector suggestion, if this studio opens one.
+ *
+ * It is a modal, so it does more than hide the view: it intercepts clicks on
+ * the composer. A test that reloads can meet it again after the reload, not
+ * only on the first load.
+ */
+export async function dismissConnectorSuggestion(page: Page): Promise<void> {
   const suggestion = page.getByRole("dialog", { name: "Connector suggestion" });
   await suggestion.waitFor({ state: "visible", timeout: 2_000 }).catch(() => {});
   if (await suggestion.isVisible()) {

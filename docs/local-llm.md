@@ -165,9 +165,25 @@ one it did not fetch — and download progress is never broadcast, because only 
 tab doing the work renders it. A browser with no channel (private browsing) just
 keeps the ladder to itself.
 
-Two honest caveats: nothing in CI has WebGPU, so the engine itself has only
-ever been driven through a fake engine, and the real-GPU path is an unchecked
-box in `docs/superpowers/plans/2026-11-01-edge-llm-ladder-remaining-work.md`.
+The studio stops asking only once it has the answer. Pressing **Not now** does
+not simply hide the strip: a banner whose buttons *are* answers is not allowed to
+close itself, because a strip that vanishes before the consent write reaches disk
+claims an answer the studio never wrote down — and a tab reloaded inside that
+window asks again while pretending to have believed the first one. So the strip
+goes quiet when the write is committed, which is what makes "we won't ask you
+again" a promise a test can check rather than a sentence. That seam is
+`apps/studio/e2e/edge.spec.ts`: three scenarios driven against the *built*
+bundle — offer, yes, streamed reply that never leaves the tab, and no second ask
+after a reload; decline and reload; then a key appearing later handing the turns
+back to the server. The engine is replaced by a fake the *page* installs
+(`e2e/edgeDevice.ts` → `window.__odiEdgeEngine`), not one compiled into the
+bundle, so nothing a person downloads is a code path only tests run.
+
+Two honest caveats: nothing in CI has WebGPU, so the model itself has only ever
+been driven through that fake — the suite proves the seams around it (routing,
+consent, banners, provenance, storage, cross-tab) and not WebLLM, and the
+real-GPU path is an unchecked box in
+`docs/superpowers/plans/2026-11-01-edge-llm-ladder-remaining-work.md`.
 The engine never reaches the `browser-model` capability from the
 server manifests — a server cannot see a client GPU — so the Worker and
 sidecar keep reporting it `available: false`; only the browser's capability

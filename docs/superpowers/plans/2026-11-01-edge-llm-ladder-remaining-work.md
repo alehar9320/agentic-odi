@@ -6,8 +6,9 @@ to `main`'s current tip — see "Merged with `main`" below.
 and the banners are built and tested, **a person can turn the feature on** —
 the offer strip asks once — **that answer can now be changed from Settings**,
 with the tiers on disk listed and freeable, **every reply says which brain
-produced it**, and **two open tabs agree without being asked**. What is left is
-the end-to-end spec and verification on real hardware.
+produced it**, **two open tabs agree without being asked**, and **the end-to-end
+shape of all of it is driven by Playwright against the built bundle**. What is
+left is verification on real hardware, which no CI browser can do.
 
 This file exists because the branch was cut short for review and the working
 environment it was built in is temporary. Nothing here may survive only in a
@@ -82,11 +83,15 @@ absent.
 | `634d927` | 9 (second half) | The other half of the claim, tested: a turn handed to a healthy endpoint earns *neither* provenance label, so the marker provably follows the routing rather than the feature flag. |
 | `1fec223` | 9 (cross-tab) | `edge/bus.ts` — the ladder tells its other tabs. `EdgeNotice` gains `{ kind: "changed" }`, `EdgeManager` publishes on settled notices only, `reset()` closes the channel, and `src/test/fakeBroadcastChannel.ts` doubles the browser API for the suites that need two tabs. |
 | `a61e9d4` | merge | `origin/main` merged forward a second time (conversation list, saved canvas, per-field Settings saves, the assistant-ui ledger, the reuse-ladder agents doc). One file conflicted for real: `components/SettingsPanel.tsx`, because `main` moved the connection rows into `settings/sections/*`. Resolved by keeping `main`'s structure and re-mounting `<EdgeModelSection />` after `</ConnectionsSection>` — and pinned with a test, since a silent drop here would have been invisible. |
-| this commit | 9 (first run) | The offer reached the person it is for — found, not assumed. `App.test.tsx` renders the real shell for a no-key, no-sidecar, WebGPU-capable first visit and asserts the `edge-offer` strip is in the dock above the introduction; it failed, because the bridge gated the question on a health measurement that main's survey deliberately never makes for a browser-only visitor. `BannerBridge` now asks whenever nothing is answering (`llmHealth.healthy !== true && !hasModelEndpoint(settings)`) while `model-offline` keeps its measured-refusal condition. Plus the deliberate call, written down: the introduction stays model-free and grows no second consent. |
+| `8b83406` | 9 (first run) | The offer reached the person it is for — found, not assumed. `App.test.tsx` renders the real shell for a no-key, no-sidecar, WebGPU-capable first visit and asserts the `edge-offer` strip is in the dock above the introduction; it failed, because the bridge gated the question on a health measurement that main's survey deliberately never makes for a browser-only visitor. `BannerBridge` now asks whenever nothing is answering (`llmHealth.healthy !== true && !hasModelEndpoint(settings)`) while `model-offline` keeps its measured-refusal condition. Plus the deliberate call, written down: the introduction stays model-free and grows no second consent. |
+| this commit | 10 (e2e) | `e2e/edge.spec.ts` + `e2e/edgeDevice.ts` driving the shipped bundle through a page-installed engine factory (`window.__odiEdgeEngine`, read only in `defaultEngineFactory`), and the defect that suite found: a banner button that is an *answer* used to close the strip before the answer was written, so a reload re-asked. `BannerAction.durable` moves a durable answer's lifetime to the condition that raised it; `EdgeStateStore` writes now wait for the transaction's `done` rather than the put request. `dismissConnectorSuggestion` extracted into `e2e/helpers.ts` — the modal intercepts the composer again after a reload. |
 
-Everything the branch changes on top of `main` as merged: 43 files, 4,658 lines
-added, 50 deleted, and 115 added browser test cases, which now run 965 tests
-across 101 files, plus one amended Python security-header test.
+Everything the branch changes on top of `main` as merged: 48 files, 5,012 lines
+added, 136 deleted. The studio's vitest suite runs 970 tests across 101 files,
+and Playwright drives the *built* bundle in 24 chromium scenarios — 3 of them
+this ladder. On the Python side the branch touches one file,
+`tests/test_worker_security_headers.py`, which asserts the CSP additions;
+`uv run pytest -q` is 1,848 passed.
 
 ## Merged with `main` (twice)
 
@@ -238,22 +243,53 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
       own capability registry reports the truth. Verified against both manifests
       and said in `docs/local-llm.md` §"The browser tier".
 
-### 10 — Verification a reviewer can repeat
+### 10 — Verification a reviewer can repeat — e2e DONE, the GPU by hand still open
 
-- [ ] `e2e/edge.spec.ts` with `FakeEdgeEngine`
-      (`apps/studio/src/test/edgeFake.ts`) injected via
-      `edgeManager.setEngineFactory` behind the flags mechanism. WebGPU does not
-      exist in CI; jsdom covers logic, not the model.
-- [ ] **The real gate, by hand, on a WebGPU device:** `npm --prefix apps/studio run
+- [x] `apps/studio/e2e/edge.spec.ts` drives the **shipped bundle** with a fake
+      engine the page installs: `e2e/edgeDevice.ts` puts a factory on
+      `window.__odiEdgeEngine`, and `EdgeManager.defaultEngineFactory()` is the
+      only place that reads it. The plan predicted a test-only module injected
+      through `edgeManager.setEngineFactory`; that would have made the suite
+      exercise a code path no person ever runs, so the fake lives outside the
+      artifact instead. It declares `implements EdgeLLMEngine`, so a seam that
+      moves stops compiling rather than quietly passing.
+      Three scenarios: offer → *Answer in this browser* → the fetch narrated in
+      place → ready toast → a streamed reply that reads *"Answered in this
+      browser"*, never *"Local draft"*, with zero requests reaching `/api/chat`,
+      and no second ask after a reload. Then decline → reload → never asked
+      again. Then a key appearing later handing the turns back to the remote
+      path. `--repeat-each=5` on the durability scenario, because that is the
+      one that was failing: 15 passed, not a flake that got lucky.
+      Run it with `npx playwright test --project=chromium` from `apps/studio`,
+      after `npx vite build` — the sidecar serves `dist`.
+- [x] **What that found, in the product rather than in the test.** "Not now" made
+      the strip vanish, and then a reload asked again — every run, until the run
+      that happened to make one extra round trip to the page first. The write was
+      never lost: measuring inside the app showed `setConsent` had not *run* yet
+      when the strip disappeared. Radix closes a toast the moment an action
+      button is pressed, so the click itself answered the question on screen
+      while `EdgeManager.decline()` was still opening IndexedDB in the
+      background — and the reload took the document with it. A banner whose
+      buttons are answers now says so (`BannerAction.durable`, both `edge-offer`
+      buttons): the click cannot close it, and only the condition that raised it
+      may. So the strip going quiet is evidence the studio has the answer, which
+      is the claim it was always making. `BannerBridge.test.tsx` pins both halves
+      — still there while the write is in flight, gone when the notice lands —
+      and fails without the flag.
+- [ ] **The real gate, by hand, on a WebGPU device — CI cannot do this, and the
+      suite deliberately does not pretend to.** `npm --prefix apps/studio run
       dev:full` → clear the key in Settings → send a message → the offer strip
       appears → **Answer in this browser** → Tier 1 downloads with a live strip →
       reply streams → ten answers later the next tier prefetches during idle →
       upgrade toast → re-add a key and turns return to the remote path.
 - [ ] The **Not now** path by hand: decline, confirm `model-offline` returns and
       that no second ask ever appears.
-- [ ] Multi-tab: confirm `navigator.locks` keeps one engine across tabs —
+- [ ] Multi-tab on two real tabs: confirm `navigator.locks` keeps one engine,
       including two tabs that both show the offer.
-- [ ] `scripts/pr_guards.py` and both CI checks (`ci.yml`, `pr-guardrails.yml`).
+- [ ] Tier 3 prefill jank on a mid-range device, and one iPhone or iPad —
+      `navigator.deviceMemory` reports nothing there, and the memory cap is
+      designed, not measured.
+- [ ] Both CI checks (`ci.yml`, `pr-guardrails.yml`) on every push.
 
 ## Known gaps beyond the iterations
 
@@ -300,18 +336,29 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
 git fetch origin && git checkout alehar9320/flyingfish
 npm --prefix apps/studio install
 npm --prefix apps/studio run typecheck
-npm --prefix apps/studio test -- --run     # 101 files, 965 tests
+npm --prefix apps/studio test -- --run     # 101 files, 970 tests
 npm --prefix apps/studio run lint          # 0 errors, 5 pre-existing warnings
 npm --prefix apps/studio run build
-uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 330 passed
-uv run pytest -q                           # 1824 passed (repo-wide)
+cd apps/studio && npx playwright test --project=chromium   # 24 scenarios; needs the build above
+uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 336 passed
+uv run pytest -q                           # 1848 passed (repo-wide)
+uv run python scripts/pr_guards.py diff-shape --base origin/main
+uv run python scripts/pr_guards.py fabrication --base origin/main
+# body-truth checks the PR text, so it needs that text on disk first:
+gh pr view 608 --json body -q .body > /tmp/pr608.md
+uv run python scripts/pr_guards.py body-truth --base origin/main --body-file /tmp/pr608.md
 ```
+
+`npx playwright install-deps chromium` is the one-time system step if the
+browser has never run in this container.
 
 Then start at iteration 9's last open item if you want a first-run visitor to
 meet the browser model in the intro flow (the offer strip already does this job
 after the studio has opened; the context conversation is what is left), or at
-iteration 10 if you want to prove it on a GPU. A first real user can already
-reach the feature, control it, see which brain answered, and have two tabs agree
-on both; none of those is required for that.
+the rest of iteration 10 — the hand list above — which is the only thing that
+can say WebLLM itself works. A first real user can already reach the feature,
+control it, see which brain answered, have two tabs agree on both, and have the
+suite drive the end-to-end shape of all of it against the shipped bundle; the
+fake engine is the only part that is not real.
 
 Every iteration ends with that block green, one commit, and this file updated.

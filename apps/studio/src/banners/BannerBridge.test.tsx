@@ -352,6 +352,48 @@ describe("BannerBridge", () => {
     expect(edge.decline).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the offer strip up while \"Not now\" is still being written down", async () => {
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    let settle: (value: undefined) => void = () => {
+      /* replaced by the test, when the write is meant to have landed */
+    };
+    edge.decline = vi.fn(
+      () =>
+        new Promise<undefined>((resolve) => {
+          settle = resolve;
+        }),
+    );
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+
+    act(() => {
+      screen.getByRole("button", { name: "Not now" }).click();
+    });
+    // The click is not a dismissal. A strip that vanishes before the answer is
+    // on disk tells the person their refusal was recorded while it was still in
+    // flight, and a tab reloaded inside that window asks them again.
+    expect(edge.decline).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument();
+
+    // What clears it is the ladder noticing the answer, so the write and the
+    // notice arrive together, the way `EdgeManager.decline` does it.
+    await act(async () => {
+      edge.offerFor = vi.fn(async () => null);
+      settle(undefined);
+      edge.noticeListener?.({ kind: "consent-changed" });
+    });
+    await waitFor(() =>
+      expect(screen.queryByText(/This browser can answer, free/i)).not.toBeInTheDocument(),
+    );
+  });
+
   it("sends \"Answer in this browser\" to consent plus the first download", async () => {
     edge.offerFor = vi.fn(async () => ({
       tier: "t1",

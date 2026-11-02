@@ -88,6 +88,12 @@ interface EdgeDb extends DBSchema {
 
 const EMPTY_STATE: TierState = { status: "empty", cachedAt: null };
 
+/**
+ * Every write waits for its transaction's `done` — the platform's commit signal —
+ * rather than for the put request, which resolves while the transaction is still
+ * open. The UI announces a settled ladder off these writes, so a promise that
+ * resolves early would be a promise about work that has not finished.
+ */
 export class EdgeStateStore {
   private readonly db: IDBPDatabase<EdgeDb>;
 
@@ -121,7 +127,9 @@ export class EdgeStateStore {
   }
 
   async setTierState(id: EdgeTierId, state: TierState): Promise<void> {
-    await this.db.put("tiers", { id, state });
+    const tx = this.db.transaction("tiers", "readwrite");
+    tx.objectStore("tiers").put({ id, state });
+    await tx.done;
   }
 
   async getUsage(): Promise<EdgeUsage> {
@@ -139,7 +147,9 @@ export class EdgeStateStore {
       edgeTurns: current.edgeTurns + 1,
       streamedSeconds: current.streamedSeconds + Math.max(0, streamedSeconds),
     };
-    await this.db.put("usage", { id: "usage", ...next });
+    const tx = this.db.transaction("usage", "readwrite");
+    tx.objectStore("usage").put({ id: "usage", ...next });
+    await tx.done;
     return next;
   }
 
@@ -149,7 +159,9 @@ export class EdgeStateStore {
   }
 
   async setConsent(state: ConsentState): Promise<void> {
-    await this.db.put("consent", { id: "consent", state });
+    const tx = this.db.transaction("consent", "readwrite");
+    tx.objectStore("consent").put({ id: "consent", state });
+    await tx.done;
   }
 
   /** Forget our metadata (e.g. after the user frees the model storage). */

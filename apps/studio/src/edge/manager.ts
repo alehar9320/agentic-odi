@@ -96,7 +96,23 @@ export function hasModelEndpoint(settings: StudioConfig): boolean {
   return isEndpointConfiguredForSettings(settings);
 }
 
+/**
+ * The engine the ladder actually drives.
+ *
+ * `window.__odiEdgeEngine` is the end-to-end suite's seam: a browser in CI has
+ * no GPU, so the page installs its own engine factory before the studio boots.
+ * It is read here and nowhere else, and it is a factory the *page* provides
+ * rather than a fake compiled into the bundle — a shipped mock would be a second
+ * code path nobody tests, and this way the suite drives the same manager,
+ * scheduler, storage and banner seams a person hits.
+ */
 async function defaultEngineFactory(): Promise<EdgeLLMEngine> {
+  const injected = (
+    window as unknown as { __odiEdgeEngine?: () => Promise<EdgeLLMEngine> | EdgeLLMEngine }
+  ).__odiEdgeEngine;
+  if (injected) {
+    return await injected();
+  }
   const { createWebLLMEngine } = await import("./webllmEngine");
   return createWebLLMEngine();
 }

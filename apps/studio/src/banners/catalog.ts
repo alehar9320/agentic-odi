@@ -45,8 +45,8 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     body: "No model key needed, nothing sent to anyone else. One download, then your replies run in this tab.",
     dismissible: false,
     actions: [
-      { label: "Answer in this browser", action: "enable-edge-model", tone: "primary" },
-      { label: "Not now", action: "decline-edge-model", tone: "ghost" },
+      { label: "Answer in this browser", action: "enable-edge-model", tone: "primary", durable: true },
+      { label: "Not now", action: "decline-edge-model", tone: "ghost", durable: true },
     ],
   },
   "edge-downloading": {
