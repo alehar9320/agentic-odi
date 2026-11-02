@@ -47,6 +47,19 @@ export function CustomizePage() {
 
   const installedNames = useMemo(() => new Set(connectors.map((item) => item.name)), [connectors]);
 
+  // Three sections read from one service. When they all fail with the same
+  // message it is one upstream outage, not three — say it once (audit A3).
+  const sharedError =
+    connectorsError &&
+    featuredError &&
+    marketplaceError &&
+    connectorsError.message === featuredError.message &&
+    featuredError.message === marketplaceError.message
+      ? connectorsError
+      : null;
+
+  // Responses can arrive out of order; only the newest search may write.
+
   // A curated pick and its registry entry are the same connector under two
   // ids. Showing it twice would read as two things to install.
   const featuredNames = useMemo(() => new Set(featured.map(listingKey)), [featured]);
@@ -150,12 +163,23 @@ export function CustomizePage() {
       </header>
 
       <div className="customize__body">
+        {sharedError ? (
+          <FailurePanel
+            error={sharedError}
+            retryText="reload"
+            onRetry={() => {
+              void refreshConnectors();
+              void refreshFeatured();
+              void searchMarketplace({ q: query, area });
+            }}
+          />
+        ) : null}
         <section className="customize__section" aria-label="Installed connectors">
           <h3 className="customize__section-title">
             Installed
             <span className="customize__count">{connectors.length}</span>
           </h3>
-          {connectorsError ? (
+          {connectorsError && !sharedError ? (
             <FailurePanel
               error={connectorsError}
               retryText="reload"
@@ -197,7 +221,7 @@ export function CustomizePage() {
           <p className="customize__section-note">
             Curated connectors we have checked, grouped by what they let the studio do.
           </p>
-          {featuredError ? (
+          {featuredError && !sharedError ? (
             <FailurePanel
               error={featuredError}
               retryText="reload"
@@ -232,7 +256,7 @@ export function CustomizePage() {
             Live listings from the official MCP registry. A verified badge means Docker reviewed
             the server.
           </p>
-          {marketplaceError ? (
+          {marketplaceError && !sharedError ? (
             <FailurePanel
               error={marketplaceError}
               retryText="reload"

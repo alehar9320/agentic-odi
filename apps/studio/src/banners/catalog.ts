@@ -13,16 +13,15 @@ export const DEFAULT_DURATION_MS = 6000;
 
 export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
   "sidecar-down": {
-    severity: "critical",
+    // Audit A4: a first run with no sidecar is the designed offline path, not
+    // an emergency. One calm strip, one action.
+    severity: "warning",
     life: "persistent",
     dock: "top",
     title: "The studio sidecar isn't running.",
     body: "The assistant is paused and live data is frozen until it comes back.",
     dismissible: true,
-    actions: [
-      { label: "Recheck", action: "recheck-sidecar", tone: "ghost" },
-      { label: "Start the sidecar", action: "open-setup", tone: "ghost" },
-    ],
+    actions: [{ label: "Recheck", action: "recheck-sidecar", tone: "ghost" }],
   },
   "model-offline": {
     severity: "warning",
@@ -31,11 +30,7 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     title: "Working by hand.",
     body: "No model is reachable, so the assistant is paused. Every change still writes to your ODI repository.",
     dismissible: false,
-    actions: [
-      { label: "Capture an outcome", action: "open-capture", tone: "ghost" },
-      { label: "Map the job", action: "open-jobmap", tone: "ghost" },
-      { label: "Set your context", action: "open-setup", tone: "ghost" },
-    ],
+    actions: [{ label: "Capture an outcome", action: "open-capture", tone: "ghost" }],
   },
   "update-available": {
     severity: "info",

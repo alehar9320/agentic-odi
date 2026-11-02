@@ -44,7 +44,7 @@ it("renders a critical top strip with its actions", async () => {
   await expect.element(screen.getByRole("button", { name: "Recheck" })).toBeVisible();
 });
 
-it("renders the warning strip with every way to keep working", async () => {
+it("renders the warning strip with its one way to keep working", async () => {
   const screen = await render(
     <Frame>
       <BannerStack banners={[banner("model-offline")]} />
@@ -52,7 +52,12 @@ it("renders the warning strip with every way to keep working", async () => {
   );
 
   await expect.element(screen.getByText(/Working by hand/i)).toBeVisible();
-  await expect.element(screen.getByRole("button", { name: "Map the job" })).toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Capture an outcome" }))
+    .toBeVisible();
+  const commands = [...screen.container.querySelectorAll("button")];
+  expect(commands.some((button) => button.textContent === "Map the job")).toBe(false);
+
 });
 
 it("stacks corner toasts for success, info, and error", async () => {

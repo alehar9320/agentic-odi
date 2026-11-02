@@ -693,8 +693,7 @@ a {
 }
 
 .composer__shell:focus-within {
-  border-color: rgba(139, 140, 248, 0.42);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.09), 0 14px 34px rgba(0, 0, 0, 0.3);
+  border-color: var(--line-strong);
 }
 
 /* Keyboard focus gets the same ring as the rest of the app. The capsule owns

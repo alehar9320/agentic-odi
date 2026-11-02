@@ -126,15 +126,6 @@ export function StudioBar({
 
         <button
           type="button"
-          className="studio-pill pill-changelog"
-          onClick={onChangelog}
-          aria-label="Open What's New changelog"
-        >
-          ✨ What's New
-        </button>
-
-        <button
-          type="button"
           className="icon-button"
           aria-label="New conversation"
           title="New conversation"
@@ -222,6 +213,17 @@ export function StudioBar({
           </button>
           {menuOpen && (
             <div className="bar__menu-list" role="menu" aria-label="More actions">
+              <button
+                type="button"
+                role="menuitem"
+                className="bar__menu-item"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onChangelog();
+                }}
+              >
+                What's New
+              </button>
               <button
                 type="button"
                 role="menuitem"

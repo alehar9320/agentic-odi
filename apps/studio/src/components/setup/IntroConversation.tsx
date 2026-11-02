@@ -483,7 +483,7 @@ export function IntroConversation() {
             <div className="setup__replies" aria-label="Question options">
               <button
                 type="button"
-                className="suggestion suggestion--quiet"
+                className="quiet-action"
                 onClick={skip}
                 disabled={busy}
               >

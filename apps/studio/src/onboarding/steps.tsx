@@ -137,7 +137,8 @@ function StatusRow({
   value: boolean | null;
 }) {
   const state = value === true ? "ok" : value === false ? "warn" : "pending";
-  const text = value === true ? "Connected" : value === false ? "Not reachable" : "Checking";
+  // Audit A6: nothing is "wrong" on a machine that simply has no services yet.
+  const text = value === true ? "Ready" : value === false ? "Not connected" : "Checking";
 
   return (
     <div className={`wizard-check wizard-check--${state}`}>
