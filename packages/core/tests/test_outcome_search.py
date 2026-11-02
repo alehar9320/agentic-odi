@@ -369,3 +369,13 @@ def test_the_service_refuses_a_non_numeric_score_bound(service_repo: InMemoryRep
 
     with pytest.raises(ValidationError, match="min_score"):
         service.search_outcomes(min_score=prose_bound)
+
+
+def test_the_service_refuses_a_negative_page_with_the_established_error(
+    service_repo: InMemoryRepository,
+) -> None:
+    """``page()`` raises a bare ValueError; a caller-facing surface owes a domain error."""
+    service = ODIService(service_repo)
+
+    with pytest.raises(ValidationError, match="offset"):
+        service.search_outcomes(offset=-1)

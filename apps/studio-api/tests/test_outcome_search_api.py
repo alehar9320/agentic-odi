@@ -181,6 +181,16 @@ def test_a_malformed_query_parameter_is_refused_with_the_established_shape() -> 
     assert "sidestep" in error["message"]
 
 
+def test_a_negative_page_is_a_refused_request_rather_than_a_crash() -> None:
+    """An out-of-range number is the same failure here as everywhere else: 422."""
+    client = _client()
+    response = client.get("/api/outcomes/search?offset=-1")
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "out_of_range"
+    assert "offset" in error["message"]
+
+
 def test_mcp_backend_uses_the_contract_tool(monkeypatch) -> None:
     calls: list[tuple[str, dict]] = []
 

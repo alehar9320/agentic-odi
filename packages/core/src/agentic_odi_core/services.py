@@ -616,6 +616,12 @@ class ODIService:
                     float(bound)
                 except (TypeError, ValueError) as exc:
                     raise ValidationError(f"{name} must be a number: {exc}") from exc
+        #: ``page()`` guards the slice with a bare ValueError, which every caller
+        #: facing a surface would report as an internal failure. A nonsensical
+        #: number is a bad request, so it arrives as the established error here.
+        for name, number in (("limit", limit), ("offset", offset)):
+            if number is not None and number < 0:
+                raise ValueOutOfRangeError(f"{name} must be >= 0")
         query = OutcomeQuery(
             text=text,
             stage=str(stage) if stage is not None else None,

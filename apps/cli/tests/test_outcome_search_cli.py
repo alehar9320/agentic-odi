@@ -139,6 +139,16 @@ def test_a_malformed_query_fails_as_an_error_not_a_crash(tmp_path) -> None:
     assert "sidestep" in result.output
 
 
+def test_a_negative_page_fails_as_an_error_not_a_crash(tmp_path) -> None:
+    db, _, _ = _seed(tmp_path)
+
+    result = CliRunner().invoke(app, ["--db", db, "desired-outcomes", "search", "--offset", "-1"])
+
+    assert result.exit_code == 1
+    assert "offset" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_the_human_rendering_names_the_counts(tmp_path) -> None:
     db, _, _ = _seed(tmp_path)
 
