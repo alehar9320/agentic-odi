@@ -135,6 +135,9 @@ a {
   height: 100dvh;
   display: flex;
   flex-direction: column;
+  /* The shell owns this gap, not the top banner dock: with no banner to show
+     the dock is unmounted, and the bar still should not touch the window edge. */
+  padding-top: 8px;
   background:
     radial-gradient(760px 420px at 50% 108%, rgba(99, 102, 241, 0.09), transparent 72%),
     radial-gradient(900px 520px at 68% -12%, rgba(99, 102, 241, 0.08), transparent 68%),
@@ -5438,7 +5441,7 @@ details[open] summary {
   position: sticky;
   top: 0;
   z-index: 900;
-  padding: 8px 22px 0;
+  padding: 0 22px;
 }
 
 .banner-dock--corner {
