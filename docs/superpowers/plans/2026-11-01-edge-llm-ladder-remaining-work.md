@@ -352,11 +352,11 @@ npm --prefix apps/studio run build
 cd apps/studio && npx playwright test --project=chromium   # 24 scenarios; needs the build above
 uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 336 passed
 uv run pytest -q                           # 1848 passed (repo-wide)
-uv run python scripts/pr_guards.py diff-shape --base origin/main
-uv run python scripts/pr_guards.py fabrication --base origin/main
+uv run python scripts/pr_guards.py diff-shape          # --base-ref defaults to origin/main
+uv run python scripts/pr_guards.py fabrication
 # body-truth checks the PR text, so it needs that text on disk first:
 gh pr view 608 --json body -q .body > /tmp/pr608.md
-uv run python scripts/pr_guards.py body-truth --base origin/main --body-file /tmp/pr608.md
+uv run python scripts/pr_guards.py body-truth --body-file /tmp/pr608.md
 ```
 
 `npx playwright install-deps chromium` is the one-time system step if the
