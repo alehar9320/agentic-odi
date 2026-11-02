@@ -56,8 +56,35 @@ The detail is below; this is the shape the rest of the document explains.
 | `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
 | `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | Via the same repository when the local backend is active; conversations and memory in `~/.agentic-odi/studio.db` |
 | `packages/connectors` | Connector protocol, presets, record mapping | Shared `connectors.json` registry; ingested batches land in an in-process sink |
-| `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | Browser cache only |
+| `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | IndexedDB (`agentic-odi-studio`) plus named `localStorage` keys — see Storage facts below |
 | `apps/cli` | Terminal rendering, local/remote backend selection | SQLite directly for `local`, no local writes for `mcp` |
+
+## Storage facts
+
+`apps/studio/src/bff/storageFacts.ts` answers "where does my data live and how
+big is it" from one selector, so whatever renders the answer does not re-derive
+it. `storageFacts(store)` reads the store's own snapshot and reports
+`{engine, database, bytes, records, lastWrite, persistent}`; `localStorageFacts()`
+reports the app's `localStorage` keys with their byte sizes.
+
+Three constraints shape what it is allowed to say:
+
+- `database` is imported from `apps/studio/src/bff/store/indexedDbStore.ts`, not
+  restated there — the name has one source of truth. A memory store reports
+  `null` and `persistent: false`, because nothing in it survives the tab.
+- `lastWrite` is derived. The `meta` store holds only a sequence counter, so no
+  write time is recorded anywhere to read; the selector takes the newest
+  `updated_at` across jobs, steps, outcomes, observations, and conversations,
+  with turn `created_at` as the remaining source.
+- `bytes` is the origin's usage from `navigator.storage.estimate()` where the
+  browser offers one, and the string `"unknown"` where it does not — never a
+  zero that reads like an empty database.
+
+No stored value is ever read. `studio.settings` holds the LLM key (see
+[Trust boundaries](trust-boundaries.md)), so the inventory names keys and sizes
+and stops there. `APP_STORAGE_KEYS` and `APP_STORAGE_PREFIXES` are that
+inventory, and a test fails when a writer uses a `studio.*` or `agentic-odi.*`
+key that the inventory does not cover.
 
 ## Write Paths
 
