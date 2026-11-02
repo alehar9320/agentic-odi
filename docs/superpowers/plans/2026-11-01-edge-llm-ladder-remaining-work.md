@@ -2,7 +2,12 @@
 
 **Branch:** `alehar9320/flyingfish` **Base:** `main`, merged forward twice — the
 last merge took `main` at `7269ba2`, and `origin/main` has moved three commits
-since (see "Merged with `main`" below).
+since (see "Merged with `main`" below). I checked what those three are instead of
+assuming: dev-dependency version bumps — `ruff`, `pytest-asyncio`, `mypy` —
+landing only in `pyproject.toml` and `uv.lock`. No Studio source, no sidecar
+route, no Worker code, and the branch is still `MERGEABLE`. So the drift is
+Python tooling. Re-running the Python matrix is what a merge at the new tip
+owes; the browser-tier numbers below are unaffected.
 **Status:** the engine, the ladder, the routing seam, the progression scheduler
 and the banners are built and tested, **a person can turn the feature on** —
 the offer strip asks once — **that answer can now be changed from Settings**,
@@ -90,18 +95,27 @@ absent.
 
 Everything the branch changes on top of `main` as merged, measured the way the
 guardrail measures it (`git diff origin/main...HEAD`, generated lockfiles
-excluded from the line count): 48 files, 5,177 lines added, 52 deleted, net
-5,125; 123 test functions added. The studio's vitest suite runs 970 tests across
-101 files, and Playwright drives the *built* bundle in 24 chromium scenarios — 3
-of them this ladder, green in CI's `End-to-end` check. On the Python side the
+excluded from the line count): 48 changed files and 123 test functions added.
+Those two hold across the documentation commits, because a docs commit edits a
+file already in the diff and adds no test. Net lines do not: 5,125 at `50e953d`,
+5,135 at `cdf2ea3`, and the number drifts by exactly the lines each later
+documentation commit writes. So treat the net figure as an indication of size
+and `diff-shape` as the authority — it is green at this head, and it is the
+command below, not this sentence, that a reviewer should run.
+
+The studio's vitest suite runs 970 tests across 101 files, and Playwright drives
+the *built* bundle in 24 chromium scenarios — 3 of them this ladder, green in
+CI's `End-to-end` check. On the Python side the
 branch touches one file, `tests/test_worker_security_headers.py`, which asserts
 the CSP additions; `uv run pytest -q` is 1,848 passed.
 
 PR #608's body is kept in that same measured shape, including the `Reuses:`
 block the guardrail asks of a change this size; `PR guardrails` is green at
-`50e953d`. The numbers above are the guard's, taken at this base — `origin/main`
-has moved since the last merge forward, so anyone who merges should re-run the
-gate at the new tip rather than trusting these figures.
+`50e953d` and again at `cdf2ea3`, the head the full check suite is green on —
+`End-to-end`, `studio`, `smoke`, the 3.10/3.11/3.12 matrix, `tauri-build`, the
+Chromatic run and the Cloudflare preview build all passing, `updater-e2e`
+skipped as not applicable. `origin/main` has since moved; see the header for
+what that drift actually is rather than a warning about it.
 
 ## Merged with `main` (twice)
 
