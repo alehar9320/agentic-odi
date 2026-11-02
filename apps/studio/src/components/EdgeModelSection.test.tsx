@@ -26,6 +26,7 @@ const edge = vi.hoisted(() => ({
   decline: vi.fn(async () => undefined),
   freeTier: vi.fn<(tier: EdgeTierId) => Promise<void>>(async () => undefined),
   servedTier: vi.fn(async () => null as EdgeTierId | null),
+  lastFetchFailed: vi.fn(() => false),
   listener: null as ((notice: EdgeNotice) => void) | null,
 }));
 
@@ -49,6 +50,7 @@ vi.mock("../edge/manager", async (importOriginal) => {
       decline: () => edge.decline(),
       freeTier: (tier: EdgeTierId) => edge.freeTier(tier),
       servedTier: () => edge.servedTier(),
+      lastFetchFailed: () => edge.lastFetchFailed(),
       addNoticeListener: (listener: (notice: EdgeNotice) => void) => {
         edge.listener = listener;
         return () => {
@@ -97,6 +99,7 @@ describe("EdgeModelSection", () => {
     edge.decline = vi.fn(async () => undefined);
     edge.freeTier = vi.fn<(tier: EdgeTierId) => Promise<void>>(async () => undefined);
     edge.servedTier = vi.fn(async () => null as EdgeTierId | null);
+    edge.lastFetchFailed = vi.fn(() => false);
     edge.listener = null;
     window.localStorage.clear();
   });
@@ -146,6 +149,88 @@ describe("EdgeModelSection", () => {
     expect(
       await screen.findByText(/model endpoint is answering for now/),
     ).toBeInTheDocument();
+  });
+
+  it("gives back the door to a yes that landed nothing", async () => {
+    // The case the ask cannot cover: consent was answered yes — here, in
+    // another tab, on an earlier visit — and no model ended up on disk, because
+    // the fetching tab was closed, or the download failed. The strip only ever
+    // asks an unanswered question, so it is gone, and this panel is the only
+    // door. Shut here means a person who wanted this feature cannot get it back
+    // without withdrawing a consent they never withdrew.
+    edge.panel = panelState({ consent: "granted" });
+    render(<EdgeModelSection />);
+
+    expect(await screen.findByText(/no model is on this device yet/i)).toBeInTheDocument();
+    const start = screen.getByRole("button", {
+      name: "Download Llama 3.2 1B — about 1.3 GB, once",
+    });
+    await act(async () => {
+      fireEvent.click(start);
+    });
+
+    expect(edge.grantAndStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("says when a yes that landed nothing was beaten to the lock", async () => {
+    // Pressing the door in the second tab while the first is fetching is the
+    // normal way to meet this: the download is already under way and the honest
+    // sentence is "not here", not an error.
+    edge.grantAndStart = vi.fn(async () => null);
+    edge.panel = panelState({ consent: "granted" });
+    render(<EdgeModelSection />);
+
+    const start = await screen.findByRole("button", { name: /Download Llama 3.2 1B/ });
+    await act(async () => {
+      fireEvent.click(start);
+    });
+
+    expect(screen.getByText(/nothing started in this tab/i)).toBeInTheDocument();
+  });
+
+  it("does not point at another tab when this tab's own download threw", async () => {
+    // The same press answers two ways, and the line under the button has to
+    // match: "nothing started in this tab" describes a lock someone else won,
+    // not a download this tab began and lost.
+    edge.grantAndStart = vi.fn(async () => null);
+    edge.lastFetchFailed = vi.fn(() => true);
+    edge.panel = panelState({ consent: "granted" });
+    render(<EdgeModelSection />);
+
+    const start = await screen.findByRole("button", { name: /Download Llama 3.2 1B/ });
+    await act(async () => {
+      fireEvent.click(start);
+    });
+
+    expect(screen.queryByText(/nothing started in this tab/i)).not.toBeInTheDocument();
+    // And the door stays open, because nothing is on disk.
+    expect(screen.getByRole("button", { name: /Download Llama 3.2 1B/ })).toBeEnabled();
+  });
+
+  it("does not offer to fetch what this device already has", async () => {
+    edge.panel = panelState({
+      consent: "granted",
+      tiers: [tierState("t1", { status: "active" }), tierState("t2"), tierState("t3")],
+    });
+    render(<EdgeModelSection />);
+
+    expect(await screen.findByRole("button", { name: "Stop answering here" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Download Llama/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/no model is on this device yet/i)).not.toBeInTheDocument();
+  });
+
+  it("does not start a browser download over a model endpoint that is answering", async () => {
+    edge.panel = panelState({ consent: "granted" });
+    studio.settings = {
+      base_url: "https://api.openai.com/v1",
+      api_key: "sk",
+      model_name: "gpt",
+      mcp_url: "http://localhost:8000/mcp",
+    };
+    render(<EdgeModelSection />);
+
+    expect(await screen.findByText(/model endpoint is answering for now/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Download Llama/ })).not.toBeInTheDocument();
   });
 
   it("hides the offer and says so while the switch is off", async () => {

@@ -427,6 +427,65 @@ describe("EdgeManager", () => {
       // turn after the read that noticed it, not one still standing in the queue.
       await vi.waitFor(() => expect(manager.canServe(noEndpoint, false)).toBe(false));
     });
+
+    it("reports a download that never landed, instead of rejecting into the console", async () => {
+      // Weights fail for ordinary reasons — offline mid-fetch, a CDN hiccup, the
+      // browser refusing the cache. Nothing about that is a programming error,
+      // and a person who pressed *Answer in this browser* must not be left with
+      // a strip still narrating a download that stopped and an exception only the
+      // console saw.
+      const failing = new FakeEdgeEngine({ failLoadWith: new Error("no weights today") });
+      manager.setEngineFactory(async () => failing);
+      const { env, queue } = idleQueue();
+      manager.setSchedulerEnvironment(env);
+      const notices: string[] = [];
+      const listen = manager.addNoticeListener((notice) =>
+        notices.push("tier" in notice ? `${notice.kind}:${notice.tier}` : notice.kind),
+      );
+
+      const started = manager.grantAndStart();
+      await vi.waitFor(() => expect(queue).toHaveLength(1));
+      queue.shift()?.();
+
+      expect(await started).toBeNull();
+      expect(notices).toContain("downloading:t1");
+      expect(notices).toContain("fetch-failed");
+      expect(manager.isBusy()).toBe(false);
+      // Nothing was written, so the ladder still says the device has no model —
+      // which is what puts the download back on screen in Settings.
+      expect(await manager.servedTier()).toBeNull();
+      listen();
+    });
+
+    it("remembers that the download which failed was this tab's own", async () => {
+      // `grantAndStart` resolves null for two different reasons, and the studio
+      // has to pick one sentence: another tab won the engine lock, or the fetch
+      // this tab started stopped landing. The banner layer and Settings both ask
+      // this before they blame a second tab for a download nobody else saw.
+      const failing = new FakeEdgeEngine({ failLoadWith: new Error("no weights today") });
+      manager.setEngineFactory(async () => failing);
+      const { env, queue } = idleQueue();
+      manager.setSchedulerEnvironment(env);
+
+      const started = manager.grantAndStart();
+      await vi.waitFor(() => expect(queue).toHaveLength(1));
+      queue.shift()?.();
+      await started;
+
+      expect(manager.lastFetchFailed()).toBe(true);
+    });
+
+    it("does not report a failure for a download that never began", async () => {
+      const { env } = idleQueue();
+      const hidden = { ...env, visible: () => false };
+      manager.setSchedulerEnvironment(hidden);
+
+      expect(await manager.grantAndStart()).toBeNull();
+
+      // Nothing was attempted, so nothing failed: the honest sentence here is
+      // that this tab is waiting for a visible, idle moment.
+      expect(manager.lastFetchFailed()).toBe(false);
+    });
   });
 
   describe("when a second tab moves the ladder", () => {
@@ -475,6 +534,31 @@ describe("EdgeManager", () => {
       await manager.decline();
 
       expect(here).toEqual(["consent-changed"]);
+      expect(there).toEqual(["changed"]);
+      a();
+      b();
+    });
+
+    it("keeps a fetch that failed to the tab that tried it", async () => {
+      // A failed fetch changed nothing for anyone else: no tier landed, no
+      // storage was freed. The consent the press wrote *is* a fact the other tab
+      // has to re-read, so it hears about the answer — what stays home is the
+      // sentence that this tab's download stopped.
+      const here: string[] = [];
+      const there: string[] = [];
+      const a = manager.addNoticeListener((notice) => here.push(notice.kind));
+      const b = other.addNoticeListener((notice) => there.push(notice.kind));
+
+      manager.setEngineFactory(async () => new FakeEdgeEngine({ failLoadWith: new Error("gone") }));
+      const { env, queue } = idleQueue();
+      manager.setSchedulerEnvironment(env);
+
+      const started = manager.grantAndStart();
+      await vi.waitFor(() => expect(queue).toHaveLength(1));
+      queue.shift()?.();
+      await started;
+
+      expect(here).toContain("fetch-failed");
       expect(there).toEqual(["changed"]);
       a();
       b();

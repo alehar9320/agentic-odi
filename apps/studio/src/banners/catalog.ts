@@ -57,6 +57,21 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     body: "Downloading the next model while your device is idle. Replies keep flowing meanwhile.",
     dismissible: true,
   },
+  "edge-fetch-failed": {
+    severity: "warning",
+    // Persistent, because the consent question that led here is already
+    // answered: this is the only place the studio can say what happened and
+    // hand the download back. Dismissible, because a person who is offline can
+    // be told once and left alone.
+    life: "persistent",
+    dock: "top",
+    title: "That download didn't finish.",
+    body: "Nothing is answering in this browser yet, and nothing else was affected. Try the download again when you have a connection.",
+    dismissible: true,
+    actions: [
+      { label: "Try the download again", action: "enable-edge-model", tone: "primary", durable: true },
+    ],
+  },
   "edge-ready": {
     severity: "success",
     life: "transient",

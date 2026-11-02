@@ -104,6 +104,9 @@ export function BannerBridge() {
   useEffect(() => {
     const unsubscribe = edgeManager.addNoticeListener((notice) => {
       if (notice.kind === "downloading") {
+        // A percent tick is this tab's engine working again, which is the fact
+        // that makes "that download didn't finish" no longer true.
+        resolve("edge-fetch-failed");
         const percent = Math.round(notice.progress.percent * 100);
         raise({
           kind: "edge-downloading",
@@ -111,7 +114,23 @@ export function BannerBridge() {
         });
         return;
       }
-      resolve("edge-downloading");
+      // Only a notice about *this tab's* engine ends the download story. A
+      // `changed` from another tab says the disk moved, not that the fetch here
+      // stopped — and on a real connection the next percent tick may be a minute
+      // away, so clearing here would leave the strip that explains the wait gone
+      // while the wait continues.
+      if (notice.kind === "ready" || notice.kind === "unlocked" || notice.kind === "tier-freed") {
+        resolve("edge-downloading");
+        resolve("edge-fetch-failed");
+      }
+      if (notice.kind === "fetch-failed") {
+        // The fetch this tab started threw, so the narration has to stop
+        // claiming a download is coming and say what actually happened — with
+        // the same download on the button, because the consent question that
+        // asked for it will never be asked again.
+        resolve("edge-downloading");
+        raise({ kind: "edge-fetch-failed" });
+      }
       if (notice.kind === "ready") {
         raise({
           kind: "edge-ready",
@@ -172,7 +191,12 @@ export function useBannerActionDispatcher(): {
           }
           // Nothing started here. Another tab may already be fetching it —
           // in which case the model is arriving and a complaint would be a
-          // lie — or the moment was genuinely wrong.
+          // lie — or the moment was genuinely wrong. A download this tab
+          // started and lost is neither: the notice already raised the strip
+          // that says so, and this guess would sit next to it contradicting it.
+          if (edgeManager.lastFetchFailed()) {
+            return;
+          }
           if ((await edgeManager.servedTier()) === null) {
             raise({
               kind: "error",

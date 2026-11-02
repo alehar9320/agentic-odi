@@ -8,6 +8,7 @@ const ALL_KINDS: BannerKind[] = [
   "model-offline",
   "edge-offer",
   "edge-downloading",
+  "edge-fetch-failed",
   "edge-ready",
   "edge-unlocked",
   "update-available",
@@ -79,6 +80,19 @@ describe("BANNER_CATALOG", () => {
       "enable-edge-model",
       "decline-edge-model",
     ]);
+  });
+
+  it("treats a download that did not land as a strip that hands back the same ask", () => {
+    // The consent question is answered and nothing arrived, so the one-time ask
+    // is gone: this strip is the only place left that can say what happened and
+    // offer the download again.
+    const entry = BANNER_CATALOG["edge-fetch-failed"];
+    expect(entry.severity).toBe("warning");
+    expect(entry.life).toBe("persistent");
+    expect(entry.dock).toBe("top");
+    expect(entry.dismissible).toBe(true);
+    expect(entry.title).toMatch(/didn't finish/i);
+    expect(entry.actions?.map((action) => action.action)).toEqual(["enable-edge-model"]);
   });
 
   it("treats a first tier landing as a success toast, not a permanent strip", () => {

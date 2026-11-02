@@ -31,6 +31,10 @@ export interface SchedulerDeps {
   eligibility(): Promise<Eligibility>;
   onProgress(tier: EdgeTierId, progress: LoadProgress): void;
   onUnlocked(tier: EdgeTierId, origin: TierOrigin): void;
+  /** The load threw — the weights did not land. Reported rather than rejected:
+   * nothing about a dropped download is a programming error, and a caller that
+   * is not watching for a promise rejection must still be able to say so. */
+  onFetchFailed(tier: EdgeTierId, origin: TierOrigin): void;
   env?: SchedulerEnvironment;
 }
 
@@ -152,16 +156,29 @@ export class EdgeScheduler {
     if (!this.goodMoment()) {
       return null;
     }
+    let failed = false;
     const { acquired } = await withEngineLock(async () => {
       const engine = await this.deps.engine();
-      await engine.load(tierById(tier).modelId, (progress) => {
-        this.deps.onProgress(tier, progress);
-      });
+      try {
+        await engine.load(tierById(tier).modelId, (progress) => {
+          this.deps.onProgress(tier, progress);
+        });
+      } catch {
+        // The weights did not land. Swallowed here on purpose: the throw has
+        // nothing to abort and nobody upstream is waiting on a rejected promise,
+        // so it becomes a notice the person can read instead of a console line.
+        failed = true;
+        return;
+      }
       await this.deps.state.setTierState(tier, {
         status: "active",
         cachedAt: new Date().toISOString(),
       });
     });
+    if (failed) {
+      this.deps.onFetchFailed(tier, origin);
+      return null;
+    }
     if (!acquired) {
       // Another tab is on it; its write to the shared state will show up
       // before the next turn is routed.

@@ -78,10 +78,11 @@ async function prime(options: {
   store.close();
 }
 
-function harness(overrides: { eligibility?: Eligibility; locks?: boolean } = {}) {
+function harness(overrides: { eligibility?: Eligibility; locks?: boolean; load?: Error } = {}) {
   const harnessEnv = fakeEnv();
-  const engine = new FakeEdgeEngine();
+  const engine = new FakeEdgeEngine({ failLoadWith: overrides.load });
   const unlocked: string[] = [];
+  const failed: string[] = [];
   const progress: Array<[string, LoadProgress]> = [];
   let lockRequest: ReturnType<typeof vi.fn> | null = null;
   if (overrides.locks) {
@@ -112,12 +113,14 @@ function harness(overrides: { eligibility?: Eligibility; locks?: boolean } = {})
     eligibility: async () => overrides.eligibility ?? healthyDesktop,
     onProgress: (tier, p) => progress.push([tier, p]),
     onUnlocked: (tier) => unlocked.push(tier),
+    onFetchFailed: (tier) => failed.push(tier),
     env: harnessEnv.env,
   });
   return {
     scheduler,
     engine,
     unlocked,
+    failed,
     progress,
     lockRequest,
     ...harnessEnv,
@@ -161,6 +164,25 @@ describe("EdgeScheduler", () => {
     const started = h.scheduler.noteTurn();
     await h.fireIdle();
     expect(await started).toBe("t2");
+    h.cleanup();
+  });
+
+  it("reports a download that threw instead of rejecting into the console", async () => {
+    // Weights fail for ordinary reasons: the network drops, the CDN refuses, the
+    // browser rejects the cache. That is news the person can act on, not a
+    // programming error — and the ladder must not pretend a tier landed.
+    await prime({ consent: "granted", hosted: [["t1", "active"]], turns: 10 });
+    const h = harness({ load: new Error("no weights today") });
+
+    const started = h.scheduler.noteTurn();
+    await h.fireIdle();
+
+    expect(await started).toBeNull();
+    expect(h.failed).toEqual(["t2"]);
+    expect(h.unlocked).toEqual([]);
+    const store = await EdgeStateStore.open();
+    expect((await store.getTierStates()).t2.status).toBe("empty");
+    store.close();
     h.cleanup();
   });
 

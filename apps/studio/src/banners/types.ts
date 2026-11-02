@@ -22,6 +22,7 @@ export type BannerKind =
   | "model-offline"
   | "edge-offer"
   | "edge-downloading"
+  | "edge-fetch-failed"
   | "edge-ready"
   | "edge-unlocked"
   | "update-available"

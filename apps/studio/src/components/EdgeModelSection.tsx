@@ -66,7 +66,13 @@ export function EdgeModelSection() {
     setSpokeTooSoon(false);
     try {
       const tier = await edgeManager.grantAndStart();
-      setSpokeTooSoon(tier === null && (await edgeManager.servedTier()) === null);
+      // A download this tab started and lost is not a download that never
+      // began: the strip above this panel already says it did not finish, and
+      // "nothing started in this tab" would point at a second tab that has no
+      // idea this one exists.
+      setSpokeTooSoon(
+        tier === null && !edgeManager.lastFetchFailed() && (await edgeManager.servedTier()) === null,
+      );
     } finally {
       setPending(null);
       refresh();
@@ -87,6 +93,34 @@ export function EdgeModelSection() {
   const offerLabel = entry
     ? `Download ${entry.label} — about ${formatGB(entry.approxBytes)}, once`
     : null;
+  // The one fact that makes starting worth offering again: nothing is on disk.
+  // A yes whose fetch never landed — the fetching tab closed, the download
+  // refused — leaves the consent answered, so the strip has gone and this panel
+  // is the only door. Without it the feature is switched off by a door that
+  // only opens on a question already answered.
+  const nothingHosted = (panel?.tiers ?? []).every((tier) => tier.status === "empty");
+  const canStartHere =
+    panel !== null && panel.downloadable && nothingHosted && !hasModelEndpoint(settings);
+
+  const startControl =
+    offerLabel === null ? null : (
+      <>
+        <button
+          type="button"
+          className="button"
+          disabled={pending !== null}
+          onClick={() => void sayYes()}
+        >
+          {offerLabel}
+        </button>
+        {spokeTooSoon ? (
+          <p className="muted">
+            Nothing started in this tab — another tab may already be fetching it, or this
+            browser is waiting for a visible, idle moment off a Save Data connection.
+          </p>
+        ) : null}
+      </>
+    );
 
   return (
     <section className="settings__edge" aria-labelledby="settings-edge-heading">
@@ -125,6 +159,15 @@ export function EdgeModelSection() {
                   ? "Your model endpoint is answering for now; clear it and this takes over."
                   : "Replies run here as soon as a tier is on this device."}
               </p>
+              {canStartHere ? (
+                <>
+                  <p className="muted">
+                    No model is on this device yet, so nothing is answering here. Fetching it is
+                    the same one-time download the first ask described.
+                  </p>
+                  {startControl}
+                </>
+              ) : null}
               <button
                 type="button"
                 className="button button--ghost"
@@ -150,20 +193,7 @@ export function EdgeModelSection() {
                   ? "You turned this down earlier. You can change that here."
                   : "This browser has nothing to answer with yet."}
               </p>
-              <button
-                type="button"
-                className="button"
-                disabled={pending !== null}
-                onClick={() => void sayYes()}
-              >
-                {offerLabel}
-              </button>
-              {spokeTooSoon ? (
-                <p className="muted">
-                  Nothing started in this tab — another tab may already be fetching it, or this
-                  browser is waiting for a visible, idle moment off a Save Data connection.
-                </p>
-              ) : null}
+              {startControl}
             </div>
           ) : (
             <p className="muted">

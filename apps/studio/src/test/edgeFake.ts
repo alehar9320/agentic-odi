@@ -16,6 +16,9 @@ import { computeEligibility } from "../edge/ladder";
 export interface FakeEngineOptions {
   tokens?: string[];
   failWith?: Error;
+  /** Throw out of `load()` instead, so a caller can be tested against a fetch
+   * that did not land. */
+  failLoadWith?: Error;
   /** Eligibility `probe()` reports; defaults to a healthy desktop. */
   eligibility?: Eligibility;
   onStreamStart?: () => void;
@@ -47,6 +50,9 @@ export class FakeEdgeEngine implements EdgeLLMEngine {
   async load(modelId: string, onProgress: (p: LoadProgress) => void): Promise<void> {
     this.loads.push(modelId);
     onProgress({ phase: "download", percent: 0.5, text: "Download 50%" });
+    if (this.options.failLoadWith) {
+      throw this.options.failLoadWith;
+    }
     onProgress({ phase: "ready", percent: 1, text: "Finish" });
   }
 

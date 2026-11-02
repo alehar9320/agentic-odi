@@ -36,6 +36,7 @@ const edge = vi.hoisted(() => ({
   decline: vi.fn(async () => undefined),
   servedTier: vi.fn(async () => null as EdgeTierId | null),
   isBusy: vi.fn(() => false),
+  lastFetchFailed: vi.fn(() => false),
   noticeListener: null as ((notice: EdgeNotice) => void) | null,
 }));
 
@@ -55,6 +56,7 @@ vi.mock("../edge/manager", async () => {
       decline: () => edge.decline(),
       servedTier: () => edge.servedTier(),
       isBusy: () => edge.isBusy(),
+      lastFetchFailed: () => edge.lastFetchFailed(),
       addNoticeListener: (listener: (notice: EdgeNotice) => void) => {
         edge.noticeListener = listener;
         return () => {
@@ -101,6 +103,7 @@ describe("BannerBridge", () => {
     edge.decline = vi.fn(async () => undefined);
     edge.servedTier = vi.fn(async () => null);
     edge.isBusy = vi.fn(() => false);
+    edge.lastFetchFailed = vi.fn(() => false);
     edge.noticeListener = null;
   });
 
@@ -288,6 +291,35 @@ describe("BannerBridge", () => {
     expect(edge.sync.mock.calls.length).toBeGreaterThan(readsBefore);
     expect(screen.queryByText(/answering in this tab now/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+  });
+
+  it("does not blame another tab for a download this tab lost", async () => {
+    // `grantAndStart` resolving null has two meanings, and the strip next to
+    // this one already says which: the fetch this tab began threw. Guessing
+    // "another tab may be fetching it" over that would contradict the sentence
+    // the notice just raised.
+    edge.offerFor = vi.fn(async () => ({
+      tier: "t1",
+      label: "Llama 3.2 1B",
+      approxBytes: 1_300_000_000,
+    }));
+    edge.grantAndStart = vi.fn(async () => {
+      edge.noticeListener?.({ kind: "fetch-failed" });
+      return null;
+    });
+    edge.lastFetchFailed = vi.fn(() => true);
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    await waitFor(() =>
+      expect(screen.getByText(/This browser can answer, free/i)).toBeInTheDocument(),
+    );
+
+    act(() => {
+      screen.getByRole("button", { name: "Answer in this browser" }).click();
+    });
+    await waitFor(() => expect(screen.getByText(/didn't finish/i)).toBeInTheDocument());
+
+    expect(screen.queryByText(/didn't start here/i)).not.toBeInTheDocument();
   });
 
   it("says so when a yes does not start a download", async () => {
@@ -514,6 +546,64 @@ describe("BannerBridge", () => {
     expect(screen.queryByText(/Making this browser smarter, quietly/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Your replies just got smarter/i)).toBeInTheDocument();
     expect(screen.getByText(/Llama 3.2 3B is answering in this browser now/i)).toBeInTheDocument();
+  });
+
+  it("keeps narrating its own fetch when another tab touches the ladder", async () => {
+    // The tab doing the downloading hears `changed` from its own publish, and
+    // again when a second tab answers. That notice means "the disk moved", not
+    // "your download stopped" — and on a real connection the next percent tick
+    // can be a minute away, so silencing here would blank the one strip that
+    // explains why nothing is answering yet.
+    renderShell();
+    await act(async () => {});
+
+    act(() => {
+      edge.noticeListener?.({
+        kind: "downloading",
+        tier: "t1",
+        progress: { phase: "download", percent: 0.05, text: "5%" },
+      });
+    });
+    act(() => {
+      edge.noticeListener?.({ kind: "changed" });
+    });
+
+    expect(screen.getByText(/Fetching Llama 3.2 1B \(5%\)/)).toBeInTheDocument();
+  });
+
+  it("says plainly when the download a yes started did not land", async () => {
+    // A stalled narration is worse than a failure named: the person keeps
+    // waiting for a model that is never coming, in a studio that will not ask
+    // them the question again. The strip stops claiming, and says where the
+    // retry is.
+    renderShell();
+    await act(async () => {});
+
+    act(() => {
+      edge.noticeListener?.({
+        kind: "downloading",
+        tier: "t1",
+        progress: { phase: "download", percent: 0.4, text: "40%" },
+      });
+    });
+    act(() => {
+      edge.noticeListener?.({ kind: "fetch-failed" });
+    });
+
+    expect(screen.queryByText(/Making this browser smarter, quietly/i)).not.toBeInTheDocument();
+    expect(await screen.findByText(/didn't finish/i)).toBeInTheDocument();
+
+    // A second press starts a second story: the failure strip is not a scar that
+    // stays over the download it describes.
+    act(() => {
+      edge.noticeListener?.({
+        kind: "downloading",
+        tier: "t1",
+        progress: { phase: "download", percent: 0.1, text: "10%" },
+      });
+    });
+    expect(screen.getByText(/Making this browser smarter, quietly/i)).toBeInTheDocument();
+    expect(screen.queryByText(/didn't finish/i)).not.toBeInTheDocument();
   });
 
   it("unsubscribes from edge notices when the bridge unmounts", () => {

@@ -37,11 +37,28 @@ export type EdgeNotice =
   /** The person answered the consent question, either way. */
   | { kind: "consent-changed" }
   /**
+   * The fetch this tab started did not land — offline mid-download, a refused
+   * cache, a model the runtime could not load. Deliberately never broadcast:
+   * nothing on disk moved, so no other tab has a fact to correct, and no other
+   * tab promised this person a download.
+   */
+  | { kind: "fetch-failed" }
+  /**
    * Another tab moved the ladder — consent given there, a tier fetched or
    * freed there. Deliberately without details: this tab did not do it, so the
    * honest news is "go and look", not a claim about a model it never fetched.
    */
   | { kind: "changed" };
+
+/** The notice kinds worth telling the other tabs about. Anything else is this
+ * tab's own narration; `changed` in particular is what a tab *hears*, so
+ * sending it back would be an echo with no new fact under it. */
+const SETTLED_NOTICE_KINDS: EdgeNotice["kind"][] = [
+  "consent-changed",
+  "ready",
+  "unlocked",
+  "tier-freed",
+];
 
 /** The one-time ask, in the two numbers that matter: which model, how big. */
 export interface EdgeOffer {
@@ -134,6 +151,10 @@ export class EdgeManager {
   private bus: LadderBus | null = null;
   private environment: SchedulerEnvironment | null = null;
   private fetching = false;
+  /** The last download this tab started is the one that threw. A second null
+   * from `grantAndStart` — another tab won the engine — is a different fact, and
+   * the two sentences are not interchangeable. */
+  private fetchFailed = false;
   /** What this tab last read of consent and the tiers on disk. A person's
    * message is never made to wait on a storage read to learn who is answering
    * it, so the routing decision reads this and the read that follows corrects
@@ -188,11 +209,11 @@ export class EdgeManager {
   }
 
   private emit(notice: EdgeNotice): void {
-    // Everything but a progress tick changed what storage says about the
-    // ladder — consent given, a tier hosted or freed — so the routing snapshot
-    // follows the notice, and so do the other tabs. A tick changes nothing
-    // anyone could decide on, and would flood the channel.
-    if (notice.kind !== "downloading") {
+    // The kinds that change what a tab could decide with: consent answered, a
+    // tier hosted, a tier freed. A progress tick would flood the channel with
+    // numbers only the fetching tab renders, and a failed fetch changed nothing
+    // for anyone else — so neither leaves this tab.
+    if (SETTLED_NOTICE_KINDS.includes(notice.kind)) {
       this.reread();
       this.ensureBus().publish();
     }
@@ -210,6 +231,7 @@ export class EdgeManager {
     this.state = null;
     this.loadedTier = null;
     this.fetching = false;
+    this.fetchFailed = false;
     this.bus?.close();
     this.bus = null;
     this.snapshot = { consent: "unset", servedTier: null };
@@ -237,7 +259,12 @@ export class EdgeManager {
           // The prefetch loaded through this tab's engine, so the next turn
           // starts already on the stronger tier.
           this.loadedTier = tier;
+          this.fetchFailed = false;
           this.emit({ kind: origin === "bootstrap" ? "ready" : "unlocked", tier });
+        },
+        onFetchFailed: () => {
+          this.fetchFailed = true;
+          this.emit({ kind: "fetch-failed" });
         },
         env: this.environment ?? undefined,
       });
@@ -311,13 +338,15 @@ export class EdgeManager {
 
   /** Say yes, then earn nothing: fetch the entry tier now so the next turn
    * has a voice. Resolves to the tier hosted, or null when the moment was
-   * wrong or another tab is already doing it. */
+   * wrong, another tab is already doing it, or the download this tab started
+   * did not land — `lastFetchFailed()` says which. */
   async grantAndStart(): Promise<EdgeTierId | null> {
     const state = await this.ensureState();
     await state.setConsent("granted");
     // From this instant this tab is working on an answer, so "no model is
     // reachable" has stopped being true. The banner layer asks `isBusy`.
     this.fetching = true;
+    this.fetchFailed = false;
     this.emit({ kind: "consent-changed" });
     try {
       return await (await this.ensureScheduler()).bootstrap();
@@ -329,6 +358,13 @@ export class EdgeManager {
   /** True while this tab has a first-tier download in flight. */
   isBusy(): boolean {
     return this.fetching;
+  }
+
+  /** True when the download this tab itself started is the one that threw.
+   * Both surfaces that answer a press ask this before saying "another tab may
+   * already be fetching it" — a sentence about a lock, not about a failure. */
+  lastFetchFailed(): boolean {
+    return this.fetchFailed;
   }
 
   /** Say no, durably. Settings can change it; the studio cannot ask twice. */
