@@ -200,10 +200,40 @@ Reduced motion is honoured globally in `theme.css` (`@media
 (prefers-reduced-motion: reduce)` collapses animations, transitions, and
 `scroll-behavior`), so new components inherit it without opting in.
 
-Contrast is never faked in jsdom: it is computed from the palette tokens above,
-and a real-browser axe pass over the matrix, palette, and mobile lens remains a
-candidate for the Playwright suite described below, which today covers the
-end-to-end seams rather than accessibility.
+### Contrast as a build gate
+
+The jsdom sweep above cannot measure contrast, so the browser carries that
+half of the gate (issue #543, parent #331). `e2e/a11y.spec.ts` renders the five
+core screens — home, the opportunity landscape, the records lens, catch-up, and
+settings — in both themes and fails when a screen paints a pair that is not on
+the known list, naming the screen, the selector, both colours, and the ratio.
+The job is required: `.github/workflows/ci.yml` runs it as `Contrast gate` and
+`ci-green` depends on it.
+
+- **the walker** — `src/test/contrast.ts` resolves the effective background by
+  walking the ancestors and folding each `background-color` and each gradient
+  stop together. axe skips any element over a gradient and returns it as
+  `incomplete`, which is exactly the shell, the hero, and the charts, so the
+  walker measures them itself and reports a pair it still cannot resolve (an
+  image, a filter) as `indeterminate` rather than skipping it. It is
+  self-contained: the spec serialises it into the page with
+  `Function.prototype.toString`, and `src/test/contrast.test.ts` runs the same
+  source in jsdom.
+- **the raw-colour gate** — `src/styles/colors.test.ts` fails on a hex or
+  `rgb()` literal outside `theme.css`, naming the file and line, so a component
+  cannot inline a colour the theme does not own. A handful of files whose
+  colours are structural (generated artwork, print media, SVG chart fills) are
+  named in `ALLOWED_FILES` with a reason and an issue; the list is capped and
+  fails on a stale entry, so it can only shrink.
+- **the known pairs** — `e2e/a11y/knownPairs.ts` records the token-level
+  failures the walker finds today, each owned by #542 ("fix the tokens that
+  fail AA", not yet merged) or #335. It is a ratchet: an unlisted pair fails
+  immediately, and an entry that stops failing fails too, so the list can only
+  shrink. When #542 lands, the gate reports the stale entries and they are
+  deleted.
+
+A deliberately low-contrast pair is injected in the spec's last test, so the
+gate is proven to fail rather than assumed to.
 
 ## End-to-end
 
