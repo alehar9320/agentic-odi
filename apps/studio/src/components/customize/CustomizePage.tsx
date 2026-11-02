@@ -142,19 +142,14 @@ export function CustomizePage() {
         </div>
 
         <div className="customize__areas" aria-label="Capability areas">
-          <button
-            type="button"
-            className={`customize__chip${area === "" ? " is-active" : ""}`}
-            onClick={() => setArea("")}
-          >
-            All
-          </button>
+          {/* No "All" chip: an unselected row already means all, and the active
+              chip toggles itself back off. */}
           {Object.entries(areas).map(([id, label]) => (
             <button
               key={id}
               type="button"
               className={`customize__chip${area === id ? " is-active" : ""}`}
-              onClick={() => setArea(id)}
+              onClick={() => setArea(area === id ? "" : id)}
             >
               {label}
             </button>
