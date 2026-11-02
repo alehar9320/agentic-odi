@@ -183,6 +183,12 @@ Studio says so in one place and keeps going:
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
   all.
+- Where that work sits, and how much room it takes, is one call away:
+  `bff/storageFacts.ts` reports the engine, the database name, the record count,
+  the newest write the records carry, and whether the browser agreed to keep the
+  store across restarts — plus the settings keys in `localStorage` by name and
+  size, never by value, since one of them holds your model key. See
+  [Data flow → Storage facts](architecture/data-flow.md).
 - A warning strip appears only for something that actually broke: a model or
   sidecar that this session reached and then lost, or a check you asked for by
   pressing **Recheck** or running the tour's live step. Opening Settings measures
