@@ -108,7 +108,7 @@ test.describe("Pillar 0 · Arrive — a stranger gets value in five minutes", ()
 
     const empty = page.locator(".studio-empty");
     await expect(empty).toBeVisible();
-    await expect(empty).toContainText("No opportunities yet");
+    await expect(empty).toContainText("No saved copy on this device");
     await expect(empty).toContainText("Capture an outcome");
     // No fabricated rows: the canvas the sidecar returns is genuinely empty.
     await expect(page.locator(".metric-grid")).toHaveCount(0);
