@@ -178,6 +178,37 @@ describe("EvidenceStream", () => {
     ]);
   });
 
+  it("leaves arrow keys to the controls inside an open form", () => {
+    renderWith();
+    fireEvent.click(screen.getByRole("button", { name: /Turn Call with Ada into an outcome/ }));
+
+    for (const control of [
+      screen.getByLabelText("Job"),
+      screen.getByLabelText("Desired outcome"),
+      screen.getByLabelText(/^Importance/),
+      screen.getByLabelText(/^Current satisfaction/),
+    ]) {
+      for (const key of ["ArrowUp", "ArrowDown"]) {
+        // fireEvent returns false once the handler has called preventDefault.
+        expect(fireEvent.keyDown(control, { key })).toBe(true);
+      }
+    }
+
+    expect(labels()).toEqual(["Call with Ada", "Slack thread", "Support ticket"]);
+    expect(localStorage.getItem("agentic-odi.evidence-order")).toBeNull();
+  });
+
+  it("reorders the row itself while its form is open", () => {
+    renderWith();
+    fireEvent.click(screen.getByRole("button", { name: /Turn Call with Ada into an outcome/ }));
+
+    fireEvent.keyDown(screen.getByRole("listitem", { name: /Call with Ada/ }), {
+      key: "ArrowDown",
+    });
+
+    expect(labels()).toEqual(["Slack thread", "Call with Ada", "Support ticket"]);
+  });
+
   it("reorders by dragging one record onto another", () => {
     renderWith();
 
