@@ -92,6 +92,45 @@ test.describe("answering in the browser", () => {
     await expect(offerStrip(page)).toHaveCount(0);
   });
 
+  test("an answer the tab produced is still there after a reload, still labelled", async ({
+    page,
+  }) => {
+    await installEdgeDevice(page);
+    await openStudio(page);
+
+    await offerStrip(page)
+      .getByRole("button", { name: "Answer in this browser" })
+      .click();
+    await expect(dock(page).filter({ hasText: "answering in this tab now" })).toBeVisible();
+
+    await dismissConnectorSuggestion(page);
+    await page.getByRole("textbox", { name: COMPOSER }).fill("Where do I start?");
+    await page.getByRole("button", { name: "Send message" }).click();
+
+    const asked = reply(page);
+    await expect(asked).toContainText("Start with the job, then the outcome.");
+
+    // The person closes the tab and comes back. What the browser answered is
+    // the only copy of that work there is: no key was configured, so no server
+    // ever saw the turn. Losing it here loses their research.
+    await page.reload();
+    await expect(page.getByRole("textbox", { name: COMPOSER })).toBeVisible();
+    // Named, not "the first one": the specs before this one chatted to the same
+    // sidecar, so a real reload shows their turns and this browser's own answer
+    // next to them — which is the merge, not a leak.
+    await expect(
+      page
+        .getByRole("log", { name: CONVERSATION })
+        .locator(".message--user")
+        .filter({ hasText: "Where do I start?" }),
+    ).toBeVisible();
+    const remembered = reply(page);
+    await expect(remembered).toContainText("Start with the job, then the outcome.");
+    await expect(
+      remembered.getByRole("button", { name: "Answered in this browser" }),
+    ).toBeVisible();
+  });
+
   test("a key appearing later takes the turns back", async ({ page }) => {
     await installEdgeDevice(page);
     const sent = watchRemoteTurns(page);

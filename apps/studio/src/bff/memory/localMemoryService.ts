@@ -6,6 +6,7 @@ import type {
   Observation,
   ObservationKind,
   ObservationStatus,
+  ReplyProvenance,
 } from "../../types";
 import { notFound, validation } from "../errors";
 import { newId, nowIso } from "../id";
@@ -157,9 +158,23 @@ export class LocalMemoryService {
   }
 
   async createConversation(title = ""): Promise<Conversation> {
+    return this.ensureConversation(newId(), title);
+  }
+
+  /**
+   * Hold a conversation this store never made — the id came from the server — so
+   * an answer produced here has somewhere to be recorded. An existing
+   * conversation is returned as it is, including its title: adopting an id is not
+   * a licence to rewrite what is already on disk.
+   */
+  async ensureConversation(id: string, title = ""): Promise<StoredConversation> {
+    const existing = await this.store.getConversation(id);
+    if (existing) {
+      return existing;
+    }
     const now = nowIso();
     const conversation: StoredConversation = {
-      id: newId(),
+      id,
       title: title.trim(),
       created_at: now,
       updated_at: now,
@@ -222,6 +237,7 @@ export class LocalMemoryService {
     content: string,
     messageId?: string | null,
     parentId?: string | null,
+    provenance?: ReplyProvenance,
   ): Promise<ConversationTurn> {
     if (!TURN_ROLES.has(role)) {
       throw validation(`Unknown turn role: ${role}.`);
@@ -237,6 +253,7 @@ export class LocalMemoryService {
       created_at: nowIso(),
       message_id: messageId ?? null,
       parent_id: parentId ?? null,
+      ...(provenance ? { provenance } : {}),
     });
     const now = nowIso();
     await this.store.putConversation({

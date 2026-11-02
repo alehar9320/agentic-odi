@@ -1,10 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioApiError, fetchCanvas, fetchMemory, isTransportFailure, listConversations, streamChat } from "./studioApi";
+import {
+  StudioApiError,
+  fetchCanvas,
+  fetchConversationTree,
+  fetchMemory,
+  isTransportFailure,
+  listConversations,
+  streamChat,
+} from "./studioApi";
 
 const bff = {
   data: { fetchCanvas: vi.fn() },
-  memory: { listObservations: vi.fn(), listConversations: vi.fn() },
+  memory: {
+    listObservations: vi.fn(),
+    listConversations: vi.fn(),
+    getConversation: vi.fn(),
+    conversationTree: vi.fn(),
+  },
   chat: { stream: vi.fn() },
 };
 
@@ -24,6 +37,8 @@ beforeEach(() => {
   vi.mocked(bff.data.fetchCanvas).mockReset();
   vi.mocked(bff.memory.listObservations).mockReset();
   vi.mocked(bff.memory.listConversations).mockReset();
+  vi.mocked(bff.memory.getConversation).mockReset();
+  vi.mocked(bff.memory.conversationTree).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
 });
 
@@ -132,5 +147,143 @@ describe("listConversations fallback", () => {
 
     expect(listed.map((item) => item.id)).toEqual(["c-2"]);
     expect(bff.memory.listConversations).not.toHaveBeenCalled();
+  });
+});
+
+function serverTree(headId: string, ids: string[]) {
+  const conversation = {
+    id: "c-1",
+    title: "Activation model",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    head_id: headId,
+  };
+  return jsonResponse({
+    conversation,
+    messages: ids.map((id) => ({
+      id,
+      parent_id: null,
+      role: "user",
+      content: `asked as ${id}`,
+      created_at: "2026-01-01T09:00:00Z",
+    })),
+    head_id: headId,
+  });
+}
+
+/** What this browser recorded for the same conversation id. */
+function localTurns() {
+  return [
+    {
+      id: 7,
+      conversation_id: "c-1",
+      role: "user",
+      content: "Where do I start?",
+      created_at: "2026-01-02T09:00:00Z",
+      message_id: "q-2",
+      parent_id: "m-1",
+    },
+    {
+      id: 8,
+      conversation_id: "c-1",
+      role: "assistant",
+      content: "Start with the job, then the outcome.",
+      created_at: "2026-01-02T09:00:05Z",
+      message_id: "a-2",
+      parent_id: "q-2",
+      provenance: "edge",
+    },
+  ];
+}
+
+describe("fetchConversationTree with the browser's own turns", () => {
+  it("shows what this browser answered next to the server's thread", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(serverTree("m-1", ["m-1"]));
+    vi.mocked(bff.memory.getConversation).mockResolvedValueOnce({ id: "c-1" });
+    vi.mocked(bff.memory.conversationTree).mockResolvedValueOnce({
+      conversation: { id: "c-1" },
+      messages: localTurns(),
+      head_id: "a-2",
+    });
+
+    const tree = await fetchConversationTree("c-1");
+
+    expect(tree.messages.map((turn) => turn.id)).toEqual(["m-1", "q-2", "a-2"]);
+    expect(tree.messages[2]?.provenance).toBe("edge");
+  });
+
+  it("reopens on the last turn answered, whoever answered it", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(serverTree("m-1", ["m-1"]));
+    vi.mocked(bff.memory.getConversation).mockResolvedValueOnce({ id: "c-1" });
+    vi.mocked(bff.memory.conversationTree).mockResolvedValueOnce({
+      conversation: { id: "c-1" },
+      messages: localTurns(),
+      head_id: "a-2",
+    });
+
+    const tree = await fetchConversationTree("c-1");
+
+    expect(tree.head_id).toBe("a-2");
+  });
+
+  it("names the browser as the brain when only the browser holds the thread", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
+    vi.mocked(bff.memory.conversationTree).mockResolvedValueOnce({
+      conversation: { id: "c-1" },
+      messages: localTurns(),
+      head_id: "a-2",
+    });
+    vi.mocked(bff.memory.getConversation).mockResolvedValueOnce({ id: "c-1" });
+
+    const tree = await fetchConversationTree("c-1");
+
+    expect(tree.messages.map((turn) => turn.id)).toEqual(["q-2", "a-2"]);
+    expect(tree.messages[1]?.provenance).toBe("edge");
+  });
+
+  it("keeps the branch that was left open when the browser's turns are older", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        conversation: { id: "c-1", title: "", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", head_id: "m-1" },
+        messages: [
+          { id: "m-1", parent_id: null, role: "user", content: "left here", created_at: "2026-01-01T09:00:00Z" },
+          { id: "m-2", parent_id: null, role: "user", content: "the other branch", created_at: "2026-01-01T10:00:00Z" },
+        ],
+        head_id: "m-1",
+      }),
+    );
+    vi.mocked(bff.memory.getConversation).mockResolvedValueOnce({ id: "c-1" });
+    vi.mocked(bff.memory.conversationTree).mockResolvedValueOnce({
+      conversation: { id: "c-1" },
+      messages: [
+        { id: 7, conversation_id: "c-1", role: "assistant", content: "answered first", created_at: "2026-01-01T08:00:00Z", message_id: "a-0", parent_id: null },
+      ],
+      head_id: "a-0",
+    });
+
+    const tree = await fetchConversationTree("c-1");
+
+    expect(tree.messages.map((turn) => turn.id)).toEqual(["m-1", "m-2", "a-0"]);
+    expect(tree.head_id).toBe("m-1");
+  });
+
+  it("keeps the server's thread when this browser holds none", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(serverTree("m-1", ["m-1"]));
+    vi.mocked(bff.memory.getConversation).mockResolvedValueOnce(undefined);
+
+    const tree = await fetchConversationTree("c-1");
+
+    expect(tree.messages.map((turn) => turn.id)).toEqual(["m-1"]);
+    expect(tree.head_id).toBe("m-1");
+  });
+
+  it("keeps the server's thread when the browser's own memory will not open", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(serverTree("m-1", ["m-1"]));
+    vi.mocked(bff.memory.getConversation).mockRejectedValueOnce(new Error("IndexedDB blocked"));
+
+    const tree = await fetchConversationTree("c-1");
+
+    expect(tree.messages.map((turn) => turn.id)).toEqual(["m-1"]);
+    expect(tree.head_id).toBe("m-1");
   });
 });

@@ -354,6 +354,23 @@ describe("Conversation provenance", () => {
     harness.state.openPanel.mockClear();
   });
 
+  it("still names the browser on a reply that came back from storage", () => {
+    const { container } = renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "From this browser.",
+        provenance: "edge",
+        parts: [{ kind: "text", text: "From this browser." }],
+      },
+    ]);
+
+    const chips = container.querySelectorAll("button.message__tag");
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent("Answered in this browser");
+  });
+
   it("names one brain per reply: an edge answer is never also a local draft", () => {
     harness.state.edgeReplyFor = "m-1";
     harness.state.offlineReplyFor = "m-1";

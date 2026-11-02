@@ -250,6 +250,14 @@ export type ChatPart =
       claims: Claim[];
     };
 
+/**
+ * A reply this browser's own model wrote. It is the only provenance worth
+ * storing: a turn from a configured endpoint is on the server already, and the
+ * rule-based draft is named from the live stream — main's mechanism, unchanged
+ * by this.
+ */
+export type ReplyProvenance = "edge";
+
 export interface ChatMessage {
   /** Stable id. Branching and persisted turns are keyed by it. */
   id: string;
@@ -272,6 +280,11 @@ export interface ChatMessage {
   error?: StudioError;
   /** The question this turn answered, kept so a failed turn can be retried. */
   retryText?: string;
+  /**
+   * Set on a reply this browser produced, from the turn's own stored record, so
+   * the label outlives the stream that first showed it.
+   */
+  provenance?: ReplyProvenance;
 }
 
 /**
@@ -392,6 +405,8 @@ export interface TurnNode {
   created_at: string;
   /** What each sentence stands behind, restored from the turn's citations. */
   claims?: Claim[];
+  /** Who wrote this reply, as the browser that produced it recorded it. */
+  provenance?: ReplyProvenance;
 }
 
 export interface ConversationTree {

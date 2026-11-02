@@ -179,7 +179,10 @@ Studio says so in one place and keeps going:
   on the replies around it, and nothing about it covers the thread. The mirror
   case carries the opposite line — **Answered in this browser**, on the reply the
   tab's own model produced — same spot, same button, and never both at once:
-  exactly one brain answered the reply you are looking at.
+  exactly one brain answered the reply you are looking at. That exchange is
+  written to this browser's own memory, because no server was ever asked to hold
+  it: close the tab, come back, and the answer is still on the thread with the
+  same claim on it.
 - The work still happens. `apps/studio/src/bff` is the studio's own BFF running
   in the browser: the conversation, the canvas, and memory are read and written
   in IndexedDB, and the deterministic assistant answers ODI questions, creates

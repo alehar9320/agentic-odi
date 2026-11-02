@@ -147,12 +147,13 @@ export function toThreadMessageLike(message: ChatMessage): ThreadMessageLike {
           },
         }
       : {}),
-    ...(failed || message.retryText
+    ...(failed || message.retryText || message.provenance
       ? {
           metadata: {
             custom: {
               ...(message.error ? { error: message.error } : {}),
               ...(message.retryText ? { retryText: message.retryText } : {}),
+              ...(message.provenance ? { provenance: message.provenance } : {}),
             },
           },
         }

@@ -33,7 +33,7 @@ import {
   TypingPart,
 } from "../../assistant/parts";
 import { useStudio } from "../../state/StudioContext";
-import type { StudioError } from "../../types";
+import type { ReplyProvenance, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon } from "../icons";
@@ -64,13 +64,16 @@ function phaseLabel(phase: string | null): string {
 }
 
 /** One brain per reply, and the answer that was earned locally is the one that
- *  gets said — a browser reply is never also the "no model connected" draft. */
+ *  gets said — a browser reply is never also the "no model connected" draft.
+ *  The live marker says which model answered this session; the turn's own record
+ *  says who wrote it when the thread came back from storage. */
 function provenanceTagFor(
   id: string,
   edgeReplyFor: string | null,
   offlineReplyFor: string | null,
+  recorded: ReplyProvenance | undefined,
 ): string | null {
-  if (edgeReplyFor === id) {
+  if (edgeReplyFor === id || recorded === "edge") {
     return PROVENANCE_TAG.edge;
   }
   if (offlineReplyFor === id) {
@@ -82,7 +85,10 @@ function provenanceTagFor(
 function AssistantMessage() {
   const { edgeReplyFor, offlineReplyFor, thinkingPhase, sendMessage, openPanel } = useStudio();
   const id = useAuiState((state) => state.message.id);
-  const provenance = provenanceTagFor(id, edgeReplyFor, offlineReplyFor);
+  const recorded = useAuiState(
+    (state) => state.message.metadata.custom?.provenance as ReplyProvenance | undefined,
+  );
+  const provenance = provenanceTagFor(id, edgeReplyFor, offlineReplyFor, recorded);
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
   const hasText = useAuiState((state) =>

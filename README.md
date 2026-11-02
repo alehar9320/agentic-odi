@@ -148,7 +148,9 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   It asks once, names the size of the one-time download, and starts at the
   smallest tier the device can host; ten served answers (or fifteen minutes of
   streamed replies) earn the next one in the background. Settings → *Answers in
-  this browser* changes the answer, shows each tier, and frees its storage.
+  this browser* changes the answer, shows each tier, and frees its storage. An
+  answer it produced is kept by the browser itself, so closing the tab loses
+  neither the reply nor the label saying who wrote it.
   Conversation turns only — tool turns still need a model. See
   [Local LLM Backend](docs/local-llm.md#the-browser-tier-edge-models).
 - **A real conversation runtime.** The Studio uses assistant-ui over its

@@ -31,9 +31,11 @@ import type {
   Strategy,
   StudioConfig,
   StudioError,
+  TurnNode,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
+import { readEdgeTurns, recordEdgeTurn } from "../edge/transcript";
 
 /** A failure the sidecar reported, kept whole so the UI can show it. */
 export class StudioApiError extends Error {
@@ -638,35 +640,160 @@ export async function listConversations(): Promise<ConversationSummary[]> {
   );
 }
 
-export function fetchLatestConversation(): Promise<LatestConversation> {
-  return withLocal(
+/**
+ * The thread to reopen when the page opens. Server-first, but an exchange this
+ * browser streamed from its own model is in no server row, so it wins when it
+ * is the more recent work — otherwise the person who used the browser model
+ * reloads onto last week's thread and wonders where their answer went.
+ */
+export async function fetchLatestConversation(): Promise<LatestConversation> {
+  const server = await withLocal(
     () => getJson<LatestConversation>("/api/conversations/latest"),
-    async (bff) => bff.memory.latestConversation(),
+    (bff) => bff.memory.latestConversation(),
   );
+  let mine: LatestConversation | null;
+  try {
+    mine = await browserAnsweredThread();
+  } catch {
+    return server;
+  }
+  if (!mine?.conversation) {
+    return server;
+  }
+  if (!server.conversation) {
+    return mine;
+  }
+  return touchedAfter(mine.conversation.updated_at, server.conversation.updated_at)
+    ? mine
+    : server;
+}
+
+/**
+ * The newest thread this browser holds an answer for, if it holds one at all.
+ * A local draft written while the server was out is not this claim: only the
+ * reply the browser's own model produced is work the server cannot show.
+ */
+async function browserAnsweredThread(): Promise<LatestConversation | null> {
+  const bff = await getStudioBff();
+  const latest = await bff.memory.latestConversation();
+  const { conversation } = latest;
+  if (!conversation) {
+    return null;
+  }
+  const recorded = await readEdgeTurns(bff.memory, conversation.id);
+  if (!recorded.some((turn) => turn.provenance === "edge")) {
+    return null;
+  }
+  return { ...latest, conversation };
+}
+
+/** Wall-clock order, because the two producers stamp their own format. */
+function touchedAfter(candidate: string, current: string): boolean {
+  return Date.parse(candidate) > Date.parse(current);
 }
 
 /** The whole branch tree, so a reload reopens the branch that was visible. */
 export async function fetchConversationTree(conversationId: string): Promise<ConversationTree> {
-  return withLocal(
+  const tree = await withLocal(
     () =>
       getJson<ConversationTree>(
         `/api/conversations/${encodeURIComponent(conversationId)}/tree`,
       ),
-    async (bff) => {
-      const tree = await bff.memory.conversationTree(conversationId);
-      return {
-        conversation: tree.conversation,
-        messages: tree.messages.map((turn) => ({
-          id: String(turn.message_id ?? turn.id),
-          parent_id: turn.parent_id ?? null,
-          role: turn.role,
-          content: turn.content,
-          created_at: turn.created_at,
-        })),
-        head_id: tree.head_id,
-      };
-    },
-  );
+    (bff) => localTree(bff, conversationId),
+  ).catch((failure: unknown) => {
+    // A server that has never seen this id is not a dead end for the person
+    // whose own browser wrote the thread: the browser's copy is the thread.
+    if (!(failure instanceof StudioApiError) || failure.status !== 404) {
+      throw failure;
+    }
+    return getStudioBff()
+      .then((bff) => localTree(bff, conversationId))
+      .catch(() => {
+        // Neither copy exists, which is the 404 the server said it was.
+        throw failure;
+      });
+  });
+  return withBrowserTurns(tree, conversationId);
+}
+
+/** This browser's copy of a thread, in the shape the server would have sent. */
+async function localTree(
+  bff: Awaited<ReturnType<typeof getStudioBff>>,
+  conversationId: string,
+): Promise<ConversationTree> {
+  const local = await bff.memory.conversationTree(conversationId);
+  return {
+    conversation: local.conversation,
+    messages: local.messages.map((turn) => ({
+      id: String(turn.message_id ?? turn.id),
+      parent_id: turn.parent_id ?? null,
+      role: turn.role,
+      content: turn.content,
+      created_at: turn.created_at,
+      ...(turn.provenance ? { provenance: turn.provenance } : {}),
+    })),
+    head_id: local.head_id,
+  };
+}
+
+/**
+ * Turns this tab answered on its own are in no server row, so the server's tree
+ * cannot show them. Read them from the browser's memory and merge; the person
+ * who closed the tab and came back gets the thread they actually had.
+ */
+async function withBrowserTurns(
+  tree: ConversationTree,
+  conversationId: string,
+): Promise<ConversationTree> {
+  let mine: TurnNode[];
+  try {
+    const bff = await getStudioBff();
+    mine = await readEdgeTurns(bff.memory, conversationId);
+  } catch {
+    // The server's thread is the one that must survive: a memory store that
+    // will not open costs the person their own drafts, nothing more.
+    return tree;
+  }
+  const known = new Set(tree.messages.map((turn) => turn.id));
+  const missing = mine.filter((turn) => !known.has(turn.id));
+  if (!missing.length) {
+    return tree;
+  }
+  // Recorded order is the thread order; two turns stamped in the same
+  // millisecond are normal when the model runs down the hall.
+  const tip = missing[missing.length - 1];
+  const head = tree.messages.find((turn) => turn.id === tree.head_id);
+  return {
+    ...tree,
+    messages: [...tree.messages, ...missing],
+    // A branch left open deliberately stays open; only a newer answer moves it.
+    head_id: head && !touchedAfter(tip.created_at, head.created_at) ? tree.head_id : tip.id,
+  };
+}
+
+/** One exchange this tab streamed, and the thread it was asked in — which a
+ * first turn does not have yet. */
+export interface BrowserExchange {
+  conversationId: string | null;
+  question: { id: string; text: string; parentId: string | null };
+  answer: { id: string; text: string };
+}
+
+/**
+ * Keep an exchange the browser answered for itself. No server ever saw it, so
+ * this store is the only copy there is. Returns the conversation it landed in,
+ * for a turn asked before the thread existed.
+ */
+export async function recordBrowserTurn(exchange: BrowserExchange): Promise<string> {
+  const bff = await getStudioBff();
+  const conversationId =
+    exchange.conversationId ?? (await bff.memory.createConversation()).id;
+  await recordEdgeTurn(bff.memory, {
+    conversationId,
+    question: exchange.question,
+    answer: exchange.answer,
+  });
+  return conversationId;
 }
 
 /** Record which branch is visible. */

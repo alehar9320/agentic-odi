@@ -106,6 +106,44 @@ describe("LocalMemoryService conversations", () => {
     expect(assistant.parent_id).toBe("m-1");
   });
 
+  it("adopts a conversation id it did not mint, so a turn has somewhere to live", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const adopted = await memory.ensureConversation("srv-42", "Where do I start?");
+    expect(adopted.id).toBe("srv-42");
+
+    await memory.appendTurn("srv-42", "user", "How do I score this?", "m-1", null);
+    const tree = await memory.conversationTree("srv-42");
+    expect(tree.messages.map((turn) => turn.content)).toEqual(["How do I score this?"]);
+  });
+
+  it("leaves a conversation it already holds alone", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    await memory.ensureConversation("srv-42", "Where do I start?");
+    const again = await memory.ensureConversation("srv-42", "A title chosen elsewhere");
+    expect(again.title).toBe("Where do I start?");
+  });
+
+  it("records which brain answered a stored turn", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const conv = await memory.createConversation();
+    await memory.appendTurn(conv.id, "user", "Where do I start?", "m-1", null);
+    await memory.appendTurn(
+      conv.id,
+      "assistant",
+      "Start with the job.",
+      "m-2",
+      "m-1",
+      "edge",
+    );
+
+    const tree = await memory.conversationTree(conv.id);
+    expect(tree.messages.find((turn) => turn.message_id === "m-2")?.provenance).toBe("edge");
+    expect(tree.messages.find((turn) => turn.message_id === "m-1")?.provenance).toBeUndefined();
+  });
+
   it("builds a conversation tree with head", async () => {
     const store = makeStore();
     const memory = new LocalMemoryService(store);

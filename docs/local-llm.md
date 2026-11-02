@@ -165,6 +165,18 @@ one it did not fetch — and download progress is never broadcast, because only 
 tab doing the work renders it. A browser with no channel (private browsing) just
 keeps the ladder to itself.
 
+An answer this browser produced is kept by this browser. The exchange — the
+question, the reply, and the fact that this browser's own model wrote it — goes
+into the studio's IndexedDB the moment the stream ends, because nothing else will
+ever hold it: no key was configured, so no server saw the turn. Reopening the page
+reads it back. The thread this browser answered most recently wins the reload when
+it is the more recent work; a thread the server has never heard of is served from
+the browser's copy instead of failing as a `404` and leaving the person at an empty
+introduction; and *"Answered in this browser"* comes from that stored record, not
+only from the live stream, so the claim outlives the tab. What does not survive is
+any cross-device illusion: another machine will not show these turns, because they
+were never sent anywhere.
+
 The studio stops asking only once it has the answer. Pressing **Not now** does
 not simply hide the strip: a banner whose buttons *are* answers is not allowed to
 close itself, because a strip that vanishes before the consent write reaches disk
@@ -172,12 +184,13 @@ claims an answer the studio never wrote down — and a tab reloaded inside that
 window asks again while pretending to have believed the first one. So the strip
 goes quiet when the write is committed, which is what makes "we won't ask you
 again" a promise a test can check rather than a sentence. That seam is
-`apps/studio/e2e/edge.spec.ts`: three scenarios driven against the *built*
+`apps/studio/e2e/edge.spec.ts`: four scenarios driven against the *built*
 bundle — offer, yes, streamed reply that never leaves the tab, and no second ask
-after a reload; decline and reload; then a key appearing later handing the turns
-back to the server. The engine is replaced by a fake the *page* installs
-(`e2e/edgeDevice.ts` → `window.__odiEdgeEngine`), not one compiled into the
-bundle, so nothing a person downloads is a code path only tests run.
+after a reload; decline and reload; close the tab and come back to find the
+browser's own answer still there and still labelled; then a key appearing later
+handing the turns back to the server. The engine is replaced by a fake the *page*
+installs (`e2e/edgeDevice.ts` → `window.__odiEdgeEngine`), not one compiled into
+the bundle, so nothing a person downloads is a code path only tests run.
 
 Two honest caveats: nothing in CI has WebGPU, so the model itself has only ever
 been driven through that fake — the suite proves the seams around it (routing,

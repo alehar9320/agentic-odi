@@ -44,6 +44,7 @@ import {
   healthMcp,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
+  recordBrowserTurn,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
   streamChat,
@@ -135,6 +136,7 @@ export function turnsToMessages(
         parentId: node.parent_id,
         role: node.role,
         content,
+        ...(node.provenance ? { provenance: node.provenance } : {}),
         parts: claims.length
           ? [{ kind: "claims" as const, content, claims }]
           : content
@@ -1663,6 +1665,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         };
         if (useEdge) {
           await edgeManager.stream(turnRequest, handleEvent, controller.signal);
+          if (content) {
+            // Nothing on the other end kept this exchange: no request was made.
+            // The browser's own transcript is the only place it can survive the
+            // tab, so write it before anything else claims the turn is done.
+            const thread = await recordBrowserTurn({
+              conversationId,
+              question: {
+                id: userMessage.id,
+                text: userMessage.content,
+                parentId: userMessage.parentId ?? null,
+              },
+              answer: { id: assistantId, text: content },
+            }).catch(() => null);
+            if (thread) {
+              setConversationId((current) => current ?? thread);
+            } else {
+              pushToast(
+                "error",
+                "This answer stays in the tab — the browser would not keep it.",
+              );
+            }
+          }
         } else {
           await streamChat(turnRequest, handleEvent, controller.signal);
         }
@@ -1714,6 +1738,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshConnectors,
       llmHealth,
       cancelScheduledProbes,
+      pushToast,
     ],
   );
 

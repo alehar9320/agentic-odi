@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
+import { getStudioBff } from "../bff/index";
 import { EdgeStateStore } from "../edge/storage";
 import { edgeManager } from "../edge/manager";
 import { FakeEdgeEngine } from "../test/edgeFake";
@@ -58,6 +59,9 @@ let chatFailure: Error | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
 let llmUnhealthy = false;
+/** Which thread the fixture says the person was last in. */
+let latestId = CONVERSATION.id;
+let edgeThreadId = 0;
 let signalFetches = 0;
 let configHangs = false;
 let approvalCalls: Record<string, unknown>[] = [];
@@ -126,7 +130,7 @@ function route(
   }
   if (url === "/api/conversations/latest") {
     return json({
-      conversation: CONVERSATION,
+      conversation: { ...CONVERSATION, id: latestId },
       turns: [
         {
           id: 1,
@@ -153,7 +157,7 @@ function route(
     headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
     return json({ conversation: CONVERSATION });
   }
-  if (url === "/api/conversations/c-1/tree") {
+  if (url.startsWith("/api/conversations/") && url.endsWith("/tree")) {
     return json({
       conversation: CONVERSATION,
       messages: [
@@ -995,6 +999,9 @@ describe("StudioContext edge routing", () => {
     connectorFetches = 0;
     llmHealthFetches = 0;
     llmUnhealthy = true;
+    // These tests write to the browser's own transcript, which outlives a hook
+    // unmount. Each one gets a thread of its own so no case reads another's work.
+    latestId = `c-edge-${edgeThreadId++}`;
     // The visitor these tests are about: the shipped address with nothing behind
     // it and no key. Written before the page loads, so the sidecar's own defaults
     // — which in this fixture do carry a key — cannot arrive and answer over the
@@ -1017,6 +1024,12 @@ describe("StudioContext edge routing", () => {
     await store.setConsent("granted");
     await store.setTierState("t1", { status: "cached", cachedAt: "2026-01-01T00:00:00.000Z" });
     store.close();
+    // The transcript store below is shared by every case in this file, and a
+    // page now reopens whichever thread this browser answered most recently.
+    // So each case starts from a browser that has answered nothing yet; the
+    // alternative is a reload test reading the previous case's answer.
+    const bff = await getStudioBff();
+    await bff.memory.clearMemory();
     // A turn is routed from what this tab has read, not from a read it is still
     // waiting on. On a real page that read happens at mount; here it is the
     // thing under test, so the ladder's state is read before anyone types.
@@ -1135,5 +1148,37 @@ describe("StudioContext edge routing", () => {
     });
 
     expect(chatAttempts).toBe(1);
+  });
+
+  /** One browser answer, then the page closed and opened again. */
+  async function reopenAfterEdgeAnswer() {
+    const view = await openStudio();
+    await act(async () => {
+      await view.result.current.sendMessage("what should I dig into next?");
+    });
+    view.unmount();
+
+    const reopened = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(reopened.result.current.messages).toHaveLength(4));
+    return reopened;
+  }
+
+  it("keeps an answer the browser gave for the next time the page opens", async () => {
+    const reopened = await reopenAfterEdgeAnswer();
+
+    expect(reopened.result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Tell me more.",
+      "what should I dig into next?",
+      "Hello from the edge.",
+    ]);
+    reopened.unmount();
+  });
+
+  it("still names the browser as the brain after the page reopens", async () => {
+    const reopened = await reopenAfterEdgeAnswer();
+
+    expect(reopened.result.current.messages.at(-1)?.provenance).toBe("edge");
+    reopened.unmount();
   });
 });

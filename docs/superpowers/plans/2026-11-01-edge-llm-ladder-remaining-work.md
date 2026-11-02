@@ -277,15 +277,36 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
       exercise a code path no person ever runs, so the fake lives outside the
       artifact instead. It declares `implements EdgeLLMEngine`, so a seam that
       moves stops compiling rather than quietly passing.
-      Three scenarios: offer → *Answer in this browser* → the fetch narrated in
+      Four scenarios: offer → *Answer in this browser* → the fetch narrated in
       place → ready toast → a streamed reply that reads *"Answered in this
       browser"*, never *"Local draft"*, with zero requests reaching `/api/chat`,
       and no second ask after a reload. Then decline → reload → never asked
-      again. Then a key appearing later handing the turns back to the remote
-      path. `--repeat-each=5` on the durability scenario, because that is the
-      one that was failing: 15 passed, not a flake that got lucky.
+      again. Then close the tab and come back: the answer the browser produced is
+      still on screen and still labelled. Then a key appearing later handing the
+      turns back to the remote path. `--repeat-each=5` on the durability scenario,
+      because that is the one that was failing: 15 passed, not a flake that got
+      lucky.
       Run it with `npx playwright test --project=chromium` from `apps/studio`,
       after `npx vite build` — the sidecar serves `dist`.
+- [x] **What the reload scenario found, in the product.** Writing the transcript
+      was not enough: the reloaded page came back to the introduction with nothing
+      in it. Two separate reasons, both real, neither visible from jsdom. First,
+      `fetchLatestConversation` asked only the server, and a turn answered in the
+      browser is in no server row, so there was no thread to reopen. Second, once
+      the browser's own thread *was* chosen, `fetchConversationTree` asked the
+      server for it and the sidecar said `404 not_found` — an application failure,
+      which `withLocal` correctly refuses to paper over — so the load threw and
+      `StudioContext` swallowed it. The reads now consult this browser's copy: the
+      newest local thread wins when it holds an edge answer and is the more recent
+      work, and a `404` for a conversation this browser wrote serves that browser's
+      copy, while a conversation nobody holds still reports the server's `404`.
+      `studioApi.edgeTranscript.test.ts` pins all of it against a real memory
+      store, and the Playwright scenario is what proves the two reads meet in the
+      middle of a page load.
+      One claim the tests do *not* make: a local draft written by the rule-based
+      assistant while the sidecar was out does not get to claim the reload. It is
+      not work the browser's model did, and a thread the person never chose must
+      not steal the thread the server has.
 - [x] **What that found, in the product rather than in the test.** "Not now" made
       the strip vanish, and then a reload asked again — every run, until the run
       that happened to make one extra round trip to the page first. The write was
@@ -328,15 +349,24 @@ interface, which is why `turn.test.ts`'s inline fake gained a no-op.
   `navigator.locks` on a real GPU with two tabs both reaching for the engine: the
   losing tab gets no notice of the lock it never acquired, only the news that
   the ladder moved. That check is on the iteration-10 manual list.
-- **The provenance label lives for the session.** *"Answered in this browser"*
-  and *"Local draft, no model connected"* both come from a `status` frame in the
-  live stream, so a reply re-read from history next visit carries no label. That
-  is `main`'s existing mechanism, unchanged and shared; giving a message its own
-  stored provenance means a new field on the persisted message and a second
-  consumer in `assistant/convert.ts`, which this branch deliberately did not do.
+- **The draft label still lives for the session; the browser label does not.**
+  *"Answered in this browser"* survives closing the tab: the exchange an edge
+  turn produced is written to this browser's own transcript with
+  `provenance: "edge"` (`edge/transcript.ts`), and the two reads a reload makes —
+  `fetchLatestConversation` to pick the thread, `fetchConversationTree` to fill
+  it — merge those rows into whatever the server sent. So a person who closed the
+  tab and came back finds the answer they got and the claim attached to it, in
+  the one store that could ever hold it: the sidecar has no provenance column,
+  because the server never saw the turn. *"Local draft, no model connected"* is
+  unchanged — still `main`'s live `status` frame, still gone next visit, still
+  correct for a rule-based draft nobody is being credited for.
 - **Edge turns never reach the server conversation tree** while the sidecar is up.
   A backfill through `POST /api/conversations/{id}/turns` is an explicit non-goal
-  for v1 and must stay documented, not discovered.
+  for v1 and must stay documented, not discovered. What is no longer true is the
+  consequence: the work is not lost and not invisible, because this browser keeps
+  its own copy and prefers it on reload — including a thread id the server answers
+  `404` for, which now serves the browser's copy instead of failing the load. The
+  limit that remains is cross-device: another machine will not see these turns.
 - **Weighted-cache loss is honest but unmeasured.** Our IndexedDB ladder is the
   source of truth; if WebLLM's own cache is evicted, we re-download rather than
   claim a tier we no longer have.
