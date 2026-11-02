@@ -41,6 +41,11 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-1: 150ms;
   --dur-2: 250ms;
+  /* The two widths a reading column takes: the one every surface in the thread
+     shares, and the wider grid the connector catalogue needs. Surfaces sized to
+     the shell — the lens drawer, the diagnostics table — are not columns. */
+  --measure: 720px;
+  --measure-wide: 900px;
 
   /* Canvas components were written against the original palette; the aliases
      keep them on the live tokens so both themes stay in step. */
@@ -304,7 +309,7 @@ a {
   flex-direction: column;
   gap: var(--s-5);
   width: 100%;
-  max-width: 720px;
+  max-width: var(--measure);
   /* auto block margins centre when there is room and scroll when there isn't */
   margin-block: auto;
 }
@@ -359,7 +364,7 @@ a {
 }
 
 .chat__thread {
-  max-width: 720px;
+  max-width: var(--measure);
   margin: 0 auto;
 }
 
@@ -399,7 +404,7 @@ a {
 }
 
 .chat__dock > * {
-  max-width: 720px;
+  max-width: var(--measure);
   margin: 0 auto;
 }
 
@@ -2406,7 +2411,7 @@ button.message__tag:hover {
   justify-content: space-between;
   gap: var(--s-3);
   width: calc(100% - 44px);
-  max-width: 720px;
+  max-width: var(--measure);
   margin: 6px auto 0;
   color: var(--faint);
   font-size: var(--t-xs);
@@ -2438,7 +2443,7 @@ button.message__tag:hover {
 /* ------------------------------------------------------------------ */
 .intro__summary {
   width: calc(100% - 44px);
-  max-width: 720px;
+  max-width: var(--measure);
   margin: 8px auto 0;
   padding: 20px 22px;
   border: 1px solid var(--line-strong);
@@ -2560,7 +2565,7 @@ button.message__tag:hover {
 }
 
 .intro__examples {
-  max-width: 720px;
+  max-width: var(--measure);
   margin: 6px auto 0;
   color: var(--faint);
   font-size: var(--t-xs);
@@ -3853,7 +3858,9 @@ button.message__tag:hover {
 .changelog-modal {
   position: relative;
   width: 100%;
-  max-width: 680px;
+  /* The release notes are a reading column, so they take the same measure as
+     the thread and the wizard instead of a third width of their own. */
+  max-width: var(--measure);
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -4432,7 +4439,7 @@ details[open] summary {
   align-items: center;
   gap: var(--s-1);
   width: 100%;
-  max-width: 720px;
+  max-width: var(--measure);
   margin: 0 auto;
   padding: 0 0 6px;
   list-style: none;
@@ -5625,7 +5632,7 @@ details[open] summary {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
-  max-width: 900px;
+  max-width: var(--measure-wide);
   width: 100%;
   margin: 0 auto 20px;
 }
@@ -5752,7 +5759,7 @@ details[open] summary {
   display: flex;
   flex-direction: column;
   gap: var(--s-5);
-  max-width: 900px;
+  max-width: var(--measure-wide);
   width: 100%;
   margin: 0 auto;
 }

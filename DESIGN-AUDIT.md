@@ -99,6 +99,27 @@ Extracted from `styles/theme.css` + `onboarding/onboarding.css` (declarations co
 Colors and shadows already have a clean token set (`--bg/--text/--accent/--line/--surface`)
 — keep, don't invent a second palette.
 
+## Layout — measured, not vibes
+
+Every centred surface that holds a column of prose, grepped out of the two stylesheets:
+
+| Surface | Before | Reads as |
+|---|---|---|
+| `.chat__welcome-inner`, `.chat__thread`, `.chat__dock > *` | 720 | the thread's column |
+| `.setup__meta`, `.intro__summary`, `.intro__examples` | 720 | the thread's column |
+| `.rail__list` | 720 | the thread's column |
+| `.wizard-panel` | `min(720px, 100%)` | the thread's column, in a modal |
+| `.changelog-modal` | **680** | the same column, 40px narrower for no reason |
+| `.customize__head`, `.customize__body` | **900** | the catalogue grid |
+
+So the app had one real column, drawn nine times at 720 and once at 680, plus a wider grid at
+900. Two tokens, `--measure: 720px` and `--measure-wide: 900px`, now hold those; the changelog
+modal moves onto the shared measure so its text edge lands where the thread's does.
+
+Deliberately *not* columns, and left alone: `.lens` (`min(520px, 44vw)` — a drawer sized to the
+shell), `.diagnostics-modal` (760 — a table, dev-only), popovers, tooltips and rail chips
+(170–440 — component-sized). Widening the grid is not the same act as naming it.
+
 ## Audit items (ordered by impact on first impressions)
 
 1. **A1 Tokens & motion** — define the five scales above as tokens; sweep the hero, composer,
@@ -114,3 +135,7 @@ Colors and shadows already have a clean token set (`--bg/--text/--accent/--line/
 8. **A8 Changelog modal** — remove quote; demote "Mark all read".
 9. **A9 Console errors** — dev-proxy 502s from health probes must not spam the console;
    fetch failures handled quietly.
+10. **A10 Shared grid** — put every reading column on one `--measure`, the catalogue on
+    `--measure-wide`, and stop the changelog modal from carrying a 680px width of its own.
+    Ranked last by impact on first impressions on purpose: a visitor never sees a grid, only
+    the places where two surfaces that should share an edge do not.

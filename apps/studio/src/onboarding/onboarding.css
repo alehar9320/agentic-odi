@@ -20,7 +20,7 @@
 
 .wizard-panel {
   position: relative;
-  width: min(720px, 100%);
+  width: min(var(--measure), 100%);
   min-height: min(540px, 82vh);
   max-height: min(88vh, 760px);
   display: flex;

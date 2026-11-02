@@ -15,6 +15,7 @@ not by reading the diff.
 | A7 settings | fixed | Duplicated status block replaced by one sentence per view. |
 | A8 changelog modal | fixed | Quote removed; "Mark all read" only exists when something is unread. |
 | A9 console errors | **left** | See below. |
+| A10 shared grid | fixed | One `--measure` for every reading column, `--measure-wide` for the catalogue. |
 | PR #61 micro-interaction block | **left** | See below. |
 | Cold-visit connector prompt | **left** | See below. |
 | Light theme | **not audited** | See below. |
