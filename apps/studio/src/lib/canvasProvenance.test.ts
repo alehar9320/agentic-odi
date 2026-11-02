@@ -68,12 +68,15 @@ describe("canvas provenance", () => {
    * A live board in IndexedDB and a live board on a sidecar both carry
    * `provenance.kind === "live"`, so only `source` separates them — and the
    * receipt that promises where a capture went has to read the one that does.
+   * `local` is the sidecar's own repository, so reading it as the browser would
+   * tell a desktop visitor that their work is trapped in a tab that is not
+   * holding it.
    */
   it("names the browser store from the source, not from liveness", () => {
     expect(
       isBrowserCanvas(
         canvas({
-          source: "local",
+          source: "browser",
           provenance: {
             kind: "live",
             reason: "local_store",
@@ -83,6 +86,7 @@ describe("canvas provenance", () => {
         }),
       ),
     ).toBe(true);
+    expect(isBrowserCanvas(canvas({ source: "local" }))).toBe(false);
     expect(isBrowserCanvas(canvas({ source: "mcp" }))).toBe(false);
     expect(isBrowserCanvas(canvas({ source: "seed" }))).toBe(false);
     expect(isBrowserCanvas(null)).toBe(false);

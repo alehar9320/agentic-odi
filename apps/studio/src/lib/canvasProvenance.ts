@@ -86,12 +86,13 @@ export function savedCopyCaption(
 
 /**
  * True when this board is the browser's own store and nobody else is keeping a
- * copy. `source` is the storage signal: `provenance.kind` says live or seeded,
- * which is about whether the work is the user's, not about where it lives — a
- * sidecar board and an IndexedDB board both read `live`.
+ * copy. `source` is the storage signal, but `local` is not it: the sidecar
+ * answers `local` for its own SQLite repository, so a desktop board would claim
+ * the browser had kept it. The browser BFF says `browser`, and a board cached by
+ * an older build says neither — the clause stays off rather than lying.
  */
 export function isBrowserCanvas(data: CanvasData | null | undefined): boolean {
-  return data?.source === "local";
+  return data?.source === "browser";
 }
 
 /** The one clause that names the store, so no receipt invents its own. */

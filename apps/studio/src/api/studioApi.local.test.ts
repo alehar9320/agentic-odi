@@ -51,10 +51,10 @@ describe("isTransportFailure", () => {
 describe("fetchCanvas fallback", () => {
   it("falls back to the local BFF when the sidecar returns 502 with a proxy detail", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
-    vi.mocked(bff.data.fetchCanvas).mockResolvedValueOnce({ jobs: [], steps: [], outcomes: [], source: "local" });
+    vi.mocked(bff.data.fetchCanvas).mockResolvedValueOnce({ jobs: [], steps: [], outcomes: [], source: "browser" });
 
     const canvas = await fetchCanvas("http://mcp");
-    expect(canvas.source).toBe("local");
+    expect(canvas.source).toBe("browser");
     expect(bff.data.fetchCanvas).toHaveBeenCalled();
   });
 

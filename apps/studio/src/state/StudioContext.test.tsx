@@ -668,9 +668,10 @@ describe("StudioContext first run in a browser with no server", () => {
 describe("StudioContext when the board is kept in this browser", () => {
   /**
    * The board reports where it lives through `source`. The local BFF answers
-   * "local"; the sidecar answers "mcp"/"live". A receipt that just says "saved"
-   * promises a server that isn't there, so the browser-kept case must name the
-   * store — and the sidecar-kept case must keep its old, truthful copy.
+   * "browser"; the sidecar answers "mcp", or "local" for its own repository. A
+   * receipt that just says "saved" promises a server that isn't there, so the
+   * browser-kept case must name the store — and every other case must keep its
+   * old, truthful copy.
    */
   beforeEach(() => {
     localStorage.clear();
@@ -679,7 +680,7 @@ describe("StudioContext when the board is kept in this browser", () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.startsWith("/api/canvas")) {
-          return json({ jobs: [], steps: [], outcomes: [], source: "local" });
+          return json({ jobs: [], steps: [], outcomes: [], source: "browser" });
         }
         return route(input, init);
       }),
