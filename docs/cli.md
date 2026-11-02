@@ -150,6 +150,9 @@ agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+agentic-odi desired-outcomes search --job-id <job-id> --text "three days"
+agentic-odi desired-outcomes search --theme <theme-id> --stage execute --confidence scored
+agentic-odi desired-outcomes search --min-score 10 --limit 20 --offset 20 --json
 
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
@@ -174,6 +177,22 @@ and the Studio API returns a 422 with the same message.
 `summary` shows how many of the eight job-map phases the Job covers, which are
 still missing, and the underserved outcomes (score above 10) in descending
 order. `--top` caps that list; `--json` returns the same data for a script.
+
+`search` narrows the library without exporting it. `--text` is a
+case-insensitive substring of the statement, a theme's name, and the evidence
+linked to the outcome; an outcome supported by three matching quotes still
+appears once. Filters in different options combine (AND), repeated `--theme`
+values are one choice among several (OR), and `--min-score`/`--max-score` bound
+the opportunity score inclusively — an unscored outcome has no score to compare,
+so a band never returns it. `--confidence` is `scored` or `unscored`, naming
+whether a score exists at all. `--sort` takes the same values as `list`:
+`opportunity_score` (unscored last) or `insertion`. The JSON body is
+`{items, total, facets}`: `total` counts matches before `--limit`/`--offset`,
+and each facet row is the query with that row's own filter removed, so the
+buckets overlap and are not expected to sum to `total`. `GET
+/api/outcomes/search` runs the identical query and returns identical ids, total,
+and facet counts; `--tag` is accepted but refused until outcomes actually carry
+tags.
 
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows

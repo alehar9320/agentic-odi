@@ -740,6 +740,21 @@ class LocalBackend(Backend):
         outcomes = self.service.unassign_theme(args["outcome_ids"], args["theme_id"])
         return [outcome.model_dump(mode="json") for outcome in outcomes]
 
+    def _search_outcomes(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.search_outcomes(
+            text=args.get("text"),
+            stage=args.get("stage"),
+            theme_ids=args.get("theme_ids"),
+            confidence=args.get("confidence"),
+            tags=args.get("tags"),
+            min_score=args.get("min_score"),
+            max_score=args.get("max_score"),
+            job_id=args.get("job_id"),
+            sort=args.get("sort", "opportunity_score"),
+            limit=args.get("limit"),
+            offset=args.get("offset", 0),
+        )
+
     def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
         strategy = self.service.get_strategy()
         return None if strategy is None else strategy.model_dump(mode="json")
@@ -809,6 +824,7 @@ _LOCAL_HANDLERS = {
     "list_themes": LocalBackend._list_themes,
     "assign_theme": LocalBackend._assign_theme,
     "unassign_theme": LocalBackend._unassign_theme,
+    "search_outcomes": LocalBackend._search_outcomes,
     "get_health": LocalBackend._get_health,
 }
 

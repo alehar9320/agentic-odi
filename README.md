@@ -154,6 +154,7 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 ```bash
 odi jobs list
 odi desired-outcomes list --job-id <id>
+odi desired-outcomes search --text "three days" --min-score 10  # same query as GET /api/outcomes/search
 odi segments run --job <id>          # Stage 5: who the scored outcomes point at
 odi strategy propose                 # Stage 6: the bet, and the paths it beat
 odi themes assign --theme <id> --outcome <id>  # file outcomes under a named theme

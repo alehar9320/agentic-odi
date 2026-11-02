@@ -16,11 +16,19 @@ import typer
 
 from agentic_odi_cli import flags
 from agentic_odi_cli.backend import run_tool
-from agentic_odi_cli.render import render_deleted, render_outcome, render_outcome_list, render_saved
+from agentic_odi_cli.render import (
+    render_deleted,
+    render_outcome,
+    render_outcome_list,
+    render_saved,
+    render_search,
+)
 
 desired_outcomes_app = typer.Typer(help="Manage desired Outcomes.")
 
 JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
+THEME_OPTION = typer.Option(None, "--theme", help="Theme ID; repeat for several themes")
+TAG_OPTION = typer.Option(None, "--tag", help="Tag; repeat for several tags")
 
 EXPORT_FIELDS = (
     "id",
@@ -125,6 +133,55 @@ def get(
     typer.echo(
         render_outcome(run_tool("get_outcome", {"outcome_id": outcome_id}), as_json=json_output)
     )
+
+
+@desired_outcomes_app.command("search")
+def search(
+    text: str | None = typer.Option(
+        None,
+        help="Case-insensitive substring of statements, theme names, and evidence",
+    ),
+    stage: str | None = typer.Option(None, help="Job-map stage, e.g. execute"),
+    theme: list[str] | None = THEME_OPTION,
+    confidence: str | None = typer.Option(None, help="scored or unscored"),
+    tag: list[str] | None = TAG_OPTION,
+    min_score: float | None = typer.Option(None, help="Lowest opportunity score (inclusive)"),
+    max_score: float | None = typer.Option(None, help="Highest opportunity score (inclusive)"),
+    job_id: str | None = typer.Option(None, help="Limit the search to one job"),
+    sort: str = typer.Option("opportunity_score", help="opportunity_score or insertion"),
+    limit: int | None = typer.Option(None, help="Page size"),
+    offset: int = typer.Option(0, help="Skip this many results"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Search the outcome library without leaving the terminal.
+
+    One query, one answer everywhere: the CLI and ``GET /api/outcomes/search``
+    run the same core search and get the same ids, total, and facet counts.
+    """
+    args: dict[str, Any] = {
+        "text": text,
+        "stage": stage,
+        "confidence": confidence,
+        "min_score": min_score,
+        "max_score": max_score,
+        "job_id": job_id,
+        "sort": sort,
+        "limit": limit,
+        "offset": offset,
+    }
+    if theme:
+        args["theme_ids"] = theme
+    if tag:
+        args["tags"] = tag
+    result = run_tool("search_outcomes", args)
+    theme_names = {} if json_output else _theme_names()
+    typer.echo(render_search(result, as_json=json_output, theme_names=theme_names))
+
+
+def _theme_names() -> dict[str, str]:
+    return {
+        str(item.get("id", "")): str(item.get("name", "")) for item in run_tool("list_themes", {})
+    }
 
 
 @desired_outcomes_app.command("update")

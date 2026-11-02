@@ -7,7 +7,7 @@ import sys
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
 from agentic_odi_connectors.catalog import UnknownPresetError
@@ -529,6 +529,59 @@ async def get_outcomes(
             for outcome in service.get_outcomes(job.id, step_id)
         ]
     return {"ok": True, "result": [item.model_dump(mode="json") for item in outcomes]}
+
+
+@router.get("/outcomes/search", response_model=dict[str, Any])
+async def search_outcomes_api(
+    request: Request,
+    text: str | None = Query(None),
+    stage: str | None = Query(None),
+    theme_ids: Annotated[list[str] | None, Query()] = None,
+    confidence: str | None = Query(None),
+    tags: Annotated[list[str] | None, Query()] = None,
+    min_score: float | None = Query(None),
+    max_score: float | None = Query(None),
+    job_id: str | None = Query(None),
+    sort: str = Query("opportunity_score"),
+    limit: int | None = Query(None),
+    offset: int = Query(0),
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Narrow the library the way the terminal does, and get the same answer.
+
+    The body is the contract's own ``{items, total, facets}``, so a query spelled
+    the same here and in ``agentic-odi desired-outcomes search`` returns identical
+    ids, totals, and facet counts. ``job_id`` is optional on purpose: searching
+    across every job is a request, not a missing parameter.
+    """
+    filters = {
+        "text": text,
+        "stage": stage,
+        "confidence": confidence,
+        "min_score": min_score,
+        "max_score": max_score,
+        "job_id": job_id,
+        "limit": limit,
+    }
+    arguments: dict[str, Any] = {key: value for key, value in filters.items() if value is not None}
+    if theme_ids:
+        arguments["theme_ids"] = list(theme_ids)
+    if tags:
+        arguments["tags"] = list(tags)
+    if sort != "opportunity_score":
+        arguments["sort"] = sort
+    if offset:
+        arguments["offset"] = offset
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.SEARCH_OUTCOMES.value, arguments
+        )
+        payload = _json_or_raw(result)
+        return payload if isinstance(payload, dict) else {}
+    try:
+        return _service(request).search_outcomes(**arguments)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
 
 
 @router.post("/jobs")

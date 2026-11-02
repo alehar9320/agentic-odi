@@ -342,6 +342,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/outcomes/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Outcomes Api
+         * @description Narrow the library the way the terminal does, and get the same answer.
+         *
+         *     The body is the contract's own ``{items, total, facets}``, so a query spelled
+         *     the same here and in ``agentic-odi desired-outcomes search`` returns identical
+         *     ids, totals, and facet counts. ``job_id`` is optional on purpose: searching
+         *     across every job is a request, not a missing parameter.
+         */
+        get: operations["search_outcomes_api_api_outcomes_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/steps/{step_id}": {
         parameters: {
             query?: never;
@@ -2696,6 +2721,50 @@ export interface operations {
                 "application/json": components["schemas"]["AddOutcomeRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_outcomes_api_api_outcomes_search_get: {
+        parameters: {
+            query?: {
+                text?: string | null;
+                stage?: string | null;
+                theme_ids?: string[] | null;
+                confidence?: string | null;
+                tags?: string[] | null;
+                min_score?: number | null;
+                max_score?: number | null;
+                job_id?: string | null;
+                sort?: string;
+                limit?: number | null;
+                offset?: number;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

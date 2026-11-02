@@ -293,6 +293,49 @@ def render_outcome_list(outcomes: Any, *, as_json: bool) -> str:
     )
 
 
+def render_search(result: dict[str, Any], *, as_json: bool, theme_names: dict[str, str]) -> str:
+    """Render a search_outcomes reply: the page, its total, and the facet counts."""
+    if as_json:
+        return _json(result)
+    items = result.get("items", [])
+    total = result.get("total", len(items))
+    lines = [
+        (
+            "Nothing matches these filters — widen them or clear one and search again."
+            if total == 0
+            else f"{total} outcome(s) match"
+            + (f"; showing {len(items)}." if len(items) != total else ".")
+        )
+    ]
+    lines.append(
+        _table(
+            ("id", "statement", "importance", "satisfaction", "opportunity"),
+            [
+                (
+                    str(item.get("id", "")),
+                    _truncate(str(item.get("statement", ""))),
+                    _num(item.get("importance", "")),
+                    _num(item.get("satisfaction", "")),
+                    _num(item.get("opportunity_score", "")),
+                )
+                for item in items
+            ],
+            empty="",
+        )
+    )
+    facets = result.get("facets", {})
+    for dimension, label, names in (
+        ("stage", "stage", {}),
+        ("theme", "theme", theme_names),
+        ("confidence", "confidence", {}),
+    ):
+        counts = facets.get(dimension, {})
+        shown = [f"{names.get(key, key)}={value}" for key, value in counts.items() if value]
+        if shown:
+            lines.append(f"{label}: " + "  ".join(shown))
+    return "\n".join(line for line in lines if line)
+
+
 def render_evidence(item: Any, *, as_json: bool) -> str:
     """Render one evidence record as a labelled block or JSON."""
     if not isinstance(item, dict):
