@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -29,6 +30,7 @@ from agentic_odi_studio_api.studio.errors import (
 )
 from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.memory import StudioMemory
+from agentic_odi_studio_api.studio.paths import issue_token
 from agentic_odi_studio_api.studio.router import router as studio_router
 
 CORS_ORIGINS = [
@@ -83,6 +85,39 @@ class CSPMiddleware:
         await self.app(scope, receive, send_with_csp)
 
 
+class _AuthMiddleware:
+    """Require a per-install bearer token on every ``/api`` route.
+
+    ``/health`` stays open for the deploy's readiness probe, and the static
+    shell assets are served unauthenticated.
+    """
+
+    def __init__(self, app: ASGIApp, token: str) -> None:
+        self.app = app
+        self.token = token
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        headers = dict(scope.get("headers", []))
+        auth = headers.get(b"authorization", b"").decode("latin-1")
+        if path == "/health" or path.startswith("/assets"):
+            await self.app(scope, receive, send)
+            return
+        if path.startswith("/api"):
+            expected = f"Bearer {self.token}"
+            if not auth or not hmac.compare_digest(auth, expected):
+                response = JSONResponse(
+                    {"error": {"code": "unauthorized", "message": "Unauthorized"}},
+                    status_code=401,
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 def default_spa_dist() -> Path:
     """Resolve the built SPA, preferring an explicit override."""
     configured = os.environ.get("AGENTIC_ODI_STUDIO_DIST")
@@ -126,6 +161,8 @@ def create_app(
     app.state.connectors = connectors or ConnectorService(marketplace=resolved_marketplace)
     app.state.memory = memory or StudioMemory()
     app.state.approvals = approvals
+    app.state.studio_token = issue_token()
+    app.add_middleware(_AuthMiddleware, token=app.state.studio_token)
 
     app.add_middleware(
         CORSMiddleware,
