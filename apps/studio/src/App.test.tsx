@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { fetchConfig, healthLlm } from "./api/studioApi";
+import { fetchConfig, health, healthLlm } from "./api/studioApi";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -25,6 +25,16 @@ vi.mock("./api/studioApi", () => ({
       },
     ],
     source: "local" as const,
+  })),
+  health: vi.fn(async () => ({
+    status: "ok",
+    request_id: "test",
+    checks: {
+      sidecar: { ok: true, detail: "the sidecar is serving requests", latency_ms: 0 },
+      store: { ok: true, detail: "the store answers (:memory:)", latency_ms: 0 },
+      mcp: { ok: true, detail: "http://localhost:8000/mcp", latency_ms: 0 },
+      llm: { ok: true, detail: "LLM backend is reachable.", latency_ms: 0 },
+    },
   })),
   healthMcp: vi.fn(async () => ({ reachable: true })),
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend is reachable." })),
@@ -122,6 +132,16 @@ beforeEach(() => {
   vi.mocked(healthLlm).mockResolvedValue({
     healthy: true,
     message: "LLM backend is reachable.",
+  });
+  vi.mocked(health).mockResolvedValue({
+    status: "ok",
+    request_id: "test",
+    checks: {
+      sidecar: { ok: true, detail: "the sidecar is serving requests", latency_ms: 0 },
+      store: { ok: true, detail: "the store answers (:memory:)", latency_ms: 0 },
+      mcp: { ok: true, detail: "http://localhost:8000/mcp", latency_ms: 0 },
+      llm: { ok: true, detail: "LLM backend is reachable.", latency_ms: 0 },
+    },
   });
 });
 
@@ -284,6 +304,7 @@ describe("studio shell", () => {
     // nothing about what is missing until the person asks or something breaks.
     const { fetchConfig } = await import("./api/studioApi");
     vi.mocked(fetchConfig).mockRejectedValueOnce(new Error("no sidecar"));
+    vi.mocked(health).mockRejectedValueOnce(new Error("no sidecar"));
     vi.mocked(healthLlm).mockResolvedValueOnce({ healthy: false, message: "offline" });
     render(<App />);
 
@@ -310,8 +331,9 @@ describe("studio shell", () => {
         "studio.settings",
         JSON.stringify({ base_url: "", api_key: "", model_name: "", mcp_url: "", theme }),
       );
-      const { fetchConfig, healthLlm } = await import("./api/studioApi");
+      const { fetchConfig, health, healthLlm } = await import("./api/studioApi");
       vi.mocked(fetchConfig).mockRejectedValueOnce(new Error("no sidecar"));
+      vi.mocked(health).mockRejectedValueOnce(new Error("no sidecar"));
       vi.mocked(healthLlm).mockRejectedValueOnce(new Error("no sidecar"));
 
       render(<App />);
@@ -328,6 +350,7 @@ describe("studio shell", () => {
     // with no sidecar every one of those measurements is a refusal, and none of them is
     // a strip across the top of the window.
     vi.mocked(fetchConfig).mockRejectedValue(new Error("no sidecar"));
+    vi.mocked(health).mockRejectedValue(new Error("no sidecar"));
     vi.mocked(healthLlm).mockRejectedValue(new Error("no sidecar"));
     vi.useFakeTimers();
     try {
@@ -354,6 +377,7 @@ describe("studio shell", () => {
       expect(document.querySelectorAll(".banner")).toHaveLength(0);
 
       vi.mocked(fetchConfig).mockRejectedValue(new Error("the sidecar went away"));
+      vi.mocked(health).mockRejectedValue(new Error("the sidecar went away"));
       await act(async () => {
         await vi.advanceTimersByTimeAsync(31_000);
       });

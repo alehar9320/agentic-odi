@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Diagnostics
+         * @description Return diagnostic metadata only; never return database paths or records.
+         */
+        get: operations["get_diagnostics_api_diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/changelog": {
         parameters: {
             query?: never;
@@ -64,6 +84,30 @@ export interface paths {
         };
         /** Get Changelog Route */
         get: operations["get_changelog_route_api_changelog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Health
+         * @description The one health answer: sidecar, store, MCP, and model in one report.
+         *
+         *     ``GET`` because a browser, the Worker, and a monitor all issue one, and the
+         *     query overrides let Settings check an unsaved configuration. It never writes
+         *     and always answers inside its budget, even when everything is down.
+         */
+        get: operations["get_health_api_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1091,6 +1135,40 @@ export interface components {
             /** Assistant Id */
             assistant_id?: string | null;
         };
+        /**
+         * ClaimCitationOut
+         * @description The record label a claim carries, snapshotted when the turn was stored.
+         */
+        ClaimCitationOut: {
+            /** Id */
+            id: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Source Name
+             * @default
+             */
+            source_name: string;
+        };
+        /**
+         * ClaimOut
+         * @description One declarative sentence and what stands behind it.
+         */
+        ClaimOut: {
+            /** Index */
+            index: number;
+            /** Text */
+            text: string;
+            /** Status */
+            status: string;
+            /** Evidence */
+            evidence?: components["schemas"]["ClaimCitationOut"][];
+            /** Reason */
+            reason?: string | null;
+        };
         /** ConnectorListItem */
         ConnectorListItem: {
             /** Name */
@@ -1177,6 +1255,44 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HealthCheck
+         * @description One component's state, in the shape every surface reads.
+         */
+        HealthCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
+            /**
+             * Latency Ms
+             * @default 0
+             */
+            latency_ms: number;
+        };
+        /**
+         * HealthReport
+         * @description The single health answer: sidecar, store, MCP, and model.
+         *
+         *     ``status`` is ``ok``, ``degraded``, or ``down``; each check names what it
+         *     found so a person can act on it instead of guessing from a port.
+         */
+        HealthReport: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "down";
+            /** Checks */
+            checks: {
+                [key: string]: components["schemas"]["HealthCheck"];
+            };
+            /**
+             * Request Id
+             * @default
+             */
+            request_id: string;
         };
         /** HealthStatus */
         HealthStatus: {
@@ -1557,6 +1673,8 @@ export interface components {
             message_id?: string | null;
             /** Parent Id */
             parent_id?: string | null;
+            /** Claims */
+            claims?: components["schemas"]["ClaimOut"][];
         };
         /**
          * TurnNode
@@ -1573,6 +1691,8 @@ export interface components {
             content: string;
             /** Created At */
             created_at: string;
+            /** Claims */
+            claims?: components["schemas"]["ClaimOut"][];
         };
         /**
          * UiCatalogRequest
@@ -1771,6 +1891,28 @@ export interface operations {
             };
         };
     };
+    get_diagnostics_api_diagnostics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     get_changelog_route_api_changelog_get: {
         parameters: {
             query?: never;
@@ -1789,6 +1931,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    get_health_api_health_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+                base_url?: string | null;
+                model?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

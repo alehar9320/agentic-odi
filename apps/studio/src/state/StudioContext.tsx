@@ -40,8 +40,7 @@ import {
   fetchSignals,
   fetchStrategy,
   fetchUnreadSignalCount,
-  healthLlm,
-  healthMcp,
+  health,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
@@ -73,6 +72,7 @@ import type {
   ConnectorPreset,
   ConnectorSuggestion,
   CustomizeTarget,
+  HealthReport,
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
@@ -296,6 +296,8 @@ export interface StudioContextValue {
   refreshModels: (config?: { base_url: string; api_key: string }) => Promise<void>;
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
+  /** The one health answer (sidecar, store, MCP, model), or null until probed. */
+  healthReport: HealthReport | null;
   /** Whether the user has dismissed this session's sidecar-down notice. */
   dismissedSidecarNotice: boolean;
   /** Probe again now, e.g. after the user started the sidecar. */
@@ -561,6 +563,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
+  const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
+  /** The raw answer from the last survey; recorded only by an explicit check. */
+  const healthAnswerRef = useRef<HealthReport | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -939,22 +944,30 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const surveyConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
       const target = { ...settings, ...override };
-      const [sidecar, mcp, llm] = await Promise.all([
-        fetchConfig()
-          .then(() => true)
-          .catch(() => false),
-        healthMcp(target.mcp_url)
-          .then((result) => result.reachable)
-          .catch(() => false),
-        healthLlm({
-          base_url: target.base_url,
-          api_key: target.api_key,
-          model: target.model_name,
-        }).catch((error: unknown) => ({
-          healthy: false,
-          message: (error as Error).message || "The model did not answer.",
-        })),
-      ]);
+      // One health answer, not three probes: the sidecar owns the vocabulary
+      // for what is working, and the SPA must not re-derive it from a port.
+      const answer = await health({
+        mcp_url: target.mcp_url,
+        base_url: target.base_url,
+        model: target.model_name,
+      }).catch(() => null);
+      healthAnswerRef.current = answer;
+
+      if (answer === null) {
+        return {
+          sidecarReachable: false,
+          mcpReachable: false,
+          llmHealthy: false,
+          llmMessage: "The studio sidecar did not answer.",
+        };
+      }
+
+      const sidecar = answer.checks.sidecar?.ok ?? false;
+      const mcp = answer.checks.mcp?.ok ?? false;
+      const llm = {
+        healthy: answer.checks.llm?.ok ?? false,
+        message: answer.checks.llm?.detail ?? "The model did not answer.",
+      };
       void refreshCapabilities();
       return {
         sidecarReachable: sidecar,
@@ -987,6 +1000,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       mode: "evidence" | "recovery" = "evidence",
     ): Promise<ConnectionReport> => {
       const report = await surveyConnections(override);
+      setHealthReport(healthAnswerRef.current);
       const sidecar = report.sidecarReachable;
       const llm = { healthy: report.llmHealthy, message: report.llmMessage };
 
@@ -2028,6 +2042,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshModels,
       mcpReachable,
       sidecarReachable,
+      healthReport,
       dismissedSidecarNotice,
       dismissSidecarNotice,
       recheckConnections,
@@ -2141,6 +2156,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshModels,
       mcpReachable,
       sidecarReachable,
+      healthReport,
       dismissedSidecarNotice,
       dismissSidecarNotice,
       recheckConnections,
