@@ -114,6 +114,11 @@ export function EvidenceStream() {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLLIElement>, id: string) => {
+    // Only the row's own arrow keys reorder it. A control inside the row — the job
+    // select, the statement input, a rating slider — keeps its native arrow behavior.
+    if (event.target !== event.currentTarget) {
+      return;
+    }
     if (event.key === "ArrowUp") {
       event.preventDefault();
       move(id, -1);
