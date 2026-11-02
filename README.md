@@ -191,6 +191,8 @@ soon". See [External Connectors](docs/connectors.md).
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
 | [Reuse First](docs/architecture/reuse.md) | The ladder agents walk before writing code: reuse what exists, adopt what is declared, copy with provenance, then build |
 | [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
+| [Design Audit](DESIGN-AUDIT.md) | The target identity, the one scale per value, and the per-screen findings the current look came from |
+| [Design: Left Over](DESIGN-REMAINING.md) | What that pass deliberately did not change, and the reason for each |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
