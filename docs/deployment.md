@@ -144,11 +144,11 @@ choices keep this project far below that ceiling:
 | Choice | Where | Why |
 |---|---|---|
 | Browser mode only picks up `*.visual.test.tsx` | `apps/studio/vitest.visual.config.ts` | The 29 jsdom unit tests never bill a snapshot; adding a component to visual review is one explicit new file. |
-| One Chromium instance, one viewport | same file | No browser or viewport matrix multiplying each test. |
+| One Chromium instance, no viewport matrix | same file | No browser or viewport matrix multiplying each test; a file may size the viewport for the one state it pins. |
 | Animations paused at their end frame | same file (`pauseAnimationAtEnd`) | Shimmer and fade-in components do not diff on capture timing. |
 
-Today that is **2 snapshots per build**, one build per branch push, so the
-monthly allowance would cover ~2,500 builds. A component added to visual review
+Today that is **9 snapshots per build**, one build per branch push, so the
+monthly allowance would cover ~550 builds. A component added to visual review
 costs one snapshot per state per build, so keep new files focused on the states
 that matter rather than every prop permutation.
 

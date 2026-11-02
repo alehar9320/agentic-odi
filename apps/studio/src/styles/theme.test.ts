@@ -99,3 +99,22 @@ describe("composer focus ring", () => {
     );
   });
 });
+
+describe("starter card surface", () => {
+  it("gives the starter cards an explicit light-theme fill", () => {
+    // The dark rule is a white alpha, which is invisible over the light page.
+    // Light theme has to name a surface of its own, scoped to the starter set
+    // so the setup wizard's reply pills keep theirs.
+    expect(themeCss).toMatch(
+      /html\.theme-light \.composer__pills \.suggestion[^{]*\{[^}]*background:\s*var\(--surface\)/,
+    );
+  });
+
+  it("stacks the starter set into one column on a phone", () => {
+    const phone = themeCss.match(/@media \(max-width: 390px\)\s*\{([\s\S]*?)\n\}/);
+    expect(phone, "expected a 390px media block").not.toBeNull();
+    const body = phone![1];
+    expect(body).toMatch(/\.composer__pills\s*\{[^}]*flex-direction:\s*column/);
+    expect(body).toMatch(/\.composer__pills \.suggestion\s*\{[^}]*width:\s*100%/);
+  });
+});
