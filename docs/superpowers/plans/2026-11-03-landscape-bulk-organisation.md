@@ -60,7 +60,7 @@ pytest `TestClient`.
   `remove_theme_ids`, `add_tags`, `dry_run`), `_bulk_target_ids(request, mcp_url, outcome_ids, query) -> list[str]`,
   and `POST /api/outcomes/bulk` returning the report dict.
 
-- [ ] **Step 1: write the failing router tests** in `test_studio_bulk.py`, using
+- [x] **Step 1: write the failing router tests** in `test_studio_bulk.py`, using
   `def _client(kind: str) -> TestClient: return TestClient(create_app(InMemoryRepository(), backend=backend))`
   the way `test_studio_router.py:15` does, and seeding through `client.post("/api/jobs")` +
   `client.post("/api/outcomes")`:
@@ -74,14 +74,14 @@ pytest `TestClient`.
   * `query` widens the run: the report's `requested` is the search total, not the checked
     count, and every id the search names is in `changed`.
 
-- [ ] **Step 2: run them, confirm they fail** — `uv run pytest apps/studio-api/tests/test_studio_bulk.py -q`
+- [x] **Step 2: run them, confirm they fail** — `uv run pytest apps/studio-api/tests/test_studio_bulk.py -q`
   (404s / unknown route).
-- [ ] **Step 3: implement.** Add `BulkQuery`/`BulkRequest` to `schemas.py`; add
+- [x] **Step 3: implement.** Add `BulkQuery`/`BulkRequest` to `schemas.py`; add
   `_bulk_target_ids` (pages `search_outcomes` with `limit=200` until it has `total` ids,
   unioned with the named ids, order-stable) and the route in `router.py`. Pass
   `dry_run` through in both the MCP and local branches.
-- [ ] **Step 4: run the tests, confirm they pass.**
-- [ ] **Step 5: commit** `feat(studio-api): POST /api/outcomes/bulk · ALH-197`.
+- [x] **Step 4: run the tests, confirm they pass.**
+- [x] **Step 5: commit** `feat(studio-api): POST /api/outcomes/bulk · ALH-197`.
 
 ### Task 2: `POST /api/outcomes/bulk/undo`
 
@@ -95,34 +95,34 @@ pytest `TestClient`.
   restored-row report; a token that expired or was already used is a 400 whose message is
   the service's own sentence.
 
-- [ ] **Step 1: failing tests** — apply through the route, undo through the route, the
+- [x] **Step 1: failing tests** — apply through the route, undo through the route, the
   outcome reads back as it was; undo twice → 400 `already undone`; undo a token from an
   older run after a newer one wrote → 400 naming the newer token; a row edited by hand
   between apply and undo is in the undo report's `skipped`.
-- [ ] **Step 2: verify they fail**, then **Step 3: implement** the route, **Step 4: verify
+- [x] **Step 2: verify they fail**, then **Step 3: implement** the route, **Step 4: verify
   they pass**, **Step 5: commit** `feat(studio-api): undo a bulk run over HTTP · ALH-197`.
 
 ### Task 3: the UI preview and the CLI preview are one calculation
 
 **Files:** Test: `tests/contract/test_bulk_contract.py` (extend).
 
-- [ ] **Step 1: write the parity test** — build one fixture, run the CLI's
+- [x] **Step 1: write the parity test** — build one fixture, run the CLI's
   `LocalBackend.run_tool("bulk_update_outcomes", {..., "dry_run": True})` and the route's
   same call on an `ODIService` over the same store, and assert the two `changes` lists and
   the two `skipped` lists are equal, and that the store's event count is unchanged by the
   pair of previews.
-- [ ] **Step 2: run it** — `uv run pytest tests/contract/test_bulk_contract.py -q`. Fix
+- [x] **Step 2: run it** — `uv run pytest tests/contract/test_bulk_contract.py -q`. Fix
   whatever ordering difference it exposes in the route (it must not re-sort rows the service
   returned).
-- [ ] **Step 3: commit** `test(contract): the Studio and CLI previews agree row for row`.
+- [x] **Step 3: commit** `test(contract): the Studio and CLI previews agree row for row`.
 
 ### Task 4: regenerate the OpenAPI artifacts
 
-- [ ] **Step 1:** dump `create_app(...).openapi()` into `apps/studio/openapi.json` in the
+- [x] **Step 1:** dump `create_app(...).openapi()` into `apps/studio/openapi.json` in the
   same 2-space JSON shape that is committed (the file is generated in-process; there is no
   script).
-- [ ] **Step 2:** `cd apps/studio && npm run gen:api-types`.
-- [ ] **Step 3:** `git diff --exit-code -- src/api/schema.d.ts` after a second `gen:api-types`
+- [x] **Step 2:** `cd apps/studio && npm run gen:api-types`.
+- [x] **Step 3:** `git diff --exit-code -- src/api/schema.d.ts` after a second `gen:api-types`
   run proves the committed types are current; commit
   `chore(studio): regenerate OpenAPI for the bulk routes`.
 
@@ -137,10 +137,10 @@ test `apps/studio/src/api/studioApi.bulk.test.ts` (new).
   `previewBulkOutcomes(body)` / `applyBulkOutcomes(body)` / `undoBulkOutcomes({mcp_url, token})`,
   all returning `Promise<BulkReport>` and rejecting with `StudioApiError` on a refused run.
 
-- [ ] **Step 1: failing fetcher tests** with `vi.stubGlobal("fetch", …)`: the body is posted
+- [x] **Step 1: failing fetcher tests** with `vi.stubGlobal("fetch", …)`: the body is posted
   to `/api/outcomes/bulk` with `dry_run: true` for the preview and `false` for the apply; a
   400 envelope rejects with the `StudioError` inside it, keeping the server's message.
-- [ ] **Step 2: implement**, **Step 3: `npx vitest run src/api` passes**, **Step 4: commit**
+- [x] **Step 2: implement**, **Step 3: `npx vitest run src/api` passes**, **Step 4: commit**
   `feat(studio): bulk preview, apply and undo fetchers`.
 
 ### Task 6: selection, the change bar, and the change dialog
@@ -156,41 +156,44 @@ extend `apps/studio/src/test/a11y.test.tsx` only if the sweep needs the bar moun
 - Consumes: Task 5's fetchers; `Narrowing` and the landscape's `result: OutcomeSearch`
   (its `total` is the wider action's number); `JOB_STAGES`; the `themes` list already
   fetched; `useFocusTrap`.
-- Produces: `BulkChangeBar({selectedCount, matchingTotal, themes, busy, onClear, onPreviewSelected, onPreviewAll})`,
-  `BulkChangeDialog({report, mode, error, onApply, onUndo, onClose, busy})` where `mode` is
-  `"preview" | "applied"`.
+- Produces: `BulkDraft {stage?, addThemeIds, removeThemeIds, addTags}` and
+  `BulkChangeBar({selectedCount, matchingTotal, themes, draft, busy, onClear, onDraftChange, onPreviewSelected, onPreviewAll})`,
+  `BulkChangeDialog({report, mode, error, themes, steps, busy, onApply, onUndo, onClose})` where `mode` is
+  `"preview" | "applied"`; `OutcomeCard` and the table row take an optional
+  `checked` / `onToggleChecked` pair, which the landscape supplies only when there is a
+  store to write to.
 
-- [ ] **Step 1: failing component tests** (same `vi.mock` harness style as
+- [x] **Step 1: failing component tests** (same `vi.mock` harness style as
   `OpportunityLandscape.search.test.tsx`):
   * ticking two cards shows the bar naming `2 selected`; with a narrowing whose `total` is
     137, the bar offers `Preview all 137 matching` and the checked-count line separately;
   * with nothing selected the bar is absent and no preview call is made;
-  * pressing Preview calls the fetcher with `dry_run: true`, renders one table row per
+  * pressing Preview calls the preview fetcher, renders one table row per
     `changes` entry with its `from` and `to`, and lists a skipped row with its reason;
-  * Apply sends `dry_run: false` with the same ids, then the bar reads
+  * Apply sends the same run without the preview flag, then the dialog reads
     `12 changed · 3 skipped` — the test asserts the skipped number is in the sentence;
   * Undo calls the undo fetcher with the token and the dialog closes on the returned report;
   * a rejected preview keeps the selection and the drafted change (the bar is still there
     with the same numbers) and shows the server's message;
   * an expired-token error is shown with no optimistic restore: the canvas refreshes and the
     rows keep the applied values.
-- [ ] **Step 2: implement** selection state (`Set<string>`, toggle without touching
+- [x] **Step 2: implement** selection state (`Set<string>`, toggle without touching
   `focusSubject`), a checkbox in `OutcomeCard` and in the table row, the bar, the dialog.
-- [ ] **Step 3: `npx vitest run src/components/canvas` and `npx tsc -b --noEmit` pass**, then
+- [x] **Step 3: `npx vitest run src/components/canvas` and `npx tsc -b --noEmit` pass**, then
   **Step 4: the a11y sweep passes** in cards, matrix and table view (`npx vitest run src/test/a11y.test.tsx`).
-- [ ] **Step 5: commit** `feat(studio): select, preview, apply and undo bulk changes in the landscape`.
+- [x] **Step 5: commit** `feat(studio): select, preview, apply and undo bulk changes in the landscape`.
 
 ### Task 7: document it
 
 **Files:** Modify `docs/living-studio.md` (the "What the canvas is made of" section),
 `README.md`.
 
-- [ ] **Step 1:** write the selection and undo limitations into `docs/living-studio.md`:
+- [x] **Step 1:** write the selection and undo limitations into `docs/living-studio.md`:
   checked rows are the run; the wider run is a named action whose count came from the same
   search; the matrix view cannot select; a preview is not a promise — the write's own skip
   reasons win; an undo token expires under a newer run and restores only untouched rows.
-- [ ] **Step 2:** one `README.md` capability sentence for the landscape bulk run.
-- [ ] **Step 3:** `uv run python scripts/doc_check.py` clean; commit
+- [x] **Step 2:** one `README.md` capability sentence for the landscape bulk run.
+- [x] **Step 3:** `uv run python scripts/doc_check.py` clean; commit
   `docs(living-studio,README): the landscape's bulk run and its limits`.
 - [ ] **Step 4:** full gates — `uv run pytest -q`, `uv run ruff check .`,
   `uv run ruff format --check .`, `uv run mypy apps brand packages`,

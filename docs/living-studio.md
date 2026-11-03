@@ -301,6 +301,27 @@ demonstration board says so in one line instead of answering with zero matches,
 and a sidecar that cannot be reached is reported as a failure with a retry
 rather than as an empty library.
 
+Organising many outcomes at once starts from that same board. A checkbox on each
+card and each table row adds the row to a selection; the docked bar that appears
+holds the drafted change — a stage, themes to add or remove, tags — and offers
+**Preview N selected** and, when a filter is on, **Preview all M matching**. The
+checked rows are exactly the run, and widening is its own named action that
+states the number it is about to write, so expanding the set is never a side
+effect of pressing a button that said something else. Both go to
+`POST /api/outcomes/bulk`, which answers with the change table the CLI prints:
+one row per field written, one line per row the service skipped with its reason.
+Apply sends the same request without the preview flag, and the dialog that
+reports it counts what changed and what was skipped rather than calling a partial
+run a success.
+
+Three limits are worth stating plainly. The matrix view cannot select — its dots
+are positions, not rows — so a bulk run is aimed from the cards or the table. A
+preview is not a promise: the write's own skip reasons win, because anything can
+have happened to a row between the two requests. And the **Undo** button carries
+the token that run was issued: a newer bulk run expires an older token, and an
+undo restores only the rows nobody edited since, so a failed undo shows the
+service's sentence and re-reads the canvas instead of rolling rows back by hand.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront

@@ -150,7 +150,9 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **Organise a set, then change your mind.** `odi desired-outcomes bulk` files a
   narrowed set on a stage, under themes, and with tags in one run — `--dry-run`
   lists the rows it would write and writes nothing, and the real run prints the
-  token that takes those rows back.
+  token that takes those rows back. The same run lives on the board: tick the
+  cards or table rows, preview the table the CLI prints, apply it, and undo it
+  from the dialog, which counts what was skipped as well as what changed.
 - **A real conversation runtime.** The Studio uses assistant-ui over its
   sidecar-owned transcript, with attachments, tool traces, opt-in approvals for
   chat writes and unknown tools, and branch-aware editing and regeneration.
