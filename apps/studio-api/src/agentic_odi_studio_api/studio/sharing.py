@@ -41,7 +41,7 @@ DEFAULT_TTL_DAYS = 7
 MAX_TTL_DAYS = 30
 
 #: Namespaced so a token is recognisable in a log without being a secret.
-TOKEN_PREFIX = "odi_sh_"
+TOKEN_PREFIX = "odi_sh_"  # nosec B105 - a token namespace, not a credential
 
 #: Where a minted link points when nothing overrides it. #550 serves the page
 #: that renders the payload; until then the link names the read endpoint.
