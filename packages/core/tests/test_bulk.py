@@ -83,9 +83,9 @@ def test_a_bulk_operation_survives_a_reopen(tmp_path: Path) -> None:
 
 # --- the bulk change itself --------------------------------------------------
 
-from agentic_odi_core.bulk import image  # noqa: E402
+from agentic_odi_core.bulk import BulkReport, image  # noqa: E402
 from agentic_odi_core.errors import ValidationError  # noqa: E402
-from agentic_odi_core.models import Outcome  # noqa: E402
+from agentic_odi_core.models import JobStage, Outcome  # noqa: E402
 from agentic_odi_core.query import OutcomeQuery  # noqa: E402
 from agentic_odi_core.services import ODIService  # noqa: E402
 
@@ -107,12 +107,26 @@ def _job_with_map(service: ODIService, name: str, stages: tuple[str, ...]) -> di
     service.add_outcome(job.id, STATEMENT_THREE)
     steps = {}
     for order, stage in enumerate(stages, start=1):
-        steps[stage] = service.add_step(job.id, f"Step for {stage}", order=order, stage=stage).id
+        steps[stage] = service.add_step(
+            job.id, f"Step for {stage}", order=order, stage=JobStage(stage)
+        ).id
     return {"job_id": job.id, **steps}
 
 
 def _outcome(service: ODIService, job_id: str, statement: str) -> str:
     return service.add_outcome(job_id, statement).id
+
+
+def _stored(service: ODIService, outcome_id: str) -> Outcome:
+    """Read one outcome back, as a whole object the assertions can walk into."""
+    stored = service.repo.get_outcome(outcome_id)
+    assert stored is not None
+    return stored
+
+
+def _token(report: BulkReport) -> str:
+    assert report.undo_token is not None
+    return report.undo_token
 
 
 def test_a_preview_lists_the_rows_a_real_run_would_write_without_writing_them(
@@ -172,7 +186,7 @@ def test_a_repeated_id_cannot_write_twice(service: ODIService) -> None:
 
     assert report.requested == 1
     assert report.changed == [o_a]
-    assert service.repo.get_outcome(o_a).theme_ids == [theme]
+    assert _stored(service, o_a).theme_ids == [theme]
 
 
 def test_an_empty_selection_is_refused(service: ODIService) -> None:
@@ -189,7 +203,7 @@ def test_a_theme_both_added_and_removed_is_refused_before_any_write(
 
     with pytest.raises(ValidationError, match="both added and removed"):
         service.bulk_update_outcomes([o_a], add_theme_ids=[theme], remove_theme_ids=[theme])
-    assert service.repo.get_outcome(o_a).theme_ids == []
+    assert _stored(service, o_a).theme_ids == []
 
 
 def test_a_stage_moves_each_outcome_onto_its_own_jobs_step(service: ODIService) -> None:
@@ -201,8 +215,8 @@ def test_a_stage_moves_each_outcome_onto_its_own_jobs_step(service: ODIService) 
     report = service.bulk_update_outcomes([o_a, o_b], stage="locate")
 
     assert sorted(report.changed) == sorted([o_a, o_b])
-    assert service.repo.get_outcome(o_a).step_id == one["locate"]
-    assert service.repo.get_outcome(o_b).step_id == two["locate"]
+    assert _stored(service, o_a).step_id == one["locate"]
+    assert _stored(service, o_b).step_id == two["locate"]
 
 
 def test_a_job_without_that_stage_is_skipped_rather_than_guessed(
@@ -238,7 +252,7 @@ def test_added_tags_land_once_and_a_row_that_already_matches_changes_nothing(
     report = service.bulk_update_outcomes([o_a, o_b], add_tags=["churn"])
 
     assert report.changed == [o_a]
-    assert service.repo.get_outcome(o_a).tags == ["churn"]
+    assert _stored(service, o_a).tags == ["churn"]
     assert report.skipped[0]["reason"] == "no change"
     assert len(service.repo.bulk_operations) == 1
 
@@ -290,26 +304,26 @@ def test_undo_restores_themes_stage_and_tags_exactly(service: ODIService) -> Non
     o_a = _outcome(service, one["job_id"], STATEMENT_ONE)
     theme = service.add_theme("Billing").id
     service.update_outcome(o_a, {"tags": ["keep-me"]})
-    original = image(service.repo.get_outcome(o_a))
+    original = image(_stored(service, o_a))
 
     report = service.bulk_update_outcomes(
         [o_a], add_theme_ids=[theme], stage="locate", add_tags=["churn"]
     )
-    undone = service.undo_bulk(report.undo_token)
+    undone = service.undo_bulk(_token(report))
 
     assert sorted(undone.changed) == sorted(report.changed)
-    assert image(service.repo.get_outcome(o_a)) == original
+    assert image(_stored(service, o_a)) == original
 
 
 def test_undo_restores_a_step_that_was_never_set(service: ODIService) -> None:
     one = _job_with_map(service, "Reconcile invoices", ("locate", "execute"))
     o_a = _outcome(service, one["job_id"], STATEMENT_ONE)
-    assert service.repo.get_outcome(o_a).step_id is None
+    assert _stored(service, o_a).step_id is None
 
     report = service.bulk_update_outcomes([o_a], stage="locate")
-    service.undo_bulk(report.undo_token)
+    service.undo_bulk(_token(report))
 
-    assert service.repo.get_outcome(o_a).step_id is None
+    assert _stored(service, o_a).step_id is None
 
 
 def test_a_newer_bulk_run_expires_the_older_token(service: ODIService) -> None:
@@ -319,17 +333,17 @@ def test_a_newer_bulk_run_expires_the_older_token(service: ODIService) -> None:
     second = service.bulk_update_outcomes([o_a], add_tags=["pricing"])
 
     with pytest.raises(ValidationError, match=f"{second.undo_token} wrote after it"):
-        service.undo_bulk(first.undo_token)
+        service.undo_bulk(_token(first))
 
 
 def test_one_token_cannot_undo_twice(service: ODIService) -> None:
     one = _job_with_map(service, "Reconcile invoices", ("locate", "execute"))
     o_a = _outcome(service, one["job_id"], STATEMENT_ONE)
     report = service.bulk_update_outcomes([o_a], add_tags=["churn"])
-    service.undo_bulk(report.undo_token)
+    service.undo_bulk(_token(report))
 
     with pytest.raises(ValidationError, match="already undone"):
-        service.undo_bulk(report.undo_token)
+        service.undo_bulk(_token(report))
 
 
 def test_an_unknown_token_is_refused(service: ODIService) -> None:
@@ -347,13 +361,13 @@ def test_undo_leaves_a_row_someone_answered_after_the_bulk_run(
 
     report = service.bulk_update_outcomes([o_a, o_b], add_theme_ids=[theme])
     service.update_outcome(o_b, {"tags": ["hand-edited"]})
-    undone = service.undo_bulk(report.undo_token)
+    undone = service.undo_bulk(_token(report))
 
     assert undone.changed == [o_a]
     assert undone.skipped[0]["reason"] == "changed since the bulk update"
-    assert service.repo.get_outcome(o_a).theme_ids == []
-    assert service.repo.get_outcome(o_b).theme_ids == [theme]
-    assert service.repo.get_outcome(o_b).tags == ["hand-edited"]
+    assert _stored(service, o_a).theme_ids == []
+    assert _stored(service, o_b).theme_ids == [theme]
+    assert _stored(service, o_b).tags == ["hand-edited"]
 
 
 def test_a_reordered_membership_is_not_a_conflict(service: ODIService) -> None:
@@ -365,9 +379,9 @@ def test_a_reordered_membership_is_not_a_conflict(service: ODIService) -> None:
     report = service.bulk_update_outcomes([o_a], add_theme_ids=[second])
     service.update_outcome(o_a, {"theme_ids": [second, first]})
 
-    service.undo_bulk(report.undo_token)
+    service.undo_bulk(_token(report))
 
-    assert service.repo.get_outcome(o_a).theme_ids == [first]
+    assert _stored(service, o_a).theme_ids == [first]
 
 
 def test_a_token_still_works_after_a_reload(tmp_path: Path) -> None:
@@ -389,8 +403,8 @@ def test_a_token_still_works_after_a_reload(tmp_path: Path) -> None:
     report = service.bulk_update_outcomes(["o-1"], add_theme_ids=[theme], stage="locate")
 
     reopened = ODIService(SQLiteRepository(db_path=path))
-    undone = reopened.undo_bulk(report.undo_token)
+    undone = reopened.undo_bulk(_token(report))
 
     assert undone.changed == ["o-1"]
-    assert reopened.repo.get_outcome("o-1").theme_ids == []
-    assert reopened.repo.get_outcome("o-1").step_id is None
+    assert _stored(reopened, "o-1").theme_ids == []
+    assert _stored(reopened, "o-1").step_id is None
