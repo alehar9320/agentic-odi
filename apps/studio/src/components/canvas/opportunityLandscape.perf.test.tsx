@@ -33,8 +33,18 @@ function bigCanvas() {
 }
 
 const harness = vi.hoisted(() => ({
+  // The board asks the store for a page and its counts on mount. This test is
+  // about the render of 1,500 outcomes, so the answer is handed over without a
+  // network call and the facet row stays empty.
+  search: vi.fn(async () => ({
+    items: [],
+    total: 1500,
+    facets: { stage: {}, theme: {}, confidence: {} },
+  })),
+  themes: vi.fn(async () => []),
   state: {
     canvasState: { kind: "ready", data: null } as unknown as CanvasState,
+    settings: { mcp_url: "http://mcp" },
     refreshCanvas: vi.fn(),
     openPanel: vi.fn(),
     theses: [],
@@ -45,6 +55,12 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("../../state/StudioContext", () => ({ useStudio: () => harness.state }));
+
+vi.mock("../../api/studioApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api/studioApi")>()),
+  fetchOutcomeSearch: harness.search,
+  fetchThemes: harness.themes,
+}));
 
 describe("OpportunityLandscape at study scale", () => {
   it("bounds the plotted points but keeps every outcome in the summary", () => {

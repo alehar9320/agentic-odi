@@ -145,6 +145,10 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **Desktop app:** `npm --prefix apps/studio run tauri dev`.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
+- **Narrow the landscape by asking.** The Opportunity Landscape's search field,
+  stage/theme/confidence facets and score band run the same `OutcomeQuery` as
+  `odi desired-outcomes search`, so the board draws the store's page, total and
+  counts instead of a filtered copy of what it had already loaded.
 - **A real conversation runtime.** The Studio uses assistant-ui over its
   sidecar-owned transcript, with attachments, tool traces, opt-in approvals for
   chat writes and unknown tools, and branch-aware editing and regeneration.

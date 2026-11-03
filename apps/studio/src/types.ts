@@ -25,6 +25,24 @@ export interface Outcome {
   telemetry?: string;
 }
 
+/**
+ * The counts the sidecar computed for this same query with only its own
+ * dimension removed. Buckets overlap by design, so they are not a breakdown of
+ * `total` and are never re-derived here.
+ */
+export interface OutcomeFacets {
+  stage: Record<string, number>;
+  theme: Record<string, number>;
+  confidence: Record<string, number>;
+}
+
+/** One page of the narrowed library: the rows, the total before paging, the facets. */
+export interface OutcomeSearch {
+  items: Outcome[];
+  total: number;
+  facets: OutcomeFacets;
+}
+
 export interface Evidence {
   id: string;
   source_name?: string;
