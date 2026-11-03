@@ -56,11 +56,19 @@ vi.mock("./api/studioApi", () => ({
   dismissSignal: vi.fn(async () => ({ id: "sig-1" })),
   fetchConnectorCatalog: vi.fn(async () => []),
   fetchConnectors: vi.fn(async () => []),
-  asStudioError: (error: unknown) => ({
-    code: "internal",
-    message: error instanceof Error ? error.message : "Something went wrong.",
-    retryable: false,
-  }),
+  asStudioError: (error: unknown) => {
+    // Mirror the real helper: a StudioApiError carries the sidecar's whole
+    // error body, so a structured failure survives the mock.
+    const structured = (error as { error?: unknown } | null)?.error;
+    if (structured && typeof structured === "object") {
+      return structured;
+    }
+    return {
+      code: "internal",
+      message: error instanceof Error ? error.message : "Something went wrong.",
+      retryable: false,
+    };
+  },
   fetchLatestConversation: vi.fn(async () => ({ conversation: null, turns: [] })),
   createConversation: vi.fn(async () => ({
     id: "c-new",
@@ -707,5 +715,36 @@ describe("first run", () => {
         expect.objectContaining({ name: "Get a service from commit to production" }),
       );
     });
+  });
+});
+
+describe("boot failure", () => {
+  it("shows the failure page, not the conversation, when the database is damaged", async () => {
+    vi.mocked(fetchConfig).mockRejectedValueOnce(
+      Object.assign(new Error("Your database failed its integrity check."), {
+        error: {
+          code: "store_corrupt",
+          message:
+            "Your database failed its integrity check: /home/me/.odi.db. " +
+            "Last backup: 06:14 (odi-20260102T061400Z.db).",
+          detail: "database disk image is malformed",
+          suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
+          retryable: false,
+        },
+      }),
+    );
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Your database failed its integrity check.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Last backup: 06:14");
+    expect(screen.getByRole("button", { name: "Recheck the database" })).toBeInTheDocument();
+    // The conversation is not offered: there is nothing to show from a store
+    // that failed its check.
+    expect(screen.queryByRole("textbox", { name: /message the studio/i })).toBeNull();
   });
 });

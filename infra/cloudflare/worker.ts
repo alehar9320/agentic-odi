@@ -7,13 +7,14 @@
  * Tunnel. (Running the sidecar inside Cloudflare requires Workers Containers,
  * which is a paid-plan feature.)
  *
- * When `SIDECAR_URL` is absent, the Worker answers `/api/capabilities` with a
- * local-only manifest so the browser BFF can run fully offline. Every other
- * `/api/*` request returns a 502 carrying the shared `{"error": StudioError}`
- * shape, so a dead tunnel reads as a recoverable, actionable failure instead of
- * a blank page or a legacy `{"detail": ...}` blob. The browser BFF then serves
- * canvas data, memory, conversations, and the deterministic assistant from
- * IndexedDB.
+ * The Worker answers two `/api/*` routes itself, before the sidecar is
+ * consulted: `GET /api/build` reports the release tag, and `/api/capabilities`
+ * falls back to a local-only manifest when `SIDECAR_URL` is absent so the
+ * browser BFF can run fully offline. Every other `/api/*` request returns a 502
+ * carrying the shared `{"error": StudioError}` shape, so a dead tunnel reads as
+ * a recoverable, actionable failure instead of a blank page or a legacy
+ * `{"detail": ...}` blob. The browser BFF then serves canvas data, memory,
+ * conversations, and the deterministic assistant from IndexedDB.
  */
 
 interface Env {
@@ -24,6 +25,9 @@ interface Env {
    * model endpoint, e.g. "https://api.myprovider.com". Curated defaults are
    * always included. */
   LLM_ORIGINS?: string;
+  /** The tag this Worker was deployed from, declared in `wrangler.jsonc`.
+   * Answers `GET /api/build`; nothing else about the deployment. */
+  RELEASE_VERSION?: string;
 }
 
 const API_PREFIX = "/api/";
@@ -156,10 +160,16 @@ interface StudioError {
 /**
  * Build a Worker-originated failure as the shared `{"error": StudioError}` the
  * sidecar returns, so a dead tunnel reads as a recoverable, actionable failure
- * instead of a blank page or a legacy `{"detail": ...}` blob. The returned
- * Response is wrapped with `secure(...)` by its callers.
+ * instead of a blank page or a legacy `{"detail": ...}` blob. The default
+ * status is the 502 that means "downstream unreachable"; a route the Worker
+ * answers itself passes its own. The returned Response is wrapped with
+ * `secure(...)` by its callers.
  */
-function sidecarError(error: StudioError, requestId: string | null): Response {
+function sidecarError(
+  error: StudioError,
+  requestId: string | null,
+  init: ResponseInit = { status: 502 },
+): Response {
   return Response.json(
     {
       error: {
@@ -170,7 +180,7 @@ function sidecarError(error: StudioError, requestId: string | null): Response {
         request_id: requestId,
       },
     },
-    { status: 502 },
+    init,
   );
 }
 
@@ -185,6 +195,35 @@ export default {
 
     if (!url.pathname.startsWith(API_PREFIX)) {
       return secure(await env.ASSETS.fetch(request), env);
+    }
+
+    // Release identity is the Worker's own answer, so it responds whether or
+    // not a sidecar is configured, and before the proxy branch does. It exposes
+    // nothing but the declared tag: no env dump, and never a timestamp, because
+    // two deploys of one release must report the same string.
+    if (url.pathname === "/api/build") {
+      if (request.method !== "GET") {
+        return secure(
+          sidecarError(
+            {
+              code: "method_not_allowed",
+              message: "The build route only answers GET.",
+              suggestion: "Read /api/build with GET.",
+              retryable: false,
+            },
+            requestId,
+            { status: 405, headers: { Allow: "GET" } },
+          ),
+          env,
+        );
+      }
+      return secure(
+        Response.json(
+          { version: env.RELEASE_VERSION ?? "unknown" },
+          { headers: { "Cache-Control": "no-store" } },
+        ),
+        env,
+      );
     }
 
     const sidecar = env.SIDECAR_URL?.trim().replace(/\/+$/, "");

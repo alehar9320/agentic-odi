@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { UNDERSERVED_THRESHOLD } from "../../lib/odi";
 import type { CanvasState } from "../../types";
 import { OpportunityLandscape } from "./OpportunityLandscape";
 
@@ -347,5 +348,54 @@ describe("OpportunityLandscape canvas states", () => {
 
     expect(screen.getByText(/mcp endpoint unreachable/i)).toBeInTheDocument();
     expect(screen.queryByText(/saved/i)).toBeNull();
+  });
+});
+
+describe("OpportunityLandscape score rendering", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  // The metric tile typed "10" by hand while the boundary lived in lib/odi.ts, so
+  // the copy could disagree with the rule it claims to describe.
+  it("labels the underserved metric with the exported threshold", () => {
+    render(<OpportunityLandscape />);
+
+    expect(
+      screen.getByText(`Underserved Targets (>${UNDERSERVED_THRESHOLD})`),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the average opportunity score to one decimal", () => {
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("12.5");
+  });
+
+  // An outcome the sidecar never scored rendered "0.0" in the table and "N/A" on
+  // the card. The formatter already owns that distinction.
+  it("shows an unscored outcome as N/A in the table rather than as a zero", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-108",
+            statement: "Minimize unanswered support tickets",
+            importance: 5,
+            satisfaction: 5,
+            opportunity_score: null,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const row = screen.getByRole("row", { name: /minimize unanswered support tickets/i });
+    expect(within(row).getByText("N/A")).toBeInTheDocument();
   });
 });
