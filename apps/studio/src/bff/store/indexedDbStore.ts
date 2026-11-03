@@ -16,7 +16,7 @@ import {
   type WorkspaceSnapshot,
 } from "./types";
 
-const DB_NAME = "agentic-odi-studio";
+export const DB_NAME = "agentic-odi-studio";
 const DB_VERSION = 2;
 const DRAIN_LEASE_KEY = "drain_lease";
 
