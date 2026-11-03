@@ -214,6 +214,9 @@ export function OpportunityLandscape() {
    * order — re-sorting it here would be a second ordering that can disagree
    * with the pager beside it. An unnarrowed board is the whole library, which
    * is ordered by opportunity as it always was.
+   *
+   * One rule for every score on this canvas: compare the stored number, display
+   * the rounded one. Two outcomes that both print "13.0" still have an order.
    */
   const rows = useMemo(() => {
     if (narrowed) {

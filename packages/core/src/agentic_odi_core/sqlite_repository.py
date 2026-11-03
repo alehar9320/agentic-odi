@@ -24,6 +24,7 @@ from agentic_odi_core.models import (
     Signal,
     Step,
     Strategy,
+    Study,
     Theme,
     compute_opportunity_score,
 )
@@ -70,6 +71,7 @@ class SQLiteRepository(Repository):
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.bulk_operations: dict[str, BulkOperation] = {}
         self.segments: dict[str, Segment] = {}
+        self.studies: dict[str, Study] = {}
         self.strategies: dict[str, Strategy] = {}
         self.themes: dict[str, Theme] = {}
         self._last_event_id = 0
@@ -226,6 +228,10 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.strategies, p, Strategy)
         elif et == "PROPOSAL_CREATED":
             self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
+        elif et == "STUDY_CREATED":
+            self.studies[p["id"]] = Study.model_validate(p)
+        elif et == "STUDY_UPDATED":
+            self._merge_updates(self.studies, p, Study)
         elif et == "PROPOSAL_UPDATED":
             self._merge_updates(self.proposals, p, OutcomeProposal)
         elif et == "THEME_CREATED":
@@ -946,6 +952,51 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return self.outcomes[outcome_id]
+
+    def add_study(self, study: Study) -> Study:
+        with self._lock:
+            self.store.append(
+                "STUDY_CREATED",
+                study.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return study
+
+    def get_study(self, study_id: str) -> Study | None:
+        with self._lock:
+            self._sync()
+            return self.studies.get(study_id)
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        with self._lock:
+            self._sync()
+            items = list(self.studies.values())
+            if job_id is not None:
+                items = [study for study in items if study.job_id == job_id]
+            return items
+
+    def update_study(self, study_id: str, updates: dict[str, Any]) -> Study | None:
+        with self._lock:
+            self._sync()
+            study = self.studies.get(study_id)
+            if study is None:
+                return None
+            current = study.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_study = study.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "STUDY_UPDATED",
+                {"id": study_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_study
 
     def add_strategy(self, strategy: Strategy) -> Strategy:
         with self._lock:

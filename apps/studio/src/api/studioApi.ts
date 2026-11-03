@@ -34,6 +34,7 @@ import type {
   Strategy,
   StudioConfig,
   StudioError,
+  Study,
   Theme,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
@@ -685,6 +686,15 @@ export async function undoBulkOutcomes(mcpUrl: string, token: string): Promise<B
     mcp_url: mcpUrl,
     token,
   });
+}
+
+/** The opened studies, or an empty list before any study has been opened. */
+export async function fetchStudies(mcpUrl: string, jobId?: string): Promise<Study[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Study[]>(`/api/studies?${params.toString()}`);
 }
 
 /** The recorded Stage 6 path, or null when no strategy has been proposed yet. */
