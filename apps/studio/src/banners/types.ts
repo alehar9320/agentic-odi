@@ -20,6 +20,10 @@ export type BannerDock = "top" | "corner";
 export type BannerKind =
   | "sidecar-down"
   | "model-offline"
+  | "edge-offer"
+  | "edge-downloading"
+  | "edge-ready"
+  | "edge-unlocked"
   | "update-available"
   | "update-ready"
   | "write-rejected"
@@ -34,7 +38,9 @@ export type BannerActionId =
   | "open-capture"
   | "open-jobmap"
   | "install-update"
-  | "restart";
+  | "restart"
+  | "enable-edge-model"
+  | "decline-edge-model";
 
 export interface BannerAction {
   label: string;
@@ -49,6 +55,15 @@ export interface BannerAction {
    */
   intent?: string;
   tone: "primary" | "ghost";
+  /**
+   * True when the click is an *answer the studio has to record* rather than a
+   * gesture. Radix closes a toast as soon as an action is pressed; for an
+   * answer, that would let the strip go quiet while the write is still in
+   * flight — and a person who reloads in that window gets asked again. A
+   * durable action leaves the banner's lifetime with the condition that raised
+   * it, so the strip disappears only once the answer is on disk.
+   */
+  durable?: boolean;
 }
 
 /** What a caller passes. Everything but `kind` may be omitted. */

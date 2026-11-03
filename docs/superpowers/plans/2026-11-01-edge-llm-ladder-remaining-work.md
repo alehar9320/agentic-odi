@@ -1,0 +1,451 @@
+# Edge LLM Ladder — Remaining Work
+
+**Branch:** `alehar9320/flyingfish` **Base:** `main`, merged forward three times —
+the last merge took `main` at `fe8599c` and was clean, no conflict in a single
+file. What that merge brought is worth naming, because it lands in the two files
+this branch's durability work just edited: `fetchConfig` now aborts at 1,200 ms
+so a hanging proxy cannot freeze the first screen, and boot order is explicit —
+local data first, config never a gate, the off-screen reads at idle. The browser
+tier's merge-at-load reads are IndexedDB only, which is exactly what "local data
+first" now means, so the two changes agree; the suite says so at the merged head
+(999 vitest, 25 chromium scenarios). The Python matrix moved too — `ruff`,
+`pytest-asyncio`, `mypy` version bumps — and is green at `1848 passed`.
+**Status:** the engine, the ladder, the routing seam, the progression scheduler
+and the banners are built and tested, **a person can turn the feature on** —
+the offer strip asks once — **that answer can now be changed from Settings**,
+with the tiers on disk listed and freeable, **every reply says which brain
+produced it and keeps saying it after the tab closes** (the exchange lives in
+this browser's own memory and is merged back in when the page reopens), **a
+settled fact reaches the other open tabs** (tested at unit
+level; two real tabs holding the engine is still a handoff item), and **the
+end-to-end shape of all of it is driven by Playwright against the built bundle**.
+What is left is verification on real hardware, which no CI browser can do.
+
+This file exists because the branch was cut short for review and the working
+environment it was built in is temporary. Nothing here may survive only in a
+scratch checkout, so the whole gap list lives on the branch.
+
+## Read this first: how a person reaches it today
+
+With nothing answering for the Studio — no model endpoint the client counts as
+configured, and no healthy model — the top dock shows *"This browser can answer,
+free."* naming the model and its one-time size, with two buttons:
+
+- **Answer in this browser** → `EdgeManager.grantAndStart()`
+  (`apps/studio/src/edge/manager.ts`) records consent and calls the new
+  `EdgeScheduler.bootstrap()` (`apps/studio/src/edge/scheduler.ts`) — rung zero.
+  It fetches the weakest tier this device could host, under the same
+  quiet-moment and single-engine-across-tabs rules as any other download. When
+  it lands, a `ready` notice replaces the strip with a toast and the next turn
+  is answered in the tab.
+- **Not now** → durable `setConsent("denied")`. `offerFor()` never returns an
+  offer after that, so the studio asks exactly once.
+
+*Nothing answering* is the condition, deliberately not *a probe failed*: the
+studio's background survey will not call a model down for a visitor who never
+configured one, so waiting on that measurement would have kept the offer from
+exactly the person it is for. See the closed "First run, no key" item in
+iteration 9. The apology strip is narrower and stays where it was — it appears
+only for a refusal that was actually measured, which is why a browser-only first
+run with a device that could not host a tier shows nothing at all.
+
+The offer appears only where it would change the answer: flag on, no healthy
+remote endpoint, consent still `unset`, nothing on disk, and a device the ladder
+can actually host. If the yes finds a hidden tab, a Save Data connection, or
+another tab holding the engine lock, nothing was fetched and the strip says so
+rather than pretending.
+
+**Settings → Answers in this browser** (`apps/studio/src/components/EdgeModelSection.tsx`)
+is the second place to give that answer, and the only place to take it back.
+It reads one snapshot (`edgeManager.panelState()`) and re-reads it on every
+settled edge notice — a tier landing, a tier freed, consent changing — while
+ignoring the per-percent download ticks, so it stays a view of the ladder rather
+than a second owner of its state. The checkbox is the `edgeModel` flag; the
+consent answer moves through the same `grantAndStart()` / `decline()` calls as
+the banner, and a yes that starts nothing reports that, in the same words.
+
+Once it is answering, the transcript keeps the person in no doubt about who is
+doing the work: a reply the tab produced carries *"Answered in this browser"* on
+itself, in the same slot and the same kind of button as *"Local draft, no model
+connected"* carries on a reply no model produced. Two brains, one line, never
+both on one reply.
+
+Until the previous iteration the two ends were missing — nothing granted
+consent, and nothing fetched Tier 1 (`noteTurn()` climbed only *from* a hosted
+tier). Both now exist, which is the difference between infrastructure and a
+feature. The rest of this file is what a reviewer should still expect to be
+absent.
+
+## What is built (commit map)
+
+| Commit | Iteration | Delivered |
+| --- | --- | --- |
+| `6796fa2` | 1 | `edge/types.ts`, `edge/ladder.ts`, `edge/storage.ts` + `edgeModel` flag — engine interface, three-tier ladder with device gates, IndexedDB state + engine lock |
+| `b91bdc0` | 2 | `browser-model` capability probe reports WebGPU and ladder truth instead of only `window.ai` |
+| `76d8bd9` | 3 | `edge/webllmEngine.ts`, `@mlc-ai/web-llm` dependency, Worker CSP for wasm + weight origins |
+| `c9fbdf6` | 4 | `edge/turn.ts`, `edge/prompt.ts` — an edge turn emitted as the exact `RawSseEvent` frames the transcript already consumes |
+| `dc7988d` | 5 | `edge/manager.ts` + the `runTurn` seam and the relaxed sidecar guard — that guard is gone now, deleted by `main`'s "never refuse to send"; the seam is what remains |
+| `f39c3fa` | 6 | `edge/scheduler.ts` — ten served answers earn the next tier, consent-locked, idle/visible/SaveData-gated, single-engine-across-tabs |
+| `fd0bfe4` | 7 | `edge-downloading` / `edge-unlocked` banner kinds; the bridge subscribes to edge notices and stops claiming "Working by hand" while the edge answers |
+| `d34d8e5` | 9 (first half) | `EdgeScheduler.bootstrap()` (rung zero), `EdgeManager.offerFor / grantAndStart / decline / isBusy`, the `ready` and `consent-changed` notices, and the `edge-offer` / `edge-ready` banners with both buttons wired through the dispatcher. `docs/local-llm.md` now describes a reachable feature. Landed out of plan order, before the Settings section, because nothing else on this branch matters while no person can switch it on. |
+| `3a1f633` | 8 | `components/EdgeModelSection.tsx` — Settings → *Answers in this browser*: the flag switch, a consent answer that can be changed and withdrawn, per-tier status with device reasons, free-a-tier storage, the progression meter, the quota line. `EdgeManager.panelState()` and `freeTier()` (with `EdgeLLMEngine.evict`, the only Settings path that may pull in the WebLLM chunk), the notice seam turned multi-subscriber so the strip and Settings both react, and the section mounted in `SettingsPanel`. |
+| `f475509` | merge | `origin/main` merged forward; see "Merged with `main`" below for the four conflicts and what each one cost this feature. |
+| `748e817` | 9 (second half) | The reply names its brain: `edge/turn.ts` opens with `status` `phase: "edge"`, `StudioContext` records `edgeReplyFor` beside the existing `offlineReplyFor`, and `Conversation.tsx` renders one provenance tag per reply — *"Answered in this browser"* — with the edge answer taking precedence over the draft label. Plus the capability prose in `docs/local-llm.md` and `docs/living-studio.md`. |
+| `634d927` | 9 (second half) | The other half of the claim, tested: a turn handed to a healthy endpoint earns *neither* provenance label, so the marker provably follows the routing rather than the feature flag. |
+| `1fec223` | 9 (cross-tab) | `edge/bus.ts` — the ladder tells its other tabs. `EdgeNotice` gains `{ kind: "changed" }`, `EdgeManager` publishes on settled notices only, `reset()` closes the channel, and `src/test/fakeBroadcastChannel.ts` doubles the browser API for the suites that need two tabs. |
+| `a61e9d4` | merge | `origin/main` merged forward a second time (conversation list, saved canvas, per-field Settings saves, the assistant-ui ledger, the reuse-ladder agents doc). One file conflicted for real: `components/SettingsPanel.tsx`, because `main` moved the connection rows into `settings/sections/*`. Resolved by keeping `main`'s structure and re-mounting `<EdgeModelSection />` after `</ConnectionsSection>` — and pinned with a test, since a silent drop here would have been invisible. |
+| `8b83406` | 9 (first run) | The offer reached the person it is for — found, not assumed. `App.test.tsx` renders the real shell for a no-key, no-sidecar, WebGPU-capable first visit and asserts the `edge-offer` strip is in the dock above the introduction; it failed, because the bridge gated the question on a health measurement that main's survey deliberately never makes for a browser-only visitor. `BannerBridge` now asks whenever nothing is answering (`llmHealth.healthy !== true && !hasModelEndpoint(settings)`) while `model-offline` keeps its measured-refusal condition. Plus the deliberate call, written down: the introduction stays model-free and grows no second consent. |
+| `50e953d` | 10 (e2e) | `e2e/edge.spec.ts` + `e2e/edgeDevice.ts` driving the shipped bundle through a page-installed engine factory (`window.__odiEdgeEngine`, read only in `defaultEngineFactory`), and the defect that suite found: a banner button that is an *answer* used to close the strip before the answer was written, so a reload re-asked. `BannerAction.durable` moves a durable answer's lifetime to the condition that raised it; `EdgeStateStore` writes now wait for the transaction's `done` rather than the put request. `dismissConnectorSuggestion` extracted into `e2e/helpers.ts` — the modal intercepts the composer again after a reload. |
+| `8758faf` | 10 (that suite's second defect) | The reload scenario found a worse one: an answer the browser streamed existed only in React state, so closing the tab lost the work *and* the claim about who produced it — the label, the transcript, both. `edge/transcript.ts` records the exchange through the same `LocalMemoryService` the deterministic BFF already writes to (`StoredTurn.provenance` is new, and browser-only — Python's SQLite has no such column); `studioApi.ts` merges those rows at read time, so `fetchConversationTree` shows the thread the person actually had and serves the browser's copy when the server has never seen the id (before, that `404` threw, `loadLocalData()` swallowed it, and they landed on an empty introduction), and `fetchLatestConversation` reopens the browser's thread only when it holds an answer its own model produced. `Conversation.tsx` then names the brain from the record, not only from a live `status` frame. |
+
+| `07e96e8` | merge | `origin/main` merged forward a third time (`fetchConfig` aborts at 1,200 ms, boot order made explicit, dev-dependency bumps). No conflicts; the durability reads are IndexedDB-only, which is the invariant that change is protecting. |
+
+Everything the branch changes on top of `main` as merged, measured the way the
+guardrail measures it (`git diff origin/main...HEAD`, generated lockfiles
+excluded from the line count): 58 changed files and 149 test functions added.
+Those two hold across the documentation commits, because a docs commit edits a
+file already in the diff and adds no test. Net lines do not: 6,032 at the
+merged head `07e96e8`, counted before the commit that writes this sentence, and
+the number drifts by exactly the lines each later documentation commit writes.
+So treat the net figure as an indication of size and `diff-shape` as the
+authority — it is green at this head, and it is the command below, not this
+sentence, that a reviewer should run.
+
+The studio's vitest suite runs 999 tests across 103 files at the merged head and
+Playwright drives the *built* bundle in 25 chromium scenarios — 4 of them this
+ladder; both are green locally at `07e96e8`, and CI's `End-to-end` and `studio`
+checks are the same commands against the same artifact. On the Python side the
+branch touches one file, `tests/test_worker_security_headers.py`, which asserts
+the CSP additions; `uv run pytest -q` is 1,848 passed.
+
+PR #608's body is kept in that same measured shape, including the `Reuses:`
+block the guardrail asks of a change this size. The last head the *full* check
+suite was read green on is `cdf2ea3` — `End-to-end`, `studio`, `smoke`, the
+3.10/3.11/3.12 matrix, `tauri-build`, the Chromatic run and the Cloudflare
+preview build all passing, `updater-e2e` skipped as not applicable, with `PR
+guardrails` green at both `50e953d` and `cdf2ea3`. What `8758faf`, the merge and
+this commit put in front of CI is new since that read, so re-run
+`gh pr checks 608` rather than trusting this sentence for the current head. The
+branch is level with `origin/main` as of this writing; see the header for what
+that merge brought and why it needed no conflict resolution.
+
+## Merged with `main` (three times, the third clean)
+
+The first two merges carried real conflicts and are what this section describes.
+The third — `07e96e8`, taking `main` at `fe8599c` — auto-merged every file,
+including the two this branch's durability work had just edited (`api/studioApi.ts`,
+`state/StudioContext.tsx`), and the suites were re-run at that head rather than
+assumed green.
+
+`main` moved under the branch and PR #608 went CONFLICTING. Four files carried
+real conflicts. What changed, in the shape a reviewer can check:
+
+- **One endpoint rule.** `apps/studio/src/lib/modelEndpoint.ts` is now the
+  studio's single definition of *"a server is answering"*, and it counts a
+  keyless model on the person's own network. The browser tier defers to it
+  through `hasModelEndpoint()` (`edge/manager.ts`), which delegates instead of
+  re-deriving — a fallback that talked over a working Ollama would be a bug, not
+  a fallback. `bff/capabilities/registry.ts` reads the same function.
+- **A refusal to delete.** `main` removed the guard that blocked a turn when the
+  sidecar was known-down ("sending is the only evidence that matters"), so the
+  relaxation iteration 5 made at that call site went with it. The seam it opened
+  survives, and its job is now exactly one thing: *which brain answers*, not
+  *whether to answer at all*.
+- **The routing decision reads a snapshot.** A turn no longer awaits a storage
+  read to learn who will answer it. `EdgeManager` keeps `{consent, servedTier}`
+  in memory, warms it when the provider mounts, refreshes it after every
+  non-progress edge notice, and fires a best-effort re-read at each decision —
+  so nobody's message is queued behind IndexedDB. The cost, said plainly: a
+  change made elsewhere lands on the turn *after* the read that noticed it.
+  `sync()` is the awaitable form for surfaces that can wait, and the banner strip
+  uses it before deciding. This was not a style preference: awaiting the read
+  hung the whole `StudioContext` suite, because fake-indexeddb schedules its
+  transactions on the very timers those tests fake.
+- **The survey is idle-scheduled.** `main` waits for an idle moment (or 2s)
+  before probing anything, and a background probe that finds nothing no longer
+  reports the sidecar down. The edge-routing tests were rewritten against those
+  rules — they call `recheckConnections()` when they need a fact about the
+  server, and wait for the person's own history to paint before typing.
+- **The second merge moved Settings under it.** `main`'s per-field save work
+  pulled the connection rows and the model controls into
+  `settings/sections/ConnectionsSection` and `ModelSection`, so
+  `SettingsPanel.tsx` was the only real conflict left. The resolution keeps
+  `main`'s layout and re-mounts `<EdgeModelSection />` immediately after
+  `</ConnectionsSection>` — the same position it held when the panel was flat:
+  below what the studio can reach, above what you can do about it. Nothing else
+  on the branch needed re-deriving: the edge section drives its own
+  feature-flag override (`features/flags.ts`), not `saveSettings`, so it never
+  touched the save path `main` reworked. That reposition was one line and could
+  have been dropped without any test noticing, so `SettingsPanel.test.tsx` now
+  mocks the section with a visible marker and asserts the panel renders it.
+
+## Remaining iterations
+
+### 8 — Settings `EdgeModelSection` (the control surface) — DONE
+
+Pattern followed: the existing About section in the Settings panel.
+
+- [x] Enable/disable toggle bound to the `edgeModel` flag (`setFeatureOverride`,
+      so it writes the same `localStorage` key the URL-parameter and diagnostics
+      paths read).
+- [x] **Consent control** — the place to *change* the answer the offer strip
+      recorded. With nothing on disk it is one button in the size of the
+      download ("Download Llama 3.2 1B — about 1.3 GB, once") that goes through
+      `EdgeManager.grantAndStart()`, exactly as the banner button does; with a
+      tier answering it is "Stop answering here" → `decline()`. A granted consent
+      that a paid key currently outranks says so instead of implying the browser
+      is answering.
+- [x] Tier rows: label, on-disk size, state (`not downloaded` / `on this device`
+      / `answering`), and the device reason on any tier that this hardware could
+      not host.
+- [x] **Delete a tier** to free storage — `EdgeManager.freeTier()` clears our
+      IndexedDB state and, for a tier that was actually fetched, calls the new
+      `EdgeLLMEngine.evict()` (WebLLM's `deleteModelAllInfoInCache`). Plus a
+      storage line from `navigator.storage.estimate()`.
+- [x] Tests: 12 in `EdgeModelSection.test.tsx` (a row per state, the flag
+      round-trip, revoke-consent, free-a-tier, the meter, the honest
+      nothing-started notice, unsubscribe on unmount) and 6 more in
+      `manager.test.ts` for the snapshot and the eviction rules — including that
+      freeing a tier that was never fetched touches neither the engine nor its
+      cache.
+
+What that cost in the existing code, so a reviewer knows where to look: the
+notice seam went from one listener to many (`addNoticeListener` returns an
+unsubscribe) because the strip and Settings now both react; `panelState()`
+reports exactly one tier as `answering` — the strongest on disk — and demotes
+stored-but-superseded tiers to `on this device`; `evict` was added to the engine
+interface, which is why `turn.test.ts`'s inline fake gained a no-op.
+
+### 9 — Light it up: first-run copy, bootstrap download, docs
+
+- [x] **Tier 1 bootstrap.** `EdgeScheduler.bootstrap()` fetches the weakest
+      eligible tier as *first*, not only as *next*, and `EdgeManager` reaches it
+      from the consent answer. (Delivered in `d34d8e5`.)
+- [x] A no-key visitor is offered the browser model in one sentence, with the
+      size, and has an explicit "Not now". (Delivered in `d34d8e5` as the `edge-offer`
+      strip; the intro-flow copy below is still open.)
+- [x] **First run, no key.** Pinned by a test instead of prose — and the test
+      found the feature was not reachable, which is why this item is closed with
+      a fix rather than a paragraph.
+      - `App.test.tsx` now renders the real shell for a visitor with no brief, no
+        key, no sidecar, `firstRunIntro` on, and a device that reports WebGPU: the
+        `edge-offer` strip is present, in the dock, while the introduction owns the
+        stage, with both buttons and exactly one copy of the ask.
+      - **The defect it caught:** the bridge asked the consent question only when
+        `llmHealth.healthy === false`. Main's survey deliberately refuses to
+        record a model as down for a browser-only visitor (`checkConnections`
+        "recovery" mode — #309: no unrequested apology on a first run), so
+        `healthy` stays `null` there forever, and the offer was only ever shown to
+        someone who had a paid endpoint and lost it. The audience the tier exists
+        for never saw it.
+      - **The fix:** the strip's condition is now *nothing is answering* —
+        `llmHealth.healthy !== true && !hasModelEndpoint(settings)` — which is the
+        same deference the turn router already used. The apology keeps its old,
+        narrower condition: it is raised only when a refusal was actually
+        measured. So a first run with a capable device gets an offer, a first run
+        without one gets nothing at all, and a configured-but-dead endpoint still
+        gets "Working by hand". Two new `BannerBridge` cases hold those two halves
+        apart; the four pre-existing #309 "zero banners" cases still pass, which
+        is the proof the widening did not leak into the apology.
+      - **The decision, made deliberately:** the introduction itself stays
+        model-free and does *not* grow a second GB-scale consent. One ask, one
+        place, one time; the dock is app-level, so it is above the intro rather
+        than inside its script.
+      - `BannerBridge.test.tsx` mocks `edge/manager` but no longer mocks
+        `hasModelEndpoint`: the endpoint rule stays real, because a bridge tested
+        against a fake deference proves nothing about deferring.
+- [x] `edge-active` marker on an edge reply in the transcript, so a person can
+      tell which brain answered. (Delivered in `748e817`: `edge/turn.ts` now
+      opens its stream with `status` `phase: "edge"`, `StudioContext` records that
+      as `edgeReplyFor` the same way it already records `offlineReplyFor`, and
+      `Conversation` puts *"Answered in this browser"* on the reply — one button,
+      opens Settings, never both labels on one reply.)
+- [x] Cross-tab ladder sync: a yes, a landed tier, or a freed tier in one tab
+      reaches the other tabs immediately. `edge/bus.ts` opens a
+      `BroadcastChannel("agentic-odi-edge-ladder")` and `EdgeManager` publishes
+      on every settled notice — never on a download tick — while the receive path
+      re-reads storage and emits `{ kind: "changed" }` to this page's listeners
+      only. Deliberately contentless, and deliberately not a replay: a tab that
+      did not fetch a model does not announce one as *"answering in this tab
+      now"*. The channel is opened when a page starts caring
+      (`addNoticeListener`, or the provider's mount-time `sync()`), so a tab that
+      only ever reads still hears; where `BroadcastChannel` is missing or refused
+      (private browsing) the bus is silent and the ladder keeps working in one
+      tab. `BannerBridge` and Settings needed no changes: both already react to
+      any non-progress notice.
+- [x] `docs/local-llm.md` §"The browser tier" rewritten for what actually
+      shipped, including what has never been run on real hardware. (Done in `d34d8e5`.)
+- [x] Add the capability to `README.md` and — per `.agents/rules` line 159,
+      which routes a new conversation capability there — to the capability table
+      in `docs/living-studio.md`. Both name the conversation-turns-only
+      boundary. (Done in `3a1f633`.)
+- [x] State the divergence honestly: `apps/studio-api/.../studio/router.py:1220`
+      and `infra/cloudflare/worker.ts:57` keep `browser-model` at
+      `available: false` — a server cannot see a client GPU — while the client's
+      own capability registry reports the truth. Verified against both manifests
+      and said in `docs/local-llm.md` §"The browser tier".
+
+### 10 — Verification a reviewer can repeat — e2e DONE, the GPU by hand still open
+
+- [x] `apps/studio/e2e/edge.spec.ts` drives the **shipped bundle** with a fake
+      engine the page installs: `e2e/edgeDevice.ts` puts a factory on
+      `window.__odiEdgeEngine`, and `EdgeManager.defaultEngineFactory()` is the
+      only place that reads it. The plan predicted a test-only module injected
+      through `edgeManager.setEngineFactory`; that would have made the suite
+      exercise a code path no person ever runs, so the fake lives outside the
+      artifact instead. It declares `implements EdgeLLMEngine`, so a seam that
+      moves stops compiling rather than quietly passing.
+      Four scenarios: offer → *Answer in this browser* → the fetch narrated in
+      place → ready toast → a streamed reply that reads *"Answered in this
+      browser"*, never *"Local draft"*, with zero requests reaching `/api/chat`,
+      and no second ask after a reload. Then decline → reload → never asked
+      again. Then close the tab and come back: the answer the browser produced is
+      still on screen and still labelled. Then a key appearing later handing the
+      turns back to the remote path. Re-run with `--repeat-each=5` at the merged
+      head, because a durability test that passes once can be a race that got
+      lucky — and four of five did fail. What failed was the assertion, not the
+      feature: it demanded exactly one user message reading *"Where do I start?"*
+      and the reopened thread legitimately holds two, because an earlier visit in
+      the same shared-sidecar run asked that question through the server and the
+      merge shows both. The DOM at the failure confirms the product put this
+      browser's answer last, with its label, so the check now names the *newest*
+      exchange instead of counting matches — an ordering claim, which is stronger
+      than the presence claim it replaced. `--repeat-each=5` on the whole file:
+      **20 passed.**
+      Unexplained, and worth a trace to whoever runs this on hardware: in a
+      repeated run every scenario takes ~13 s where its first pass takes ~5 s.
+      No assertion is failing and no fixed wait exists in `e2e/helpers.ts` beyond
+      the 2 s the connector-suggestion probe allows itself, so the extra seconds
+      are the app being slower to become interactive when it reopens a thread
+      that already has turns. That is a UX question, not a correctness one, and
+      nothing here proves it is *not* real.
+      Run it with `npx playwright test --project=chromium` from `apps/studio`,
+      after `npx vite build` — the sidecar serves `dist`.
+- [x] **What the reload scenario found, in the product.** Writing the transcript
+      was not enough: the reloaded page came back to the introduction with nothing
+      in it. Two separate reasons, both real, neither visible from jsdom. First,
+      `fetchLatestConversation` asked only the server, and a turn answered in the
+      browser is in no server row, so there was no thread to reopen. Second, once
+      the browser's own thread *was* chosen, `fetchConversationTree` asked the
+      server for it and the sidecar said `404 not_found` — an application failure,
+      which `withLocal` correctly refuses to paper over — so the load threw and
+      `StudioContext` swallowed it. The reads now consult this browser's copy: the
+      newest local thread wins when it holds an edge answer and is the more recent
+      work, and a `404` for a conversation this browser wrote serves that browser's
+      copy, while a conversation nobody holds still reports the server's `404`.
+      `studioApi.edgeTranscript.test.ts` pins all of it against a real memory
+      store, and the Playwright scenario is what proves the two reads meet in the
+      middle of a page load.
+      One claim the tests do *not* make: a local draft written by the rule-based
+      assistant while the sidecar was out does not get to claim the reload. It is
+      not work the browser's model did, and a thread the person never chose must
+      not steal the thread the server has.
+- [x] **What that found, in the product rather than in the test.** "Not now" made
+      the strip vanish, and then a reload asked again — every run, until the run
+      that happened to make one extra round trip to the page first. The write was
+      never lost: measuring inside the app showed `setConsent` had not *run* yet
+      when the strip disappeared. Radix closes a toast the moment an action
+      button is pressed, so the click itself answered the question on screen
+      while `EdgeManager.decline()` was still opening IndexedDB in the
+      background — and the reload took the document with it. A banner whose
+      buttons are answers now says so (`BannerAction.durable`, both `edge-offer`
+      buttons): the click cannot close it, and only the condition that raised it
+      may. So the strip going quiet is evidence the studio has the answer, which
+      is the claim it was always making. `BannerBridge.test.tsx` pins both halves
+      — still there while the write is in flight, gone when the notice lands —
+      and fails without the flag.
+- [ ] **The real gate, by hand, on a WebGPU device — CI cannot do this, and the
+      suite deliberately does not pretend to.** `npm --prefix apps/studio run
+      dev:full` → clear the key in Settings → send a message → the offer strip
+      appears → **Answer in this browser** → Tier 1 downloads with a live strip →
+      reply streams → ten answers later the next tier prefetches during idle →
+      upgrade toast → re-add a key and turns return to the remote path.
+- [ ] The **Not now** path by hand: decline, confirm `model-offline` returns and
+      that no second ask ever appears.
+- [ ] Multi-tab on two real tabs: confirm `navigator.locks` keeps one engine,
+      including two tabs that both show the offer.
+- [ ] Tier 3 prefill jank on a mid-range device, and one iPhone or iPad —
+      `navigator.deviceMemory` reports nothing there, and the memory cap is
+      designed, not measured.
+- [ ] Both CI checks (`ci.yml`, `pr-guardrails.yml`) on every push.
+
+## Known gaps beyond the iterations
+
+- **Main-thread prefill.** v1 runs WebLLM on the main thread; Tier 3 prefill will
+  jank the UI. The worker path (`engine.worker.ts` +
+  `SimpleWorkerMLCEngineHandler`) is the scheduled upgrade, and `EdgeLLMEngine`
+  exists so the swap touches one file.
+- **One-turn staleness is gone; one real-hardware question remains.** Cross-tab
+  consent, tier state and the Settings snapshot now travel over the ladder bus
+  (iteration 9 above), so a tab never answers a turn from a fact another tab
+  invalidated a minute ago. What the bus cannot prove from a test runner is
+  `navigator.locks` on a real GPU with two tabs both reaching for the engine: the
+  losing tab gets no notice of the lock it never acquired, only the news that
+  the ladder moved. That check is on the iteration-10 manual list.
+- **The draft label still lives for the session; the browser label does not.**
+  *"Answered in this browser"* survives closing the tab: the exchange an edge
+  turn produced is written to this browser's own transcript with
+  `provenance: "edge"` (`edge/transcript.ts`), and the two reads a reload makes —
+  `fetchLatestConversation` to pick the thread, `fetchConversationTree` to fill
+  it — merge those rows into whatever the server sent. So a person who closed the
+  tab and came back finds the answer they got and the claim attached to it, in
+  the one store that could ever hold it: the sidecar has no provenance column,
+  because the server never saw the turn. *"Local draft, no model connected"* is
+  unchanged — still `main`'s live `status` frame, still gone next visit, still
+  correct for a rule-based draft nobody is being credited for.
+- **Edge turns never reach the server conversation tree** while the sidecar is up.
+  A backfill through `POST /api/conversations/{id}/turns` is an explicit non-goal
+  for v1 and must stay documented, not discovered. What is no longer true is the
+  consequence: the work is not lost and not invisible, because this browser keeps
+  its own copy and prefers it on reload — including a thread id the server answers
+  `404` for, which now serves the browser's copy instead of failing the load. The
+  limit that remains is cross-device: another machine will not see these turns.
+- **Weighted-cache loss is honest but unmeasured.** Our IndexedDB ladder is the
+  source of truth; if WebLLM's own cache is evicted, we re-download rather than
+  claim a tier we no longer have.
+- **Memory-tight devices (iOS Safari).** The ladder caps tiers by
+  `navigator.deviceMemory` and quota headroom, but no real iPhone has been
+  tested; treat the caps as designed, not proven.
+- **Test coverage floors are Python-only** — `codecov.yml` ignores
+  `apps/studio`, so none of this moves the backend coverage gate.
+- **The CSP may be moot on the hosted Studio, in its current form.** On the live
+  preview and on production `main`, `/` comes back as a Cloudflare edge-cache HIT
+  with **no** `Content-Security-Policy` header at all, so nothing in this branch
+  blocks WebLLM there — and equally, the app document ships with no CSP. The
+  header does apply to Worker-run responses (`/api/*` verified on the preview,
+  including `'wasm-unsafe-eval'` and the three weight origins). If the CSP is ever
+  made to cover cached documents, re-verify `worker-src`/`child-src` for WebLLM's
+  wasm loading, which this branch did not need to touch.
+
+## Resume checklist (for whoever picks this up)
+
+```bash
+git fetch origin && git checkout alehar9320/flyingfish
+npm --prefix apps/studio install
+npm --prefix apps/studio run typecheck
+npm --prefix apps/studio test -- --run     # 103 files, 999 tests
+npm --prefix apps/studio run lint          # 0 errors, 5 pre-existing warnings
+npm --prefix apps/studio run build
+cd apps/studio && npx playwright test --project=chromium   # 25 scenarios, 4 of them this ladder; needs the build above
+uv run pytest apps/studio-api tests/test_worker_security_headers.py -q   # 336 passed
+uv run pytest -q                           # 1848 passed (repo-wide)
+uv run python scripts/pr_guards.py diff-shape          # --base-ref defaults to origin/main
+uv run python scripts/pr_guards.py fabrication
+# body-truth checks the PR text, so it needs that text on disk first:
+gh pr view 608 --json body -q .body > /tmp/pr608.md
+uv run python scripts/pr_guards.py body-truth --body-file /tmp/pr608.md
+```
+
+`npx playwright install-deps chromium` is the one-time system step if the
+browser has never run in this container.
+
+Then start at iteration 9's last open item if you want a first-run visitor to
+meet the browser model in the intro flow (the offer strip already does this job
+after the studio has opened; the context conversation is what is left), or at
+the rest of iteration 10 — the hand list above — which is the only thing that
+can say WebLLM itself works. A first real user can already reach the feature,
+control it, see which brain answered, have two tabs agree on both, and have the
+suite drive the end-to-end shape of all of it against the shipped bundle; the
+fake engine is the only part that is not real.
+
+Every iteration ends with that block green, one commit, and this file updated.

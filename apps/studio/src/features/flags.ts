@@ -12,7 +12,7 @@
  * can never silently change behaviour.
  */
 
-export type FeatureFlagName = "firstRunWizard" | "firstRunIntro";
+export type FeatureFlagName = "firstRunWizard" | "firstRunIntro" | "edgeModel";
 
 export interface FeatureFlagDefinition {
   name: FeatureFlagName;
@@ -33,6 +33,13 @@ export const FEATURE_FLAGS: Record<FeatureFlagName, FeatureFlagDefinition> = {
     description:
       "The conversational first-run introduction, in place of the five-field setup form.",
     envVar: "VITE_STUDIO_FIRST_RUN_INTRO",
+    defaultEnabled: true,
+  },
+  edgeModel: {
+    name: "edgeModel",
+    description:
+      "Runs free GPU-accelerated models in this browser when no paid model endpoint is configured.",
+    envVar: "VITE_STUDIO_EDGE_MODEL",
     defaultEnabled: true,
   },
 };

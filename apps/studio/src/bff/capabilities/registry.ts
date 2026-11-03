@@ -1,4 +1,5 @@
 import { apiUrl } from "../../bridge/desktopBridge";
+import { collectDeviceSignals, computeEligibility, firstEligibleTier } from "../../edge/ladder";
 import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
 
@@ -25,7 +26,13 @@ export interface CapabilityProbe {
   id: CapabilityId;
   label: string;
   description: string;
-  check(settings: StudioConfig): Promise<boolean>;
+  check(settings: StudioConfig): Promise<ProbeResult>;
+}
+
+export interface ProbeResult {
+  ok: boolean;
+  /** One human sentence for why a capability is out of reach. */
+  reason?: string;
 }
 
 const localStatuses: Record<CapabilityId, Capability> = {
@@ -49,8 +56,8 @@ const localStatuses: Record<CapabilityId, Capability> = {
   },
   "browser-model": {
     id: "browser-model",
-    label: "Browser built-in model",
-    description: "Uses the browser's built-in large language model when present.",
+    label: "In-browser model",
+    description: "Runs free GPU-accelerated models on this device when no paid endpoint is set.",
     status: "unavailable",
   },
   "endpoint-model": {
@@ -85,9 +92,16 @@ const localStatuses: Record<CapabilityId, Capability> = {
   },
 };
 
-function isBrowserModelAvailable(): boolean {
-  const ai = (globalThis as { ai?: { languageModel?: unknown } }).ai;
-  return Boolean(ai && typeof ai.languageModel === "function");
+async function browserModelProbe(): Promise<ProbeResult> {
+  const eligibility = computeEligibility(await collectDeviceSignals());
+  if (firstEligibleTier(eligibility)) {
+    return { ok: true };
+  }
+  const reason =
+    eligibility.reasons[0] ??
+    eligibility.tiers.find((decision) => decision.reason)?.reason ??
+    "No in-browser model fits this device right now.";
+  return { ok: false, reason };
 }
 
 /** Probe a same-origin sidecar route. In the browser this is the Worker
@@ -122,37 +136,37 @@ export class CapabilityRegistry {
       id: "browser-model",
       label: localStatuses["browser-model"].label,
       description: localStatuses["browser-model"].description,
-      check: async () => isBrowserModelAvailable(),
+      check: async () => browserModelProbe(),
     },
     {
       id: "endpoint-model",
       label: localStatuses["endpoint-model"].label,
       description: localStatuses["endpoint-model"].description,
-      check: async (settings) => isEndpointConfiguredForSettings(settings),
+      check: async (settings) => ({ ok: isEndpointConfiguredForSettings(settings) }),
     },
     {
       id: "sidecar-llm",
       label: localStatuses["sidecar-llm"].label,
       description: localStatuses["sidecar-llm"].description,
-      check: async () => probeSidecar("/api/capabilities", "sidecar-llm"),
+      check: async () => ({ ok: await probeSidecar("/api/capabilities", "sidecar-llm") }),
     },
     {
       id: "sidecar-connectors",
       label: localStatuses["sidecar-connectors"].label,
       description: localStatuses["sidecar-connectors"].description,
-      check: async () => probeSidecar("/api/connectors"),
+      check: async () => ({ ok: await probeSidecar("/api/connectors") }),
     },
     {
       id: "sidecar-mcp",
       label: localStatuses["sidecar-mcp"].label,
       description: localStatuses["sidecar-mcp"].description,
-      check: async () => probeSidecar("/api/health/mcp"),
+      check: async () => ({ ok: await probeSidecar("/api/health/mcp") }),
     },
     {
       id: "sidecar-import",
       label: localStatuses["sidecar-import"].label,
       description: localStatuses["sidecar-import"].description,
-      check: async () => probeSidecar("/api/capabilities", "sidecar-import"),
+      check: async () => ({ ok: await probeSidecar("/api/capabilities", "sidecar-import") }),
     },
   ];
 
@@ -162,7 +176,9 @@ export class CapabilityRegistry {
         let ok: boolean;
         let reason: string | undefined;
         try {
-          ok = await probe.check(settings);
+          const result = await probe.check(settings);
+          ok = result.ok;
+          reason = result.reason;
         } catch (error) {
           ok = false;
           reason = error instanceof Error ? error.message : "Probe failed.";

@@ -4,6 +4,7 @@ import type {
   Job,
   Observation,
   Outcome,
+  ReplyProvenance,
   Step,
 } from "../../types";
 
@@ -46,6 +47,12 @@ export interface StoredConversation extends Conversation {
 export interface StoredTurn extends ConversationTurn {
   message_id: string | null;
   parent_id: string | null;
+  /**
+   * Recorded by the tab that produced the reply, and stored nowhere else: the
+   * server's turn row has no such column, so a browser answer's provenance is
+   * the browser's own fact to keep.
+   */
+  provenance?: ReplyProvenance;
 }
 
 export interface WorkspaceSnapshot {

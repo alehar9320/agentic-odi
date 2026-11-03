@@ -44,6 +44,7 @@ import {
   healthMcp,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
+  recordBrowserTurn,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
   streamChat,
@@ -55,12 +56,14 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
+import { edgeManager } from "../edge/manager";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import { loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
+  ChatStreamRequest,
   CanvasData,
   CanvasState,
   ChatAttachment,
@@ -134,6 +137,7 @@ export function turnsToMessages(
         parentId: node.parent_id,
         role: node.role,
         content,
+        ...(node.provenance ? { provenance: node.provenance } : {}),
         parts: claims.length
           ? [{ kind: "claims" as const, content, claims }]
           : content
@@ -344,6 +348,12 @@ export interface StudioContextValue {
    * the one answer it describes instead of every answer on screen.
    */
   offlineReplyFor: string | null;
+  /**
+   * The reply this browser's own model produced, by message id. A person who
+   * pays nothing and runs nothing server-side deserves to know which brain
+   * answered — the same reason the offline label exists, pointing the other way.
+   */
+  edgeReplyFor: string | null;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
   addOutcome: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
   createJob: (payload: { name: string; description?: string }) => Promise<string | null>;
@@ -558,6 +568,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   // hint once the studio has answered something, from /start, or from Settings.
   const [setupOpen, setSetupOpen] = useState(false);
   const [offlineReplyFor, setOfflineReplyFor] = useState<string | null>(null);
+  const [edgeReplyFor, setEdgeReplyFor] = useState<string | null>(null);
   const [canvasState, setCanvasState] = useState<CanvasState>(() => {
     const cached = loadCanvasCache();
     return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
@@ -1335,6 +1346,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Decide the provider before touching state: a visitor with no paid
+      // endpoint and a cached browser model is answered in-tab, even when the
+      // sidecar itself is down. The decision reads what this tab last read of
+      // storage rather than awaiting a storage round trip — a message a person
+      // typed is never made to wait on a disk.
+      const useEdge = edgeManager.canServe(settings, llmHealth.healthy === true);
+
       // Sending is the only evidence that matters here. streamChat asks the
       // sidecar first and the browser second, so the first message of a first run
       // is answered whether or not a local server exists. Refusing to try at all
@@ -1364,6 +1382,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setStreaming(true);
       setThinkingPhase("health_check");
       setOfflineReplyFor(null);
+      setEdgeReplyFor(null);
       setToolActivity([]);
 
       const controller = new AbortController();
@@ -1476,6 +1495,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             setThinkingPhase(phase);
             if (phase === "offline") {
               setOfflineReplyFor(assistantId);
+            }
+            if (phase === "edge") {
+              setEdgeReplyFor(assistantId);
             }
             break;
           }
@@ -1640,23 +1662,46 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       };
 
       try {
-        await streamChat(
-          {
-            base_url: settings.base_url,
-            api_key: settings.api_key,
-            model: settings.model_name,
-            mcp_url: settings.mcp_url,
-            messages: history,
-            brief,
-            ui_catalog: catalogManifest(),
-            conversation_id: conversationId,
-            attachments,
-            approvals: true,
-            assistant_id: assistantId,
-          },
-          handleEvent,
-          controller.signal,
-        );
+        const turnRequest: ChatStreamRequest = {
+          base_url: settings.base_url,
+          api_key: settings.api_key,
+          model: settings.model_name,
+          mcp_url: settings.mcp_url,
+          messages: history,
+          brief,
+          ui_catalog: catalogManifest(),
+          conversation_id: conversationId,
+          attachments,
+          approvals: true,
+          assistant_id: assistantId,
+        };
+        if (useEdge) {
+          await edgeManager.stream(turnRequest, handleEvent, controller.signal);
+          if (content) {
+            // Nothing on the other end kept this exchange: no request was made.
+            // The browser's own transcript is the only place it can survive the
+            // tab, so write it before anything else claims the turn is done.
+            const thread = await recordBrowserTurn({
+              conversationId,
+              question: {
+                id: userMessage.id,
+                text: userMessage.content,
+                parentId: userMessage.parentId ?? null,
+              },
+              answer: { id: assistantId, text: content },
+            }).catch(() => null);
+            if (thread) {
+              setConversationId((current) => current ?? thread);
+            } else {
+              pushToast(
+                "error",
+                "This answer stays in the tab — the browser would not keep it.",
+              );
+            }
+          }
+        } else {
+          await streamChat(turnRequest, handleEvent, controller.signal);
+        }
       } catch (error) {
         const aborted = (error as Error).name === "AbortError";
         if (aborted) {
@@ -1703,7 +1748,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversationId,
       refreshCanvas,
       refreshConnectors,
+      llmHealth,
       cancelScheduledProbes,
+      pushToast,
     ],
   );
 
@@ -1893,6 +1940,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setStreaming(false);
     setThinkingPhase(null);
     setOfflineReplyFor(null);
+    setEdgeReplyFor(null);
     setConversationId(null);
     void apiCreateConversation()
       .then((conversation) =>
@@ -1936,6 +1984,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setMessages(turnsToMessages(tree.messages, tree.head_id));
     };
     void loadLocalData().catch(() => undefined);
+
+    // Which model answers the next message is decided from a snapshot in
+    // memory, not from a storage read a person has to wait behind. Open the
+    // ladder's state now, while nobody is asking anything, so the first turn of
+    // a session already knows what is on this device.
+    void edgeManager.sync().catch(() => undefined);
 
     // Configuration is a convenience, not a gate. It may fill defaults for a
     // browser that has none; a failure is silent, because a hosted studio with no
@@ -2126,6 +2180,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
+      edgeReplyFor,
       addStep,
       addOutcome,
       promoteEvidence,
@@ -2241,6 +2296,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
+      edgeReplyFor,
       addStep,
       addOutcome,
       promoteEvidence,
