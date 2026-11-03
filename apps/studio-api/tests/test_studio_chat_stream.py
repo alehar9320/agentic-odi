@@ -336,6 +336,8 @@ def test_approval_classification_preserves_reads_and_local_surfaces(monkeypatch)
     assert not chat.is_mutating_tool("remember")
     assert not chat.is_mutating_tool("render_ui")
     assert chat.is_mutating_tool("add_connector")
+    assert chat.is_mutating_tool("open_study")
+    assert not chat.is_mutating_tool("list_studies")
     monkeypatch.setitem(
         TOOL_SPECS,
         "get_future_write",

@@ -761,6 +761,32 @@ def get_segments(job_id: str | None = None) -> str:
 
 
 @mcp.tool
+def open_study(job_id: str, name: str, wave: int, method_notes: str | None = None) -> str:
+    """Open a named study — one pass over a Job at a given wave number.
+
+    A study opens ``planned``. The same ``(job_id, name)`` may not repeat a wave,
+    so an accidental re-run is refused while a deliberate later wave is allowed.
+    """
+    try:
+        study = service.open_study(job_id=job_id, name=name, wave=wave, method_notes=method_notes)
+    except JobNotFoundError:
+        return job_not_found(job_id)
+    except OdiError as exc:
+        return f"Error: {exc}"
+    return json.dumps(study.model_dump(mode="json"))
+
+
+@mcp.tool
+def list_studies(job_id: str | None = None) -> str:
+    """List stored studies, optionally scoped to one job.
+
+    Empty until ``open_study`` has run: a study is opened, never typed in.
+    """
+    studies = service.list_studies(job_id=job_id)
+    return json.dumps([study.model_dump(mode="json") for study in studies])
+
+
+@mcp.tool
 def get_strategy() -> str:
     """The latest recorded strategy, or ``null`` when Stage 6 has not run."""
     strategy = service.get_strategy()
