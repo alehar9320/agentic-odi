@@ -1,47 +1,17 @@
 {
-  "description": "One scoring fixture, read by Python and TypeScript, so the two can no longer disagree in silence. The expected score for each case is computed by hand from the ODI formula: importance + max(importance - satisfaction, 0).",
+  "formula": "importance + max(importance - satisfaction, 0)",
   "cases": [
-    {
-      "name": "importance below satisfaction",
-      "importance": 3,
-      "satisfaction": 9,
-      "expected": 3
-    },
-    {
-      "name": "importance equal to satisfaction",
-      "importance": 5,
-      "satisfaction": 5,
-      "expected": 5
-    },
-    {
-      "name": "importance above satisfaction",
-      "importance": 8,
-      "satisfaction": 4,
-      "expected": 12
-    },
-    {
-      "name": "importance at the top of the scale",
-      "importance": 20,
-      "satisfaction": 1,
-      "expected": 39
-    },
-    {
-      "name": "importance zero with satisfaction zero",
-      "importance": 0,
-      "satisfaction": 0,
-      "expected": 0
-    },
-    {
-      "name": "negative gap is clamped to importance",
-      "importance": 4,
-      "satisfaction": 9,
-      "expected": 4
-    },
-    {
-      "name": "null importance and satisfaction",
-      "importance": null,
-      "satisfaction": null,
-      "expected": null
-    }
+    {"id": "floor", "importance": 0.0, "satisfaction": 0.0, "score": 0.0},
+    {"id": "ceiling", "importance": 20.0, "satisfaction": 20.0, "score": 20.0},
+    {"id": "max-gap", "importance": 20.0, "satisfaction": 0.0, "score": 40.0},
+    {"id": "equal-is-served", "importance": 10.0, "satisfaction": 10.0, "score": 10.0},
+    {"id": "equal-low", "importance": 5.0, "satisfaction": 5.0, "score": 5.0},
+    {"id": "satisfaction-above", "importance": 10.0, "satisfaction": 20.0, "score": 10.0},
+    {"id": "underserved-gap", "importance": 8.0, "satisfaction": 4.0, "score": 12.0},
+    {"id": "fractional-gap", "importance": 7.5, "satisfaction": 2.5, "score": 12.5},
+    {"id": "unscored", "importance": null, "satisfaction": null, "score": null},
+    {"id": "importance-below-satisfaction", "importance": 3.0, "satisfaction": 9.0, "score": 3.0},
+    {"id": "top-of-scale-gap", "importance": 20.0, "satisfaction": 1.0, "score": 39.0},
+    {"id": "clamped-below-satisfaction", "importance": 4.0, "satisfaction": 9.0, "score": 4.0}
   ]
 }

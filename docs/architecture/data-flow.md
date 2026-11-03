@@ -1,5 +1,53 @@
 # Data Flow
 
+## The Shape
+
+Connectors are the only way data enters from outside the local store. Reads
+project the same repository three ways, and every write emits signals.
+
+```mermaid
+flowchart LR
+    subgraph inbound["The only path in from outside"]
+        SOURCE["Connector endpoint: MCP client or REST call"]
+        BATCH["IngestBatch — normalized records"]
+        SINK["IngestSink — in-process, dies with the command"]
+        DRAFT["EvidenceDraft — connectors mapping"]
+        SOURCE --> BATCH --> SINK -->|drafts_from_batch| DRAFT
+    end
+
+    DOMAIN["ODIService — validation, dedupe, idempotent promotion"]
+    STORE[("SQLiteRepository — append-only event log + snapshots")]
+    DRAFT -->|add_evidence| DOMAIN --> STORE
+
+    GATE{"Approval gate — sidecar chat only"}
+    CHAT["Chat tool loop — /api/chat"]
+    LLM["OpenAI-compatible LLM"]
+    SPA["Studio SPA"]
+    CLI["CLI"]
+    MCP["MCP tools"]
+
+    CHAT <--> LLM
+    SPA -->|"/api/chat"| CHAT
+    GATE -.->|an approval card pauses the turn| CHAT
+    CHAT -->|local backend direct, mcp backend via MCP| DOMAIN
+    CLI -->|local or mcp| DOMAIN
+    MCP --> DOMAIN
+    SPA -->|"/api/canvas, /steps, /outcomes"| DOMAIN
+
+    STORE -->|read-through state| PROJ["Pydantic models — outcomes ranked by opportunity score"]
+    PROJ --> SPA
+    PROJ --> CLI
+    PROJ --> MCP
+
+    DOMAIN -->|every write| SIGNAL["Signals — record_signal"]
+    SIGNAL --> FEED["CatchUpFeed — odi signals unread"]
+
+    STORE -.->|turn citations name evidence ids, no foreign key| MEMDB[("studio.db — PM memory")]
+    MEMDB -.->|bounded context| CHAT
+```
+
+The detail is below; this is the shape the rest of the document explains.
+
 ## Sources of Truth
 
 | Layer | Owns | Persists |
@@ -8,8 +56,35 @@
 | `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
 | `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | Via the same repository when the local backend is active; conversations and memory in `~/.agentic-odi/studio.db` |
 | `packages/connectors` | Connector protocol, presets, record mapping | Shared `connectors.json` registry; ingested batches land in an in-process sink |
-| `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | Browser cache only |
+| `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | IndexedDB (`agentic-odi-studio`) plus named `localStorage` keys — see Storage facts below |
 | `apps/cli` | Terminal rendering, local/remote backend selection | SQLite directly for `local`, no local writes for `mcp` |
+
+## Storage facts
+
+`apps/studio/src/bff/storageFacts.ts` answers "where does my data live and how
+big is it" from one selector, so whatever renders the answer does not re-derive
+it. `storageFacts(store)` reads the store's own snapshot and reports
+`{engine, database, bytes, records, lastWrite, persistent}`; `localStorageFacts()`
+reports the app's `localStorage` keys with their byte sizes.
+
+Three constraints shape what it is allowed to say:
+
+- `database` is imported from `apps/studio/src/bff/store/indexedDbStore.ts`, not
+  restated there — the name has one source of truth. A memory store reports
+  `null` and `persistent: false`, because nothing in it survives the tab.
+- `lastWrite` is derived. The `meta` store holds only a sequence counter, so no
+  write time is recorded anywhere to read; the selector takes the newest
+  `updated_at` across jobs, steps, outcomes, observations, and conversations,
+  with turn `created_at` as the remaining source.
+- `bytes` is the origin's usage from `navigator.storage.estimate()` where the
+  browser offers one, and the string `"unknown"` where it does not — never a
+  zero that reads like an empty database.
+
+No stored value is ever read. `studio.settings` holds the LLM key (see
+[Trust boundaries](trust-boundaries.md)), so the inventory names keys and sizes
+and stops there. `APP_STORAGE_KEYS` and `APP_STORAGE_PREFIXES` are that
+inventory, and a test fails when a writer uses a `studio.*` or `agentic-odi.*`
+key that the inventory does not cover.
 
 ## Write Paths
 
@@ -65,6 +140,26 @@ server is a normal state the picker explains.
 The studio memory is a separate SQLite file, not an ODI repository. It never
 feeds the canvas; it only supplies bounded context to the next chat turn.
 
+### Store open and close
+
+Both SQLite files are gated the same way at open. `IntentStore` and
+`StudioMemory` run a bounded `PRAGMA quick_check` (a budget of SQLite VM opcodes
+spent through a progress handler) before anything else touches the file; a
+damaged file raises `StoreCorrupt` instead of letting a bare
+`sqlite3.DatabaseError` escape. The `Repository` protocol carries the result as
+`integrity` and exposes `checkpoint(mode)`; `InMemoryRepository` answers `ok` and
+no-ops.
+
+The sidecar turns that failure into one structured `store_corrupt` body and
+serves a boot failure page; `/health` reports `degraded` while `/health` and
+`/api/diagnostics` stay reachable. A damaged file is never deleted or
+overwritten.
+
+On a clean stop, the app's lifespan shutdown checkpoints each store
+(`wal_checkpoint(TRUNCATE)`) and closes it, so no `-wal` is left for the next
+process to recover. Between stops, `AGENTIC_ODI_CHECKPOINT_SECONDS` (default
+60, `0` disables) runs a passive checkpoint on a timer.
+
 The SPA sends `mcp_url` with every data request for compatibility. In `local` mode the sidecar ignores it; in `mcp` mode it is required for canvas and mutations.
 
 ### Connectors
@@ -88,6 +183,10 @@ The sink is a hand-off buffer, not storage: nothing survives the process, and
 `--dry-run` stops before both the sink append and the evidence writes. Evidence
 mapping is the only way connector data reaches the ODI repository, and it goes
 through the same `ODIService.add_evidence` path as a hand-entered record.
+`EvidenceDraft` is that path's transport shape, not a second domain model: it is
+held equal to `Evidence` by `packages/connectors/tests/test_evidence_equivalence.py`,
+which fails and names both files when either the fields or the `EvidenceItemType`
+vocabulary moves on one side only.
 
 ## The Conversation
 
@@ -117,6 +216,7 @@ The SPA owns the visible path; the sidecar owns the record. Turns persist with
 `message_id` and `parent_id`, and the conversation stores `head_id`:
 
 ```text
+GET   /api/conversations                       -> every thread, last touch first
 GET   /api/conversations/latest                -> thread + turns (resume)
 GET   /api/conversations/{id}/tree             -> branch tree + head
 PATCH /api/conversations/{id} {"head_id"}      -> record the visible branch
@@ -149,6 +249,8 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_MCP_TIMEOUT` | CLI MCP client calls | `30` seconds |
 | `AGENTIC_ODI_MCP_KEEPALIVE` | MCP session keepalive interval | `15` seconds (`0` disables) |
 | `AGENTIC_ODI_STUDIO_DB` | Studio API memory | `~/.agentic-odi/studio.db` |
+| `AGENTIC_ODI_BACKUP_DIR` | core recovery, boot failure message | `~/.agentic-odi/backups` |
+| `AGENTIC_ODI_CHECKPOINT_SECONDS` | Studio API idle checkpoint interval | `60` seconds (`0` disables) |
 | `AGENTIC_ODI_CONNECTORS_CONFIG` | connectors registry (CLI, Studio, MCP) | `~/.config/agentic-odi/connectors.json` |
 | `AGENTIC_ODI_CONNECTOR_TIMEOUT` | connector health/ingest calls | `30` seconds |
 | `AGENTIC_ODI_STUDIO_DIST` | Studio API, dev launcher | `apps/studio/dist` |
@@ -195,6 +297,20 @@ MCP tool result (text)
 - **The canvas is a union.** `CanvasState` is `loading | ready | empty |
   error`. An empty canvas is an invitation; a failed canvas is a failure panel
   with Retry. The two never look the same.
+- **The saved copy is drawn, not hidden.** A canvas read from the browser cache
+  is initial state with `kind: "loading"`, so the boards draw it and caption it
+  "Saved …" from the cache's `generated_at` instead of covering it with a
+  skeleton. The skeleton is kept only for a genuinely empty store, and the
+  caption claims no freshness the timestamp does not support. `canvasCached`
+  tells a board whether the data on screen came from the cache. `EvidenceStream`
+  follows both halves of that rule: it puts the same caption over rows that
+  survived a reload, and it reserves "No evidence captured yet" for a canvas
+  that really answered with nothing — while loading it shows a status line and a
+  card ghost, and on failure the `FailurePanel` with Retry wired to
+  `refreshCanvas`, over the retained rows when there are some and in their place
+  when there are none. Evidence empties independently of the workspace, so the
+  lens reads `canvasState.kind` itself rather than trusting the canvas-wide
+  `empty`, which can announce "nothing here" about a canvas full of jobs.
 - **The turn log is safe.** One JSON line per turn carries the request id, the
   model, the round and tool counts, the error count, the duration, and the
   outcome. Sensitive keys are dropped rather than redacted, so no token, key,

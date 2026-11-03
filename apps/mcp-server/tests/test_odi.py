@@ -34,6 +34,10 @@ async def test_odi_workflow():
                 "statement": "Minimize the time it takes to find a specific song when searching the catalog",
                 "importance": 8.5,
                 "satisfaction": 4.0,
+                "claim_check": {
+                    "asked": ["How long does a search take?"],
+                    "answers": ["Roughly a minute"],
+                },
             },
         )
         outcome_text = outcome_res.content[0].text

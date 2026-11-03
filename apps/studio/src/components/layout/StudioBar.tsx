@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
+import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import { resolveTheme } from "../../lib/theme";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
@@ -24,6 +26,7 @@ export function StudioBar({
   const {
     llmHealth,
     messages,
+    sidecarReachable,
     unreadSignalCount,
     openPanel,
     openCustomize,
@@ -32,7 +35,7 @@ export function StudioBar({
     settings,
   } = useStudio();
   const update = useUpdateSnapshot();
-  const theme = settings.theme === "light" ? "light" : "dark";
+  const theme = resolveTheme(settings.theme);
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -66,8 +69,26 @@ export function StudioBar({
     pushToast("success", "Conversation exported as Markdown.");
   }
 
+  // A measured answer outranks an inference from the settings. The shipped desktop
+  // default points at the sidecar's own proxy — a loopback address the browser cannot
+  // talk model-to — so guessing from the endpoint alone would read "no model connected"
+  // forever on a machine where the model is in fact answering. "Connecting" is for a
+  // connection somebody is trying to make and has not yet heard back from.
+  const endpointConfigured = isEndpointConfiguredForSettings({
+    base_url: settings.base_url,
+    api_key: settings.api_key,
+    model_name: settings.model_name,
+  });
   const status =
-    llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
+    llmHealth.healthy === true
+      ? "Live"
+      : llmHealth.healthy === false
+        ? "Local mode"
+        : endpointConfigured || sidecarReachable === true
+          ? "Connecting"
+          : "Local";
+  const statusDetail =
+    status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
   const updateReady = update.phase === "ready";
   const versionText = updateReady
     ? "Update ready"
@@ -152,12 +173,12 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
-          aria-label={`Model status: ${status}. ${llmHealth.message}`}
-          title={llmHealth.message}
+          aria-label={`Model status: ${status}. ${statusDetail}`}
+          title={statusDetail}
         >
           <span
-            className={`status-dot${llmHealth.healthy === false ? " is-warn" : ""}${
-              llmHealth.healthy === null ? " is-unknown" : ""
+            className={`status-dot${status === "Local mode" ? " is-warn" : ""}${
+              status === "Connecting" ? " is-unknown" : ""
             }`}
           />
           {status}

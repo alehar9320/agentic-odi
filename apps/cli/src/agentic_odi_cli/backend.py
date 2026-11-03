@@ -239,6 +239,7 @@ class LocalBackend(Backend):
 
     def _add_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
+            ClaimCheckError,
             JobNotFoundError,
             StepNotFoundError,
             ValueOutOfRangeError,
@@ -247,6 +248,7 @@ class LocalBackend(Backend):
         )
 
         step_id = args.get("step_id")
+        claim_check = args.get("claim_check")
         try:
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
@@ -254,6 +256,7 @@ class LocalBackend(Backend):
                 importance=float(args["importance"]),
                 satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
+                claim_check=claim_check,
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -261,6 +264,8 @@ class LocalBackend(Backend):
             raise BackendError(step_not_found(step_id)) from None
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
+        except ClaimCheckError as exc:
+            raise BackendError(str(exc)) from exc
         return outcome.model_dump()
 
     def _get_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:

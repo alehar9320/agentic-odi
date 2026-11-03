@@ -24,12 +24,16 @@ from agentic_odi_core.errors import (
     OdiError,
     RateLimitError,
     SerializationError,
+    StoreCorrupt,
     StoreError,
     error_status,
 )
 from agentic_odi_core.evaluation import (
+    OutcomeScoreMismatchError,
     OutcomeStatementError,
+    assert_outcome_scores_match,
     evaluate_outcome_statement,
+    load_score_fixture,
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
@@ -57,6 +61,8 @@ from agentic_odi_core.models import (
     V2MOM,
     BusinessImpactCategory,
     BusinessValue,
+    ClaimCheck,
+    ClaimSkip,
     CustomerOutcome,
     CustomerValue,
     Direction,
@@ -97,6 +103,7 @@ from agentic_odi_core.segmentation import (
     unclustered_outcomes,
 )
 from agentic_odi_core.services import (
+    ClaimCheckError,
     CustomerOutcomeNotFoundError,
     EvidenceNotFoundError,
     InvalidOutcomeStatementError,
@@ -111,6 +118,8 @@ from agentic_odi_core.services import (
     StepNotFoundError,
     StrategyNotFoundError,
     ValueOutOfRangeError,
+    manual_claim_check,
+    require_claim_check,
 )
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
@@ -121,6 +130,9 @@ from agentic_odi_core.strategy import propose_strategy
 __all__ = [
     "ScheduledWork",
     "ScheduledWorkNotFoundError",
+    "OutcomeScoreMismatchError",
+    "assert_outcome_scores_match",
+    "load_score_fixture",
     "ScheduledWorkStatus",
     "ScheduledWorkTriggerType",
     "Segment",
@@ -140,6 +152,9 @@ __all__ = [
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
+    "ClaimCheck",
+    "ClaimCheckError",
+    "ClaimSkip",
     "ConflictError",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
@@ -175,6 +190,7 @@ __all__ = [
     "SerializationError",
     "Step",
     "StepNotFoundError",
+    "StoreCorrupt",
     "StoreError",
     "Signal",
     "SignalBudget",
@@ -207,9 +223,11 @@ __all__ = [
     "invalid_strategy_request",
     "job_not_found",
     "job_stage_catalog",
+    "manual_claim_check",
     "odi_schema",
     "outcome_not_found",
     "parse_tool_result",
+    "require_claim_check",
     "statement_to_dict",
     "step_not_found",
     "tool_result_text",

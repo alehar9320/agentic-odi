@@ -188,10 +188,17 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.ADD_OUTCOME.value: ToolSpec(
         name="add_outcome",
-        summary="Add a desired Outcome to a Job.",
+        summary="Add a desired Outcome to a Job; a score must carry a claim_check.",
         effect=_derive_effect("add_outcome"),
-        arguments=("job_id", "statement", "importance", "satisfaction", "step_id"),
-        required=("job_id", "statement", "importance", "satisfaction"),
+        arguments=(
+            "job_id",
+            "statement",
+            "importance",
+            "satisfaction",
+            "step_id",
+            "claim_check",
+        ),
+        required=("job_id", "statement"),
         returns="The created Outcome.",
         stage="2",
     ),
@@ -352,7 +359,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.EVALUATE_OUTCOME.value: ToolSpec(
         name="evaluate_outcome",
         summary="Evaluate an outcome statement against ODI format rules.",
-        effect=_derive_effect("evaluate_outcome"),
+        effect=ToolEffect.READ,
         arguments=("statement", "job_id"),
         required=("statement",),
         returns="A verdict with coded issues and suggestions.",
@@ -368,7 +375,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.COMPUTE_OPPORTUNITY.value: ToolSpec(
         name="compute_opportunity",
         summary="Compute an ODI opportunity score from importance and satisfaction.",
-        effect=_derive_effect("compute_opportunity"),
+        effect=ToolEffect.READ,
         arguments=("importance", "satisfaction"),
         required=("importance", "satisfaction"),
         returns="The opportunity score as a float.",

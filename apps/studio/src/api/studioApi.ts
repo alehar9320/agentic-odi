@@ -12,6 +12,7 @@ import type {
   ConnectorOperationResponse,
   ConnectorPreset,
   Conversation,
+  ConversationSummary,
   ConversationTree,
   CreateJobPayload,
   Job,
@@ -66,6 +67,9 @@ export function isTransportFailure(error: unknown): boolean {
   }
   return false;
 }
+
+/** How long the boot config request may hang before boot stops waiting on it. */
+const CONFIG_TIMEOUT_MS = 1_200;
 
 /** Map an HTTP status the sidecar/worker returned (with no body) to a code. */
 function codeForStatus(status: number): string {
@@ -200,9 +204,10 @@ async function studioError(response: Response): Promise<StudioApiError> {
   return new StudioApiError(described, response.status, false);
 }
 
-async function getJson<T>(path: string): Promise<T> {
+async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(apiUrl(path), {
     headers: { Accept: "application/json", ...authHeaders() },
+    ...(signal ? { signal } : {}),
   });
   if (!response.ok) {
     const error = await studioError(response);
@@ -261,8 +266,17 @@ async function withLocal<T>(
 }
 
 export async function fetchConfig(): Promise<StudioConfig> {
-  const body = await getJson<{ defaults: StudioConfig }>("/api/config");
-  return body.defaults;
+  // Configuration is a convenience, not a gate: a proxy that accepts the
+  // connection and never answers must not hold the first screen. Bound it and
+  // let the caller fall back to the defaults it already has.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CONFIG_TIMEOUT_MS);
+  try {
+    const body = await getJson<{ defaults: StudioConfig }>("/api/config", controller.signal);
+    return body.defaults;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface SidecarDiagnostics {
@@ -645,6 +659,17 @@ export function clearMemory(): Promise<{ ok: boolean }> {
   return withLocal(
     () => deleteJson<{ ok: boolean }>("/api/memory"),
     async (bff) => bff.memory.clearMemory(),
+  );
+}
+
+/** Every thread the PM can reopen, most recently touched first. */
+export async function listConversations(): Promise<ConversationSummary[]> {
+  return withLocal(
+    () =>
+      getJson<{ conversations: ConversationSummary[] }>("/api/conversations").then(
+        (body) => body.conversations,
+      ),
+    (bff) => bff.memory.listConversations(),
   );
 }
 

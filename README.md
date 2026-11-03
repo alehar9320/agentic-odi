@@ -12,11 +12,13 @@ desired outcomes, and opportunity scores that rank them.
 [![Open the Living Studio](https://img.shields.io/badge/Open%20the%20Living%20Studio-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://agentic-odi.alehar.workers.dev/)
 [![Run it locally](https://img.shields.io/badge/Run%20it%20locally-1e293b?style=for-the-badge&logo=gnubash&logoColor=white)](#quick-start)
 
-**Try it now — nothing to install.** The Studio opens in your browser; live data
-and chat need the local sidecar below. Want to see what it produces first?
-[Open the sample workspace](https://alehar9320.github.io/agentic-odi/sample/) —
-a read-only job, its scored outcomes, and the evidence behind them, generated
-from a committed fixture and labelled a sample on every row.
+**Try it now — nothing to install.** The Studio opens in your browser and works
+from the first minute: the canvas, the thread, and the assistant all run on your
+device. Add the local sidecar below for live MCP data and your own model. Want to
+see what it produces first? [Open the sample
+workspace](https://alehar9320.github.io/agentic-odi/sample/) — a read-only job,
+its scored outcomes, and the evidence behind them, generated from a committed
+fixture and labelled a sample on every row.
 
 **Or install the CLI in one line** (Linux, macOS):
 
@@ -142,9 +144,10 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its
-  sidecar-owned transcript, with attachments, tool traces, approvals, and
-  branch-aware editing and regeneration. Settings → About also offers an
-  opt-in, redacted local diagnostics preview; no report is uploaded. See
+  sidecar-owned transcript, with attachments, tool traces, opt-in approvals for
+  chat writes and unknown tools, and branch-aware editing and regeneration.
+  Settings → About also offers an opt-in, redacted local diagnostics preview; no
+  report is uploaded. See
   [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
@@ -186,6 +189,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Reuse First](docs/architecture/reuse.md) | The ladder agents walk before writing code: reuse what exists, adopt what is declared, copy with provenance, then build |
 | [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
@@ -205,20 +209,38 @@ A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
 shared tooling at the root. Packages live in `packages/`, runnable services in
 `apps/`, and deployment assets in `infra/`. The
 [architecture index](docs/architecture/README.md) explains how the pieces fit
-together and where each contract is enforced:
+together and where each contract is enforced; its Dependency Direction diagram
+is a contract of its own — `tests/test_architecture.py` checks the drawn arrows
+against the declared dependencies and the real imports, so the picture cannot
+drift from the workspace. The distributions are:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
+
+Inside `packages/core` there are four groups, and the rules between them are
+written down rather than implied — with `errors.py`, the exception hierarchy, open
+to every group. **Domain** (`models.py`, `evaluation.py`, `mapping.py`,
+`corpus.py`) is the vocabulary and imports no other group. **Persistence**
+(`repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`,
+`factory.py`) stores what the other groups decide and may not import methodology —
+`tests/test_architecture.py` enforces that one rule, and also refuses a new core
+module that belongs to no group. **Methodology** (`services.py`, `segmentation.py`,
+`strategy.py`, `router.py`, `messages.py`, `steve_jobs.py`) owns the service door,
+which is `services.py`. **Contract** (`contract.py`, `errors.py`, `remote.py`,
+`schema.py`, `connection.py`, `consent.py`) is the MCP wire protocol; anything may
+import it and it imports no persistence or methodology. The full table, and the
+reason `contract.py` is not its own package yet, is in
+[ADR 0005](docs/architecture/adr/0005-core-layers-and-the-contract-split.md).
 
 ## Contributing
 
@@ -228,7 +250,7 @@ request:
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy apps packages && uv run pytest
-uv run python scripts/doc_check.py   # documented commands, paths, routes, and env vars exist
+uv run python scripts/doc_check.py   # documented commands, paths, routes, env vars, and the assistant-ui ledger hold up
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage

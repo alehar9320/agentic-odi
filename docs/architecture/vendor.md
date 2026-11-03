@@ -19,9 +19,11 @@ The rule in one line: **copied markup, depended-on behaviour.**
    store and the fetch. That wrapper is the only place a product concern enters
    the copied surface.
 3. **Every vendored file carries a provenance header and a ledger entry.** The
-   first line names the upstream, the commit, the date, and the SPDX licence;
-   `vendor.lock.json` records the same facts per path so the licence is
-   auditable and the commit is checkable.
+   first line is `// vendored: <source> — <SPDX> — retrieved <date> — local
+   edits: <what>`; `apps/studio/vendor.lock.json` records the same facts per
+   path plus an integrity handle, so the licence is auditable and the copy is
+   re-fetchable. A registry item has no commit, which is why the handle is a
+   hash of the fetched artefact rather than a revision that does not exist.
 4. **One surface per pull request, 400 changed lines maximum.** A 2,000-line
    drop of a UI kit is unauditable and unmaintainable. Copy the one component
    the current issue needs.
@@ -29,10 +31,10 @@ The rule in one line: **copied markup, depended-on behaviour.**
    header says what drifted, in its `local edits:` note. An unmarked edit means
    the next copy-in either loses the fix or pretends the file never changed.
 
-## How rule two is enforced
+## How the rules are enforced
 
-Two independent gates, because a widened lint glob silently deletes the second
-one:
+Rule two has two independent gates, because a widened lint glob silently deletes the
+second one:
 
 - ESLint restricts the aliased forms — `@/state/*`, `@/api/*`, `@/assistant/*`,
   `@/bff/*` — for files under `src/vendor/**`. See `apps/studio/eslint.config.js`.
@@ -44,15 +46,28 @@ one:
 Adding `import { useStudio } from "@/state/StudioContext"` to a file under
 `src/vendor` therefore fails `npm run lint` and `npm test` both.
 
+Rule three is enforced by `apps/studio/src/vendor/ledger.test.ts`: every copied or
+authored file in the tree must appear exactly once in `apps/studio/vendor.lock.json`,
+a copied file's header must split into the parts the lock records, and a first-party
+file must carry no header. An undocumented copy-in fails `npm test` rather than
+waiting for a reviewer to notice the file has no source.
+
+The wider question — when to copy at all, and what to check before adding a
+dependency — is `docs/architecture/reuse.md`.
+
 ## Layout
 
 ```text
 src/vendor/
   boundary.ts                  the rule as data
   boundary.test.ts             lint's second pair of eyes
+  ledger.test.ts               the ledger rule as a test
   components/ui/               copied primitives (props in, markup out)
   components/assistant/        copied transcript surfaces
 ```
+
+The ledger itself lives one directory out, at `apps/studio/vendor.lock.json`, so a
+`shadcn add` refreshing this tree cannot overwrite the record of what it copied.
 
 The alias `@/` resolves inside this tree, so copied files keep the import
 statements they arrived with and stay inside the boundary.
