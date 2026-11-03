@@ -6377,3 +6377,15 @@ details[open] summary {
   font-size: var(--t-sm);
   color: var(--amber);
 }
+
+/* ================================================================== */
+/* Motion curves. The website's build reads this second :root block   */
+/* (website/tools/extract.py, read_easings) and renders the site's    */
+/* motion section from it, so the declarations stay here even where   */
+/* the app now reaches for --ease-out above.                          */
+/* ================================================================== */
+:root {
+  --ease-apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.22);
+  --ease-apple-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-tactile: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
