@@ -367,6 +367,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/outcomes/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Outcomes Api
+         * @description Preview or write one organisation change across a set of outcomes.
+         *
+         *     The body is ``BulkReport``'s own dictionary — ``requested``, ``changed``, ``skipped`` with
+         *     a reason per row, the per-field ``changes`` table, and the ``undo_token`` a preview leaves
+         *     empty — so the Studio renders a calculation it did not make. A refused run (nothing
+         *     selected, a stage outside the job map, one theme both added and removed) arrives as the
+         *     shared error envelope with the service's own sentence.
+         */
+        post: operations["bulk_outcomes_api_api_outcomes_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/bulk/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Bulk Outcomes Api
+         * @description Take a bulk run back with the token it answered with.
+         *
+         *     A row someone edited since the run is left alone and listed in ``skipped``, and a token a
+         *     newer run expired or that has already been used comes back as a refusal — never as a
+         *     partial restore, so the Studio can show the sentence without having guessed at the state.
+         */
+        post: operations["undo_bulk_outcomes_api_api_outcomes_bulk_undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/steps/{step_id}": {
         parameters: {
             query?: never;
@@ -1141,6 +1191,74 @@ export interface components {
             text?: string | null;
             /** Data Url */
             data_url?: string | null;
+        };
+        /**
+         * BulkQuery
+         * @description The narrowing a bulk run covers beyond the rows it names.
+         *
+         *     The field names are ``GET /api/outcomes/search``'s own, so the set a preview counted is
+         *     the set the write answers to. Omit it and the run touches the named rows only.
+         */
+        BulkQuery: {
+            /** Text */
+            text?: string | null;
+            /** Stage */
+            stage?: string | null;
+            /** Theme Ids */
+            theme_ids?: string[];
+            /** Confidence */
+            confidence?: string | null;
+            /** Tags */
+            tags?: string[];
+            /** Min Score */
+            min_score?: number | null;
+            /** Max Score */
+            max_score?: number | null;
+            /** Job Id */
+            job_id?: string | null;
+        };
+        /**
+         * BulkRequest
+         * @description One organisation change across a set of outcomes, previewed or written.
+         *
+         *     ``outcome_ids`` are the rows the person selected; ``dry_run`` asks for the change table
+         *     without writing it. Scores and statements are not bulk fields — the service refuses them.
+         */
+        BulkRequest: {
+            /** Outcome Ids */
+            outcome_ids?: string[];
+            query?: components["schemas"]["BulkQuery"] | null;
+            /** Stage */
+            stage?: string | null;
+            /** Add Theme Ids */
+            add_theme_ids?: string[];
+            /** Remove Theme Ids */
+            remove_theme_ids?: string[];
+            /** Add Tags */
+            add_tags?: string[];
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
+         * BulkUndoRequest
+         * @description Take one bulk run back with the token it answered with.
+         */
+        BulkUndoRequest: {
+            /** Token */
+            token: string;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
         };
         /**
          * BusinessImpactCategory
@@ -2765,6 +2883,76 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_outcomes_api_api_outcomes_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_bulk_outcomes_api_api_outcomes_bulk_undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUndoRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
