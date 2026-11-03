@@ -58,6 +58,13 @@ describe("StudioBar", () => {
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
         llmHealth: { healthy: false, message: "No model is reachable." },
+        settings: {
+          base_url: "https://model.example.com/v1",
+          api_key: "k",
+          model_name: "gpt-5",
+          mcp_url: "",
+          theme: "dark",
+        },
         openPanel: vi.fn(),
       }) as never,
     );
@@ -68,13 +75,73 @@ describe("StudioBar", () => {
     ).toBeInTheDocument();
   });
 
+  it("says the device is answering before any probe has run", () => {
+    // #309: an unconfigured browser is a fact about the settings, not a failure
+    // to be discovered. The bar tells it plainly with healthy still unknown.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ llmHealth: { healthy: null, message: "" } }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(
+      screen.getByRole("button", {
+        name: /model status: local\. answering from your device\. no model connected\./i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("reads a live model through the sidecar as live", () => {
+    // The shipped desktop default points the browser at the sidecar's own proxy, which
+    // is not an endpoint the bar can judge from settings alone. When the sidecar vouches
+    // for the model, that answer outranks the guess.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        llmHealth: { healthy: true, message: "qwen3 is answering." },
+        sidecarReachable: true,
+        settings: {
+          base_url: "http://localhost:8001/v1",
+          api_key: "local",
+          model_name: "qwen3:8b",
+          mcp_url: "",
+          theme: "dark",
+        },
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(
+      screen.getByRole("button", { name: /model status: live\. qwen3 is answering\./i }),
+    ).toBeInTheDocument();
+  });
+
+  it("spins only for a connection somebody is trying to make", () => {
+    // Keyless Ollama on the laptop: configured, not yet measured.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        llmHealth: { healthy: null, message: "Health not checked yet." },
+        settings: {
+          base_url: "http://127.0.0.1:11434/v1",
+          api_key: "",
+          model_name: "qwen3:8b",
+          mcp_url: "",
+          theme: "dark",
+        },
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(
+      screen.getByRole("button", { name: /model status: connecting\. health not checked yet\./i }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the brand mark decorative and labels the home control in text", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext() as never);
     const { container } = render(
       <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
     );
     expect(container.querySelector(".brand__mark")?.getAttribute("aria-hidden")).toBe("true");
-    expect(container.querySelector(".brand--home")?.getAttribute("aria-label")).toBe("Go to home");
+    expect(container.querySelector(".brand--home")?.getAttribute("aria-label")).toBe("Living Studio, go to home");
   });
 
   it("switches to the light theme from the bar", () => {

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { UNDERSERVED_THRESHOLD } from "../../lib/odi";
 import type { CanvasState } from "../../types";
 import { OpportunityLandscape } from "./OpportunityLandscape";
 
@@ -18,6 +19,7 @@ const mockCanvasData = {
 const harness = vi.hoisted(() => ({
   state: {
     canvasState: { kind: "ready", data: null } as unknown as CanvasState,
+    canvasCached: false,
     refreshCanvas: vi.fn(),
     requestSimulate: vi.fn(),
     openPanel: vi.fn(),
@@ -201,6 +203,10 @@ describe("OpportunityLandscape accessibility", () => {
 });
 
 describe("OpportunityLandscape canvas states", () => {
+  beforeEach(() => {
+    harness.state.canvasCached = false;
+  });
+
   it("shows the failure and a retry instead of the metrics when the canvas failed", () => {
     harness.state.canvasState = {
       kind: "error",
@@ -228,11 +234,15 @@ describe("OpportunityLandscape canvas states", () => {
       kind: "empty",
       data: { jobs: [], steps: [], outcomes: [], source: "local" },
     } as unknown as CanvasState;
+    harness.state.openPanel = vi.fn();
 
     render(<OpportunityLandscape />);
 
-    expect(screen.getByText(/no opportunities yet/i)).toBeInTheDocument();
+    expect(screen.getByText("No saved copy on this device")).toBeInTheDocument();
     expect(screen.queryByText("Active Job Map Contexts")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /capture an outcome/i }));
+    expect(harness.state.openPanel).toHaveBeenCalledWith("capture");
   });
 
   it("shows why the seed board is standing in when the canvas says so", () => {
@@ -273,7 +283,7 @@ describe("OpportunityLandscape canvas states", () => {
     expect(screen.queryByText(/demo data/i)).toBeNull();
   });
 
-  it("shows the skeleton while a warm canvas reloads", () => {
+  it("draws the held data on a warm reload instead of a skeleton", () => {
     harness.state.canvasState = {
       kind: "loading",
       data: mockCanvasData,
@@ -281,6 +291,111 @@ describe("OpportunityLandscape canvas states", () => {
 
     const { container } = render(<OpportunityLandscape />);
 
-    expect(container.textContent).not.toContain("Active Job Map Contexts");
+    expect(container.textContent).toContain("Active Job Map Contexts");
+    expect(container.querySelector(".skeleton")).toBeNull();
+  });
+
+  it("draws the saved copy and says when it was saved", () => {
+    harness.state.canvasState = {
+      kind: "loading",
+      data: {
+        ...mockCanvasData,
+        provenance: {
+          kind: "live",
+          reason: "store",
+          generated_at: new Date(Date.now() - 4 * 60_000).toISOString(),
+          record_counts: { jobs: 1, steps: 1, outcomes: 2, evidence: 0 },
+        },
+      },
+    } as unknown as CanvasState;
+    harness.state.canvasCached = true;
+
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.textContent).toContain("Active Job Map Contexts");
+    expect(container.querySelector(".skeleton")).toBeNull();
+    expect(screen.getByText("Saved 4 minutes ago")).toBeInTheDocument();
+  });
+
+  it("keeps the skeleton when a genuinely empty store is still loading", () => {
+    harness.state.canvasState = {
+      kind: "loading",
+      data: { jobs: [], steps: [], outcomes: [], source: "local" },
+    } as unknown as CanvasState;
+
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.querySelector(".skeleton")).not.toBeNull();
+  });
+
+  it("does not caption a saved copy that the warning strip has displaced", () => {
+    harness.state.canvasState = {
+      kind: "loading",
+      data: {
+        ...mockCanvasData,
+        warnings: ["MCP endpoint unreachable"],
+        provenance: {
+          kind: "seed",
+          reason: "mcp_unreachable",
+          generated_at: new Date(Date.now() - 4 * 60_000).toISOString(),
+          record_counts: { jobs: 1, steps: 1, outcomes: 2, evidence: 0 },
+        },
+      },
+    } as unknown as CanvasState;
+    harness.state.canvasCached = true;
+
+    render(<OpportunityLandscape />);
+
+    expect(screen.getByText(/mcp endpoint unreachable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/saved/i)).toBeNull();
+  });
+});
+
+describe("OpportunityLandscape score rendering", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  // The metric tile typed "10" by hand while the boundary lived in lib/odi.ts, so
+  // the copy could disagree with the rule it claims to describe.
+  it("labels the underserved metric with the exported threshold", () => {
+    render(<OpportunityLandscape />);
+
+    expect(
+      screen.getByText(`Underserved Targets (>${UNDERSERVED_THRESHOLD})`),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the average opportunity score to one decimal", () => {
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("12.5");
+  });
+
+  // An outcome the sidecar never scored rendered "0.0" in the table and "N/A" on
+  // the card. The formatter already owns that distinction.
+  it("shows an unscored outcome as N/A in the table rather than as a zero", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-108",
+            statement: "Minimize unanswered support tickets",
+            importance: 5,
+            satisfaction: 5,
+            opportunity_score: null,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const row = screen.getByRole("row", { name: /minimize unanswered support tickets/i });
+    expect(within(row).getByText("N/A")).toBeInTheDocument();
   });
 });

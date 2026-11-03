@@ -9,6 +9,7 @@ import { OpportunityLandscape } from "../canvas/OpportunityLandscape";
 import { SchedulePanel } from "../canvas/SchedulePanel";
 import { SegmentBoard } from "../canvas/SegmentBoard";
 import { CatchUpFeed } from "../notifications/CatchUpFeed";
+import { RecordsPanel } from "../records/RecordsPanel";
 import { SettingsPanel } from "../SettingsPanel";
 import {
   BellIcon,
@@ -20,6 +21,7 @@ import {
   SettingsIcon,
   SignalIcon,
   SparkIcon,
+  TableIcon,
 } from "../icons";
 
 export interface PanelTalk {
@@ -45,6 +47,19 @@ export interface PanelDefinition {
  * them owns an input the agent could take more naturally as a message.
  */
 export const WORKSPACE_PANELS: PanelDefinition[] = [
+  {
+    id: "records",
+    label: "Records",
+    title: "Records",
+    blurb: "Everything the store holds, with the ids and the values it returned.",
+    icon: <TableIcon />,
+    render: () => <RecordsPanel />,
+    talk: {
+      label: "Ask what's missing here",
+      intent:
+        "Here are the records I have stored. What is missing, duplicated, or inconsistent? Ask me before you change anything.",
+    },
+  },
   {
     id: "catchup",
     label: "Catch up",
