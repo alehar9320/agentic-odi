@@ -22,6 +22,7 @@ import { ThreadComposer } from "./ThreadComposer";
 const VIEW_COMMANDS = new Set<string>([
   "records",
   "landscape",
+  "brief",
   "jobmap",
   "segments",
   "evidence",

@@ -72,6 +72,7 @@ the model, so they work when it is offline.
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
 | `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/settings` | Open that lens beside the conversation |
+| `/brief` | Open the decision brief — the document a review reads, ready to download or print |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
 
@@ -510,7 +511,41 @@ rail, composer, and floating chrome are hidden, the palette switches to paper,
 and cards stay whole instead of splitting across sheets. An open lens prints
 below the thread instead of being clipped off-screen.
 
+### The decision brief
+
+A conversation is hard to hand to a review, so the Studio writes the document
+instead: `/brief`, or **Export brief** in the opportunity landscape's header,
+docks the brief as a lens beside the thread. It is built in the browser from the
+canvas — jobs, steps, outcomes, evidence, theses and the setup context — and not
+by the model, so the same offline studio that scores an outcome can produce the
+page a colleague reads. **Download .md**, **Print / PDF** and **Copy** all
+serialize the one Markdown string the preview is rendering; what a person
+approves is what leaves the app.
+
+The document is eight sections in a fixed order: Provenance, Vision, The
+decision, Top opportunities, Evidence, Dissent, Next evidence, Method. Every
+number in it counts records rather than generating prose, and the Method line
+states the score formula (`importance + max(importance - satisfaction, 0)`) so a
+reader can check the ranking against the Outcome records. Unscored outcomes are
+not opportunities and are not counted. Provenance is the part a reviewer is
+entitled to: seeded demo rows are excluded from every count and the sheet carries
+*Demo data. Nothing here comes from your research.* rather than quietly mixing
+them in, and a canvas served from this device's cached copy says the snapshot may
+be stale. Dissent is assembled from what argues against the bet — saved theses,
+canvas warnings, evidence that belongs to no outcome — plus one optional field on
+the sheet for the objection the studio could not know, which prints labelled
+*author-supplied*. Next evidence names the thinnest of the top three and a
+connector from the preset catalog that could fill it, or says plainly that no
+matching source exists to connect. On an empty canvas the export action is
+disabled and says why: nothing to brief yet.
+
+Print is the brief's own contract. While the print dialog is open the body
+carries `brief-printing`, and the sheet's controls, the objection field, the
+thread and the chrome all disappear — the PDF is the document, not a screenshot
+of the app.
+
 ## Rich responses
+
 
 The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one **inline in the conversation**: a scored

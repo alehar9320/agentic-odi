@@ -10,4 +10,11 @@ describe("findPanel", () => {
     expect(findPanel("records").id).toBe("records");
     expect(WORKSPACE_PANELS.some((panel) => panel.id === "records")).toBe(true);
   });
+
+  it("finds the decision brief lens", () => {
+    // The brief is reachable from `/brief` and from the landscape header, and
+    // both routes land on the same document.
+    expect(findPanel("brief").id).toBe("brief");
+    expect(WORKSPACE_PANELS.some((panel) => panel.id === "brief")).toBe(true);
+  });
 });
