@@ -3,6 +3,7 @@ import json
 import pytest
 from agentic_odi_mcp_server import mcp
 from fastmcp import Client
+from mcp_failures import failure, sentence
 
 
 def _claim_check() -> dict:
@@ -146,8 +147,8 @@ async def test_evaluate_outcome_reports_a_missing_job_as_an_error_string():
         )
 
     text = res.content[0].text  # type: ignore[index]
-    assert text == "Job not found: missing"
-    assert "{" not in text
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Job not found: missing"
 
 
 @pytest.mark.asyncio
@@ -178,7 +179,8 @@ async def test_promote_evidence_reports_a_missing_evidence_id():
         )
 
     text = res.content[0].text  # type: ignore[index]
-    assert text.startswith("Error:")
+    assert failure(text).code.value == "not_found"
+    assert sentence(text).startswith("Error:")
     assert "EV-MISSING" in text
     assert "list_evidence" in text
 
@@ -202,4 +204,5 @@ async def test_promote_evidence_rejects_an_unknown_target():
         )
 
     text = res.content[0].text  # type: ignore[index]
-    assert text == "Error: Unknown promotion target: slide"
+    assert failure(text).code.value == "validation"
+    assert sentence(text) == "Error: Unknown promotion target: slide"
