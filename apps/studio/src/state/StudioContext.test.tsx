@@ -209,13 +209,35 @@ function route(
     });
   }
   if (url === "/api/conversations") {
+    if (init?.method === "POST") {
+      return json({
+        conversation: {
+          id: "c-new",
+          title: "",
+          created_at: "2026-10-22T10:00:00+00:00",
+          updated_at: "2026-10-22T10:00:00+00:00",
+        },
+      });
+    }
     return json({
-      conversation: {
-        id: "c-new",
-        title: "",
-        created_at: "2026-10-22T10:00:00+00:00",
-        updated_at: "2026-10-22T10:00:00+00:00",
-      },
+      conversations: [
+        {
+          id: "c-1",
+          title: "I own activation.",
+          created_at: "2026-10-22T10:00:00+00:00",
+          updated_at: "2026-10-22T10:00:00+00:00",
+          head_id: "t-2",
+          turn_count: 2,
+        },
+        {
+          id: "c-old",
+          title: "Price the churn spike",
+          created_at: "2026-10-20T10:00:00+00:00",
+          updated_at: "2026-10-20T10:00:00+00:00",
+          head_id: null,
+          turn_count: 1,
+        },
+      ],
     });
   }
   if (url === "/api/health/mcp") {
@@ -384,6 +406,32 @@ describe("StudioContext memory and resume", () => {
     ]);
     expect(result.current.memory.map((item) => item.text)).toEqual([
       "Accountable for activation.",
+    ]);
+  });
+
+  it("loads the history list on boot, newest first", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.conversations).toHaveLength(2));
+    expect(result.current.conversations.map((conversation) => conversation.id)).toEqual([
+      "c-1",
+      "c-old",
+    ]);
+    expect(result.current.conversations[0].title).toBe("I own activation.");
+  });
+
+  it("opens a past conversation by loading its turns", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.openConversation("c-1");
+    });
+
+    expect(result.current.conversationId).toBe("c-1");
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Tell me more.",
     ]);
   });
 
