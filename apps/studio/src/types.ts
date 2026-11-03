@@ -43,6 +43,49 @@ export interface OutcomeSearch {
   facets: OutcomeFacets;
 }
 
+/**
+ * One before/after pair from a bulk run. Only three fields are ever bulk-edited —
+ * the stage a row belongs to, its themes, and its tags — so a change table has no
+ * other shape to handle here.
+ */
+export interface BulkChangeRow {
+  outcome_id: string;
+  field: "step_id" | "theme_ids" | "tags";
+  from: string | string[] | null;
+  to: string | string[] | null;
+}
+
+/** A row the run walked past, with the reason the service gave for it. */
+export interface BulkSkippedRow {
+  id: string;
+  reason: string;
+}
+
+/**
+ * What a bulk run asked for, wrote, refused and — if it wrote — how to take it
+ * back. A preview answers with the same table and `undo_token: null`; the token
+ * is only issued once the write happened.
+ */
+export interface BulkReport {
+  requested: number;
+  changed: string[];
+  skipped: BulkSkippedRow[];
+  changes: BulkChangeRow[];
+  undo_token: string | null;
+}
+
+/** The narrowing a bulk run covers beyond the rows it names: `search_outcomes`'s own fields. */
+export interface BulkNarrowing {
+  text?: string;
+  stage?: string;
+  theme_ids?: string[];
+  confidence?: string;
+  tags?: string[];
+  min_score?: number;
+  max_score?: number;
+  job_id?: string;
+}
+
 export interface Evidence {
   id: string;
   source_name?: string;
