@@ -25,7 +25,6 @@ interface QuickPill {
   label: string;
   icon: ReactNode;
   run: () => void;
-  conversational?: boolean;
 }
 
 /**
@@ -34,7 +33,7 @@ interface QuickPill {
  * the same store, so they cannot drift apart.
  */
 export function SuggestionPills() {
-  const { canvas, llmHealth, openPanel, streaming, sendMessage } = useStudio();
+  const { canvas, llmHealth, openPanel, sendMessage } = useStudio();
   const suggestions = useAuiState((state) => state.thread.suggestions);
 
   const jobs = canvas?.jobs.length ?? 0;
@@ -44,7 +43,6 @@ export function SuggestionPills() {
     label: suggestion.title ?? suggestion.prompt,
     icon: PILL_ICONS[index % PILL_ICONS.length],
     run: () => void sendMessage(suggestion.prompt),
-    conversational: true,
   }));
 
   pills.push(
@@ -66,13 +64,7 @@ export function SuggestionPills() {
   return (
     <div className="composer__pills" aria-label="Suggested next steps">
       {pills.map((pill) => (
-        <button
-          key={pill.id}
-          type="button"
-          className="suggestion"
-          disabled={Boolean(pill.conversational && streaming)}
-          onClick={pill.run}
-        >
+        <button key={pill.id} type="button" className="suggestion" onClick={pill.run}>
           {pill.icon}
           {pill.label}
         </button>

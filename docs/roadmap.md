@@ -35,6 +35,7 @@ Open pull requests that change a capability this milestone cares about. Each
 links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
+- [ ] **A study, and the waves inside it** — a named pass over a job with a unique wave per `(job, name)`; outcomes scope to a study of their own job, and legacy rows keep belonging to no study (this change).
 - [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
 - [ ] **Themes: a named tree over outcomes** — a two-level theme entity, workspace-wide or job-scoped, with memberships that survive deletion (this change).
 - [ ] **Find matching outcomes consistently** — one `OutcomeQuery` behind `odi desired-outcomes search`, the `search_outcomes` tool, and `GET /api/outcomes/search`, with dimension-removed facet counts (this change).

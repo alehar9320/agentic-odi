@@ -91,7 +91,7 @@ by the presence of one handler.
 | `adapters.attachments` | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text capped at 20k chars, images at 5 MB, refusals explained. |
 | runtime `suggestions` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `suggestionsFor`, computed from canvas state. |
 | `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | `apps/studio/src/state/StudioContext.tsx` | — | Branching works through `setMessages` and `head_id`; the dedicated adapter is unused, so the runtime infers branches from parent ids. |
-| `queue` adapter | Planned | — | #410 | Keeps a follow-up while a reply runs. |
+| `queue` adapter | Adopted | `apps/studio/src/assistant/queue.ts` | #410 | Keeps a follow-up while a reply runs. |
 | `onResume` / `thread.canResume` | Planned | — | #424 | Continues a dropped run. |
 | `adapters.threadList` switch bridge | Planned | — | #408 | The same row as the Thread list group's `adapters.threadList`, listed here because the runtime side is where the handlers switch on. |
 | `onDelete` (message) | Rejected | — | — | The transcript is the audit trail behind every claim. A turn can be edited, regenerated, or branched; deleting it breaks the record the ODI method depends on. |
@@ -147,7 +147,7 @@ by the presence of one handler.
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer's skeleton. |
 | `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | Bounded by `apps/studio/src/assistant/attachments.ts`. |
 | `ComposerPrimitive.AttachmentDropzone` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | Dropping works: the composer has its own `onDragOver`/`onDrop` with the same accept rules as `attachmentRejection`. Adopting the primitive would only relocate the same logic. |
-| `ComposerPrimitive.Queue` | Planned | — | #410 | Renders the pending lane. |
+| `ComposerPrimitive.Queue` | Adopted | `apps/studio/src/components/chat/QueueLane.tsx` | #410 | Renders the pending lane. |
 | `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #435 | Shows and clears the quote before send. |
 | `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | `apps/studio/src/assistant/dictation.ts` | #433 | Dictation, hidden where unsupported. |
 | `ComposerPrimitive.Resume` | Planned | — | #424 | Appears only with a checkpoint. |
@@ -202,9 +202,9 @@ only the surface is missing.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| `createMessageQueue(driver)` | Planned | — | #410 | `driver.run(message, {steer})`, optional `driver.cancel`. |
-| `MessageQueueController` | Planned | — | #410 | `notifyBusy` / `notifyIdle` / `notifyCancelled` / `hold` / `release` / `clear` / `subscribe` — the cancel pause is why we must not hand-roll. |
-| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Planned | — | #410 | One lane above the composer. |
+| `createMessageQueue(driver)` | Adopted | `apps/studio/src/assistant/queue.ts` | #410 | `driver.run(message, {steer})`, optional `driver.cancel`. |
+| `MessageQueueController` | Adopted | `apps/studio/src/assistant/queue.ts` | #410 | `notifyBusy` / `notifyIdle` / `notifyCancelled` / `hold` / `release` / `clear` / `subscribe` — the cancel pause is why we must not hand-roll. |
+| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Adopted | `apps/studio/src/components/chat/QueueLane.tsx` | #410 | One lane above the composer. |
 | `QueueItemState.prompt` | Rejected | — | — | Deprecated in the installed types; derive text from `parts`. |
 
 ### Reasoning and work
@@ -300,15 +300,15 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 39 |
+| Adopted | 44 |
 | Partial | 8 |
-| Planned | 25 |
+| Planned | 20 |
 | Decision | 26 |
 | Rejected | 31 |
 | Total | 129 |
 
-Read it as: **47** of the library's 129 relevant capabilities already deliver
-something a person can use, **25** more are carried by open issues, **26** rows
+Read it as: **52** of the library's 129 relevant capabilities already deliver
+something a person can use, **20** more are carried by open issues, **26** rows
 wait on a named decision, and **31** are rejected with a reason. Every row is
 accounted for — that is the whole point of the page.
 
@@ -385,12 +385,13 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
 | `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
 | `apps/studio/src/components/chat/ThreadComposer.test.tsx` | Recall of previously sent messages with `ArrowUp`/`ArrowDown`, draft restoration, and the editing and sending keys it must not break |
+| `apps/studio/src/assistant/queue.test.ts`, `src/components/chat/QueueLane.test.tsx` | The follow-up lane (#410): enqueue preserves order, steer interrupts once, a cancel pauses instead of draining, a failed dispatch restores rather than drops; the lane rows read their text from parts and their Run-now and remove controls act on one item only |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
 | `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
 | `apps/studio/src/assistant/starterCopy.test.ts` | The first-run starter lint: situation-first titles, material-first prompts, a promised artifact, no quality adjectives, no claim literal, and the untouched returning-user swaps |
-| `apps/studio/src/components/chat/SuggestionPills.test.tsx` | A starter click sends its exported prompt verbatim, and the starters stay disabled while a reply streams |
+| `apps/studio/src/components/chat/SuggestionPills.test.tsx` | A starter click sends its exported prompt verbatim, and a starter clicked while a reply streams enqueues instead of being dropped (#410) |
 | `apps/studio-api/tests/test_studio_models.py` | Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, `/api/models` response shape |
-| `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, branch switching, approval answers |
+| `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, the follow-up queue against a gated stream (#410), branch switching, approval answers |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
 | `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
 | `apps/studio-api/tests/test_studio_chat_stream.py` | Reasoning and source events, attachment prompt assembly, terminal-event invariants |

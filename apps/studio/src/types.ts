@@ -82,8 +82,26 @@ export interface Theme {
   ordinal: number;
 }
 
-export type StrategyKind = "differentiated" | "disruptive" | "new_market";
+/**
+ * A study is one named pass over a job. `wave` is the pass number, from 1:
+ * opening the same study again is a new wave, not a second copy. `closed_at` is
+ * set only once the study is closed, and `method_notes` is the researcher's own
+ * account of how the pass was run, when they have given it.
+ */
+export type StudyStatus = "planned" | "fielding" | "closed";
 
+export interface Study {
+  id: string;
+  job_id: string;
+  name: string;
+  wave: number;
+  status: StudyStatus;
+  opened_at: string;
+  closed_at?: string | null;
+  method_notes?: string | null;
+}
+
+export type StrategyKind = "differentiated" | "disruptive" | "new_market";
 export interface RejectedPath {
   kind: StrategyKind;
   why: string;

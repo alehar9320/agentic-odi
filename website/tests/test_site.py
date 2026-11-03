@@ -519,6 +519,9 @@ def test_page_weights_are_within_budget(page: str):
     # on the Development page, which now reaches ~93 KB and is the new long
     # pole; it is a coverage record, not decoration, so the ceiling moves.
     # search_outcomes is the widest argument table on the reference page (eleven
-    # parameters, one per narrowing dimension), and it carries the page past 96 KB
-    # to ~98 KB, so the ceiling moves with it.
-    assert size <= 100 * 1024, f"{page}: {size} bytes"
+    # parameters, one per narrowing dimension). The Study entity and its two
+    # tools (open_study, list_studies) add a few KB, and the six theme tools
+    # (add_theme, rename_theme, delete_theme, list_themes, assign_theme,
+    # unassign_theme) plus the Theme entity push the page past 100 KB, so the
+    # ceiling moves with the record it holds.
+    assert size <= 110 * 1024, f"{page}: {size} bytes"
