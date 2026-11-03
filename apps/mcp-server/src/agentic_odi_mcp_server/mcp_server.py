@@ -976,7 +976,7 @@ def search_outcomes(
             offset=offset,
         )
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps(result)
 
 
