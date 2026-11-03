@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import "fake-indexeddb/auto";
+import { openDB } from "idb";
 
 import { IndexedDbLocalStore } from "./indexedDbStore";
 import { MemoryLocalStore } from "./memoryStore";
@@ -100,6 +101,38 @@ describe("IndexedDbLocalStore", () => {
     store.close();
   });
 
+  it("round-trips outbox records and reclaims a stale drain lease", async () => {
+    const store = await makeStore();
+    await store.enqueueOutbox({
+      id: "rec-1",
+      kind: "create",
+      entity: "job",
+      local_id: "local-1",
+      server_id: null,
+      payload: { name: "Job" },
+      depends_on: [],
+      state: "pending",
+      attempts: 0,
+      last_error: null,
+      created_at: "2026-01-01T00:00:00Z",
+      acknowledged_at: null,
+    });
+    const queued = await store.listOutbox();
+    expect(queued).toHaveLength(1);
+    expect(queued[0].payload).toEqual({ name: "Job" });
+
+    // First holder claims the lease; a second tab is turned away.
+    expect(await store.claimDrainLease("a", 1_000, 500)).toBeNull();
+    expect(await store.claimDrainLease("b", 1_100, 500)).toEqual({
+      holder: "a",
+      expires_at: 1_500,
+    });
+    // Past expiry the lease is stale and reclaimable.
+    expect(await store.claimDrainLease("b", 1_600, 500)).toBeNull();
+    expect(await store.getDrainLease()).toEqual({ holder: "b", expires_at: 2_100 });
+    store.close();
+  });
+
   it("snapshots and restores the whole workspace across store instances", async () => {
     const first = await makeStore();
     await first.putJob({
@@ -154,6 +187,51 @@ describe("IndexedDbLocalStore", () => {
     second.close();
   });
 
+  it("migrates a seeded v1 database to v2 without losing rows", async () => {
+    // Seed the v1 schema exactly as the previous release created it.
+    const legacy = await openDB("agentic-odi-studio", 1, {
+      upgrade(database) {
+        database.createObjectStore("meta", { keyPath: "key" });
+        const jobs = database.createObjectStore("jobs", { keyPath: "id" });
+        jobs.createIndex("by-seq", "seq");
+        const steps = database.createObjectStore("steps", { keyPath: "id" });
+        steps.createIndex("by-job", "job_id");
+        steps.createIndex("by-seq", "seq");
+        const outcomes = database.createObjectStore("outcomes", { keyPath: "id" });
+        outcomes.createIndex("by-job", "job_id");
+        outcomes.createIndex("by-seq", "seq");
+        const observations = database.createObjectStore("observations", {
+          keyPath: "id",
+        });
+        observations.createIndex("by-created", "created_at");
+        const conversations = database.createObjectStore("conversations", {
+          keyPath: "id",
+        });
+        conversations.createIndex("by-updated", "updated_at");
+        const turns = database.createObjectStore("turns", {
+          keyPath: "id",
+          autoIncrement: true,
+        });
+        turns.createIndex("by-conversation", "conversation_id");
+      },
+    });
+    await legacy.put("jobs", {
+      id: "j-1",
+      name: "Legacy Job",
+      description: "",
+      seq: 1,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    });
+    legacy.close();
+
+    const store = await makeStore();
+    const jobs = await store.listJobs();
+    expect(jobs.map((job) => job.name)).toEqual(["Legacy Job"]);
+    // The v2 outbox store exists and is empty.
+    expect(await store.listOutbox()).toEqual([]);
+    store.close();
+  });
   it("counts the turns a conversation holds", async () => {
     const store = await makeStore();
     await store.putConversation(conversation("c-1", "2026-01-01T00:00:00Z"));
