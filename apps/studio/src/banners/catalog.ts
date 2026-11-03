@@ -29,7 +29,7 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     life: "persistent",
     dock: "top",
     title: "Working by hand.",
-    body: "No model is reachable, so the assistant is paused. Every change still writes to your ODI repository.",
+    body: "No model is reachable, so the assistant answers from your board instead of reasoning over it. Everything you capture is still saved.",
     dismissible: false,
     actions: [
       { label: "Capture an outcome", action: "open-capture", tone: "ghost" },

@@ -19,7 +19,7 @@ def _source() -> str:
 
 def test_sidecar_not_configured_emits_the_studio_error_shape() -> None:
     source = _source()
-    assert 'code: "mcp_unreachable"' in source
+    assert 'code: "sidecar_unavailable"' in source
     assert 'message: "The studio sidecar isn\'t configured."' in source
     assert "Set SIDECAR_URL and redeploy." in source
     assert "retryable: false" in source
@@ -45,3 +45,15 @@ def test_a_dead_sidecar_still_returns_502() -> None:
     # Both Worker-originated failures keep the 502 the SPA already treats as
     # "downstream unreachable".
     assert source.count("{ status: 502 }") == 1
+
+
+def test_the_worker_never_borrows_the_sidecars_mcp_code() -> None:
+    source = _source()
+    # `mcp_unreachable` means "a sidecar answered and could not reach the MCP
+    # server", which the SPA must report rather than swallow. The Worker sent it
+    # for its own "no sidecar here" answer, and because the SPA reads a
+    # structured body as proof the studio spoke, every hosted request looked like
+    # a refusal and never fell back to the browser store. A sidecar's own
+    # `mcp_unreachable` still passes through untouched — it is the Worker
+    # answering for itself that must use the other code.
+    assert 'code: "mcp_unreachable"' not in source

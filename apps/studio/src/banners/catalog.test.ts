@@ -44,6 +44,24 @@ describe("BANNER_CATALOG", () => {
     expect(entry.dismissible).toBe(false);
   });
 
+  /**
+   * A banner is raised in front of a person who may be standing in a hosted
+   * studio with no sidecar at all, so naming a repository names something the
+   * browser cannot keep. What they capture *is* saved — in the repository when
+   * there is one, in the browser when there isn't — which is why the copy
+   * promises a saving and not a destination. (#326 is the work that names the
+   * store instead of leaving it implied.)
+   */
+  it("promises no repository a browser-only studio does not have", () => {
+    for (const kind of ["model-offline", "sidecar-down"] as const) {
+      expect(BANNER_CATALOG[kind].body, kind).not.toMatch(/repository|\bODI\b/i);
+    }
+  });
+
+  it("says the assistant still answers from the board when no model is reachable", () => {
+    expect(BANNER_CATALOG["model-offline"].body).toMatch(/answers from your board/i);
+  });
+
   it("keeps the toast kinds transient and in the corner", () => {
     for (const kind of ["info", "success", "error"] as const) {
       expect(BANNER_CATALOG[kind].life).toBe("transient");

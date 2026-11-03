@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { asStudioError } from "../../api/studioApi";
 import { HELP_TEXT, type StudioCommand } from "../../lib/commands";
 import {
   QUESTION_COUNT,
@@ -346,16 +347,24 @@ export function SetupConversation() {
     const jobName = context.job_statement || context.product_name;
     const description = [context.target_user, context.core_problem].filter(Boolean).join(" — ");
     let jobId = brief?.job_id ?? canvas?.jobs.find((job) => job.name === jobName)?.id ?? null;
+    // Keeping what the person typed matters more than the row it should have
+    // produced, so a failed job write never costs them their context. It does
+    // have to be said out loud: a clean-save toast here leaves them reading a
+    // board with no job and a message that promised one.
+    let jobProblem: string | null = null;
     if (jobName) {
       if (jobId) {
-        await updateJob(jobId, { name: jobName, description: description || undefined });
+        try {
+          await updateJob(jobId, { name: jobName, description: description || undefined });
+        } catch (error) {
+          jobProblem = `the job wasn't renamed — ${asStudioError(error).message}`;
+        }
       } else {
-        // A job that could not be created must not cost the user their
-        // context: the setup continues without a job id.
         try {
           jobId = await createJob({ name: jobName, description: description || undefined });
-        } catch {
+        } catch (error) {
           jobId = null;
+          jobProblem = `the job wasn't created — ${asStudioError(error).message}`;
         }
       }
     } else {
@@ -367,10 +376,12 @@ export function SetupConversation() {
       clearChat();
     }
     pushToast(
-      "success",
-      editing
-        ? "Context updated — I will use it from here."
-        : "Context saved. Every reply now starts from your job.",
+      jobProblem ? "error" : "success",
+      jobProblem
+        ? `Context kept — ${jobProblem}. Add the job on the board and every reply will use it.`
+        : editing
+          ? "Context updated — I will use it from here."
+          : "Context saved. Every reply now starts from your job.",
     );
   }
 

@@ -15,6 +15,12 @@
  * a recoverable, actionable failure instead of a blank page or a legacy
  * `{"detail": ...}` blob. The browser BFF then serves canvas data, memory,
  * conversations, and the deterministic assistant from IndexedDB.
+ *
+ * Those 502s carry `code: "sidecar_unavailable"`, never `mcp_unreachable`. The
+ * SPA reads a structured body as "the studio answered and refused", so the two
+ * codes are the only thing that separates a sidecar that heard the request and
+ * rejected it from one that was never there — and only the second case belongs
+ * to the browser store.
  */
 
 interface Env {
@@ -242,7 +248,7 @@ export default {
       return secure(
         sidecarError(
           {
-            code: "mcp_unreachable",
+            code: "sidecar_unavailable",
             message: "The studio sidecar isn't configured.",
             suggestion: "Set SIDECAR_URL and redeploy.",
             retryable: false,
@@ -285,7 +291,7 @@ export default {
       return secure(
         sidecarError(
           {
-            code: "mcp_unreachable",
+            code: "sidecar_unavailable",
             message: "The studio sidecar isn't reachable.",
             suggestion: "Start the sidecar locally (python scripts/dev.py), then try again.",
             retryable: true,

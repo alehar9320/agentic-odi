@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { asStudioError } from "../../api/studioApi";
 import { HELP_TEXT, type StudioCommand } from "../../lib/commands";
 import {
   INTRO_TURNS,
@@ -376,19 +377,23 @@ export function IntroConversation() {
       .filter(Boolean)
       .join(" — ");
     let jobId = brief?.job_id ?? canvas?.jobs.find((job) => job.name === jobName)?.id ?? null;
+    // Keeping what the person typed matters more than the row it should have
+    // produced, so a failed job write never costs them their context. It does
+    // have to be said out loud: a clean-save toast here leaves them reading a
+    // board with no job and a message that promised one.
+    let jobProblem: string | null = null;
     if (jobName && jobId) {
-      // A job write that fails must not cost the person their context: the
-      // brief is saved either way.
       try {
         await updateJob(jobId, { name: jobName, description: description || undefined });
-      } catch {
-        /* keep the existing job id */
+      } catch (error) {
+        jobProblem = `the job wasn't renamed — ${asStudioError(error).message}`;
       }
     } else if (jobName) {
       try {
         jobId = await createJob({ name: jobName, description: description || undefined });
-      } catch {
+      } catch (error) {
         jobId = null;
+        jobProblem = `the job wasn't created — ${asStudioError(error).message}`;
       }
     } else {
       jobId = null;
@@ -400,10 +405,12 @@ export function IntroConversation() {
       clearChat();
     }
     pushToast(
-      "success",
-      editing
-        ? "Context updated — I will use it from here."
-        : "Context saved. Every reply now starts from what you told me.",
+      jobProblem ? "error" : "success",
+      jobProblem
+        ? `Context kept — ${jobProblem}. Add the job on the board and every reply will use it.`
+        : editing
+          ? "Context updated — I will use it from here."
+          : "Context saved. Every reply now starts from what you told me.",
     );
   }
 
