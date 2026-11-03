@@ -42,6 +42,7 @@ import {
   fetchUnreadSignalCount,
   healthLlm,
   healthMcp,
+  listConversations as apiListConversations,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
@@ -72,6 +73,7 @@ import type {
   ConnectorListItem,
   ConnectorPreset,
   ConnectorSuggestion,
+  ConversationSummary,
   CustomizeTarget,
   MarketplaceListing,
   MarketplaceSearch,
@@ -328,6 +330,12 @@ export interface StudioContextValue {
   stopStreaming: () => void;
   clearChat: () => void;
   conversationId: string | null;
+  /** The recent threads, newest first, as the history list shows them. */
+  conversations: ConversationSummary[];
+  /** Re-read the history list; called when it opens and after a turn persists. */
+  refreshConversations: () => Promise<void>;
+  /** Open a past thread by loading its turns; never a conversation without them. */
+  openConversation: (conversationId: string) => Promise<void>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -576,6 +584,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -1316,6 +1325,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Re-read the history list: the switcher's rows, newest first.
+   *
+   * Declared before `runTurn` so a turn that creates or titles a thread can
+   * refresh the list it is about to join.
+   */
+  const refreshConversations = useCallback(async () => {
+    try {
+      setConversations(await apiListConversations());
+    } catch {
+      /* history is a convenience; the current thread keeps working without it */
+    }
+  }, []);
+
+  /**
    * One turn, from the user's words to the agent's last part.
    *
    * `base` is the visible path the turn answers, so the same machinery serves a
@@ -1587,6 +1610,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             const id = String(event.data.id ?? "");
             if (id) {
               setConversationId(id);
+              // The thread was just created or titled: the history list would
+              // otherwise show yesterday's answer until a reload.
+              void refreshConversations();
             }
             break;
           }
@@ -1703,6 +1729,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversationId,
       refreshCanvas,
       refreshConnectors,
+      refreshConversations,
       cancelScheduledProbes,
     ],
   );
@@ -1885,6 +1912,25 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, [pushToast]);
 
+  const openConversation = useCallback(
+    async (targetId: string) => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setStreaming(false);
+      setThinkingPhase(null);
+      setOfflineReplyFor(null);
+      setToolActivity([]);
+      // The tree, not the flat turn list: a thread with branches must open on
+      // the branch that was visible when it was left. A conversation is never
+      // opened without its turns.
+      const tree = await fetchConversationTree(targetId);
+      setConversationId(targetId);
+      setMessages(turnsToMessages(tree.messages, tree.head_id));
+      void refreshConversations();
+    },
+    [refreshConversations],
+  );
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -1922,6 +1968,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       await Promise.resolve();
       void refreshCanvas();
       void refreshMemory();
+      void refreshConversations();
       const { conversation } = await fetchLatestConversation();
       if (cancelled || !conversation) {
         return;
@@ -2117,6 +2164,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       stopStreaming,
       clearChat,
       conversationId,
+      conversations,
+      refreshConversations,
+      openConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2232,6 +2282,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       stopStreaming,
       clearChat,
       conversationId,
+      conversations,
+      refreshConversations,
+      openConversation,
       memory,
       memoryLoading,
       refreshMemory,

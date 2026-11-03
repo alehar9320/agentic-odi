@@ -34,15 +34,18 @@ jobs:
         run: uv run --directory website pytest tests/
 
       # Fail fast if any critical source file is missing before we build.
-      # A deleted website/index.html or build script must never let a
-      # broken site reach GitHub Pages.
+      # These are the inputs build_site.py renders the landing page from; the
+      # generated website/index.html is no longer committed, so the built-site
+      # check below is what guards the output.
       - name: Verify critical source files exist
         run: |
           for f in \
             .github/workflows/pages.yml \
             website/tools/build_site.py \
-            website/index.html \
-            website/tests/test_pages_deploy.py; do
+            website/tests/test_pages_deploy.py \
+            website/templates/landing.html \
+            website/templates/base.html \
+            website/content/landing.json; do
             [ -s "$f" ] || { echo "::error::Missing or empty critical file: $f"; exit 1; }
           done
           echo "OK: critical source files present"
