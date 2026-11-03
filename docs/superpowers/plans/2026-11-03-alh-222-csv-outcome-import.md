@@ -262,10 +262,10 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
 
 **Interfaces:**
 - Consumes: Task 1/2 core names; `router_module.call_mcp_tool`, `_uses_mcp`, `_service`, `_as_http_error`; `StudioErrorCode.MCP_TOOL_FAILED` / `MCP_UNREACHABLE`.
-- Produces: multipart route `POST /api/outcomes/import` with fields `file` (`UploadFile`), `job_id`, `dry_run` (default `False`), `mcp_url` (default `""`), returning `dict[str, Any]` — the report's `as_dict()` — exactly as `/outcomes/bulk` returns its report.
+- Produces: multipart route `POST /api/outcomes/import` with fields `file` (bytes), `job_id`, `dry_run` (default `False`), `mcp_url` (default `""`), returning `dict[str, Any]` — the report's `as_dict()` — exactly as `/outcomes/bulk` returns its report.
 
-- [ ] **Step 1: declare the dependency** in `apps/studio-api/pyproject.toml` under `[project] dependencies`, then `uv lock` and commit the lock hunk with the task; nothing else in the lock changes because `python-multipart` already resolves there.
-- [ ] **Step 2: write the failing tests** with `TestClient(create_app(InMemoryRepository(), backend="local"))` and the fixture read as bytes:
+- [x] **Step 1: declare the dependency** in `apps/studio-api/pyproject.toml` under `[project] dependencies`, then `uv lock` and commit the lock hunk with the task; nothing else in the lock changes because `python-multipart` already resolves there.
+- [x] **Step 2: write the failing tests** with `TestClient(create_app(InMemoryRepository(), backend="local"))` and the fixture read as bytes:
 
   ```python
   files = {"file": ("outcomes.csv", FIXTURE.read_bytes(), "text/csv")}
@@ -281,10 +281,10 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
   - `test_the_mcp_branch_drives_the_existing_tools` — `monkeypatch.setattr(router_module, "call_mcp_tool", _call)` collecting `(tool, arguments)`: only `add_outcome` and `assign_theme` appear, `assign_theme` is called once per matched theme with a list of ids, and every scored `add_outcome` call carries `manual_claim_check()`.
   - `test_a_tool_refusal_is_a_row_refusal` — the fake raises `StudioHTTPError(StudioError(code=MCP_TOOL_FAILED, message="…"))` for one row: that row is refused, the run continues.
   - `test_an_unreachable_server_aborts_the_run` — the fake raises `StudioHTTPError(... MCP_UNREACHABLE ...)` at row 20: earlier rows stay in `created`, `aborted` names line 20, and `refused` does not contain 20 invented entries.
-- [ ] **Step 3: `uv run pytest apps/studio-api/tests/test_outcome_import_router.py -q`** → fails (404, no route).
-- [ ] **Step 4: implement the route.** Parse bytes with `parse_outcome_table(await file.read())`. `_uses_mcp(request)` selects an `McpImportTarget` (an inner class over `call_mcp_tool` for the five `ImportTarget` methods, translating `MCP_TOOL_FAILED` into `OdiError` so the loop refuses the row and `MCP_UNREACHABLE` into `ImportAbortedError` so the loop stops); otherwise `ServiceImportTarget(_service(request))`. Wrap the whole call in the router's existing `except Exception as exc: raise _as_http_error(exc) from exc` so an unknown job still becomes the 404 the other routes give.
-- [ ] **Step 5: re-run the file's tests** → pass; then `uv run pytest apps/studio-api/tests -q` for regressions in the router suite.
-- [ ] **Step 6: full gates**, then commit `feat(studio-api): upload a CSV of outcomes (ALH-222)`.
+- [x] **Step 3: `uv run pytest apps/studio-api/tests/test_outcome_import_router.py -q`** → fails (404, no route).
+- [x] **Step 4: implement the route.** The handler is a plain `def`, not `async def`, and takes `file: bytes = File(...)` so Starlette runs it in the threadpool — that is what makes `asyncio.run(call_mcp_tool(...))` legal inside `McpImportTarget`, the same bridge `apps/cli/backend.py` and `studio/connectors.py` use. `_uses_mcp(request)` selects `McpImportTarget` (module-level, not an inner class, because `monkeypatch.setattr(router_module, "call_mcp_tool", …)` must rebind the name the target looks up, and `tests/test_architecture.py` registers core modules only); its failure translation is by code, not by a fixed pair: `MCP_UNREACHABLE`/`LLM_UNREACHABLE` or any retryable `StudioError` becomes `ImportAbortedError` so the loop keeps the rows it wrote, anything else becomes `OdiError` so the loop refuses that row and continues. The other branch checks `_service(request).get_job(job_id) is None` first. Both branches raise `JobNotFoundError` before the loop — an unknown job is a mistake about the request, and answers 404 with no report; over MCP that check is a `get_job` call. `except StudioHTTPError: raise` precedes the router's existing `except Exception as exc: raise _as_http_error(exc) from exc`, so `_require_mcp_url`'s own 400 is never re-mapped to a 500.
+- [x] **Step 5: re-run the file's tests** → pass; then `uv run pytest apps/studio-api/tests -q` for regressions in the router suite.
+- [x] **Step 6: full gates**, then commit `feat(studio-api): upload a CSV of outcomes (ALH-222)`.
 
 ## Task 6: regenerate the OpenAPI artifacts
 
