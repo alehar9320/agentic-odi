@@ -48,6 +48,13 @@ def _bulk(client: TestClient, **body: Any) -> dict[str, Any]:
     return response.json()
 
 
+def _stored(repo: InMemoryRepository, outcome_id: str) -> Outcome:
+    """Read one outcome back, as a whole object the assertions can walk into."""
+    stored = repo.get_outcome(outcome_id)
+    assert stored is not None
+    return stored
+
+
 # --- the preview --------------------------------------------------------------
 
 
@@ -63,7 +70,7 @@ def test_a_dry_run_answers_with_the_table_and_writes_nothing() -> None:
     assert report["changes"] == [
         {"outcome_id": "o-1", "field": "step_id", "from": None, "to": "s-locate"}
     ]
-    assert repo.get_outcome("o-1").step_id is None
+    assert _stored(repo, "o-1").step_id is None
     assert repo.bulk_operations == {}
 
 
@@ -78,7 +85,7 @@ def test_a_preview_and_the_write_it_describes_name_the_same_rows() -> None:
 
     assert (applied["changes"], applied["skipped"]) == (preview["changes"], preview["skipped"])
     assert applied["undo_token"] is not None
-    assert repo.get_outcome("o-2").tags == ["churn"]
+    assert _stored(repo, "o-2").tags == ["churn"]
 
 
 # --- the rows that do not move ------------------------------------------------
@@ -139,7 +146,7 @@ def test_a_theme_both_added_and_removed_is_refused_and_writes_nothing() -> None:
 
     assert response.status_code == 400
     assert "both added and removed" in response.json()["error"]["message"]
-    assert repo.get_outcome("o-1").theme_ids == []
+    assert _stored(repo, "o-1").theme_ids == []
 
 
 def test_a_change_that_names_nothing_to_change_is_refused() -> None:
@@ -171,7 +178,7 @@ def test_a_narrowing_widens_the_run_to_every_match_it_named() -> None:
     #: stays out of the run rather than being swept in by the widening.
     assert report["requested"] == 2
     assert sorted(report["changed"]) == ["o-1", "o-2"]
-    assert repo.get_outcome("o-3").theme_ids == []
+    assert _stored(repo, "o-3").theme_ids == []
 
 
 # --- the mcp backend takes the same arguments ---------------------------------
@@ -265,8 +272,8 @@ def test_undo_restores_what_the_run_wrote() -> None:
     undone = _undo(client, token)
 
     assert sorted(undone["changed"]) == ["o-1", "o-2"]
-    assert repo.get_outcome("o-1").theme_ids == []
-    assert repo.get_outcome("o-2").theme_ids == []
+    assert _stored(repo, "o-1").theme_ids == []
+    assert _stored(repo, "o-2").theme_ids == []
 
 
 def test_undoing_the_same_token_twice_is_refused() -> None:
@@ -292,7 +299,7 @@ def test_a_newer_run_expires_the_older_token_without_touching_either_answer() ->
     assert response.status_code == 400
     assert f"{second} wrote after it" in response.json()["error"]["message"]
     #: The refusal is not a partial restore: the second run's tag is still on the row.
-    assert repo.get_outcome("o-1").tags == ["pricing"]
+    assert _stored(repo, "o-1").tags == ["pricing"]
 
 
 def test_a_row_someone_answered_after_the_run_is_left_alone_and_named() -> None:
@@ -305,7 +312,7 @@ def test_a_row_someone_answered_after_the_run_is_left_alone_and_named() -> None:
 
     assert undone["changed"] == ["o-1"]
     assert undone["skipped"] == [{"id": "o-2", "reason": "changed since the bulk update"}]
-    assert repo.get_outcome("o-2").tags == ["hand-edited"]
+    assert _stored(repo, "o-2").tags == ["hand-edited"]
 
 
 def test_an_unknown_token_is_refused_with_the_service_sentence() -> None:
