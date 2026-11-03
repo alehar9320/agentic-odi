@@ -772,7 +772,7 @@ def open_study(job_id: str, name: str, wave: int, method_notes: str | None = Non
     except JobNotFoundError:
         return job_not_found(job_id)
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps(study.model_dump(mode="json"))
 
 
