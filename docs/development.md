@@ -388,6 +388,8 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
 | `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
 | `apps/studio/src/assistant/starterCopy.test.ts` | The first-run starter lint: situation-first titles, material-first prompts, a promised artifact, no quality adjectives, no claim literal, and the untouched returning-user swaps |
+| `apps/studio/src/lib/sampleLoop.test.ts`, `src/components/chat/SampleLoopStrip.test.tsx` | The empty stage's worked example (#318): the score is computed with the client's formula, the segment follows the shared threshold, all three gaps are named, nothing counts or stores, Start with my own focuses the composer and sends nothing, and Hide survives a reload |
+| `apps/studio/e2e/sample-loop.spec.ts` | Playwright: the labelled finished loop is visible before any interaction, the hand-off writes nothing, and Hide survives a reload |
 | `apps/studio/src/components/chat/SuggestionPills.test.tsx` | A starter click sends its exported prompt verbatim, and the starters stay disabled while a reply streams |
 | `apps/studio-api/tests/test_studio_models.py` | Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, `/api/models` response shape |
 | `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, branch switching, approval answers |
