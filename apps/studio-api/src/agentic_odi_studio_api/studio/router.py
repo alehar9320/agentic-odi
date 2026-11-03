@@ -1109,7 +1109,11 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
 
 @router.get("/conversations", response_model=ConversationListResponse)
 def list_conversations(request: Request) -> ConversationListResponse:
-    """The history a switcher lists: every thread, most recent touch first."""
+    """The history a switcher lists: at most 20 threads, most recent touch first.
+
+    Titles come from the first question, so the list names each thread without
+    carrying a single turn body.
+    """
     conversations = _memory(request).list_conversations()
     return ConversationListResponse(
         conversations=[conversation.to_dict() for conversation in conversations]
