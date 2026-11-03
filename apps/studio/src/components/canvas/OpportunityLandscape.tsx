@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { asStudioError, fetchOutcomeSearch, fetchThemes } from "../../api/studioApi";
+import {
+  applyBulkOutcomes,
+  asStudioError,
+  fetchOutcomeSearch,
+  fetchThemes,
+  previewBulkOutcomes,
+  undoBulkOutcomes,
+  type BulkRequest,
+} from "../../api/studioApi";
 import { JOB_STAGES } from "../../domain/jobStages";
 import {
   canvasHasRecords,
@@ -14,9 +22,18 @@ import {
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome, OutcomeSearch, StudioError, Theme } from "../../types";
+import type {
+  BulkNarrowing,
+  BulkReport,
+  Outcome,
+  OutcomeSearch,
+  StudioError,
+  Theme,
+} from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
+import { BulkChangeBar, type BulkDraft } from "./BulkChangeBar";
+import { BulkChangeDialog } from "./BulkChangeDialog";
 import { OutcomeCard } from "./OutcomeCard";
 
 type ViewMode = "matrix" | "cards" | "table";
@@ -46,6 +63,8 @@ interface Narrowing {
 type SearchStatus = "loading" | "ready" | "error";
 
 const BLANK_NARROWING: Narrowing = {};
+
+const BLANK_BULK_DRAFT: BulkDraft = { addThemeIds: [], removeThemeIds: [], addTags: [] };
 
 function isNarrowing(query: Narrowing): boolean {
   return Boolean(
@@ -305,6 +324,122 @@ export function OpportunityLandscape() {
     setSelectedOutcomeId(next);
     if (next) {
       focusSubject("outcome", next);
+    }
+  }
+
+  /**
+   * The checked rows, in the order they were checked. Selection is its own
+   * interaction: it never moves focus or opens the detail panel, so ticking ten
+   * rows is ten clicks and not twenty changes on the screen.
+   */
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  const [bulkDraft, setBulkDraft] = useState<BulkDraft>(BLANK_BULK_DRAFT);
+  const [bulkReport, setBulkReport] = useState<BulkReport | null>(null);
+  const [bulkMode, setBulkMode] = useState<"preview" | "applied">("preview");
+  const [bulkError, setBulkError] = useState<StudioError | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  /** The run the table counted, so Apply writes exactly the set it described. */
+  const bulkRun = useRef<BulkRequest | null>(null);
+
+  function toggleChecked(id: string) {
+    setCheckedIds((current) =>
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
+    );
+  }
+
+  function clearSelection() {
+    setCheckedIds([]);
+    setBulkReport(null);
+    setBulkError(null);
+    bulkRun.current = null;
+  }
+
+  /** The board's own narrowing, in the names the search route answers to. */
+  function bulkQuery(): BulkNarrowing | undefined {
+    if (!narrowed) {
+      return undefined;
+    }
+    return {
+      text: narrowing.text,
+      stage: narrowing.stage,
+      theme_ids: narrowing.themeIds,
+      confidence: narrowing.confidence,
+      min_score: narrowing.minScore,
+      max_score: narrowing.maxScore,
+    };
+  }
+
+  function askPreview(widen: boolean) {
+    const run: BulkRequest = {
+      mcpUrl: settings.mcp_url,
+      outcomeIds: checkedIds,
+      stage: bulkDraft.stage,
+      addThemeIds: bulkDraft.addThemeIds,
+      removeThemeIds: bulkDraft.removeThemeIds,
+      addTags: bulkDraft.addTags,
+      query: widen ? bulkQuery() : undefined,
+    };
+    bulkRun.current = run;
+    setBulkBusy(true);
+    setBulkError(null);
+    previewBulkOutcomes(run)
+      .then((report) => {
+        setBulkReport(report);
+        setBulkMode("preview");
+      })
+      .catch((error: unknown) => setBulkError(asStudioError(error)))
+      .finally(() => setBulkBusy(false));
+  }
+
+  function writeRun() {
+    const run = bulkRun.current;
+    if (!run) {
+      return;
+    }
+    setBulkBusy(true);
+    setBulkError(null);
+    applyBulkOutcomes(run)
+      .then((report) => {
+        setBulkReport(report);
+        setBulkMode("applied");
+        // The store holds the truth about these rows, so it is asked again.
+        void refreshCanvas();
+      })
+      .catch((error: unknown) => setBulkError(asStudioError(error)))
+      .finally(() => setBulkBusy(false));
+  }
+
+  /**
+   * An undo that failed — an expired token, usually — is shown and then the canvas
+   * is re-read. Nothing here rolls a row back by hand: the store kept what the run
+   * wrote, and the screen has to agree with it rather than with the attempt.
+   */
+  function undoRun() {
+    const token = bulkReport?.undo_token;
+    if (!token) {
+      return;
+    }
+    setBulkBusy(true);
+    setBulkError(null);
+    undoBulkOutcomes(settings.mcp_url, token)
+      .then(() => {
+        clearSelection();
+        setBulkDraft(BLANK_BULK_DRAFT);
+        void refreshCanvas();
+      })
+      .catch((error: unknown) => {
+        setBulkError(asStudioError(error));
+        void refreshCanvas();
+      })
+      .finally(() => setBulkBusy(false));
+  }
+
+  function closeDialog() {
+    setBulkReport(null);
+    setBulkError(null);
+    // A run that landed is finished: its rows are no longer pending anything.
+    if (bulkMode === "applied") {
+      setCheckedIds([]);
     }
   }
 
@@ -599,6 +734,28 @@ export function OpportunityLandscape() {
         </div>
       )}
 
+      {canNarrow && checkedIds.length ? (
+        <BulkChangeBar
+          selectedCount={checkedIds.length}
+          matchingTotal={result?.total ?? rows.length}
+          themes={themes}
+          draft={bulkDraft}
+          busy={bulkBusy}
+          onClear={clearSelection}
+          onDraftChange={setBulkDraft}
+          onPreviewSelected={() => askPreview(false)}
+          onPreviewAll={() => askPreview(true)}
+        />
+      ) : null}
+
+      {/* A refusal that arrived with no table open still has to be read, and the
+          selection that caused it stays standing so it can be fixed and retried. */}
+      {bulkError && !bulkReport ? (
+        <p className="studio-bulk-error" role="alert">
+          {bulkError.message}
+        </p>
+      ) : null}
+
       {canvasState.kind === "error" ? null : isLoading && !hasRecords ? (
         <GhostOpportunityCards />
       ) : isEmpty ? (
@@ -625,7 +782,14 @@ export function OpportunityLandscape() {
           </p>
         </div>
       ) : viewMode === "matrix" ? (
-        <OpportunityMatrixView
+        <>
+          {canNarrow ? (
+            <p className="caption" style={{ marginBottom: 8 }}>
+              The map plots positions, not rows — tick outcomes on the cards or the table to
+              organise several at once.
+            </p>
+          ) : null}
+          <OpportunityMatrixView
           outcomes={rows}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
@@ -633,16 +797,25 @@ export function OpportunityLandscape() {
           activeOutcome={activeOutcome}
           sample={sample}
         />
+        </>
       ) : viewMode === "table" ? (
         <OpportunityTableView
           outcomes={rows}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
+          checkedIds={canNarrow ? checkedIds : []}
+          onToggleChecked={canNarrow ? toggleChecked : undefined}
         />
       ) : rows.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {rows.map((outcome, index) => (
-            <OutcomeCard outcome={outcome} sample={sample} key={outcome.id ?? index} />
+            <OutcomeCard
+              outcome={outcome}
+              sample={sample}
+              key={outcome.id ?? index}
+              checked={Boolean(outcome.id) && checkedIds.includes(outcome.id ?? "")}
+              onToggleChecked={canNarrow && outcome.id ? toggleChecked : undefined}
+            />
           ))}
         </div>
       ) : (
@@ -687,6 +860,19 @@ export function OpportunityLandscape() {
           </div>
         </section>
       )}
+      {bulkReport ? (
+        <BulkChangeDialog
+          report={bulkReport}
+          mode={bulkMode}
+          error={bulkError}
+          themes={themes}
+          steps={canvas?.steps ?? []}
+          busy={bulkBusy}
+          onApply={writeRun}
+          onUndo={undoRun}
+          onClose={closeDialog}
+        />
+      ) : null}
     </section>
   );
 }
@@ -1108,10 +1294,15 @@ function OpportunityTableView({
   outcomes,
   selectedOutcomeId,
   onSelectOutcome,
+  checkedIds,
+  onToggleChecked,
 }: {
   outcomes: Outcome[];
   selectedOutcomeId: string | null;
   onSelectOutcome: (id: string) => void;
+  checkedIds: string[];
+  /** Absent when there is no store to write to, which is when there is no checkbox. */
+  onToggleChecked?: (id: string) => void;
 }) {
   return (
     <div style={{ overflowX: "auto", border: "1px solid var(--studio-border)", borderRadius: 12 }}>
@@ -1131,6 +1322,7 @@ function OpportunityTableView({
             const opp = outcome.opportunity_score ?? 0;
             const underserved = isUnderserved(opp);
             const isSelected = selectedOutcomeId === outcome.id;
+            const rowId = outcome.id;
 
             return (
               <tr
@@ -1156,7 +1348,30 @@ function OpportunityTableView({
                   transition: "background 0.15s ease",
                 }}
               >
-                <td style={{ padding: "10px 14px", fontWeight: 700, color: "var(--studio-indigo)" }}>
+                <td
+                  style={{
+                    padding: "10px 14px",
+                    fontWeight: 700,
+                    color: "var(--studio-indigo)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {onToggleChecked && rowId ? (
+                    <input
+                      type="checkbox"
+                      className="studio-bulk-check"
+                      checked={checkedIds.includes(rowId)}
+                      aria-label={`Select ${rowId} for a bulk change`}
+                      // Ticking a row is not a request to inspect it.
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.stopPropagation();
+                        }
+                      }}
+                      onChange={() => onToggleChecked(rowId)}
+                    />
+                  ) : null}
                   {outcome.id}
                 </td>
                 <td style={{ padding: "10px 14px", color: "var(--studio-text)" }}>

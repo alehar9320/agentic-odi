@@ -6368,3 +6368,197 @@ details[open] summary {
   font-size: 0.8rem;
   color: var(--amber);
 }
+
+/* ALH-197 (M2-03.2) — the bulk run: the docked change bar and its table. */
+
+.card__check,
+.studio-bulk-check {
+  width: 15px;
+  height: 15px;
+  margin: 0 8px 0 0;
+  accent-color: var(--studio-indigo);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.studio-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+}
+
+.studio-bulk-bar__count {
+  margin: 0;
+  align-self: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--studio-indigo);
+}
+
+.studio-bulk-bar__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--studio-muted);
+}
+
+.studio-bulk-bar__field .studio-input {
+  min-width: 150px;
+}
+
+.studio-bulk-bar__pills {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+}
+
+.studio-bulk-bar__pills li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.studio-bulk-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.studio-bulk-error {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: var(--studio-amber);
+  font-size: 0.85rem;
+}
+
+.studio-bulk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 13, 19, 0.75);
+  backdrop-filter: blur(12px);
+  padding: 20px;
+}
+
+.studio-bulk-scrim {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.studio-bulk-modal {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(145deg, rgba(26, 32, 48, 0.95), rgba(15, 20, 32, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  overflow: hidden;
+}
+
+.studio-bulk-modal__header {
+  padding: 20px 24px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--studio-border);
+}
+
+.studio-bulk-modal__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.studio-bulk-modal__subtitle {
+  margin: 18px 0 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--studio-muted);
+}
+
+.studio-bulk-modal__close {
+  background: transparent;
+  border: 0;
+  color: var(--studio-muted);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.studio-bulk-modal__body {
+  padding: 16px 24px;
+  overflow-y: auto;
+}
+
+.studio-bulk-modal__error {
+  margin: 12px 24px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: var(--studio-amber);
+  font-size: 0.85rem;
+}
+
+.studio-bulk-modal__skipped {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--studio-muted);
+}
+
+.studio-bulk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  text-align: left;
+}
+
+.studio-bulk-table th,
+.studio-bulk-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--studio-border);
+  vertical-align: top;
+}
+
+.studio-bulk-table th {
+  color: var(--studio-muted);
+  font-weight: 600;
+}
+
+.studio-bulk-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--studio-border);
+}
