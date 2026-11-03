@@ -402,11 +402,13 @@ def _persist_turn(
     message_id: str | None = None,
     parent_id: str | None = None,
     claims: list[Claim] | None = None,
+    request_id: str = "",
 ) -> int | None:
     """Record a turn and its claims, tolerating a duplicate retry.
 
     A retry that reuses a message id rewrites the same citation rows instead of
-    stacking new ones. A failure to remember never breaks the reply.
+    stacking new ones. A failure to remember never breaks the reply, but it is
+    logged: a turn the store lost is otherwise invisible.
     """
     if memory is None or conversation_id is None or not content.strip():
         return None
@@ -426,7 +428,15 @@ def _persist_turn(
         if claims:
             memory.add_citations(turn_id, claims)
         return turn_id
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # Deliberate degradation: the person keeps the reply they already read,
+        # and the request id here is what makes the missing turn findable.
+        log.warning(
+            "turn was not persisted (request_id=%s, role=%s, error=%s)",
+            request_id,
+            role,
+            type(exc).__name__,
+        )
         return None
 
 
@@ -546,7 +556,15 @@ async def _turn_frames(
         if conversation is None:
             conversation = memory.create_conversation()
         conversation_id = conversation.id
-        _persist_turn(memory, conversation_id, "user", last_user, user_message_id, user_parent_id)
+        _persist_turn(
+            memory,
+            conversation_id,
+            "user",
+            last_user,
+            user_message_id,
+            user_parent_id,
+            request_id=request_id,
+        )
         updated = memory.get_conversation(conversation_id) or conversation
         yield frame("conversation", {"id": updated.id, "title": updated.title})
 
@@ -588,6 +606,7 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            request_id=request_id,
         )
         return
 
@@ -621,6 +640,7 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            request_id=request_id,
         )
         return
 
@@ -732,6 +752,7 @@ async def _turn_frames(
                     assistant_message_id,
                     user_message_id,
                     claims,
+                    request_id=request_id,
                 )
                 yield frame("message", _message_payload(final, claims))
                 return
@@ -892,6 +913,7 @@ async def _turn_frames(
             assistant_message_id,
             user_message_id,
             claims,
+            request_id=request_id,
         )
         yield frame("message", _message_payload(content, claims))
 

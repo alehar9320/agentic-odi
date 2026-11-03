@@ -91,6 +91,7 @@ import type {
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
+import { resolveTheme } from "../lib/theme";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
 
 /**
@@ -244,7 +245,6 @@ export const EMPTY_CONFIG: StudioConfig = {
   api_key: "local",
   model_name: "local-tools-model",
   mcp_url: "http://localhost:8000/mcp",
-  theme: "dark",
 };
 
 export type ToastKind = "success" | "error" | "info";
@@ -296,6 +296,14 @@ export interface StudioContextValue {
   refreshModels: (config?: { base_url: string; api_key: string }) => Promise<void>;
   mcpReachable: boolean;
   sidecarReachable: boolean | null;
+  /**
+   * A store that failed its integrity check on boot. When set, the Studio
+   * shows the failure page instead of a half-empty board: the database is the
+   * only copy, so pretending it is empty would be a lie.
+   */
+  bootError: StudioError | null;
+  /** Re-probe after a backup is restored; clears `bootError` on a clean answer. */
+  recheckBoot: () => Promise<void>;
   /** Whether the user has dismissed this session's sidecar-down notice. */
   dismissedSidecarNotice: boolean;
   /** Probe again now, e.g. after the user started the sidecar. */
@@ -540,7 +548,10 @@ function loadTheses(): Thesis[] {
 
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
-  const theme: StudioTheme = settings.theme === "light" ? "light" : "dark";
+  // The stored choice, or the operating system when there is none — the same
+  // resolution the inline bootstrap in index.html runs before React, so the
+  // class it painted and the class the app keeps are the same one.
+  const theme: StudioTheme = resolveTheme(settings.theme);
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   // The context conversation is never a gate. It opens from the stage, from a
@@ -561,6 +572,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
+  const [bootError, setBootError] = useState<StudioError | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -1927,18 +1939,31 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     // Configuration is a convenience, not a gate. It may fill defaults for a
     // browser that has none; a failure is silent, because a hosted studio with no
-    // sidecar configured answers 502 by design and that is not an outage.
+    // sidecar configured answers 502 by design and that is not an outage. A
+    // damaged database is the one exception: the sidecar is up and telling us the
+    // only copy is damaged, so the failure page replaces the shell rather than
+    // letting the board look merely empty.
     fetchConfig()
       .then((defaults) => {
         if (cancelled) {
           return;
         }
         setSidecarReachable(true);
+        setBootError(null);
         if (localStorage.getItem(SETTINGS_KEY) === null) {
           saveSettings(defaults);
         }
       })
-      .catch(() => undefined);
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        const problem = asStudioError(error);
+        if (problem.code === "store_corrupt") {
+          setBootError(problem);
+          setSidecarReachable(true);
+        }
+      });
 
     // Status rows, capabilities, and the connector list are read in Settings and
     // in the tour, not on the stage. Let the first screen settle; give the probes
@@ -2013,6 +2038,42 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const canvasLoading = canvasState.kind === "loading";
   const canvasError = canvasState.kind === "error" ? canvasState.error : null;
 
+  // Re-probe after the person restored a backup: a clean answer clears the boot
+  // page and re-hydrates the studio in place.
+  const recheckBoot = useCallback(async () => {
+    try {
+      const defaults = await fetchConfig();
+      setSidecarReachable(true);
+      setBootError(null);
+      if (localStorage.getItem(SETTINGS_KEY) === null) {
+        saveSettings(defaults);
+      }
+    } catch (error) {
+      const problem = asStudioError(error);
+      if (problem.code === "store_corrupt") {
+        setBootError(problem);
+        setSidecarReachable(true);
+        return;
+      }
+      setSidecarReachable(false);
+      return;
+    }
+    void refreshCapabilities();
+    void refreshCanvas();
+    void refreshConnectors();
+    void refreshPresets();
+    void refreshFeatured();
+    void refreshMemory();
+  }, [
+    saveSettings,
+    refreshCapabilities,
+    refreshCanvas,
+    refreshConnectors,
+    refreshPresets,
+    refreshFeatured,
+    refreshMemory,
+  ]);
+
   const value = useMemo<StudioContextValue>(
     () => ({
       settings,
@@ -2037,6 +2098,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshModels,
       mcpReachable,
       sidecarReachable,
+      bootError,
+      recheckBoot,
       dismissedSidecarNotice,
       dismissSidecarNotice,
       recheckConnections,
@@ -2150,6 +2213,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshModels,
       mcpReachable,
       sidecarReachable,
+      bootError,
+      recheckBoot,
       dismissedSidecarNotice,
       dismissSidecarNotice,
       recheckConnections,

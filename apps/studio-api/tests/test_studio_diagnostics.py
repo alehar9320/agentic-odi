@@ -28,7 +28,7 @@ def test_diagnostics_returns_only_metadata_and_database_basename(monkeypatch, tm
     assert body["db"] == {
         "name": "odi.db",
         "size_bytes": private_path.stat().st_size,
-        "integrity": "unknown",
+        "integrity": "ok",
         "counts": {"jobs": 1, "outcomes": 0, "evidence": 0, "observations": 0},
     }
     assert body["migrations"] == {"events": "current"}
