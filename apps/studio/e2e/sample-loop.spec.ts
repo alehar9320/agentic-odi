@@ -45,6 +45,26 @@ test.describe("the sample loop", () => {
     await expect(page.getByRole("log", { name: "Conversation" })).toHaveCount(0);
   });
 
+  test("stacks its three beats and stays legible at 390px", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 700 });
+    await openStudio(page);
+
+    const strip = page.getByRole("region", { name: "Sample loop, not your data" });
+    await expect(strip).toBeVisible();
+
+    // Every value is still on screen: the band stacks rather than clipping.
+    for (const value of ["Importance 9", "Satisfaction 3", "Opportunity 15"]) {
+      await expect(strip.getByText(value)).toBeVisible();
+    }
+    await expect(strip.getByRole("button", { name: "Start with my own" })).toBeVisible();
+
+    // The three beats are one column, not three.
+    const beats = await strip.locator(".sample-loop__beat").evaluateAll((nodes) =>
+      nodes.map((node) => Math.round(node.getBoundingClientRect().top)),
+    );
+    expect(new Set(beats).size).toBe(beats.length);
+  });
+
   test("hides the sample and survives a reload", async ({ page }) => {
     await openStudio(page);
 
