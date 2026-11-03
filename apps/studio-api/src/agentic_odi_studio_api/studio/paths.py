@@ -11,7 +11,7 @@ import os
 import secrets
 from pathlib import Path
 
-TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"
+TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"  # nosec B105 - env var name, not a secret
 
 
 def token_path() -> Path:

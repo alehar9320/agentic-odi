@@ -7,12 +7,12 @@ import json
 import os
 import signal
 import sys
-import uvicorn
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import uvicorn
 from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
@@ -50,9 +50,9 @@ from agentic_odi_core import (
 from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 
-TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"
+TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"  # nosec B105 - env var name, not a secret
 
 
 def _token_path() -> Path:
@@ -965,7 +965,7 @@ def main(argv: list[str] | None = None) -> None:
     validate_at_startup()
     setup_graceful_shutdown()
     token = _studio_token()
-    app = _AuthMiddleware(mcp.http_app(), token) if hasattr(mcp, "http_app") else mcp
+    app = _AuthMiddleware(mcp.http_app(), token)
     uvicorn.run(app, host="127.0.0.1", port=resolve_port(args.port))
 
 
