@@ -4,7 +4,9 @@ import "fake-indexeddb/auto";
 import { openDB } from "idb";
 
 import { IndexedDbLocalStore } from "./indexedDbStore";
+import { DB_NAME, DB_VERSION } from "./migrations";
 import { MemoryLocalStore } from "./memoryStore";
+import type { LocalStore, StoredJob, StoredOutcome, StoredStep, StoredTurn } from "./types";
 
 async function makeStore() {
   const store = await IndexedDbLocalStore.open();
@@ -13,8 +15,28 @@ async function makeStore() {
 
 async function clearDb() {
   if (typeof indexedDB !== "undefined") {
-    await indexedDB.deleteDatabase("agentic-odi-studio");
+    await indexedDB.deleteDatabase(DB_NAME);
   }
+}
+
+/** Every store and index the v2 schema declares, read from a live connection. */
+async function schemaOf(name: string, version: number) {
+  const db = await openDB(name, version);
+  const stores = Array.from(db.objectStoreNames).sort();
+  const shape = await Promise.all(
+    stores.map(async (store) => {
+      const tx = db.transaction(store, "readonly");
+      const objectStore = tx.objectStore(store);
+      return {
+        store,
+        keyPath: objectStore.keyPath,
+        autoIncrement: objectStore.autoIncrement,
+        indexes: Array.from(objectStore.indexNames).sort(),
+      };
+    }),
+  );
+  db.close();
+  return shape;
 }
 
 afterEach(async () => {
@@ -187,50 +209,59 @@ describe("IndexedDbLocalStore", () => {
     second.close();
   });
 
-  it("migrates a seeded v1 database to v2 without losing rows", async () => {
-    // Seed the v1 schema exactly as the previous release created it.
-    const legacy = await openDB("agentic-odi-studio", 1, {
-      upgrade(database) {
-        database.createObjectStore("meta", { keyPath: "key" });
-        const jobs = database.createObjectStore("jobs", { keyPath: "id" });
-        jobs.createIndex("by-seq", "seq");
-        const steps = database.createObjectStore("steps", { keyPath: "id" });
-        steps.createIndex("by-job", "job_id");
-        steps.createIndex("by-seq", "seq");
-        const outcomes = database.createObjectStore("outcomes", { keyPath: "id" });
-        outcomes.createIndex("by-job", "job_id");
-        outcomes.createIndex("by-seq", "seq");
-        const observations = database.createObjectStore("observations", {
-          keyPath: "id",
-        });
-        observations.createIndex("by-created", "created_at");
-        const conversations = database.createObjectStore("conversations", {
-          keyPath: "id",
-        });
-        conversations.createIndex("by-updated", "updated_at");
-        const turns = database.createObjectStore("turns", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        turns.createIndex("by-conversation", "conversation_id");
-      },
-    });
-    await legacy.put("jobs", {
-      id: "j-1",
-      name: "Legacy Job",
-      description: "",
-      seq: 1,
-      created_at: "2026-01-01T00:00:00Z",
-      updated_at: "2026-01-01T00:00:00Z",
-    });
-    legacy.close();
+  it("migrates a seeded v1 database to v2 with every row and the schema intact", async () => {
+    await seedV1();
 
+    const before = await rowsOf(DB_NAME, 1);
+    expect(Object.keys(before)).toHaveLength(7);
     const store = await makeStore();
-    const jobs = await store.listJobs();
-    expect(jobs.map((job) => job.name)).toEqual(["Legacy Job"]);
-    // The v2 outbox store exists and is empty.
-    expect(await store.listOutbox()).toEqual([]);
+    const after = await rowsOf(DB_NAME, DB_VERSION);
+
+    // Every row in all seven v1 stores survives the upgrade, byte for byte.
+    for (const name of Object.keys(before)) {
+      expect(after[name], `rows in ${name}`).toEqual(before[name]);
+    }
+    // The v2 outbox store is added, and it starts empty.
+    expect(after.outbox).toEqual([]);
     store.close();
+
+    // The migrated schema equals a fresh v2 database: same stores, key paths,
+    // auto-increment flags, and index names.
+    const migrated = await schemaOf(DB_NAME, DB_VERSION);
+    await clearDb();
+    const fresh = await makeStore();
+    fresh.close();
+    expect(migrated).toEqual(await schemaOf(DB_NAME, DB_VERSION));
+    expect(migrated).toEqual(expectedV2Schema());
+  });
+
+  it("closes the old connection and flags a reload when another tab upgrades", async () => {
+    const first = await makeStore();
+    await first.putJob(job("j-1", "Kept"));
+
+    let reloaded = false;
+    first.onVersionChange(() => {
+      reloaded = true;
+    });
+
+    // A second connection upgrades past this one. Without a versionchange
+    // handler the first connection blocks the upgrade and this promise hangs.
+    const upgraded = await openDB(DB_NAME, DB_VERSION + 1);
+    expect(reloaded).toBe(true);
+    expect(first.needsReload).toBe(true);
+    // The old connection closed, so the upgrade finished rather than blocking.
+    expect(upgraded.version).toBe(DB_VERSION + 1);
+
+    // The rows are still there for the reloaded page to read.
+    const jobs = await upgraded.getAll("jobs");
+    expect(jobs.map((row) => row.name)).toEqual(["Kept"]);
+    upgraded.close();
+  });
+
+  it("never needs a reload in the memory-only fallback", () => {
+    const store: LocalStore = new MemoryLocalStore();
+    expect(store.needsReload).toBe(false);
+    expect(store.onVersionChange(() => undefined)).toBeTypeOf("function");
   });
   it("counts the turns a conversation holds", async () => {
     const store = await makeStore();
@@ -285,4 +316,160 @@ function turn(conversationId: string, messageId: string) {
     message_id: messageId,
     parent_id: null,
   };
+}
+
+function job(id: string, name: string): StoredJob {
+  return {
+    id,
+    name,
+    description: "",
+    seq: 1,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+}
+
+function step(id: string): StoredStep {
+  return {
+    id,
+    job_id: "j-1",
+    name: "Step",
+    order: 1,
+    seq: 2,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+}
+
+function outcome(id: string): StoredOutcome {
+  return {
+    id,
+    job_id: "j-1",
+    statement: "Minimize the time it takes to decide.",
+    importance: 8,
+    satisfaction: 3,
+    opportunity_score: 13,
+    step_id: "s-1",
+    seq: 3,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+}
+
+/**
+ * Seed a v1 database with a row in all seven stores, using the schema the
+ * previous release created. This is the fixture the migration must carry
+ * forward; the v2 migration is not involved in writing it.
+ */
+async function seedV1(): Promise<void> {
+  const legacy = await openDB(DB_NAME, 1, {
+    upgrade(database) {
+      database.createObjectStore("meta", { keyPath: "key" });
+      const jobs = database.createObjectStore("jobs", { keyPath: "id" });
+      jobs.createIndex("by-seq", "seq");
+      const steps = database.createObjectStore("steps", { keyPath: "id" });
+      steps.createIndex("by-job", "job_id");
+      steps.createIndex("by-seq", "seq");
+      const outcomes = database.createObjectStore("outcomes", { keyPath: "id" });
+      outcomes.createIndex("by-job", "job_id");
+      outcomes.createIndex("by-seq", "seq");
+      const observations = database.createObjectStore("observations", {
+        keyPath: "id",
+      });
+      observations.createIndex("by-created", "created_at");
+      const conversations = database.createObjectStore("conversations", {
+        keyPath: "id",
+      });
+      conversations.createIndex("by-updated", "updated_at");
+      const turns = database.createObjectStore("turns", {
+        keyPath: "id",
+        autoIncrement: true,
+      });
+      turns.createIndex("by-conversation", "conversation_id");
+    },
+  });
+  await legacy.put("meta", { key: "seq", value: 3 });
+  await legacy.put("jobs", job("j-1", "Legacy Job"));
+  await legacy.put("steps", step("s-1"));
+  await legacy.put("outcomes", outcome("o-1"));
+  await legacy.put("observations", {
+    id: "ob-1",
+    kind: "business",
+    text: "Legacy observation",
+    data: {},
+    status: "confirmed",
+    confidence: 0.5,
+    source_turn: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  });
+  await legacy.put("conversations", conversation("c-1", "2026-01-01T00:00:00Z"));
+  await legacy.put("turns", turn("c-1", "m-1") as StoredTurn);
+  legacy.close();
+}
+
+/** Every row in every store, keyed by store name, read from a live database. */
+async function rowsOf(name: string, version: number) {
+  const db = await openDB(name, version);
+  const stores = Array.from(db.objectStoreNames).sort();
+  const rows: Record<string, unknown[]> = {};
+  for (const store of stores) {
+    rows[store] = await db.getAll(store);
+  }
+  db.close();
+  return rows;
+}
+
+/** The v2 schema written out, so the migrated shape is asserted, not assumed. */
+function expectedV2Schema() {
+  return [
+    {
+      store: "conversations",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-updated"],
+    },
+    {
+      store: "jobs",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-seq"],
+    },
+    {
+      store: "meta",
+      keyPath: "key",
+      autoIncrement: false,
+      indexes: [],
+    },
+    {
+      store: "observations",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-created"],
+    },
+    {
+      store: "outbox",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-created", "by-state"],
+    },
+    {
+      store: "outcomes",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-seq"],
+    },
+    {
+      store: "steps",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-seq"],
+    },
+    {
+      store: "turns",
+      keyPath: "id",
+      autoIncrement: true,
+      indexes: ["by-conversation"],
+    },
+  ];
 }
