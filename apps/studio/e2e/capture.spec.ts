@@ -51,15 +51,18 @@ test.describe("capturing an outcome", () => {
 
     const panel = page.getByRole("complementary", { name: "Capture by hand" });
     const score = panel.locator(".score-preview");
+    const scoreValue = score.locator("b");
 
-    // importance 8.5, satisfaction 3.5 -> 8.5 + max(8.5 - 3.5, 0) = 13.50
-    await expect(score).toContainText("13.50");
+    // importance 8.5, satisfaction 3.5 -> 8.5 + max(8.5 - 3.5, 0) = 13.5. Asserted on the
+    // number itself, not as a substring: "13.5" is inside "13.50", so a loose check would
+    // pass either display.
+    await expect(scoreValue).toHaveText("13.5");
     await expect(score).toContainText("underserved");
 
     await panel.getByLabel(/^Importance/).fill("9.2");
 
-    // 9.2 + max(9.2 - 3.5, 0) = 14.90
-    await expect(score).toContainText("14.90");
+    // 9.2 + max(9.2 - 3.5, 0) = 14.9
+    await expect(scoreValue).toHaveText("14.9");
     // The slider and the label the user reads both follow.
     await expect(panel.getByLabel(/^Importance/)).toHaveValue("9.2");
     await expect(panel.getByText("Importance · 9.2")).toBeVisible();
@@ -73,8 +76,8 @@ test.describe("capturing an outcome", () => {
     await panel.getByLabel(/^Importance/).fill("4");
     await panel.getByLabel(/^Current satisfaction/).fill("9");
 
-    // 4 + max(4 - 9, 0) = 4.00, which is not underserved.
-    await expect(panel.locator(".score-preview")).toContainText("4.00");
+    // 4 + max(4 - 9, 0) = 4.0, which is not underserved.
+    await expect(panel.locator(".score-preview b")).toHaveText("4.0");
     await expect(panel.locator(".score-preview")).toContainText("appropriately served");
   });
 
