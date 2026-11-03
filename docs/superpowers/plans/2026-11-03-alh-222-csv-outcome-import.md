@@ -70,7 +70,7 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
   ```
 - Consumes: nothing outside the stdlib and `agentic_odi_core.errors`.
 
-- [ ] **Step 1: write the fixture file.** Generate it once with this snippet, commit the bytes, and never regenerate them — three suites assert against these exact line numbers:
+- [x] **Step 1: write the fixture file.** Generate it once with this snippet, commit the bytes, and never regenerate them — three suites assert against these exact line numbers:
 
   ```python
   from pathlib import Path
@@ -109,9 +109,9 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
   ambiguous on lines 12 and 13; line 9 refuses on the bounds, line 18 on the statement, line 27
   on `Unknown stage: collect`; 37 created, 3 refused, no in-file duplicates and no warnings.
 
-- [ ] **Step 2: run the parser tests to make sure they fail.** `uv run pytest packages/core/tests/test_outcome_import.py -q` → `ModuleNotFoundError: agentic_odi_core.outcome_import`.
+- [x] **Step 2: run the parser tests to make sure they fail.** `uv run pytest packages/core/tests/test_outcome_import.py -q` → `ModuleNotFoundError: agentic_odi_core.outcome_import`.
 
-- [ ] **Step 3: write the tests** in `packages/core/tests/test_outcome_import.py`, module docstring naming ALH-222, and the fixture read the way `evaluation.py:186` reads its fixture:
+- [x] **Step 3: write the tests** in `packages/core/tests/test_outcome_import.py`, module docstring naming ALH-222, and the fixture read the way `evaluation.py:186` reads its fixture:
 
   ```python
   FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "outcomes_mixed_40.csv"
@@ -129,12 +129,12 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
   - `test_the_fixture_parses_to_forty_rows_with_three_broken` — `len(rows) == 40`, and the three rows at the pinned lines are the ones carrying `importance == 11`, the malformed statement, and `stage == "collect"`.
   - `test_an_exported_file_round_trips` — build the header `id,job_id,step_id,statement,importance,satisfaction,opportunity_score` (the CLI's `EXPORT_FIELDS`) with one row; the statement, scores and `step_id` are read, `id` and `opportunity_score` are reported, and nothing in `ignored_columns` reached a row field.
 
-- [ ] **Step 4: implement `parse_outcome_table`** in `outcome_import.py`. Read with `csv.reader` over `io.StringIO(newline="")`; normalise each header once (`strip().lower()`); canonical column names are `statement importance satisfaction importance_n satisfaction_n theme stage step_id job_id id job_id opportunity_score`; statement column = the first of `statement`, `outcome`, `need` present, and if two of them carry different non-empty header *names* as columns, refuse at parse time. `UnsupportedFormatError(OdiError)` is defined in this module. Numeric cells: empty → `None`, unparseable → keep the raw string on the row field typed `float | None` and let Task 2 refuse it (store the unparsed text in `ImportRow` as a `problems: list[str]` field on the row — one per bad cell, phrased `importance must be a number, got "soon"`).
-- [ ] **Step 5: `uv run pytest packages/core/tests/test_outcome_import.py -q`** → pass.
-- [ ] **Step 6: add the re-exports** (`ImportRow`, `ParsedTable`, `parse_outcome_table`) to `agentic_odi_core/__init__.py` and its `__all__`, keeping import order ruff-clean.
-- [ ] **Step 7: register the module** in `tests/test_architecture.py::CORE_LAYERS["methodology"]` and in the methodology row of the layer table in `docs/architecture/README.md`, then `uv run pytest tests/test_architecture.py -q`.
-- [ ] **Step 8: full gates** (`uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy apps brand packages`, `uv run pytest -q`).
-- [ ] **Step 9: commit** `feat(core): parse an outcome CSV into rows (ALH-222)`.
+- [x] **Step 4: implement `parse_outcome_table`** in `outcome_import.py`. Read with `csv.reader` over `io.StringIO(newline="")`; normalise each header once (`strip().lower()`); canonical column names are `statement importance satisfaction importance_n satisfaction_n theme stage step_id job_id id job_id opportunity_score`; statement column = the first of `statement`, `outcome`, `need` present, and if two of them carry different non-empty header *names* as columns, refuse at parse time. `UnsupportedFormatError(OdiError)` is defined in this module. Numeric cells: empty → `None`, unparseable → keep the raw string on the row field typed `float | None` and let Task 2 refuse it (store the unparsed text in `ImportRow` as a `problems: list[str]` field on the row — one per bad cell, phrased `importance must be a number, got "soon"`).
+- [x] **Step 5: `uv run pytest packages/core/tests/test_outcome_import.py -q`** → pass.
+- [x] **Step 6: add the re-exports** (`ImportRow`, `ParsedTable`, `parse_outcome_table`) to `agentic_odi_core/__init__.py` and its `__all__`, keeping import order ruff-clean.
+- [x] **Step 7: register the module** in `tests/test_architecture.py::CORE_LAYERS["methodology"]` and in the methodology row of the layer table in `docs/architecture/README.md`, then `uv run pytest tests/test_architecture.py -q`.
+- [x] **Step 8: full gates** (`uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy apps brand packages`, `uv run pytest -q`).
+- [x] **Step 9: commit** `feat(core): parse an outcome CSV into rows (ALH-222)`.
 
 ## Task 2: `import_outcomes` — one loop, one report
 
@@ -152,7 +152,7 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
       def themes(self, job_id: str) -> list[Theme]: ...
       def steps(self, job_id: str) -> list[Step]: ...
       def existing_statements(self, job_id: str) -> list[str]: ...
-      def add_outcome(self, row: ImportRow, claim_check: ClaimCheck | None,
+      def add_outcome(self, job_id: str, row: ImportRow, claim_check: ClaimCheck | None,
                       step_id: str | None) -> str: ...
       def assign_theme(self, outcome_ids: list[str], theme_id: str) -> None: ...
 
@@ -178,7 +178,7 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
                       dry_run: bool = False) -> ImportReport
   ```
 
-- [ ] **Step 1: append the failing tests.** Each seeds through `InMemoryRepository` + `ODIService` (the idiom in `packages/core/tests/test_bulk.py`), creating the job, exactly one step with `stage=JobStage.EXECUTE`, and themes named `Onboarding` (job-scoped), `Urgent` (job-scoped) and `Urgent` (workspace-scoped).
+- [x] **Step 1: append the failing tests.** Each seeds through `InMemoryRepository` + `ODIService` (the idiom in `packages/core/tests/test_bulk.py`), creating the job, exactly one step with `stage=JobStage.EXECUTE`, and themes named `Onboarding` (job-scoped), `Urgent` (job-scoped) and `Urgent` (workspace-scoped).
   - `test_the_fixture_writes_thirty_seven_and_refuses_three` — report has `len(created) == 37`, `len(refused) == 3`, the refusals' lines are the pinned three, the `importance == 11` refusal's reason contains `must be between 1.0 and 10.0`, and the store holds 37 outcomes.
   - `test_one_bad_score_does_not_cost_the_other_rows` — the row after the bad one is created.
   - `test_a_dry_run_writes_nothing_and_reports_the_same_run` — `dry_run=True` twice → the two `as_dict()` are equal, every `created` entry has `outcome_id is None`, `service.get_outcomes(job_id)` is empty, and the event log gained nothing (`repo.list_signals()` / the events count the bulk tests already use).
@@ -194,11 +194,11 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
   - `test_duplicate_matching_is_casefolded_and_whitespace_collapsed` — `"  Minimize the TIME  to…"` vs the stored form matches; `"Minimize the time"` vs `"Minimize the time to deploy"` does **not** match.
   - `test_a_row_with_a_non_numeric_score_is_refused_before_any_write` — the `problems` text from Task 1 becomes the refusal reason.
   - `test_a_created_row_never_becomes_a_refusal_and_vice_versa` — `len(created) + len(refused) == 40` for the fixture.
-- [ ] **Step 2: `uv run pytest packages/core/tests/test_outcome_import.py -q`** → the new tests fail in `import_outcomes` (missing).
-- [ ] **Step 3: implement the loop** in `outcome_import.py`. Order of operations: one `themes()`, one `steps()`, one `existing_statements()` call; build a name→ids map (case-sensitive) and a stage→steps map once; then per row in file order — pre-validate (row `problems`, bounds per field, `evaluate_outcome_statement`, `JobStage` name, stage→one step, `step_id` existence via `steps()`, `job_id` cell agreement), collect the outcome and its theme name if created, and wrap each write in `try/except OdiError` turning it into a refusal with `str(exc)`. Catch `ImportAbortedError` (raised by a target whose transport died) and stop, filling `aborted` and leaving the rows already written in `created`. File into themes **after** the row loop, one `assign_theme` per matched theme with its whole list of ids. Duplicate warning matching uses a module-level `_canonical(statement) = " ".join(statement.casefold().split())`. A `ParsedTable.problems` short-circuits to a report with zero rows and one refused entry at `line=1` whose reason is the first problem.
-- [ ] **Step 4: `ServiceImportTarget`** in the same module: `themes` → `service.list_themes(job_id) + service.list_themes(None)`; `steps` → `service.get_job_map(job_id)`; `existing_statements` → `service.get_outcomes(job_id)`; `add_outcome` → `service.add_outcome(...)` returning `outcome.id`; `assign_theme` → `service.assign_theme(ids, theme_id)`.
-- [ ] **Step 5: re-export** `ImportReport`, `ImportTarget`, `ServiceImportTarget`, `ImportAbortedError`, `import_outcomes` from `agentic_odi_core`.
-- [ ] **Step 6: full gates**, then commit `feat(core): import outcome rows with a row-level report (ALH-222)`.
+- [x] **Step 2: `uv run pytest packages/core/tests/test_outcome_import.py -q`** → the new tests fail in `import_outcomes` (missing).
+- [x] **Step 3: implement the loop** in `outcome_import.py`. Order of operations: one `themes()`, one `steps()`, one `existing_statements()` call; build a name→ids map (case-sensitive) and a stage→steps map once; then per row in file order — pre-validate (row `problems`, bounds per field, `evaluate_outcome_statement`, `JobStage` name, stage→one step, `step_id` existence via `steps()`, `job_id` cell agreement), collect the outcome and its theme name if created, and wrap each write in `try/except OdiError` turning it into a refusal with `str(exc)`. Catch `ImportAbortedError` (raised by a target whose transport died) and stop, filling `aborted` and leaving the rows already written in `created`. File into themes **after** the row loop, one `assign_theme` per matched theme with its whole list of ids. Duplicate warning matching uses a module-level `_canonical(statement) = " ".join(statement.casefold().split())`. A `ParsedTable.problems` short-circuits to a report with zero rows and one refused entry at `line=1` whose reason is the first problem.
+- [x] **Step 4: `ServiceImportTarget`** in the same module: `themes` → `service.list_themes(job_id)` (that read already returns the job's themes plus the workspace-wide ones, so one call, not two); `steps` → `service.get_job_map(job_id)`; `existing_statements` → `service.get_outcomes(job_id)`; `add_outcome` → `service.add_outcome(...)` returning `outcome.id`; `assign_theme` → `service.assign_theme(ids, theme_id)`.
+- [x] **Step 5: re-export** `ImportReport`, `ImportTarget`, `ServiceImportTarget`, `ImportAbortedError`, `import_outcomes` from `agentic_odi_core`.
+- [x] **Step 6: full gates**, then commit `feat(core): import outcome rows with a row-level report (ALH-222)`.
 
 ## Task 3: `LocalBackend._add_outcome` accepts an unscored row
 

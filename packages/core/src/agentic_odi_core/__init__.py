@@ -90,9 +90,14 @@ from agentic_odi_core.models import (
     job_stage_catalog,
 )
 from agentic_odi_core.outcome_import import (
+    ImportAbortedError,
+    ImportReport,
     ImportRow,
+    ImportTarget,
     ParsedTable,
+    ServiceImportTarget,
     UnsupportedFormatError,
+    import_outcomes,
     parse_outcome_table,
 )
 from agentic_odi_core.remote import (
@@ -195,8 +200,12 @@ __all__ = [
     "OdiError",
     "OnDeviceLLMEngine",
     "Outcome",
+    "ImportAbortedError",
+    "ImportReport",
     "ImportRow",
+    "ImportTarget",
     "ParsedTable",
+    "ServiceImportTarget",
     "UnsupportedFormatError",
     "OutcomeNotFoundError",
     "OutcomeProposal",
@@ -241,6 +250,7 @@ __all__ = [
     "format_opportunity_score_insight",
     "error_envelope",
     "generate_steve_jobs_response",
+    "import_outcomes",
     "invalid_strategy_request",
     "job_not_found",
     "job_stage_catalog",
