@@ -569,6 +569,15 @@ The segment card is the answer to "who is this for?": the people, the job they
 are doing, the step their outcomes cluster on, and the verdict those outcomes
 support. A verdict is never shown apart from the confidence behind it, and
 outcomes that joined no cluster are listed under the card rather than folded in.
+The board (`SegmentBoard.tsx`) resolves each segment's `outcome_ids` against the
+canvas and shows the members themselves — every member's statement and its stored
+score — so a segment is inspectable rather than a name to trust. The mean is
+taken over scored members only, with an explicit `M not scored` beside it and
+`Not scored` when nothing is scored; a missing score is never a zero. An id that
+resolves to no outcome is dropped and counted, never invented. One line always
+says where the people came from: an inferred group is a **candidate segment**,
+grouped by the job it serves, while a supplied group is *people named from your
+evidence*. Each member is a button that focuses that outcome in the landscape.
 The strategy card carries Stage 6: the one path the evidence supports, the moves
 it proposes, and **every path it beat with the reason**. The catalog requires at
 least two rejected paths, so a strategy that records none cannot be validated.
