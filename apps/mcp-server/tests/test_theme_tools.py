@@ -92,9 +92,10 @@ async def test_a_third_level_theme_is_refused() -> None:
             "add_theme", {"name": "Too deep", "job_id": job_id, "parent_id": child["id"]}
         )
 
-        text = _text(refused)
-        assert text.startswith("Error:"), text
-        assert "two levels" in text
+        refusal = _payload(refused)
+        assert refusal["error"]["code"] == "validation", refused
+        assert refusal["message"].startswith("Error:"), refusal
+        assert "two levels" in refusal["message"]
 
 
 @pytest.mark.asyncio
@@ -110,8 +111,9 @@ async def test_a_theme_on_a_foreign_job_is_named_and_refused() -> None:
             "assign_theme", {"outcome_ids": [outcome_id], "theme_id": foreign["id"]}
         )
 
-        text = _text(refused)
-        assert text.startswith("Error:"), text
-        assert "workspace theme" in text
+        refusal = _payload(refused)
+        assert refusal["error"]["code"] == "validation", refused
+        assert refusal["message"].startswith("Error:"), refusal
+        assert "workspace theme" in refusal["message"]
         unchanged = _payload(await client.call_tool("get_outcome", {"outcome_id": outcome_id}))
         assert unchanged["theme_ids"] == []
