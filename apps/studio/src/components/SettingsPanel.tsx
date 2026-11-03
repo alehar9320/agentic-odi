@@ -9,6 +9,7 @@ import {
 } from "../diagnostics/bundle";
 import { DiagnosticsModal } from "../diagnostics/DiagnosticsModal";
 import { PRODUCT_NAME } from "../lib/brand";
+import { resolveTheme } from "../lib/theme";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { ConnectionReport } from "../state/StudioContext";
@@ -60,7 +61,7 @@ function AboutSection({
       version: snapshot.currentVersion ?? STUDIO_VERSION,
       build: __STUDIO_BUILD_DATE__,
       platform: PLATFORM_LABELS[platform],
-      theme: settings.theme === "light" ? "light" : "dark",
+      theme: resolveTheme(settings.theme),
       reachable,
       defaults: {
         base_url: settings.base_url,
