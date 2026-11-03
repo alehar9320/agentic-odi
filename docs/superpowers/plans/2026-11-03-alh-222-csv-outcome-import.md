@@ -58,11 +58,12 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
       stage: str | None = None
       step_id: str | None = None
       job_id: str | None = None
+      problems: list[str] = field(default_factory=list)  # a cell that is not a number, phrased
 
   @dataclass
   class ParsedTable:
       rows: list[ImportRow]
-      unknown_columns: dict[str, str]   # header -> what was done with it
+      ignored_columns: dict[str, str]   # header -> why nothing was done with it
       problems: list[str]               # file-level; non-empty means rows == []
 
   def parse_outcome_table(source: str | bytes, fmt: str = "csv") -> ParsedTable
@@ -87,8 +88,8 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
               "during a month-end handoff", "when the audit trail breaks"]
 
   rows = ["statement,importance,satisfaction,theme,stage"]
-  for i in range(37):  # data rows -> file lines 2..38; (i%10, i%12) is unique under 60,
-                       # so all 37 statements differ and no row is a duplicate.
+  for i in range(40):  # data rows -> file lines 2..41; (i%10, i%12) is unique under 60,
+                       # so all 40 statements differ and no row is an in-file duplicate.
       theme = ("Onboarding" if i < 6 else "Retention" if i < 10 else
                "Urgent" if i < 12 else "")
       stage = "execute" if i in {2, 3} else ""
@@ -116,10 +117,12 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
   FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "outcomes_mixed_40.csv"
   ```
 
-  - `test_parse_reads_the_statement_synonyms` — `need,x` and `outcome,x` headers each map to `statement`; a file with `statement` **and** `need` both non-empty gives `problems == [...]` naming both headers and `rows == []`; a file with `outcome` and `need` (same meaning) parses.
+  - `test_parse_reads_the_statement_synonyms` — `need,x` and `outcome,x` headers each map to `statement`; a file with `outcome` and `need` (same meaning) parses; a **row** whose two statement cells differ carries `problems == ['statement is ambiguous: …']` naming both headers while its neighbour rows still parse (a whole file never dies for one row).
   - `test_parse_uses_physical_line_numbers` — the first data row is line 2, and the fixture's bad score row is reported at the line Step 1 pins.
   - `test_parse_leaves_a_blank_score_as_none` — `,` in an importance cell gives `importance is None`; a `0` in the cell gives `0.0` — the two are different rows.
-  - `test_parse_reports_unknown_and_ignored_columns` — `Notes` lands in `unknown_columns` with `"ignored"`; `id`, `opportunity_score`, `importance_n`, `satisfaction_n` land in `unknown_columns` too, each with a reason naming why nothing was done with it.
+  - `test_parse_reports_ignored_columns_with_a_reason` — `Notes` lands in `ignored_columns` as an
+    unknown column; `id`, `opportunity_score`, `importance_n`, `satisfaction_n` land there too,
+    each with the reason it could not be used.
   - `test_parse_accepts_text_and_bytes` — the same document through both types gives equal `rows`.
   - `test_parse_refuses_a_non_csv_format` — `parse_outcome_table(text, fmt="xlsx")` raises `UnsupportedFormatError` whose message names `csv` as the only format this increment reads.
   - `test_parse_of_an_empty_file_reports_one_problem_at_line_1` — no header, and the same for a header with no `statement`/`outcome`/`need`.
@@ -148,7 +151,7 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
   class ImportTarget(Protocol):
       def themes(self, job_id: str) -> list[Theme]: ...
       def steps(self, job_id: str) -> list[Step]: ...
-      def existing_statements(self, job_id: str) -> list[Outcome]: ...
+      def existing_statements(self, job_id: str) -> list[str]: ...
       def add_outcome(self, row: ImportRow, claim_check: ClaimCheck | None,
                       step_id: str | None) -> str: ...
       def assign_theme(self, outcome_ids: list[str], theme_id: str) -> None: ...

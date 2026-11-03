@@ -89,6 +89,12 @@ from agentic_odi_core.models import (
     create_job,
     job_stage_catalog,
 )
+from agentic_odi_core.outcome_import import (
+    ImportRow,
+    ParsedTable,
+    UnsupportedFormatError,
+    parse_outcome_table,
+)
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
@@ -189,6 +195,9 @@ __all__ = [
     "OdiError",
     "OnDeviceLLMEngine",
     "Outcome",
+    "ImportRow",
+    "ParsedTable",
+    "UnsupportedFormatError",
     "OutcomeNotFoundError",
     "OutcomeProposal",
     "OutcomeStatementError",
@@ -239,6 +248,7 @@ __all__ = [
     "odi_schema",
     "outcome_not_found",
     "parse_tool_result",
+    "parse_outcome_table",
     "require_claim_check",
     "statement_to_dict",
     "step_not_found",

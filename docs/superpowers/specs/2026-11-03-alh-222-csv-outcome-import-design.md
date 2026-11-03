@@ -126,15 +126,15 @@ and emits no `theme` or `stage` column, so an `export` → `import` cycle does n
 filing across; widening `export` is out of scope here and the round-trip test asserts the
 narrow claim rather than a round trip that quietly drops a person's themes.
 
-- Two synonyms carrying **different non-empty values** in one header (`statement` and `need`)
-  is ambiguous, so the header mapping refuses at parse time — before any row is read — with
-  the columns named. Choosing one by declared priority would be guessing at a person's intent
-  with their whole file on the line.
+- A row whose statement columns carry **different non-empty values** (`statement` says one
+  thing, `need` says another) is that row's refusal, naming both headers — not a whole-file
+  failure, because the other 39 rows are the person's research and picking one by declared
+  priority would be the importer inventing a need.
 - Two spellings of the same column with the same meaning (`outcome` and `need`) map to one
   and are not an error.
-- Any header that is neither canonical nor synonym is reported in `unknown_columns` with what
-  was done with it (ignored) and is **not** fatal. A spreadsheet carries a `Notes` column;
-  the import should still work, and should say what it dropped.
+- Any header that is neither canonical nor synonym is reported in `ignored_columns` with what
+  was done with it and is **not** fatal. A spreadsheet carries a `Notes` column; the import
+  should still work, and should say what it dropped.
 - `id` and `opportunity_score` are known-and-ignored, reported as such: an exported file has
   them, an import must not act on either. `importance_n` and `satisfaction_n` are parsed into
   the row (the issue's row shape names them) and reported as ignored, because `Outcome` has
@@ -282,8 +282,7 @@ One shape, shared by both doors, in this order:
 | `refused` | per row: `line`, `statement`, `reason` — a service sentence, never a paraphrase |
 | `unmatched_themes` | name → lines |
 | `ambiguous_themes` | name → candidate theme ids → lines |
-| `unknown_columns` | header → what happened to it |
-| `ignored_columns` | header → why nothing was done with it (`importance_n`, `opportunity_score`, …) |
+| `ignored_columns` | header → why nothing was done with it — an unknown column (`"not an outcome column; ignored"`), or a known one with nowhere to land (`"importance_n` has no field on an Outcome; ignored"`, `"opportunity_score is computed, never entered"`) |
 | `warnings` | duplicate rows, and any other thing a person should know before they trust this run |
 | `aborted` | null, or `{line, reason}` when the server went away mid-run |
 
@@ -297,8 +296,8 @@ numbers, then the theme and column notes; `--json` prints the report object as i
 upload endpoint returns the same object, so the Studio board and the terminal disagree on
 nothing.
 
-A file that cannot be parsed at all (no header row, no `statement`/`outcome`/`need` column,
-an empty file, two conflicting statement headers) yields a report with **zero rows and one
+A file that cannot be parsed at all (no header row, no `statement`/`outcome`/`need` column, an
+empty file, a header with nothing under it) yields a report with **zero rows and one
 refusal at line 1** carrying the parse error, not an HTTP 500 or a traceback — and a
 **200**, because a well-formed answer to a badly-formed file is an answer, not an error. The
 errors that are not the file's fault keep the status the rest of the router gives them: 404
