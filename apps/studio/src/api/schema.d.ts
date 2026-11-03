@@ -498,6 +498,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Studies
+         * @description The opened studies, same records under both backends.
+         *
+         *     Empty until the agent has run ``open_study``: a study is opened as a named
+         *     pass over a job, never typed into the canvas.
+         */
+        get: operations["get_studies_api_studies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategy": {
         parameters: {
             query?: never;
@@ -696,7 +719,10 @@ export interface paths {
         };
         /**
          * List Conversations
-         * @description The history a switcher lists: every thread, most recent touch first.
+         * @description The history a switcher lists: at most 20 threads, most recent touch first.
+         *
+         *     Titles come from the first question, so the list names each thread without
+         *     carrying a single turn body.
          */
         get: operations["list_conversations_api_conversations_get"];
         put?: never;
@@ -955,6 +981,23 @@ export interface paths {
          * @description Reject a proposal. Nothing is written to the ODI store.
          */
         post: operations["reject_proposal_api_api_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/{full_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Spa Fallback */
+        get: operations["spa_fallback__full_path__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3073,6 +3116,40 @@ export interface operations {
             };
         };
     };
+    get_studies_api_studies_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_strategy_api_strategy_get: {
         parameters: {
             query?: {
@@ -4154,6 +4231,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spa_fallback__full_path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                full_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

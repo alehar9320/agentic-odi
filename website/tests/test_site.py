@@ -518,4 +518,9 @@ def test_page_weights_are_within_budget(page: str):
     # bring it to ~85 KB. The assistant-ui ledger (issue #429) puts 129 rows
     # on the Development page, which now reaches ~93 KB and is the new long
     # pole; it is a coverage record, not decoration, so the ceiling moves.
-    assert size <= 96 * 1024, f"{page}: {size} bytes"
+    # The Study entity and its two tools (open_study, list_studies) add the
+    # last few KB to the MCP reference page. The six theme tools (add_theme,
+    # rename_theme, delete_theme, list_themes, assign_theme, unassign_theme)
+    # and the Theme entity push it past 100 KB, so the ceiling moves again —
+    # the page is the contract record, not decoration.
+    assert size <= 110 * 1024, f"{page}: {size} bytes"
