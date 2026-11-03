@@ -237,7 +237,7 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
 - Consumes: Task 1/2 core names; `run_tool`; Task 3's unscored `add_outcome`.
 - Produces: the command `desired-outcomes import <path> --job-id <id> [--dry-run] [--json]`; `render_import_report(report: Any, *, as_json: bool) -> str`; a `ToolImportTarget` in `desired_outcomes.py` implementing `ImportTarget` over `run_tool` with `get_job_map`, `list_themes`, `get_outcomes`, `add_outcome`, `assign_theme`.
 
-- [ ] **Step 1: write the CLI tests** using the `CliRunner`/`--db` idiom from `apps/cli/tests/test_bulk_cli.py` (`_invoke`, `_json`, `_seed` patterns; copy their shapes, do not import them across files):
+- [x] **Step 1: write the CLI tests** using the `CliRunner`/`--db` idiom from `apps/cli/tests/test_bulk_cli.py` (`_invoke`, `_json`, `_seed` patterns; copy their shapes, do not import them across files):
   - dry run of the fixture against a seeded job prints `would create 37` and `refused 3`, exits 0, and `desired-outcomes list` is still empty;
   - `--json` output is the report `as_dict()` and parses;
   - the real run leaves 37 outcomes, and its JSON equals the dry-run JSON with the null ids replaced;
@@ -246,12 +246,12 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
   - a path that does not exist exits 1 and names the path;
   - human output after a write run says how to take this back and names `desired-outcomes delete`;
   - the fixture's `Retention` row is reported as unmatched and the two `Urgent` rows as ambiguous.
-- [ ] **Step 2: `uv run pytest apps/cli/tests/test_outcome_import_cli.py -q`** → fails (no such command).
-- [ ] **Step 3: implement `ToolImportTarget` and the command.** The command reads the file with `Path(path).read_text(encoding="utf-8")`, catches `OSError` into the exit-1 sentence, calls `parse_outcome_table` then `import_outcomes(ServiceOrTool...)` with `dry_run=`, and echoes `render_import_report`. `--dry-run` help text: `Report what this file would do without writing it`. No `--claim-check` option (spec §4).
-- [ ] **Step 4: implement `render_import_report`** next to `render_bulk_report`, reusing its `_table` and `_json` helpers: headline `Created N outcome(s)` / `Would create N outcome(s)`, then a `line | statement | reason` table of refusals (`empty="Every row wrote."`), then one line per theme/column note, then warnings.
-- [ ] **Step 5: `uv run pytest apps/cli/tests/test_outcome_import_cli.py -q`** → pass.
-- [ ] **Step 6: document** the command in `docs/cli.md` where the other `desired-outcomes` commands are listed — including the header table (canonical names, the `outcome`/`need` synonyms, and what is ignored) — and add one line to `README.md`'s capability list.
-- [ ] **Step 7: full gates plus `uv run --directory website pytest tests/ -q`** (the CLI-reference completeness test), then commit `feat(cli): odi desired-outcomes import (ALH-222)`.
+- [x] **Step 2: `uv run pytest apps/cli/tests/test_outcome_import_cli.py -q`** → fails (no such command).
+- [x] **Step 3: implement `ToolImportTarget` and the command.** The command pre-checks `run_tool("get_job", ...)` so an unknown job exits 1 with no report (spec §1), reads the file with `Path(path).read_bytes()` — `parse_outcome_table` decodes `utf-8-sig` with replacement, so a binary file cannot raise a traceback the way `read_text` would — catches `OSError` into the exit-1 sentence, calls `parse_outcome_table` then `import_outcomes(...)` with `dry_run=`, and echoes `render_import_report`. `--dry-run` help text: `Report what this file would do without writing it`. No `--claim-check` option (spec §4).
+- [x] **Step 4: implement `render_import_report`** next to `render_bulk_report`, reusing its `_table` and `_json` helpers: headline `Created N outcome(s); M refused.` / `Would create N outcome(s)`, then a `line | statement | reason` table of refusals (`empty="Every row wrote."`) with the reason capped at `_REASON_WIDTH` because an ODI-format verdict is a paragraph and would stretch every table row to its length (`--json` carries it whole), then one line per theme/column note, then warnings, then the aborted line, then — write runs only — the `desired-outcomes delete` sentence and every created id (spec §8).
+- [x] **Step 5: `uv run pytest apps/cli/tests/test_outcome_import_cli.py -q`** → pass.
+- [x] **Step 6: document** the command in `docs/cli.md` where the other `desired-outcomes` commands are listed — including the header table (canonical names, the `outcome`/`need` synonyms, and what is ignored) — and add one line to `README.md`'s capability list.
+- [x] **Step 7: full gates plus `uv run --directory website pytest tests/ -q`** (the CLI-reference completeness test), then commit `feat(cli): odi desired-outcomes import (ALH-222)`.
 
 ## Task 5: `POST /api/outcomes/import`
 

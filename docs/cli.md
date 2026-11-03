@@ -149,6 +149,8 @@ agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
+agentic-odi desired-outcomes import outcomes.csv --job-id <job-id> --dry-run
+agentic-odi desired-outcomes import outcomes.csv --job-id <job-id>
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
 agentic-odi desired-outcomes search --job-id <job-id> --text "three days"
 agentic-odi desired-outcomes search --theme <theme-id> --stage execute --confidence scored
@@ -219,6 +221,33 @@ that run is spent. Themes and stages are written through the same single-item pa
 `themes assign` and `desired-outcomes update` use, so the event log reads like the
 hand edits it replaces. The API and Studio surfaces for the same operation are the
 sibling issue.
+
+`import` files a spreadsheet of outcomes against one job, which is `export` run
+backwards: a library exported, edited in a spreadsheet, and brought back lands on
+the same rows it left. The header names the columns; it is read case-insensitively
+and with spaces trimmed, and an unknown column is reported as ignored rather than
+dropped in silence.
+
+| Column | Reads as |
+| --- | --- |
+| `statement` | the outcome statement. `outcome` and `need` are accepted for the same column; two of them that disagree refuse that row |
+| `importance`, `satisfaction` | the 1–10 scores. A row may carry neither; a value outside the band refuses the row |
+| `theme` | a theme's exact name, matched against this job's themes and the workspace-wide ones |
+| `stage` | a job-map stage — a row is filed on the job's one step in that stage |
+| `step_id` | the step to file the row on, which wins over `stage` |
+| `job_id` | compared, never obeyed: the target is `--job-id`. A row naming another job is refused and both ids are named, so a file exported from one job cannot quietly relocate another job's research |
+| `id`, `opportunity_score`, `importance_n`, `satisfaction_n` | read and ignored, and said so: a new outcome gets its own id, opportunity is computed from the two scores, and no field on an outcome holds a count |
+
+Rows are written one at a time through the same `add_outcome` path as
+`desired-outcomes add`, so a row the CLI would refuse is refused here too — with
+its line number in the file and the sentence the single-row command would print —
+while the rest still land. A row that carries scores is recorded as a by-hand
+score, because a spreadsheet is not an interview. A theme name that matches no
+theme, or matches two, leaves its rows created unfiled and says which lines, since
+guessing what a research file meant is how a library gets quietly wrong.
+`--dry-run` writes nothing and prints the same report a real run would, minus the
+ids. An import has no undo token: a write run prints the ids it created, and
+`desired-outcomes delete` takes them back one at a time.
 
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
