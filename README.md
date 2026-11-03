@@ -85,6 +85,10 @@ per-platform archives with SHA-256 checksums for a manual download. See
   the record behind it, or says it is a hypothesis. The bar's history list keeps
   the last twenty threads one click away, each named by its first question and
   marked when it is the one on screen.
+- **One artifact you can hand over.** A read-only link opens a single artifact
+  and its evidence on its own page — no rail, no composer, no way into the rest
+  of the workspace — and states when the link expires. The link is a capability,
+  not a copy of the database.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **Evidence becomes outcomes.** An ingested record is mined into a scored,

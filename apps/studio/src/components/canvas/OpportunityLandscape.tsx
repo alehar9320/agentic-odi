@@ -9,6 +9,7 @@ import {
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { ShareAction } from "../ShareAction";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
 
@@ -137,31 +138,34 @@ export function OpportunityLandscape() {
         </div>
 
         {/* View Mode Switcher */}
-        <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", padding: 3, borderRadius: 8, border: "1px solid var(--studio-border)" }}>
-          <button
-            type="button"
-            className={`studio-button ${viewMode === "matrix" ? "studio-button--primary" : ""}`}
-            style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
-            onClick={() => setViewMode("matrix")}
-          >
-            📊 Matrix
-          </button>
-          <button
-            type="button"
-            className={`studio-button ${viewMode === "cards" ? "studio-button--primary" : ""}`}
-            style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
-            onClick={() => setViewMode("cards")}
-          >
-            🎴 Visual Cards
-          </button>
-          <button
-            type="button"
-            className={`studio-button ${viewMode === "table" ? "studio-button--primary" : ""}`}
-            style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
-            onClick={() => setViewMode("table")}
-          >
-            📋 Table View
-          </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", padding: 3, borderRadius: 8, border: "1px solid var(--studio-border)" }}>
+            <button
+              type="button"
+              className={`studio-button ${viewMode === "matrix" ? "studio-button--primary" : ""}`}
+              style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
+              onClick={() => setViewMode("matrix")}
+            >
+              📊 Matrix
+            </button>
+            <button
+              type="button"
+              className={`studio-button ${viewMode === "cards" ? "studio-button--primary" : ""}`}
+              style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
+              onClick={() => setViewMode("cards")}
+            >
+              🎴 Visual Cards
+            </button>
+            <button
+              type="button"
+              className={`studio-button ${viewMode === "table" ? "studio-button--primary" : ""}`}
+              style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
+              onClick={() => setViewMode("table")}
+            >
+              📋 Table View
+            </button>
+          </div>
+          <ShareAction />
         </div>
       </div>
 
