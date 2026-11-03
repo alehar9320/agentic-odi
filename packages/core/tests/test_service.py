@@ -278,6 +278,19 @@ def test_update_outcome_recomputes_opportunity_score(service: ODIService) -> Non
     assert updated2.opportunity_score == 14.0
 
 
+def test_update_outcome_replaces_the_tags_an_outcome_holds(service: ODIService) -> None:
+    job = service.add_job("Job")
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time to ship a release when the build is green",
+    )
+    assert outcome.tags == []
+    tagged = service.update_outcome(outcome.id, {"tags": ["churn", "pricing"]})
+    assert tagged.tags == ["churn", "pricing"]
+    retagged = service.update_outcome(outcome.id, {"tags": ["pricing"]})
+    assert retagged.tags == ["pricing"]
+
+
 def test_update_outcome_rejects_out_of_range_scores(service: ODIService) -> None:
     job = service.add_job("Job")
     outcome = service.add_outcome(

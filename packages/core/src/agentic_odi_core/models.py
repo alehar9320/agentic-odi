@@ -188,6 +188,10 @@ class Outcome(BaseModel):
         default_factory=list,
         description="The themes this outcome is filed under; empty until one is assigned",
     )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Free-form labels carried by this outcome; empty until one is added",
+    )
 
 
 class ValueMetric(BaseModel):

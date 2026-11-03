@@ -8,8 +8,9 @@ in a client.
 
 Decisions settled from the parent's readiness blocker:
 
-* Multi-value fields (``theme_ids``) are one dimension with OR semantics; an
-  outcome in either theme appears once. Different dimensions combine with AND.
+* Multi-value fields (``theme_ids``, ``tags``) are one dimension with OR
+  semantics; an outcome in either theme appears once. Different dimensions
+  combine with AND.
 * Permitted sorts are exactly :data:`OUTCOME_SORTS` — the library is narrowed
   with the same ordering the paginated list reads use.
 * The score band is inclusive at both ends and excludes unscored outcomes;
@@ -49,11 +50,6 @@ class OutcomeQuery:
 
 
 def _validate_query(repo: Repository, query: OutcomeQuery) -> None:
-    if query.tags:
-        raise ValidationError(
-            "tags cannot be filtered yet: no outcome holds tags. "
-            "File outcomes under a theme instead, or add the tag field first."
-        )
     if query.stage is not None and query.stage not in {stage.value for stage in JobStage}:
         raise ValidationError(f"Unknown stage: {query.stage}")
     if query.confidence is not None and query.confidence not in CONFIDENCE_LEVELS:
@@ -99,6 +95,9 @@ def _passes(
             return False
     if skip != "theme" and query.theme_ids:
         if not any(tid in query.theme_ids for tid in outcome.theme_ids):
+            return False
+    if query.tags:
+        if not any(tag in query.tags for tag in outcome.tags):
             return False
     if skip != "confidence" and query.confidence is not None:
         if (query.confidence == "scored") != _is_scored(outcome):

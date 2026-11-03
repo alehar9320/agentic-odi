@@ -293,11 +293,35 @@ def test_an_unknown_sort_is_refused_with_the_permitted_values(
         run(repo, sort="alphabetical")
 
 
-def test_tags_are_refused_because_no_outcome_holds_any_yet(
+def test_a_tag_filter_returns_the_outcomes_holding_any_of_the_queried_tags(
     repo: InMemoryRepository,
 ) -> None:
-    with pytest.raises(ValidationError, match="tags"):
-        run(repo, tags=["urgent"])
+    from agentic_odi_core.models import Outcome
+
+    repo.add_outcome(
+        Outcome(
+            id="o-tag-1",
+            job_id="j-other",
+            statement="Avoid missing a renewal date",
+            tags=["churn"],
+        )
+    )
+    repo.add_outcome(
+        Outcome(
+            id="o-tag-2",
+            job_id="j-other",
+            statement="Minimize the time to classify a chargeback",
+            tags=["pricing"],
+        )
+    )
+    assert ids(run(repo, tags=["churn"])) == ["o-tag-1"]
+    assert sorted(ids(run(repo, tags=["churn", "pricing"]))) == ["o-tag-1", "o-tag-2"]
+
+
+def test_an_outcome_without_tags_is_matched_by_no_tag(
+    repo: InMemoryRepository,
+) -> None:
+    assert ids(run(repo, tags=["urgent"])) == []
 
 
 def test_a_negative_page_is_refused_by_the_shared_page_helper(
