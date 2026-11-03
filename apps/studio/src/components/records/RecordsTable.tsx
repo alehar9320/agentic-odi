@@ -2,13 +2,27 @@ import { MAX_ROWS, RECORD_SECTIONS, type RecordRow } from "../../lib/records";
 
 interface RecordsTableProps {
   rows: RecordRow[];
+  /** The row key that is open, not an id: a record without an id can still be open. */
+  selectedKey: string | null;
+  onSelect: (rowKey: string) => void;
+  /** So closing a record can hand focus back to the row that opened it. */
+  registerButton: (rowKey: string, button: HTMLButtonElement | null) => void;
 }
 
 /**
  * One table per kind, because every kind has its own real columns. A single
  * mixed table would invent a column model the store does not have.
+ *
+ * A row is a button rather than a clickable region, so opening a record is a thing
+ * a keyboard and a screen reader can do: the first cell names it, and
+ * `aria-expanded` says whether it is already open.
  */
-export function RecordsTable({ rows }: RecordsTableProps) {
+export function RecordsTable({
+  rows,
+  selectedKey,
+  onSelect,
+  registerButton,
+}: RecordsTableProps) {
   if (rows.length === 0) {
     return (
       <p className="records__empty">
@@ -51,15 +65,29 @@ export function RecordsTable({ rows }: RecordsTableProps) {
                   const lastIndex = row.cells.length - 1;
                   return (
                     <tr key={row.rowKey}>
-                      {row.cells.map((cell, index) => (
-                        <td key={`${row.rowKey}:${index}`}>
-                          {index === lastIndex ? (
-                            <code className="records__id">{cell}</code>
-                          ) : (
-                            cell
-                          )}
-                        </td>
-                      ))}
+                      {row.cells.map((cell, index) =>
+                        index === 0 ? (
+                          <th className="records__row" scope="row" key={`${row.rowKey}:0`}>
+                            <button
+                              type="button"
+                              className="records__row-button"
+                              aria-expanded={row.rowKey === selectedKey}
+                              ref={(button) => registerButton(row.rowKey, button)}
+                              onClick={() => onSelect(row.rowKey)}
+                            >
+                              {cell}
+                            </button>
+                          </th>
+                        ) : (
+                          <td key={`${row.rowKey}:${index}`}>
+                            {index === lastIndex ? (
+                              <code className="records__id">{cell}</code>
+                            ) : (
+                              cell
+                            )}
+                          </td>
+                        ),
+                      )}
                     </tr>
                   );
                 })}

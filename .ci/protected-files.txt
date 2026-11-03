@@ -8,4 +8,5 @@
 .github/actions/setup/action.yml
 website/tools/build_site.py
 website/tests/test_pages_deploy.py
+website/tests/test_ci_required.py
 tests/contract/test_protected_files.py
