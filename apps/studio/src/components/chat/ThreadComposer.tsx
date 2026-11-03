@@ -7,7 +7,7 @@
  * setup wizard's composer.
  */
 
-import { ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
+import { AuiIf, ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
@@ -18,9 +18,11 @@ import {
   formatFileSize,
   isImageLike,
 } from "../../assistant/attachments";
+import { dictationSupported } from "../../assistant/dictation";
+import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
-import { ArrowUpIcon, PaperclipIcon, StopIcon } from "../icons";
+import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
 import { ModelPicker } from "./ModelPicker";
 
@@ -103,6 +105,8 @@ function ComposerBody({
 }) {
   const aui = useAui();
   const { llmHealth } = useStudio();
+  const history = useComposerHistory();
+  const [recall, setRecall] = useState("");
   // A page can mount more than one composer, so every id and description needs
   // to be unique per instance rather than a fixed string in the document.
   const attachmentHelpId = useId();
@@ -164,11 +168,28 @@ function ComposerBody({
       aui.composer.setText("");
       setDismissedFor("");
       onSlashCommand(text);
+      return;
+    }
+
+    // The palette owns the arrows while it is open; history must not fight it.
+    if (open || event.defaultPrevented) {
+      return;
+    }
+
+    const empty = text.trim() === "";
+    history.onKeyDown(event);
+    // The hook prevents the default only when it actually recalled a message.
+    // Announcing here keeps it to one status change per recall, never per key.
+    if (event.key === "ArrowUp" && empty && event.defaultPrevented) {
+      setRecall(recallAnnouncement(aui.composer.getState().text));
     }
   }
 
   return (
     <>
+      <p className="sr-only" role="status">
+        {recall}
+      </p>
       <SuggestionPills />
       <CommandPalette
         id={paletteId}
@@ -180,6 +201,25 @@ function ComposerBody({
       />
       <ConnectorChips />
       <AttachmentRow />
+      {/* The live transcript is recognition output, not a draft: it is marked
+          as interim and the primitive replaces it with the final sentence. */}
+      <AuiIf condition={(state) => state.composer.dictation != null}>
+        <p className="composer__dictation">
+          <span className="composer__dictation-label">Listening</span>
+          <ComposerPrimitive.DictationTranscript />
+        </p>
+      </AuiIf>
+      {/* The runtime renders this container only while a quote is set, so the
+          strip cannot promise a quote that is not there. */}
+      <ComposerPrimitive.Quote className="composer__quote">
+        <ComposerPrimitive.QuoteText className="composer__quote-text" />
+        <ComposerPrimitive.QuoteDismiss
+          className="composer__quote-dismiss"
+          aria-label="Remove quote"
+        >
+          ✕
+        </ComposerPrimitive.QuoteDismiss>
+      </ComposerPrimitive.Quote>
       <div className="composer__shell">
         <label className="sr-only" htmlFor={inputId}>
           Message the studio
@@ -211,6 +251,28 @@ function ComposerBody({
           }}
         />
         <div className="composer__actions">
+          {/* No microphone where recognition is unavailable, and no second
+              voice system: this is the documented dictation seam. */}
+          {dictationSupported() ? (
+            <>
+              <AuiIf condition={(state) => state.composer.dictation == null}>
+                <ComposerPrimitive.Dictate
+                  className="composer__attach composer__mic"
+                  aria-label="Dictate a message"
+                >
+                  <MicIcon size={16} />
+                </ComposerPrimitive.Dictate>
+              </AuiIf>
+              <AuiIf condition={(state) => state.composer.dictation != null}>
+                <ComposerPrimitive.StopDictation
+                  className="composer__attach composer__mic is-listening"
+                  aria-label="Stop dictating"
+                >
+                  <StopIcon size={14} />
+                </ComposerPrimitive.StopDictation>
+              </AuiIf>
+            </>
+          ) : null}
           <ComposerPrimitive.AddAttachment
             className="composer__attach"
             aria-label="Attach a file"

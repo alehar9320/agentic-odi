@@ -17,6 +17,11 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
+    // Matches the vite alias: `@/` is src/vendor/, the copied components.
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/vendor/*"]
+    },
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
   "include": ["src"]

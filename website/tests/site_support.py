@@ -58,11 +58,21 @@ def read_page(page: str) -> str:
     return (_BUILT / page).read_text(encoding="utf-8")
 
 
+# Pages that are deliberately self-contained: inlined CSS, no client bundle, no
+# shared shell. The 404 page and the sample workspace must render with no
+# network at all, so they are served as-is and are not subject to the site
+# shell's contract (the theme toggle, the shared assets). Their own contract is
+# the opposite, and it is asserted directly.
+STANDALONE_PAGES = {"404.html", "sample/index.html"}
+
+
 def all_pages() -> list[str]:
-    """Every built HTML page, as a path relative to the built site root."""
+    """Every built HTML page that uses the shared shell, relative to the site root."""
     assert _BUILT is not None, "the site was not built"
     return sorted(
-        p.relative_to(_BUILT).as_posix() for p in _BUILT.rglob("*.html") if p.name != "404.html"
+        p.relative_to(_BUILT).as_posix()
+        for p in _BUILT.rglob("*.html")
+        if p.relative_to(_BUILT).as_posix() not in STANDALONE_PAGES
     )
 
 

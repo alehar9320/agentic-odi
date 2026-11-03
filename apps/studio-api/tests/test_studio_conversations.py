@@ -95,6 +95,65 @@ def test_rename_keeps_the_tree() -> None:
     assert renamed.head_id is None
 
 
+def test_the_conversation_list_is_ordered_by_the_last_touch(tmp_path) -> None:
+    path = tmp_path / "studio.db"
+    memory = StudioMemory(path)
+    # Created in one order, touched in the other: the list follows recency.
+    revisited = memory.create_conversation("Quarterly review")
+    untouched = memory.create_conversation("Activation model")
+    memory.close()
+
+    connection = sqlite3.connect(path)
+    with connection:
+        connection.execute(
+            "UPDATE conversations SET created_at = ?, updated_at = ? WHERE id = ?",
+            ("2026-01-01T00:00:00+00:00", "2026-02-09T00:00:00+00:00", revisited.id),
+        )
+        connection.execute(
+            "UPDATE conversations SET created_at = ?, updated_at = ? WHERE id = ?",
+            ("2026-02-05T00:00:00+00:00", "2026-02-05T00:00:00+00:00", untouched.id),
+        )
+    connection.close()
+
+    listed = StudioMemory(path).list_conversations()
+
+    assert [item.id for item in listed] == [revisited.id, untouched.id]
+
+
+def test_the_conversation_list_counts_the_turns_of_each_conversation() -> None:
+    memory = _memory()
+    talked = memory.create_conversation()
+    quiet = memory.create_conversation()
+    memory.append_turn(talked.id, "user", "How do I score this?", "m-1", None)
+    memory.append_turn(talked.id, "assistant", "By importance and satisfaction.", "m-2", "m-1")
+
+    counts = {item.id: item.turn_count for item in memory.list_conversations()}
+
+    assert counts == {talked.id: 2, quiet.id: 0}
+
+
+def test_the_conversation_list_keeps_the_fields_a_switcher_needs() -> None:
+    memory = _memory()
+    blank = memory.create_conversation()
+    branch = memory.create_conversation("Activation model")
+    memory.append_turn(branch.id, "user", "list jobs", "m-1", None)
+    memory.append_turn(branch.id, "assistant", "first", "m-2", "m-1")
+    memory.append_turn(branch.id, "assistant", "second", "m-3", "m-1")
+    memory.set_head(branch.id, "m-3")
+
+    listed = {item.id: item for item in memory.list_conversations()}
+
+    assert listed[blank.id].to_dict() == {
+        "id": blank.id,
+        "title": "",
+        "created_at": blank.created_at,
+        "updated_at": blank.updated_at,
+        "head_id": None,
+        "turn_count": 0,
+    }
+    assert listed[branch.id].head_id == "m-3"
+
+
 def test_the_tree_endpoint_returns_messages_and_the_head() -> None:
     memory = _memory()
     conversation = memory.create_conversation()

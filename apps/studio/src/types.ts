@@ -296,6 +296,12 @@ export interface StudioBrief {
   target_user: string;
   job_statement: string;
   core_problem: string;
+  /** The person's own part in the work, from the first-run introduction. */
+  role?: string;
+  /** The team around them, when they named one. */
+  team?: string;
+  /** What they already have to work from: calls, tickets, threads. */
+  evidence_at_hand?: string[];
   job_id?: string;
   v2mom?: V2Mom;
 }
@@ -305,6 +311,7 @@ export interface StudioBrief {
  * stage; a lens makes room for itself and never replaces the thread.
  */
 export type WorkspacePanelId =
+  | "records"
   | "landscape"
   | "jobmap"
   | "segments"
@@ -424,6 +431,11 @@ export interface Conversation {
   updated_at: string;
   /** The visible branch head turn, when the conversation has branches. */
   head_id?: string | null;
+}
+
+/** A conversation as the history list shows it: enough to name it and size it. */
+export interface ConversationSummary extends Conversation {
+  turn_count: number;
 }
 
 export interface ConversationTurn {

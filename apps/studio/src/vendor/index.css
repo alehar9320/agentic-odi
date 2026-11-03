@@ -1,0 +1,18 @@
+/*
+ * Tailwind v4 for copied components only.
+ *
+ * `source(none)` switches off Tailwind's automatic content detection, and the
+ * `@source` below re-enables it for this directory alone, so no product class
+ * is ever generated here. Preflight is deliberately not imported: it is a
+ * document-wide reset (`*, ::after, ::before { border: 0; margin: 0 }`) and
+ * would restyle everything src/styles/theme.css already renders. Issue #385.
+ */
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+
+@source "./**/*.{ts,tsx}";
+/* Test files quote class names to assert on the compiled output; scanning them
+   would generate exactly the utilities those assertions say must be absent. */
+@source not "./**/*.test.{ts,tsx}";

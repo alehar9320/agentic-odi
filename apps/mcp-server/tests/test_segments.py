@@ -55,6 +55,10 @@ async def _seed_underserved_job(client: Client) -> str:
                 "importance": importance,
                 "satisfaction": satisfaction,
                 "step_id": step["id"],
+                "claim_check": {
+                    "asked": ["How important is this?"],
+                    "answers": ["Very"],
+                },
             },
         )
         text = _text(added)
@@ -112,6 +116,10 @@ async def test_propose_strategy_returns_one_path_with_the_paths_it_beat() -> Non
                 "statement": "Minimize the time it takes to verify the new value when deploying",
                 "importance": 5,
                 "satisfaction": 5,
+                "claim_check": {
+                    "asked": ["How long does verification take?"],
+                    "answers": ["A few minutes"],
+                },
             },
         )
         assert not _text(served).startswith("Error:"), _text(served)

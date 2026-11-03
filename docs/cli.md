@@ -142,6 +142,7 @@ only when you intentionally need to stage a map before capturing outcomes.
 
 # Desired Outcomes
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4 --claim-check '{"asked": ["How long does setup take?"], "answers": ["About a day"]}'
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
@@ -157,6 +158,13 @@ agentic-odi summary <job-id> --top 3 --json
 
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
 checks a statement against the ODI format rules before saving.
+
+A score must carry the questions behind it. `--claim-check` takes the JSON you
+collected — `asked`, `answers`, and `skips` (each skip needs a reason). Omit it
+and the score is recorded as unverified, saying no customer questions were
+asked, so a by-hand score is never mistaken for an interrogated one. The MCP
+`add_outcome` tool is stricter: it refuses a score with no `claim_check` at all,
+and a score with no numbers is always legal.
 
 Job names are validated by the core model: 3–64 characters drawn from letters,
 digits, spaces, underscores, and hyphens. Descriptions may be up to 500
@@ -185,6 +193,13 @@ agentic-odi evidence add \
   --content "Setup takes two days for every new engineer" \
   --job-id <job-id>
 
+# ...or from a text file (or '-' for stdin), on the same cap the Studio uses
+agentic-odi evidence add \
+  --source-name "interview" --name "Support lead" \
+  --file quote.md
+cat quote.txt | agentic-odi evidence add \
+  --source-name "interview" --name "Support lead" --file -
+
 # Read and delete
 agentic-odi evidence list --job-id <job-id>
 agentic-odi evidence list --job-id <job-id> --json
@@ -195,6 +210,11 @@ agentic-odi evidence delete <evidence-id> --yes
 agentic-odi evidence promote <evidence-id> --to job
 agentic-odi evidence promote <evidence-id> --to outcome --job-id <job-id>
 ```
+
+`--file` reads `.txt`, `.md`, `.markdown`, `.vtt`, and `.srt`, and takes exactly
+one of `--content` or `--file`. A file longer than 20,000 characters is truncated
+and the kept amount is reported. `.pdf` and `.docx` are refused: attach them in
+the Studio, which extracts their text.
 
 `connectors ingest --job-id <job-id>` maps every evidence-bearing record in the
 ingested batch into evidence in one step.

@@ -1,4 +1,5 @@
 import { CheckIcon } from "../components/icons";
+import { updateTitle, versionLabel } from "../lib/brand";
 import { useUpdateService, useUpdateSnapshot } from "./UpdateProvider";
 import { bannerView } from "./machine";
 
@@ -25,17 +26,17 @@ export function UpdateBanner() {
     switch (view.kind) {
       case "downloading":
         return {
-          title: `Getting Living Studio ${view.version} ready`,
+          title: updateTitle(view.version, "downloading"),
           detail: "Downloading in the background — you can keep working.",
         };
       case "installing":
         return {
-          title: `Installing Living Studio ${view.version}`,
+          title: updateTitle(view.version, "installing"),
           detail: "One moment.",
         };
       case "ready":
         return {
-          title: `Living Studio ${view.version} is ready`,
+          title: `${versionLabel(view.version)} is ready`,
           detail: view.pendingInstall
             ? "Updating closes and reopens the app."
             : "Restart now, or it will apply the next time you open the studio.",

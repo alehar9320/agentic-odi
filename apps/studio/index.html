@@ -6,11 +6,81 @@
     <link rel="alternate icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
-    <title>The Living Studio | Agentic ODI</title>
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0a0b0e" />
+    <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)" />
+    <meta name="apple-mobile-web-app-title" content="Living Studio" />
+    <title>Living Studio</title>
+    <!-- Bootstrap only: paint the window before the bundle parses. The colours
+         are copies of --bg/--line in src/styles/theme.css, which stays the
+         source of truth; bootShell.test.ts fails if the two drift apart. -->
+    <style>
+      :root {
+        --boot-bg: #0a0b0e;
+        --boot-line: rgba(255, 255, 255, 0.07);
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: light) {
+        html:not(.theme-dark) {
+          --boot-bg: #f5f6f8;
+          --boot-line: rgba(15, 23, 42, 0.09);
+          color-scheme: light;
+        }
+      }
+      html.theme-light {
+        --boot-bg: #f5f6f8;
+        --boot-line: rgba(15, 23, 42, 0.09);
+        color-scheme: light;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background: var(--boot-bg);
+      }
+      .boot-shell {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        grid-template-rows: 56px 34px 1fr;
+        background: var(--boot-bg);
+      }
+      .boot-shell__bar {
+        border-bottom: 1px solid var(--boot-line);
+      }
+    </style>
+    <!-- Resolve the theme before React runs, so the shell and the app agree on
+         one class. It reads the value the app does and consults the OS only when
+         nothing is stored; theme state stays owned by state/StudioContext.tsx. -->
+    <script>
+      (function () {
+        var theme = null;
+        try {
+          var stored = JSON.parse(window.localStorage.getItem("studio.settings") || "null");
+          if (stored && (stored.theme === "light" || stored.theme === "dark")) theme = stored.theme;
+        } catch (error) {}
+        if (!theme) {
+          var light =
+            typeof window.matchMedia === "function" &&
+            window.matchMedia("(prefers-color-scheme: light)").matches;
+          theme = light ? "light" : "dark";
+        }
+        var root = document.documentElement;
+        root.classList.add(theme === "light" ? "theme-light" : "theme-dark");
+        root.style.colorScheme = theme;
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot" class="boot-shell" aria-hidden="true">
+        <div class="boot-shell__bar"></div>
+        <div class="boot-shell__rail"></div>
+        <div class="boot-shell__stage"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
