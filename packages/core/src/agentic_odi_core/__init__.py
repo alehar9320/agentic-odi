@@ -85,6 +85,7 @@ from agentic_odi_core.models import (
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
+    error_envelope,
     parse_tool_result,
     tool_result_text,
 )
@@ -211,6 +212,7 @@ __all__ = [
     "evaluate_outcome_statement",
     "evidence_not_found",
     "format_opportunity_score_insight",
+    "error_envelope",
     "generate_steve_jobs_response",
     "invalid_strategy_request",
     "job_not_found",
