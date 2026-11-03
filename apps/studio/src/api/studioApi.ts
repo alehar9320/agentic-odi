@@ -155,7 +155,7 @@ export function asStudioError(error: unknown): StudioError {
 /** The per-install sidecar token, shared with the sidecar and the MCP server. */
 const STUDIO_TOKEN_KEY = "studio.token";
 
-function getStudioToken(): string | null {
+export function getStudioToken(): string | null {
   if (typeof localStorage === "undefined") {
     return null;
   }
