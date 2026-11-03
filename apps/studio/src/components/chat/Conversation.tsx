@@ -39,7 +39,8 @@ import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon } from "../icons";
 import { Markdown } from "./Markdown";
 import { StallNotice } from "./StallNotice";
-import { WorkBlock, workGrouping } from "./WorkBlock";
+import { WorkBlock } from "./WorkBlock";
+import { workGrouping } from "./workGrouping";
 
 const PHASE_LABEL: Record<string, string> = {
   health_check: "Waking the model",
