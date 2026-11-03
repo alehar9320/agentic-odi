@@ -476,3 +476,28 @@ class ScheduledWork(BaseModel):
     last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
     next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
     result_summary: str | None = Field(None, description="Execution outcome or error summary")
+
+
+class BulkChange(BaseModel):
+    """One outcome's before and after image, so a bulk run can be taken back."""
+
+    outcome_id: str
+    before: dict[str, Any] = Field(..., description="step_id, theme_ids, tags as they were")
+    after: dict[str, Any] = Field(..., description="step_id, theme_ids, tags as the run wrote them")
+
+
+class BulkOperation(BaseModel):
+    """A written bulk run, addressed later by its undo token.
+
+    Only rows that actually changed appear in ``changes``; ``skipped`` is kept for the
+    expiry message and the audit trail.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    applied_at: datetime = Field(..., description="When the real run wrote")
+    requested: int = Field(..., description="Distinct ids the run was asked to change")
+    changes: list[BulkChange] = Field(default_factory=list)
+    skipped: list[dict[str, str]] = Field(
+        default_factory=list, description="Rows not written, each with its reason"
+    )
+    undone_at: datetime | None = Field(None, description="Set once this run has been undone")

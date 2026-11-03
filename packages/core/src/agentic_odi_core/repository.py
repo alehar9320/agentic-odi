@@ -9,6 +9,7 @@ from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    BulkOperation,
     CustomerOutcome,
     Evidence,
     Job,
@@ -121,6 +122,7 @@ class Repository(Protocol):
     evidence: dict[str, Evidence]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
+    bulk_operations: dict[str, BulkOperation]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
     themes: dict[str, Theme]
@@ -194,6 +196,12 @@ class Repository(Protocol):
     ) -> list[ScheduledWork]: ...
     def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
     def delete_scheduled_work(self, work_id: str) -> bool: ...
+    def add_bulk_operation(self, operation: BulkOperation) -> BulkOperation: ...
+    def get_bulk_operation(self, operation_id: str) -> BulkOperation | None: ...
+    def list_bulk_operations(self) -> list[BulkOperation]: ...
+    def update_bulk_operation(
+        self, operation_id: str, updates: dict
+    ) -> BulkOperation | None: ...
     def add_segment(self, segment: Segment) -> Segment: ...
     def get_segment(self, segment_id: str) -> Segment | None: ...
     def list_segments(self, job_id: str | None = None) -> list[Segment]: ...
@@ -232,6 +240,7 @@ class InMemoryRepository:
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.bulk_operations: dict[str, BulkOperation] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
         self.themes: dict[str, Theme] = {}
@@ -560,6 +569,28 @@ class InMemoryRepository:
             del self.scheduled_work[work_id]
             return True
         return False
+
+    def add_bulk_operation(self, operation: BulkOperation) -> BulkOperation:
+        self.bulk_operations[operation.id] = operation
+        return operation
+
+    def get_bulk_operation(self, operation_id: str) -> BulkOperation | None:
+        return self.bulk_operations.get(operation_id)
+
+    def list_bulk_operations(self) -> list[BulkOperation]:
+        return list(self.bulk_operations.values())
+
+    def update_bulk_operation(
+        self, operation_id: str, updates: dict[str, Any]
+    ) -> BulkOperation | None:
+        operation = self.bulk_operations.get(operation_id)
+        if operation is None:
+            return None
+        current = operation.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_operation = operation.model_validate(current)
+        self.bulk_operations[operation_id] = new_operation
+        return new_operation
 
     def add_segment(self, segment: Segment) -> Segment:
         self.segments[segment.id] = segment
