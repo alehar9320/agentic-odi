@@ -13,7 +13,7 @@ import {
   type WorkspaceSnapshot,
 } from "./types";
 
-const DB_NAME = "agentic-odi-studio";
+export const DB_NAME = "agentic-odi-studio";
 const DB_VERSION = 1;
 
 interface StudioDb extends DBSchema {
