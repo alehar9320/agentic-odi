@@ -24,12 +24,16 @@ from agentic_odi_core.errors import (
     OdiError,
     RateLimitError,
     SerializationError,
+    StoreCorrupt,
     StoreError,
     error_status,
 )
 from agentic_odi_core.evaluation import (
+    OutcomeScoreMismatchError,
     OutcomeStatementError,
+    assert_outcome_scores_match,
     evaluate_outcome_statement,
+    load_score_fixture,
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
@@ -127,6 +131,9 @@ from agentic_odi_core.strategy import propose_strategy
 __all__ = [
     "ScheduledWork",
     "ScheduledWorkNotFoundError",
+    "OutcomeScoreMismatchError",
+    "assert_outcome_scores_match",
+    "load_score_fixture",
     "ScheduledWorkStatus",
     "ScheduledWorkTriggerType",
     "Segment",
@@ -184,6 +191,7 @@ __all__ = [
     "SerializationError",
     "Step",
     "StepNotFoundError",
+    "StoreCorrupt",
     "StoreError",
     "Signal",
     "SignalBudget",

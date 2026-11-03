@@ -50,6 +50,7 @@ const DEFAULT_CHAT_STREAM =
 
 let chatStream: string | null = null;
 let canvasFails = false;
+let bootCorrupt = false;
 let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
@@ -98,6 +99,22 @@ function route(
           reject(error);
         });
       });
+    }
+    if (bootCorrupt) {
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: "store_corrupt",
+            message:
+              "Your database failed its integrity check: /home/me/.odi.db. " +
+              "Last backup: 06:14 (odi-20260102T061400Z.db).",
+            detail: "database disk image is malformed",
+            suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
+            retryable: false,
+          },
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      );
     }
     if (configFails) {
       throw new TypeError("fetch failed");
@@ -231,6 +248,7 @@ describe("StudioContext memory and resume", () => {
     chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -465,6 +483,7 @@ describe("StudioContext failures", () => {
     chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -551,6 +570,7 @@ describe("StudioContext first run in a browser with no server", () => {
     chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     configAborts = 0;
     catalogFetches = 0;
@@ -809,6 +829,7 @@ describe("StudioContext health polling", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     vi.useFakeTimers();
@@ -889,6 +910,7 @@ describe("StudioContext theme", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
@@ -935,6 +957,7 @@ describe("StudioContext canvas state", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -971,6 +994,7 @@ describe("StudioContext stopped turns", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -1005,6 +1029,7 @@ describe("StudioContext write approval and branches", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -1065,5 +1090,54 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext boot failure", () => {
+  beforeEach(() => {
+    bootCorrupt = true;
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("surfaces a store-corrupt failure as bootError, not as a down sidecar", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.bootError).not.toBeNull());
+
+    expect(result.current.bootError?.code).toBe("store_corrupt");
+    expect(result.current.bootError?.message).toContain("/home/me/.odi.db");
+    // The sidecar answered, so it is reachable; the database is the problem.
+    expect(result.current.sidecarReachable).toBe(true);
+  });
+
+  it("clears the failure page once a restored store answers cleanly", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.bootError).not.toBeNull());
+
+    // The person restored a backup; the next probe answers cleanly.
+    bootCorrupt = false;
+    await act(async () => {
+      await result.current.recheckBoot();
+    });
+
+    expect(result.current.bootError).toBeNull();
+    expect(result.current.sidecarReachable).toBe(true);
   });
 });

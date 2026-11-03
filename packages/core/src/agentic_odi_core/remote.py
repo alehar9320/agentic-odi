@@ -31,6 +31,7 @@ class StudioErrorCode(str, Enum):
     CONFLICT = "conflict"
     RATE_LIMITED = "rate_limited"
     CONSENT_REQUIRED = "consent_required"
+    STORE_CORRUPT = "store_corrupt"
     INTERNAL = "internal"
 
 
@@ -50,6 +51,7 @@ STATUS_FOR_CODE: dict[StudioErrorCode, int] = {
     StudioErrorCode.CONFLICT: 409,
     StudioErrorCode.RATE_LIMITED: 429,
     StudioErrorCode.CONSENT_REQUIRED: 403,
+    StudioErrorCode.STORE_CORRUPT: 500,
     StudioErrorCode.MCP_UNREACHABLE: 502,
     StudioErrorCode.LLM_UNREACHABLE: 502,
     StudioErrorCode.MCP_TOOL_FAILED: 500,
@@ -69,6 +71,7 @@ _MESSAGE_FOR_CODE: dict[StudioErrorCode, str] = {
     StudioErrorCode.CONFLICT: "That conflicts with the current state.",
     StudioErrorCode.RATE_LIMITED: "Too many requests.",
     StudioErrorCode.CONSENT_REQUIRED: "That action needs the PM's approval first.",
+    StudioErrorCode.STORE_CORRUPT: "The database failed its integrity check.",
     StudioErrorCode.MCP_TOOL_FAILED: "The operation did not complete.",
     StudioErrorCode.LLM_TOOL_ROUNDS_EXHAUSTED: "The assistant reached its tool limit for this turn.",
     StudioErrorCode.INTERNAL: "Something went wrong.",
@@ -86,6 +89,9 @@ _SUGGESTION_FOR_CODE: dict[StudioErrorCode, str | None] = {
     StudioErrorCode.CONFLICT: "Reload and try again.",
     StudioErrorCode.RATE_LIMITED: "Wait, then try again.",
     StudioErrorCode.CONSENT_REQUIRED: "Get the PM's approval for this workspace, then try again.",
+    StudioErrorCode.STORE_CORRUPT: (
+        "Restore a backup, then restart. The damaged file was left untouched."
+    ),
     StudioErrorCode.MCP_TOOL_FAILED: "Try again.",
     StudioErrorCode.LLM_TOOL_ROUNDS_EXHAUSTED: "Ask me to continue from here.",
     StudioErrorCode.INTERNAL: "Try again.",
