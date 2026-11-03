@@ -696,7 +696,10 @@ export interface paths {
         };
         /**
          * List Conversations
-         * @description The history a switcher lists: every thread, most recent touch first.
+         * @description The history a switcher lists: at most 20 threads, most recent touch first.
+         *
+         *     Titles come from the first question, so the list names each thread without
+         *     carrying a single turn body.
          */
         get: operations["list_conversations_api_conversations_get"];
         put?: never;
@@ -955,6 +958,76 @@ export interface paths {
          * @description Reject a proposal. Nothing is written to the ODI store.
          */
         post: operations["reject_proposal_api_api_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Shares
+         * @description The owner's links, without tokens: id, artifact, and the key dates.
+         */
+        get: operations["list_shares_api_share_get"];
+        put?: never;
+        /**
+         * Mint Share
+         * @description Mint a scoped, expiring, read-only link for one artifact.
+         *
+         *     The raw token is returned exactly once; only its hash is stored. Creation
+         *     happens through this route only, so the token is never minted by a page.
+         */
+        post: operations["mint_share_api_share_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/share/{share_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Share
+         * @description Revoke a link. Effective immediately, and idempotent.
+         */
+        delete: operations["revoke_share_api_share__share_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/share/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Shared
+         * @description Read exactly the one artifact a token names, and its own evidence.
+         *
+         *     A malformed, unknown, expired, or revoked token is the same ``404``; the
+         *     response never says which. There is no list and no canvas here.
+         */
+        get: operations["read_shared_api_share__token__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1567,6 +1640,21 @@ export interface components {
             mcp_url: string;
         };
         /**
+         * MintShareRequest
+         * @description Mint one scoped, expiring, read-only link for one artifact.
+         */
+        MintShareRequest: {
+            /**
+             * Artifact Kind
+             * @enum {string}
+             */
+            artifact_kind: "outcome" | "segment" | "strategy";
+            /** Artifact Id */
+            artifact_id: string;
+            /** Ttl Days */
+            ttl_days?: number | null;
+        };
+        /**
          * ModelListRequest
          * @description Which backend to ask for its model ids. The key travels in the body, not
          *     the query string, so it never lands in a URL or an access log.
@@ -1742,6 +1830,36 @@ export interface components {
             };
             /** Job Id */
             job_id?: string | null;
+        };
+        /**
+         * ShareMintResponse
+         * @description The one time the raw token is shown. Only its hash is stored.
+         */
+        ShareMintResponse: {
+            /** Id */
+            id: string;
+            /** Token */
+            token: string;
+            /** Url */
+            url: string;
+            /** Expires At */
+            expires_at: string;
+        };
+        /**
+         * SharedArtifactResponse
+         * @description Exactly the named artifact and its own evidence. Nothing else.
+         */
+        SharedArtifactResponse: {
+            /** Artifact Kind */
+            artifact_kind: string;
+            /** Artifact */
+            artifact: {
+                [key: string]: unknown;
+            };
+            /** Evidence */
+            evidence?: {
+                [key: string]: unknown;
+            }[];
         };
         /**
          * SignalActionRequest
@@ -4154,6 +4272,125 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shares_api_share_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    mint_share_api_share_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MintShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareMintResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_share_api_share__share_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_shared_api_share__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedArtifactResponse"];
                 };
             };
             /** @description Validation Error */
