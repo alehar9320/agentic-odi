@@ -210,7 +210,7 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
 - Produces for Task 4: `run_tool("add_outcome", args)` working when `args` omits `importance`/`satisfaction`, returning the outcome dict with `importance is None`.
 - Consumes: `ODIService.add_outcome`'s optional scores (unchanged), `ToolName.ADD_OUTCOME`'s contract, which already declares both optional.
 
-- [ ] **Step 1: write the failing test** in `apps/cli/tests/test_backend.py`:
+- [x] **Step 1: write the failing test** in `apps/cli/tests/test_backend.py`:
 
   ```python
   def test_add_outcome_without_scores_is_created(tmp_path):
@@ -220,10 +220,10 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
       assert result["importance"] is None and result["satisfaction"] is None
   ```
   Currently this raises `KeyError: 'importance'`.
-- [ ] **Step 2: `uv run pytest apps/cli/tests/test_backend.py -k add_outcome -q`** → fails.
-- [ ] **Step 3: replace `float(args["importance"])` / `float(args["satisfaction"])`** with a local `_score(args, name)` returning `None` when the key is absent or the value is `None`, and `float(value)` otherwise. Leave `_VALUE_RANGE_ERROR` and every other handler untouched — three tests across three apps pin that sentence and it mirrors the tool's own.
-- [ ] **Step 4: `uv run pytest apps/cli/tests -q`** → pass; the existing scored-path tests are unaffected because `add` always passes both keys.
-- [ ] **Step 5: full gates**, then commit `fix(cli): an unscored add_outcome through the local backend (ALH-222)`.
+- [x] **Step 2: `uv run pytest apps/cli/tests/test_backend.py -k add_outcome -q`** → fails.
+- [x] **Step 3: replace `float(args["importance"])` / `float(args["satisfaction"])`** with a local `_score(args, name)` returning `None` when the key is absent or the value is `None`, and `float(value)` otherwise. Leave `_VALUE_RANGE_ERROR` and every other handler untouched — three tests across three apps pin that sentence and it mirrors the tool's own.
+- [x] **Step 4: `uv run pytest apps/cli/tests -q`** → pass; the existing scored-path tests are unaffected because `add` always passes both keys.
+- [x] **Step 5: full gates**, then commit `fix(cli): an unscored add_outcome through the local backend (ALH-222)`.
 
 ## Task 4: `odi desired-outcomes import`
 

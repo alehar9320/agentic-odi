@@ -56,6 +56,16 @@ _BUSINESS_VALUE_FIELDS = {
 }
 
 
+def _score(args: dict[str, Any], name: str) -> float | None:
+    """One score cell: absent or null stays absent, never a zero.
+
+    An outcome captured before anyone scored it is legal, and a row of a spreadsheet
+    that names only importance must not be turned into ``0`` for the other column.
+    """
+    value = args.get(name)
+    return None if value is None else float(value)
+
+
 class BackendError(Exception):
     """A user-facing failure: not found, invalid input, or unreachable server.
 
@@ -253,8 +263,8 @@ class LocalBackend(Backend):
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
                 statement=args["statement"],
-                importance=float(args["importance"]),
-                satisfaction=float(args["satisfaction"]),
+                importance=_score(args, "importance"),
+                satisfaction=_score(args, "satisfaction"),
                 step_id=step_id,
                 claim_check=claim_check,
             )
