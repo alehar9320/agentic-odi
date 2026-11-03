@@ -11,7 +11,7 @@ from agentic_odi_studio_api.studio.claims import (
     EvidenceSnapshot,
     split_claims,
 )
-from agentic_odi_studio_api.studio.memory import StudioMemory
+from agentic_odi_studio_api.studio.memory import MAX_CONVERSATIONS, StudioMemory
 from fastapi.testclient import TestClient
 
 
@@ -152,6 +152,83 @@ def test_the_conversation_list_keeps_the_fields_a_switcher_needs() -> None:
         "turn_count": 0,
     }
     assert listed[branch.id].head_id == "m-3"
+
+
+def test_the_conversation_list_returns_the_recent_threads_newest_first(tmp_path) -> None:
+    path = tmp_path / "studio.db"
+    memory = StudioMemory(path)
+    older = memory.create_conversation("First question")
+    newer = memory.create_conversation("Second question")
+    memory.close()
+
+    connection = sqlite3.connect(path)
+    with connection:
+        connection.execute(
+            "UPDATE conversations SET updated_at = ? WHERE id = ?",
+            ("2026-02-01T00:00:00+00:00", older.id),
+        )
+        connection.execute(
+            "UPDATE conversations SET updated_at = ? WHERE id = ?",
+            ("2026-02-09T00:00:00+00:00", newer.id),
+        )
+    connection.close()
+
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=StudioMemory(path)))
+    listed = client.get("/api/conversations").json()["conversations"]
+
+    assert [item["id"] for item in listed] == [newer.id, older.id]
+    # The title is derived from the first question; nothing here carries prose.
+    assert listed[0]["title"] == "Second question"
+
+
+def test_the_conversation_list_caps_at_twenty_and_keeps_the_newest(tmp_path) -> None:
+    path = tmp_path / "studio.db"
+    memory = StudioMemory(path)
+    ids = [memory.create_conversation(f"Thread {index}").id for index in range(25)]
+    memory.close()
+
+    connection = sqlite3.connect(path)
+    with connection:
+        for index, conversation_id in enumerate(ids):
+            # Ascending timestamps, so the newest thread is unambiguous.
+            stamp = f"2026-02-{index + 1:02d}T00:00:00+00:00"
+            connection.execute(
+                "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                (stamp, conversation_id),
+            )
+    connection.close()
+
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=StudioMemory(path)))
+    listed = client.get("/api/conversations").json()["conversations"]
+
+    assert len(listed) == MAX_CONVERSATIONS
+    # Newest first: the most recently touched is kept, the oldest five are not.
+    assert [item["id"] for item in listed] == list(reversed(ids))[:MAX_CONVERSATIONS]
+
+
+def test_the_conversation_list_carries_no_turn_bodies() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    memory.append_turn(conversation.id, "user", "First question.", "m-1", None)
+    memory.append_turn(conversation.id, "assistant", "An answer nobody should see.", "m-2", "m-1")
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=memory))
+
+    body = client.get("/api/conversations").json()
+    item = body["conversations"][0]
+
+    # The summary is metadata and a count; the prose stays behind the tree route.
+    assert set(item) == {
+        "id",
+        "title",
+        "created_at",
+        "updated_at",
+        "head_id",
+        "turn_count",
+    }
+    # No turn bodies ride along: only the title, derived from the first question.
+    assert "content" not in item
+    assert "turns" not in item
+    assert "nobody should see" not in client.get("/api/conversations").text
 
 
 def test_the_tree_endpoint_returns_messages_and_the_head() -> None:
