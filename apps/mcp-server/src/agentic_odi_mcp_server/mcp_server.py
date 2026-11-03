@@ -880,7 +880,7 @@ def add_theme(
     except JobNotFoundError:
         return job_not_found(job_id or "")
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps(theme.model_dump(mode="json"))
 
 
@@ -902,7 +902,7 @@ def rename_theme(
             theme_id, name=name, description=description, ordinal=ordinal, parent_id=parent_id
         )
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps(theme.model_dump(mode="json"))
 
 
@@ -912,7 +912,7 @@ def delete_theme(theme_id: str) -> str:
     try:
         return json.dumps(service.delete_theme(theme_id))
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
 
 
 @mcp.tool
@@ -932,7 +932,7 @@ def assign_theme(outcome_ids: list[str], theme_id: str) -> str:
     try:
         outcomes = service.assign_theme(outcome_ids, theme_id)
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps([outcome.model_dump(mode="json") for outcome in outcomes])
 
 
@@ -942,7 +942,7 @@ def unassign_theme(outcome_ids: list[str], theme_id: str) -> str:
     try:
         outcomes = service.unassign_theme(outcome_ids, theme_id)
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps([outcome.model_dump(mode="json") for outcome in outcomes])
 
 
