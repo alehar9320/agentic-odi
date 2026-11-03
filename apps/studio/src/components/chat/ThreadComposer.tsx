@@ -23,7 +23,14 @@ import { recallAnnouncement, useComposerHistory } from "../../assistant/composer
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
-import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
+import {
+  CommandPalette,
+  ComposerHint,
+  ConnectorChips,
+  ContextChip,
+  SuggestionPills,
+  paletteOpenFor,
+} from "./composerParts";
 import { QueueLane } from "./QueueLane";
 import { ModelPicker } from "./ModelPicker";
 
@@ -214,6 +221,7 @@ function ComposerBody({
         onChoose={choose}
       />
       <ConnectorChips />
+      <ContextChip />
       <QueueLane />
       <AttachmentRow />
       {/* The live transcript is recognition output, not a draft: it is marked

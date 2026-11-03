@@ -51,6 +51,8 @@ const DEFAULT_CHAT_STREAM =
 
 let chatStream: string | null = null;
 let canvasFails = false;
+/** Extra records the canvas route serves; empty keeps every other test as-is. */
+let canvasRecords: Record<string, unknown> = {};
 let bootCorrupt = false;
 let chatAborts = false;
 let chatFailure: Error | null = null;
@@ -178,7 +180,7 @@ function route(
         headers: { "Content-Type": "application/json" },
       });
     }
-    return json({ jobs: [], steps: [], outcomes: [], source: "local" });
+    return json({ jobs: [], steps: [], outcomes: [], source: "local", ...canvasRecords });
   }
   if (url === "/api/connectors/catalog") {
     catalogFetches += 1;
@@ -1429,5 +1431,130 @@ describe("StudioContext follow-up queue (#410)", () => {
       gatedTurns[2].respond(DEFAULT_CHAT_STREAM);
     });
     await waitFor(() => expect(result.current.streaming).toBe(false));
+  });
+});
+
+describe("StudioContext agent focus", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    bootCorrupt = false;
+    chatAborts = false;
+    canvasFails = false;
+    canvasRecords = {};
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends the selected record as a pointer the sidecar can verify", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("outcome", "O-9");
+    });
+    await act(async () => {
+      await result.current.sendMessage("what would have to be true?");
+    });
+
+    expect(chatBody?.focus).toEqual({ kind: "outcome", id: "O-9" });
+  });
+
+  it("sends no focus when the screen has nothing selected", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("what would have to be true?");
+    });
+
+    expect(chatBody?.focus ?? null).toBeNull();
+  });
+
+  it("does not point at a record the sidecar cannot read", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("strategy", "S-1");
+    });
+    await act(async () => {
+      await result.current.sendMessage("what would have to be true?");
+    });
+
+    expect(chatBody?.focus ?? null).toBeNull();
+  });
+
+  it("stops pointing at the screen once the person clears the focus", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("outcome", "O-9");
+    });
+    expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-9" });
+    // Focusing a record is remembered for the next visit, so clearing must undo it.
+    expect(localStorage.getItem("studio.session")).toContain("O-9");
+
+    act(() => {
+      result.current.clearFocus();
+    });
+
+    expect(result.current.focusedSubject).toBeNull();
+    expect(localStorage.getItem("studio.session")).toBeNull();
+
+    await act(async () => {
+      await result.current.sendMessage("what would have to be true?");
+    });
+
+    expect(chatBody?.focus ?? null).toBeNull();
+  });
+
+  it("names the focused record with the words the snapshot holds", async () => {
+    canvasRecords = {
+      outcomes: [{ id: "O-9", statement: "Reduce the time to reconcile a failed payment" }],
+    };
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("outcome", "O-9");
+    });
+
+    await waitFor(() =>
+      expect(result.current.focusedSubjectLabel).toBe(
+        "Reduce the time to reconcile a failed payment",
+      ),
+    );
+  });
+
+  it("names nothing for a selection this snapshot does not hold", async () => {
+    canvasRecords = {
+      outcomes: [{ id: "O-9", statement: "An outcome that is still on the board" }],
+    };
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("outcome", "deleted-yesterday");
+    });
+
+    // The pointer still travels — the sidecar answers nothing it cannot read —
+    // but the composer has no words to claim, so no chip may appear.
+    expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "deleted-yesterday" });
+    expect(result.current.focusedSubjectLabel).toBeNull();
   });
 });

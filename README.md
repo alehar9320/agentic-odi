@@ -151,6 +151,12 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   Settings → About also offers an opt-in, redacted local diagnostics preview; no
   report is uploaded. See
   [The Living Studio](docs/living-studio.md).
+- **The agent knows what you are looking at.** Select a job, step, outcome, or
+  evidence record and the Studio tells the sidecar only *which* record — kind and
+  id — never what it says. The sidecar re-reads that record from the store and
+  answers about it in the store's own words; an id the store does not have earns
+  no sentence. A quiet chip in the composer names what was said on your behalf,
+  opens the record when you press it, and can be dismissed.
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
 ```bash
