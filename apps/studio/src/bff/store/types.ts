@@ -109,6 +109,14 @@ export interface WorkspaceSnapshot {
  */
 export interface LocalStore {
   readonly durable: boolean;
+  /**
+   * True once a write was refused for lack of space. While it holds, a write
+   * throws before it touches the store; reads keep working, so the work that is
+   * already there stays exportable.
+   */
+  readonly storageFull: boolean;
+  /** Called when `storageFull` flips. Returns the unsubscribe function. */
+  subscribeStorageFull(listener: () => void): () => void;
   nextSeq(): Promise<number>;
   listJobs(): Promise<StoredJob[]>;
   getJob(id: string): Promise<StoredJob | undefined>;

@@ -9,10 +9,12 @@ const studio = vi.hoisted(() => ({
   sidecarReachable: true as boolean | null,
   llmHealth: { healthy: true as boolean | null, message: "" },
   dismissedSidecarNotice: false,
+  storageFull: false,
   dismissSidecarNotice: vi.fn(),
   recheckConnections: vi.fn(),
   openSetup: vi.fn(),
   openPanel: vi.fn(),
+  exportWorkspace: vi.fn(),
   ask: vi.fn(),
 }));
 
@@ -71,6 +73,7 @@ describe("BannerBridge", () => {
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: true, message: "" };
     studio.dismissedSidecarNotice = false;
+    studio.storageFull = false;
     setOnLine(true);
   });
 
@@ -253,5 +256,49 @@ describe("BannerBridge", () => {
     goOnline();
 
     expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
+  });
+
+  it("raises one storage-full strip with Export as its only action", () => {
+    studio.storageFull = true;
+    renderShell();
+
+    expect(
+      screen.getByText(/This browser is out of space for this site/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Your existing work is safe/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Export" })).toHaveLength(1);
+    // Nothing suggests clearing data to make room.
+    expect(screen.queryByText(/clear|delete|remove/i)).not.toBeInTheDocument();
+  });
+
+  it("runs the real export through the dispatcher", () => {
+    studio.storageFull = true;
+    studio.exportWorkspace.mockClear();
+    renderShell();
+
+    act(() => {
+      screen.getByRole("button", { name: "Export" }).click();
+    });
+
+    expect(studio.exportWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the storage-full strip when writes are no longer paused", () => {
+    studio.storageFull = true;
+    const { rerender } = renderShell();
+    expect(
+      screen.getByText(/This browser is out of space for this site/i),
+    ).toBeInTheDocument();
+
+    studio.storageFull = false;
+    rerender(
+      <BannerProvider>
+        <BannerBridge />
+        <Shell />
+      </BannerProvider>,
+    );
+    expect(
+      screen.queryByText(/This browser is out of space for this site/i),
+    ).not.toBeInTheDocument();
   });
 });
