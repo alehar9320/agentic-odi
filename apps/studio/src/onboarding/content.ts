@@ -52,22 +52,22 @@ export const STEPS: OnboardingStep[] = [
   },
   {
     id: "goal",
-    label: "Starting point",
+    label: "Where to start",
     title: "What's on your mind?",
-    lead: "Pick the one that sounds like your week. You can change direction any time by saying so.",
+    lead: "Pick what feels most urgent. You can change direction anytime.",
   },
   {
     id: "readiness",
-    label: "Instruments",
-    title: "A quick look at your instruments.",
+    label: "Setup",
+    title: "Your setup.",
     lead:
-      "The studio runs locally. The copilot needs an OpenAI-compatible model to " +
-      "answer; everything else works by hand.",
+      "The studio works standalone. It works better with an AI assistant — " +
+      "but you can add that later.",
   },
   {
     id: "launch",
-    label: "First move",
-    title: "Your first move.",
+    label: "First step",
+    title: "Your first step.",
     lead: "One sentence is enough to start.",
   },
 ];

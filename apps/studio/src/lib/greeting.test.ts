@@ -57,12 +57,20 @@ describe("greetingCandidates", () => {
     expect(kinds).toEqual(["capability", "greeting"]);
   });
 
-  it("reflects the opportunity landscape once outcomes exist", () => {
+  it("reflects the gap landscape once outcomes exist", () => {
     const insight = greetingCandidates(
       context({ outcomeCount: 4, underservedCount: 1, jobCount: 2 }),
     ).find((candidate) => candidate.id === "insight-outcomes");
 
-    expect(insight?.text).toBe("4 outcomes mapped — 1 underserved.");
+    expect(insight?.text).toBe("4 gaps worth chasing — attention needed.");
+  });
+
+  it("uses singular verb agreement for one gap", () => {
+    const insight = greetingCandidates(
+      context({ outcomeCount: 1, underservedCount: 1, jobCount: 2 }),
+    ).find((candidate) => candidate.id === "insight-outcomes");
+
+    expect(insight?.text).toBe("1 gap worth chasing — attention needed.");
   });
 
   it("stays honest about the canvas when nothing is underserved", () => {
@@ -70,7 +78,7 @@ describe("greetingCandidates", () => {
       (candidate) => candidate.id === "insight-outcomes",
     );
 
-    expect(insight?.text).toBe("1 outcome mapped. Nothing is starving for attention.");
+    expect(insight?.text).toBe("1 gap worth chasing. Nothing urgent here yet.");
   });
 
   it("offers a capability line when the canvas is empty", () => {

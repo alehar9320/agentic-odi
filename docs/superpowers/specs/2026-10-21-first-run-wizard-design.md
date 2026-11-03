@@ -46,8 +46,8 @@ Four steps, one progress rail, never more than two actions on screen.
 | Step | Question | What it does |
 |---|---|---|
 | 1. Welcome | *What is this?* | The JTBD premise, plus the three moves: map the job, score the outcomes, test the bet. |
-| 2. Starting point | *Where do I begin?* | Four goal cards: name the job, read the landscape, simulate a bet, capture an outcome. |
-| 3. Instruments | *Will it work?* | Live sidecar, MCP, and model status. If the model is down, the three config fields are inline with **Save & test**. |
+| 2. Where to start | *Where do I begin?* | Four goal cards: name the job, read the landscape, simulate a bet, capture an outcome. |
+| 3. Setup | *Will it work?* | Live data bridge and model status. If the model is down, the three config fields are inline with **Save & test**. |
 | 4. First move | *What happens next?* | The chosen destination and what the user walks away with. One primary action. |
 
 The tour opens over the shell on the first visit. The context conversation is

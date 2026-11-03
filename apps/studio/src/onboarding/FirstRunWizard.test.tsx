@@ -122,11 +122,11 @@ describe("FirstRunWizard", () => {
     fireEvent.click(continueButton());
 
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "A quick look at your instruments.",
+      "Your setup.",
     );
     fireEvent.click(continueButton());
 
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Your first move.");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Your first step.");
     expect(
       screen.getByText("We start in the conversation. Tell me what you already know."),
     ).toBeInTheDocument();
@@ -227,7 +227,7 @@ describe("FirstRunWizard", () => {
     renderWizard();
 
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "A quick look at your instruments.",
+      "Your setup.",
     );
   });
 
