@@ -1006,7 +1006,7 @@ def bulk_update_outcomes(
             dry_run=dry_run,
         )
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps(report.as_dict())
 
 
@@ -1020,7 +1020,7 @@ def undo_bulk(token: str) -> str:
     try:
         report = service.undo_bulk(token)
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps(report.as_dict())
 
 

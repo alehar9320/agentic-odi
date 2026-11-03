@@ -118,14 +118,15 @@ async def test_an_unknown_stage_refuses_the_whole_call_not_one_row() -> None:
     async with Client(mcp) as client:
         outcome_id, _ = await _seed(client)
 
-        text = _text(
+        refusal = _payload(
             await client.call_tool(
                 "bulk_update_outcomes", {"outcome_ids": [outcome_id], "stage": "sidestep"}
             )
         )
 
-        assert text.startswith("Error:")
-        assert "sidestep" in text
+        assert refusal["error"]["code"] == "validation"
+        assert refusal["message"].startswith("Error:")
+        assert "sidestep" in refusal["message"]
 
 
 @pytest.mark.asyncio
@@ -133,7 +134,7 @@ async def test_a_self_contradicting_theme_change_is_refused_with_the_error_text(
     async with Client(mcp) as client:
         outcome_id, theme_id = await _seed(client)
 
-        text = _text(
+        refusal = _payload(
             await client.call_tool(
                 "bulk_update_outcomes",
                 {
@@ -144,5 +145,6 @@ async def test_a_self_contradicting_theme_change_is_refused_with_the_error_text(
             )
         )
 
-        assert text.startswith("Error:")
-        assert "both added and removed" in text
+        assert refusal["error"]["code"] == "validation"
+        assert refusal["message"].startswith("Error:")
+        assert "both added and removed" in refusal["message"]
