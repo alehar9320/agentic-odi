@@ -787,7 +787,6 @@ function OpportunityTableView({
                     style={{
                       background: underserved ? "rgba(251, 191, 36, 0.15)" : "rgba(255,255,255,0.05)",
                       color: underserved ? "var(--studio-amber)" : "var(--studio-muted)",
-                      fontSize: "0.72rem",
                     }}
                   >
                     {underserved ? "UNDERSERVED" : "NORMAL"}
