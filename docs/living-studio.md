@@ -596,6 +596,42 @@ itself, including that a quote containing `<script>` or `<h1>` prints as the
 characters the person said. The rules live in `scripts/artifact_a11y.py`; what
 passes them is a well-built document, not a certified one.
 
+### Sharing a read-only artifact
+
+A person can hand a teammate one artifact without handing over the workspace.
+The landscape header carries a **Share** control; choosing a duration (7, 14, or
+30 days) mints a link through the sidecar and shows it once, with a **Copy
+link** button. The link is a capability, not a copy of the database: it opens a
+read-only page that renders the landscape — or the vision — and its own
+evidence, and nothing else.
+
+The page lives at `/shared/:token`. It is deliberately *not* the Studio with its
+controls hidden. The route is decided before any provider mounts, so it never
+runs the workspace boot: no canvas fetch, no rail, no composer, no navigation
+into the app, and no sidecar configuration beyond the one scoped payload the
+token returns. The header names the artifact and its expiry
+(`Shared read-only · expires in 3 days`), and the only action is the browser's
+own print, which is [the decision brief](https://github.com/alehar9320/agentic-odi/issues/350)'s
+brief. An expired link, or a token that is unknown or revoked, shows one
+sentence and no data; a guessed artifact id renders nothing, because there is no
+id to guess — only the token, and the token is scoped to one artifact.
+
+The mint and read contract belongs to the sidecar's share store
+([#549](https://github.com/alehar9320/agentic-odi/issues/549)): it mints a link
+for one artifact, returns the scoped payload for a token, and revokes by id.
+Until that store lands, the **Share** control is present but the mint call has
+no route behind it, so a click reports the failure rather than promising a link
+it did not make. When the store offers no revoke, the sheet says the link
+**cannot be revoked from this build** and stops working on its own at expiry,
+rather than offering a control that does nothing.
+
+| File | Role |
+|---|---|
+| `apps/studio/src/lib/share.ts` | The `/shared/:token` route reader and the expiry wording. Pure, and tested on its own. |
+| `apps/studio/src/components/SharedArtifact.tsx` | The read-only page: one artifact, its evidence, and the expiry. No edit control, no navigation. |
+| `apps/studio/src/components/ShareAction.tsx` | The landscape's share control; disabled with a reason when the sidecar is unreachable or the canvas is empty. |
+| `apps/studio/src/components/ShareSheet.tsx` | The dialog that mints a link for a chosen duration, offers it to copy, and states whether it can be revoked. |
+
 ## Rich responses
 
 
