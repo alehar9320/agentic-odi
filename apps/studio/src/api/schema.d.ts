@@ -417,6 +417,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/outcomes/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Outcomes Api
+         * @description Import a spreadsheet of desired Outcomes into one Job.
+         *
+         *     The body is ``ImportReport``'s own dictionary — ``created`` with a line number
+         *     and an outcome id per row, ``refused`` with the service's own sentence per bad
+         *     row, the theme names that matched nothing or matched two, the columns read and
+         *     ignored, and ``aborted`` when the server stopped answering — so the Studio
+         *     shows what the terminal shows. A bad row is a 200 with a reason; a bad request
+         *     (no file, an unknown job) is the 422 or 404 every other outcome route gives.
+         */
+        post: operations["import_outcomes_api_api_outcomes_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/steps/{step_id}": {
         parameters: {
             query?: never;
@@ -1234,6 +1261,23 @@ export interface components {
             text?: string | null;
             /** Data Url */
             data_url?: string | null;
+        };
+        /** Body_import_outcomes_api_api_outcomes_import_post */
+        Body_import_outcomes_api_api_outcomes_import_post: {
+            /** File */
+            file: string;
+            /** Job Id */
+            job_id: string;
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
         };
         /**
          * BulkQuery
@@ -2994,6 +3038,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["BulkUndoRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_outcomes_api_api_outcomes_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_outcomes_api_api_outcomes_import_post"];
             };
         };
         responses: {

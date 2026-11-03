@@ -291,10 +291,10 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
 **Files:**
 - Modify: `apps/studio/openapi.json`, `apps/studio/src/api/schema.d.ts`
 
-- [ ] **Step 1: dump** `create_app(InMemoryRepository(), backend="local").openapi()` into `apps/studio/openapi.json` with `json.dumps(..., indent=2)`, matching the committed shape, then confirm the diff adds only the import route.
-- [ ] **Step 2: `cd apps/studio && npm run gen:api-types`.**
-- [ ] **Step 3: prove currency:** run Step 2 again with `git diff --exit-code -- src/api/schema.d.ts`; then `npx tsc -b --noEmit`, `npx eslint .`, `npx vitest run` (no TS source changes, so all three must be unchanged-green).
-- [ ] **Step 4: commit** `chore(studio): regenerate OpenAPI for the outcome import route`.
+- [x] **Step 1: dump** `create_app(InMemoryRepository(), backend="local").openapi()` into `apps/studio/openapi.json` with `json.dumps(..., indent=2)`, matching the committed shape, then confirm the diff adds only the import route.
+- [x] **Step 2: `cd apps/studio && npm run gen:api-types`.**
+- [x] **Step 3: prove currency:** run Step 2 again with `git diff --exit-code -- src/api/schema.d.ts`; then `npx tsc -b --noEmit`, `npx eslint .`, `npx vitest run` (no TS source changes, so all three must be unchanged-green).
+- [x] **Step 4: commit** `chore(studio): regenerate OpenAPI for the outcome import route`.
 
 ## Task 7: the two doors must not disagree
 
