@@ -83,8 +83,8 @@ from agentic_odi_core.models import (
     StrategyKind,
     ValueMetric,
     compute_opportunity_score,
-    explain_opportunity_score,
     create_job,
+    explain_opportunity_score,
     job_stage_catalog,
 )
 from agentic_odi_core.remote import (

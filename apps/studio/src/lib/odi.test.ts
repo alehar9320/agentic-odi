@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,6 +11,20 @@ import {
   UNDERSERVED_THRESHOLD,
 } from "./odi";
 
+interface OpportunityScoreRow {
+  importance: number;
+  satisfaction: number;
+  score: number;
+  underserved: boolean;
+}
+
+// Vitest runs with the studio package as its working directory.
+const SHARED_FIXTURE = join(
+  process.cwd(),
+  "../../packages/core/tests/fixtures/opportunity_scores.json",
+);
+const SHARED_ROWS = JSON.parse(readFileSync(SHARED_FIXTURE, "utf8")) as OpportunityScoreRow[];
+
 describe("opportunityScore", () => {
   it("computes importance + max(importance - satisfaction, 0)", () => {
     expect(opportunityScore(9.2, 3.1)).toBeCloseTo(15.3, 5);
@@ -16,6 +33,17 @@ describe("opportunityScore", () => {
   it("never subtracts when satisfaction exceeds importance", () => {
     expect(opportunityScore(4, 9)).toBeCloseTo(4, 5);
     expect(opportunityScore(8, 8)).toBeCloseTo(8, 5);
+  });
+});
+
+describe("opportunityScore against packages/core's fixture", () => {
+  it("explains every committed row the same way Python does", () => {
+    expect(SHARED_ROWS).toHaveLength(5);
+    for (const row of SHARED_ROWS) {
+      const score = opportunityScore(row.importance, row.satisfaction);
+      expect(score, `${row.importance}/${row.satisfaction}`).toBeCloseTo(row.score, 5);
+      expect(isUnderserved(score), `${row.importance}/${row.satisfaction}`).toBe(row.underserved);
+    }
   });
 });
 

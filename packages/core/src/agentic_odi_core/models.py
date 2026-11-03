@@ -87,19 +87,24 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
     return float(importance + max(importance - satisfaction, 0.0))
 
 
-def explain_opportunity_score(importance, satisfaction):
-    """Explain how an opportunity score is computed."""
+def explain_opportunity_score(
+    importance: float | None, satisfaction: float | None
+) -> dict[str, Any]:
+    """Explain how an opportunity score is computed.
+
+    Returns the algebra behind the number: the two inputs, the gap between
+    them, the score, and the threshold it is measured against. ``None`` for
+    either input is reported as an absent input, never as a zero.
+    """
     inputs_present = importance is not None and satisfaction is not None
-    if inputs_present:
-        gap = max(importance - satisfaction, 0)
+    gap: float | None = None
+    score: float | None = None
+    if importance is not None and satisfaction is not None:
+        gap = round(max(importance - satisfaction, 0.0), 4)
         if importance > satisfaction:
-            score = 2 * importance - satisfaction
+            score = round(2.0 * importance - satisfaction, 4)
         else:
-            score = importance
-        score = float(score)
-    else:
-        gap = None
-        score = None
+            score = float(importance)
     return {
         "importance": importance,
         "satisfaction": satisfaction,
