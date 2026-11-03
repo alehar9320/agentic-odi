@@ -97,9 +97,10 @@ async def test_a_malformed_search_is_refused_with_the_established_error_text() -
     async with Client(mcp) as client:
         job_id, theme_id, other_id = await _seed(client)
 
-        text = _text(
+        refusal = _payload(
             await client.call_tool("search_outcomes", {"job_id": job_id, "stage": "sidestep"})
         )
 
-        assert text.startswith("Error:")
-        assert "sidestep" in text
+        assert refusal["error"]["code"] == "validation"
+        assert refusal["message"].startswith("Error:")
+        assert "sidestep" in refusal["message"]
