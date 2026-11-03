@@ -312,7 +312,7 @@ without giving up the message model the sidecar already understands.
 
 | Capability | What it means here |
 |---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Latest message** control returns you to the live end without interrupting assistant-ui's follow behavior. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
 | **Silence** | A run that stops producing tokens for eight seconds shows *Still working · no new output for Ns* under the reply, while the Stop button keeps its meaning. The signal comes from assistant-ui's stall detection over text, reasoning, tool arguments, and tool results — never from a timer watching the DOM — so a long tool call reads as work, not a freeze. A dropped stream never shows it: that path ends in the failure panel. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
@@ -351,7 +351,7 @@ cites the issue or PR that landed it.
 | runtime `suggestions` | Adopted | Starter suggestions computed from canvas state. | #238 |
 | `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works; the dedicated adapter is unused, branches are inferred from parent ids. | — |
 | `ThreadPrimitive.Root` | Adopted | The transcript's shell. | #238 |
-| `ThreadPrimitive.Viewport` | Adopted | Scrolling and the latest-message affordance. | #238 |
+| `ThreadPrimitive.Viewport` | Adopted | Scrolling; the jump-to-latest affordance reads its `isAtBottom`. | #238 |
 | `ThreadPrimitive.Messages` | Adopted | The message map. | #238 |
 | `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data is adopted; the pills are hand-rolled because they carry the artifact-preview copy. | — |
 | `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
@@ -379,7 +379,7 @@ cites the issue or PR that landed it.
 | `useAui` | Adopted | Imperative composer actions. | #238 |
 | `AuiIf` | Adopted | The conditional idiom in use. | #238 |
 | `unstable_useComposerInputHistory` | Adopted | Up-arrow recalls what you sent last. | #430 |
-| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the latest-message affordance. | #245 |
+| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count is ours (`arrivalCount.ts`). | #245 |
 | Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
 | Tool result rendering | Adopted | Each MCP call is a trace chip. | #238 |
 | `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
@@ -709,7 +709,7 @@ Each row below names a state to reach and what is worth your own eyes.
 | State | How to reach it | What to judge |
 |---|---|---|
 | Activity line | A turn whose first token is slow: a cold model, or a long prompt | The label moves *Waking the model* → *Opening your studio tools* → *Thinking*, the dots animate, an elapsed count appears after 3 s, and the reply does not jump the layout when it arrives |
-| Streaming prose | Any turn | The caret trails the last word, the send button is a stop button, and scrolling away offers **Latest message** without fighting the follow |
+| Streaming prose | Any turn | The caret trails the last word, the send button is a stop button, and scrolling away offers **Jump to latest** with a count of what arrived, without fighting the follow |
 | Reasoning | A backend that streams `reasoning_content` or `reasoning` | The disclosure opens while it is written, settles to *Thought for Ns*, reopens on click, and never repeats the answer |
 | Tool trace and sources | A model that emits real `tool_calls` | The dot pulses while the tool runs, the chip previews what came back, and the source names the tool the turn actually read |
 | Approval | The same, asking it to write ("add a step to …") | The turn pauses for **Allow**/**Decline**, a decline reads as a tool result and not an error, and a double click runs the tool once |

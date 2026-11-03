@@ -1,6 +1,9 @@
+import { useState } from "react";
+
 import { ThreadPrimitive, useThreadViewport } from "@assistant-ui/react";
 
 import { isFeatureEnabled } from "../../features/flags";
+import { arrivalAnnouncement, arrivalLabel, arrivedSince } from "./arrivalCount";
 import {
   HELP_TEXT,
   IMPACT_PROMPT,
@@ -28,25 +31,53 @@ const VIEW_COMMANDS = new Set<string>([
   "settings",
 ]);
 
-function LatestMessageButton() {
+/**
+ * The one scroll control.
+ *
+ * assistant-ui owns the viewport: `ThreadPrimitive.Viewport autoScroll` follows
+ * the bottom and stops when a person scrolls up, and `useThreadViewport` exposes
+ * that as `isAtBottom`. This component only adds the signal the viewport lacks —
+ * how much arrived while the reader was away — and the way back, so there is
+ * still exactly one authority over `scrollTop`.
+ *
+ * `messageCount` counts messages, not tokens: the tail assistant message exists
+ * from the first frame and only its content grows, so a long stream announces
+ * once, not per delta.
+ */
+function LatestMessageButton({ messageCount }: { messageCount: number }) {
   const isAtBottom = useThreadViewport((state) => state.isAtBottom);
   const scrollToBottom = useThreadViewport((state) => state.scrollToBottom);
   // A reader who asked for less motion should land on the newest reply, not
   // watch the transcript animate past everything in between.
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
-  if (isAtBottom) {
-    return null;
+  // The transcript length last seen from the bottom. It only advances while the
+  // reader is at the bottom, so a scroll up freezes it and the difference is
+  // what arrived in their absence. Adjusting it during render (not in an effect)
+  // is React's documented pattern and keeps the count out of a second commit.
+  const [seen, setSeen] = useState(messageCount);
+  if (isAtBottom && seen !== messageCount) {
+    setSeen(messageCount);
   }
+  const arrived = isAtBottom ? 0 : arrivedSince(seen, messageCount);
 
   return (
-    <button
-      type="button"
-      className="chat__latest"
-      onClick={() => scrollToBottom({ behavior: reducedMotion ? "auto" : "smooth" })}
-    >
-      Latest message
-    </button>
+    <>
+      {!isAtBottom && (
+        <button
+          type="button"
+          className="chat__latest"
+          onClick={() => scrollToBottom({ behavior: reducedMotion ? "auto" : "smooth" })}
+        >
+          {arrivalLabel(arrived)}
+        </button>
+      )}
+      {/* Always mounted, and updated only when the count changes, so a screen
+          reader hears it once per arrival and never once per streamed token. */}
+      <p className="sr-only" role="status" aria-live="polite" aria-label="New replies">
+        {arrivalAnnouncement(arrived)}
+      </p>
+    </>
   );
 }
 
@@ -188,7 +219,7 @@ export function ChatStage() {
             <Conversation />
           </div>
         </ThreadPrimitive.Viewport>
-        <LatestMessageButton />
+        <LatestMessageButton messageCount={messages.length} />
       </div>
       <div className="chat__dock">
         <GuidanceHint />

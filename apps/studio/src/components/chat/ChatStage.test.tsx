@@ -74,7 +74,7 @@ describe("ChatStage", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows a latest-message control when the viewport is detached during a run", async () => {
+  it("shows a jump-to-latest control when the viewport is detached during a run", async () => {
     harness.state.messages = [
       { id: "u-1", parentId: null, role: "user", content: "An older question" },
       { id: "a-1", parentId: "u-1", role: "assistant", content: "An older answer" },
@@ -89,7 +89,7 @@ describe("ChatStage", () => {
     );
 
     const viewport = container.querySelector(".chat__scroll") as HTMLDivElement;
-    expect(screen.queryByRole("button", { name: "Latest message" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /jump to latest/i })).toBeNull();
     Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1200 });
     Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 400 });
     Object.defineProperty(viewport, "scrollTop", { configurable: true, value: 800, writable: true });
@@ -98,7 +98,9 @@ describe("ChatStage", () => {
 
     viewport.scrollTop = 200;
     fireEvent.scroll(viewport);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Latest message" })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /jump to latest/i })).toBeInTheDocument(),
+    );
 
     Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1500 });
     harness.state.messages = [
@@ -113,11 +115,157 @@ describe("ChatStage", () => {
       </StudioRuntimeProvider>,
     );
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Latest message" })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /jump to latest/i })).toBeInTheDocument(),
+    );
     expect(viewport.scrollTop).toBe(200);
   });
 
-  it("returns the viewport to the bottom when the latest-message control is selected", async () => {
+  it("counts the turns that arrived while the reader was scrolled up", async () => {
+    harness.state.messages = [
+      { id: "u-1", parentId: null, role: "user", content: "An older question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An older answer" },
+      { id: "u-2", parentId: "a-1", role: "user", content: "A new question" },
+      { id: "a-2", parentId: "u-2", role: "assistant", content: "A live answer" },
+    ];
+    harness.state.streaming = true;
+    const { container, rerender } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const viewport = container.querySelector(".chat__scroll") as HTMLDivElement;
+    Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1200 });
+    Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 400 });
+    Object.defineProperty(viewport, "scrollTop", { configurable: true, value: 800, writable: true });
+    viewport.dispatchEvent(new Event("wheel", { bubbles: true }));
+    fireEvent.scroll(viewport);
+    viewport.scrollTop = 200;
+    fireEvent.scroll(viewport);
+
+    // Two whole turns land while the reader is away: the count says two.
+    harness.state.messages = [
+      ...harness.state.messages,
+      { id: "u-3", parentId: "a-2", role: "user", content: "Another question" },
+      { id: "a-3", parentId: "u-3", role: "assistant", content: "Another answer" },
+    ];
+    rerender(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const pill = await screen.findByRole("button", { name: "2 new · Jump to latest" });
+    expect(pill).toBeInTheDocument();
+    // The polite region states the count once, in words.
+    expect(screen.getByRole("status", { name: "New replies" })).toHaveTextContent("2 new messages");
+  });
+
+  it("does not inflate the count while one turn streams token by token", async () => {
+    harness.state.messages = [
+      { id: "u-1", parentId: null, role: "user", content: "An older question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An older answer" },
+      { id: "u-2", parentId: "a-1", role: "user", content: "A new question" },
+      { id: "a-2", parentId: "u-2", role: "assistant", content: "A live answer" },
+    ];
+    harness.state.streaming = true;
+    const { container, rerender } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const viewport = container.querySelector(".chat__scroll") as HTMLDivElement;
+    Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1200 });
+    Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 400 });
+    Object.defineProperty(viewport, "scrollTop", { configurable: true, value: 800, writable: true });
+    viewport.dispatchEvent(new Event("wheel", { bubbles: true }));
+    fireEvent.scroll(viewport);
+    viewport.scrollTop = 200;
+    fireEvent.scroll(viewport);
+
+    // One turn arrives, then grows: same message id, longer content.
+    harness.state.messages = [
+      ...harness.state.messages,
+      { id: "u-3", parentId: "a-2", role: "user", content: "Another question" },
+    ];
+    rerender(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+    await screen.findByRole("button", { name: "1 new · Jump to latest" });
+
+    harness.state.messages = [
+      ...harness.state.messages,
+      { id: "a-3", parentId: "u-3", role: "assistant", content: "Another answer, first delta" },
+    ];
+    rerender(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+    harness.state.messages = [
+      ...harness.state.messages.slice(0, -1),
+      { id: "a-3", parentId: "u-3", role: "assistant", content: "Another answer, first delta plus more" },
+    ];
+    rerender(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    // The streamed turn is one arrival, not one per delta.
+    const pill = await screen.findByRole("button", { name: "2 new · Jump to latest" });
+    expect(pill).toBeInTheDocument();
+  });
+
+  it("clears the count when the reader returns to the bottom", async () => {
+    harness.state.messages = [
+      { id: "u-1", parentId: null, role: "user", content: "An older question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An older answer" },
+      { id: "u-2", parentId: "a-1", role: "user", content: "A new question" },
+      { id: "a-2", parentId: "u-2", role: "assistant", content: "A live answer" },
+    ];
+    harness.state.streaming = true;
+    const { container, rerender } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const viewport = container.querySelector(".chat__scroll") as HTMLDivElement;
+    Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1200 });
+    Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 400 });
+    Object.defineProperty(viewport, "scrollTop", { configurable: true, value: 800, writable: true });
+    viewport.dispatchEvent(new Event("wheel", { bubbles: true }));
+    fireEvent.scroll(viewport);
+    viewport.scrollTop = 200;
+    fireEvent.scroll(viewport);
+
+    harness.state.messages = [
+      ...harness.state.messages,
+      { id: "u-3", parentId: "a-2", role: "user", content: "Another question" },
+    ];
+    rerender(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+    await screen.findByRole("button", { name: "1 new · Jump to latest" });
+
+    // Scrolling back to the bottom hides the pill and empties the announcement.
+    viewport.scrollTop = 800;
+    fireEvent.scroll(viewport);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /jump to latest/i })).toBeNull(),
+    );
+    expect(screen.getByRole("status", { name: "New replies" })).toHaveTextContent("");
+  });
+
+  it("returns the viewport to the bottom when the jump-to-latest control is selected", async () => {
     harness.state.messages = [
       { id: "u-1", parentId: null, role: "user", content: "An older question" },
       { id: "a-1", parentId: "u-1", role: "assistant", content: "An older answer" },
@@ -148,12 +296,12 @@ describe("ChatStage", () => {
     Object.defineProperty(viewport, "scrollTo", { configurable: true, value: scrollTo });
     viewport.scrollTop = 200;
     fireEvent.scroll(viewport);
-    const latestButton = await screen.findByRole("button", { name: "Latest message" });
+    const latestButton = await screen.findByRole("button", { name: /jump to latest/i });
 
     fireEvent.click(latestButton);
     expect(scrollTo).toHaveBeenCalledWith({ top: 1200, behavior: "smooth" });
     await waitFor(() => expect(viewport.scrollTop).toBe(800));
-    expect(screen.queryByRole("button", { name: "Latest message" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /jump to latest/i })).toBeNull();
   });
 
   it("returns to the live end without animating when reduced motion is preferred", async () => {
@@ -195,7 +343,7 @@ describe("ChatStage", () => {
       viewport.scrollTop = 200;
       fireEvent.scroll(viewport);
 
-      const latestButton = await screen.findByRole("button", { name: "Latest message" });
+      const latestButton = await screen.findByRole("button", { name: /jump to latest/i });
       fireEvent.click(latestButton);
 
       expect(scrollTo).toHaveBeenCalledWith({ top: 1200, behavior: "auto" });
@@ -206,6 +354,59 @@ describe("ChatStage", () => {
         value: originalMatchMedia,
       });
     }
+  });
+
+  it("lets a keyboard reader reach the pill and press it without stealing focus", async () => {
+    harness.state.messages = [
+      { id: "u-1", parentId: null, role: "user", content: "An older question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An older answer" },
+      { id: "u-2", parentId: "a-1", role: "user", content: "A new question" },
+      { id: "a-2", parentId: "u-2", role: "assistant", content: "A live answer" },
+    ];
+    harness.state.streaming = true;
+    const { container } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    // A reader is typing in the composer when the pill appears.
+    const textbox = screen.getByRole("textbox");
+    textbox.focus();
+    expect(textbox).toHaveFocus();
+
+    const viewport = container.querySelector(".chat__scroll") as HTMLDivElement;
+    Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1200 });
+    Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 400 });
+    Object.defineProperty(viewport, "scrollTop", { configurable: true, value: 800, writable: true });
+    viewport.dispatchEvent(new Event("wheel", { bubbles: true }));
+    fireEvent.scroll(viewport);
+    const scrollTo = vi.fn();
+    Object.defineProperty(viewport, "scrollTo", { configurable: true, value: scrollTo });
+    viewport.scrollTop = 200;
+    fireEvent.scroll(viewport);
+
+    const pill = await screen.findByRole("button", { name: /jump to latest/i });
+    // Mounting the pill never moves focus away from where the reader was.
+    expect(pill).not.toHaveFocus();
+    expect(textbox).toHaveFocus();
+
+    // It is a real button: focusable and pressable with the keyboard.
+    pill.focus();
+    expect(pill).toHaveFocus();
+    fireEvent.keyDown(pill, { key: "Enter" });
+    fireEvent.click(pill);
+    expect(scrollTo).toHaveBeenCalled();
+  });
+
+  it("keeps the pill free of any pulse so reduced-motion users see a still control", async () => {
+    // The pill's only motion is the scroll it triggers; it carries no
+    // animation of its own, which is what the theme's reduced-motion block
+    // would otherwise have to neutralise.
+    const themeCss = await import("../../styles/theme.css?raw");
+    const start = themeCss.default.indexOf(".chat__latest {");
+    const block = themeCss.default.slice(start, themeCss.default.indexOf("}", start));
+    expect(block).not.toMatch(/animation\s*:/);
   });
 
   it("renders the failure as an error surface instead of an empty chat", () => {
