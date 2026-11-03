@@ -1,0 +1,14 @@
+{
+  "formula": "importance + max(importance - satisfaction, 0)",
+  "cases": [
+    {"id": "floor", "importance": 0.0, "satisfaction": 0.0, "score": 0.0},
+    {"id": "ceiling", "importance": 20.0, "satisfaction": 20.0, "score": 20.0},
+    {"id": "max-gap", "importance": 20.0, "satisfaction": 0.0, "score": 40.0},
+    {"id": "equal-is-served", "importance": 10.0, "satisfaction": 10.0, "score": 10.0},
+    {"id": "equal-low", "importance": 5.0, "satisfaction": 5.0, "score": 5.0},
+    {"id": "satisfaction-above", "importance": 10.0, "satisfaction": 20.0, "score": 10.0},
+    {"id": "underserved-gap", "importance": 8.0, "satisfaction": 4.0, "score": 12.0},
+    {"id": "fractional-gap", "importance": 7.5, "satisfaction": 2.5, "score": 12.5},
+    {"id": "unscored", "importance": null, "satisfaction": null, "score": null}
+  ]
+}
