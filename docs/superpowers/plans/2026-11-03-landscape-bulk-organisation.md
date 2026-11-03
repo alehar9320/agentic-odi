@@ -195,7 +195,7 @@ extend `apps/studio/src/test/a11y.test.tsx` only if the sweep needs the bar moun
 - [x] **Step 2:** one `README.md` capability sentence for the landscape bulk run.
 - [x] **Step 3:** `uv run python scripts/doc_check.py` clean; commit
   `docs(living-studio,README): the landscape's bulk run and its limits`.
-- [ ] **Step 4:** full gates — `uv run pytest -q`, `uv run ruff check .`,
+- [x] **Step 4:** full gates — `uv run pytest -q`, `uv run ruff check .`,
   `uv run ruff format --check .`, `uv run mypy apps brand packages`,
   `cd apps/studio && npx eslint . && npx vitest run` — then push and open the PR stacked on
   `qoder/ALH-196-bulk-outcome-changes`, move ALH-197 to In Review in Linear with the link.
