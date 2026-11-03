@@ -36,6 +36,7 @@ from agentic_odi_core import (
     invalid_strategy_request,
     manual_claim_check,
 )
+from agentic_odi_core.query import OutcomeQuery
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
@@ -76,6 +77,9 @@ from agentic_odi_studio_api.studio.schemas import (
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
     ApproveProposalRequest,
+    BulkQuery,
+    BulkRequest,
+    BulkUndoRequest,
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
@@ -582,6 +586,114 @@ async def search_outcomes_api(
         return _service(request).search_outcomes(**arguments)
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
+
+
+#: How deep a wider bulk run pages the shared search. Not a cap on the run: the route keeps
+#: walking until it holds the ``total`` the store reported.
+_BULK_SEARCH_PAGE = 200
+
+
+def _bulk_arguments(body: BulkRequest, outcome_ids: list[str]) -> dict[str, Any]:
+    """The tool's own arguments, with the empty ones left out as the CLI leaves them out."""
+    arguments: dict[str, Any] = {"outcome_ids": outcome_ids, "dry_run": body.dry_run}
+    if body.stage is not None:
+        arguments["stage"] = body.stage
+    for field_name, values in (
+        ("add_theme_ids", body.add_theme_ids),
+        ("remove_theme_ids", body.remove_theme_ids),
+        ("add_tags", body.add_tags),
+    ):
+        if values:
+            arguments[field_name] = list(values)
+    return arguments
+
+
+async def _mcp_bulk_ids(mcp_url: str, query: BulkQuery, named: list[str]) -> list[str]:
+    """Every id the narrowing answers, the named ones first.
+
+    The MCP tool takes ids rather than a narrowing — that is the contract's shape — so a run
+    that covers more than the checked rows walks the same search the landscape is paging.
+    Stopping on the store's ``total`` rather than on a short page is what keeps the counted
+    set and the written set the same set.
+    """
+    ids: list[str] = list(dict.fromkeys(named))
+    arguments = {key: value for key, value in query.model_dump().items() if value not in (None, [])}
+    offset = 0
+    while True:
+        result = await call_mcp_tool(
+            mcp_url,
+            ToolName.SEARCH_OUTCOMES.value,
+            {**arguments, "limit": _BULK_SEARCH_PAGE, "offset": offset},
+        )
+        payload = _json_or_raw(result)
+        items = payload.get("items", []) if isinstance(payload, dict) else []
+        total = int(payload.get("total", 0)) if isinstance(payload, dict) else 0
+        for item in items:
+            outcome_id = str(item.get("id"))
+            if outcome_id not in ids:
+                ids.append(outcome_id)
+        offset += _BULK_SEARCH_PAGE
+        if not items or offset >= total:
+            return ids
+
+
+@router.post("/outcomes/bulk", response_model=dict[str, Any])
+async def bulk_outcomes_api(body: BulkRequest, request: Request) -> dict[str, Any]:
+    """Preview or write one organisation change across a set of outcomes.
+
+    The body is ``BulkReport``'s own dictionary — ``requested``, ``changed``, ``skipped`` with
+    a reason per row, the per-field ``changes`` table, and the ``undo_token`` a preview leaves
+    empty — so the Studio renders a calculation it did not make. A refused run (nothing
+    selected, a stage outside the job map, one theme both added and removed) arrives as the
+    shared error envelope with the service's own sentence.
+    """
+    if _uses_mcp(request):
+        mcp_url = _require_mcp_url(body.mcp_url)
+        outcome_ids = (
+            await _mcp_bulk_ids(mcp_url, body.query, body.outcome_ids)
+            if body.query is not None
+            else list(body.outcome_ids)
+        )
+        result = await call_mcp_tool(
+            mcp_url, ToolName.BULK_UPDATE_OUTCOMES.value, _bulk_arguments(body, outcome_ids)
+        )
+        payload = _json_or_raw(result)
+        return payload if isinstance(payload, dict) else {}
+    try:
+        query = None if body.query is None else OutcomeQuery(**body.query.model_dump())
+        report = _service(request).bulk_update_outcomes(
+            body.outcome_ids,
+            add_theme_ids=body.add_theme_ids,
+            remove_theme_ids=body.remove_theme_ids,
+            stage=body.stage,
+            add_tags=body.add_tags,
+            query=query,
+            dry_run=body.dry_run,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return report.as_dict()
+
+
+@router.post("/outcomes/bulk/undo", response_model=dict[str, Any])
+async def undo_bulk_outcomes_api(body: BulkUndoRequest, request: Request) -> dict[str, Any]:
+    """Take a bulk run back with the token it answered with.
+
+    A row someone edited since the run is left alone and listed in ``skipped``, and a token a
+    newer run expired or that has already been used comes back as a refusal — never as a
+    partial restore, so the Studio can show the sentence without having guessed at the state.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.UNDO_BULK.value, {"token": body.token}
+        )
+        payload = _json_or_raw(result)
+        return payload if isinstance(payload, dict) else {}
+    try:
+        report = _service(request).undo_bulk(body.token)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return report.as_dict()
 
 
 @router.post("/jobs")

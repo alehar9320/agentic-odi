@@ -4,6 +4,8 @@ import type {
   AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
+  BulkNarrowing,
+  BulkReport,
   CanvasData,
   ChangelogData,
   ChatStreamRequest,
@@ -628,6 +630,62 @@ export async function fetchOutcomeSearch(
     params.set("offset", String(filters.offset));
   }
   return getJson<OutcomeSearch>(`/api/outcomes/search?${params.toString()}`);
+}
+
+/**
+ * One organisation run, as the board describes it. `outcomeIds` are the checked
+ * rows; `query` is the narrowing that counted them, sent so the sidecar can widen
+ * the run to every matching outcome when the person asks it to.
+ */
+export interface BulkRequest {
+  mcpUrl: string;
+  outcomeIds: string[];
+  query?: BulkNarrowing;
+  stage?: string;
+  addThemeIds?: string[];
+  removeThemeIds?: string[];
+  addTags?: string[];
+}
+
+/**
+ * Preview and write share a route and differ only by `dry_run`, so the change
+ * table a person read is built by the same code that would apply it. A refused
+ * run rejects with the service's own sentence — the board shows that, not a
+ * translation of it.
+ */
+function bulkBody(run: BulkRequest, dryRun: boolean): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    mcp_url: run.mcpUrl,
+    outcome_ids: run.outcomeIds,
+    add_theme_ids: run.addThemeIds ?? [],
+    remove_theme_ids: run.removeThemeIds ?? [],
+    add_tags: run.addTags ?? [],
+    dry_run: dryRun,
+  };
+  if (run.stage) {
+    body.stage = run.stage;
+  }
+  if (run.query) {
+    body.query = run.query;
+  }
+  return body;
+}
+
+/** The change table for this run, with nothing written and no undo token. */
+export async function previewBulkOutcomes(run: BulkRequest): Promise<BulkReport> {
+  return sendJson<BulkReport>("POST", "/api/outcomes/bulk", bulkBody(run, true));
+}
+
+/** Write the run. The report's `undo_token` takes exactly this run back. */
+export async function applyBulkOutcomes(run: BulkRequest): Promise<BulkReport> {
+  return sendJson<BulkReport>("POST", "/api/outcomes/bulk", bulkBody(run, false));
+}
+
+export async function undoBulkOutcomes(mcpUrl: string, token: string): Promise<BulkReport> {
+  return sendJson<BulkReport>("POST", "/api/outcomes/bulk/undo", {
+    mcp_url: mcpUrl,
+    token,
+  });
 }
 
 /** The opened studies, or an empty list before any study has been opened. */

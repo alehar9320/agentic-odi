@@ -10,7 +10,18 @@ import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
 
-export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sample?: boolean }) {
+export function OutcomeCard({
+  outcome,
+  sample = false,
+  checked = false,
+  onToggleChecked,
+}: {
+  outcome: Outcome;
+  sample?: boolean;
+  checked?: boolean;
+  /** Present only where a bulk run can be aimed at this row. */
+  onToggleChecked?: (id: string) => void;
+}) {
   const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
   // Records captured against this outcome, with their way back to the source.
   const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
@@ -34,6 +45,15 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
   return (
     <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>
       <header className="card__head">
+        {onToggleChecked && outcome.id ? (
+          <input
+            className="card__check"
+            type="checkbox"
+            checked={checked}
+            aria-label={`Select ${outcomeId} for a bulk change`}
+            onChange={() => onToggleChecked(outcomeId)}
+          />
+        ) : null}
         <span className="card__id">{outcomeId}</span>
         <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
         {sample ? (

@@ -13,6 +13,8 @@ import { beforeEach, describe, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../assistant/StudioRuntime";
 import { CatchUpFeed } from "../components/notifications/CatchUpFeed";
+import { BulkChangeBar } from "../components/canvas/BulkChangeBar";
+import { BulkChangeDialog } from "../components/canvas/BulkChangeDialog";
 import { JobMap } from "../components/canvas/JobMap";
 import { OpportunityLandscape } from "../components/canvas/OpportunityLandscape";
 import { ChatStage } from "../components/chat/ChatStage";
@@ -24,6 +26,7 @@ import { OnboardingProvider } from "../onboarding/OnboardingProvider";
 import { useOnboarding } from "../onboarding/context";
 import { createUpdateService, UpdateProvider } from "../updater";
 import type { UpdateTransport } from "../updater/types";
+import type { BulkReport } from "../types";
 import { expectAccessible } from "./axe";
 
 const noop = () => {};
@@ -213,8 +216,79 @@ describe("axe sweep", () => {
     await expectAccessible(container);
   });
 
-  it("passes the job map", async () => {
-    const { container } = renderWithUpdates(
+  it("passes the bulk change bar and its table", async () => {
+    const themes = [
+      { id: "t-1", name: "Cash timing", ordinal: 0 },
+      { id: "t-2", name: "Exception handling", ordinal: 1 },
+    ];
+    const report: BulkReport = {
+      requested: 3,
+      changed: ["O-101", "O-102"],
+      skipped: [{ id: "O-103", reason: "organizes a different job than the theme" }],
+      changes: [
+        { outcome_id: "O-101", field: "theme_ids", from: [], to: ["t-1"] },
+        { outcome_id: "O-102", field: "step_id", from: "STEP-1", to: "STEP-2" },
+      ],
+      undo_token: null,
+    };
+
+    const bar = renderWithUpdates(
+      <Surface>
+        <BulkChangeBar
+          selectedCount={2}
+          matchingTotal={137}
+          themes={themes}
+          draft={{ addThemeIds: ["t-1"], removeThemeIds: ["t-2"], addTags: ["q3-review"] }}
+          busy={false}
+          onClear={noop}
+          onDraftChange={noop}
+          onPreviewSelected={noop}
+          onPreviewAll={noop}
+        />
+      </Surface>,
+    );
+    await expectAccessible(bar.container);
+    bar.unmount();
+
+    const preview = renderWithUpdates(
+      <Surface>
+        <h2 className="sr-only">Opportunity landscape</h2>
+        <BulkChangeDialog
+          report={report}
+          mode="preview"
+          error={null}
+          themes={themes}
+          steps={canvasData.steps}
+          busy={false}
+          onApply={noop}
+          onUndo={noop}
+          onClose={noop}
+        />
+      </Surface>,
+    );
+    await expectAccessible(preview.container);
+    preview.unmount();
+
+    const applied = renderWithUpdates(
+      <Surface>
+        <h2 className="sr-only">Opportunity landscape</h2>
+        <BulkChangeDialog
+          report={{ ...report, undo_token: "b-1" }}
+          mode="applied"
+          error={{ code: "conflict", message: "That undo token was taken by a newer run.", retryable: false }}
+          themes={themes}
+          steps={canvasData.steps}
+          busy={false}
+          onApply={noop}
+          onUndo={noop}
+          onClose={noop}
+        />
+      </Surface>,
+    );
+    await expectAccessible(applied.container);
+  });
+
+  it("passes the job map", async () => {    const { container } = renderWithUpdates(
       <Surface>
         <JobMap />
       </Surface>,

@@ -1235,6 +1235,88 @@
         }
       }
     },
+    "/api/outcomes/bulk": {
+      "post": {
+        "summary": "Bulk Outcomes Api",
+        "description": "Preview or write one organisation change across a set of outcomes.\n\nThe body is ``BulkReport``'s own dictionary \u2014 ``requested``, ``changed``, ``skipped`` with\na reason per row, the per-field ``changes`` table, and the ``undo_token`` a preview leaves\nempty \u2014 so the Studio renders a calculation it did not make. A refused run (nothing\nselected, a stage outside the job map, one theme both added and removed) arrives as the\nshared error envelope with the service's own sentence.",
+        "operationId": "bulk_outcomes_api_api_outcomes_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Bulk Outcomes Api Api Outcomes Bulk Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/bulk/undo": {
+      "post": {
+        "summary": "Undo Bulk Outcomes Api",
+        "description": "Take a bulk run back with the token it answered with.\n\nA row someone edited since the run is left alone and listed in ``skipped``, and a token a\nnewer run expired or that has already been used comes back as a refusal \u2014 never as a\npartial restore, so the Studio can show the sentence without having guessed at the state.",
+        "operationId": "undo_bulk_outcomes_api_api_outcomes_bulk_undo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUndoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Undo Bulk Outcomes Api Api Outcomes Bulk Undo Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/steps/{step_id}": {
       "patch": {
         "summary": "Patch Step",
@@ -3859,6 +3941,178 @@
         ],
         "title": "AttachmentRef",
         "description": "One file the user attached to a turn.\n\nNothing is stored server-side: an attachment is part of the message. Text is\nextracted by the client because only the client has the file; images arrive\nas data URLs for backends that accept them."
+      },
+      "BulkQuery": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "theme_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Theme Ids"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "min_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Score"
+          },
+          "max_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Score"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "title": "BulkQuery",
+        "description": "The narrowing a bulk run covers beyond the rows it names.\n\nThe field names are ``GET /api/outcomes/search``'s own, so the set a preview counted is\nthe set the write answers to. Omit it and the run touches the named rows only."
+      },
+      "BulkRequest": {
+        "properties": {
+          "outcome_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Outcome Ids"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkQuery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "add_theme_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Add Theme Ids"
+          },
+          "remove_theme_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Remove Theme Ids"
+          },
+          "add_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Add Tags"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "BulkRequest",
+        "description": "One organisation change across a set of outcomes, previewed or written.\n\n``outcome_ids`` are the rows the person selected; ``dry_run`` asks for the change table\nwithout writing it. Scores and statements are not bulk fields \u2014 the service refuses them."
+      },
+      "BulkUndoRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "BulkUndoRequest",
+        "description": "Take one bulk run back with the token it answered with."
       },
       "BusinessImpactCategory": {
         "type": "string",

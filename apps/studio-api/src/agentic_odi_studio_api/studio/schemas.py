@@ -86,6 +86,47 @@ class UpdateOutcomeRequest(BaseModel):
     mcp_url: str = ""
 
 
+class BulkQuery(BaseModel):
+    """The narrowing a bulk run covers beyond the rows it names.
+
+    The field names are ``GET /api/outcomes/search``'s own, so the set a preview counted is
+    the set the write answers to. Omit it and the run touches the named rows only.
+    """
+
+    text: str | None = None
+    stage: str | None = None
+    theme_ids: list[str] = Field(default_factory=list)
+    confidence: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    min_score: float | None = None
+    max_score: float | None = None
+    job_id: str | None = None
+
+
+class BulkRequest(BaseModel):
+    """One organisation change across a set of outcomes, previewed or written.
+
+    ``outcome_ids`` are the rows the person selected; ``dry_run`` asks for the change table
+    without writing it. Scores and statements are not bulk fields — the service refuses them.
+    """
+
+    outcome_ids: list[str] = Field(default_factory=list)
+    query: BulkQuery | None = None
+    stage: str | None = None
+    add_theme_ids: list[str] = Field(default_factory=list)
+    remove_theme_ids: list[str] = Field(default_factory=list)
+    add_tags: list[str] = Field(default_factory=list)
+    dry_run: bool = False
+    mcp_url: str = ""
+
+
+class BulkUndoRequest(BaseModel):
+    """Take one bulk run back with the token it answered with."""
+
+    token: str
+    mcp_url: str = ""
+
+
 class SignalActionRequest(BaseModel):
     """Body for the read/dismiss signal routes; only the MCP backend needs it."""
 
