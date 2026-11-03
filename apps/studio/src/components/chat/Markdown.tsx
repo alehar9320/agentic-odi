@@ -16,9 +16,7 @@ function renderSpans(spans: MdInline[]) {
           </code>
         );
       case "link": {
-        const safe =
-          /^(https?:\/\/|mailto:)/i.test(span.href) &&
-          !/^(javascript:|data:|vbscript:|file:)/i.test(span.href);
+        const safe = /^(https?:\/\/|mailto:)/i.test(span.href);
         if (!safe) {
           return <Fragment key={index}>{span.text}</Fragment>;
         }
