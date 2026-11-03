@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import { resolveTheme } from "../../lib/theme";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
@@ -34,7 +35,7 @@ export function StudioBar({
     settings,
   } = useStudio();
   const update = useUpdateSnapshot();
-  const theme = settings.theme === "light" ? "light" : "dark";
+  const theme = resolveTheme(settings.theme);
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);

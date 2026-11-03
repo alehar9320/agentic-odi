@@ -116,6 +116,33 @@ a change.
   `attachments.ts` extracts files in the browser. The library is presentation
   only — it holds no product state and makes no network calls of its own.
 
+## Inside `packages/core`
+
+`packages/core` is one distribution that holds four groups. It is large, and the
+temptation it creates is to split it. [ADR 0005](adr/0005-core-layers-and-the-contract-split.md)
+records why that is the wrong move today and what would make it the right one.
+What is worth doing now is naming the groups, so "edit core" means "edit the
+persistence group, which may not call the service door":
+
+| Group | Modules | Rule |
+|---|---|---|
+| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
+| **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `factory.py` | Stores what the other groups decide. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
+| **methodology** | `services.py`, `segmentation.py`, `strategy.py`, `router.py`, `messages.py`, `steve_jobs.py` | The ODI stages and the LLM path. `services.py` owns the service door every caller enters through; may import domain, persistence, and contract. |
+| **contract** | `contract.py`, `errors.py`, `remote.py`, `schema.py`, `connection.py`, `consent.py` | The MCP wire protocol, enforced against the live registry by `tests/contract/test_mcp_contract.py`. May be imported by anything; imports no persistence and no methodology. |
+
+`errors.py` is the exception hierarchy the whole package raises, so it is the one
+module any group may import.
+
+Two things this does not claim. It is not a package boundary — all four groups
+share the `agentic_odi_core` namespace, and moving a file is out of scope for the
+decision it documents. And only one row is machine-checked: the
+`grimp`-based graph above reads edges *between* workspace distributions, so an
+intra-core import like `sqlite_repository` reaching into `services` is invisible
+to it. That is why the persistence rule is an AST check in the same file, and why
+`test_every_core_module_is_in_exactly_one_group` exists — it fails when a new
+module belongs to no group, which is how the table above would rot.
+
 ## Persistence
 
 - `SQLiteRepository` is the production default for the CLI, MCP server, and Studio API.
@@ -186,6 +213,7 @@ Start here, then take the one that answers your question.
 | [Trust boundaries](trust-boundaries.md) | What each process may reach, where credentials live, and what crosses the wire. |
 | [The generative UI protocol](ui-protocol.md) | The closed catalog, validation on both ends, limits, and the action model. |
 | [Studio banners](banners.md) | The Studio's unified notice system. |
+| [Reuse first](reuse.md) | The ladder an agent walks before writing new code, its bounds, and the ledger a copy-in must appear in. |
 | [Vendor alley](vendor.md) | What may be copied into `src/vendor`, and how the boundary is enforced. |
 | [Testing](testing.md) | Test layout, commands, and what each suite is responsible for. |
 | [Agent assignment](../agents.md) | Which agents can take an issue, how a claim is recorded, and what expires. |
