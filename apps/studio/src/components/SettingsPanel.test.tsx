@@ -351,3 +351,45 @@ describe("SettingsPanel connection survey", () => {
     expect(recheckConnections).not.toHaveBeenCalled();
   });
 });
+
+describe("SettingsPanel section modules", () => {
+  it("composes the five sections in order", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    const { container } = renderPanel();
+
+    // Data (context), Model, Connections (bridge), Updates, About.
+    expect(screen.getByText(/your context/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^model$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /studio bridge/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /software update/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("Your context")).toBeLessThan(text.indexOf("Model"));
+    expect(text.indexOf("Model")).toBeLessThan(text.indexOf("Studio bridge"));
+  });
+
+  it("keeps the Model section intact when the connector fetch fails", () => {
+    // #531: a broken connector fetch shows the Connections error and leaves the
+    // model controls beside it working, because each section owns its failure.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [],
+        connectorsError: {
+          code: "mcp_unreachable",
+          message: "The connector list is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+        models: ["local-tools-model"],
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
+    expect(screen.getByLabelText(/^model/i)).toHaveValue("m");
+    expect(screen.getByLabelText("Base URL")).toHaveValue("http://x");
+  });
+});
