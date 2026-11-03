@@ -342,6 +342,25 @@ agentic-odi themes unassign --theme <theme-id> --outcome <outcome-id>
 different job under a job-scoped theme, refuses the whole call before anything
 is written.
 
+## Studies and waves
+
+A study is one named pass over a job — its interviews, its outcomes, its dates.
+Opening the same study again is a new **wave**, not a second copy of the first, so
+"the market last quarter" and "the market this quarter" stay comparable. A study
+opens `planned`; the same `(job, name)` may not repeat a wave, which refuses an
+accidental re-run while leaving a deliberate later wave expressible.
+
+```bash
+agentic-odi studies open --job <job-id> --name "Invoice sweep" --wave 1
+agentic-odi studies open --job <job-id> --name "Invoice sweep" --wave 2 --method-notes "revisit after the price change"
+agentic-odi studies list
+agentic-odi studies list --job <job-id> --json
+```
+
+`studies list` is empty until a study has been opened. Outcomes carry an optional
+`study_id` scoping them to a study of their own job; a row that predates studies has
+none, and opening studies never invents one for it.
+
 ## Schema, scoring, and guidance
 
 ```bash

@@ -61,6 +61,8 @@ class ToolName(str, Enum):
     LIST_PROPOSALS = "list_proposals"
     APPROVE_PROPOSAL = "approve_proposal"
     REJECT_PROPOSAL = "reject_proposal"
+    OPEN_STUDY = "open_study"
+    LIST_STUDIES = "list_studies"
     ADD_THEME = "add_theme"
     RENAME_THEME = "rename_theme"
     DELETE_THEME = "delete_theme"
@@ -655,6 +657,21 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("token",),
         returns="The report of the restored rows.",
         stage="2",
+    ),
+    ToolName.OPEN_STUDY.value: ToolSpec(
+        name="open_study",
+        summary="Open a named study pass over a Job at a given wave number.",
+        effect=_derive_effect("open_study"),
+        arguments=("job_id", "name", "wave", "method_notes"),
+        required=("job_id", "name", "wave"),
+        returns="The created Study, opened as planned.",
+    ),
+    ToolName.LIST_STUDIES.value: ToolSpec(
+        name="list_studies",
+        summary="List the studies opened for a Job.",
+        effect=_derive_effect("list_studies"),
+        arguments=("job_id",),
+        returns="A list of Studies. Empty until a study has been opened.",
     ),
 }
 
