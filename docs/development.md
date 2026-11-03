@@ -341,10 +341,21 @@ locally: `npx playwright install chromium`. See
 Tailwind v4 styles `src/vendor/**` and nothing else (issue #385). The stylesheet
 imports the theme and utility layers with `source(none)` and then rescans that
 directory alone, so no product class is ever generated and Tailwind's
-document-wide reset stays out of the bundle. The product keeps rendering from
-`src/styles/theme.css`, which `src/main.tsx` imports first; vendor utilities land
-in `@layer utilities`, and an unlayered product rule always outranks a layered
-utility, so the two can never fight over the same element.
+document-wide reset stays out of the bundle. The product sheets live in a
+`product` layer, and `src/styles/entry.css` is the only file that states the order
+(issue #384): one `@layer theme, base, components, product, utilities;` line, then
+the product sheets imported `layer(product)`, then the vendor sheet as generated.
+An unlayered rule outranks every layered one, specificity included, so while
+`theme.css` was imported unlayered a copied component lost its own utilities to
+product element rules; with `product` declared below `utilities` the utility wins
+where one is actually used, and no product selector needs `!important`.
+`src/main.tsx` imports `entry.css` and no other stylesheet.
+
+Two guards hold the line, because the interesting part is a rule no jsdom run can
+see. `src/styles/entry.test.ts` reads the sources so the order stays declared in
+one place, and `src/vendor/layering.visual.test.tsx` measures computed styles in
+Chromium — jsdom resolves no cascade for `@layer`, so only a browser proves a
+utility actually outranks a product rule.
 
 `components.json` points the shadcn CLI at that stylesheet and at the `@/` alias,
 which resolves to `src/vendor/` in the Vite config and in both tsconfigs. A copied
@@ -361,6 +372,12 @@ vendor tree standardises on `src/vendor/lib/utils.ts`, so `npm rm cn` and point 
 import back at `@/lib/utils` after each add.
 `npm --prefix apps/studio test -- --run src/vendor` proves the scope by reading the
 compiled stylesheet.
+
+One product sheet is still unlayered: `src/onboarding/onboarding.css` is imported
+by the wizard chunk rather than by the entry, so it outranks utilities the way the
+theme used to. Nothing outside `src/vendor` renders a copied component today, which
+is why that is a note and not a bug — layer it the same way before placing one
+inside the wizard.
 
 ### Conversational UI coverage
 
@@ -408,6 +425,8 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
 | `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
+| `apps/studio/src/styles/entry.test.ts` | The cascade order lives in `entry.css` alone: `product` between `theme` and `utilities`, both product sheets imported into that layer, and `main.tsx` importing no other stylesheet |
+| `apps/studio/src/vendor/layering.visual.test.tsx` | In Chromium: a vendored utility outranks `button { color: inherit }`, and a product rule still outranks the browser default |
 | `apps/studio/src/lib/theme.test.ts` | `resolveTheme`: the stored choice wins, the media query answers when nothing is stored, and dark is the last resort |
 | `apps/studio/src/lib/boot.test.ts` | `removeBootShell` clears the shell on mount and is a no-op without one |
 | `apps/studio/e2e/first-paint.spec.ts` | Playwright: the shell paints the token colour with JavaScript off and the bundle blocked, a stored theme wins over the system, and the handover to React keeps the colour |
