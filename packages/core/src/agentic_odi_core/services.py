@@ -46,6 +46,8 @@ from agentic_odi_core.models import (
     SignalKind,
     Step,
     Strategy,
+    Study,
+    StudyStatus,
     Theme,
     compute_opportunity_score,
 )
@@ -82,6 +84,14 @@ class CustomerOutcomeNotFoundError(NotFoundError):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
         super().__init__(outcome_id, "customer_outcome")
+
+
+class StudyNotFoundError(NotFoundError):
+    """Raised when a study id does not resolve."""
+
+    def __init__(self, study_id: str, hint: str | None = None) -> None:
+        self.study_id = study_id
+        super().__init__(study_id, "study", hint)
 
 
 class ScheduledWorkNotFoundError(NotFoundError, ValueError):
@@ -418,6 +428,9 @@ class ODIService:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
             raise OutcomeNotFoundError(outcome_id)
+        study_id = updates.get("study_id")
+        if study_id is not None:
+            self._validate_study_scope(existing, study_id)
         statement = updates.get("statement", existing.statement)
         importance = updates.get("importance", existing.importance)
         satisfaction = updates.get("satisfaction", existing.satisfaction)
@@ -638,6 +651,72 @@ class ODIService:
             sort=sort,
         )
         return search_outcomes(self.repo, query, limit, offset)
+
+    # -- Studies: one named pass over a Job, and the wave inside it ----------
+
+    def open_study(
+        self, job_id: str, name: str, wave: int, method_notes: str | None = None
+    ) -> Study:
+        """Open a study — one named pass over a Job, at a given wave number.
+
+        A study opens ``planned``; ``fielding`` and ``closed`` are later
+        transitions and nothing here moves to them automatically. The same
+        ``(job_id, name)`` may not repeat a wave, so an accidental re-run of a
+        pass is refused while a deliberate later wave is expressible.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        clash = next(
+            (
+                study
+                for study in self.repo.list_studies(job_id)
+                if study.name == name and study.wave == wave
+            ),
+            None,
+        )
+        if clash is not None:
+            raise ValidationError(
+                f"Study '{name}' already has wave {wave} for this job; open wave {wave + 1} instead."
+            )
+        study = Study(job_id=job_id, name=name, wave=wave, method_notes=method_notes)
+        return self.repo.add_study(study)
+
+    def close_study(self, study_id: str) -> Study:
+        """Close a study once. A second close keeps the first ``closed_at``."""
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id)
+        if study.status is StudyStatus.CLOSED:
+            return study
+        closed = self.repo.update_study(
+            study_id,
+            {
+                "status": StudyStatus.CLOSED.value,
+                "closed_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        if closed is None:
+            raise StudyNotFoundError(study_id)
+        return closed
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        return self.repo.list_studies(job_id=job_id)
+
+    def get_study(self, study_id: str) -> Study:
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id, "open a study first")
+        return study
+
+    def _validate_study_scope(self, outcome: Outcome, study_id: str) -> None:
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id)
+        if study.job_id != outcome.job_id:
+            raise ValidationError(
+                f"Study {study_id} belongs to job {study.job_id}, not the outcome's job "
+                f"{outcome.job_id}; an outcome may only join a study of its own job."
+            )
 
     def add_customer_outcome(
         self,

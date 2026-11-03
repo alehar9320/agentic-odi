@@ -18,6 +18,7 @@ from agentic_odi_core.models import (
     Signal,
     Step,
     Strategy,
+    Study,
     Theme,
 )
 
@@ -122,6 +123,7 @@ class Repository(Protocol):
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
+    studies: dict[str, Study]
     strategies: dict[str, Strategy]
     themes: dict[str, Theme]
 
@@ -196,6 +198,10 @@ class Repository(Protocol):
     def delete_scheduled_work(self, work_id: str) -> bool: ...
     def add_segment(self, segment: Segment) -> Segment: ...
     def get_segment(self, segment_id: str) -> Segment | None: ...
+    def add_study(self, study: Study) -> Study: ...
+    def get_study(self, study_id: str) -> Study | None: ...
+    def list_studies(self, job_id: str | None = None) -> list[Study]: ...
+    def update_study(self, study_id: str, updates: dict) -> Study | None: ...
     def list_segments(self, job_id: str | None = None) -> list[Segment]: ...
     def update_segment(self, segment_id: str, updates: dict) -> Segment | None: ...
     def add_theme(self, theme: Theme) -> Theme: ...
@@ -227,6 +233,7 @@ class Repository(Protocol):
 
 class InMemoryRepository:
     def __init__(self) -> None:
+        self.studies: dict[str, Study] = {}
         self.jobs: dict[str, Job] = {}
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
@@ -637,6 +644,29 @@ class InMemoryRepository:
             if theme_id not in current:
                 current.append(theme_id)
         return self.update_outcome(outcome_id, {"theme_ids": current})
+
+    def add_study(self, study: Study) -> Study:
+        self.studies[study.id] = study
+        return study
+
+    def get_study(self, study_id: str) -> Study | None:
+        return self.studies.get(study_id)
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        items = list(self.studies.values())
+        if job_id is not None:
+            items = [study for study in items if study.job_id == job_id]
+        return items
+
+    def update_study(self, study_id: str, updates: dict) -> Study | None:
+        study = self.studies.get(study_id)
+        if study is None:
+            return None
+        current = study.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_study = study.model_validate(current)
+        self.studies[study_id] = new_study
+        return new_study
 
     def add_strategy(self, strategy: Strategy) -> Strategy:
         self.strategies[strategy.id] = strategy
