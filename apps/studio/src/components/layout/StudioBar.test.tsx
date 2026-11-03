@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -15,8 +15,12 @@ import type { UpdateSnapshot } from "../../updater/types";
 import { StudioBar } from "./StudioBar";
 
 const stubContext = (overrides: Record<string, unknown> = {}) => ({
+  conversationId: null,
+  conversations: [],
   llmHealth: { healthy: true, message: "ok" },
   messages: [],
+  openConversation: vi.fn(),
+  refreshConversations: vi.fn(),
   unreadSignalCount: 0,
   openPanel: vi.fn(),
   pushToast: vi.fn(),
@@ -252,6 +256,111 @@ describe("StudioBar", () => {
     render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
 
     expect(screen.getByRole("button", { name: "Update ready" })).toBeInTheDocument();
+  });
+
+  it("lists recent conversations with their title and time when the history opens", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T10:00:00Z"));
+    const refreshConversations = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        refreshConversations,
+        conversationId: "c-2",
+        conversations: [
+          {
+            id: "c-2",
+            title: "Where does onboarding leak?",
+            created_at: "2026-10-22T09:00:00Z",
+            updated_at: "2026-10-22T09:59:30Z",
+            head_id: null,
+            turn_count: 4,
+          },
+          {
+            id: "c-1",
+            title: "Price the churn spike",
+            created_at: "2026-10-21T09:00:00Z",
+            updated_at: "2026-10-21T09:00:00Z",
+            head_id: null,
+            turn_count: 2,
+          },
+        ],
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(screen.queryByRole("menu", { name: "Recent conversations" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+
+    const menu = screen.getByRole("menu", { name: "Recent conversations" });
+    expect(refreshConversations).toHaveBeenCalledOnce();
+    expect(within(menu).getByText("Where does onboarding leak?")).toBeInTheDocument();
+    expect(within(menu).getByText("Price the churn spike")).toBeInTheDocument();
+    expect(within(menu).getByText("Just now")).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("marks the current conversation and loads another when one is chosen", () => {
+    const openConversation = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        openConversation,
+        conversationId: "c-2",
+        conversations: [
+          {
+            id: "c-2",
+            title: "Current thread",
+            created_at: "2026-10-22T09:00:00Z",
+            updated_at: "2026-10-22T09:00:00Z",
+            head_id: null,
+            turn_count: 1,
+          },
+          {
+            id: "c-1",
+            title: "An older thread",
+            created_at: "2026-10-21T09:00:00Z",
+            updated_at: "2026-10-21T09:00:00Z",
+            head_id: null,
+            turn_count: 3,
+          },
+        ],
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+
+    const current = screen.getByRole("menuitem", { name: /current thread/i });
+    expect(current).toHaveAttribute("aria-current", "true");
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /an older thread/i }));
+
+    expect(openConversation).toHaveBeenCalledWith("c-1");
+    // Choosing closes the list, so the thread is not hidden behind it.
+    expect(screen.queryByRole("menu", { name: "Recent conversations" })).toBeNull();
+  });
+
+  it("names an untitled thread rather than showing a blank row", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        conversationId: "c-1",
+        conversations: [
+          {
+            id: "c-1",
+            title: "",
+            created_at: "2026-10-22T09:00:00Z",
+            updated_at: "2026-10-22T09:00:00Z",
+            head_id: null,
+            turn_count: 0,
+          },
+        ],
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+
+    expect(screen.getByRole("menuitem", { name: /new conversation/i })).toBeInTheDocument();
   });
 });
 

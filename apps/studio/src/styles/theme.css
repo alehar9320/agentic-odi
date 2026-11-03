@@ -337,6 +337,44 @@ a {
   cursor: not-allowed;
 }
 
+.bar__history {
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.bar__history-empty {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--faint);
+  font-size: 0.8rem;
+}
+
+.bar__history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bar__history-item[aria-current="true"] {
+  background: var(--surface-hover);
+}
+
+.bar__history-item[aria-current="true"] .bar__history-title {
+  color: var(--text);
+}
+
+.bar__history-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar__history-meta {
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
 /* ------------------------------------------------------------------ */
 /* Conversation                                                       */
 /* ------------------------------------------------------------------ */
@@ -1024,6 +1062,62 @@ a {
 }
 
 .composer__quote-dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Follow-ups waiting for the live turn to settle (#410). A quiet list, not a
+   second transcript: one row per message, actions small and keyboard-reachable. */
+.queue-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.queue-lane__item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.queue-lane__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-lane__steer,
+.queue-lane__remove {
+  flex: none;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 2px 7px;
+}
+
+.queue-lane__steer {
+  border: 1px solid var(--line, rgba(127, 127, 127, 0.35));
+}
+
+.queue-lane__steer:hover,
+.queue-lane__remove:hover {
+  color: var(--accent);
+}
+
+.queue-lane__steer:focus-visible,
+.queue-lane__remove:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

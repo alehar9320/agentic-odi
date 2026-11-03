@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
+import { queuedUserMessage } from "../assistant/queue";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -68,6 +69,50 @@ let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 let conversationCreates = 0;
 
+// The follow-up queue (#410) needs a turn that stays in flight so later sends
+// actually line up behind it: /api/chat then returns a stream the test closes
+// (respond) or breaks (abort — the same way aborting the fetch signal would).
+type GatedTurn = {
+  body: Record<string, unknown>;
+  aborted: boolean;
+  respond: (events: string) => void;
+  abort: () => void;
+};
+let gateChats = false;
+let gatedTurns: GatedTurn[] = [];
+
+function gatedChatResponse(
+  body: Record<string, unknown>,
+  signal?: AbortSignal | null,
+): Response {
+  const encoder = new TextEncoder();
+  let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const turn: GatedTurn = {
+    body,
+    aborted: false,
+    respond: (events) => {
+      streamController?.enqueue(encoder.encode(events));
+      streamController?.close();
+    },
+    abort: () => {
+      turn.aborted = true;
+      const error = new Error("The user aborted a request.");
+      error.name = "AbortError";
+      streamController?.error(error);
+    },
+  };
+  signal?.addEventListener("abort", turn.abort, { once: true });
+  gatedTurns.push(turn);
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller;
+      },
+    }),
+    { status: 200, headers: { "Content-Type": "text/event-stream" } },
+  );
+}
+
 function route(
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -98,6 +143,9 @@ function route(
           reject(error);
         });
       });
+    }
+    if (gateChats) {
+      return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
@@ -227,14 +275,34 @@ function route(
   if (url === "/api/conversations") {
     if (init?.method === "POST") {
       conversationCreates += 1;
+      return json({
+        conversation: {
+          id: "c-new",
+          title: "",
+          created_at: "2026-10-22T10:00:00+00:00",
+          updated_at: "2026-10-22T10:00:00+00:00",
+        },
+      });
     }
     return json({
-      conversation: {
-        id: "c-new",
-        title: "",
-        created_at: "2026-10-22T10:00:00+00:00",
-        updated_at: "2026-10-22T10:00:00+00:00",
-      },
+      conversations: [
+        {
+          id: "c-1",
+          title: "I own activation.",
+          created_at: "2026-10-22T10:00:00+00:00",
+          updated_at: "2026-10-22T10:00:00+00:00",
+          head_id: "t-2",
+          turn_count: 2,
+        },
+        {
+          id: "c-old",
+          title: "Price the churn spike",
+          created_at: "2026-10-20T10:00:00+00:00",
+          updated_at: "2026-10-20T10:00:00+00:00",
+          head_id: null,
+          turn_count: 1,
+        },
+      ],
     });
   }
   if (url === "/api/health/mcp") {
@@ -403,6 +471,32 @@ describe("StudioContext memory and resume", () => {
     ]);
     expect(result.current.memory.map((item) => item.text)).toEqual([
       "Accountable for activation.",
+    ]);
+  });
+
+  it("loads the history list on boot, newest first", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.conversations).toHaveLength(2));
+    expect(result.current.conversations.map((conversation) => conversation.id)).toEqual([
+      "c-1",
+      "c-old",
+    ]);
+    expect(result.current.conversations[0].title).toBe("I own activation.");
+  });
+
+  it("opens a past conversation by loading its turns", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.openConversation("c-1");
+    });
+
+    expect(result.current.conversationId).toBe("c-1");
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Tell me more.",
     ]);
   });
 
@@ -660,6 +754,12 @@ describe("StudioContext first run in a browser with no server", () => {
 
     await act(async () => {
       await result.current.sendMessage("what should I work on first?");
+    });
+
+    // sendMessage settles when the send enters the queue (#410), not when the
+    // turn answers, so the offline reply is awaited where it actually lands.
+    await waitFor(() => {
+      expect((result.current.messages.at(-1)?.content ?? "").trim().length).toBeGreaterThan(0);
     });
 
     const last = result.current.messages.at(-1);
@@ -1367,5 +1467,193 @@ describe("StudioContext startNewThread (#319)", () => {
       settings: harness.result.current.settings,
     });
     expect(after).toBe(before);
+  });
+});
+
+describe("StudioContext follow-up queue (#410)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatAttempts = 0;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    gateChats = true;
+    gatedTurns = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    gateChats = false;
+    vi.unstubAllGlobals();
+  });
+
+  async function openStudio() {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    await waitFor(() => expect(result.current.queue).not.toBeNull());
+    return result;
+  }
+
+  /** The question the sidecar was actually asked on one gated turn. */
+  function turnText(turn: GatedTurn): string {
+    const history = (turn.body.messages ?? []) as { content: string }[];
+    return history[history.length - 1]?.content ?? "";
+  }
+
+  function laneTexts(items: readonly { parts: readonly { type: string; text?: string }[] }[]): string[] {
+    return items.map((item) =>
+      item.parts.flatMap((part) => (part.type === "text" ? [part.text ?? ""] : [])).join(" "),
+    );
+  }
+
+  // The adapter mounts on the first effect, so it is present once openStudio
+  // resolves; this narrows the nullable context field for the assertions below.
+  type StudioResult = Awaited<ReturnType<typeof openStudio>>;
+  function lane(
+    result: StudioResult,
+  ): NonNullable<StudioResult["current"]["queue"]> {
+    const queue = result.current.queue;
+    if (!queue) {
+      throw new Error("queue adapter missing");
+    }
+    return queue;
+  }
+
+  it("holds follow-ups typed during an answer and sends them in order", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("first question?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+    expect(result.current.streaming).toBe(true);
+
+    await act(async () => {
+      await result.current.sendMessage("second question?");
+      await result.current.sendMessage("third question?");
+    });
+
+    // Never two streams for one conversation: the follow-ups wait in the lane.
+    expect(gatedTurns).toHaveLength(1);
+    expect(laneTexts(lane(result).items)).toEqual([
+      "second question?",
+      "third question?",
+    ]);
+
+    await act(async () => {
+      gatedTurns[0].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(2));
+    await act(async () => {
+      gatedTurns[1].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(3));
+    await act(async () => {
+      gatedTurns[2].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+
+    expect(gatedTurns.map(turnText)).toEqual([
+      "first question?",
+      "second question?",
+      "third question?",
+    ]);
+  });
+
+  it("a steered follow-up cuts in, cancelling the live answer exactly once", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("long question?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      lane(result).steer(queuedUserMessage("urgent correction"));
+    });
+
+    // The live stream aborts and the steer is dispatched at once — a cut-in,
+    // not a second stream: exactly one new request was made.
+    await waitFor(() => expect(gatedTurns).toHaveLength(2));
+    await waitFor(() => expect(gatedTurns[0].aborted).toBe(true));
+    expect(gatedTurns[1].aborted).toBe(false);
+    expect(chatAttempts).toBe(2);
+
+    await act(async () => {
+      gatedTurns[1].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+    expect(turnText(gatedTurns[1])).toBe("urgent correction");
+    // The interrupted question stays in the transcript; only its empty
+    // answer is dropped.
+    expect(result.current.messages.some((message) => message.content === "long question?")).toBe(true);
+  });
+
+  it("a follow-up removed from the lane is never fetched", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("running question?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+    await act(async () => {
+      await result.current.sendMessage("withdrawn question?");
+    });
+    const [item] = lane(result).items;
+    await act(async () => {
+      lane(result).remove(item.id);
+    });
+    expect(lane(result).items).toHaveLength(0);
+
+    await act(async () => {
+      gatedTurns[0].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+    expect(gatedTurns).toHaveLength(1);
+    expect(
+      result.current.messages.some((message) => message.content === "withdrawn question?"),
+    ).toBe(false);
+  });
+
+  it("stopping the answer keeps the lane waiting for the next send", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("first?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+    await act(async () => {
+      await result.current.sendMessage("second?");
+    });
+
+    await act(async () => {
+      result.current.stopStreaming();
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+    // Stop takes down the turn, not the person's follow-ups (#410): the lane
+    // keeps "second?" and waits — nothing fires off behind the stop.
+    expect(gatedTurns).toHaveLength(1);
+    expect(laneTexts(lane(result).items)).toEqual(["second?"]);
+
+    await act(async () => {
+      await result.current.sendMessage("third?");
+    });
+    // The next send re-arms the lane, and the older follow-up answers first.
+    await waitFor(() => expect(gatedTurns).toHaveLength(2));
+    expect(turnText(gatedTurns[1])).toBe("second?");
+    await act(async () => {
+      gatedTurns[1].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(3));
+    expect(turnText(gatedTurns[2])).toBe("third?");
+    await act(async () => {
+      gatedTurns[2].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
   });
 });

@@ -811,6 +811,31 @@ async def get_segments(
     ]
 
 
+@router.get("/studies", response_model=list[dict[str, Any]])
+async def get_studies(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The opened studies, same records under both backends.
+
+    Empty until the agent has run ``open_study``: a study is opened as a named
+    pass over a job, never typed into the canvas.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_STUDIES.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [
+        study.model_dump(mode="json") for study in _service(request).list_studies(job_id=job_id)
+    ]
+
+
 @router.get("/strategy", response_model=dict[str, Any] | None)
 async def get_strategy(
     request: Request,
@@ -1086,7 +1111,11 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
 
 @router.get("/conversations", response_model=ConversationListResponse)
 def list_conversations(request: Request) -> ConversationListResponse:
-    """The history a switcher lists: every thread, most recent touch first."""
+    """The history a switcher lists: at most 20 threads, most recent touch first.
+
+    Titles come from the first question, so the list names each thread without
+    carrying a single turn body.
+    """
     conversations = _memory(request).list_conversations()
     return ConversationListResponse(
         conversations=[conversation.to_dict() for conversation in conversations]

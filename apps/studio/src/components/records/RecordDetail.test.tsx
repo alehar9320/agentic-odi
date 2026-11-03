@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CanvasData } from "../../types";
@@ -6,7 +6,10 @@ import { buildRecords, type RecordKind, type RecordRow } from "../../lib/records
 import { RecordDetail } from "./RecordDetail";
 import { RecordsPanel } from "./RecordsPanel";
 
-const studio = vi.hoisted(() => ({ canvas: null as CanvasData | null }));
+const studio = vi.hoisted(() => ({
+  canvas: null as CanvasData | null,
+  updateOutcome: vi.fn(),
+}));
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => studio,
@@ -41,6 +44,8 @@ function renderDetail(overrides: Partial<CanvasData>, kind: RecordKind) {
 
 beforeEach(() => {
   studio.canvas = null;
+  studio.updateOutcome.mockReset();
+  studio.updateOutcome.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -255,6 +260,103 @@ describe("RecordDetail copy id", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     expect(screen.queryByText("Copied")).toBeNull();
+  });
+});
+
+describe("RecordDetail editing an outcome's two estimates", () => {
+  const outcome = {
+    id: "O-1",
+    statement: "Reach first value in a day",
+    importance: 8,
+    satisfaction: 4,
+    opportunity_score: 12.3,
+  };
+
+  it("offers number inputs for an outcome and none for an evidence record", () => {
+    renderDetail({ outcomes: [outcome] }, "outcome");
+    expect(screen.getByLabelText("Importance (1–10)")).toHaveAttribute("type", "number");
+    expect(screen.getByLabelText("Satisfaction (1–10)")).toHaveAttribute("type", "number");
+
+    cleanup();
+    renderDetail({ evidence: [{ id: "E-1", name: "Call with Acme" }] }, "evidence");
+    expect(screen.queryByLabelText("Importance (1–10)")).toBeNull();
+    expect(screen.queryByLabelText("Satisfaction (1–10)")).toBeNull();
+  });
+
+  it("keeps Save disabled until a value changes", () => {
+    renderDetail({ outcomes: [outcome] }, "outcome");
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Importance (1–10)"), { target: { value: "6" } });
+    expect(save).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText("Importance (1–10)"), { target: { value: "8" } });
+    expect(save).toBeDisabled();
+  });
+
+  it("calls the mutation once with clamped integers", async () => {
+    renderDetail({ outcomes: [outcome] }, "outcome");
+    fireEvent.change(screen.getByLabelText("Importance (1–10)"), { target: { value: "42" } });
+    fireEvent.change(screen.getByLabelText("Satisfaction (1–10)"), { target: { value: "0" } });
+
+    fireEvent.submit(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(studio.updateOutcome).toHaveBeenCalledWith("O-1", { importance: 10, satisfaction: 1 }),
+    );
+    expect(studio.updateOutcome).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the sidecar's message and keeps the typed values when the save rejects", async () => {
+    studio.updateOutcome.mockRejectedValue({
+      code: "internal",
+      message: "The outcome could not be saved.",
+      suggestion: "Try again in a moment.",
+      retryable: true,
+    });
+    renderDetail({ outcomes: [outcome] }, "outcome");
+    fireEvent.change(screen.getByLabelText("Importance (1–10)"), { target: { value: "6" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Save" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The outcome could not be saved.");
+    expect(alert).toHaveTextContent("Try again in a moment.");
+    expect(screen.getByLabelText("Importance (1–10)")).toHaveValue(6);
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  // While the refreshed record is on its way the old score stays and says it is
+  // being recomputed. The new number is never guessed here.
+  it("keeps the old score and appends recomputing while the save is in flight", async () => {
+    let resolveSave: () => void = () => {};
+    studio.updateOutcome.mockImplementation(
+      () => new Promise<void>((resolve) => {
+        resolveSave = resolve;
+      }),
+    );
+    renderDetail({ outcomes: [outcome] }, "outcome");
+    fireEvent.change(screen.getByLabelText("Importance (1–10)"), { target: { value: "6" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Save" }));
+
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getByText("12.3 recomputing")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveSave();
+    });
+    expect(screen.getByText("12.3")).toBeInTheDocument();
+  });
+
+  // The score is the sidecar's. With no score on the record the detail says so,
+  // and it never derives a number from the two estimates it was handed.
+  it("shows unscored for a null score and never computes one", () => {
+    const { container } = renderDetail(
+      { outcomes: [{ id: "O-1", importance: 8, satisfaction: 4, opportunity_score: null }] },
+      "outcome",
+    );
+    expect(container.textContent).toContain("unscored");
+    expect(container.textContent).not.toContain("12");
   });
 });
 
