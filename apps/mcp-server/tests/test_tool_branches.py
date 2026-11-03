@@ -204,19 +204,37 @@ async def test_delete_customer_outcome_reports_missing_ids() -> None:
     assert _text(result) == "Customer outcome not found: missing"
 
 
-def test_main_runs_the_http_transport(monkeypatch) -> None:
+def _capture_uvicorn(monkeypatch) -> list[dict]:
+    """Record what ``server.main`` hands to the server instead of listening.
+
+    Without this the test would bind a real socket and never return, because
+    ``main`` now serves an ASGI app it builds itself.
+    """
     calls: list[dict] = []
-    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(
+        server.uvicorn,
+        "run",
+        lambda app, **kwargs: calls.append({"app": app, **kwargs}),
+    )
+    monkeypatch.setattr(server, "_studio_token", lambda: "test-token")
+    return calls
+
+
+def test_main_serves_the_token_gated_app(monkeypatch) -> None:
+    calls = _capture_uvicorn(monkeypatch)
 
     server.main([])
 
-    assert calls == [{"transport": "http", "port": 8000}]
+    assert calls[0]["host"] == "127.0.0.1"
+    assert calls[0]["port"] == 8000
+    # The gate is the point of the change: an app served without it is not gated.
+    assert isinstance(calls[0]["app"], server._AuthMiddleware)
+    assert calls[0]["app"].token == "test-token"
 
 
 def test_main_passes_an_explicit_port_through(monkeypatch) -> None:
-    calls: list[dict] = []
-    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
+    calls = _capture_uvicorn(monkeypatch)
 
     server.main(["--port", "8010"])
 
-    assert calls == [{"transport": "http", "port": 8010}]
+    assert calls[0]["port"] == 8010
