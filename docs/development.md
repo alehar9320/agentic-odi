@@ -103,7 +103,7 @@ by the presence of one handler.
 | `useRemoteThreadListRuntime`, `useCloudThreadListAdapter`, `AssistantCloud` | Rejected | — | — | Local-first: no account, no cloud, no outbound thread sync. |
 | Prebuilt `ExternalThread`, `SingleThreadList`, `InMemoryThreadList`, `RemoteThreadList` | Rejected | — | — | A prebuilt thread cannot carry the ODI part renderers; adopting it would can the three-file part bridge. |
 | `createThreadRowsSelector` / `ThreadRow` | Decision | — | — | Group the conversation list by day once #408 lands. Decide from real list lengths, not now. |
-| `groupPartByType` / `GroupedParts` | Planned | — | #392 | Fallback if `ChainOfThoughtPrimitive` cannot exclude a pending approval. |
+| `groupPartByType` / `GroupedParts` | Partial | `apps/studio/src/components/chat/WorkBlock.tsx` | — | The fallback fired: the turn's work groups through `GroupedParts` (see the message table), but with our own `workGrouping`. `groupPartByType` keys by part type or tool name alone, so a pending approval — a `tool-call` part — would be folded into the row. |
 | `getExternalStoreMessages` / `bindExternalStoreMessage` | Rejected | — | — | One store. These exist to reconcile foreign messages, which we do not accept. |
 
 ### Thread
@@ -133,7 +133,7 @@ by the presence of one handler.
 | `MessagePrimitive.Quote` | Adopted | `apps/studio/src/assistant/quote.ts` | #435 | Renders the quoted passage on a sent turn. |
 | `MessagePrimitive.Error` / `ErrorPrimitive` | Rejected | — | — | `FailurePanel` already renders the structured error, the retry copy, and the Try again action from `metadata.custom.error`. Swapping adds nothing and loses the ODI failure language. |
 | `GenerativeUIRender` / `MessagePrimitive.GenerativeUI` | Decision | — | — | Would let a model emit UI we did not validate. The ODI catalog is schema-validated; revisit only if validation moves server-side. |
-| `MessagePrimitive.GroupedParts` | Planned | — | #392 | See the runtime table. |
+| `MessagePrimitive.GroupedParts` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #392 | The reasoning and tool calls of one run fold into a single disclosure; `indicator="never"` keeps the activity line and caret where the `components` map put them. |
 | `MessagePrimitive.PartByIndex` / `Content` | Rejected | — | — | `Parts` is the one path; aliases would be a second. |
 | `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | `apps/studio/src/assistant/parts.tsx` | — | Rendered through the `components` map (custom `TextPart`, `FilePart`) rather than the bare primitives, which cannot show claim chips or extraction state. |
 | `MessagePartPrimitive.InProgress` | Decision | — | — | Our `TypingPart` shows a phase ("checking the sidecar"). The primitive would flatten that to a generic indicator. |
@@ -211,9 +211,9 @@ only the surface is missing.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Planned | — | #392 | One disclosure per settled turn. |
+| `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Rejected | — | — | Checked against the installed 0.15.31 rather than the docs: `groupMessageParts` starts a run at any adjacent `tool-call` or `reasoning` part, so its one disclosure would gather a write that is still asking. `GroupedParts` with `workGrouping` ends a run at an unanswered approval. |
 | Pending approvals inside a group | Rejected | — | — | A pending write is a question, not history. It stays ungrouped and visible, always. |
-| `useToolCallElapsed` | Planned | — | #392 | "Worked for Ns · N tools". |
+| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. |
 | `useMessageTiming` | Decision | — | — | Tokens/second is engineering telemetry. Useful to us, not to the PM; expose it only behind a diagnostics toggle if at all. |
 
 ### Selection and quote
@@ -300,11 +300,11 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 44 |
-| Partial | 8 |
-| Planned | 20 |
+| Adopted | 45 |
+| Partial | 9 |
+| Planned | 16 |
 | Decision | 26 |
-| Rejected | 31 |
+| Rejected | 33 |
 | Total | 129 |
 
 Read it as: **52** of the library's 129 relevant capabilities already deliver

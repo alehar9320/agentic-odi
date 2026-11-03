@@ -4925,6 +4925,74 @@ details[open] summary {
   display: none;
 }
 
+/* The run row: one line for the thinking and the calls a turn did. It is the
+   same quiet card as the thought process inside it — the answer stays the loud
+   thing — and it carries no animation of its own, so a reader who asked for
+   reduced motion gets the same row they always did. */
+.work-block {
+  margin: 2px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+  overflow: hidden;
+}
+
+.work-block.is-running {
+  border-color: rgba(139, 140, 248, 0.26);
+}
+
+.work-block__trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.work-block__trigger:hover {
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+}
+
+.work-block__chevron {
+  margin-left: auto;
+  transition: transform 0.16s ease;
+}
+
+.work-block__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* The calls keep their own rows inside here; the card is the fold, not a new
+   skin on them. */
+.work-block__body {
+  padding: 0 14px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.work-block__body .reasoning {
+  margin: 10px 0 0;
+  border: 0;
+  background: transparent;
+}
+
+.work-block__body .reasoning__body {
+  padding: 8px 2px 4px;
+  border-top: 0;
+}
+
+.work-block__body[hidden] {
+  display: none;
+}
+
 .source-chip {
   display: inline-flex;
   align-items: baseline;
@@ -5441,7 +5509,8 @@ details[open] summary {
 .quiet-action:focus-visible,
 .branch-picker__step:focus-visible,
 .attachment-chip__remove:focus-visible,
-.reasoning__summary:focus-visible {
+.reasoning__summary:focus-visible,
+.work-block__trigger:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
