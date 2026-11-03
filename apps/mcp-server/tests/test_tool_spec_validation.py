@@ -72,9 +72,7 @@ def test_startup_is_silent_when_valid(monkeypatch, capsys):
 def test_main_validates_before_serving(monkeypatch):
     calls: list[object] = []
     monkeypatch.setattr(mcp_server, "validate_at_startup", lambda: calls.append("validate"))
-    monkeypatch.setattr(
-        mcp_server.uvicorn, "run", lambda app, **kwargs: calls.append("run")
-    )
+    monkeypatch.setattr(mcp_server.uvicorn, "run", lambda app, **kwargs: calls.append("run"))
     monkeypatch.setattr(mcp_server, "_studio_token", lambda: "test-token")
 
     mcp_server.main([])
