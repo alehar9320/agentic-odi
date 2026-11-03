@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from doc_check import (
+    ALL_METHODS,
     collect_issues,
     documented_cli_commands,
     documented_env_vars,
@@ -14,6 +15,7 @@ from doc_check import (
     missing_file_paths,
     missing_routes,
     readme_code_overview_paths,
+    worker_routes,
 )
 
 
@@ -103,6 +105,51 @@ def test_reports_a_documented_route_the_router_does_not_serve() -> None:
     missing = missing_routes({"guide": "`GET /api/imagination`"}, routes)
 
     assert missing == ["GET /api/imagination"]
+
+
+def _worker_source(tmp_path: Path) -> Path:
+    worker = tmp_path / "infra" / "cloudflare" / "worker.ts"
+    worker.parent.mkdir(parents=True)
+    worker.write_text(
+        'if (url.pathname === "/api/build") {\n'
+        '  if (request.method !== "GET") {\n'
+        "    return 405;\n"
+        "  }\n"
+        "  return 200;\n"
+        "}\n"
+        "const sidecar = env.SIDECAR_URL;\n"
+        'if (url.pathname === "/api/capabilities") {\n'
+        "  return 200;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    return worker
+
+
+def test_a_route_the_worker_answers_is_read_from_its_source(tmp_path: Path) -> None:
+    # The Worker has no router object to introspect, so `docs/deployment.md`
+    # could not name `/api/build` if the check only knew the sidecar's routes.
+    _worker_source(tmp_path)
+
+    assert worker_routes(root=tmp_path) == {"/api/build": {"GET"}, "/api/capabilities": ALL_METHODS}
+
+
+def test_a_method_the_worker_refuses_is_still_reported_as_missing(tmp_path: Path) -> None:
+    _worker_source(tmp_path)
+
+    missing = missing_routes(
+        {"guide": "`GET /api/build`\n`POST /api/build`"},
+        set(),
+        worker_routes(root=tmp_path),
+    )
+
+    assert missing == ["POST /api/build"]
+
+
+def test_a_bare_worker_route_path_counts_as_served(tmp_path: Path) -> None:
+    _worker_source(tmp_path)
+
+    assert missing_routes({"guide": "`/api/build`"}, set(), worker_routes(root=tmp_path)) == []
 
 
 def test_reports_an_environment_variable_nothing_reads() -> None:
