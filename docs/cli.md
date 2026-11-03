@@ -154,6 +154,11 @@ agentic-odi desired-outcomes search --job-id <job-id> --text "three days"
 agentic-odi desired-outcomes search --theme <theme-id> --stage execute --confidence scored
 agentic-odi desired-outcomes search --min-score 10 --limit 20 --offset 20 --json
 
+# Organise a set in one reviewable run: preview it, then take it back
+agentic-odi desired-outcomes bulk --job-id <job-id> --stage locate --set-stage execute --dry-run
+agentic-odi desired-outcomes bulk --id <outcome-id> --add-theme <theme-id> --add-tag needs-review
+agentic-odi desired-outcomes undo <token>
+
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
 agentic-odi summary <job-id> --top 3 --json
@@ -191,8 +196,29 @@ whether a score exists at all. `--sort` takes the same values as `list`:
 and each facet row is the query with that row's own filter removed, so the
 buckets overlap and are not expected to sum to `total`. `GET
 /api/outcomes/search` runs the identical query and returns identical ids, total,
-and facet counts; `--tag` is accepted but refused until outcomes actually carry
-tags.
+and facet counts; `--tag` matches outcomes carrying any of the tags you name.
+
+`bulk` organises that same narrowed set in one reviewable run. The rows it acts on
+are the `--id` flags unioned with every match of the narrowing, read with no page
+limit — "everything in this theme" means everything, not the first screen of it.
+The writes are `--set-stage`, `--add-theme`, `--remove-theme` and `--add-tag`;
+statements and scores are never bulk-edited, because a score carries signal
+semantics and a statement is argued one outcome at a time. `--dry-run` walks the
+whole pipeline and writes nothing, prints no undo token, and lists the same rows a
+real run on unchanged input would write. Each row answers for itself: an outcome
+filed under another job's theme, or a job with no such stage, is reported as a skip
+with its reason and the rest still land. Naming one theme both to add and to remove
+refuses the call — a contradiction is a bad request, not an ordering.
+
+A real run prints the token that takes it back:
+`agentic-odi desired-outcomes undo <token>`. It is single-use and single-active —
+a newer bulk run retires it, and a row someone edited since the bulk change is left
+alone and reported rather than overwritten. The token is a persisted record, so it
+survives closing the terminal, and it is not a permanent history: undo one run and
+that run is spent. Themes and stages are written through the same single-item paths
+`themes assign` and `desired-outcomes update` use, so the event log reads like the
+hand edits it replaces. The API and Studio surfaces for the same operation are the
+sibling issue.
 
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
