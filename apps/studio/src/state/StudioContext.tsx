@@ -253,7 +253,37 @@ export interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
+  /** One-off callback, for a toast that can hand back what it just took. */
+  action?: { label: string; run: () => void };
+  /** How long the toast stays up. Defaults to six seconds. */
+  durationMs?: number;
 }
+
+/**
+ * What `startNewThread()` hands back: the snapshot lives in a ref, so the only
+ * way to reach it is through the handle that took it.
+ */
+export interface NewThreadHandle {
+  undo: () => void;
+  commit: () => void;
+}
+
+interface ThreadSnapshot {
+  messages: ChatMessage[];
+  conversationId: string | null;
+  toolActivity: ToolActivity[];
+  offlineReplyFor: string | null;
+  scrollTop: number;
+  undoToastId: number;
+}
+
+/**
+ * The thread's scroll box, owned by the assistant-ui viewport primitive in
+ * `ChatStage`. Undo restores a transcript the way the person left it, and the
+ * reading position is part of what they left; the store has no other handle on
+ * it, so the snapshot reaches for the one element the thread scrolls in.
+ */
+const THREAD_VIEWPORT_SELECTOR = ".chat__scroll";
 
 export interface ToolActivity {
   name: string;
@@ -316,6 +346,7 @@ export interface StudioContextValue {
   messages: ChatMessage[];
   streaming: boolean;
   thinkingPhase: string | null;
+  toolActivity: ToolActivity[];
   sendMessage: (text: string, attachments?: ChatAttachment[]) => Promise<void>;
   /** Re-answer the turn that follows `messageId`, as a sibling branch. */
   regenerateFrom: (messageId: string | null) => Promise<void>;
@@ -327,6 +358,12 @@ export interface StudioContextValue {
   respondToApproval: (approvalId: string, approved: boolean, reason?: string) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
+  /**
+   * Leave this thread behind without deleting it. Returns null when there is
+   * nothing to leave, or when a reply is still coming and `stop` was not given
+   * — the caller asks first.
+   */
+  startNewThread: (options?: { stop?: boolean }) => NewThreadHandle | null;
   conversationId: string | null;
   memory: Observation[];
   memoryLoading: boolean;
@@ -374,7 +411,11 @@ export interface StudioContextValue {
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
   toasts: Toast[];
-  pushToast: (kind: ToastKind, message: string) => void;
+  pushToast: (
+    kind: ToastKind,
+    message: string,
+    options?: { action?: { label: string; run: () => void }; durationMs?: number },
+  ) => number;
   dismissToast: (id: number) => void;
   connectors: ConnectorListItem[];
   presets: ConnectorPreset[];
@@ -696,17 +737,124 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
 
-  const pushToast = useCallback((kind: ToastKind, message: string) => {
-    const id = (toastId.current += 1);
-    setToasts((prev) => [...prev, { id, kind, message }]);
-    window.setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 6000);
-  }, []);
+  const pushToast = useCallback(
+    (
+      kind: ToastKind,
+      message: string,
+      options?: { action?: { label: string; run: () => void }; durationMs?: number },
+    ) => {
+      const id = (toastId.current += 1);
+      setToasts((prev) => [
+        ...prev,
+        {
+          id,
+          kind,
+          message,
+          ...(options?.action ? { action: options.action } : {}),
+          ...(options?.durationMs ? { durationMs: options.durationMs } : {}),
+        },
+      ]);
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((toast) => toast.id !== id));
+      }, options?.durationMs ?? 6000);
+      return id;
+    },
+    [],
+  );
 
   const dismissToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
+
+  const threadSnapshot = useRef<ThreadSnapshot | null>(null);
+
+  /** Put the thread back exactly as the snapshot left it, and stop offering Undo. */
+  const undoNewThread = useCallback(() => {
+    const snapshot = threadSnapshot.current;
+    if (!snapshot) {
+      return;
+    }
+    threadSnapshot.current = null;
+    dismissToast(snapshot.undoToastId);
+    setMessages(snapshot.messages);
+    setConversationId(snapshot.conversationId);
+    setToolActivity(snapshot.toolActivity);
+    setOfflineReplyFor(snapshot.offlineReplyFor);
+    const viewport = document.querySelector<HTMLElement>(THREAD_VIEWPORT_SELECTOR);
+    if (viewport) {
+      viewport.scrollTop = snapshot.scrollTop;
+    }
+  }, [dismissToast]);
+
+  /**
+   * The new thread is in use, so the snapshot is stale. Handing it back now
+   * would splice two threads together, which is worse than no Undo at all.
+   */
+  const commitNewThread = useCallback(() => {
+    const snapshot = threadSnapshot.current;
+    if (!snapshot) {
+      return;
+    }
+    threadSnapshot.current = null;
+    dismissToast(snapshot.undoToastId);
+    pushToast("info", "New thread started.");
+  }, [dismissToast, pushToast]);
+
+  const startNewThread = useCallback(
+    (options?: { stop?: boolean }) => {
+      if (streaming) {
+        if (!options?.stop) {
+          return null;
+        }
+      } else if (messages.length === 0) {
+        return null;
+      }
+
+      const viewport = document.querySelector<HTMLElement>(THREAD_VIEWPORT_SELECTOR);
+      threadSnapshot.current = {
+        messages,
+        conversationId,
+        toolActivity,
+        offlineReplyFor,
+        scrollTop: viewport?.scrollTop ?? 0,
+        undoToastId: 0,
+      };
+
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setMessages([]);
+      setToolActivity([]);
+      setStreaming(false);
+      setThinkingPhase(null);
+      setOfflineReplyFor(null);
+      // Not `apiCreateConversation`: the sidecar names the conversation on the
+      // `conversation` frame of the first reply, so a thread nobody wrote to
+      // never becomes a row in the store — and never becomes what boot restores.
+      setConversationId(null);
+
+      const handle: NewThreadHandle = { undo: undoNewThread, commit: commitNewThread };
+      threadSnapshot.current.undoToastId = pushToast(
+        "success",
+        "New thread. Your last one is still saved.",
+        {
+          durationMs: 10_000,
+          action: { label: "Undo", run: () => handle.undo() },
+        },
+      );
+      return handle;
+    },
+    [
+      streaming,
+      messages,
+      conversationId,
+      toolActivity,
+      offlineReplyFor,
+      pushToast,
+      undoNewThread,
+      commitNewThread,
+    ],
+  );
+
 
   const dismissConnectorSuggestion = useCallback((preset: string) => {
     setConnectorSuggestions((prev) => prev.filter((s) => s !== preset));
@@ -1341,6 +1489,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       // because a background probe once said "down" is what made a working studio
       // look broken before the person had done anything.
       cancelScheduledProbes();
+      // Writing here is the proof the new thread was wanted: Undo is spent.
+      commitNewThread();
 
       const userMessage: ChatMessage = existingUserMessage ?? {
         id: crypto.randomUUID(),
@@ -1704,6 +1854,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshCanvas,
       refreshConnectors,
       cancelScheduledProbes,
+      commitNewThread,
     ],
   );
 
@@ -2116,6 +2267,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       respondToApproval,
       stopStreaming,
       clearChat,
+      startNewThread,
       conversationId,
       memory,
       memoryLoading,
@@ -2231,6 +2383,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       respondToApproval,
       stopStreaming,
       clearChat,
+      startNewThread,
       conversationId,
       memory,
       memoryLoading,
