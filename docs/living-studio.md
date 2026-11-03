@@ -37,6 +37,7 @@ The Studio opens as a conversation, not a dashboard.
 
 | Surface | What it does |
 |---|---|
+| **First paint** | The window opens already the right colour. `apps/studio/index.html` carries an inline `<style>` with the background and the shell grid (bar, rail, stage) and a short inline script that resolves the theme — the stored `studio.settings` choice, or `prefers-color-scheme` when nothing is stored — and sets the class on `<html>` before the module bundle parses. React replaces the shell on its first commit, so there is no white flash and no dark-then-light flip. The inline colours are copies of `--bg` and `--line` in `src/styles/theme.css`, and `src/styles/bootShell.test.ts` fails if the two drift apart. |
 | **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step, and no warning about a server nothing you have done needs yet. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
 | **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and the first move. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. |
 | **Context conversation** | Opened when you ask for it — the **Start with you and your team** starter, the context hint, `/start`, or Settings. A five-turn introduction in the chat, led by the agent: who you are and your team, who feels the problem first, what they are trying to win, where it breaks, and what you already have. One question at a time, examples shown as muted text, with **Skip this question** and **Explore on my own** always available. The five answers come back as an editable card, in your words; skipping stores nothing, and progress is kept as a draft. |
@@ -46,7 +47,7 @@ The Studio opens as a conversation, not a dashboard.
 | **Bar** | The only persistent chrome: home, new conversation, catch-up, live model status, **Customize**, and settings. There is no navigation drawer to compete with the thread. |
 | **Customize** | The one place to manage connectors. It replaces the conversation while open (the bar stays, so leaving is one gesture) and shows three bands: what is installed, read from the same `connectors.json` the CLI uses; a handful of curated picks as non-gating examples; and the marketplace, populated from the trusted vendor registry so a listing can be added by id. Capability areas filter the shelf, a listing that needs a token names its environment variable and stores nothing, a listing that cannot be installed says why, and an unreachable marketplace is reported rather than shown as an empty list. A studio with nothing installed suggests a connector when one would help; dismissing the suggestion keeps it dismissed. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
-| **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. |
+| **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. In the Records lens a row is a button: it opens that one record below the tables with every field the store holds, its id behind **Copy id**, and each parent that exists as a filter that narrows the tables without leaving the lens. Where the store knows nothing it says so — `—` for an absent value, `unscored` for an outcome with no score, and the plain line *This record stores only the fields above — no author and no timestamp.* |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
 While a turn has produced no text yet, an activity line names the phase (*Waking
@@ -70,7 +71,7 @@ the model, so they work when it is offline.
 | `/new` | New conversation |
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
-| `/landscape`, `/jobmap`, `/evidence`, `/settings` | Open that lens beside the conversation |
+| `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/settings` | Open that lens beside the conversation |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
 
@@ -182,6 +183,12 @@ Studio says so in one place and keeps going:
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
   all.
+- Where that work sits, and how much room it takes, is one call away:
+  `bff/storageFacts.ts` reports the engine, the database name, the record count,
+  the newest write the records carry, and whether the browser agreed to keep the
+  store across restarts — plus the settings keys in `localStorage` by name and
+  size, never by value, since one of them holds your model key. See
+  [Data flow → Storage facts](architecture/data-flow.md).
 - A warning strip appears only for something that actually broke: a model or
   sidecar that this session reached and then lost, or a check you asked for by
   pressing **Recheck** or running the tour's live step. Opening Settings measures
@@ -211,7 +218,9 @@ nothing on screen can claim otherwise before the person has asked for something.
 - The stage paints from local data: the canvas, the thread you left, and the
   composer. The request for sidecar defaults is a convenience that may fill in
   settings later; a slow or absent sidecar cannot hold the first screen behind
-  it, and its failure is silent.
+  it, and its failure is silent. A proxy that accepts the connection and never
+  answers is bounded at 1,200 ms, so boot carries on with the defaults it already
+  has rather than waiting on a reply that may never come.
 - Health, connector, and capability probes wait until the browser is idle (or
   two seconds), and are given up entirely if you send a message first. A negative
   they find keeps the studio **unknown** rather than **down**.
@@ -244,6 +253,23 @@ agentic_odi_mcp_server)…`. When the Studio is reached through the free
 Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 `{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
 …"}}` with `X-Request-ID` echoed for support.
+
+### When the database failed its check
+
+A store that is *reachable* but *damaged* is a different condition from a sidecar
+that is down, and it is shown differently. The sidecar runs a bounded
+`PRAGMA quick_check` when it opens the store; when that check fails it refuses
+every data route with one `{"error": {"code": "store_corrupt", …}}` body and
+leaves the file exactly as it found it. `/health` reports `degraded` with
+`reason: store_corrupt`, while `/api/diagnostics` and `/health` stay
+reachable so the failure can still be read and copied.
+
+The SPA answers that one code with a full-page failure instead of the shell:
+it names the file, shows the last backup it can find under
+`AGENTIC_ODI_BACKUP_DIR` (`~/.agentic-odi/backups`), says the damaged file was
+left untouched, and offers **Recheck the database** for after the person has
+restored a copy. It never offers to delete or overwrite anything — that decision
+belongs to the person.
 
 ### What the canvas is made of
 
@@ -377,7 +403,7 @@ cites the issue or PR that landed it.
 | `apps/studio/src/assistant/StudioRuntime.tsx` | `useExternalStoreRuntime`: `onNew`, `onEdit`, `onReload`, `onCancel`, `setMessages`, `onRespondToToolApproval`, suggestions, attachments. |
 | `apps/studio/src/assistant/attachments.ts` | The attachment adapter and the browser-side text/image extraction. |
 | `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface, claims. |
-| `apps/studio/src/assistant/claims.ts` | Hides claim markers (including one split across streamed chunks), cuts the reply so every chip lands after its own sentence, and counts citations without a seeded demo. |
+| `apps/studio/src/assistant/claims.ts` | Hides claim markers (including one split across streamed chunks), cuts the reply so every chip lands after its own sentence, and counts citations without a seeded demo. The Markdown export reads a claim-bearing reply through this same parser, so the file cannot say something other than what the transcript showed. |
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
@@ -438,7 +464,9 @@ Nothing is silently promoted: the agent may propose, but the person decides.
 The agent writes notes through a `remember` tool during a normal reply. The
 sidecar applies it, emits a `memory` SSE event, and the panel updates without a
 refresh. Memory writes are best-effort — a database failure never turns a good
-answer into an error.
+answer into an error. A turn can therefore finish without being remembered; when
+that happens the sidecar logs one warning carrying the request id, the role, and
+the exception class — never the words of the turn — instead of failing the reply.
 
 Storage is a separate SQLite file from the ODI repository:
 `~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`
@@ -470,7 +498,11 @@ flight, and a restore failure simply leaves the room empty.
 The bar's overflow menu has **Export → Markdown**. The file labels every
 speaker, keeps the prose as Markdown, and writes each agent-composed surface as
 a fenced JSON block, so a thread can be pasted into a doc or a ticket without
-the reader needing the Studio.
+the reader needing the Studio. A reply that arrived with claims keeps them: each
+sentence carries the distinction the transcript drew beside it — *Hypothesis*,
+*Uncited*, or `Source · record name, record id` — the claim markers themselves
+never print outside code, and the labels state what the turn read when it was
+written rather than promising that the record is still there.
 
 **Diagnostics are separate from conversation export.** Settings → About →
 Diagnostics builds a local, opt-in bundle, then shows the exact pretty-printed

@@ -122,7 +122,7 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
             />
           </label>
           <p className="score-preview">
-            Opportunity <b>{opportunityScore(importance, satisfaction).toFixed(2)}</b>
+            Opportunity <b>{formatOpportunityScore(opportunityScore(importance, satisfaction))}</b>
           </p>
           <div className="card__edit-actions">
             <button type="submit" className="button button--ghost" disabled={saving}>
