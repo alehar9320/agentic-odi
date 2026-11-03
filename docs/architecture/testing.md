@@ -162,6 +162,15 @@ stub and once with `navigator.locks` deleted so the lease row runs. Both assert
 exactly one send per record, and the lease path also proves a crashed holder's
 lease is reclaimed only after it expires and that a running drain renews it.
 
+The workspace escape hatch in `apps/studio/src/bff/index.ts` is covered by
+`index.test.ts`: a version 2 export round-trips every record, a version 1 file is
+migrated on the way in (its records kept, its absent `evidence` becoming an empty
+list), and an unreadable version is refused with the version it found.
+`SettingsPanel.test.tsx` covers the door: Export downloads
+`agentic-odi-workspace.json`, Import into a non-empty workspace asks first and
+cancelling changes nothing, and a version mismatch is reported before anything is
+replaced.
+
 Copied UI is guarded structurally: `src/vendor/boundary.test.ts` reads every
 `.ts` and `.tsx` file under `apps/studio/src/vendor/` and fails on a specifier
 that resolves into a product slice (`state`, `api`, `assistant`, `bff`). It is

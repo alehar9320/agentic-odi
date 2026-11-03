@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { StudioBff } from "./index";
+import { StudioBff, parseWorkspaceSnapshot } from "./index";
+import { WORKSPACE_SNAPSHOT_VERSION } from "./store/types";
 import { MemoryLocalStore } from "./store/memoryStore";
 
 afterEach(() => {
@@ -13,36 +14,110 @@ function makeBff() {
 }
 
 describe("StudioBff workspace export/import", () => {
-  it("exports an empty workspace as JSON with version 1", async () => {
+  it("exports an empty workspace as JSON at the current version", async () => {
     const bff = makeBff();
     const json = await bff.exportWorkspace();
     const snapshot = JSON.parse(json);
-    expect(snapshot.version).toBe(1);
+    expect(snapshot.version).toBe(WORKSPACE_SNAPSHOT_VERSION);
     expect(snapshot.exported_at).toBeDefined();
     expect(snapshot.jobs).toEqual([]);
     expect(snapshot.steps).toEqual([]);
     expect(snapshot.outcomes).toEqual([]);
     expect(snapshot.observations).toEqual([]);
+    expect(snapshot.evidence).toEqual([]);
     expect(snapshot.conversations).toEqual([]);
     expect(snapshot.turns).toEqual([]);
+    expect(snapshot.pending_writes_excluded).toBe(false);
   });
 
-  it("round-trips canvas data through export and import", async () => {
+  it("round-trips every record at version 2", async () => {
     const bff = makeBff();
     const job = await bff.data.createJob({ name: "Job A" });
     await bff.data.createJob({ name: "Job B" });
     await bff.data.addStep({ job_id: job.id, name: "Step", order: 0 });
+    await bff.data.addOutcome({
+      job_id: job.id,
+      statement: "Minimize the time it takes to decide",
+      importance: 8,
+      satisfaction: 3,
+    });
+    await bff.memory.addObservation({
+      kind: "evidence",
+      text: "A recorded observation",
+      confidence: 0.9,
+      confirmed: true,
+    });
 
     const json = await bff.exportWorkspace();
     const snapshot = JSON.parse(json);
+    expect(snapshot.version).toBe(WORKSPACE_SNAPSHOT_VERSION);
     expect(snapshot.jobs).toHaveLength(2);
     expect(snapshot.steps).toHaveLength(1);
+    expect(snapshot.outcomes).toHaveLength(1);
+    expect(snapshot.observations).toHaveLength(1);
 
     const fresh = makeBff();
     await fresh.importWorkspace(json);
     const canvas = await fresh.data.fetchCanvas();
     expect(canvas.jobs.map((j) => j.name).sort()).toEqual(["Job A", "Job B"]);
     expect(canvas.steps).toHaveLength(1);
+    expect(canvas.outcomes).toHaveLength(1);
+    const memory = await fresh.memory.listObservations();
+    expect(memory).toHaveLength(1);
+    expect(memory[0].text).toBe("A recorded observation");
+
+    // The re-export of a restored workspace equals the original snapshot.
+    const reexported = JSON.parse(await fresh.exportWorkspace());
+    expect(reexported.jobs).toEqual(snapshot.jobs);
+    expect(reexported.outcomes).toEqual(snapshot.outcomes);
+    expect(reexported.turns).toEqual(snapshot.turns);
+  });
+
+  it("migrates a version 1 file, keeping every record and adding empty new stores", async () => {
+    const v1 = {
+      version: 1,
+      jobs: [
+        {
+          id: "j-1",
+          name: "Legacy job",
+          description: "",
+          seq: 1,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      steps: [],
+      outcomes: [],
+      observations: [],
+      conversations: [],
+      turns: [],
+      exported_at: "2026-01-02T00:00:00Z",
+    };
+
+    const bff = makeBff();
+    await bff.importWorkspace(JSON.stringify(v1));
+
+    const canvas = await bff.data.fetchCanvas();
+    expect(canvas.jobs.map((j) => j.name)).toEqual(["Legacy job"]);
+
+    // A v1 file has no evidence, so the migrated workspace has an empty store.
+    const snapshot = await bff.workspaceSummary();
+    expect(snapshot.counts.evidence).toBe(0);
+    expect(snapshot.counts.jobs).toBe(1);
+  });
+
+  it("reports a version mismatch instead of swallowing it", async () => {
+    const bff = makeBff();
+    await expect(
+      bff.importWorkspace(JSON.stringify({ version: 99, jobs: [] })),
+    ).rejects.toThrow(/version 99/);
+  });
+
+  it("rejects a payload with no version at all", async () => {
+    const bff = makeBff();
+    await expect(
+      bff.importWorkspace(JSON.stringify({ jobs: [] })),
+    ).rejects.toThrow(/version none/);
   });
 
   it("rejects invalid JSON on import", async () => {
@@ -50,11 +125,32 @@ describe("StudioBff workspace export/import", () => {
     await expect(bff.importWorkspace("not json")).rejects.toThrow();
   });
 
-  it("rejects unsupported workspace version on import", async () => {
+  it("marks pending writes as excluded from the file", async () => {
     const bff = makeBff();
-    await expect(
-      bff.importWorkspace(JSON.stringify({ version: 2 })),
-    ).rejects.toThrow();
+    await bff.store.enqueueOutbox({
+      id: "out-1",
+      kind: "create",
+      entity: "job",
+      local_id: "j-1",
+      server_id: null,
+      payload: {},
+      depends_on: [],
+      state: "pending",
+      attempts: 0,
+      last_error: null,
+      created_at: "2026-01-01T00:00:00Z",
+      acknowledged_at: null,
+    });
+
+    const snapshot = JSON.parse(await bff.exportWorkspace());
+    expect(snapshot.pending_writes_excluded).toBe(true);
+  });
+
+  it("summarizes an empty workspace", async () => {
+    const bff = makeBff();
+    const summary = await bff.workspaceSummary();
+    expect(summary.empty).toBe(true);
+    expect(summary.records).toBe(0);
   });
 
   it("importFromSidecar returns false when local already has data", async () => {
@@ -131,5 +227,30 @@ describe("StudioBff workspace export/import", () => {
     expect(memory[0].text).toBe("Sidecar observation");
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe("parseWorkspaceSnapshot", () => {
+  it("reads a version 2 file with its evidence", () => {
+    const parsed = parseWorkspaceSnapshot(
+      JSON.stringify({
+        version: 2,
+        jobs: [],
+        steps: [],
+        outcomes: [],
+        observations: [],
+        evidence: [{ id: "e-1", source_name: "Gong", name: "Call" }],
+        conversations: [],
+        turns: [],
+      }),
+    );
+    expect(parsed.version).toBe(2);
+    expect(parsed.evidence).toHaveLength(1);
+  });
+
+  it("treats a missing list as empty rather than throwing", () => {
+    const parsed = parseWorkspaceSnapshot(JSON.stringify({ version: 2 }));
+    expect(parsed.jobs).toEqual([]);
+    expect(parsed.evidence).toEqual([]);
   });
 });

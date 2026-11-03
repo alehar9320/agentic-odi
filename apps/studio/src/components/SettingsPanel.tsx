@@ -17,6 +17,7 @@ import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ModelSection } from "./settings/sections/ModelSection";
+import { WorkspaceSection } from "./settings/sections/WorkspaceSection";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
 import { detectPlatform } from "../updater/platform";
 
@@ -385,6 +386,8 @@ export function SettingsPanel() {
             </>
           )}
       </ConnectionsSection>
+
+      <WorkspaceSection />
 
       <div className="settings__actions">
         <button

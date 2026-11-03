@@ -5,6 +5,7 @@ import {
   type ClaimSegment,
 } from "../assistant/claims";
 import type { ChatMessage, Claim, ClaimCitation } from "../types";
+import { downloadFile } from "./download";
 
 const SPEAKER: Record<ChatMessage["role"], string> = {
   user: "User",
@@ -201,14 +202,5 @@ export function exportFilename(exportedAt: Date = new Date()): string {
 
 /** Hand a Markdown file to the browser's save dialog. */
 export function downloadMarkdown(markdown: string, filename: string): void {
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  downloadFile(markdown, filename, "text/markdown;charset=utf-8");
 }

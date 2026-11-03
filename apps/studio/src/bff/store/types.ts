@@ -1,6 +1,7 @@
 import type {
   Conversation,
   ConversationTurn,
+  Evidence,
   Job,
   Observation,
   Outcome,
@@ -90,14 +91,47 @@ export function byCreated<T extends { created_at: string; id: string }>(
   return left.created_at.localeCompare(right.created_at) || left.id.localeCompare(right.id);
 }
 
+/** The snapshot version this build writes and the highest it reads. */
+export const WORKSPACE_SNAPSHOT_VERSION = 2;
+
+/**
+ * Everything a person's workspace is, as one portable object.
+ *
+ * Version 2 adds `evidence`; a version 1 file still imports, gaining an empty
+ * `evidence` list on the way in. The outbox is excluded by design — a queued
+ * intent is not portable, and replaying someone else's writes on import would
+ * be a duplicate, not a restore.
+ */
 export interface WorkspaceSnapshot {
   version: number;
   jobs: StoredJob[];
   steps: StoredStep[];
   outcomes: StoredOutcome[];
   observations: Observation[];
+  /**
+   * Captured research records. The browser store holds none yet (evidence is
+   * read-only through the sidecar until #306 adds the store), so this is `[]`
+   * today; it travels in the snapshot so a future store round-trips without a
+   * third version.
+   */
+  evidence: Evidence[];
   conversations: StoredConversation[];
   turns: StoredTurn[];
+}
+
+/** What a workspace holds, for naming it before it is replaced. */
+export interface WorkspaceSummary {
+  records: number;
+  counts: {
+    jobs: number;
+    steps: number;
+    outcomes: number;
+    observations: number;
+    evidence: number;
+    conversations: number;
+    turns: number;
+  };
+  empty: boolean;
 }
 
 /**

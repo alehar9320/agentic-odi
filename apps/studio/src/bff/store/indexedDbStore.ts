@@ -5,6 +5,7 @@ import { nowIso } from "../id";
 import {
   byCreated,
   bySeq,
+  WORKSPACE_SNAPSHOT_VERSION,
   type DrainLease,
   type LocalStore,
   type OutboxRecord,
@@ -358,11 +359,14 @@ export class IndexedDbLocalStore implements LocalStore {
     );
     const turns = turnLists.flat();
     return {
-      version: 1,
+      version: WORKSPACE_SNAPSHOT_VERSION,
       jobs,
       steps,
       outcomes,
       observations,
+      // The browser store holds no evidence yet (read-only through the sidecar
+      // until #306); the field travels so the file shape is version 2.
+      evidence: [],
       conversations,
       turns,
     };

@@ -2240,6 +2240,32 @@ input[type="range"] {
   gap: 7px;
 }
 
+.settings__workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* The file input is driven by its label, which is styled as the button. */
+.settings__workspace-import {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.settings__workspace-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.settings__workspace-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.72rem;
+}
+
 .muted {
   color: var(--faint);
   font-size: 0.72rem;
