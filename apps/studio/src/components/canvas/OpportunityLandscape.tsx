@@ -1,7 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 
 import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
-import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
+import {
+  formatOpportunityScore,
+  isUnderserved,
+  UNDERSERVED_THRESHOLD,
+} from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -76,9 +80,8 @@ export function OpportunityLandscape() {
   }, [evidence]);
 
   const avgOpportunity = useMemo(() => {
-    if (!outcomes.length) return 0;
     const total = outcomes.reduce((acc, o) => acc + (o.opportunity_score ?? 0), 0);
-    return (total / outcomes.length).toFixed(1);
+    return formatOpportunityScore(outcomes.length ? total / outcomes.length : null);
   }, [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
@@ -212,7 +215,7 @@ export function OpportunityLandscape() {
             <div className="studio-metric__value">{jobs.length}</div>
           </div>
           <div className="studio-metric">
-            <div className="studio-metric__label">Underserved Targets (&gt;10)</div>
+            <div className="studio-metric__label">{`Underserved Targets (>${UNDERSERVED_THRESHOLD})`}</div>
             <div className="studio-metric__value" style={{ color: "var(--studio-amber)" }}>{underservedCount}</div>
             <div className="studio-metric__delta">High Value Innovation</div>
           </div>
@@ -776,7 +779,7 @@ function OpportunityTableView({
                     color: underserved ? "var(--studio-amber)" : "inherit",
                   }}
                 >
-                  {opp.toFixed(1)}
+                  {formatOpportunityScore(outcome.opportunity_score)}
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span
