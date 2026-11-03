@@ -87,6 +87,33 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
     return float(importance + max(importance - satisfaction, 0.0))
 
 
+def explain_opportunity_score(importance, satisfaction):
+    """Explain how an opportunity score is computed."""
+    inputs_present = importance is not None and satisfaction is not None
+    if inputs_present:
+        gap = max(importance - satisfaction, 0)
+        if importance > satisfaction:
+            score = 2 * importance - satisfaction
+        else:
+            score = importance
+        score = float(score)
+    else:
+        gap = None
+        score = None
+    return {
+        "importance": importance,
+        "satisfaction": satisfaction,
+        "gap": gap,
+        "score": score,
+        "threshold": 10.0,
+        "underserved": bool(score is not None and score > 10.0),
+        "min_score": 1.0,
+        "max_score": 19.0,
+        "inputs_present": inputs_present,
+        "method": "importance + max(importance - satisfaction, 0)",
+    }
+
+
 JOB_NAME_PATTERN = r"^[A-Za-z0-9 _-]+$"
 JOB_NAME_MIN_LENGTH = 3
 JOB_NAME_MAX_LENGTH = 64

@@ -35,6 +35,7 @@ from agentic_odi_core import (
     capability_manifest,
     capability_summary,
     compute_opportunity_score,
+    explain_opportunity_score,
     error_envelope,
     evaluate_outcome_statement,
     invalid_strategy_request,
@@ -383,6 +384,16 @@ def compute_opportunity(importance: float, satisfaction: float) -> str:
         )
     score = compute_opportunity_score(importance, satisfaction)
     return f"Opportunity score: {score:.2f}"
+
+
+@mcp.tool
+def explain_opportunity(importance: float, satisfaction: float) -> str:
+    if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
+        return _fail(
+            ValueOutOfRangeError("importance and satisfaction must be between 1.0 and 10.0")
+        )
+    result = explain_opportunity_score(importance, satisfaction)
+    return json.dumps(result)
 
 
 @mcp.tool
