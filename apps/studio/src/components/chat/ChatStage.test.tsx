@@ -11,7 +11,7 @@ const harness = vi.hoisted(() => ({
     streaming: false,
     thinkingPhase: null as string | null,
     toolActivity: [] as unknown[],
-    offlineReply: false,
+    offlineReplyFor: null as string | null,
     sendMessage: vi.fn<(text: string) => Promise<void>>(),
     regenerateFrom: vi.fn<(messageId: string | null) => Promise<void>>(),
     editFrom: vi.fn<(messageId: string | null, text: string) => Promise<void>>(),
@@ -238,5 +238,21 @@ describe("ChatStage", () => {
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toBeInTheDocument();
     expect(errorLog).not.toHaveBeenCalled();
+  });
+
+  it("docks the records lens when the palette runs /records", () => {
+    harness.state.openPanel.mockClear();
+
+    render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "/records" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(harness.state.openPanel).toHaveBeenCalledWith("records");
   });
 });

@@ -77,6 +77,13 @@ const state = vi.hoisted(() => ({
   modelsMessage: null,
   refreshModels: vi.fn(async () => undefined),
   checkConnections: vi.fn(async () => ({ llmHealthy: true })),
+  surveyConnections: vi.fn(async () => ({
+    sidecarReachable: true,
+    mcpReachable: true,
+    llmHealthy: true,
+    llmMessage: "ok",
+  })),
+  recheckConnections: vi.fn(async () => undefined),
   // Chat
   messages: [] as unknown[],
   sendMessage: vi.fn(async () => undefined),
@@ -93,7 +100,7 @@ const state = vi.hoisted(() => ({
   streaming: false,
   thinkingPhase: null as string | null,
   toolActivity: [] as unknown[],
-  offlineReply: false,
+  offlineReplyFor: null as string | null,
   stopStreaming: vi.fn(),
   regenerateFrom: vi.fn(async () => undefined),
   editFrom: vi.fn(async () => undefined),

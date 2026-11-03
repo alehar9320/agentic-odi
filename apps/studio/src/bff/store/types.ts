@@ -89,6 +89,8 @@ export interface LocalStore {
   putConversation(conversation: StoredConversation): Promise<void>;
   setConversationHead(id: string, headId: string | null): Promise<StoredConversation>;
   listTurns(conversationId: string): Promise<ConversationTurn[]>;
+  /** How much a conversation holds, without reading every turn. */
+  countTurns(conversationId: string): Promise<number>;
   appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn>;
   clearTurns(conversationId: string): Promise<void>;
   conversationTree(conversationId: string): Promise<{

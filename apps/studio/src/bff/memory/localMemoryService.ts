@@ -1,5 +1,6 @@
 import type {
   Conversation,
+  ConversationSummary,
   ConversationTurn,
   LatestConversation,
   Observation,
@@ -170,6 +171,17 @@ export class LocalMemoryService {
 
   async getConversation(id: string): Promise<StoredConversation | undefined> {
     return this.store.getConversation(id);
+  }
+
+  /** The history list: every thread, most recent touch first, with its size. */
+  async listConversations(): Promise<ConversationSummary[]> {
+    const conversations = await this.store.listConversations();
+    return Promise.all(
+      conversations.map(async (conversation) => ({
+        ...conversation,
+        turn_count: await this.store.countTurns(conversation.id),
+      })),
+    );
   }
 
   async setConversationHead(
