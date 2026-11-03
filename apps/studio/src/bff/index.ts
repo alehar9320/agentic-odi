@@ -1,5 +1,5 @@
 import { apiUrl } from "../bridge/desktopBridge";
-import { getStudioToken } from "../api/studioApi";
+import { authHeaders } from "../api/studioApi";
 import { nowIso } from "./id";
 import type { CanvasData, ChangelogData, Observation } from "../types";
 import type { LocalStore } from "./store/types";
@@ -24,12 +24,6 @@ export class StudioBff {
     this.memory = new LocalMemoryService(store);
     this.chat = new ChatOrchestrator(store, this.data, this.memory);
     this.capabilities = capabilityRegistry;
-  }
-
-  /** Headers attaching the per-install bearer token to sidecar calls. */
-  authHeaders(): HeadersInit {
-    const token = getStudioToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
   async init(): Promise<void> {
@@ -90,12 +84,12 @@ export class StudioBff {
 
     const canvas = (await fetch(
       apiUrl(`/api/canvas?mcp_url=${encodeURIComponent(mcpUrl)}`),
-      { headers: this.authHeaders() },
+      { headers: authHeaders() },
     ).then((response) => response.json())) as CanvasData;
 
     const observationPage = (await fetch(
       apiUrl("/api/memory/observations"),
-      { headers: this.authHeaders() },
+      { headers: authHeaders() },
     ).then((response) => response.json())) as {
       observations: Observation[];
     };

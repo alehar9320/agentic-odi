@@ -163,7 +163,7 @@ export function getStudioToken(): string | null {
 }
 
 /** Headers attaching the bearer token to every sidecar call. */
-function authHeaders(): HeadersInit {
+export function authHeaders(): HeadersInit {
   const token = getStudioToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
