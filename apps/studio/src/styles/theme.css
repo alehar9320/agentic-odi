@@ -256,6 +256,44 @@ a {
   cursor: not-allowed;
 }
 
+.bar__history {
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.bar__history-empty {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--faint);
+  font-size: 0.8rem;
+}
+
+.bar__history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bar__history-item[aria-current="true"] {
+  background: var(--surface-hover);
+}
+
+.bar__history-item[aria-current="true"] .bar__history-title {
+  color: var(--text);
+}
+
+.bar__history-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar__history-meta {
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
 /* ------------------------------------------------------------------ */
 /* Conversation                                                       */
 /* ------------------------------------------------------------------ */
