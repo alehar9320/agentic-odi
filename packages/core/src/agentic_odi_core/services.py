@@ -734,9 +734,11 @@ class ODIService:
         remove_theme_ids: list[str] | None,
         add_tags: list[str] | None,
     ) -> tuple[list[str], list[str], list[str]]:
-        return list(dict.fromkeys(add_theme_ids or [])), list(
-            dict.fromkeys(remove_theme_ids or [])
-        ), list(dict.fromkeys(add_tags or []))
+        return (
+            list(dict.fromkeys(add_theme_ids or [])),
+            list(dict.fromkeys(remove_theme_ids or [])),
+            list(dict.fromkeys(add_tags or [])),
+        )
 
     def _bulk_targets(self, outcome_ids: list[str] | None, query: OutcomeQuery | None) -> list[str]:
         """The distinct ids this run owns: those named, plus every match of the narrowing.

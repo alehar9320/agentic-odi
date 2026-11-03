@@ -755,6 +755,20 @@ class LocalBackend(Backend):
             offset=args.get("offset", 0),
         )
 
+    def _bulk_update_outcomes(self, args: dict[str, Any]) -> dict[str, Any]:
+        report = self.service.bulk_update_outcomes(
+            args.get("outcome_ids"),
+            add_theme_ids=args.get("add_theme_ids"),
+            remove_theme_ids=args.get("remove_theme_ids"),
+            stage=args.get("stage"),
+            add_tags=args.get("add_tags"),
+            dry_run=bool(args.get("dry_run", False)),
+        )
+        return report.as_dict()
+
+    def _undo_bulk(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.undo_bulk(args["token"]).as_dict()
+
     def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
         strategy = self.service.get_strategy()
         return None if strategy is None else strategy.model_dump(mode="json")
@@ -825,6 +839,8 @@ _LOCAL_HANDLERS = {
     "assign_theme": LocalBackend._assign_theme,
     "unassign_theme": LocalBackend._unassign_theme,
     "search_outcomes": LocalBackend._search_outcomes,
+    "bulk_update_outcomes": LocalBackend._bulk_update_outcomes,
+    "undo_bulk": LocalBackend._undo_bulk,
     "get_health": LocalBackend._get_health,
 }
 

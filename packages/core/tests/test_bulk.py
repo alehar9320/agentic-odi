@@ -124,9 +124,7 @@ def test_a_preview_lists_the_rows_a_real_run_would_write_without_writing_them(
     theme = service.add_theme("Billing").id
     before = dict(service.repo.outcomes)
 
-    preview = service.bulk_update_outcomes(
-        [o_a, o_b], add_theme_ids=[theme], dry_run=True
-    )
+    preview = service.bulk_update_outcomes([o_a, o_b], add_theme_ids=[theme], dry_run=True)
 
     assert sorted(preview.changed) == sorted([o_a, o_b])
     assert preview.undo_token is None
@@ -285,6 +283,7 @@ def test_a_filter_selects_every_match_of_the_narrowing_not_one_page(
 
 
 # --- taking it back -----------------------------------------------------------
+
 
 def test_undo_restores_themes_stage_and_tags_exactly(service: ODIService) -> None:
     one = _job_with_map(service, "Reconcile invoices", ("locate", "execute"))
