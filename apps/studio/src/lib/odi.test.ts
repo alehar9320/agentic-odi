@@ -1,3 +1,4 @@
+import type { Outcome } from "../types";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +6,7 @@ import {
   isUnderserved,
   opportunityPill,
   opportunityScore,
+  scoredAverage,
   UNDERSERVED_THRESHOLD,
 } from "./odi";
 
@@ -63,5 +65,46 @@ describe("opportunityPill", () => {
       label: "✓ Served (Opp: N/A)",
       variant: "green",
     });
+  });
+});
+
+describe("scoredAverage", () => {
+  const outcome = (score: number | null | undefined): Outcome =>
+    ({ opportunity_score: score } as Outcome);
+
+  it("averages only the scores the store holds, ignoring unrated ones", () => {
+    expect(scoredAverage([outcome(12), outcome(null)])).toEqual({
+      mean: 12,
+      scored: 1,
+      unscored: 1,
+    });
+  });
+
+  it("returns null when nothing was scored", () => {
+    expect(scoredAverage([outcome(null), outcome(undefined)])).toEqual({
+      mean: null,
+      scored: 0,
+      unscored: 2,
+    });
+  });
+
+  it("returns the mean of the stored values, not of pre-rounded ones", () => {
+    expect(scoredAverage([outcome(11.44), outcome(11.44)])).toEqual({
+      mean: 11.44,
+      scored: 2,
+      unscored: 0,
+    });
+  });
+
+  it("counts a real zero as scored", () => {
+    expect(scoredAverage([outcome(0)])).toEqual({
+      mean: 0,
+      scored: 1,
+      unscored: 0,
+    });
+  });
+
+  it("returns all-zero counts for an empty list", () => {
+    expect(scoredAverage([])).toEqual({ mean: null, scored: 0, unscored: 0 });
   });
 });

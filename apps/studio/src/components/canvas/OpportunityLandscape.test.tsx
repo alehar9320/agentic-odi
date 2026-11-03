@@ -432,11 +432,75 @@ describe("OpportunityLandscape score rendering", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the average opportunity score to one decimal", () => {
+it("shows the average opportunity score to one decimal", () => {
     render(<OpportunityLandscape />);
 
     const tile = screen.getByText("Avg Opportunity Score").parentElement;
     expect(tile?.textContent).toContain("12.5");
+  });
+
+  // #646: an outcome nobody scored is counted, never treated as a zero.
+  it("averages only scored outcomes and says how many were not scored", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-12",
+            statement: "Minimize a scored outcome",
+            importance: 9,
+            satisfaction: 3,
+            opportunity_score: 12,
+          },
+          {
+            id: "O-UNSCORED",
+            statement: "Minimize an unscored outcome",
+            importance: 5,
+            satisfaction: 5,
+            opportunity_score: null,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("12.0");
+    expect(tile?.textContent).toContain("1 scored · 1 not scored");
+  });
+
+  // #646: an absence must never read as a zero.
+  it("shows Not scored when nothing was scored, never 0.0 or NaN", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-UNSCORED-1",
+            statement: "Minimize one unscored outcome",
+            importance: 5,
+            satisfaction: 5,
+            opportunity_score: null,
+          },
+          {
+            id: "O-UNSCORED-2",
+            statement: "Minimize another unscored outcome",
+            importance: 6,
+            satisfaction: 6,
+            opportunity_score: null,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("Not scored");
+    expect(tile?.textContent).not.toContain("0.0");
+    expect(tile?.textContent).not.toContain("NaN");
+    expect(tile?.textContent).toContain("0 scored · 2 not scored");
   });
 
   // An outcome the sidecar never scored rendered "0.0" in the table and "N/A" on

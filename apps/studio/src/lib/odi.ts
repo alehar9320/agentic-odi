@@ -1,3 +1,5 @@
+import type { Outcome } from "../types";
+
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -29,4 +31,31 @@ export function opportunityPill(score: number | null | undefined): PillDescripto
     return { label: `🔥 Underserved (Opp: ${formatted})`, variant: "amber" };
   }
   return { label: `✓ Served (Opp: ${formatted})`, variant: "green" };
+}
+
+/** Average of the scores the store actually holds. Outcomes that were never
+ * scored are counted, never treated as a zero. `mean` is `null` when nothing
+ * was scored — the caller decides what to show then. */
+export function scoredAverage(outcomes: Outcome[]): {
+  mean: number | null;
+  scored: number;
+  unscored: number;
+} {
+  let sum = 0;
+  let scored = 0;
+  let unscored = 0;
+  for (const outcome of outcomes) {
+    const score = outcome.opportunity_score;
+    if (typeof score === "number" && Number.isFinite(score)) {
+      sum += score;
+      scored += 1;
+    } else {
+      unscored += 1;
+    }
+  }
+  return {
+    mean: scored ? sum / scored : null,
+    scored,
+    unscored,
+  };
 }
