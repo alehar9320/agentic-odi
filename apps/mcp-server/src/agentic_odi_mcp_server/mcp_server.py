@@ -1006,6 +1006,50 @@ def search_outcomes(
     return json.dumps(result)
 
 
+@mcp.tool
+def bulk_update_outcomes(
+    outcome_ids: list[str],
+    add_theme_ids: list[str] | None = None,
+    remove_theme_ids: list[str] | None = None,
+    stage: str | None = None,
+    add_tags: list[str] | None = None,
+    dry_run: bool = False,
+) -> str:
+    """Organise a set of outcomes in one run: stage, themes, and tags.
+
+    Each row succeeds on its own or reports why it was skipped, so one outcome filed
+    under a theme from another job does not stop the others. ``dry_run`` walks the
+    whole pipeline and writes nothing — the ids and changes it lists are the ones a
+    real run on unchanged input produces, and it offers no undo token.
+    """
+    try:
+        report = service.bulk_update_outcomes(
+            outcome_ids,
+            add_theme_ids=add_theme_ids,
+            remove_theme_ids=remove_theme_ids,
+            stage=stage,
+            add_tags=add_tags,
+            dry_run=dry_run,
+        )
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps(report.as_dict())
+
+
+@mcp.tool
+def undo_bulk(token: str) -> str:
+    """Take a bulk run back, row by row, through the same validators.
+
+    The token is single-use and single-active: a newer bulk run retires it, and a row
+    edited since the bulk change is left alone and reported rather than overwritten.
+    """
+    try:
+        report = service.undo_bulk(token)
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps(report.as_dict())
+
+
 DEFAULT_PORT = 8000
 
 

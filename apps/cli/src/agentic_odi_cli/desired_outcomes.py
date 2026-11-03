@@ -17,6 +17,7 @@ import typer
 from agentic_odi_cli import flags
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import (
+    render_bulk_report,
     render_deleted,
     render_outcome,
     render_outcome_list,
@@ -29,6 +30,10 @@ desired_outcomes_app = typer.Typer(help="Manage desired Outcomes.")
 JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
 THEME_OPTION = typer.Option(None, "--theme", help="Theme ID; repeat for several themes")
 TAG_OPTION = typer.Option(None, "--tag", help="Tag; repeat for several tags")
+_ID_OPTION = typer.Option(None, "--id", help="Outcome ID; repeat for several outcomes")
+_ADD_THEME_OPTION = typer.Option(None, "--add-theme", help="File under this theme; repeat")
+_REMOVE_THEME_OPTION = typer.Option(None, "--remove-theme", help="Remove this theme; repeat")
+_ADD_TAG_OPTION = typer.Option(None, "--add-tag", help="Add this tag; repeat")
 
 EXPORT_FIELDS = (
     "id",
@@ -159,29 +164,139 @@ def search(
     run the same core search and get the same ids, total, and facet counts.
     """
     args: dict[str, Any] = {
+        **_narrowing(
+            text=text,
+            stage=stage,
+            theme=theme,
+            confidence=confidence,
+            tag=tag,
+            min_score=min_score,
+            max_score=max_score,
+            job_id=job_id,
+        ),
+        "sort": sort,
+        "limit": limit,
+        "offset": offset,
+    }
+    result = run_tool("search_outcomes", args)
+    theme_names = {} if json_output else _theme_names()
+    typer.echo(render_search(result, as_json=json_output, theme_names=theme_names))
+
+
+def _narrowing(
+    *,
+    text: str | None,
+    stage: str | None,
+    theme: list[str] | None,
+    confidence: str | None,
+    tag: list[str] | None,
+    min_score: float | None,
+    max_score: float | None,
+    job_id: str | None,
+) -> dict[str, Any]:
+    """One spelling of the shared search options, reused by bulk so a filter means
+    the same thing in both commands."""
+    args: dict[str, Any] = {
         "text": text,
         "stage": stage,
         "confidence": confidence,
         "min_score": min_score,
         "max_score": max_score,
         "job_id": job_id,
-        "sort": sort,
-        "limit": limit,
-        "offset": offset,
     }
     if theme:
         args["theme_ids"] = theme
     if tag:
         args["tags"] = tag
-    result = run_tool("search_outcomes", args)
-    theme_names = {} if json_output else _theme_names()
-    typer.echo(render_search(result, as_json=json_output, theme_names=theme_names))
+    return args
 
 
 def _theme_names() -> dict[str, str]:
     return {
         str(item.get("id", "")): str(item.get("name", "")) for item in run_tool("list_themes", {})
     }
+
+
+@desired_outcomes_app.command("bulk")
+def bulk(
+    outcome_id: list[str] | None = _ID_OPTION,
+    text: str | None = typer.Option(None, help="Narrow by substring, as ``search`` does"),
+    stage: str | None = typer.Option(None, help="Narrow to outcomes filed on this stage"),
+    theme: list[str] | None = THEME_OPTION,
+    confidence: str | None = typer.Option(None, help="scored or unscored"),
+    tag: list[str] | None = TAG_OPTION,
+    min_score: float | None = typer.Option(None, help="Lowest opportunity score (inclusive)"),
+    max_score: float | None = typer.Option(None, help="Highest opportunity score (inclusive)"),
+    job_id: str | None = typer.Option(None, help="Narrow the set to one job"),
+    set_stage: str | None = typer.Option(
+        None, "--set-stage", help="Move every selected outcome onto this job-map stage"
+    ),
+    add_theme: list[str] | None = _ADD_THEME_OPTION,
+    remove_theme: list[str] | None = _REMOVE_THEME_OPTION,
+    add_tag: list[str] | None = _ADD_TAG_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Report the rows without writing them"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Organise a set of outcomes in one reviewable run.
+
+    The selected rows are the ``--id`` flags unioned with every match of the
+    narrowing, which is the same search ``odi desired-outcomes search`` runs and
+    is read without a page limit: "everything in this theme" means everything.
+    Each row answers for itself, so one outcome filed under another job's theme
+    is reported as a skip and the rest still land. ``--dry-run`` writes nothing
+    and hands back no token.
+    """
+    narrowing = _narrowing(
+        text=text,
+        stage=stage,
+        theme=theme,
+        confidence=confidence,
+        tag=tag,
+        min_score=min_score,
+        max_score=max_score,
+        job_id=job_id,
+    )
+    ids = list(dict.fromkeys(outcome_id or []))
+    if any(narrowing.values()):
+        matched = run_tool("search_outcomes", narrowing)
+        ids += [str(item["id"]) for item in matched.get("items", []) if item.get("id") not in ids]
+
+    args: dict[str, Any] = {"outcome_ids": ids, "dry_run": dry_run}
+    if add_theme:
+        args["add_theme_ids"] = add_theme
+    if remove_theme:
+        args["remove_theme_ids"] = remove_theme
+    if set_stage:
+        args["stage"] = set_stage
+    if add_tag:
+        args["add_tags"] = add_tag
+    report = run_tool("bulk_update_outcomes", args)
+    theme_names = {} if json_output else _theme_names()
+    typer.echo(
+        render_bulk_report(
+            report,
+            as_json=json_output,
+            theme_names=theme_names,
+            mode="preview" if dry_run else "apply",
+        )
+    )
+
+
+@desired_outcomes_app.command("undo")
+def undo(
+    token: str = typer.Argument(..., help="The undo token a bulk run printed"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Take a bulk run back.
+
+    The token is single-use and single-active: a newer bulk run retires it, and a
+    row edited since then is left alone and reported rather than overwritten.
+    """
+    report = run_tool("undo_bulk", {"token": token})
+    theme_names = {} if json_output else _theme_names()
+    typer.echo(
+        render_bulk_report(report, as_json=json_output, theme_names=theme_names, mode="undo")
+    )
 
 
 @desired_outcomes_app.command("update")

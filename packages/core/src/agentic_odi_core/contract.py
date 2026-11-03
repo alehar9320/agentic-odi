@@ -70,6 +70,8 @@ class ToolName(str, Enum):
     ASSIGN_THEME = "assign_theme"
     UNASSIGN_THEME = "unassign_theme"
     SEARCH_OUTCOMES = "search_outcomes"
+    BULK_UPDATE_OUTCOMES = "bulk_update_outcomes"
+    UNDO_BULK = "undo_bulk"
 
 
 class ToolEffect(str, Enum):
@@ -620,6 +622,40 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "offset",
         ),
         returns="Items, the pre-pagination total, and facet counts for the current filters.",
+        stage="2",
+    ),
+    ToolName.BULK_UPDATE_OUTCOMES.value: ToolSpec(
+        name="bulk_update_outcomes",
+        summary=(
+            "File a set of outcomes on a stage, change their themes, and tag them in one run; "
+            "dry_run previews the rows without writing them."
+        ),
+        effect=_derive_effect("bulk_update_outcomes"),
+        arguments=(
+            "outcome_ids",
+            "add_theme_ids",
+            "remove_theme_ids",
+            "stage",
+            "add_tags",
+            "dry_run",
+        ),
+        required=("outcome_ids",),
+        returns=(
+            "The report: requested count, changed ids, skipped rows with reasons, the per-field "
+            "change table, and the undo token a preview leaves empty."
+        ),
+        stage="2",
+    ),
+    ToolName.UNDO_BULK.value: ToolSpec(
+        name="undo_bulk",
+        summary=(
+            "Take a bulk run back; a row someone edited since is left alone and reported rather "
+            "than overwritten."
+        ),
+        effect=_derive_effect("undo_bulk"),
+        arguments=("token",),
+        required=("token",),
+        returns="The report of the restored rows.",
         stage="2",
     ),
     ToolName.OPEN_STUDY.value: ToolSpec(

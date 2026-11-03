@@ -336,6 +336,57 @@ def render_search(result: dict[str, Any], *, as_json: bool, theme_names: dict[st
     return "\n".join(line for line in lines if line)
 
 
+_BULK_HEADLINE = {
+    "preview": "Would change",
+    "apply": "Changed",
+    "undo": "Restored",
+}
+
+
+def _bulk_cell(field_name: str, value: Any, theme_names: dict[str, str]) -> str:
+    """One end of a change, readable: themes by name, nothing as a dash."""
+    if value is None:
+        return "-"
+    if isinstance(value, list):
+        return ", ".join(theme_names.get(str(item), str(item)) for item in value) or "-"
+    return str(value)
+
+
+def render_bulk_report(
+    report: Any, *, as_json: bool, theme_names: dict[str, str], mode: str = "apply"
+) -> str:
+    """Render a bulk run: the rows it touched, the rows it refused, and how to take it back."""
+    if not isinstance(report, dict):
+        return _json(report) if as_json else str(report)
+    if as_json:
+        return _json(report)
+    changed = report.get("changed", [])
+    requested = report.get("requested", 0)
+    skipped = report.get("skipped", [])
+    headline = f"{_BULK_HEADLINE[mode]} {len(changed)} outcome(s) of {requested} selected"
+    lines = [f"{headline}; {len(skipped)} skipped." if skipped else f"{headline}."]
+    lines.append(
+        _table(
+            ("outcome", "field", "from", "to"),
+            [
+                (
+                    str(row.get("outcome_id", "")),
+                    str(row.get("field", "")),
+                    _bulk_cell(str(row.get("field", "")), row.get("from"), theme_names),
+                    _bulk_cell(str(row.get("field", "")), row.get("to"), theme_names),
+                )
+                for row in report.get("changes", [])
+            ],
+            empty="No row moved.",
+        )
+    )
+    lines.extend(f"skipped {row.get('id', '')}: {row.get('reason', '')}" for row in skipped)
+    token = report.get("undo_token")
+    if token:
+        lines.append(f"Undo with: agentic-odi desired-outcomes undo {token}")
+    return "\n".join(line for line in lines if line)
+
+
 def render_evidence(item: Any, *, as_json: bool) -> str:
     """Render one evidence record as a labelled block or JSON."""
     if not isinstance(item, dict):

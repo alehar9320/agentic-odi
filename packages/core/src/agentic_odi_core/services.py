@@ -11,6 +11,14 @@ from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
 
+from agentic_odi_core.bulk import (
+    BulkReport,
+    apply_tags,
+    apply_themes,
+    changed_fields,
+    image,
+    theme_delta,
+)
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
@@ -27,6 +35,8 @@ from agentic_odi_core.mapping import (
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    BulkChange,
+    BulkOperation,
     BusinessValue,
     ClaimCheck,
     ClaimSkip,
@@ -651,6 +661,229 @@ class ODIService:
             sort=sort,
         )
         return search_outcomes(self.repo, query, limit, offset)
+
+    # --- bulk change (ALH-196 / M2-03.1) ------------------------------------
+
+    def bulk_update_outcomes(
+        self,
+        outcome_ids: list[str] | None,
+        *,
+        add_theme_ids: list[str] | None = None,
+        remove_theme_ids: list[str] | None = None,
+        stage: str | None = None,
+        add_tags: list[str] | None = None,
+        query: OutcomeQuery | None = None,
+        dry_run: bool = False,
+    ) -> BulkReport:
+        """Organise a filtered set in one reviewable operation.
+
+        Each row succeeds or reports its own reason: a missing outcome, a theme that does not
+        organise this outcome's job, or a job with no such stage skips that row and leaves the
+        others applied. ``dry_run`` walks the whole pipeline and writes nothing, so the ids and
+        the change table it lists are the ones a real run on unchanged input produces — and it
+        produces no undo token.
+
+        A contradiction is a bad request rather than a silent ordering: one theme both added
+        and removed refuses the whole call, and so does a stage outside the job map.
+        """
+        add, remove, tags = self._bulk_request(add_theme_ids, remove_theme_ids, add_tags)
+        if stage is not None and stage not in {value.value for value in JobStage}:
+            raise ValidationError(f"Unknown stage: {stage}")
+        contradictions = [theme_id for theme_id in add if theme_id in remove]
+        if contradictions:
+            raise ValidationError(
+                f"Theme {contradictions[0]} is both added and removed; a bulk change picks one."
+            )
+        if not add and not remove and stage is None and not tags:
+            raise ValidationError(
+                "Nothing to change: name a theme to add or remove, a stage, or a tag."
+            )
+        targets = self._bulk_targets(outcome_ids, query)
+        if not targets:
+            raise ValidationError("No outcomes selected")
+
+        report = BulkReport(requested=len(targets))
+        planned: list[BulkChange] = []
+        for outcome_id in targets:
+            outcome = self.repo.get_outcome(outcome_id)
+            if outcome is None:
+                report.skipped.append({"id": outcome_id, "reason": "outcome not found"})
+                continue
+            problem, after = self._bulk_after_image(outcome, add, remove, stage, tags)
+            if problem is not None:
+                report.skipped.append({"id": outcome_id, "reason": problem})
+                continue
+            before = image(outcome)
+            moved = changed_fields(before, after)
+            if not moved:
+                report.skipped.append({"id": outcome_id, "reason": "no change"})
+                continue
+            for field_name in moved:
+                report.changes.append(
+                    {
+                        "outcome_id": outcome_id,
+                        "field": field_name,
+                        "from": before[field_name],
+                        "to": after[field_name],
+                    }
+                )
+            planned.append(BulkChange(outcome_id=outcome_id, before=before, after=after))
+            if not dry_run:
+                self._write_bulk_row(outcome, after)
+            report.changed.append(outcome_id)
+
+        if dry_run or not planned:
+            return report
+        operation = self.repo.add_bulk_operation(
+            BulkOperation(
+                applied_at=datetime.now(timezone.utc),
+                requested=report.requested,
+                changes=planned,
+                skipped=list(report.skipped),
+            )
+        )
+        report.undo_token = operation.id
+        return report
+
+    @staticmethod
+    def _bulk_request(
+        add_theme_ids: list[str] | None,
+        remove_theme_ids: list[str] | None,
+        add_tags: list[str] | None,
+    ) -> tuple[list[str], list[str], list[str]]:
+        return (
+            list(dict.fromkeys(add_theme_ids or [])),
+            list(dict.fromkeys(remove_theme_ids or [])),
+            list(dict.fromkeys(add_tags or [])),
+        )
+
+    def _bulk_targets(self, outcome_ids: list[str] | None, query: OutcomeQuery | None) -> list[str]:
+        """The distinct ids this run owns: those named, plus every match of the narrowing.
+
+        The query runs without a page limit: a bulk change over "everything missing a stage"
+        means the library's whole answer, not the first screen of it.
+        """
+        ids: list[str] = list(dict.fromkeys(outcome_ids or []))
+        if query is not None:
+            matched = search_outcomes(self.repo, query).get("items", [])
+            ids += [str(item["id"]) for item in matched if item.get("id") not in ids]
+        return list(dict.fromkeys(ids))
+
+    def _bulk_after_image(
+        self,
+        outcome: Outcome,
+        add: list[str],
+        remove: list[str],
+        stage: str | None,
+        tags: list[str],
+    ) -> tuple[str | None, dict[str, Any]]:
+        """(reason, None) when this row cannot change; (None, the new fields) when it can."""
+        themes: list[str] = []
+        for theme_id in add:
+            theme = self.repo.get_theme(theme_id)
+            if theme is None:
+                return f"unknown theme: {theme_id}", {}
+            if theme.job_id is not None and theme.job_id != outcome.job_id:
+                return (
+                    f"Theme {theme.id} organizes job {theme.job_id}, not the outcome's job "
+                    f"{outcome.job_id}; an outcome may only join a theme in its scope.",
+                    {},
+                )
+            themes.append(theme_id)
+        for theme_id in remove:
+            if self.repo.get_theme(theme_id) is None:
+                return f"unknown theme: {theme_id}", {}
+
+        step_id = outcome.step_id
+        if stage is not None:
+            step = self._stage_step(outcome, stage)
+            if step is None:
+                return f"job has no stage '{stage}'", {}
+            step_id = step.id
+
+        after: dict[str, Any] = image(outcome)
+        after["step_id"] = step_id
+        after["theme_ids"] = apply_themes(outcome.theme_ids, add, remove)
+        after["tags"] = apply_tags(outcome.tags, tags)
+        return None, after
+
+    def _stage_step(self, outcome: Outcome, stage: str) -> Step | None:
+        """The job's step that holds this stage, chosen the same way every time."""
+        candidates = [
+            step
+            for step in self.repo.get_steps_for_job(outcome.job_id)
+            if step.stage is not None and step.stage.value == stage
+        ]
+        if not candidates:
+            return None
+        return min(candidates, key=lambda step: (step.stage_index or 0, step.order, step.id))
+
+    def _write_bulk_row(self, outcome: Outcome, after: dict[str, Any]) -> None:
+        """One row through the paths a single edit takes, so no validator is skipped."""
+        added, removed = theme_delta(outcome.theme_ids, after["theme_ids"])
+        if added or removed:
+            if self.repo.change_theme_membership(outcome.id, added=added, removed=removed) is None:
+                raise OutcomeNotFoundError(outcome.id)
+        updates: dict[str, Any] = {}
+        if after["step_id"] != outcome.step_id:
+            updates["step_id"] = after["step_id"]
+        if set(after["tags"]) != set(outcome.tags):
+            updates["tags"] = after["tags"]
+        if updates:
+            self.update_outcome(outcome.id, updates)
+
+    def undo_bulk(self, token: str) -> BulkReport:
+        """Take a bulk run back, row by row, through the same validators.
+
+        The token is single-use and single-active: it is refused once undone, and refused in
+        favour of the newest run. A row someone edited since the bulk change is left alone and
+        reported — undo must not overwrite a deliberate later answer.
+        """
+        operation = self.repo.get_bulk_operation(token)
+        if operation is None:
+            raise ValidationError(f"Unknown bulk token: {token}")
+        if operation.undone_at is not None:
+            raise ValidationError(f"Bulk {token} is already undone.")
+        newer = [op for op in self.repo.list_bulk_operations() if op.id != token]
+        if newer:
+            raise ValidationError(
+                f"Bulk {token} expired: bulk {newer[-1].id} wrote after it. "
+                "One bulk run stays undoable at a time."
+            )
+
+        report = BulkReport(requested=len(operation.changes))
+        restored: list[str] = []
+        for change in operation.changes:
+            outcome = self.repo.get_outcome(change.outcome_id)
+            if outcome is None:
+                report.skipped.append({"id": change.outcome_id, "reason": "outcome not found"})
+                continue
+            current = image(outcome)
+            if changed_fields(change.after, current):
+                report.skipped.append(
+                    {
+                        "id": change.outcome_id,
+                        "reason": "changed since the bulk update",
+                    }
+                )
+                continue
+            moved = changed_fields(current, change.before)
+            for field_name in moved:
+                report.changes.append(
+                    {
+                        "outcome_id": change.outcome_id,
+                        "field": field_name,
+                        "from": current[field_name],
+                        "to": change.before[field_name],
+                    }
+                )
+            self._write_bulk_row(outcome, change.before)
+            restored.append(change.outcome_id)
+            report.changed.append(change.outcome_id)
+
+        if restored:
+            self.repo.update_bulk_operation(token, {"undone_at": datetime.now(timezone.utc)})
+        return report
 
     # -- Studies: one named pass over a Job, and the wave inside it ----------
 

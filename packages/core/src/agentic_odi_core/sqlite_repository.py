@@ -14,6 +14,7 @@ from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    BulkOperation,
     CustomerOutcome,
     Evidence,
     Job,
@@ -68,6 +69,7 @@ class SQLiteRepository(Repository):
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.bulk_operations: dict[str, BulkOperation] = {}
         self.segments: dict[str, Segment] = {}
         self.studies: dict[str, Study] = {}
         self.strategies: dict[str, Strategy] = {}
@@ -203,6 +205,10 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.scheduled_work, p, ScheduledWork)
         elif et == "SCHEDULED_WORK_DELETED":
             self.scheduled_work.pop(p["id"], None)
+        elif et == "BULK_UPDATE_APPLIED":
+            self.bulk_operations[p["id"]] = BulkOperation.model_validate(p)
+        elif et == "BULK_UPDATE_UNDONE":
+            self._merge_updates(self.bulk_operations, p, BulkOperation)
 
         elif et == "CUSTOMER_OUTCOME_DELETED":
             self.customer_outcomes.pop(p["id"], None)
@@ -768,6 +774,57 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_bulk_operation(self, operation: BulkOperation) -> BulkOperation:
+        with self._lock:
+            self.store.append(
+                "BULK_UPDATE_APPLIED",
+                operation.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return operation
+
+    def get_bulk_operation(self, operation_id: str) -> BulkOperation | None:
+        with self._lock:
+            self._sync()
+            return self.bulk_operations.get(operation_id)
+
+    def list_bulk_operations(self) -> list[BulkOperation]:
+        with self._lock:
+            self._sync()
+            return list(self.bulk_operations.values())
+
+    def update_bulk_operation(
+        self, operation_id: str, updates: dict[str, Any]
+    ) -> BulkOperation | None:
+        with self._lock:
+            self._sync()
+            operation = self.bulk_operations.get(operation_id)
+            if operation is None:
+                return None
+            current = operation.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_operation = operation.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "BULK_UPDATE_UNDONE",
+                {
+                    "id": operation_id,
+                    "updates": {
+                        key: value
+                        for key, value in new_operation.model_dump(mode="json").items()
+                        if key in updates
+                    },
+                },
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_operation
 
     def add_segment(self, segment: Segment) -> Segment:
         with self._lock:
