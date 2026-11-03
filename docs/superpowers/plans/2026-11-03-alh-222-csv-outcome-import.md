@@ -301,10 +301,10 @@ Inputs no task's tests would otherwise exercise, and what a person is owed when 
 **Files:**
 - Test: `apps/studio-api/tests/test_outcome_import_router.py` (append)
 
-- [ ] **Step 1: write the contract test** — `test_the_cli_and_the_upload_report_the_same_run`: build the same seeded job twice, once through `import_outcomes(... ServiceImportTarget ...)` and once through `TestClient` upload with `dry_run=true`, and assert the two `as_dict()` are equal for `refused`, `unmatched_themes`, `ambiguous_themes`, `warnings` and the `created` statements/lines. This is the criterion the design exists to satisfy; if someone forks the loop into the router, it goes red here.
-- [ ] **Step 2: run it** (`uv run pytest apps/studio-api/tests/test_outcome_import_router.py -q`) → pass; fix the loop, not the assertion, if it does not.
-- [ ] **Step 3: add the In-flight line to `docs/roadmap.md`**: **Import a spreadsheet of outcomes** — `odi desired-outcomes import` and `POST /api/outcomes/import` share one parser and one row-level report, a bad row is refused with its line number while the rest write, and `--dry-run` previews the run without writing it (this change) — following the "In flight" section's existing style.
-- [ ] **Step 4: full gates**, `uv run python scripts/doc_check.py`, then commit `test(studio): the import reports the same run through both doors (ALH-222)`.
+- [x] **Step 1: write the contract test** — `test_the_cli_and_the_upload_report_the_same_run`: build the same seeded job twice, once through `import_outcomes(... ServiceImportTarget ...)` and once through `TestClient` upload with `dry_run=true`, and assert the two `as_dict()` are equal. This is the criterion the design exists to satisfy; if someone forks the loop into the router, it goes red here. (The plan named five fields and a projection of `created`; the whole-dict equality is the same claim with less room for a field to be quietly omitted from the comparison, and a dry run leaves nothing but the ids to differ on.)
+- [x] **Step 2: run it** (`uv run pytest apps/studio-api/tests/test_outcome_import_router.py -q`) → pass; fix the loop, not the assertion, if it does not.
+- [x] **Step 3: add the In-flight line to `docs/roadmap.md`**: **Import a spreadsheet of outcomes** — `odi desired-outcomes import` and `POST /api/outcomes/import` share one parser and one row-level report, a bad row is refused with its line number while the rest write, and `--dry-run` previews the run without writing it (this change) — following the "In flight" section's existing style.
+- [x] **Step 4: full gates**, `uv run python scripts/doc_check.py`, then commit `test(studio): the import reports the same run through both doors (ALH-222)`.
 
 ---
 

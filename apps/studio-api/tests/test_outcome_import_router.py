@@ -19,7 +19,10 @@ from agentic_odi_core import (
     InMemoryRepository,
     JobStage,
     ODIService,
+    ServiceImportTarget,
+    import_outcomes,
     manual_claim_check,
+    parse_outcome_table,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from agentic_odi_studio_api.app import create_app
@@ -302,3 +305,28 @@ def test_an_unknown_job_over_mcp_is_a_404_not_a_report(monkeypatch) -> None:
 
     assert response.status_code == 404, response.text
     assert [tool for tool, _ in calls] == ["get_job"]
+
+
+# --- the two doors ------------------------------------------------------------
+
+
+def test_the_cli_and_the_upload_report_the_same_run() -> None:
+    """The criterion the design exists to satisfy: one loop, two handles.
+
+    The terminal runs the import over the service and prints what comes back; the
+    Studio runs the same call behind this route and shows the JSON it comes back
+    in. A sentence the route invented, a refusal it reordered, a theme note lost on
+    the way out of HTTP — each goes red here as a whole-report difference, because
+    that is exactly what a person comparing the two screens would see.
+    """
+    client, service, job_id = _seeded_service()
+    preview = import_outcomes(
+        parse_outcome_table(FIXTURE.read_bytes()),
+        ServiceImportTarget(service),
+        job_id=job_id,
+        dry_run=True,
+    ).as_dict()
+
+    body = _upload(client, job_id, dry_run="true").json()
+
+    assert body == preview
