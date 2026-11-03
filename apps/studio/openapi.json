@@ -1317,6 +1317,47 @@
         }
       }
     },
+    "/api/outcomes/import": {
+      "post": {
+        "summary": "Import Outcomes Api",
+        "description": "Import a spreadsheet of desired Outcomes into one Job.\n\nThe body is ``ImportReport``'s own dictionary \u2014 ``created`` with a line number\nand an outcome id per row, ``refused`` with the service's own sentence per bad\nrow, the theme names that matched nothing or matched two, the columns read and\nignored, and ``aborted`` when the server stopped answering \u2014 so the Studio\nshows what the terminal shows. A bad row is a 200 with a reason; a bad request\n(no file, an unknown job) is the 422 or 404 every other outcome route gives.",
+        "operationId": "import_outcomes_api_api_outcomes_import_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_outcomes_api_api_outcomes_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Import Outcomes Api Api Outcomes Import Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/steps/{step_id}": {
       "patch": {
         "summary": "Patch Step",
@@ -3941,6 +3982,35 @@
         ],
         "title": "AttachmentRef",
         "description": "One file the user attached to a turn.\n\nNothing is stored server-side: an attachment is part of the message. Text is\nextracted by the client because only the client has the file; images arrive\nas data URLs for backends that accept them."
+      },
+      "Body_import_outcomes_api_api_outcomes_import_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "job_id"
+        ],
+        "title": "Body_import_outcomes_api_api_outcomes_import_post"
       },
       "BulkQuery": {
         "properties": {

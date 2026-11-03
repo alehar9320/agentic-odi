@@ -10,7 +10,8 @@ from __future__ import annotations
 import csv
 import io
 import json
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import typer
 
@@ -19,11 +20,15 @@ from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import (
     render_bulk_report,
     render_deleted,
+    render_import_report,
     render_outcome,
     render_outcome_list,
     render_saved,
     render_search,
 )
+
+if TYPE_CHECKING:
+    from agentic_odi_core import ClaimCheck, ImportRow, Step, Theme
 
 desired_outcomes_app = typer.Typer(help="Manage desired Outcomes.")
 
@@ -128,6 +133,91 @@ def export(
     for item in outcomes:
         writer.writerow({field: item.get(field, "") for field in EXPORT_FIELDS})
     typer.echo(buffer.getvalue(), nl=False)
+
+
+class ToolImportTarget:
+    """The import loop's door to the tool layer.
+
+    Every read and every write goes through ``run_tool``, so an imported row
+    leaves exactly the way ``desired-outcomes add`` does: the same refusals, the
+    same by-hand claim check behind a score, whether the backend is the local
+    store or a running MCP server.
+    """
+
+    def themes(self, job_id: str) -> list[Theme]:
+        from agentic_odi_core import Theme
+
+        return [Theme.model_validate(item) for item in run_tool("list_themes", {"job_id": job_id})]
+
+    def steps(self, job_id: str) -> list[Step]:
+        from agentic_odi_core import Step
+
+        return [Step.model_validate(item) for item in run_tool("get_job_map", {"job_id": job_id})]
+
+    def existing_statements(self, job_id: str) -> list[str]:
+        return [
+            str(outcome.get("statement", ""))
+            for outcome in run_tool("get_outcomes", {"job_id": job_id})
+        ]
+
+    def add_outcome(
+        self,
+        job_id: str,
+        row: ImportRow,
+        claim_check: ClaimCheck | None,
+        step_id: str | None,
+    ) -> str:
+        args: dict[str, Any] = {"job_id": job_id, "statement": row.statement}
+        if row.importance is not None:
+            args["importance"] = row.importance
+        if row.satisfaction is not None:
+            args["satisfaction"] = row.satisfaction
+        if step_id is not None:
+            args["step_id"] = step_id
+        if claim_check is not None:
+            args["claim_check"] = claim_check.model_dump(mode="json")
+        return str(run_tool("add_outcome", args)["id"])
+
+    def assign_theme(self, outcome_ids: list[str], theme_id: str) -> None:
+        run_tool("assign_theme", {"outcome_ids": outcome_ids, "theme_id": theme_id})
+
+
+@desired_outcomes_app.command("import")
+def import_file(
+    path: str = typer.Argument(
+        ..., help="CSV of outcome rows, as a research file or ``export`` writes one"
+    ),
+    job_id: str = typer.Option(..., help="Job ID the outcomes belong to"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Report what this file would do without writing it"
+    ),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Import a spreadsheet of desired Outcomes in one reviewable run.
+
+    The rows go through the same door as ``desired-outcomes add``, so a row the
+    CLI would refuse is refused here too: it is reported with its line number in
+    the file and the rest still land. A row that carries scores is recorded as a
+    by-hand score, because a spreadsheet is not an interview. ``--dry-run``
+    writes nothing and reports what the real run would do. There is no undo token
+    for an import — take a row back with ``desired-outcomes delete``.
+    """
+    run_tool("get_job", {"job_id": job_id})
+    try:
+        source = Path(path).read_bytes()
+    except OSError as exc:
+        typer.echo(f"Error: cannot read {path}: {exc.strerror or exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    from agentic_odi_core import import_outcomes, parse_outcome_table
+
+    report = import_outcomes(
+        parse_outcome_table(source),
+        ToolImportTarget(),
+        job_id=job_id,
+        dry_run=dry_run,
+    )
+    typer.echo(render_import_report(report, as_json=json_output))
 
 
 @desired_outcomes_app.command("get")

@@ -7,9 +7,11 @@ terminal and a script piping into ``jq`` without a second code path.
 from __future__ import annotations
 
 import json
+import textwrap
 from typing import Any
 
 _STATEMENT_WIDTH = 60
+_REASON_WIDTH = 80
 
 
 def _json(payload: Any) -> str:
@@ -384,6 +386,70 @@ def render_bulk_report(
     token = report.get("undo_token")
     if token:
         lines.append(f"Undo with: agentic-odi desired-outcomes undo {token}")
+    return "\n".join(line for line in lines if line)
+
+
+def _line_span(lines: Any) -> str:
+    """The file lines a theme note covers: ``line 8`` or ``lines 8, 10, 11``."""
+    if not isinstance(lines, list):
+        return str(lines)
+    named = ", ".join(str(line) for line in lines)
+    return f"lines {named}" if len(lines) > 1 else f"line {named}"
+
+
+def render_import_report(report: Any, *, as_json: bool) -> str:
+    """Render an import: what it wrote, what it refused, and what it could not decide."""
+    data = report.as_dict() if hasattr(report, "as_dict") else report
+    if as_json:
+        return _json(data)
+    if not isinstance(data, dict):
+        return str(data)
+    created = data.get("created", [])
+    refused = data.get("refused", [])
+    dry_run = bool(data.get("dry_run"))
+    verb = "Would create" if dry_run else "Created"
+    headline = f"{verb} {len(created)} outcome(s)"
+    lines = [f"{headline}; {len(refused)} refused." if refused else f"{headline}."]
+    lines.append(
+        _table(
+            ("line", "statement", "reason"),
+            [
+                (
+                    str(row.get("line", "")),
+                    _truncate(str(row.get("statement", ""))),
+                    # The ODI-format verdict can run to a paragraph, which would stretch every
+                    # row of the table to its length; ``--json`` carries it whole.
+                    _truncate(str(row.get("reason", "")), _REASON_WIDTH),
+                )
+                for row in refused
+            ],
+            empty="Every row wrote.",
+        )
+    )
+    for entry in data.get("unmatched_themes", []):
+        lines.append(
+            f'theme "{entry.get("name", "")}" matches no theme on this job, so those rows '
+            f"were created unfiled ({_line_span(entry.get('lines', []))})"
+        )
+    for entry in data.get("ambiguous_themes", []):
+        candidates = entry.get("candidate_ids", [])
+        ids = ", ".join(str(candidate) for candidate in candidates)
+        lines.append(
+            f'theme "{entry.get("name", "")}" matches {len(candidates)} themes ({ids}), so '
+            f"those rows were created unfiled ({_line_span(entry.get('lines', []))})"
+        )
+    for column, why in sorted(data.get("ignored_columns", {}).items()):
+        lines.append(f'column "{column}" ignored: {why}')
+    lines.extend(str(warning) for warning in data.get("warnings", []))
+    aborted = data.get("aborted")
+    if aborted:
+        lines.append(f"stopped at line {aborted.get('line', '')}: {aborted.get('reason', '')}")
+    if created and not dry_run:
+        ids = " ".join(str(row.get("outcome_id", "")) for row in created)
+        lines.append(
+            "To take this back, delete each outcome created: agentic-odi desired-outcomes delete <id>"
+        )
+        lines.extend(textwrap.wrap(ids, width=80))
     return "\n".join(line for line in lines if line)
 
 

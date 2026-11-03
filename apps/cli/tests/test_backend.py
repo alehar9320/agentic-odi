@@ -372,6 +372,44 @@ def test_local_backend_rejects_out_of_range_scores(tmp_path):
         )
 
 
+def test_local_backend_adds_an_outcome_that_carries_no_scores(tmp_path):
+    # A row captured before anyone scored it is legal through the service and the MCP tool;
+    # the local backend had been reading both scores as required keys.
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job"})["id"]
+
+    created = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to ship a release when the build is green",
+        },
+    )
+
+    assert created["importance"] is None
+    assert created["satisfaction"] is None
+    assert created["opportunity_score"] is None
+    assert created["claim_check"] is None
+
+
+def test_local_backend_adds_an_outcome_with_one_score(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job_id = backend.call("add_job", {"name": "Job"})["id"]
+
+    created = backend.call(
+        "add_outcome",
+        {
+            "job_id": job_id,
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 7.0,
+        },
+    )
+
+    assert created["importance"] == 7.0
+    assert created["satisfaction"] is None
+    assert created["opportunity_score"] is None
+
+
 def test_local_backend_update_customer_outcome_folds_value_metrics(tmp_path):
     backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
     job_id = backend.call("add_job", {"name": "Job"})["id"]

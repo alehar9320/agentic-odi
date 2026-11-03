@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from importlib.metadata import PackageNotFoundError
@@ -18,7 +19,11 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    ClaimCheck,
     EvidenceNotFoundError,
+    ImportAbortedError,
+    ImportRow,
+    ImportTarget,
     InvalidOutcomeStatementError,
     JobNotFoundError,
     NoStrategyEvidenceError,
@@ -29,16 +34,21 @@ from agentic_odi_core import (
     OutcomeStatementError,
     ProposalStatus,
     SegmentNotFoundError,
+    ServiceImportTarget,
+    Step,
     StepNotFoundError,
+    Theme,
     ToolName,
     ValueOutOfRangeError,
     error_status,
+    import_outcomes,
     invalid_strategy_request,
     manual_claim_check,
+    parse_outcome_table,
 )
 from agentic_odi_core.query import OutcomeQuery
 from agentic_odi_core.remote import StudioError, StudioErrorCode
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, File, Form, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
@@ -691,6 +701,128 @@ async def undo_bulk_outcomes_api(body: BulkUndoRequest, request: Request) -> dic
         return payload if isinstance(payload, dict) else {}
     try:
         report = _service(request).undo_bulk(body.token)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return report.as_dict()
+
+
+#: A server that stopped answering ends an import run; one that refused a row does not.
+_ABORT_CODES = {StudioErrorCode.MCP_UNREACHABLE, StudioErrorCode.LLM_UNREACHABLE}
+
+
+def _import_failure(error: StudioError) -> OdiError:
+    """Choose the loop's reaction to an MCP failure from the code the transport gave."""
+    if error.code in _ABORT_CODES or error.retryable:
+        return ImportAbortedError(error.message)
+    return OdiError(error.message)
+
+
+def _mcp_call(mcp_url: str, tool: str, arguments: dict[str, Any]) -> str:
+    """One MCP tool call from synchronous code: the same bridge the connector
+    health check uses, so the threadpool route needs no loop of its own."""
+    try:
+        return asyncio.run(call_mcp_tool(mcp_url, tool, arguments))
+    except StudioHTTPError as exc:
+        raise _import_failure(exc.error) from exc
+
+
+def _mcp_rows(mcp_url: str, tool: str, arguments: dict[str, Any]) -> list[Any]:
+    payload = _json_or_raw(_mcp_call(mcp_url, tool, arguments))
+    return payload if isinstance(payload, list) else []
+
+
+def _require_job_over_mcp(mcp_url: str, job_id: str) -> None:
+    """An unknown job is a mistake about the request, not about a row.
+
+    The run has no file to talk about yet, so it answers with the 404 every other
+    outcome route gives rather than a report holding one refusal.
+    """
+    payload = _payload_from_text(_mcp_call(mcp_url, ToolName.GET_JOB.value, {"job_id": job_id}))
+    if "id" not in payload:
+        raise JobNotFoundError(job_id)
+
+
+class McpImportTarget:
+    """The import loop's door to a remote MCP server.
+
+    The five calls are the tools an outcome already answers to — ``list_themes``,
+    ``get_job_map``, ``get_outcomes``, ``add_outcome``, ``assign_theme`` — so an
+    upload files exactly what the terminal files and no import-shaped tool enters
+    the contract. The claim-check bridge is the CLI's: a row carrying scores is
+    written with ``manual_claim_check``, because a spreadsheet is not an interview.
+    """
+
+    def __init__(self, mcp_url: str) -> None:
+        self.mcp_url = mcp_url
+
+    def themes(self, job_id: str) -> list[Theme]:
+        rows = _mcp_rows(self.mcp_url, ToolName.LIST_THEMES.value, {"job_id": job_id})
+        return [Theme.model_validate(row) for row in rows]
+
+    def steps(self, job_id: str) -> list[Step]:
+        rows = _mcp_rows(self.mcp_url, ToolName.GET_JOB_MAP.value, {"job_id": job_id})
+        return [Step.model_validate(row) for row in rows]
+
+    def existing_statements(self, job_id: str) -> list[str]:
+        rows = _mcp_rows(self.mcp_url, ToolName.GET_OUTCOMES.value, {"job_id": job_id})
+        return [str(row.get("statement", "")) for row in rows if isinstance(row, dict)]
+
+    def add_outcome(
+        self,
+        job_id: str,
+        row: ImportRow,
+        claim_check: ClaimCheck | None,
+        step_id: str | None,
+    ) -> str:
+        arguments: dict[str, Any] = {"job_id": job_id, "statement": row.statement}
+        if row.importance is not None:
+            arguments["importance"] = row.importance
+        if row.satisfaction is not None:
+            arguments["satisfaction"] = row.satisfaction
+        if step_id is not None:
+            arguments["step_id"] = step_id
+        if claim_check is not None:
+            arguments["claim_check"] = claim_check.model_dump(mode="json")
+        payload = _payload_from_text(_mcp_call(self.mcp_url, ToolName.ADD_OUTCOME.value, arguments))
+        return str(payload["id"])
+
+    def assign_theme(self, outcome_ids: list[str], theme_id: str) -> None:
+        _mcp_call(
+            self.mcp_url,
+            ToolName.ASSIGN_THEME.value,
+            {"outcome_ids": outcome_ids, "theme_id": theme_id},
+        )
+
+
+@router.post("/outcomes/import", response_model=dict[str, Any])
+def import_outcomes_api(
+    request: Request,
+    file: bytes = File(...),
+    job_id: str = Form(...),
+    dry_run: bool = Form(False),
+    mcp_url: str = Form(""),
+) -> dict[str, Any]:
+    """Import a spreadsheet of desired Outcomes into one Job.
+
+    The body is ``ImportReport``'s own dictionary — ``created`` with a line number
+    and an outcome id per row, ``refused`` with the service's own sentence per bad
+    row, the theme names that matched nothing or matched two, the columns read and
+    ignored, and ``aborted`` when the server stopped answering — so the Studio
+    shows what the terminal shows. A bad row is a 200 with a reason; a bad request
+    (no file, an unknown job) is the 422 or 404 every other outcome route gives.
+    """
+    try:
+        if _uses_mcp(request):
+            mcp_url = _require_mcp_url(mcp_url)
+            _require_job_over_mcp(mcp_url, job_id)
+            target: ImportTarget = McpImportTarget(mcp_url)
+        else:
+            if _service(request).get_job(job_id) is None:
+                raise JobNotFoundError(job_id)
+            target = ServiceImportTarget(_service(request))
+        report = import_outcomes(parse_outcome_table(file), target, job_id=job_id, dry_run=dry_run)
+    except StudioHTTPError:
+        raise
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return report.as_dict()

@@ -155,6 +155,11 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   token that takes those rows back. The same run lives on the board: tick the
   cards or table rows, preview the table the CLI prints, apply it, and undo it
   from the dialog, which counts what was skipped as well as what changed.
+- **Bring a research file in.** `odi desired-outcomes import outcomes.csv --job-id
+  <id>` files a spreadsheet of outcomes row by row through the same door as `add`: a
+  row the CLI would refuse is refused with its line number in the file and the rest
+  still land, `--dry-run` prints the run without writing it, and a theme name that
+  matches nothing — or matches two — leaves its rows unfiled and says which lines.
 - **A real conversation runtime.** The Studio uses assistant-ui over its
   sidecar-owned transcript, with attachments, tool traces, opt-in approvals for
   chat writes and unknown tools, and branch-aware editing and regeneration.
