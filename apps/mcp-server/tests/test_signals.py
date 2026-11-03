@@ -3,13 +3,14 @@
 import json
 
 import pytest
-from agentic_odi_mcp_server import mcp
 from fastmcp import Client
 from mcp_failures import failure, sentence
 
 
 @pytest.mark.asyncio
-async def test_add_job_emits_a_signal_the_tools_can_read() -> None:
+async def test_add_job_emits_a_signal_the_tools_can_read(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Ship it"})
         listed = json.loads((await client.call_tool("list_signals", {})).content[0].text)
@@ -20,7 +21,9 @@ async def test_add_job_emits_a_signal_the_tools_can_read() -> None:
 
 
 @pytest.mark.asyncio
-async def test_read_and_dismiss_update_the_signal_in_place() -> None:
+async def test_read_and_dismiss_update_the_signal_in_place(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Ship it"})
         listed = json.loads((await client.call_tool("list_signals", {})).content[0].text)
@@ -44,7 +47,9 @@ async def test_read_and_dismiss_update_the_signal_in_place() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unknown_signal_ids_answer_with_error_strings() -> None:
+async def test_unknown_signal_ids_answer_with_error_strings(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         for tool in ("mark_signal_read", "dismiss_signal"):
             text = (await client.call_tool(tool, {"signal_id": "nope"})).content[0].text

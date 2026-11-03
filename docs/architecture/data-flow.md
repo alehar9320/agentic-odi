@@ -53,7 +53,7 @@ The detail is below; this is the shape the rest of the document explains.
 | Layer | Owns | Persists |
 |---|---|---|
 | `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `Signal`, `ODIService`, repository protocol | SQLite event log + snapshots |
-| `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
+| `apps/mcp-server` | MCP tool adapters over `ODIService` | `create_server()` builds the store at process start; `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
 | `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | Via the same repository when the local backend is active; conversations and memory in `~/.agentic-odi/studio.db` |
 | `packages/connectors` | Connector protocol, presets, record mapping | Shared `connectors.json` registry; ingested batches land in an in-process sink |
 | `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | IndexedDB (`agentic-odi-studio`) plus named `localStorage` keys — see Storage facts below |
@@ -107,7 +107,7 @@ MCP client / Studio MCP mode / CLI --backend mcp
   -> configured Repository
 ```
 
-`apps/mcp-server` builds its repository once at import time with `build_repository()`. Production uses SQLite; tests set `AGENTIC_ODI_DB=:memory:` (the root test suite does this in `tests/conftest.py`).
+`apps/mcp-server` builds its repository in `create_server()`, which `main()` calls when the process starts; importing the module opens nothing. Production uses SQLite; `AGENTIC_ODI_DB=:memory:` still selects the in-memory store, and tests hand `create_server()` one of their own. The sidecar (`create_app`) and the MCP server (`create_server`) now answer "when is the store opened?" the same way — see ADR 0006.
 
 ### Studio API
 

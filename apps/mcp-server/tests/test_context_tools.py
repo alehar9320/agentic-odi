@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 import pytest
-from agentic_odi_mcp_server import mcp
 from fastmcp import Client
 
 
@@ -21,7 +20,9 @@ async def _new_job(client) -> str:
 
 
 @pytest.mark.asyncio
-async def test_tool_catalog_exposes_context_and_evidence_tools():
+async def test_tool_catalog_exposes_context_and_evidence_tools(
+    mcp,
+):
     async with Client(mcp) as client:
         names = {tool.name for tool in await client.list_tools()}
 
@@ -37,7 +38,9 @@ async def test_tool_catalog_exposes_context_and_evidence_tools():
 
 
 @pytest.mark.asyncio
-async def test_evaluate_outcome_accepts_well_formed_statement():
+async def test_evaluate_outcome_accepts_well_formed_statement(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool(
             "evaluate_outcome",
@@ -52,7 +55,9 @@ async def test_evaluate_outcome_accepts_well_formed_statement():
 
 
 @pytest.mark.asyncio
-async def test_evaluate_outcome_reports_format_issues():
+async def test_evaluate_outcome_reports_format_issues(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool("evaluate_outcome", {"statement": "Make it better"})
 
@@ -65,7 +70,9 @@ async def test_evaluate_outcome_reports_format_issues():
 
 
 @pytest.mark.asyncio
-async def test_evaluate_outcome_includes_existing_job_outcomes():
+async def test_evaluate_outcome_includes_existing_job_outcomes(
+    mcp,
+):
     async with Client(mcp) as client:
         job_id = await _new_job(client)
         await client.call_tool(
@@ -99,7 +106,9 @@ async def test_evaluate_outcome_includes_existing_job_outcomes():
 
 
 @pytest.mark.asyncio
-async def test_get_odi_schema_returns_every_entity():
+async def test_get_odi_schema_returns_every_entity(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool("get_odi_schema", {})
         schema = _json(res.content[0].text)  # type: ignore[index]
@@ -108,7 +117,9 @@ async def test_get_odi_schema_returns_every_entity():
 
 
 @pytest.mark.asyncio
-async def test_evidence_lifecycle_over_mcp():
+async def test_evidence_lifecycle_over_mcp(
+    mcp,
+):
     async with Client(mcp) as client:
         job_id = await _new_job(client)
         created = await client.call_tool(
@@ -149,7 +160,9 @@ async def test_evidence_lifecycle_over_mcp():
 
 
 @pytest.mark.asyncio
-async def test_evidence_tools_report_not_found():
+async def test_evidence_tools_report_not_found(
+    mcp,
+):
     async with Client(mcp) as client:
         missing = "no-such-evidence"
         assert (

@@ -151,6 +151,7 @@ module belongs to no group, which is how the table above would rot.
   `~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`. They are
   sidecar-local and never enter the ODI repository or the MCP contract.
 - `build_repository()` chooses SQLite by default and `InMemoryRepository` when `AGENTIC_ODI_DB=:memory:`, which is what tests use.
+- Neither runnable server imports a store: the sidecar builds one in `create_app(repo=...)` and the MCP server in `create_server(repository=...)`, each at process start (ADR 0006).
 - The CLI selects its backend with `--backend local|mcp` or `AGENTIC_ODI_BACKEND`.
 - The Studio API selects `local` (direct service calls) or `mcp` (passthrough) with `AGENTIC_ODI_BACKEND` or `create_app(backend=...)`.
 - The Studio keeps the last focused subject in `localStorage` under
