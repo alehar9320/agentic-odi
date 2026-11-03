@@ -1,4 +1,5 @@
 import { ThreadPrimitive, useThreadViewport } from "@assistant-ui/react";
+import { useRef, useState } from "react";
 
 import { isFeatureEnabled } from "../../features/flags";
 import {
@@ -16,6 +17,7 @@ import { SetupConversation } from "../setup/SetupConversation";
 import { Conversation } from "./Conversation";
 import { GuidanceHint } from "./GuidanceHint";
 import { Hero } from "./Hero";
+import { SampleLoopStrip } from "./SampleLoopStrip";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { ThreadComposer } from "./ThreadComposer";
 
@@ -68,6 +70,8 @@ export function ChatStage() {
   } = useStudio();
 
   const empty = messages.length === 0;
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const [composerPlaceholder, setComposerPlaceholder] = useState<string | undefined>(undefined);
 
   function runCommand(command: StudioCommand) {
     if (VIEW_COMMANDS.has(command.id)) {
@@ -156,6 +160,13 @@ export function ChatStage() {
     return true;
   }
 
+  function startWithOwn() {
+    // Focus the composer and change only its placeholder. Nothing is sent, so
+    // no fabricated text enters the thread.
+    setComposerPlaceholder("Paste a customer quote to begin.");
+    composerRef.current?.focus();
+  }
+
   if (setupOpen) {
     return isFeatureEnabled("firstRunIntro") ? <IntroConversation /> : <SetupConversation />;
   }
@@ -166,10 +177,13 @@ export function ChatStage() {
         <div className="chat__welcome">
           <div className="chat__welcome-inner">
             <Hero />
+            <SampleLoopStrip onStartOwn={startWithOwn} />
             <ThreadComposer
               onCommand={(command) => runCommand(command)}
               onSlashCommand={submitCommand}
               autoFocus
+              placeholder={composerPlaceholder}
+              inputRef={composerRef}
             />
           </div>
         </div>
