@@ -66,7 +66,11 @@ clean without the importer guessing.
   `StepNotFoundError`, `ValueOutOfRangeError` ("importance must be between 1.0 and 10.0"),
   `InvalidOutcomeStatementError`, or `ClaimCheckError`.
 - Core modules must be listed in `tests/test_architecture.py::CORE_LAYERS` and in the layer
-  table in `docs/architecture/README.md` in the same change.
+  table in `docs/architecture/README.md` in the same change. The new module is
+  **methodology**, next to `services.py`, not domain: it calls `manual_claim_check()` and
+  drives writes, and the domain group may import neither methodology nor persistence
+  (`docs/architecture/README.md:129`). Its `target` protocol keeps it free of `ODIService` so
+  the MCP adapters can satisfy it.
 - Studio API responses must appear in the committed `apps/studio/openapi.json` and
   `src/api/schema.d.ts`, regenerated rather than hand-edited.
 - `docs/cli.md` must document the new command: `website/tests/test_generated.py::test_the_cli_reference_mentions_every_registered_command`
@@ -303,9 +307,9 @@ for an unknown `job_id`, 422 for a missing `file` or `job_id` field. Same for a 
 
 ## What the builder decides
 
-- File name and internal layout for the core module, if `outcome_import.py` in the domain
-  layer is wrong for some reason I have not seen; the architecture test and the layer table
-  must move with it either way.
+- Name of the dataclasses and helpers inside `outcome_import.py`, so long as the module is
+  methodology, the two public functions keep the shapes the issue names, and the architecture
+  test and the layer table move with it.
 - Exact sentence wording, except where the issue or the existing service fixes it (a refusal
   quoting the service keeps the service's words; `Unknown stage: …` is `query.py`'s).
 - Whether the CLI reader is a `pathlib` read or an open file handle, and how it decodes
