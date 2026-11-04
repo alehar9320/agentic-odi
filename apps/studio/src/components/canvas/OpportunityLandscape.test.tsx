@@ -1,9 +1,9 @@
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { UNDERSERVED_THRESHOLD } from "../../lib/odi";
+import { isUnderserved, opportunityScore, UNDERSERVED_THRESHOLD } from "../../lib/odi";
 import type { CanvasState } from "../../types";
-import { OpportunityLandscape } from "./OpportunityLandscape";
+import { OpportunityLandscape, plotX, plotY } from "./OpportunityLandscape";
 
 // Mock StudioContext
 const mockCanvasData = {
@@ -462,5 +462,71 @@ describe("OpportunityLandscape score rendering", () => {
 
     const row = screen.getByRole("row", { name: /minimize unanswered support tickets/i });
     expect(within(row).getByText("N/A")).toBeInTheDocument();
+  });
+});
+
+describe("OpportunityLandscape underserved boundary", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  function pointInPolygon(px: number, py: number, points: string): boolean {
+    const verts = points.split(" ").map((pair) => {
+      const [x, y] = pair.split(",").map(Number);
+      return [x, y] as [number, number];
+    });
+    let inside = false;
+    for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
+      const [xi, yi] = verts[i];
+      const [xj, yj] = verts[j];
+      if (yi > py !== yj > py) {
+        const xIntersect = xj + ((py - yj) / (yi - yj)) * (xi - xj);
+        if (px < xIntersect) {
+          inside = !inside;
+        }
+      }
+    }
+    return inside;
+  }
+
+  it("renders the underserved polygon derived from the score formula", () => {
+    const { container } = render(<OpportunityLandscape />);
+    const polygon = container.querySelector("polygon");
+    expect(polygon).not.toBeNull();
+    expect(polygon?.getAttribute("points")).toBe("40,20 40,180 480,40 480,20");
+  });
+
+  it("keeps the underserved zone label truthful", () => {
+    render(<OpportunityLandscape />);
+    expect(screen.getByText("★ Underserved Innovation Zone (Opp Score > 10)")).toBeInTheDocument();
+  });
+
+  it("maps importance and satisfaction to plot coordinates", () => {
+    expect(plotX(0)).toBeCloseTo(40);
+    expect(plotY(5)).toBeCloseTo(180);
+    expect(plotX(10)).toBeCloseTo(480);
+    expect(plotY(10)).toBeCloseTo(40);
+  });
+
+  it("classifies boundary points consistently with isUnderserved", () => {
+    const cases: [number, number, boolean][] = [
+      [9, 2, true], // importance 9, satisfaction 2 -> inside / underserved
+      [3, 8, false], // importance 3, satisfaction 8 -> outside / served
+      [8, 6, false], // on the line, score 10 -> not underserved
+    ];
+    for (const [importance, satisfaction, underserved] of cases) {
+      expect(isUnderserved(opportunityScore(importance, satisfaction))).toBe(underserved);
+    }
+    expect(opportunityScore(8, 6)).toBe(10);
+    expect(isUnderserved(10)).toBe(false);
+  });
+
+  it("places (9,2) inside the shaded polygon and (3,8) outside", () => {
+    const { container } = render(<OpportunityLandscape />);
+    const polygon = container.querySelector("polygon")!;
+    const points = polygon.getAttribute("points")!;
+    expect(pointInPolygon(plotX(2), plotY(9), points)).toBe(true);
+    expect(pointInPolygon(plotX(8), plotY(3), points)).toBe(false);
   });
 });
