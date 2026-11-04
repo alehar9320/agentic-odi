@@ -24,7 +24,6 @@ from agentic_odi_core.models import (
     Step,
     Strategy,
     Study,
-    compute_opportunity_score,
 )
 from agentic_odi_core.repository import (
     Repository,
