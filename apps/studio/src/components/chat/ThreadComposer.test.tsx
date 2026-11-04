@@ -115,3 +115,59 @@ describe("ThreadComposer recall", () => {
     expect(sendMessage).toHaveBeenCalledWith("Send this", expect.anything());
   });
 });
+
+describe("ThreadComposer focus chip", () => {
+  const statement = "Reduce the time to reconcile a failed payment";
+  const focusedSubject = { kind: "outcome", id: "O-9" };
+
+  function withFocus(overrides: Record<string, unknown> = {}) {
+    renderComposer({ focusedSubject, focusedSubjectLabel: statement, ...overrides });
+  }
+
+  it("admits which record the agent was told about", () => {
+    withFocus();
+
+    expect(screen.getByRole("button", { name: `Looking at: ${statement}` })).toBeTruthy();
+  });
+
+  it("announces the focus to a screen reader", () => {
+    withFocus();
+
+    const announced = screen
+      .getAllByRole("status")
+      .some((region) => (region.textContent ?? "").includes(statement));
+    expect(announced).toBe(true);
+  });
+
+  it("says nothing when the screen has selected nothing", () => {
+    renderComposer();
+
+    expect(screen.queryByRole("button", { name: /Looking at/ })).toBeNull();
+  });
+
+  it("says nothing about a selection the canvas cannot name", () => {
+    renderComposer({ focusedSubject, focusedSubjectLabel: null });
+
+    expect(screen.queryByRole("button", { name: /Looking at/ })).toBeNull();
+  });
+
+  it("takes the person to the record when they press the chip", () => {
+    const revealFocusedSubject = vi.fn();
+    withFocus({ revealFocusedSubject });
+
+    fireEvent.click(screen.getByRole("button", { name: `Looking at: ${statement}` }));
+
+    expect(revealFocusedSubject).toHaveBeenCalledOnce();
+  });
+
+  it("stops speaking for the screen when the person clears it", () => {
+    const clearFocus = vi.fn();
+    withFocus({ clearFocus });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Stop telling the agent what you are looking at" }),
+    );
+
+    expect(clearFocus).toHaveBeenCalledOnce();
+  });
+});
