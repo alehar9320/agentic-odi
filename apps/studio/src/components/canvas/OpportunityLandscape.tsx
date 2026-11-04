@@ -4,6 +4,7 @@ import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canv
 import {
   formatOpportunityScore,
   isUnderserved,
+  scoredAverage,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
@@ -79,10 +80,9 @@ export function OpportunityLandscape() {
     return ids.size;
   }, [evidence]);
 
-  const avgOpportunity = useMemo(() => {
-    const total = outcomes.reduce((acc, o) => acc + (o.opportunity_score ?? 0), 0);
-    return formatOpportunityScore(outcomes.length ? total / outcomes.length : null);
-  }, [outcomes]);
+  const avgOpportunityResult = useMemo(() => scoredAverage(outcomes), [outcomes]);
+  const avgOpportunity = avgOpportunityResult.mean === null ? "Not scored" : formatOpportunityScore(avgOpportunityResult.mean);
+  const avgOpportunityCaption = `${avgOpportunityResult.scored} scored · ${avgOpportunityResult.unscored} not scored`;
 
   const filteredOutcomes = useMemo(() => {
     return outcomes.filter((outcome) => {
@@ -230,6 +230,7 @@ export function OpportunityLandscape() {
           <div className="studio-metric">
             <div className="studio-metric__label">Avg Opportunity Score</div>
             <div className="studio-metric__value">{avgOpportunity}</div>
+            <div className="studio-metric__delta">{avgOpportunityCaption}</div>
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Unique Customer Quotes</div>
