@@ -19,10 +19,19 @@ import {
   isImageLike,
 } from "../../assistant/attachments";
 import { dictationSupported } from "../../assistant/dictation";
+import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
-import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
+import {
+  CommandPalette,
+  ComposerHint,
+  ConnectorChips,
+  ContextChip,
+  SuggestionPills,
+  paletteOpenFor,
+} from "./composerParts";
+import { QueueLane } from "./QueueLane";
 import { ModelPicker } from "./ModelPicker";
 
 const acceptedAttachmentTypes = ATTACHMENT_ACCEPT.split(",");
@@ -30,7 +39,7 @@ const acceptedTextExtensions = acceptedAttachmentTypes.filter((type) => type.sta
 const acceptedImageTypes = acceptedAttachmentTypes
   .filter((type) => type.startsWith("image/"))
   .map((type) => type.slice("image/".length).toUpperCase());
-const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*) and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files up to ${MAX_ATTACHMENT_CHARS.toLocaleString()} characters.`;
+const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*), Word documents (.docx), and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text and Word files up to ${MAX_ATTACHMENT_CHARS.toLocaleString()} characters.`;
 
 /** The local preview for an image before it is ever sent. */
 function AttachmentThumb({ file }: { file?: File }) {
@@ -104,6 +113,8 @@ function ComposerBody({
 }) {
   const aui = useAui();
   const { llmHealth } = useStudio();
+  const history = useComposerHistory();
+  const [recall, setRecall] = useState("");
   // A page can mount more than one composer, so every id and description needs
   // to be unique per instance rather than a fixed string in the document.
   const attachmentHelpId = useId();
@@ -165,11 +176,41 @@ function ComposerBody({
       aui.composer.setText("");
       setDismissedFor("");
       onSlashCommand(text);
+      return;
+    }
+
+    // Enter is a send, not a race (#410): while a turn runs the follow-up
+    // joins the queue lane instead of interrupting the live answer.
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing &&
+      text.trim() !== ""
+    ) {
+      event.preventDefault();
+      aui.composer.send({ steer: false });
+      return;
+    }
+
+    // The palette owns the arrows while it is open; history must not fight it.
+    if (open || event.defaultPrevented) {
+      return;
+    }
+
+    const empty = text.trim() === "";
+    history.onKeyDown(event);
+    // The hook prevents the default only when it actually recalled a message.
+    // Announcing here keeps it to one status change per recall, never per key.
+    if (event.key === "ArrowUp" && empty && event.defaultPrevented) {
+      setRecall(recallAnnouncement(aui.composer.getState().text));
     }
   }
 
   return (
     <>
+      <p className="sr-only" role="status">
+        {recall}
+      </p>
       <SuggestionPills />
       <CommandPalette
         id={paletteId}
@@ -180,6 +221,8 @@ function ComposerBody({
         onChoose={choose}
       />
       <ConnectorChips />
+      <ContextChip />
+      <QueueLane />
       <AttachmentRow />
       {/* The live transcript is recognition output, not a draft: it is marked
           as interim and the primitive replaces it with the final sentence. */}
@@ -189,6 +232,17 @@ function ComposerBody({
           <ComposerPrimitive.DictationTranscript />
         </p>
       </AuiIf>
+      {/* The runtime renders this container only while a quote is set, so the
+          strip cannot promise a quote that is not there. */}
+      <ComposerPrimitive.Quote className="composer__quote">
+        <ComposerPrimitive.QuoteText className="composer__quote-text" />
+        <ComposerPrimitive.QuoteDismiss
+          className="composer__quote-dismiss"
+          aria-label="Remove quote"
+        >
+          ✕
+        </ComposerPrimitive.QuoteDismiss>
+      </ComposerPrimitive.Quote>
       <div className="composer__shell">
         <label className="sr-only" htmlFor={inputId}>
           Message the studio

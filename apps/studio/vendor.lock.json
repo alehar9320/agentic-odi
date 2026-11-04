@@ -1,0 +1,22 @@
+{
+  "$comment": "Ledger for apps/studio/src/vendor. Rule 3 of docs/architecture/vendor.md: every vendored file carries a provenance header and an entry here, so its licence is auditable and a re-copy diff stays possible. `src/vendor/ledger.test.ts` fails the suite if a file in that tree is missing from both lists, or if a header stops agreeing with its entry. Upstream registry items have no commit, so `integrity` is the sha256 of the artefact fetched from `source` — the handle a refresh diffs against.",
+  "vendored": {
+    "components/ui/button.tsx": {
+      "source": "https://ui.shadcn.com/r/styles/new-york-v4/button.json",
+      "retrievedBy": "npx shadcn@latest add button",
+      "retrieved": "2026-10-31",
+      "licence": "MIT",
+      "upstreamIssue": "shadcn-ui/ui, registry item new-york-v4/button",
+      "integrity": "sha256-4b8d7d848742727973c1b088af8d15f0b628272a1316f2d2fa344e73ddff9e9c",
+      "localEdits": "the class-merger import moves from the \"cn\" package to \"@/lib/utils\"; the six-line header above it is ours",
+      "ourCommit": "3e3deff"
+    }
+  },
+  "firstParty": {
+    "boundary.ts": "The vendor boundary as data — written here.",
+    "index.css": "Tailwind v4 scoped to this tree only; the `source(none)` and `@source` reasoning is ours, not the registry's.",
+    "lib/utils.ts": "Three-line class merger over clsx and tailwind-merge. Not a copy-in: no provenance header arrived with it and it imports only declared npm packages.",
+    "components/ui/README.md": "Policy summary for this directory.",
+    "components/assistant/README.md": "Reserved for the second copied surface; empty of code by design."
+  }
+}

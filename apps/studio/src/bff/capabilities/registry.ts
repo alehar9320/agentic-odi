@@ -1,4 +1,5 @@
 import { apiUrl } from "../../bridge/desktopBridge";
+import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
 
 export type CapabilityId =
@@ -89,15 +90,6 @@ function isBrowserModelAvailable(): boolean {
   return Boolean(ai && typeof ai.languageModel === "function");
 }
 
-function isEndpointConfigured(settings: StudioConfig): boolean {
-  return Boolean(
-    settings.base_url &&
-      settings.api_key &&
-      settings.model_name &&
-      settings.base_url !== "http://localhost:8001/v1",
-  );
-}
-
 /** Probe a same-origin sidecar route. In the browser this is the Worker
  * origin; in Tauri it is the local sidecar at 127.0.0.1:8100. When
  * `capabilityId` is given the route is expected to return a capabilities
@@ -136,7 +128,7 @@ export class CapabilityRegistry {
       id: "endpoint-model",
       label: localStatuses["endpoint-model"].label,
       description: localStatuses["endpoint-model"].description,
-      check: async (settings) => isEndpointConfigured(settings),
+      check: async (settings) => isEndpointConfiguredForSettings(settings),
     },
     {
       id: "sidecar-llm",

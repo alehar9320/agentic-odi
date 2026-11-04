@@ -1,3 +1,4 @@
+import type { RecordKind } from "./lib/records";
 import type { UiCatalogManifest, UiNode } from "./ui/protocol";
 
 export interface Job {
@@ -57,6 +58,11 @@ export type SegmentVerdict = "underserved" | "overserved" | "appropriately_serve
  * job and evidenced by outcomes. `verdict` is null when an outcome in the group
  * has no score — the studio reports that as "not enough signal" rather than
  * guessing. No demographic field exists here by design.
+ *
+ * `people_inferred` is the provenance of the group itself: true when `people`
+ * was derived from the outcomes rather than supplied, which the board words as
+ * a candidate segment. The `basis` field (#475) will name the derivation more
+ * precisely; it is deliberately not added here.
  */
 export interface Segment {
   id: string;
@@ -72,8 +78,26 @@ export interface Segment {
   created_at: string;
 }
 
-export type StrategyKind = "differentiated" | "disruptive" | "new_market";
+/**
+ * A study is one named pass over a job. `wave` is the pass number, from 1:
+ * opening the same study again is a new wave, not a second copy. `closed_at` is
+ * set only once the study is closed, and `method_notes` is the researcher's own
+ * account of how the pass was run, when they have given it.
+ */
+export type StudyStatus = "planned" | "fielding" | "closed";
 
+export interface Study {
+  id: string;
+  job_id: string;
+  name: string;
+  wave: number;
+  status: StudyStatus;
+  opened_at: string;
+  closed_at?: string | null;
+  method_notes?: string | null;
+}
+
+export type StrategyKind = "differentiated" | "disruptive" | "new_market";
 export interface RejectedPath {
   kind: StrategyKind;
   why: string;
@@ -311,7 +335,9 @@ export interface StudioBrief {
  * stage; a lens makes room for itself and never replaces the thread.
  */
 export type WorkspacePanelId =
+  | "records"
   | "landscape"
+  | "brief"
   | "jobmap"
   | "segments"
   | "evidence"
@@ -347,6 +373,23 @@ export type SignalSubjectKind =
   | "segment"
   | "strategy";
 
+/** A selected record on screen, whatever kind it is. */
+export interface FocusSubject {
+  kind: SignalSubjectKind;
+  id: string;
+}
+
+/**
+ * A record the sidecar can read back from its own store.
+ *
+ * The kinds are the ones `lib/records.ts` already enumerates: a pointer may
+ * only name a record the store is able to show.
+ */
+export type FocusPointer = {
+  kind: RecordKind;
+  id: string;
+};
+
 export interface Signal {
   id: string;
   kind: SignalKind;
@@ -380,6 +423,8 @@ export interface ChatStreamRequest {
   approvals?: boolean;
   /** The id this client is streaming the reply under. */
   assistant_id?: string | null;
+  /** The record the person has selected, as a pointer and nothing more. */
+  focus?: FocusPointer | null;
 }
 
 /** One turn in a persisted conversation, as the branch tree exposes it. */
@@ -430,6 +475,11 @@ export interface Conversation {
   updated_at: string;
   /** The visible branch head turn, when the conversation has branches. */
   head_id?: string | null;
+}
+
+/** A conversation as the history list shows it: enough to name it and size it. */
+export interface ConversationSummary extends Conversation {
+  turn_count: number;
 }
 
 export interface ConversationTurn {

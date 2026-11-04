@@ -7,8 +7,9 @@ import { CONVERSATION, lastReply, openStudio, sendMessage } from "./helpers";
  * every user takes: say something, get an answer.
  *
  * No model is reachable during the test run, so the assistant answers with the
- * sidecar's deterministic offline guidance. That is the behaviour a user with
- * no LLM configured actually sees, and it is stable enough to assert on.
+ * sidecar's deterministic reply, labelled on the reply as a local draft. That
+ * is the behaviour a user with no LLM configured actually sees, and it is
+ * stable enough to assert on.
  */
 test.describe("the conversation", () => {
   test("answers a question in the transcript", async ({ page }) => {
@@ -33,15 +34,13 @@ test.describe("the conversation", () => {
     );
   });
 
-  test("offers local guidance when the offline assistant cannot answer the request", async ({
-    page,
-  }) => {
+  test("says a reply is a local draft when no model can answer it", async ({ page }) => {
     await openStudio(page);
 
     await sendMessage(page, "What is the weather tomorrow?");
 
     const reply = await lastReply(page);
-    expect(reply).toContain("LOCAL GUIDANCE");
+    expect(reply).toContain("Local draft, no model connected");
     expect(reply).toContain("/capture — record an outcome");
   });
 

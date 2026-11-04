@@ -2064,6 +2064,30 @@ html[data-theme="light"] .theme-toggle__moon {
   white-space: pre;
 }
 
+/* Architecture diagrams. Until the renderer loads — and if it never loads, or a
+   diagram stops parsing — the element is a fence of mermaid source, so it is
+   dressed like the code block above. Once drawn it holds an SVG instead. */
+pre.mermaid {
+  margin: 0;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-sunken);
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+pre.mermaid.is-drawn {
+  text-align: center;
+}
+
+pre.mermaid.is-drawn svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ---------------------------------------------------------------- */
 /* Tabs                                                             */
 /* ---------------------------------------------------------------- */

@@ -21,7 +21,8 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
 from typing import Any
 
-from agentic_odi_core import ModelRouter, ModelTier, ODIService, RoutingMode
+from agentic_odi_core import ModelRouter, ModelTier, ODIService, Outcome, RoutingMode
+from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
@@ -50,6 +51,7 @@ from agentic_odi_studio_api.studio.schemas import (
     AttachmentRef,
     ChatMessage,
     ChatRequest,
+    FocusRef,
     StudioBrief,
 )
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
@@ -60,22 +62,9 @@ log = logging.getLogger(__name__)
 #: missing must not be able to loop forever.
 MAX_TOOL_ROUNDS = 3
 
-#: Tool names that change stored data. Everything else is a read, a surface, or
-#: a memory note — none of which needs a confirmation the user would learn to
-#: click through.
-MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
-    "add_",
-    "create_",
-    "update_",
-    "delete_",
-    "ingest_",
-    "remove_",
-)
-
-#: Writes whose names do not follow the verb-prefix convention.
-MUTATING_TOOLS: frozenset[str] = frozenset(
-    {"promote_evidence", "segment_market", "propose_strategy"}
-)
+#: Local tools deliberately handled without a write approval: rendering a UI
+#: and suggesting a memory observation retain their existing conversation flow.
+_LOCAL_UNGATED_TOOLS = frozenset({"remember", RENDER_UI_TOOL})
 
 #: Attachments are context, not a corpus: five files, and a bounded slice of each.
 MAX_ATTACHMENTS = 5
@@ -87,7 +76,10 @@ MAX_SOURCE_PREVIEW = 160
 
 def is_mutating_tool(name: str) -> bool:
     """Whether a tool call changes stored data and should be confirmed."""
-    return name in MUTATING_TOOLS or name.startswith(MUTATING_TOOL_PREFIXES)
+    if name in _LOCAL_UNGATED_TOOLS:
+        return False
+    spec = TOOL_SPECS.get(name)
+    return spec is None or spec.effect != ToolEffect.READ
 
 
 SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.
@@ -210,10 +202,14 @@ def _user_content(message: ChatMessage, attachments: list[AttachmentRef]) -> Any
     return [{"type": "text", "text": text}, *images]
 
 
-def _to_openai_messages(request: ChatRequest, memory_context: str = "") -> list[dict[str, Any]]:
+def _to_openai_messages(
+    request: ChatRequest, memory_context: str = "", focus_context: str = ""
+) -> list[dict[str, Any]]:
     system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
     if memory_context:
         system_prompt += "\n\n" + memory_context
+    if focus_context:
+        system_prompt += "\n\n" + focus_context
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     last_user = next((m for m in reversed(request.messages) if m.role == "user"), None)
     for message in request.messages:
@@ -411,11 +407,13 @@ def _persist_turn(
     message_id: str | None = None,
     parent_id: str | None = None,
     claims: list[Claim] | None = None,
+    request_id: str = "",
 ) -> int | None:
     """Record a turn and its claims, tolerating a duplicate retry.
 
     A retry that reuses a message id rewrites the same citation rows instead of
-    stacking new ones. A failure to remember never breaks the reply.
+    stacking new ones. A failure to remember never breaks the reply, but it is
+    logged: a turn the store lost is otherwise invisible.
     """
     if memory is None or conversation_id is None or not content.strip():
         return None
@@ -435,7 +433,15 @@ def _persist_turn(
         if claims:
             memory.add_citations(turn_id, claims)
         return turn_id
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # Deliberate degradation: the person keeps the reply they already read,
+        # and the request id here is what makes the missing turn findable.
+        log.warning(
+            "turn was not persisted (request_id=%s, role=%s, error=%s)",
+            request_id,
+            role,
+            type(exc).__name__,
+        )
         return None
 
 
@@ -491,6 +497,53 @@ def _local_evidence_resolver(
         return EvidenceSnapshot(id=record.id, name=record.name, source_name=record.source_name)
 
     return resolve
+
+
+def _outcome_scores(outcome: Outcome) -> str:
+    parts = []
+    if outcome.importance is not None:
+        parts.append(f"importance {outcome.importance:g}")
+    if outcome.satisfaction is not None:
+        parts.append(f"satisfaction {outcome.satisfaction:g}")
+    if outcome.opportunity_score is not None:
+        parts.append(f"opportunity {outcome.opportunity_score:g}")
+    return f" — {', '.join(parts)}" if parts else ""
+
+
+def _focus_description(focus: FocusRef, service: ODIService) -> str:
+    """The focused record as the store spells it, or nothing at all."""
+    if focus.kind == "job":
+        job = service.get_job(focus.id)
+        return "" if job is None else f'"{job.name}"'
+    if focus.kind == "step":
+        step = service.get_step(focus.id)
+        return "" if step is None else f'"{step.name}" (step {step.order} of the job map)'
+    if focus.kind == "outcome":
+        outcome = service.get_outcome(focus.id)
+        return "" if outcome is None else f'"{outcome.statement}"{_outcome_scores(outcome)}'
+    record = service.get_evidence(focus.id)
+    return "" if record is None else f'"{record.name}" from {record.source_name}'
+
+
+def _focus_context(focus: FocusRef | None, service: ODIService | None) -> str:
+    """Say what the person is looking at — using only the store's own words.
+
+    The browser sends a pointer, never a label, and an id this store does not
+    have earns no sentence: an unverified description would put words in the
+    record's mouth.
+    """
+    if focus is None or service is None:
+        return ""
+    try:
+        described = _focus_description(focus, service)
+    except Exception:  # noqa: BLE001 - the store is optional context
+        return ""
+    if not described:
+        return ""
+    return (
+        f"The user is looking at this {focus.kind} right now: {described} (id {focus.id}). "
+        "Answer about it unless they point somewhere else."
+    )
 
 
 def _message_payload(content: str, claims: list[Claim]) -> dict[str, Any]:
@@ -555,7 +608,15 @@ async def _turn_frames(
         if conversation is None:
             conversation = memory.create_conversation()
         conversation_id = conversation.id
-        _persist_turn(memory, conversation_id, "user", last_user, user_message_id, user_parent_id)
+        _persist_turn(
+            memory,
+            conversation_id,
+            "user",
+            last_user,
+            user_message_id,
+            user_parent_id,
+            request_id=request_id,
+        )
         updated = memory.get_conversation(conversation_id) or conversation
         yield frame("conversation", {"id": updated.id, "title": updated.title})
 
@@ -597,6 +658,7 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            request_id=request_id,
         )
         return
 
@@ -630,6 +692,7 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            request_id=request_id,
         )
         return
 
@@ -653,6 +716,8 @@ async def _turn_frames(
     llm_client = AsyncOpenAI(base_url=request.base_url, api_key=request.api_key, timeout=15.0)
     connector_service = service if service is not None else ConnectorService()
     memory_context = memory.memory_context() if memory is not None else ""
+    # What the person is looking at, re-read from the store before it is repeated.
+    focus_context = _focus_context(request.focus, local_service)
     # Every id the turn actually received, with the label that came with it.
     evidence = EvidenceIndex(resolver=_local_evidence_resolver(local_service))
 
@@ -673,7 +738,7 @@ async def _turn_frames(
             ) from exc
 
         openai_tools = _openai_tools(mcp_tools) + _local_tools(catalog)
-        messages: list[Any] = _to_openai_messages(request, memory_context)
+        messages: list[Any] = _to_openai_messages(request, memory_context, focus_context)
 
         spoken: list[str] = []
         ui_count = 0
@@ -741,6 +806,7 @@ async def _turn_frames(
                     assistant_message_id,
                     user_message_id,
                     claims,
+                    request_id=request_id,
                 )
                 yield frame("message", _message_payload(final, claims))
                 return
@@ -901,6 +967,7 @@ async def _turn_frames(
             assistant_message_id,
             user_message_id,
             claims,
+            request_id=request_id,
         )
         yield frame("message", _message_payload(content, claims))
 

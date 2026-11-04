@@ -23,6 +23,7 @@
       "guides": [
         { "slug": "deployment", "title": "Deployment", "source": "docs/deployment.md", "blurb": "The project site, the hosted server, and the Worker." },
         { "slug": "development", "title": "Development", "source": "docs/development.md", "blurb": "Lint, types, frontend checks, and the coverage map." },
+        { "slug": "agents", "title": "Agent assignment", "source": "docs/agents.md", "blurb": "Which agents take issues, how to claim one, and when a claim expires." },
         { "slug": "roadmap", "title": "Roadmap", "source": "docs/roadmap.md", "blurb": "What has shipped, and what is queued." }
       ]
     }

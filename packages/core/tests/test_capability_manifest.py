@@ -40,11 +40,10 @@ def test_every_tool_has_summary_effect_and_returns() -> None:
 
 
 def test_effect_derivation_matches_naming_rule() -> None:
-    """Effect is derived from the name: get_*/list_* → READ, delete_* → DESTRUCTIVE,
-    everything else → WRITE. The derivation is asserted so a tool cannot be
-    accidentally marked read-only."""
+    """Known pure calculations are reads; other unrecognized verbs default to writes."""
+    pure_calculations = {"evaluate_outcome", "compute_opportunity"}
     for name, spec in TOOL_SPECS.items():
-        if name.startswith(("get_", "list_")):
+        if name.startswith(("get_", "list_")) or name in pure_calculations:
             assert spec.effect == ToolEffect.READ, (
                 f"Tool {name} (starts with get_/list_) should be READ, got {spec.effect}"
             )

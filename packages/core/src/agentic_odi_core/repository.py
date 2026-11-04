@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
+from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
@@ -17,6 +18,7 @@ from agentic_odi_core.models import (
     Signal,
     Step,
     Strategy,
+    Study,
 )
 
 _Item = TypeVar("_Item")
@@ -114,12 +116,14 @@ class Repository(Protocol):
     jobs: dict[str, Job]
     steps: dict[str, Step]
     outcomes: dict[str, Outcome]
+    proposals: dict[str, OutcomeProposal]
     customer_outcomes: dict[str, CustomerOutcome]
     evidence: dict[str, Evidence]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    studies: dict[str, Study]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -128,6 +132,7 @@ class Repository(Protocol):
     def delete_job(self, job_id: str) -> bool: ...
     def add_step(self, step: Step) -> Step: ...
     def get_step(self, step_id: str) -> Step | None: ...
+    def list_steps(self, limit: int | None = None, offset: int = 0) -> list[Step]: ...
     def get_steps_for_job(
         self, job_id: str, limit: int | None = None, offset: int = 0
     ) -> list[Step]: ...
@@ -193,14 +198,25 @@ class Repository(Protocol):
     def get_segment(self, segment_id: str) -> Segment | None: ...
     def list_segments(self, job_id: str | None = None) -> list[Segment]: ...
     def update_segment(self, segment_id: str, updates: dict) -> Segment | None: ...
+    def add_study(self, study: Study) -> Study: ...
+    def get_study(self, study_id: str) -> Study | None: ...
+    def list_studies(self, job_id: str | None = None) -> list[Study]: ...
+    def update_study(self, study_id: str, updates: dict) -> Study | None: ...
     def add_strategy(self, strategy: Strategy) -> Strategy: ...
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
+    def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal: ...
+    def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None: ...
 
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
+    def checkpoint(self, mode: str = "TRUNCATE") -> None: ...
+    @property
+    def integrity(self) -> str: ...
     def close(self) -> None: ...
     def health(self) -> bool: ...
 
@@ -210,12 +226,14 @@ class InMemoryRepository:
         self.jobs: dict[str, Job] = {}
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
+        self.proposals: dict[str, OutcomeProposal] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.studies: dict[str, Study] = {}
 
     def add_job(self, job: Job) -> Job:
         self.jobs[job.id] = job
@@ -303,6 +321,32 @@ class InMemoryRepository:
                 current["step_id"] = None
                 self.evidence[key] = Evidence.model_validate(current)
         return True
+
+    def list_steps(self, limit: int | None = None, offset: int = 0) -> list[Step]:
+        return page(list(self.steps.values()), limit, offset)
+
+    def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal:
+        self.proposals[proposal.id] = proposal
+        return proposal
+
+    def get_proposal(self, proposal_id: str) -> OutcomeProposal | None:
+        return self.proposals.get(proposal_id)
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
+        props = list(self.proposals.values())
+        if status is not None:
+            props = [p for p in props if p.status == status]
+        return props
+
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None:
+        proposal = self.proposals.get(proposal_id)
+        if not proposal:
+            return None
+        current = proposal.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_proposal = OutcomeProposal.model_validate(current)
+        self.proposals[proposal_id] = new_proposal
+        return new_proposal
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
         self.outcomes[outcome.id] = outcome
@@ -539,6 +583,29 @@ class InMemoryRepository:
         self.segments[segment_id] = new_segment
         return new_segment
 
+    def add_study(self, study: Study) -> Study:
+        self.studies[study.id] = study
+        return study
+
+    def get_study(self, study_id: str) -> Study | None:
+        return self.studies.get(study_id)
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        items = list(self.studies.values())
+        if job_id is not None:
+            items = [study for study in items if study.job_id == job_id]
+        return items
+
+    def update_study(self, study_id: str, updates: dict) -> Study | None:
+        study = self.studies.get(study_id)
+        if study is None:
+            return None
+        current = study.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_study = study.model_validate(current)
+        self.studies[study_id] = new_study
+        return new_study
+
     def add_strategy(self, strategy: Strategy) -> Strategy:
         self.strategies[strategy.id] = strategy
         return strategy
@@ -579,6 +646,14 @@ class InMemoryRepository:
 
     def commit(self) -> None:
         """No-op: an in-memory store has nothing to flush."""
+
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """No-op: an in-memory store has no write-ahead log."""
+
+    @property
+    def integrity(self) -> str:
+        """An in-memory store is created fresh, so it is always intact."""
+        return "ok"
 
     def close(self) -> None:
         """No-op: an in-memory store holds no resources."""
