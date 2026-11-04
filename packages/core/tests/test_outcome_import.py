@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from agentic_odi_core.errors import error_status
 from agentic_odi_core.models import ClaimCheck, JobStage, Step, Theme
 from agentic_odi_core.outcome_import import (
     ImportAbortedError,
@@ -230,12 +231,17 @@ def test_text_and_bytes_parse_to_the_same_rows() -> None:
     assert parse_outcome_table(document.encode("utf-8")).rows == parse_outcome_table(document).rows
 
 
-def test_only_csv_is_read_and_the_refusal_names_the_format() -> None:
+def test_a_format_neither_door_reads_is_refused_by_name() -> None:
     with pytest.raises(UnsupportedFormatError) as excinfo:
-        parse_outcome_table(FIXTURE.read_bytes(), fmt="xlsx")
+        parse_outcome_table(FIXTURE.read_bytes(), fmt="xls")
 
     assert "csv" in str(excinfo.value)
     assert "xlsx" in str(excinfo.value)
+    assert "xls'" in str(excinfo.value)
+
+
+def test_a_wrong_format_is_a_bad_request_not_a_server_fault() -> None:
+    assert error_status(UnsupportedFormatError("xls")) == 400
 
 
 @pytest.mark.parametrize(
