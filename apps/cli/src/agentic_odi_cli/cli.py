@@ -30,6 +30,7 @@ from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.strategy import strategy_app
+from agentic_odi_cli.studies import studies_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -55,6 +56,11 @@ app.add_typer(
     segments_app,
     name="segments",
     help="Stage 5: segments derived from scored outcomes, never from demographics.",
+)
+app.add_typer(
+    studies_app,
+    name="studies",
+    help="A study is one named pass over a job; opening it again is a new wave.",
 )
 app.add_typer(
     strategy_app,

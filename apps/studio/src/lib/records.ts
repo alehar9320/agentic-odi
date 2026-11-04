@@ -46,7 +46,7 @@ export const RECORD_SECTIONS: RecordSection[] = [
 ];
 
 /** A missing field says so; it never renders as `undefined`. */
-function text(value: string | number | null | undefined): string {
+export function text(value: string | number | null | undefined): string {
   if (value === null || value === undefined) {
     return "—";
   }
@@ -55,7 +55,7 @@ function text(value: string | number | null | undefined): string {
 }
 
 /** A score is the number the sidecar returned, or the word for having none. */
-function score(value: number | null | undefined): string {
+export function score(value: number | null | undefined): string {
   return value === null || value === undefined ? "unscored" : String(value);
 }
 
@@ -133,4 +133,23 @@ export function buildRecords(canvas: CanvasData | null | undefined): RecordRow[]
   });
 
   return rows;
+}
+
+/** The field that names each kind, read from `types.ts` rather than invented here. */
+const TITLE_FIELD: Record<RecordKind, "name" | "statement"> = {
+  job: "name",
+  step: "name",
+  outcome: "statement",
+  evidence: "name",
+};
+
+/**
+ * What the store calls this record.
+ *
+ * The only words a chip may repeat: a name the browser made up would let the
+ * composer claim the person is looking at something the record never said.
+ */
+export function recordTitle(row: RecordRow): string {
+  const named = row.record as { name?: string; statement?: string };
+  return text(named[TITLE_FIELD[row.kind]]);
 }
