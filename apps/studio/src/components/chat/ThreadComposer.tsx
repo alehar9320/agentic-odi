@@ -257,8 +257,16 @@ function ComposerBody({
           onPaste={(event) => {
             // A screenshot on the clipboard is a file, not text: attach it
             // rather than letting the browser paste a placeholder name.
-            const files = Array.from(event.clipboardData?.files ?? []);
+            const clipboardData = event.clipboardData;
+            const files = Array.from(clipboardData?.files ?? []);
             if (files.length === 0) {
+              return;
+            }
+            const text = typeof clipboardData?.getData === "function" ? clipboardData.getData("text/plain") ?? "" : "";
+            if (text !== "") {
+              // Mixed payload: let the browser insert the text at the caret
+              // and attach the files alongside it.
+              onFiles(files);
               return;
             }
             event.preventDefault();
