@@ -7,8 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Sunday 06:00 UTC. Scheduled runs only execute from the default branch,
-    # and only the updater-e2e job reacts to this event.
+    # Sunday 06:00 UTC. Scheduled runs only execute from the default branch, and
+    # the two jobs that judge the deployed world rather than a pull request react to
+    # this event: updater-e2e, and hosted-first-run below. Anything that wants a
+    # probe sooner takes `workflow_dispatch`.
     - cron: "0 6 * * 0"
 
 concurrency:
@@ -544,6 +546,40 @@ jobs:
           name: updater-e2e-log
           if-no-files-found: ignore
           path: /tmp/studio-update-e2e/
+
+  # Production deploys on every push to main, and a merged PR is not proof the
+  # change reached the branch that deploys. This knocks on the real URL and reports
+  # one dated line per promise the README makes a visitor. It sits outside
+  # `ci-green`'s `needs:` for the same reason `pr-body` and `updater-e2e` do: a
+  # broken deploy is news about the deploy, not about the pull request that
+  # happened to share the branch, and a suite that is green over a branch nobody
+  # deploys is exactly how #492 and #609 went unnoticed.
+  hosted-first-run:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Probe the hosted first run
+        run: |
+          set +e
+          bash scripts/verify-hosted-first-run.sh --commit "$(git rev-parse HEAD)" \
+            | tee /tmp/hosted-first-run.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::error::the hosted first run broke; the dated lines are in the hosted-first-run-log artifact"
+            exit "$status"
+          fi
+
+      - name: Upload the probe output on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hosted-first-run-log
+          if-no-files-found: ignore
+          path: /tmp/hosted-first-run.log
 
   ci-green:
     name: CI green
