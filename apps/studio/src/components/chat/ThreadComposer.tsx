@@ -24,6 +24,7 @@ import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/com
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
+import { QueueLane } from "./QueueLane";
 import { ModelPicker } from "./ModelPicker";
 
 const acceptedAttachmentTypes = ATTACHMENT_ACCEPT.split(",");
@@ -31,7 +32,7 @@ const acceptedTextExtensions = acceptedAttachmentTypes.filter((type) => type.sta
 const acceptedImageTypes = acceptedAttachmentTypes
   .filter((type) => type.startsWith("image/"))
   .map((type) => type.slice("image/".length).toUpperCase());
-const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*) and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files up to ${MAX_ATTACHMENT_CHARS.toLocaleString()} characters.`;
+const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*), Word documents (.docx), and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text and Word files up to ${MAX_ATTACHMENT_CHARS.toLocaleString()} characters.`;
 
 /** The local preview for an image before it is ever sent. */
 function AttachmentThumb({ file }: { file?: File }) {
@@ -171,6 +172,19 @@ function ComposerBody({
       return;
     }
 
+    // Enter is a send, not a race (#410): while a turn runs the follow-up
+    // joins the queue lane instead of interrupting the live answer.
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing &&
+      text.trim() !== ""
+    ) {
+      event.preventDefault();
+      aui.composer.send({ steer: false });
+      return;
+    }
+
     // The palette owns the arrows while it is open; history must not fight it.
     if (open || event.defaultPrevented) {
       return;
@@ -200,6 +214,7 @@ function ComposerBody({
         onChoose={choose}
       />
       <ConnectorChips />
+      <QueueLane />
       <AttachmentRow />
       {/* The live transcript is recognition output, not a draft: it is marked
           as interim and the primitive replaces it with the final sentence. */}
