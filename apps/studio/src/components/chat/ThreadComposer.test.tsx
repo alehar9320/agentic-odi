@@ -59,6 +59,26 @@ function recalls(): string[] {
     .filter((text) => text.startsWith("Recalled your last message"));
 }
 
+describe("ThreadComposer paste", () => {
+  it("keeps pasted text when the clipboard also contains an image", () => {
+    const pushToast = vi.fn();
+    const input = renderComposer({ pushToast });
+    fireEvent.change(input, { target: { value: "first line\nsecond line" } });
+    input.setSelectionRange("first line".length, "first line".length);
+
+    const file = new File(["img"], "shot.png", { type: "image/png" });
+    const clipboardData = {
+      files: [file],
+      getData: (type: string) => (type === "text/plain" ? "inserted" : ""),
+    } as unknown as DataTransfer;
+
+    fireEvent.paste(input, { clipboardData });
+
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+});
+
 describe("ThreadComposer recall", () => {
   it("recalls the message sent last on an empty draft, and says so once", () => {
     const input = renderComposer();

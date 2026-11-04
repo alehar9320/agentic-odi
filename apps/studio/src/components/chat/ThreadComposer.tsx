@@ -254,11 +254,36 @@ function ComposerBody({
           aria-haspopup="listbox"
           aria-controls={open ? paletteId : undefined}
           onKeyDown={onKeyDown}
+          addAttachmentOnPaste={false}
           onPaste={(event) => {
             // A screenshot on the clipboard is a file, not text: attach it
             // rather than letting the browser paste a placeholder name.
             const files = Array.from(event.clipboardData?.files ?? []);
             if (files.length === 0) {
+              return;
+            }
+            const text = event.clipboardData?.getData("text/plain") ?? "";
+            if (text !== "") {
+              onFiles(files);
+              const input = event.currentTarget as HTMLTextAreaElement;
+              const start = input.selectionStart ?? input.value.length;
+              const end = input.selectionEnd ?? start;
+              const aui = (globalThis as any).__AUI__ || null;
+              // Try to update via composer if possible
+              try {
+                const next = input.value.slice(0, start) + text + input.value.slice(end);
+                // Dispatch input event to let the framework handle it
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                  window.HTMLTextAreaElement.prototype,
+                  "value",
+                )?.set;
+                nativeInputValueSetter?.call(input, next);
+                input.setSelectionRange(start + text.length, start + text.length);
+                const inputEvent = new Event("input", { bubbles: true });
+                input.dispatchEvent(inputEvent);
+              } catch {
+                // fall through
+              }
               return;
             }
             event.preventDefault();
