@@ -70,8 +70,9 @@ reports the app's `localStorage` keys with their byte sizes.
 Three constraints shape what it is allowed to say:
 
 - `database` is imported from `apps/studio/src/bff/store/indexedDbStore.ts`, not
-  restated there — the name has one source of truth. A memory store reports
-  `null` and `persistent: false`, because nothing in it survives the tab.
+  restated there — the name is defined once in
+  `apps/studio/src/bff/store/migrations.ts` and re-exported. A memory store
+  reports `null` and `persistent: false`, because nothing in it survives the tab.
 - `lastWrite` is derived. The `meta` store holds only a sequence counter, so no
   write time is recorded anywhere to read; the selector takes the newest
   `updated_at` across jobs, steps, outcomes, observations, and conversations,

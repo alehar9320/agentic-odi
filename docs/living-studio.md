@@ -190,6 +190,16 @@ Studio says so in one place and keeps going:
   while the drain runs — where it does not. A tab that loses the race leaves the
   records pending and picks them up on the next trigger, so a closed tab's queue
   resumes instead of stalling.
+- The browser store can change shape without losing what is in it. The schema
+  version and one migration per step live in
+  `apps/studio/src/bff/store/migrations.ts`; opening the database runs every
+  registered step from the version the person has up to `DB_VERSION`, so a
+  release that adds a store upgrades an existing database instead of failing to
+  open it. A version bump with no migration is caught by a test before it ships.
+- When a second tab opens a newer schema, the first tab would otherwise hold the
+  old connection and block the upgrade. `IndexedDbLocalStore` closes its
+  connection on `versionchange` and sets `needsReload`, which the app can read
+  to show "Reload to continue" rather than hanging.
 - Where that work sits, and how much room it takes, is one call away:
   `bff/storageFacts.ts` reports the engine, the database name, the record count,
   the newest write the records carry, and whether the browser agreed to keep the
