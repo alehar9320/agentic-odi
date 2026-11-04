@@ -281,6 +281,7 @@ def evaluate_cmd(
 def guidelines_cmd() -> None:
     """Print the ODI framework guidelines."""
     typer.echo(run_tool("get_odi_framework_guidelines", {}))
+    typer.echo("\nThe same method as a practitioner works it, stage by stage: docs/method.md.")
 
 
 capabilities_app = typer.Typer(name="capabilities", help="Inspect the assistant's tool surface.")
