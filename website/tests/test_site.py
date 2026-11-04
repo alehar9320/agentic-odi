@@ -409,11 +409,13 @@ def test_the_landing_carries_complete_social_metadata():
     assert _meta(html, "og:type") == "website"
     assert _meta(html, "og:site_name") == "Agentic ODI"
     assert _meta(html, "og:url") == PAGES_URL
-    assert _meta(html, "og:image") == PAGES_URL + "assets/og.png"
+    image = _meta(html, "og:image")
+    assert image is not None and image.startswith(f"{PAGES_URL}og/") and image.endswith(".png")
+    assert _meta(html, "og:image:alt"), "the card needs a text equivalent"
     assert _meta(html, "twitter:card") == "summary_large_image"
     assert _meta(html, "twitter:title")
     assert _meta(html, "twitter:description")
-    assert _meta(html, "twitter:image") == PAGES_URL + "assets/og.png"
+    assert _meta(html, "twitter:image") == image
     assert f'<link rel="canonical" href="{PAGES_URL}">' in html
     assert html.count('name="theme-color"') == 1
 
