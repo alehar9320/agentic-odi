@@ -113,6 +113,32 @@ describe("UiRenderer", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders a segment with its verdict and the confidence behind it", () => {
+    renderSpec({
+      type: "segment-card",
+      props: {
+        id: "SEG-2",
+        name: "Finance leads, match each line",
+        people: "Finance leads",
+        peopleInferred: false,
+        jobStatement: "Reconcile invoices without manual effort",
+        verdict: "underserved",
+        confidence: 0.8,
+        outcomeIds: ["O-14", "O-19", "O-27"],
+        rationale: "Three outcomes on Match each line; at least one scores above 10.",
+        unclustered: ["O-31"],
+      },
+    });
+
+    expect(screen.getByLabelText("Segment: Finance leads, match each line")).toBeInTheDocument();
+    // A verdict never appears without the confidence behind it.
+    expect(screen.getByText("Underserved · 80% confidence")).toBeInTheDocument();
+    expect(screen.getByText("3 outcomes: O-14, O-19, O-27")).toBeInTheDocument();
+    expect(
+      screen.getByText("Unclustered — too few outcomes to be a market: O-31"),
+    ).toBeInTheDocument();
+  });
+
   it("ranks an opportunity board by opportunity score", () => {
     renderSpec({
       type: "opportunity-board",

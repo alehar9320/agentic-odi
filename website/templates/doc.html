@@ -60,3 +60,9 @@
   </article>
 </div>
 {% endblock %}
+
+{% block scripts %}
+{% if page.has_diagram %}
+<script defer type="module" src="{{ prefix }}assets/diagrams.js"></script>
+{% endif %}
+{% endblock %}

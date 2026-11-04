@@ -6,6 +6,7 @@ const studio = vi.hoisted(() => ({
     jobs: { id: string }[];
     steps: { id: string }[];
     outcomes: { id: string; evidence?: string }[];
+    evidence?: { id: string }[];
     source: "seed" | "mcp" | "local";
     provenance?: {
       kind: "live" | "seed" | "empty";
@@ -15,6 +16,7 @@ const studio = vi.hoisted(() => ({
     };
   },
   memory: [] as { id: string; text: string }[],
+  segments: [] as { id: string }[],
   activePanel: null as string | null,
   openPanel: vi.fn(),
   closePanel: vi.fn(),
@@ -40,6 +42,7 @@ describe("WorkbenchRail", () => {
   beforeEach(() => {
     studio.canvas = null;
     studio.memory = [];
+    studio.segments = [];
     studio.activePanel = null;
     studio.openPanel.mockClear();
     studio.closePanel.mockClear();
@@ -75,6 +78,16 @@ describe("WorkbenchRail", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "What I know, 2 notes" }));
     expect(studio.openPanel).toHaveBeenCalledWith("memory");
+  });
+
+  it("counts the segments the outcomes support", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }, { id: "O-2" }] });
+    studio.segments = [{ id: "seg-1" }, { id: "seg-2" }, { id: "seg-3" }];
+
+    render(<WorkbenchRail />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Segments, 3 segments" }));
+    expect(studio.openPanel).toHaveBeenCalledWith("segments");
   });
 
   it("omits a view that has nothing to show", () => {
@@ -135,6 +148,36 @@ describe("WorkbenchRail", () => {
 
     expect(screen.queryByText("DEMO")).toBeNull();
     expect(screen.queryByText("OFFLINE")).toBeNull();
+  });
+
+  it("counts every stored record, not only the outcomes with a note", () => {
+    studio.canvas = canvas({
+      jobs: [{ id: "J-1" }],
+      steps: [{ id: "S-1" }],
+      outcomes: [{ id: "O-1" }, { id: "O-2", evidence: "a quote" }],
+      evidence: [{ id: "E-1" }],
+    });
+
+    render(<WorkbenchRail />);
+
+    expect(screen.getByRole("button", { name: "Records, 5 records" })).toBeInTheDocument();
+  });
+
+  it("opens the records lens from its chip", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+
+    render(<WorkbenchRail />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Records, 1 record" }));
+    expect(studio.openPanel).toHaveBeenCalledWith("records");
+  });
+
+  it("keeps the records chip away while nothing is stored", () => {
+    studio.canvas = canvas({ source: "mcp" });
+
+    render(<WorkbenchRail />);
+
+    expect(screen.queryByRole("button", { name: /records/i })).toBeNull();
   });
 
   it("opens a view and closes it again from the same chip", () => {

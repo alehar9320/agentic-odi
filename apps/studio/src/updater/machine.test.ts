@@ -263,11 +263,11 @@ describe("statusLine", () => {
       received: 3,
       total: 4,
     });
-    expect(statusLine(next, NOW)).toBe("Downloading Living Studio 0.12.0 — 75%");
+    expect(statusLine(next, NOW)).toBe("Downloading version 0.12.0 — 75%");
   });
 
   it("reports a staged update and the restart", () => {
-    expect(statusLine(ready(), NOW)).toBe("Living Studio 0.12.0 is ready. Restart to finish.");
+    expect(statusLine(ready(), NOW)).toBe("Version 0.12.0 is ready. Restart to finish.");
   });
 
   it("explains a pending Windows install", () => {

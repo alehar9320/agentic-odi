@@ -1,5 +1,13 @@
 {
   "files": [],
+  // The shadcn CLI reads this file for path aliases; the compiler settings
+  // live in tsconfig.app.json, which carries the same `@/` -> src/vendor map.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/vendor/*"]
+    }
+  },
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" },

@@ -401,6 +401,16 @@ def _kwarg(call: ast.Call, name: str) -> str | None:
 # the reader, so the reference page reads like documentation rather than a
 # signature dump.
 TOOL_PURPOSES: dict[str, str] = {
+    "segment_market": "Cluster the scored outcomes into outcome-based segments.",
+    "get_segments": "List the segments the market was divided into.",
+    "get_strategy": "Get the most recently recorded innovation strategy.",
+    "propose_strategy": "Recommend the one innovation path the segments support.",
+    "propose_outcome": "Propose a desired outcome mined from an evidence record.",
+    "list_proposals": "List outcome proposals, optionally filtered by status.",
+    "approve_proposal": "Approve a proposal and write it as an Outcome.",
+    "reject_proposal": "Reject a proposal; nothing is written to the ODI store.",
+    "open_study": "Open a named study pass over a Job at a given wave number.",
+    "list_studies": "List the studies opened for a Job.",
     "add_job": "Create a Job-to-be-Done.",
     "get_jobs": "List Jobs, one page at a time.",
     "get_job": "Fetch one Job by id.",
@@ -411,7 +421,7 @@ TOOL_PURPOSES: dict[str, str] = {
     "get_step": "Fetch one step by id.",
     "update_step": "Rename a step or move it in the order.",
     "delete_step": "Delete a step.",
-    "add_outcome": "Record a desired outcome with importance and satisfaction.",
+    "add_outcome": "Record a desired outcome; a score must carry its claim_check.",
     "get_outcomes": "List the desired outcomes of a Job or step, one page at a time.",
     "get_outcome": "Fetch one desired outcome by id.",
     "update_outcome": "Edit an outcome's statement or scores.",

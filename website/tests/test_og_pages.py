@@ -69,9 +69,16 @@ def test_every_page_has_a_text_equivalent_for_its_card(page: str):
     assert _meta(html, "og:description"), f"{page} has no og:description"
 
 
+#: The standalone sample page is published (it is committed and served at
+#: /sample/), so it carries a card like every other page. Only 404, which the
+#: build does not publish, is excluded.
+STANDALONE_PUBLISHED = {"sample/index.html"}
+
+
 def test_the_build_emits_exactly_one_card_per_published_page():
     cards = _cards()
-    assert set(cards) == {f"assets/og/{make_og.og_name(page)}" for page in all_pages()}
+    published = set(all_pages()) | STANDALONE_PUBLISHED
+    assert set(cards) == {f"assets/og/{make_og.og_name(page)}" for page in published}
     # The 404 page is not published, so it has no card.
     assert "assets/og/404.png" not in cards
 

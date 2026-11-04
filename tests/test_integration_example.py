@@ -118,6 +118,16 @@ async def test_an_unscored_outcome_reports_nothing_yet(server) -> None:
                     ),
                     "importance": 8,
                     "satisfaction": 4,
+                    # A number needs its provenance: this one was typed by hand,
+                    # so it records that no customer question was asked.
+                    "claim_check": {
+                        "skips": [
+                            {
+                                "question": "Was this score produced by asking the customer?",
+                                "reason": "Score entered by hand in this example.",
+                            }
+                        ]
+                    },
                 },
             )
         )

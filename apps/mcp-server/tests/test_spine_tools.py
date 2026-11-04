@@ -63,13 +63,15 @@ async def test_list_and_get_candidate_cover_the_error_branches():
         assert json.loads(listed.content[0].text)[0]["id"] == candidate_id  # type: ignore[index]
 
         bad_status = await client.call_tool("list_candidates", {"status": "bogus"})
-        assert bad_status.content[0].text == "Error: unknown candidate status: bogus"  # type: ignore[index]
+        payload = json.loads(bad_status.content[0].text)  # type: ignore[index]
+        assert payload["error"]["message"] == "unknown candidate status: bogus"
 
         fetched = await client.call_tool("get_candidate", {"candidate_id": candidate_id})
         assert json.loads(fetched.content[0].text)["id"] == candidate_id  # type: ignore[index]
 
         missing = await client.call_tool("get_candidate", {"candidate_id": "nope"})
-        assert missing.content[0].text == "Error: Candidate with ID nope not found."  # type: ignore[index]
+        payload = json.loads(missing.content[0].text)  # type: ignore[index]
+        assert payload["error"]["message"] == "Candidate with ID nope not found."
 
 
 @pytest.mark.asyncio
@@ -95,7 +97,8 @@ async def test_accept_creates_one_outcome_and_refuses_a_second_decision():
         missing = await client.call_tool(
             "accept_candidate", {"candidate_id": "nope", "importance": 9.0, "satisfaction": 4.0}
         )
-        assert missing.content[0].text == "Error: Candidate with ID nope not found."  # type: ignore[index]
+        payload = json.loads(missing.content[0].text)  # type: ignore[index]
+        assert payload["error"]["message"] == "Candidate with ID nope not found."
 
 
 @pytest.mark.asyncio
@@ -125,12 +128,14 @@ async def test_reject_keeps_the_reason_and_merge_creates_no_outcome():
         missing_candidate = await client.call_tool(
             "merge_candidate", {"candidate_id": "nope", "merged_into": outcome_id}
         )
-        assert missing_candidate.content[0].text == "Error: Candidate with ID nope not found."  # type: ignore[index]
+        payload = json.loads(missing_candidate.content[0].text)  # type: ignore[index]
+        assert payload["error"]["message"] == "Candidate with ID nope not found."
 
         rejected = await client.call_tool(
             "reject_candidate", {"candidate_id": "nope", "reason": "Not an outcome."}
         )
-        assert rejected.content[0].text == "Error: Candidate with ID nope not found."  # type: ignore[index]
+        payload = json.loads(rejected.content[0].text)  # type: ignore[index]
+        assert payload["error"]["message"] == "Candidate with ID nope not found."
 
 
 @pytest.mark.asyncio
@@ -200,20 +205,30 @@ async def test_the_whole_spine_runs_over_mcp():
 async def test_spine_tools_name_a_missing_id_rather_than_fabricating():
     async with Client(mcp) as client:
         score = await client.call_tool("get_outcome_score", {"outcome_id": "nope"})
-        assert score.content[0].text == "Error: Outcome with ID nope not found."  # type: ignore[index]
+        payload = json.loads(score.content[0].text)  # type: ignore[index]
+        assert payload["error"]["code"] == "not_found"
+        assert payload["error"]["message"] == "Outcome with ID nope not found."
 
         brief = await client.call_tool("get_brief", {"subject_id": "nope"})
-        assert brief.content[0].text == "Error: Outcome with ID nope not found."  # type: ignore[index]
+        payload = json.loads(brief.content[0].text)  # type: ignore[index]
+        assert payload["error"]["code"] == "not_found"
+        assert payload["error"]["message"] == "Outcome with ID nope not found."
 
         decision = await client.call_tool(
             "record_decision", {"subject_id": "nope", "choice": "x", "rationale": "y"}
         )
-        assert decision.content[0].text == "Error: Outcome with ID nope not found."  # type: ignore[index]
+        payload = json.loads(decision.content[0].text)  # type: ignore[index]
+        assert payload["error"]["code"] == "not_found"
+        assert payload["error"]["message"] == "Outcome with ID nope not found."
 
         bet = await client.call_tool(
             "track_bet", {"decision_id": "nope", "statement": "s", "metric": "m"}
         )
-        assert bet.content[0].text == "Error: Decision with ID nope not found."  # type: ignore[index]
+        payload = json.loads(bet.content[0].text)  # type: ignore[index]
+        assert payload["error"]["code"] == "not_found"
+        assert payload["error"]["message"] == "Decision with ID nope not found."
 
         measurement = await client.call_tool("get_measurement", {"bet_id": "nope"})
-        assert measurement.content[0].text == "Error: Bet with ID nope not found."  # type: ignore[index]
+        payload = json.loads(measurement.content[0].text)  # type: ignore[index]
+        assert payload["error"]["code"] == "not_found"
+        assert payload["error"]["message"] == "Bet with ID nope not found."

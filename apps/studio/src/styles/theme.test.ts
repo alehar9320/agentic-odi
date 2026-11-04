@@ -86,3 +86,16 @@ describe("theme tokens", () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe("composer focus ring", () => {
+  it("follows the capsule's shape instead of floating inside it", () => {
+    expect(themeCss).toMatch(
+      /\.composer__shell:has\(\.composer__input:focus-visible\)\s*\{[^}]*outline:\s*2px solid var\(--accent\)/,
+    );
+    // Only the rectangular inline editor keeps a ring on the textarea itself.
+    expect(themeCss).not.toMatch(/^\.composer__input:focus-visible,/m);
+    expect(themeCss).toMatch(
+      /\.composer--edit \.composer__input:focus-visible\s*\{[^}]*outline-offset:\s*2px/,
+    );
+  });
+});

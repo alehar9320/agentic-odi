@@ -54,6 +54,13 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
+    # The agent vendors whose docs the assignment guide cites as sources.
+    "https://docs.openhands.dev",
+    "https://kiro.dev",
+    "https://kilo.ai",
+    "https://docs.qoder.com",
+    "https://docs.github.com",
+    "https://www.theverge.com",
     # A placeholder in the connector documentation. It is not routable, and
     # it is shown as an example of what a connector URL looks like.
     "https://mcp.internal.example",
@@ -90,6 +97,7 @@ EMOJI = re.compile("[\u2600-\u27bf\U0001f300-\U0001faff]")
 # The pages rendered verbatim from the repository's guides. Their prose is
 # the maintainers', so the site's own copy rules do not apply to them.
 MIRRORED_GUIDES = {
+    "docs/agents/index.html",
     "docs/architecture/index.html",
     "docs/cli/index.html",
     "docs/connectors/index.html",
@@ -466,6 +474,24 @@ def test_the_404_page_is_self_contained():
     assert "<img" not in html
 
 
+def test_the_sample_page_is_self_contained():
+    # The sample workspace is the landing page's primary call to action. It
+    # must render with no network, so it carries its own style and references
+    # nothing external. This is the same contract as the 404 page, asserted the
+    # same way.
+    html = read_page("sample/index.html")
+    assert 'lang="en"' in html
+    assert '<meta charset="utf-8">' in html
+    assert "width=device-width" in html
+    assert html.count("<h1") == 1
+    assert "<main" in html and "<footer" in html
+    assert "<link" not in html
+    assert "<script" not in html
+    assert "<img" not in html
+    assert not EMOJI.search(html)
+    assert not QUARTER.search(html) and not MONTH_YEAR.search(html)
+
+
 # ---------------------------------------------------------------- weight & links
 
 
@@ -494,5 +520,9 @@ def test_page_weights_are_within_budget(page: str):
     # the decision, bet and measurement entities joined the schema reference, to
     # 88 KiB when the score, brief, decision, bet and measure tools joined the
     # tool reference, and to 100 KiB when the V2MOM entity, the scheduled-work
-    # tools and the signal tools landed on the same page.
-    assert size <= 100 * 1024, f"{page}: {size} bytes"
+    # tools and the signal tools landed on the same page. It moved to 120 KiB
+    # when the Study entity with open_study/list_studies, the evidence-extraction
+    # and candidate-review tools and the demo/spine reference landed on that same
+    # page: the merge of both workstreams shares one reference page, and the
+    # ceiling moves once, to the measured union.
+    assert size <= 120 * 1024, f"{page}: {size} bytes"

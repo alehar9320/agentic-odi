@@ -141,7 +141,7 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 
 <!-- BEGIN GENERATED TOOLS (scripts/integration_guide.py) -->
 
-51 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
+61 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
 
 | Tool | Effect | Stage | Required arguments | Purpose |
 | ---- | ------ | ----- | ------------------ | ------- |
@@ -155,7 +155,7 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `get_step` | `read` | 3 | `step_id` | Fetch one step by id. |
 | `update_step` | `write` | 3 | `step_id` | Rename a step or move it in the order. |
 | `delete_step` | `destructive` | 3 | `step_id` | Delete a step. |
-| `add_outcome` | `write` | 2 | `job_id`, `statement`, `importance`, `satisfaction` | Record a desired outcome with importance and satisfaction. |
+| `add_outcome` | `write` | 2 | `job_id`, `statement` | Record a desired outcome; a score must carry its claim_check. |
 | `get_outcomes` | `read` | 2 | `job_id` | List the desired outcomes of a Job or step, one page at a time. |
 | `get_outcome` | `read` | 2 | `outcome_id` | Fetch one desired outcome by id. |
 | `update_outcome` | `write` | 2 | `outcome_id` | Edit an outcome's statement or scores. |
@@ -170,9 +170,9 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `list_evidence` | `read` | — | — | List evidence, optionally for one Job, one page at a time. |
 | `delete_evidence` | `destructive` | — | `evidence_id` | Delete an evidence record. |
 | `promote_evidence` | `write` | — | `evidence_id`, `target` | Promote a record into a Job, outcome, or customer outcome. |
-| `evaluate_outcome` | `write` | 2 | `statement` | Check a statement against the ODI format before saving it. |
+| `evaluate_outcome` | `read` | 2 | `statement` | Check a statement against the ODI format before saving it. |
 | `get_odi_schema` | `read` | — | — | Return the canonical JSON schema for every ODI entity. |
-| `compute_opportunity` | `write` | 4 | `importance`, `satisfaction` | Score an importance and satisfaction pair. |
+| `compute_opportunity` | `read` | 4 | `importance`, `satisfaction` | Score an importance and satisfaction pair. |
 | `get_odi_framework_guidelines` | `read` | — | — | Say which tool to use at each stage of ODI. |
 | `get_capabilities` | `read` | — | — | Describe what the assistant can help with. |
 | `get_capabilities_manifest` | `read` | — | — | Return the whole tool surface as machine-readable JSON. |
@@ -196,6 +196,16 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `list_scheduled_work` | `read` | — | — | List scheduled work, optionally for one Job or status. |
 | `cancel_scheduled_work` | `write` | — | `work_id` | Cancel a scheduled work item. |
 | `trigger_scheduled_work` | `write` | — | `work_id` | Dispatch a scheduled work item immediately. |
+| `segment_market` | `write` | 5 | — | Cluster the scored outcomes into outcome-based segments. |
+| `get_segments` | `read` | 5 | — | List the segments the market was divided into. |
+| `get_strategy` | `read` | 6 | — | Get the most recently recorded innovation strategy. |
+| `propose_strategy` | `write` | 6 | — | Recommend the one innovation path the segments support. |
+| `propose_outcome` | `write` | 2 | `evidence_id` | Propose a desired outcome mined from an evidence record. |
+| `list_proposals` | `read` | 2 | — | List outcome proposals, optionally filtered by status. |
+| `approve_proposal` | `write` | 2 | `proposal_id` | Approve a proposal and write it as an Outcome. |
+| `reject_proposal` | `write` | 2 | `proposal_id` | Reject a proposal; nothing is written to the ODI store. |
+| `open_study` | `write` | — | `job_id`, `name`, `wave` | Open a named study pass over a Job at a given wave number. |
+| `list_studies` | `read` | — | — | List the studies opened for a Job. |
 
 <!-- END GENERATED TOOLS -->
 

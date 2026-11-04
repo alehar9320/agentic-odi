@@ -14,8 +14,10 @@ from agentic_odi_mcp_server import (  # noqa: E402
     evidence_db,
     jobs_db,
     outcomes_db,
+    segments_db,
     signals_db,
     steps_db,
+    strategies_db,
 )
 
 
@@ -28,4 +30,6 @@ def reset_db() -> Generator[None, Any, None]:
     evidence_db.clear()
     signals_db.clear()
     candidates_db.clear()
+    segments_db.clear()
+    strategies_db.clear()
     yield

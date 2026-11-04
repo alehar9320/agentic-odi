@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
+from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     BetRecord,
     CandidateStatus,
@@ -23,12 +24,16 @@ from agentic_odi_core.models import (
     Outcome,
     OutcomeCandidate,
     ScheduledWork,
+    Segment,
     Signal,
     Step,
+    Strategy,
+    Study,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import (
     Repository,
+    compute_evidence_fingerprint,
     page,
     rank_signals,
     sort_outcomes,
@@ -59,6 +64,7 @@ class SQLiteRepository(Repository):
         db_path = resolve_db_path(db_path)
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
+        self.db_path = db_path
         self._workspace_id = workspace_id or os.environ.get(
             "AGENTIC_ODI_WORKSPACE", DEFAULT_WORKSPACE
         )
@@ -73,6 +79,7 @@ class SQLiteRepository(Repository):
         self.jobs: dict[str, Job] = {}
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
+        self.proposals: dict[str, OutcomeProposal] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
         self.candidates: dict[str, OutcomeCandidate] = {}
@@ -81,6 +88,9 @@ class SQLiteRepository(Repository):
         self.measurements: dict[str, MeasurementRecord] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
+        self.studies: dict[str, Study] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -124,9 +134,14 @@ class SQLiteRepository(Repository):
         self._backfilled = True
 
     def _sync(self) -> None:
-        for ev in self.store.get_stream(workspace_id=self._workspace_id):
-            if ev["id"] > self._last_event_id:
-                self._apply_event(ev)
+        # Only the events appended since the last apply. Reading the whole log
+        # here made every repository read O(all events): a canvas assembly over
+        # a 1,500-outcome store re-parsed 200k rows instead of 3k. ``after_id``
+        # is a covering range scan on the rowid, which is the append order.
+        for ev in self.store.get_stream(
+            workspace_id=self._workspace_id, after_id=self._last_event_id
+        ):
+            self._apply_event(ev)
 
     def _apply_event(self, ev: Event) -> None:
         et = ev["type"]
@@ -160,23 +175,31 @@ class SQLiteRepository(Repository):
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
-            for key in [k for k, v in self.steps.items() if v.job_id == job_id]:
+            deleted_steps = {k for k, v in self.steps.items() if v.job_id == job_id}
+            for key in deleted_steps:
                 del self.steps[key]
-            for key in [k for k, v in self.outcomes.items() if v.job_id == job_id]:
+            deleted_outcomes = {k for k, v in self.outcomes.items() if v.job_id == job_id}
+            for key in deleted_outcomes:
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
             for key in [k for k, v in self.candidates.items() if v.job_id == job_id]:
                 del self.candidates[key]
             self._cascade_decisions()
-            for key in [
-                k
-                for k, v in self.evidence.items()
-                if v.job_id == job_id
-                or (v.step_id is not None and v.step_id not in self.steps)
-                or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-            ]:
-                del self.evidence[key]
+            #: Do not destroy research evidence: unlink references to the removed
+            #: job, its steps and its outcomes instead of deleting the rows.
+            for key, record in list(self.evidence.items()):
+                updates: dict[str, Any] = {}
+                if record.job_id == job_id:
+                    updates["job_id"] = None
+                if record.step_id in deleted_steps:
+                    updates["step_id"] = None
+                if record.outcome_id in deleted_outcomes:
+                    updates["outcome_id"] = None
+                if updates:
+                    current = record.model_dump(exclude_unset=True)
+                    current.update(updates)
+                    self.evidence[key] = Evidence.model_validate(current)
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
@@ -187,23 +210,29 @@ class SQLiteRepository(Repository):
             for key in [k for k, v in self.candidates.items() if v.step_id == step_id]:
                 del self.candidates[key]
             self._cascade_decisions()
-            for key in [
-                k
-                for k, v in self.evidence.items()
-                if v.step_id == step_id
-                or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-            ]:
-                del self.evidence[key]
+            #: Unlink evidence instead of destroying it.
+            for key, record in list(self.evidence.items()):
+                if record.step_id == step_id:
+                    current = record.model_dump(exclude_unset=True)
+                    current["step_id"] = None
+                    self.evidence[key] = Evidence.model_validate(current)
         elif et == "OUTCOME_DELETED":
             outcome_id = p["id"]
             self.outcomes.pop(outcome_id, None)
-            for key in [k for k, v in self.evidence.items() if v.outcome_id == outcome_id]:
-                del self.evidence[key]
+            #: Unlink evidence instead of destroying it: point outcome_id to NULL
+            #: so the quote survives the outcome's removal.
+            for key, record in list(self.evidence.items()):
+                if record.outcome_id == outcome_id:
+                    current = record.model_dump(exclude_unset=True)
+                    current["outcome_id"] = None
+                    self.evidence[key] = Evidence.model_validate(current)
             for key in [k for k, v in self.candidates.items() if v.outcome_id == outcome_id]:
                 del self.candidates[key]
             self._cascade_decisions()
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
+        elif et == "EVIDENCE_UPDATED":
+            self._merge_updates(self.evidence, p, Evidence)
         elif et == "CANDIDATE_UPDATED":
             self._merge_updates(self.candidates, p, OutcomeCandidate)
         elif et == "CANDIDATE_DELETED":
@@ -235,6 +264,22 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.signals, p, Signal)
         elif et == "SIGNAL_DISMISSED":
             self._merge_updates(self.signals, p, Signal)
+        elif et == "SEGMENT_CREATED":
+            self.segments[p["id"]] = Segment.model_validate(p)
+        elif et == "SEGMENT_UPDATED":
+            self._merge_updates(self.segments, p, Segment)
+        elif et == "STRATEGY_CREATED":
+            self.strategies[p["id"]] = Strategy.model_validate(p)
+        elif et == "STRATEGY_UPDATED":
+            self._merge_updates(self.strategies, p, Strategy)
+        elif et == "PROPOSAL_CREATED":
+            self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
+        elif et == "PROPOSAL_UPDATED":
+            self._merge_updates(self.proposals, p, OutcomeProposal)
+        elif et == "STUDY_CREATED":
+            self.studies[p["id"]] = Study.model_validate(p)
+        elif et == "STUDY_UPDATED":
+            self._merge_updates(self.studies, p, Study)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     def _cascade_decisions(self) -> None:
@@ -257,12 +302,18 @@ class SQLiteRepository(Repository):
         entity = entities.get(p["id"])
         if entity is None:
             return
-        current = entity.model_dump(exclude_unset=True)
+        current = entity.model_dump(mode="json", exclude_unset=True)
         current.update(p.get("updates", {}))
         try:
             entities[p["id"]] = model.model_validate(current)
         except ValidationError:
             pass
+
+    def last_event_id(self) -> int:
+        """Rowid of the event most recently applied, 0 before any write."""
+        with self._lock:
+            self._sync()
+            return self._last_event_id
 
     def add_job(self, job: Job) -> Job:
         with self._lock:
@@ -372,6 +423,53 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return True
+
+    def list_steps(self, limit: int | None = None, offset: int = 0) -> list[Step]:
+        with self._lock:
+            self._sync()
+            return page(list(self.steps.values()), limit, offset)
+
+    def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal:
+        with self._lock:
+            self.store.append(
+                "PROPOSAL_CREATED",
+                proposal.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return proposal
+
+    def get_proposal(self, proposal_id: str) -> OutcomeProposal | None:
+        with self._lock:
+            self._sync()
+            return self.proposals.get(proposal_id)
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
+        with self._lock:
+            self._sync()
+            props = list(self.proposals.values())
+            if status is not None:
+                props = [p for p in props if p.status == status]
+            return props
+
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None:
+        with self._lock:
+            self._sync()
+            proposal = self.proposals.get(proposal_id)
+            if not proposal:
+                return None
+            current = proposal.model_dump(mode="json", exclude_unset=True)
+            current.update(updates)
+            new_proposal = OutcomeProposal.model_validate(current)
+            self.store.append(
+                "PROPOSAL_UPDATED",
+                {"id": proposal_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_proposal
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
         with self._lock:
@@ -537,6 +635,56 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return True
+
+    def get_evidence_by_fingerprint(
+        self,
+        source_kind: str,
+        source_name: str,
+        name: str,
+        content: str,
+        url: str | None,
+        raw: dict[str, Any] | None,
+    ) -> Evidence | None:
+        with self._lock:
+            self._sync()
+            fingerprint = compute_evidence_fingerprint(
+                source_kind, source_name, name, content, url, raw
+            )
+            for existing in self.evidence.values():
+                if (
+                    compute_evidence_fingerprint(
+                        existing.source_kind,
+                        existing.source_name,
+                        existing.name,
+                        existing.content,
+                        existing.url,
+                        existing.raw,
+                    )
+                    == fingerprint
+                ):
+                    return existing
+            return None
+
+    def update_evidence(self, evidence_id: str, updates: dict[str, Any]) -> Evidence | None:
+        with self._lock:
+            self._sync()
+            evidence = self.evidence.get(evidence_id)
+            if not evidence:
+                return None
+            current = evidence.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_evidence = evidence.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "EVIDENCE_UPDATED",
+                {"id": evidence_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_evidence
 
     def delete_customer_outcome(self, outcome_id: str) -> bool:
         with self._lock:
@@ -801,6 +949,141 @@ class SQLiteRepository(Repository):
                 return True
             return False
 
+    def add_segment(self, segment: Segment) -> Segment:
+        with self._lock:
+            self.store.append(
+                "SEGMENT_CREATED",
+                segment.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return segment
+
+    def get_segment(self, segment_id: str) -> Segment | None:
+        with self._lock:
+            self._sync()
+            return self.segments.get(segment_id)
+
+    def list_segments(self, job_id: str | None = None) -> list[Segment]:
+        with self._lock:
+            self._sync()
+            items = list(self.segments.values())
+            if job_id is not None:
+                items = [segment for segment in items if segment.job_id == job_id]
+            return items
+
+    def update_segment(self, segment_id: str, updates: dict[str, Any]) -> Segment | None:
+        with self._lock:
+            self._sync()
+            segment = self.segments.get(segment_id)
+            if segment is None:
+                return None
+            current = segment.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_segment = segment.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "SEGMENT_UPDATED",
+                {"id": segment_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_segment
+
+    def add_study(self, study: Study) -> Study:
+        with self._lock:
+            self.store.append(
+                "STUDY_CREATED",
+                study.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return study
+
+    def get_study(self, study_id: str) -> Study | None:
+        with self._lock:
+            self._sync()
+            return self.studies.get(study_id)
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        with self._lock:
+            self._sync()
+            items = list(self.studies.values())
+            if job_id is not None:
+                items = [study for study in items if study.job_id == job_id]
+            return items
+
+    def update_study(self, study_id: str, updates: dict[str, Any]) -> Study | None:
+        with self._lock:
+            self._sync()
+            study = self.studies.get(study_id)
+            if study is None:
+                return None
+            current = study.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_study = study.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "STUDY_UPDATED",
+                {"id": study_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_study
+
+    def add_strategy(self, strategy: Strategy) -> Strategy:
+        with self._lock:
+            self.store.append(
+                "STRATEGY_CREATED",
+                strategy.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return strategy
+
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
+        with self._lock:
+            self._sync()
+            return self.strategies.get(strategy_id)
+
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
+        with self._lock:
+            self._sync()
+            items = list(self.strategies.values())
+            if segment_id is not None:
+                items = [strategy for strategy in items if strategy.segment_id == segment_id]
+            return items
+
+    def update_strategy(self, strategy_id: str, updates: dict[str, Any]) -> Strategy | None:
+        with self._lock:
+            self._sync()
+            strategy = self.strategies.get(strategy_id)
+            if strategy is None:
+                return None
+            current = strategy.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_strategy = strategy.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "STRATEGY_UPDATED",
+                {"id": strategy_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_strategy
+
     def clear(self) -> None:
         with self._lock:
             self.store.clear()
@@ -814,6 +1097,16 @@ class SQLiteRepository(Repository):
         """Flush any open transaction in the event store to disk."""
         with self._lock:
             self.store.commit()
+
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """Fold the write-ahead log back into the database file."""
+        with self._lock:
+            self.store.checkpoint(mode)
+
+    @property
+    def integrity(self) -> str:
+        """The boot check result: ``ok`` or ``deferred``."""
+        return self.store.integrity.status
 
     def close(self) -> None:
         """Close the event store and let SQLite clean up its journal files."""

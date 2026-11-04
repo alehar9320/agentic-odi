@@ -1,9 +1,17 @@
 import { useMemo, type ReactNode } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
+import { buildRecords } from "../../lib/records";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
-import { CompassIcon, RouteIcon, SignalIcon, SparkIcon } from "../icons";
+import {
+  ClusterIcon,
+  CompassIcon,
+  RouteIcon,
+  SignalIcon,
+  SparkIcon,
+  TableIcon,
+} from "../icons";
 
 interface RailItem {
   id: WorkspacePanelId;
@@ -22,14 +30,24 @@ interface RailItem {
  * people who prefer it; the conversation stays exactly where it was.
  */
 export function WorkbenchRail() {
-  const { canvas, memory, activePanel, openPanel, closePanel } = useStudio();
+  const { canvas, memory, segments, activePanel, openPanel, closePanel } = useStudio();
 
   const items = useMemo<RailItem[]>(() => {
     const outcomes = canvas?.outcomes ?? [];
     const steps = canvas?.steps ?? [];
     const evidence = outcomes.filter((outcome) => outcome.evidence?.trim()).length;
+    const records = buildRecords(canvas);
 
     const rail: RailItem[] = [];
+    if (records.length > 0) {
+      rail.push({
+        id: "records",
+        label: "Records",
+        count: records.length,
+        noun: records.length === 1 ? "record" : "records",
+        icon: <TableIcon size={14} />,
+      });
+    }
     if (outcomes.length > 0) {
       rail.push({
         id: "landscape",
@@ -46,6 +64,15 @@ export function WorkbenchRail() {
         count: steps.length,
         noun: steps.length === 1 ? "step" : "steps",
         icon: <RouteIcon size={14} />,
+      });
+    }
+    if (segments.length > 0) {
+      rail.push({
+        id: "segments",
+        label: "Segments",
+        count: segments.length,
+        noun: segments.length === 1 ? "segment" : "segments",
+        icon: <ClusterIcon size={14} />,
       });
     }
     if (evidence > 0) {
@@ -67,7 +94,7 @@ export function WorkbenchRail() {
       });
     }
     return rail;
-  }, [canvas, memory]);
+  }, [canvas, memory, segments]);
 
   const status = canvasStatus(canvas);
 

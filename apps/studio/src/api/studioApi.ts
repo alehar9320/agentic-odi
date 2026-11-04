@@ -12,6 +12,7 @@ import type {
   ConnectorOperationResponse,
   ConnectorPreset,
   Conversation,
+  ConversationSummary,
   ConversationTree,
   CreateJobPayload,
   Job,
@@ -24,10 +25,13 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
+  Segment,
   Signal,
   Step,
+  Strategy,
   StudioConfig,
   StudioError,
+  Study,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -65,6 +69,9 @@ export function isTransportFailure(error: unknown): boolean {
   return false;
 }
 
+/** How long the boot config request may hang before boot stops waiting on it. */
+const CONFIG_TIMEOUT_MS = 1_200;
+
 /** Map an HTTP status the sidecar/worker returned (with no body) to a code. */
 function codeForStatus(status: number): string {
   if (status === 404) return "not_found";
@@ -78,7 +85,7 @@ function codeForStatus(status: number): string {
 }
 
 const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
-  mcp_unreachable: "The studio sidecar isn't reachable.",
+  mcp_unreachable: "The local Studio service isn't responding.",
   not_found: "That resource wasn't found.",
   validation: "The request was invalid.",
   conflict: "That conflicts with the current state.",
@@ -88,7 +95,7 @@ const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
 
 const SUGGESTION_FOR_CODE: Partial<Record<string, string>> = {
   mcp_unreachable:
-    "Start the studio sidecar with `python scripts/dev.py` (or `npm --prefix apps/studio run dev:full`), then click Recheck.",
+    "Start it with  uv run python scripts/dev.py  and try again.",
   not_found: "Check the identifier and try again.",
   validation: "Fix the input and try again.",
   conflict: "Reload and try again.",
@@ -127,7 +134,7 @@ export function asStudioError(error: unknown): StudioError {
   if (error instanceof TypeError || (error instanceof Error && /fetch failed|network error/i.test(error.message))) {
     return {
       code: "mcp_unreachable",
-      message: MESSAGE_FOR_CODE.mcp_unreachable ?? "The studio sidecar isn't reachable.",
+      message: MESSAGE_FOR_CODE.mcp_unreachable ?? "The local Studio service isn't responding.",
       suggestion: SUGGESTION_FOR_CODE.mcp_unreachable,
       retryable: RETRYABLE_FOR_CODE.mcp_unreachable ?? true,
     };
@@ -182,8 +189,11 @@ async function studioError(response: Response): Promise<StudioApiError> {
   return new StudioApiError(described, response.status, false);
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(apiUrl(path), { headers: { Accept: "application/json" } });
+async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    headers: { Accept: "application/json" },
+    ...(signal ? { signal } : {}),
+  });
   if (!response.ok) {
     const error = await studioError(response);
     recordStudioError(error.error, path);
@@ -241,8 +251,17 @@ async function withLocal<T>(
 }
 
 export async function fetchConfig(): Promise<StudioConfig> {
-  const body = await getJson<{ defaults: StudioConfig }>("/api/config");
-  return body.defaults;
+  // Configuration is a convenience, not a gate: a proxy that accepts the
+  // connection and never answers must not hold the first screen. Bound it and
+  // let the caller fall back to the defaults it already has.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CONFIG_TIMEOUT_MS);
+  try {
+    const body = await getJson<{ defaults: StudioConfig }>("/api/config", controller.signal);
+    return body.defaults;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface SidecarDiagnostics {
@@ -535,6 +554,36 @@ export async function dismissSignal(signalId: string, mcpUrl: string): Promise<S
   });
 }
 
+export async function fetchSegments(mcpUrl: string, jobId?: string): Promise<Segment[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Segment[]>(`/api/segments?${params.toString()}`);
+}
+
+/** The opened studies, or an empty list before any study has been opened. */
+export async function fetchStudies(mcpUrl: string, jobId?: string): Promise<Study[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Study[]>(`/api/studies?${params.toString()}`);
+}
+
+/** The recorded Stage 6 path, or null when no strategy has been proposed yet. */
+export async function fetchStrategy(mcpUrl: string): Promise<Strategy | null> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  return getJson<Strategy | null>(`/api/strategy?${params.toString()}`);
+}
+
+export async function proposeStrategy(mcpUrl: string, jobId?: string): Promise<Strategy> {
+  return sendJson<Strategy>("POST", "/api/strategy/propose", {
+    mcp_url: mcpUrl,
+    job_id: jobId ?? null,
+  });
+}
+
 
 export async function fetchMemory(): Promise<Observation[]> {
   return withLocal(
@@ -600,6 +649,17 @@ export function clearMemory(): Promise<{ ok: boolean }> {
   return withLocal(
     () => deleteJson<{ ok: boolean }>("/api/memory"),
     async (bff) => bff.memory.clearMemory(),
+  );
+}
+
+/** Every thread the PM can reopen, most recently touched first. */
+export async function listConversations(): Promise<ConversationSummary[]> {
+  return withLocal(
+    () =>
+      getJson<{ conversations: ConversationSummary[] }>("/api/conversations").then(
+        (body) => body.conversations,
+      ),
+    (bff) => bff.memory.listConversations(),
   );
 }
 

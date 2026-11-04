@@ -132,13 +132,26 @@ async def test_live_registry_snapshot() -> None:
             "add_outcome": {
                 "additionalProperties": False,
                 "properties": {
-                    "importance": {"type": "number"},
+                    "claim_check": {
+                        "anyOf": [
+                            {"additionalProperties": True, "type": "object"},
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                    },
+                    "importance": {
+                        "anyOf": [{"type": "null"}, {"type": "number"}],
+                        "default": None,
+                    },
                     "job_id": {"type": "string"},
-                    "satisfaction": {"type": "number"},
+                    "satisfaction": {
+                        "anyOf": [{"type": "null"}, {"type": "number"}],
+                        "default": None,
+                    },
                     "statement": {"type": "string"},
                     "step_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
                 },
-                "required": ["importance", "job_id", "satisfaction", "statement"],
+                "required": ["job_id", "statement"],
                 "type": "object",
             },
             "add_step": {
@@ -170,6 +183,23 @@ async def test_live_registry_snapshot() -> None:
                     },
                 },
                 "required": ["job_id", "name", "order"],
+                "type": "object",
+            },
+            "approve_proposal": {
+                "additionalProperties": False,
+                "properties": {
+                    "importance": {
+                        "anyOf": [{"type": "null"}, {"type": "number"}],
+                        "default": None,
+                    },
+                    "proposal_id": {"type": "string"},
+                    "satisfaction": {
+                        "anyOf": [{"type": "null"}, {"type": "number"}],
+                        "default": None,
+                    },
+                    "statement": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                },
+                "required": ["proposal_id"],
                 "type": "object",
             },
             "cancel_scheduled_work": {
@@ -344,12 +374,20 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["work_id"],
                 "type": "object",
             },
+            "get_segments": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None}
+                },
+                "type": "object",
+            },
             "get_step": {
                 "additionalProperties": False,
                 "properties": {"step_id": {"type": "string"}},
                 "required": ["step_id"],
                 "type": "object",
             },
+            "get_strategy": {"additionalProperties": False, "properties": {}, "type": "object"},
             "list_candidates": {
                 "additionalProperties": False,
                 "properties": {
@@ -384,6 +422,13 @@ async def test_live_registry_snapshot() -> None:
                 },
                 "type": "object",
             },
+            "list_proposals": {
+                "additionalProperties": False,
+                "properties": {
+                    "status": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None}
+                },
+                "type": "object",
+            },
             "list_scheduled_work": {
                 "additionalProperties": False,
                 "properties": {
@@ -400,6 +445,13 @@ async def test_live_registry_snapshot() -> None:
                 },
                 "type": "object",
             },
+            "list_studies": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None}
+                },
+                "type": "object",
+            },
             "mark_signal_read": {
                 "additionalProperties": False,
                 "properties": {"signal_id": {"type": "string"}},
@@ -413,6 +465,20 @@ async def test_live_registry_snapshot() -> None:
                     "merged_into": {"type": "string"},
                 },
                 "required": ["candidate_id", "merged_into"],
+                "type": "object",
+            },
+            "open_study": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"type": "string"},
+                    "method_notes": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                    "name": {"type": "string"},
+                    "wave": {"type": "integer"},
+                },
+                "required": ["job_id", "name", "wave"],
                 "type": "object",
             },
             "promote_evidence": {
@@ -435,6 +501,19 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["evidence_id", "target"],
                 "type": "object",
             },
+            "propose_outcome": {
+                "additionalProperties": False,
+                "properties": {"evidence_id": {"type": "string"}},
+                "required": ["evidence_id"],
+                "type": "object",
+            },
+            "propose_strategy": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None}
+                },
+                "type": "object",
+            },
             "record_decision": {
                 "additionalProperties": False,
                 "properties": {
@@ -449,6 +528,12 @@ async def test_live_registry_snapshot() -> None:
                 "additionalProperties": False,
                 "properties": {"candidate_id": {"type": "string"}, "reason": {"type": "string"}},
                 "required": ["candidate_id", "reason"],
+                "type": "object",
+            },
+            "reject_proposal": {
+                "additionalProperties": False,
+                "properties": {"proposal_id": {"type": "string"}},
+                "required": ["proposal_id"],
                 "type": "object",
             },
             "schedule_work": {
@@ -468,6 +553,14 @@ async def test_live_registry_snapshot() -> None:
                     "trigger_type": {"default": "oneshot", "type": "string"},
                 },
                 "required": ["name", "schedule_expression"],
+                "type": "object",
+            },
+            "segment_market": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "people": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                },
                 "type": "object",
             },
             "track_bet": {
@@ -645,12 +738,19 @@ def test_declared_tool_surface_snapshot() -> None:
                 "summary": "Create a new Job-to-be-Done.",
             },
             "add_outcome": {
-                "arguments": ["importance", "job_id", "satisfaction", "statement", "step_id"],
+                "arguments": [
+                    "claim_check",
+                    "importance",
+                    "job_id",
+                    "satisfaction",
+                    "statement",
+                    "step_id",
+                ],
                 "effect": "write",
-                "required": ["importance", "job_id", "satisfaction", "statement"],
+                "required": ["job_id", "statement"],
                 "returns": "The created Outcome.",
                 "stage": "2",
-                "summary": "Add a desired Outcome to a Job.",
+                "summary": "Add a desired Outcome to a Job; three questions and the person's answers come before any score, and the score carries them as a claim_check.",
             },
             "add_step": {
                 "arguments": ["allow_empty_job_map", "job_id", "name", "order", "stage"],
@@ -659,6 +759,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The created Step.",
                 "stage": "3",
                 "summary": "Add a step to a Job's job map.",
+            },
+            "approve_proposal": {
+                "arguments": ["importance", "proposal_id", "satisfaction", "statement"],
+                "effect": "write",
+                "required": ["proposal_id"],
+                "returns": "The created Outcome.",
+                "stage": "2",
+                "summary": "Approve a proposal and write it as an Outcome.",
             },
             "cancel_scheduled_work": {
                 "arguments": ["work_id"],
@@ -670,7 +778,7 @@ def test_declared_tool_surface_snapshot() -> None:
             },
             "compute_opportunity": {
                 "arguments": ["importance", "satisfaction"],
-                "effect": "write",
+                "effect": "read",
                 "required": ["importance", "satisfaction"],
                 "returns": "The opportunity score as a float.",
                 "stage": "4",
@@ -726,7 +834,7 @@ def test_declared_tool_surface_snapshot() -> None:
             },
             "evaluate_outcome": {
                 "arguments": ["job_id", "statement"],
-                "effect": "write",
+                "effect": "read",
                 "required": ["statement"],
                 "returns": "A verdict with coded issues and suggestions.",
                 "stage": "2",
@@ -876,6 +984,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": None,
                 "summary": "Get a scheduled work item by ID.",
             },
+            "get_segments": {
+                "arguments": ["job_id"],
+                "effect": "read",
+                "required": [],
+                "returns": "A list of Segments. Empty until segment_market has run.",
+                "stage": "5",
+                "summary": "List the segments the market was divided into.",
+            },
             "get_step": {
                 "arguments": ["step_id"],
                 "effect": "read",
@@ -883,6 +999,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The Step, or an error string if not found.",
                 "stage": "3",
                 "summary": "Get a single Step by ID.",
+            },
+            "get_strategy": {
+                "arguments": [],
+                "effect": "read",
+                "required": [],
+                "returns": "The Strategy with its rejected alternatives, or null if none was recorded.",
+                "stage": "6",
+                "summary": "Get the most recently recorded innovation strategy.",
             },
             "list_candidates": {
                 "arguments": ["job_id", "limit", "offset", "quote_id", "status"],
@@ -908,6 +1032,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": None,
                 "summary": "List evidence records, optionally filtered by job/step/outcome.",
             },
+            "list_proposals": {
+                "arguments": ["status"],
+                "effect": "read",
+                "required": [],
+                "returns": "A list of OutcomeProposals.",
+                "stage": "2",
+                "summary": "List outcome proposals, optionally filtered by status.",
+            },
             "list_scheduled_work": {
                 "arguments": ["job_id", "status"],
                 "effect": "read",
@@ -923,6 +1055,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "A list of Signals, newest first.",
                 "stage": None,
                 "summary": "List signals the store recorded — real changes worth attention.",
+            },
+            "list_studies": {
+                "arguments": ["job_id"],
+                "effect": "read",
+                "required": [],
+                "returns": "A list of Studies. Empty until a study has been opened.",
+                "stage": None,
+                "summary": "List the studies opened for a Job.",
             },
             "mark_signal_read": {
                 "arguments": ["signal_id"],
@@ -940,6 +1080,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": "2",
                 "summary": "Fold a proposed outcome into an existing Outcome; creates none.",
             },
+            "open_study": {
+                "arguments": ["job_id", "method_notes", "name", "wave"],
+                "effect": "write",
+                "required": ["job_id", "name", "wave"],
+                "returns": "The created Study, opened as planned.",
+                "stage": None,
+                "summary": "Open a named study pass over a Job at a given wave number.",
+            },
             "promote_evidence": {
                 "arguments": [
                     "evidence_id",
@@ -955,6 +1103,22 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The created Job or Outcome.",
                 "stage": None,
                 "summary": "Promote evidence to a Job or an Outcome.",
+            },
+            "propose_outcome": {
+                "arguments": ["evidence_id"],
+                "effect": "write",
+                "required": ["evidence_id"],
+                "returns": "An OutcomeProposal ready for human approval.",
+                "stage": "2",
+                "summary": "Propose a desired outcome mined from an evidence record.",
+            },
+            "propose_strategy": {
+                "arguments": ["job_id"],
+                "effect": "write",
+                "required": [],
+                "returns": "The Strategy, including every path it beat and why.",
+                "stage": "6",
+                "summary": "Recommend the one innovation path the segments support.",
             },
             "record_decision": {
                 "arguments": ["choice", "rationale", "subject_id"],
@@ -972,6 +1136,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": "2",
                 "summary": "Reject a proposed outcome; a non-empty reason is required and kept.",
             },
+            "reject_proposal": {
+                "arguments": ["proposal_id"],
+                "effect": "write",
+                "required": ["proposal_id"],
+                "returns": "The rejected OutcomeProposal.",
+                "stage": "2",
+                "summary": "Reject a proposal; nothing is written to the ODI store.",
+            },
             "schedule_work": {
                 "arguments": [
                     "agent_id",
@@ -986,6 +1158,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The created scheduled work item.",
                 "stage": None,
                 "summary": "Schedule agent work with a cron or one-shot expression.",
+            },
+            "segment_market": {
+                "arguments": ["job_id", "people"],
+                "effect": "write",
+                "required": [],
+                "returns": "The segments the outcomes clustered into, with verdict and confidence.",
+                "stage": "5",
+                "summary": "Cluster the scored outcomes into outcome-based segments.",
             },
             "track_bet": {
                 "arguments": ["decision_id", "metric", "statement"],
@@ -1262,6 +1442,12 @@ unknown baseline, not a measured zero.\
                         "title": "Job Id",
                         "type": "string",
                     },
+                    "quote_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The Evidence record this outcome was promoted from",
+                        "title": "Quote Id",
+                    },
                     "step_id": {
                         "anyOf": [{"type": "null"}, {"type": "string"}],
                         "default": None,
@@ -1520,7 +1706,73 @@ representable without inventing a number.\
                 "type": "object",
             },
             "Outcome": {
+                "$defs": {
+                    "ClaimCheck": {
+                        "description": """\
+The questions behind a score: what was asked, answered, or skipped.
+
+Two numbers are not provenance. A score that carries a claim check says
+which questions produced it — ``asked`` — and what came back: the
+``answers`` the person gave and the ``skips`` with a recorded reason.
+
+``verified`` is derived, never typed in: a check is verified when at least
+one question was answered by the person. A check of only skips is
+unverified, so an outcome built on an assumption says so instead of
+borrowing the confidence of a number.\
+""",
+                        "properties": {
+                            "answers": {
+                                "description": "The answers the person gave, in order",
+                                "items": {"type": "string"},
+                                "title": "Answers",
+                                "type": "array",
+                            },
+                            "asked": {
+                                "description": "The questions put to the person",
+                                "items": {"type": "string"},
+                                "title": "Asked",
+                                "type": "array",
+                            },
+                            "skips": {
+                                "description": "Questions skipped, each with a reason",
+                                "items": {"$ref": "#/$defs/ClaimSkip"},
+                                "title": "Skips",
+                                "type": "array",
+                            },
+                        },
+                        "title": "ClaimCheck",
+                        "type": "object",
+                    },
+                    "ClaimSkip": {
+                        "description": """\
+One question that went unanswered, and why it was skipped.
+
+A skip without a reason is not a skip, it is a missing answer, so
+``reason`` is required and must not be blank.\
+""",
+                        "properties": {
+                            "question": {
+                                "description": "The question that was not answered",
+                                "title": "Question",
+                                "type": "string",
+                            },
+                            "reason": {
+                                "description": "Why it was skipped; never blank",
+                                "title": "Reason",
+                                "type": "string",
+                            },
+                        },
+                        "required": ["question", "reason"],
+                        "title": "ClaimSkip",
+                        "type": "object",
+                    },
+                },
                 "properties": {
+                    "claim_check": {
+                        "anyOf": [{"$ref": "#/$defs/ClaimCheck"}, {"type": "null"}],
+                        "default": None,
+                        "description": "The questions that produced the score, and what came back",
+                    },
                     "id": {"title": "Id", "type": "string"},
                     "importance": {
                         "anyOf": [
@@ -1568,6 +1820,12 @@ representable without inventing a number.\
                         "default": None,
                         "description": "The ID of the specific Step, if applicable",
                         "title": "Step Id",
+                    },
+                    "study_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The Study wave this outcome was measured in, or None for a row that predates studies",
+                        "title": "Study Id",
                     },
                 },
                 "required": ["job_id", "statement"],
@@ -1760,6 +2018,81 @@ rather than owning it.\
                 "title": "ScheduledWork",
                 "type": "object",
             },
+            "Segment": {
+                "$defs": {
+                    "SegmentVerdict": {
+                        "description": "Stage 5's verdict on a group of people, computed from their outcomes.",
+                        "enum": ["appropriately_served", "overserved", "underserved"],
+                        "title": "SegmentVerdict",
+                        "type": "string",
+                    }
+                },
+                "description": """\
+A group of people plus the functional job they are trying to do.
+
+The unit of analysis is the outcome: ``outcome_ids`` is the evidence, and
+``verdict`` is derived from it, never typed in. ``verdict`` is ``None`` when
+an outcome in the group has no score, because a segment cannot be classified
+from partial evidence. No demographic attribute appears here by design.\
+""",
+                "properties": {
+                    "confidence": {
+                        "description": "How much evidence supports this",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Confidence",
+                        "type": "number",
+                    },
+                    "created_at": {"format": "date-time", "title": "Created At", "type": "string"},
+                    "id": {"title": "Id", "type": "string"},
+                    "job_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The Job this segment is scoped to",
+                        "title": "Job Id",
+                    },
+                    "job_statement": {
+                        "description": "The functional job in their words",
+                        "title": "Job Statement",
+                        "type": "string",
+                    },
+                    "name": {
+                        "description": 'Human label, e.g. "Platform engineers, secrets rotation"',
+                        "title": "Name",
+                        "type": "string",
+                    },
+                    "outcome_ids": {
+                        "description": "The evidence for this segment",
+                        "items": {"type": "string"},
+                        "title": "Outcome Ids",
+                        "type": "array",
+                    },
+                    "people": {
+                        "description": "The group, in the person's words when they are recorded",
+                        "title": "People",
+                        "type": "string",
+                    },
+                    "people_inferred": {
+                        "default": False,
+                        "description": "True when `people` was derived from the outcomes, not supplied",
+                        "title": "People Inferred",
+                        "type": "boolean",
+                    },
+                    "rationale": {
+                        "description": "Why this verdict, naming the outcomes behind it",
+                        "title": "Rationale",
+                        "type": "string",
+                    },
+                    "verdict": {
+                        "anyOf": [{"$ref": "#/$defs/SegmentVerdict"}, {"type": "null"}],
+                        "default": None,
+                        "description": "Derived from the outcomes; None means not enough signal",
+                    },
+                },
+                "required": ["confidence", "job_statement", "name", "people", "rationale"],
+                "title": "Segment",
+                "type": "object",
+            },
             "Step": {
                 "$defs": {
                     "JobStage": {
@@ -1819,6 +2152,113 @@ rather than owning it.\
                 },
                 "required": ["job_id", "name", "order"],
                 "title": "Step",
+                "type": "object",
+            },
+            "Strategy": {
+                "$defs": {
+                    "StrategyKind": {
+                        "description": "Stage 6's three strategic paths.",
+                        "enum": ["differentiated", "disruptive", "new_market"],
+                        "title": "StrategyKind",
+                        "type": "string",
+                    }
+                },
+                "description": """\
+One recommended innovation path, with the paths it beat recorded.
+
+A strategy without its rejections is a conclusion, not a recommendation, so
+``rejected`` carries one entry for every kind that was not chosen.\
+""",
+                "properties": {
+                    "bets": {
+                        "description": "The proposed moves",
+                        "items": {"type": "string"},
+                        "title": "Bets",
+                        "type": "array",
+                    },
+                    "created_at": {"format": "date-time", "title": "Created At", "type": "string"},
+                    "id": {"title": "Id", "type": "string"},
+                    "kind": {"$ref": "#/$defs/StrategyKind"},
+                    "rejected": {
+                        "description": '[{"kind": "disruptive", "why": "..."}]',
+                        "items": {"additionalProperties": True, "type": "object"},
+                        "title": "Rejected",
+                        "type": "array",
+                    },
+                    "segment_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The segment this bet is aimed at",
+                        "title": "Segment Id",
+                    },
+                    "thesis": {
+                        "description": "One paragraph: why this path, from the evidence",
+                        "title": "Thesis",
+                        "type": "string",
+                    },
+                },
+                "required": ["kind", "thesis"],
+                "title": "Strategy",
+                "type": "object",
+            },
+            "Study": {
+                "$defs": {
+                    "StudyStatus": {
+                        "description": "Where a study is in its own life: opened, collecting, or closed.",
+                        "enum": ["closed", "fielding", "planned"],
+                        "title": "StudyStatus",
+                        "type": "string",
+                    }
+                },
+                "description": """\
+One named pass over a Job, and the wave number of that pass.
+
+A study is a container, not a measurement: it names a slice of research so a
+later wave can be compared with an earlier one. ``wave`` is unique per
+``(job_id, name)`` within the store — that guarantee needs to see the other
+rows, so it lives in the service, while the model owns the invariants it can
+check alone: a wave is a positive pass number, and ``closed_at`` appears if
+and only if the study is closed.\
+""",
+                "properties": {
+                    "closed_at": {
+                        "anyOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
+                        "default": None,
+                        "description": "Set once, when the study closes",
+                        "title": "Closed At",
+                    },
+                    "id": {"title": "Id", "type": "string"},
+                    "job_id": {
+                        "description": "The Job this study takes one pass over",
+                        "title": "Job Id",
+                        "type": "string",
+                    },
+                    "method_notes": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "How this pass was run, so a later wave is comparable",
+                        "title": "Method Notes",
+                    },
+                    "name": {
+                        "description": "Human label for the study, e.g. 'reconciliation sweep'",
+                        "title": "Name",
+                        "type": "string",
+                    },
+                    "opened_at": {"format": "date-time", "title": "Opened At", "type": "string"},
+                    "status": {
+                        "$ref": "#/$defs/StudyStatus",
+                        "default": "planned",
+                        "description": "Where the study is in its life",
+                    },
+                    "wave": {
+                        "description": "1-based pass number within (job_id, name)",
+                        "minimum": 1,
+                        "title": "Wave",
+                        "type": "integer",
+                    },
+                },
+                "required": ["job_id", "name", "wave"],
+                "title": "Study",
                 "type": "object",
             },
             "V2MOM": {

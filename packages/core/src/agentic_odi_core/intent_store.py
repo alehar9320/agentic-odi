@@ -8,13 +8,14 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from agentic_odi_core.errors import ConflictError, StoreError
+from agentic_odi_core.errors import ConflictError, StoreCorrupt, StoreError
 from agentic_odi_core.events import (
     DEFAULT_DEVICE,
     DEFAULT_WORKSPACE,
     Event,
     new_event_id,
 )
+from agentic_odi_core.integrity import IntegrityResult, ensure_intact
 
 _COLUMNS = {
     "event_id": "TEXT",
@@ -39,14 +40,24 @@ _UPGRADE_COMMAND = "odi update"
 class IntentStore:
     """SQLite implementation of the append-only event contract."""
 
-    def __init__(self, db_path: str = "intent_store.db", check_same_thread: bool = True) -> None:
+    def __init__(
+        self,
+        db_path: str = "intent_store.db",
+        check_same_thread: bool = True,
+        *,
+        label: str = "Your database",
+    ) -> None:
         self._db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
         self._closed = False
         try:
-            # Read the stamped version before any write. Switching to WAL or
-            # creating a table would rewrite the file header, and a future-version
-            # refusal must leave the file byte-for-byte unchanged.
+            # Gate the boot before anything else touches the file. A pragma or a
+            # migration on a damaged file raises a bare DatabaseError; the gate
+            # turns that into an actionable StoreCorrupt that names the file.
+            self.integrity: IntegrityResult = ensure_intact(self.conn, db_path, label=label)
+            # Read the stamped version before any write. Switching to WAL would
+            # rewrite the file header, and a future-version refusal must leave the
+            # file byte-for-byte unchanged.
             self.conn.execute("PRAGMA busy_timeout=5000;")
             self._refuse_future_version(self._read_version())
             # WAL lets readers and one writer work at once; the busy timeout makes
@@ -54,10 +65,14 @@ class IntentStore:
             # can all hold a connection to the same file) instead of raising
             # "database is locked" the moment the lock is taken.
             self.conn.execute("PRAGMA journal_mode=WAL;")
+            self.conn.execute("PRAGMA journal_mode=WAL;")
             self._init_db()
         except sqlite3.OperationalError as exc:
             self._close_quietly()
             raise StoreError(self._unwritable_message(exc)) from exc
+        except sqlite3.DatabaseError as exc:
+            self._close_quietly()
+            raise StoreCorrupt(db_path, [str(exc)], label=label) from exc
         except BaseException:
             self._close_quietly()
             raise
@@ -278,6 +293,7 @@ class IntentStore:
         *,
         workspace_id: str | None = None,
         after_server_seq: int = 0,
+        after_id: int = 0,
         unsynced_only: bool = False,
         replay_order: bool = False,
     ) -> list[Event]:
@@ -286,6 +302,11 @@ class IntentStore:
         if workspace_id is not None:
             clauses.append("workspace_id = ?")
             params.append(workspace_id)
+        if after_id:
+            # The rowid is the append order, so this is a covering range scan
+            # from the last event already applied rather than a full replay.
+            clauses.append("id > ?")
+            params.append(after_id)
         if after_server_seq:
             clauses.append("server_seq IS NOT NULL AND server_seq > ?")
             params.append(after_server_seq)
@@ -426,6 +447,9 @@ class IntentStore:
             else:
                 self.conn.execute("DELETE FROM events WHERE workspace_id = ?", (workspace_id,))
                 self.conn.execute("DELETE FROM sync_state WHERE workspace_id = ?", (workspace_id,))
+        # A bulk delete leaves a large log behind; fold it back now rather than
+        # waiting for the next auto-checkpoint.
+        self.checkpoint("PASSIVE")
 
     def commit(self) -> None:
         """Flush any open transaction to disk.
@@ -436,10 +460,30 @@ class IntentStore:
         """
         self.conn.commit()
 
-    def close(self) -> None:
-        """Close the connection. Safe to call more than once."""
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """Fold the write-ahead log back into the database file.
+
+        ``TRUNCATE`` empties the log after a checkpoint, so a clean shutdown
+        leaves no ``-wal`` for a later process to recover. ``PASSIVE`` is for
+        the idle case: it does what it can without waiting on readers. Both are
+        bounded by the connection's ``busy_timeout`` so a contended checkpoint
+        cannot hang the caller. Safe to call after close and on a memory store.
+        """
         if self._closed:
             return
+        try:
+            self.conn.execute(f"PRAGMA wal_checkpoint({mode})").fetchall()
+        except sqlite3.Error:
+            # A checkpoint is best-effort durability, not a write. A store that
+            # cannot checkpoint (in-memory, or a reader holding the log) still
+            # closes cleanly; the next open will recover the log.
+            pass
+
+    def close(self) -> None:
+        """Checkpoint the log, then close the connection. Safe to call twice."""
+        if self._closed:
+            return
+        self.checkpoint("TRUNCATE")
         self._closed = True
         self.conn.commit()
         self.conn.close()
