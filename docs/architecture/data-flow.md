@@ -286,6 +286,12 @@ MCP tool result (text)
   produces a readable message. Write routes no longer wrap their result in
   `{"ok": true, "result": ...}`: a success is the object, a delete is
   `{"deleted": id}`.
+- **The same envelope over MCP.** A failing tool returns
+  `{"error": StudioError, "message": "Error: …"}` as its text: the code,
+  retryability, detail, suggestion, and request id travel as data, and the
+  sentence stays for a client that only reads prose. `parse_tool_result` tries
+  that JSON first and falls back to the prose forms, so a server predating the
+  envelope is still understood.
 - **One terminal chat event.** Every `/api/chat` stream ends with exactly one
   `message` or one `error`. A recoverable tool error stays a tool result the
   model can read, but it is reported as `status: "error"` and counted. A fatal
