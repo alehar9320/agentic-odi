@@ -85,6 +85,12 @@ per-platform archives with SHA-256 checksums for a manual download. See
   the record behind it, or says it is a hypothesis. The bar's history list keeps
   the last twenty threads one click away, each named by its first question and
   marked when it is the one on screen.
+- **A document when the conversation needs one.** `/brief` writes the decision
+  brief from the canvas — the ranked bets, the records behind each, what argues
+  against them, and the next evidence to collect — as Markdown a review can read
+  with or without the Studio. Provenance travels with it: demo rows are excluded
+  from every count and labelled, and every number counts records instead of
+  generating prose.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **Evidence becomes outcomes.** An ingested record is mined into a scored,

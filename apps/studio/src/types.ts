@@ -331,6 +331,7 @@ export interface StudioBrief {
 export type WorkspacePanelId =
   | "records"
   | "landscape"
+  | "brief"
   | "jobmap"
   | "segments"
   | "evidence"

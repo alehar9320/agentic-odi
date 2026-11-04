@@ -255,4 +255,20 @@ describe("ChatStage", () => {
 
     expect(harness.state.openPanel).toHaveBeenCalledWith("records");
   });
+
+  it("docks the decision brief when the palette runs /brief", () => {
+    harness.state.openPanel.mockClear();
+
+    render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "/brief" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(harness.state.openPanel).toHaveBeenCalledWith("brief");
+  });
 });
