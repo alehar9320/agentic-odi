@@ -82,7 +82,9 @@ per-platform archives with SHA-256 checksums for a manual download. See
   in-place guidance appears only after the first exchange. It turns "a customer
   still reconciles invoices by hand" into a scored outcome, a job map, and a
   ranked opportunity board — inline in the thread. Every claim in a reply names
-  the record behind it, or says it is a hypothesis.
+  the record behind it, or says it is a hypothesis. The bar's history list keeps
+  the last twenty threads one click away, each named by its first question and
+  marked when it is the one on screen.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **Evidence becomes outcomes.** An ingested record is mined into a scored,
@@ -154,6 +156,7 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 ```bash
 odi jobs list
 odi desired-outcomes list --job-id <id>
+odi studies open --job <id> --name "Invoice sweep" --wave 1   # one pass; re-running is a new wave
 odi segments run --job <id>          # Stage 5: who the scored outcomes point at
 odi strategy propose                 # Stage 6: the bet, and the paths it beat
 odi signals unread                    # what changed while you were away
@@ -216,16 +219,31 @@ drift from the workspace. The distributions are:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) answers a navigation it cannot reach with `public/offline.html`, so an uncached deep link opened offline gets a themed page instead of the browser's error page. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
+
+Inside `packages/core` there are four groups, and the rules between them are
+written down rather than implied — with `errors.py`, the exception hierarchy, open
+to every group. **Domain** (`models.py`, `evaluation.py`, `mapping.py`,
+`corpus.py`) is the vocabulary and imports no other group. **Persistence**
+(`repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`,
+`factory.py`) stores what the other groups decide and may not import methodology —
+`tests/test_architecture.py` enforces that one rule, and also refuses a new core
+module that belongs to no group. **Methodology** (`services.py`, `segmentation.py`,
+`strategy.py`, `router.py`, `messages.py`, `steve_jobs.py`) owns the service door,
+which is `services.py`. **Contract** (`contract.py`, `errors.py`, `remote.py`,
+`schema.py`, `connection.py`, `consent.py`) is the MCP wire protocol; anything may
+import it and it imports no persistence or methodology. The full table, and the
+reason `contract.py` is not its own package yet, is in
+[ADR 0005](docs/architecture/adr/0005-core-layers-and-the-contract-split.md).
 
 ## Contributing
 

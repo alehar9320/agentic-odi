@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
+import { queuedUserMessage } from "../assistant/queue";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -50,6 +51,7 @@ const DEFAULT_CHAT_STREAM =
 
 let chatStream: string | null = null;
 let canvasFails = false;
+let bootCorrupt = false;
 let chatAborts = false;
 let chatFailure: Error | null = null;
 let connectorFetches = 0;
@@ -57,8 +59,56 @@ let llmHealthFetches = 0;
 let llmUnhealthy = false;
 let signalFetches = 0;
 let configHangs = false;
+let configAborts = 0;
+let catalogFetches = 0;
+let featuredFetches = 0;
+let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+
+// The follow-up queue (#410) needs a turn that stays in flight so later sends
+// actually line up behind it: /api/chat then returns a stream the test closes
+// (respond) or breaks (abort — the same way aborting the fetch signal would).
+type GatedTurn = {
+  body: Record<string, unknown>;
+  aborted: boolean;
+  respond: (events: string) => void;
+  abort: () => void;
+};
+let gateChats = false;
+let gatedTurns: GatedTurn[] = [];
+
+function gatedChatResponse(
+  body: Record<string, unknown>,
+  signal?: AbortSignal | null,
+): Response {
+  const encoder = new TextEncoder();
+  let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const turn: GatedTurn = {
+    body,
+    aborted: false,
+    respond: (events) => {
+      streamController?.enqueue(encoder.encode(events));
+      streamController?.close();
+    },
+    abort: () => {
+      turn.aborted = true;
+      const error = new Error("The user aborted a request.");
+      error.name = "AbortError";
+      streamController?.error(error);
+    },
+  };
+  signal?.addEventListener("abort", turn.abort, { once: true });
+  gatedTurns.push(turn);
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller;
+      },
+    }),
+    { status: 200, headers: { "Content-Type": "text/event-stream" } },
+  );
+}
 
 function route(
   input: RequestInfo | URL,
@@ -78,13 +128,41 @@ function route(
     if (chatFailure) {
       throw chatFailure;
     }
+    if (gateChats) {
+      return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
+    }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
   if (url === "/api/config") {
     if (configHangs) {
       // A slow laptop, a cold sidecar: the request is in the air and nothing is
-      // known yet. This is the state a first-time visitor actually sits in.
-      return new Promise<Response>(() => undefined);
+      // known yet. This is the state a first-time visitor actually sits in. A
+      // caller that bounds the request hands us a signal; when it fires, the
+      // request fails the way a real aborted fetch does.
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          configAborts += 1;
+          const error = new Error("The operation was aborted.");
+          error.name = "AbortError";
+          reject(error);
+        });
+      });
+    }
+    if (bootCorrupt) {
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: "store_corrupt",
+            message:
+              "Your database failed its integrity check: /home/me/.odi.db. " +
+              "Last backup: 06:14 (odi-20260102T061400Z.db).",
+            detail: "database disk image is malformed",
+            suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
+            retryable: false,
+          },
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      );
     }
     if (configFails) {
       throw new TypeError("fetch failed");
@@ -103,13 +181,19 @@ function route(
     return json({ jobs: [], steps: [], outcomes: [], source: "local" });
   }
   if (url === "/api/connectors/catalog") {
+    catalogFetches += 1;
     return json([]);
   }
   if (url.startsWith("/api/marketplace/servers")) {
     return json({ listings: [], areas: {}, cached: false, types: [{ id: "mcp", label: "MCP servers", available: true }] });
   }
   if (url.startsWith("/api/marketplace/featured")) {
+    featuredFetches += 1;
     return json({ listings: [], areas: {}, cached: false, types: [] });
+  }
+  if (url === "/api/capabilities") {
+    capabilityProbes += 1;
+    return json({ capabilities: [] });
   }
   if (url === "/api/connectors") {
     if (init?.method === "POST") {
@@ -173,13 +257,35 @@ function route(
     });
   }
   if (url === "/api/conversations") {
+    if (init?.method === "POST") {
+      return json({
+        conversation: {
+          id: "c-new",
+          title: "",
+          created_at: "2026-10-22T10:00:00+00:00",
+          updated_at: "2026-10-22T10:00:00+00:00",
+        },
+      });
+    }
     return json({
-      conversation: {
-        id: "c-new",
-        title: "",
-        created_at: "2026-10-22T10:00:00+00:00",
-        updated_at: "2026-10-22T10:00:00+00:00",
-      },
+      conversations: [
+        {
+          id: "c-1",
+          title: "I own activation.",
+          created_at: "2026-10-22T10:00:00+00:00",
+          updated_at: "2026-10-22T10:00:00+00:00",
+          head_id: "t-2",
+          turn_count: 2,
+        },
+        {
+          id: "c-old",
+          title: "Price the churn spike",
+          created_at: "2026-10-20T10:00:00+00:00",
+          updated_at: "2026-10-20T10:00:00+00:00",
+          head_id: null,
+          turn_count: 1,
+        },
+      ],
     });
   }
   if (url === "/api/health/mcp") {
@@ -212,6 +318,7 @@ describe("StudioContext memory and resume", () => {
     chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -350,6 +457,32 @@ describe("StudioContext memory and resume", () => {
     ]);
   });
 
+  it("loads the history list on boot, newest first", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.conversations).toHaveLength(2));
+    expect(result.current.conversations.map((conversation) => conversation.id)).toEqual([
+      "c-1",
+      "c-old",
+    ]);
+    expect(result.current.conversations[0].title).toBe("I own activation.");
+  });
+
+  it("opens a past conversation by loading its turns", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.openConversation("c-1");
+    });
+
+    expect(result.current.conversationId).toBe("c-1");
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Tell me more.",
+    ]);
+  });
+
   it("toasts after creating a job and recording an outcome", async () => {
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
@@ -446,6 +579,7 @@ describe("StudioContext failures", () => {
     chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -532,7 +666,12 @@ describe("StudioContext first run in a browser with no server", () => {
     chatAttempts = 0;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
+    configAborts = 0;
+    catalogFetches = 0;
+    featuredFetches = 0;
+    capabilityProbes = 0;
     llmHealthFetches = 0;
     vi.stubGlobal(
       "fetch",
@@ -547,13 +686,47 @@ describe("StudioContext first run in a browser with no server", () => {
     vi.unstubAllGlobals();
   });
 
-  it("paints the canvas while the sidecar has not answered", async () => {
+  it("bounds the config request so a black-holing proxy cannot freeze the shell", async () => {
+    // A proxy that accepts the connection and never answers. Without a bound the
+    // request stays in the air forever and the person waits on it. Boot must let
+    // it go at 1,200 ms and carry on with the defaults it already has.
+    configHangs = true;
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // Just before the bound the request is still ours to wait on.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_199);
+    });
+    expect(configAborts).toBe(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    // At 1,200 ms the request was given up rather than left hanging.
+    expect(configAborts).toBe(1);
+    // Boot completed: the person's own work is on screen, the shell is usable, and
+    // the sidecar stays unknown because config never answered.
+    expect(result.current.canvas).not.toBeNull();
+    expect(result.current.sidecarReachable).toBeNull();
+    expect(typeof result.current.sendMessage).toBe("function");
+  });
+
+  it("paints the canvas, memory, and the shell while the sidecar has not answered", async () => {
     // A cold laptop, a sidecar still starting: the request is in the air. The
     // person's own work is on screen from local storage, not behind that answer.
+    // Boot order: local data first (canvas, memory, the latest conversation),
+    // the config request alongside it and never a gate, and the off-screen reads
+    // last — so nothing on the first screen waits on /api/config.
     configHangs = true;
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
+    await waitFor(() => expect(result.current.memory).toHaveLength(1));
+    // The shell is up and usable, and the sidecar is still unknown.
+    expect(typeof result.current.sendMessage).toBe("function");
+    expect(result.current.settings).toBeDefined();
     expect(result.current.sidecarReachable).toBeNull();
   });
 
@@ -564,6 +737,12 @@ describe("StudioContext first run in a browser with no server", () => {
 
     await act(async () => {
       await result.current.sendMessage("what should I work on first?");
+    });
+
+    // sendMessage settles when the send enters the queue (#410), not when the
+    // turn answers, so the offline reply is awaited where it actually lands.
+    await waitFor(() => {
+      expect((result.current.messages.at(-1)?.content ?? "").trim().length).toBeGreaterThan(0);
     });
 
     const last = result.current.messages.at(-1);
@@ -660,6 +839,39 @@ describe("StudioContext first run in a browser with no server", () => {
     });
     expect(llmHealthFetches).toBe(0);
   });
+
+  it("keeps the shell usable and the off-screen reads unrequested while the browser stays busy", async () => {
+    // Idle never comes: a browser under load, a background tab. The shell must
+    // still be interactive — canvas, memory, and the composer — and the reads for
+    // surfaces nobody opened (connectors, presets, featured, capabilities) must
+    // stay unrequested until there is idle time to spend on them.
+    const requestIdle = vi.fn(() => 7);
+    vi.stubGlobal("requestIdleCallback", requestIdle);
+    vi.stubGlobal("cancelIdleCallback", vi.fn());
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    // The idle callback was asked for and never fired, so the fallback timer did
+    // not run either — the deferred reads are still owed, not spent.
+    expect(requestIdle).toHaveBeenCalled();
+    expect(catalogFetches).toBe(0);
+    expect(featuredFetches).toBe(0);
+    expect(connectorFetches).toBe(0);
+    expect(capabilityProbes).toBe(0);
+    expect(llmHealthFetches).toBe(0);
+
+    // Usable regardless: the person's own work is painted and the composer is live.
+    expect(result.current.canvas).not.toBeNull();
+    expect(result.current.memory).toHaveLength(1);
+    expect(typeof result.current.sendMessage).toBe("function");
+
+    // Unmount while the idle stub is still installed: the effect cleanup hands the
+    // scheduled idle time back.
+    unmount();
+  });
 });
 
 describe("StudioContext on a desktop install whose model is down", () => {
@@ -719,6 +931,7 @@ describe("StudioContext health polling", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     vi.useFakeTimers();
@@ -799,6 +1012,7 @@ describe("StudioContext theme", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
@@ -845,6 +1059,7 @@ describe("StudioContext canvas state", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -881,6 +1096,7 @@ describe("StudioContext stopped turns", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -915,6 +1131,7 @@ describe("StudioContext write approval and branches", () => {
     chatFailure = null;
     chatAborts = false;
     canvasFails = false;
+    bootCorrupt = false;
     connectorFetches = 0;
     llmHealthFetches = 0;
     approvalCalls = [];
@@ -975,5 +1192,242 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext boot failure", () => {
+  beforeEach(() => {
+    bootCorrupt = true;
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("surfaces a store-corrupt failure as bootError, not as a down sidecar", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.bootError).not.toBeNull());
+
+    expect(result.current.bootError?.code).toBe("store_corrupt");
+    expect(result.current.bootError?.message).toContain("/home/me/.odi.db");
+    // The sidecar answered, so it is reachable; the database is the problem.
+    expect(result.current.sidecarReachable).toBe(true);
+  });
+
+  it("clears the failure page once a restored store answers cleanly", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.bootError).not.toBeNull());
+
+    // The person restored a backup; the next probe answers cleanly.
+    bootCorrupt = false;
+    await act(async () => {
+      await result.current.recheckBoot();
+    });
+
+    expect(result.current.bootError).toBeNull();
+    expect(result.current.sidecarReachable).toBe(true);
+  });
+});
+
+describe("StudioContext follow-up queue (#410)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatAttempts = 0;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    gateChats = true;
+    gatedTurns = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    gateChats = false;
+    vi.unstubAllGlobals();
+  });
+
+  async function openStudio() {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    await waitFor(() => expect(result.current.queue).not.toBeNull());
+    return result;
+  }
+
+  /** The question the sidecar was actually asked on one gated turn. */
+  function turnText(turn: GatedTurn): string {
+    const history = (turn.body.messages ?? []) as { content: string }[];
+    return history[history.length - 1]?.content ?? "";
+  }
+
+  function laneTexts(items: readonly { parts: readonly { type: string; text?: string }[] }[]): string[] {
+    return items.map((item) =>
+      item.parts.flatMap((part) => (part.type === "text" ? [part.text ?? ""] : [])).join(" "),
+    );
+  }
+
+  // The adapter mounts on the first effect, so it is present once openStudio
+  // resolves; this narrows the nullable context field for the assertions below.
+  type StudioResult = Awaited<ReturnType<typeof openStudio>>;
+  function lane(
+    result: StudioResult,
+  ): NonNullable<StudioResult["current"]["queue"]> {
+    const queue = result.current.queue;
+    if (!queue) {
+      throw new Error("queue adapter missing");
+    }
+    return queue;
+  }
+
+  it("holds follow-ups typed during an answer and sends them in order", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("first question?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+    expect(result.current.streaming).toBe(true);
+
+    await act(async () => {
+      await result.current.sendMessage("second question?");
+      await result.current.sendMessage("third question?");
+    });
+
+    // Never two streams for one conversation: the follow-ups wait in the lane.
+    expect(gatedTurns).toHaveLength(1);
+    expect(laneTexts(lane(result).items)).toEqual([
+      "second question?",
+      "third question?",
+    ]);
+
+    await act(async () => {
+      gatedTurns[0].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(2));
+    await act(async () => {
+      gatedTurns[1].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(3));
+    await act(async () => {
+      gatedTurns[2].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+
+    expect(gatedTurns.map(turnText)).toEqual([
+      "first question?",
+      "second question?",
+      "third question?",
+    ]);
+  });
+
+  it("a steered follow-up cuts in, cancelling the live answer exactly once", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("long question?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      lane(result).steer(queuedUserMessage("urgent correction"));
+    });
+
+    // The live stream aborts and the steer is dispatched at once — a cut-in,
+    // not a second stream: exactly one new request was made.
+    await waitFor(() => expect(gatedTurns).toHaveLength(2));
+    await waitFor(() => expect(gatedTurns[0].aborted).toBe(true));
+    expect(gatedTurns[1].aborted).toBe(false);
+    expect(chatAttempts).toBe(2);
+
+    await act(async () => {
+      gatedTurns[1].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+    expect(turnText(gatedTurns[1])).toBe("urgent correction");
+    // The interrupted question stays in the transcript; only its empty
+    // answer is dropped.
+    expect(result.current.messages.some((message) => message.content === "long question?")).toBe(true);
+  });
+
+  it("a follow-up removed from the lane is never fetched", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("running question?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+    await act(async () => {
+      await result.current.sendMessage("withdrawn question?");
+    });
+    const [item] = lane(result).items;
+    await act(async () => {
+      lane(result).remove(item.id);
+    });
+    expect(lane(result).items).toHaveLength(0);
+
+    await act(async () => {
+      gatedTurns[0].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+    expect(gatedTurns).toHaveLength(1);
+    expect(
+      result.current.messages.some((message) => message.content === "withdrawn question?"),
+    ).toBe(false);
+  });
+
+  it("stopping the answer keeps the lane waiting for the next send", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("first?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+    await act(async () => {
+      await result.current.sendMessage("second?");
+    });
+
+    await act(async () => {
+      result.current.stopStreaming();
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+    // Stop takes down the turn, not the person's follow-ups (#410): the lane
+    // keeps "second?" and waits — nothing fires off behind the stop.
+    expect(gatedTurns).toHaveLength(1);
+    expect(laneTexts(lane(result).items)).toEqual(["second?"]);
+
+    await act(async () => {
+      await result.current.sendMessage("third?");
+    });
+    // The next send re-arms the lane, and the older follow-up answers first.
+    await waitFor(() => expect(gatedTurns).toHaveLength(2));
+    expect(turnText(gatedTurns[1])).toBe("second?");
+    await act(async () => {
+      gatedTurns[1].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(3));
+    expect(turnText(gatedTurns[2])).toBe("third?");
+    await act(async () => {
+      gatedTurns[2].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
   });
 });

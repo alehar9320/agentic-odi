@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from agentic_odi_mcp_server import mcp
 from fastmcp import Client
+from mcp_failures import failure, sentence
 
 
 def _text(result: Any) -> str:
@@ -101,7 +102,8 @@ async def test_an_unknown_job_is_reported_not_segmented() -> None:
     async with Client(mcp) as client:
         text = _text(await client.call_tool("segment_market", {"job_id": "nope"}))
 
-    assert text.startswith("Job not found: nope")
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Job not found: nope"
 
 
 @pytest.mark.asyncio
@@ -152,5 +154,6 @@ async def test_propose_strategy_refuses_without_evidence_rather_than_inventing_a
         await client.call_tool("add_job", {"name": "Rotate a leaked secret"})
         text = _text(await client.call_tool("propose_strategy", {}))
 
-    assert text.startswith("Error: Invalid strategy request: No path is supported yet:")
+    assert failure(text).code.value == "validation"
+    assert sentence(text).startswith("Error: Invalid strategy request: No path is supported yet:")
     assert "Score outcomes against a job map" in text

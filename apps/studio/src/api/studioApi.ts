@@ -31,6 +31,7 @@ import type {
   Strategy,
   StudioConfig,
   StudioError,
+  Study,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -67,6 +68,9 @@ export function isTransportFailure(error: unknown): boolean {
   }
   return false;
 }
+
+/** How long the boot config request may hang before boot stops waiting on it. */
+const CONFIG_TIMEOUT_MS = 1_200;
 
 /** Map an HTTP status the sidecar/worker returned (with no body) to a code. */
 function codeForStatus(status: number): string {
@@ -185,8 +189,11 @@ async function studioError(response: Response): Promise<StudioApiError> {
   return new StudioApiError(described, response.status, false);
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(apiUrl(path), { headers: { Accept: "application/json" } });
+async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    headers: { Accept: "application/json" },
+    ...(signal ? { signal } : {}),
+  });
   if (!response.ok) {
     const error = await studioError(response);
     recordStudioError(error.error, path);
@@ -244,8 +251,17 @@ async function withLocal<T>(
 }
 
 export async function fetchConfig(): Promise<StudioConfig> {
-  const body = await getJson<{ defaults: StudioConfig }>("/api/config");
-  return body.defaults;
+  // Configuration is a convenience, not a gate: a proxy that accepts the
+  // connection and never answers must not hold the first screen. Bound it and
+  // let the caller fall back to the defaults it already has.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CONFIG_TIMEOUT_MS);
+  try {
+    const body = await getJson<{ defaults: StudioConfig }>("/api/config", controller.signal);
+    return body.defaults;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface SidecarDiagnostics {
@@ -544,6 +560,15 @@ export async function fetchSegments(mcpUrl: string, jobId?: string): Promise<Seg
     params.set("job_id", jobId);
   }
   return getJson<Segment[]>(`/api/segments?${params.toString()}`);
+}
+
+/** The opened studies, or an empty list before any study has been opened. */
+export async function fetchStudies(mcpUrl: string, jobId?: string): Promise<Study[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Study[]>(`/api/studies?${params.toString()}`);
 }
 
 /** The recorded Stage 6 path, or null when no strategy has been proposed yet. */

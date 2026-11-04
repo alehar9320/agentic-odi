@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { UNDERSERVED_THRESHOLD } from "../../lib/odi";
 import type { CanvasState } from "../../types";
 import { OpportunityLandscape } from "./OpportunityLandscape";
 
@@ -347,5 +348,119 @@ describe("OpportunityLandscape canvas states", () => {
 
     expect(screen.getByText(/mcp endpoint unreachable/i)).toBeInTheDocument();
     expect(screen.queryByText(/saved/i)).toBeNull();
+  });
+});
+
+describe("OpportunityLandscape stored versus displayed score", () => {
+  function renderWith(outcomes: unknown[]) {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: { ...mockCanvasData, outcomes },
+    } as unknown as CanvasState;
+  }
+
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  // #563: the table sorts on the stored number and prints the rounded one. The lower
+  // score is deliberately first in the input, so a sort that compared displayed values
+  // would tie here and leave the rows in the order they arrived.
+  it("ranks two outcomes that display identically by their stored scores", () => {
+    renderWith([
+      {
+        id: "O-LOW",
+        statement: "Minimize the time to export a report",
+        importance: 8,
+        satisfaction: 4,
+        opportunity_score: 12.98,
+      },
+      {
+        id: "O-HIGH",
+        statement: "Minimize the time to sync a secret",
+        importance: 9,
+        satisfaction: 4,
+        opportunity_score: 13.04,
+      },
+    ]);
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const body = screen.getAllByRole("row").slice(1);
+    expect(body).toHaveLength(2);
+    for (const row of body) {
+      expect(within(row as HTMLElement).getByText("13.0")).toBeInTheDocument();
+    }
+    expect(body[0].textContent).toContain("O-HIGH");
+    expect(body[1].textContent).toContain("O-LOW");
+  });
+
+  // 12.94, 12.94 and 13.0 average to 12.96, which reads "13.0". Round each score first
+  // and the tile averages 12.9, 12.9 and 13.0 to 12.93, which reads "12.9" — the display
+  // step would have moved the number it is only supposed to print.
+  it("averages the stored scores and rounds once, at display", () => {
+    renderWith(
+      [12.94, 12.94, 13.0].map((score, index) => ({
+        id: `O-${index}`,
+        statement: `Outcome ${index}`,
+        importance: 8,
+        satisfaction: 4,
+        opportunity_score: score,
+      })),
+    );
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("13.0");
+  });
+});
+
+describe("OpportunityLandscape score rendering", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  // The metric tile typed "10" by hand while the boundary lived in lib/odi.ts, so
+  // the copy could disagree with the rule it claims to describe.
+  it("labels the underserved metric with the exported threshold", () => {
+    render(<OpportunityLandscape />);
+
+    expect(
+      screen.getByText(`Underserved Targets (>${UNDERSERVED_THRESHOLD})`),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the average opportunity score to one decimal", () => {
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("12.5");
+  });
+
+  // An outcome the sidecar never scored rendered "0.0" in the table and "N/A" on
+  // the card. The formatter already owns that distinction.
+  it("shows an unscored outcome as N/A in the table rather than as a zero", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-108",
+            statement: "Minimize unanswered support tickets",
+            importance: 5,
+            satisfaction: 5,
+            opportunity_score: null,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const row = screen.getByRole("row", { name: /minimize unanswered support tickets/i });
+    expect(within(row).getByText("N/A")).toBeInTheDocument();
   });
 });
