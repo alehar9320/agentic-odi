@@ -111,11 +111,11 @@ by the presence of one handler.
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
 | `ThreadPrimitive.Root` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | The transcript's shell. |
-| `ThreadPrimitive.Viewport` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | Scrolling and the latest-message affordance. |
+| `ThreadPrimitive.Viewport` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | Scrolling; the jump-to-latest affordance reads its `isAtBottom`. |
 | `ThreadPrimitive.Messages` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | The message map. |
 | `ThreadPrimitive.Empty` | Rejected | — | — | Deprecated; `AuiIf` on `state.thread.isEmpty` is the replacement, and `ChatStage` should move to it the next time it changes (see #408 task 6). |
 | `ThreadPrimitive.If` | Decision | — | — | We use `AuiIf`; do not mix two conditional idioms in one tree. |
-| `ThreadPrimitive.ScrollToBottom` | Decision | — | — | `LatestMessageButton` is hand-rolled over `useThreadViewport`. Adopt only if the primitive keeps the reduced-motion behavior. |
+| `ThreadPrimitive.ScrollToBottom` | Decision | — | — | `LatestMessageButton` is hand-rolled over `useThreadViewport` because it carries the arrival count. Adopt only if the primitive keeps the reduced-motion behavior and the count. |
 | `ThreadPrimitive.LoadEarlier` / `thread.hasEarlier` | Decision | — | — | Needs sidecar paging over a branch tree. Worth it only for very long threads; measure first. |
 | `ThreadPrimitive.ViewportFooter` | Decision | — | — | The composer is outside the viewport by design; no problem to solve. |
 | `ThreadPrimitive.ViewportProvider` | Rejected | — | — | One viewport; the provider exists for multiple viewports on one thread. |
@@ -250,7 +250,7 @@ only the surface is missing.
 | `unstable_useMentionAdapter` / `unstable_useSlashCommandAdapter` | Planned | — | #426 | Composer triggers. |
 | `unstable_useComposerInputHistory` | Adopted | `apps/studio/src/assistant/composerHistory.ts` | #430 | ArrowUp recall. |
 | `useSmooth` | Decision | — | — | Smoothes bursty SSE text. Might read as deliberate rather than laggy — needs a comparison, not a guess. |
-| `useThreadViewport` (viewport state) | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #245 | `isAtBottom` / `scrollToBottom` drive the latest-message affordance. |
+| `useThreadViewport` (viewport state) | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #245 | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count lives in `arrivalCount.ts`. |
 | `useThreadViewportAutoScroll` / `useScrollLock` | Rejected | — | — | The viewport already owns auto-scroll, and the only overlay that could need a scroll lock is the lens rail, which does not scroll the thread. |
 | `unstable_useThreadMessageIds` | Decision | — | — | Only needed if a list needs message identity outside a message scope. |
 | `useToolArgsStatus` | Decision | — | — | Belongs to the tool card work, if it needs per-argument state. |
@@ -262,8 +262,8 @@ only the surface is missing.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| `useAssistantContext` / `ModelContextRegistry` / `mergeModelContexts` / `useModelContextSnapshot` | Planned | — | #425 | Register the focused record and the open lens, attach them to the turn. |
-| `makeAssistantVisible` | Planned | — | #425 | Wrap canvas cards so their state is describable. |
+| `useAssistantContext` / `ModelContextRegistry` / `mergeModelContexts` / `useModelContextSnapshot` | Rejected | — | — | Focus reaches the model as a pointer the sidecar re-reads (`apps/studio/src/lib/focus.ts`, `chat.py:_focus_context`), which is what makes the description true. The registry feeds a prompt a client authors, and `useExternalStoreRuntime` has no send path that carries it — a prototype proved `getModelContext()` returns nothing here. #425 delivered the pointer instead. |
+| `makeAssistantVisible` | Rejected | — | — | Wrapping canvas cards to make them describable is not needed: the composer already names the focused record from the snapshot it holds, and refuses to name it when the snapshot cannot (`focusedSubjectLabel`). Per-card visibility declarations would be a second description of the same screen. |
 | `useAssistantInstructions` | Rejected | — | — | The sidecar assembles the ODI system prompt. A client-side instruction layer would be a second authority and would drift from the methodology guardrails. |
 | `AssistantFrameHost` / `AssistantFrameProvider` / `useAssistantFrameHost` / `frame` transport | Decision | — | — | Embeds the assistant in someone else's page. The Studio is the product surface, not an embedded widget. |
 
@@ -302,9 +302,9 @@ only the surface is missing.
 |---|---|
 | Adopted | 44 |
 | Partial | 8 |
-| Planned | 20 |
+| Planned | 18 |
 | Decision | 26 |
-| Rejected | 31 |
+| Rejected | 33 |
 | Total | 129 |
 
 Read it as: **52** of the library's 129 relevant capabilities already deliver
@@ -382,14 +382,17 @@ inside the wizard.
 ### Conversational UI coverage
 
 The agent-composed surfaces, first-minute guidance, and the product tour are
-covered at these levels. `ChatStage.test.tsx` also covers the latest-message
-control while following a streamed turn and returning to the live end:
+covered at these levels. `ChatStage.test.tsx` covers the jump-to-latest control
+while following a streamed turn — the arrival count, the polite announcement, the
+return to the live end, and the keyboard path — and `arrivalCount.test.ts` holds
+the pure count arithmetic:
 
 | File | What it covers |
 |---|---|
 | `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
 | `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
+| `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | The segment board's members and basis (#559): each segment lists its member outcomes with their stored scores, the mean is over scored members only with "Not scored" for none, an inferred group is called a candidate, a missing member is dropped and counted, a member opens in the landscape by mouse and keyboard, and the empty state names the next step |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
 | `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
 | `apps/studio/src/diagnostics/` | Recursive secret/URL/path redaction, 256 KiB cap, opt-in memory-only capture, local-only metadata fetch, and accessible diagnostics preview/export |
@@ -425,7 +428,7 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
 | `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
-| `apps/studio/src/styles/entry.test.ts` | The cascade order lives in `entry.css` alone: `product` between `theme` and `utilities`, both product sheets imported into that layer, and `main.tsx` importing no other stylesheet |
+| `apps/studio/src/styles/entry.test.ts` | The cascade order lives in `entry.css` alone: `product` between `theme` and `utilities`, every product sheet imported into that layer, and `main.tsx` importing no other stylesheet |
 | `apps/studio/src/vendor/layering.visual.test.tsx` | In Chromium: a vendored utility outranks `button { color: inherit }`, and a product rule still outranks the browser default |
 | `apps/studio/src/lib/theme.test.ts` | `resolveTheme`: the stored choice wins, the media query answers when nothing is stored, and dark is the last resort |
 | `apps/studio/src/lib/boot.test.ts` | `removeBootShell` clears the shell on mount and is a no-op without one |

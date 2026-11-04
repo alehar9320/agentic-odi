@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import mainSource from "../main.tsx?raw";
 import vendorCss from "../vendor/index.css?raw";
+import briefCss from "./brief.css?raw";
 import entryCss from "./entry.css?raw";
 import recordsCss from "./records.css?raw";
 import themeCss from "./theme.css?raw";
@@ -38,9 +39,10 @@ describe("the product stylesheet layer", () => {
     expect(order.indexOf("product")).toBeGreaterThan(order.indexOf("theme"));
   });
 
-  it("imports both product sheets into that layer and the vendor sheet as generated", () => {
+  it("imports every product sheet into that layer and the vendor sheet as generated", () => {
     expect(entryCss).toContain('@import "./theme.css" layer(product)');
     expect(entryCss).toContain('@import "./records.css" layer(product)');
+    expect(entryCss).toContain('@import "./brief.css" layer(product)');
     expect(entryCss).toMatch(/@import\s+"[^"]*vendor\/index\.css"/);
   });
 
@@ -49,6 +51,7 @@ describe("the product stylesheet layer", () => {
       ["main.tsx", mainSource],
       ["theme.css", themeCss],
       ["records.css", recordsCss],
+      ["brief.css", briefCss],
     ] as const) {
       expect(source, `${name} declares its own @layer order`).not.toMatch(/@layer\s+[A-Za-z]/);
     }

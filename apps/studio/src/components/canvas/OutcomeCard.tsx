@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import {
   formatOpportunityScore,
+  hasScore,
   isUnderserved,
   opportunityPill,
   opportunityScore,
@@ -28,8 +29,11 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
   const outcomeId = outcome.id ?? "O";
-  const underserved = isUnderserved(opp);
-  const pill = opportunityPill(opp);
+  const scored = hasScore(opp);
+  const underserved = scored && isUnderserved(opp);
+  const pill = scored
+    ? opportunityPill(opp)
+    : { label: "Not scored — no ratings recorded", variant: "blue" };
 
   return (
     <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>

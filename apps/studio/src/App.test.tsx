@@ -245,7 +245,7 @@ describe("studio shell", () => {
     expect(screen.queryByRole("heading", { name: "What do you want to win?" })).not.toBeInTheDocument();
   });
 
-  it("returns home from the wordmark", async () => {
+  it("returns home from the wordmark without discarding the thread", async () => {
     render(<App />);
 
     const composer = await screen.findByRole("textbox", { name: /message the studio/i });
@@ -253,14 +253,19 @@ describe("studio shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
     await screen.findByText("Where do I start?");
 
+    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+    expect(
+      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+    ).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: /go to home/i }));
 
+    // Home closes what is open; the transcript is the other control's to
+    // discard, and only after asking what is being lost.
     await waitFor(() => {
-      expect(screen.queryByText("Where do I start?")).toBeNull();
+      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
     });
-    expect(
-      screen.getByRole("heading", { name: "What do you want to win?" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Where do I start?")).toBeInTheDocument();
   });
 
   it("runs a slash command as a conversation when a model is live", async () => {
@@ -413,7 +418,7 @@ describe("studio shell", () => {
     });
   });
 
-  it("closes the setup conversation when starting a new conversation", async () => {
+  it("closes the setup conversation when starting a new thread", async () => {
     window.localStorage.removeItem("studio.brief");
     render(<App />);
 
@@ -424,7 +429,7 @@ describe("studio shell", () => {
       await screen.findByText("What are you building?", { selector: "strong" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /new conversation/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start a new thread/i }));
 
     await waitFor(() => {
       expect(screen.queryByText("What are you building?", { selector: "strong" })).toBeNull();
@@ -434,7 +439,7 @@ describe("studio shell", () => {
     ).toBeInTheDocument();
   });
 
-  it("starts a new conversation from the drawer", async () => {
+  it("starts a new thread from the drawer", async () => {
     render(<App />);
 
     const composer = await screen.findByRole("textbox", { name: /message the studio/i });
@@ -442,7 +447,7 @@ describe("studio shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
     await screen.findByText("Where do I start?");
 
-    fireEvent.click(screen.getByRole("button", { name: /new conversation/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start a new thread/i }));
 
     await waitFor(() => {
       expect(screen.queryByText("Where do I start?")).toBeNull();
@@ -747,5 +752,31 @@ describe("boot failure", () => {
     // The conversation is not offered: there is nothing to show from a store
     // that failed its check.
     expect(screen.queryByRole("textbox", { name: /message the studio/i })).toBeNull();
+  });
+});
+
+describe("the bar's new thread can be undone (#319)", () => {
+  async function withAThread() {
+    window.localStorage.removeItem("studio.brief");
+    render(<App />);
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Where do I start?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+    await screen.findByText("Where do I start?");
+  }
+
+  it("clears the transcript from the bar and offers the same thread back", async () => {
+    await withAThread();
+
+    fireEvent.click(screen.getByRole("button", { name: /start a new thread/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Where do I start?")).toBeNull();
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /undo/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Where do I start?")).toBeInTheDocument();
+    });
   });
 });
