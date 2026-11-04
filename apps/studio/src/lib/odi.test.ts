@@ -5,6 +5,7 @@ import {
   isUnderserved,
   opportunityPill,
   opportunityScore,
+  scoredAverage,
   UNDERSERVED_THRESHOLD,
 } from "./odi";
 
@@ -35,6 +36,50 @@ describe("isUnderserved", () => {
     expect(UNDERSERVED_THRESHOLD).toBe(10);
     expect(isUnderserved(UNDERSERVED_THRESHOLD)).toBe(false);
     expect(isUnderserved(UNDERSERVED_THRESHOLD + 0.1)).toBe(true);
+  });
+});
+
+describe("scoredAverage", () => {
+  it("averages only the stored numeric scores", () => {
+    const result = scoredAverage([
+      { id: "O-1", opportunity_score: 12 },
+      { id: "O-2" },
+    ]);
+
+    expect(result.mean).toBe(12);
+    expect(result.scored).toBe(1);
+    expect(result.unscored).toBe(1);
+  });
+
+  it("returns a null mean when nothing was scored", () => {
+    const result = scoredAverage([{ id: "O-1" }, { id: "O-2", opportunity_score: null }]);
+
+    expect(result.mean).toBeNull();
+    expect(result.scored).toBe(0);
+    expect(result.unscored).toBe(2);
+  });
+
+  it("averages the stored values, not pre-rounded ones", () => {
+    const result = scoredAverage([
+      { id: "O-1", opportunity_score: 11.44 },
+      { id: "O-2", opportunity_score: 11.44 },
+    ]);
+
+    expect(result.mean).toBeCloseTo(11.44, 10);
+    expect(result.scored).toBe(2);
+    expect(result.unscored).toBe(0);
+  });
+
+  it("counts a zero as scored rather than treating it as absent", () => {
+    const result = scoredAverage([{ id: "O-1", opportunity_score: 0 }]);
+
+    expect(result.mean).toBe(0);
+    expect(result.scored).toBe(1);
+    expect(result.unscored).toBe(0);
+  });
+
+  it("returns a null mean for an empty list", () => {
+    expect(scoredAverage([])).toEqual({ mean: null, scored: 0, unscored: 0 });
   });
 });
 

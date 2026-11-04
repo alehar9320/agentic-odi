@@ -414,6 +414,46 @@ describe("OpportunityLandscape stored versus displayed score", () => {
     const tile = screen.getByText("Avg Opportunity Score").parentElement;
     expect(tile?.textContent).toContain("13.0");
   });
+
+  // #646: an outcome nobody scored is not a zero. Counting it as one dragged the
+  // average down: one unscored record beside a 12.0 score read "6.0" here.
+  it("excludes unscored outcomes from the average", () => {
+    renderWith([
+      { id: "O-SCORED", statement: "Minimize the time to export", importance: 8, satisfaction: 4, opportunity_score: 12 },
+      { id: "O-UNSCORED", statement: "Minimize the time to sync" },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("12.0");
+    expect(tile?.textContent).toContain("1 scored · 1 not scored");
+  });
+
+  it("states how many outcomes the average covers", () => {
+    renderWith([
+      { id: "O-1", statement: "One", opportunity_score: 12 },
+      { id: "O-2", statement: "Two", opportunity_score: 12 },
+      { id: "O-3", statement: "Three" },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("2 scored");
+    expect(tile?.textContent).toContain("1 not scored");
+  });
+
+  it("shows Not scored when no outcome stores a score", () => {
+    renderWith([
+      { id: "O-1", statement: "One" },
+      { id: "O-2", statement: "Two", opportunity_score: null },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("Not scored");
+    expect(tile?.textContent).not.toContain("0.0");
+    expect(tile?.textContent).not.toContain("scored ·");
+  });
 });
 
 describe("OpportunityLandscape score rendering", () => {
