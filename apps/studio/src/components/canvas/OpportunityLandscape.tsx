@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
 import {
   formatOpportunityScore,
+  hasScore,
   isUnderserved,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
@@ -765,8 +766,8 @@ function OpportunityTableView({
         </thead>
         <tbody>
           {outcomes.map((outcome, idx) => {
-            const opp = outcome.opportunity_score ?? 0;
-            const underserved = isUnderserved(opp);
+            const scored = hasScore(outcome.opportunity_score);
+            const underserved = scored && isUnderserved(outcome.opportunity_score);
             const isSelected = selectedOutcomeId === outcome.id;
 
             return (
@@ -813,7 +814,7 @@ function OpportunityTableView({
                     color: underserved ? "var(--studio-amber)" : "inherit",
                   }}
                 >
-                  {formatOpportunityScore(outcome.opportunity_score)}
+                  {scored ? formatOpportunityScore(outcome.opportunity_score) : "—"}
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span
@@ -824,7 +825,7 @@ function OpportunityTableView({
                       fontSize: "0.72rem",
                     }}
                   >
-                    {underserved ? "UNDERSERVED" : "NORMAL"}
+                    {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : "Not scored"}
                   </span>
                 </td>
               </tr>

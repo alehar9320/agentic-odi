@@ -16,6 +16,12 @@ export function isUnderserved(score: number | null | undefined): boolean {
   return score != null && score > UNDERSERVED_THRESHOLD;
 }
 
+/** True only when the store actually holds a numeric score for this outcome.
+ * A real score of `0` is scored; `null`, `undefined`, and non-finite values are not. */
+export function hasScore(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 export function formatOpportunityScore(score: number | null | undefined): string {
   if (score == null) {
     return "N/A";

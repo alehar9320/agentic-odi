@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatOpportunityScore,
+  hasScore,
   isUnderserved,
   opportunityPill,
   opportunityScore,
@@ -35,6 +36,18 @@ describe("isUnderserved", () => {
     expect(UNDERSERVED_THRESHOLD).toBe(10);
     expect(isUnderserved(UNDERSERVED_THRESHOLD)).toBe(false);
     expect(isUnderserved(UNDERSERVED_THRESHOLD + 0.1)).toBe(true);
+  });
+});
+
+describe("hasScore", () => {
+  it("is true only for a finite number", () => {
+    expect(hasScore(12.5)).toBe(true);
+    expect(hasScore(0)).toBe(true); // a real score of zero is scored
+    expect(hasScore(null)).toBe(false);
+    expect(hasScore(undefined)).toBe(false);
+    expect(hasScore(NaN)).toBe(false);
+    expect(hasScore(Infinity)).toBe(false);
+    expect(hasScore("12.5")).toBe(false);
   });
 });
 
