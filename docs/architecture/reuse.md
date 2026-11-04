@@ -95,7 +95,8 @@ commit can be re-fetched:
 
 | What copied | Where recorded | Enforced by |
 | --- | --- | --- |
-| Studio UI under `apps/studio/src/vendor` | `apps/studio/vendor.lock.json`, plus a `vendored:` header per file | `apps/studio/src/vendor/ledger.test.ts` |
+| Studio UI under `apps/studio/src/vendor` | `apps/studio/vendor.lock.json`, plus a `vendored:` header per file | `apps/studio/src/vendor/ledger.test.ts` and `tests/scripts/test_vendor_policy.py` |
+| The npm packages those copies depend on | the dependency table in `docs/architecture/vendor.md` | `tests/scripts/test_vendor_policy.py`, which also holds every recorded licence to its SPDX allowlist |
 | Reference prose under `.agents/skills/reuse-first/references` | a `vendored:` HTML header naming upstream, commit, SPDX id, retrieval date, and drift | review, and the re-copy rule in `docs/architecture/vendor.md` |
 | Skills from an upstream pack | `skills-lock.json` | `npx skills update` — never hand-edit this file, and never add a skill to it that upstream does not publish |
 
