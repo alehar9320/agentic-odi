@@ -177,7 +177,4 @@ def test_readme_code_overview_paths_come_from_the_table(tmp_path: Path) -> None:
 
 def test_the_repository_documentation_matches_the_code() -> None:
     assert collect_issues() == []
-
-
-def test_env_vars_are_not_invented_by_the_checker() -> None:
     assert documented_env_vars("`AGENTIC_ODI_DB` then `AGENTIC_ODI_DB`") == {"AGENTIC_ODI_DB"}

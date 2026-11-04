@@ -5,8 +5,13 @@ from __future__ import annotations
 import sqlite3
 
 import gen_corpus
+import pytest
 from agentic_odi_core.corpus import REFERENCE_JOBS, REFERENCE_OUTCOMES, build_corpus
 from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+#: Building the reference study is CPU work, not a stall: it writes thousands
+#: of events into SQLite. The global ceiling does not cover it.
+CORPUS_TIMEOUT = 30
 
 
 def _count_events(db_path: str, event_type: str) -> int:
@@ -16,6 +21,7 @@ def _count_events(db_path: str, event_type: str) -> int:
         ).fetchone()[0]
 
 
+@pytest.mark.timeout(CORPUS_TIMEOUT)
 def test_generator_writes_the_documented_counts(tmp_path) -> None:
     db_path = str(tmp_path / "corpus.db")
 
@@ -27,6 +33,7 @@ def test_generator_writes_the_documented_counts(tmp_path) -> None:
     assert _count_events(db_path, "EVIDENCE_CREATED") == REFERENCE_OUTCOMES
 
 
+@pytest.mark.timeout(CORPUS_TIMEOUT)
 def test_running_the_generator_twice_produces_the_same_records(tmp_path) -> None:
     first = str(tmp_path / "first.db")
     second = str(tmp_path / "second.db")
@@ -43,6 +50,7 @@ def test_running_the_generator_twice_produces_the_same_records(tmp_path) -> None
     assert dump(first) == dump(second)
 
 
+@pytest.mark.timeout(CORPUS_TIMEOUT)
 def test_generator_replays_into_the_reference_study(tmp_path) -> None:
     db_path = str(tmp_path / "corpus.db")
     gen_corpus.main(["--out", db_path])
