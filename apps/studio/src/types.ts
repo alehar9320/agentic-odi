@@ -14,6 +14,24 @@ export interface Step {
   order?: number;
 }
 
+/** A question put to the person that they did not answer, and why not. */
+export interface ClaimSkip {
+  question: string;
+  reason?: string;
+}
+
+/**
+ * The questions behind a score. `verified` arrives derived from the core model —
+ * a check is verified when at least one question was answered — so a card must
+ * read it rather than compare the lists itself.
+ */
+export interface ClaimCheck {
+  asked?: string[];
+  answers?: string[];
+  skips?: ClaimSkip[];
+  verified?: boolean;
+}
+
 export interface Outcome {
   id?: string;
   job_id?: string;
@@ -21,6 +39,7 @@ export interface Outcome {
   importance?: number | null;
   satisfaction?: number | null;
   opportunity_score?: number | null;
+  claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
 }

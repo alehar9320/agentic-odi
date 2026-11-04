@@ -82,7 +82,9 @@ per-platform archives with SHA-256 checksums for a manual download. See
   in-place guidance appears only after the first exchange. It turns "a customer
   still reconciles invoices by hand" into a scored outcome, a job map, and a
   ranked opportunity board — inline in the thread. Every claim in a reply names
-  the record behind it, or says it is a hypothesis. The bar's history list keeps
+  the record behind it, or says it is a hypothesis. A score names the questions
+  that produced it, and a number with no customer answer behind it reads as
+  unverified instead of settling the matter. The bar's history list keeps
   the last twenty threads one click away, each named by its first question and
   marked when it is the one on screen.
 - **A document when the conversation needs one.** `/brief` writes the decision
