@@ -1,14 +1,20 @@
-"""ALH-222 (M2-04.1) — ``odi desired-outcomes import`` over the local backend.
+"""``odi desired-outcomes import`` over the local backend: a CSV and a workbook, one door.
 
 The command is a thin door: it reads the file, hands the rows to the shared loop, and echoes the
 report. What matters here is that the loop writes through ``run_tool``, the same door
 ``desired-outcomes add`` uses, so an import cannot file a row the CLI would refuse, and that a
 ``--dry-run`` says exactly what the real run will do — same lines, same refusals, no ids.
+ALH-223 adds the workbook to that same door, so the tests below compare the two files rather than
+re-check the rows, and pin the three ways a workbook can refuse the whole run: no reader built in,
+more than one sheet with rows, a name that is not a spreadsheet.
 """
 
 from __future__ import annotations
 
+import csv
+import io
 import json
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -230,3 +236,176 @@ def test_an_import_of_the_same_file_twice_warns_about_the_repeat(tmp_path) -> No
     assert len(second["warnings"]) == 37
     assert len(second["created"]) == 37
     assert len(_json(runner, db, ["desired-outcomes", "list", "--job-id", job_id, "--json"])) == 74
+
+
+# --- ALH-223: the same door, opened with a workbook -----------------------------
+
+
+def _value(cell: object) -> object:
+    """A cell the way ``Save as`` writes one: a number in the file stays a number."""
+    if isinstance(cell, str):
+        try:
+            return float(cell)
+        except ValueError:
+            return cell
+    return cell
+
+
+def _workbook(tmp_path, name: str, sheets: Mapping[str, Sequence[Sequence[object]]]) -> str:
+    import openpyxl
+
+    book = openpyxl.Workbook()
+    for index, (sheet, rows) in enumerate(sheets.items()):
+        worksheet = book.active if index == 0 else book.create_sheet()
+        worksheet.title = sheet
+        for row in rows:
+            worksheet.append([_value(cell) for cell in row])
+    document = tmp_path / name
+    book.save(document)
+    return str(document)
+
+
+def _fixture_rows() -> list[list[str]]:
+    return [row for row in csv.reader(io.StringIO(FIXTURE.read_text(encoding="utf-8"))) if row]
+
+
+def test_a_workbook_and_a_csv_of_the_same_rows_report_the_same_run(tmp_path) -> None:
+    db, job_id = _seed(tmp_path)
+    runner = CliRunner()
+    document = _workbook(tmp_path, "outcomes.xlsx", {"Outcomes": _fixture_rows()})
+
+    from_csv = _json(
+        runner,
+        db,
+        ["desired-outcomes", "import", _csv(tmp_path), "--job-id", job_id, "--dry-run", "--json"],
+    )
+    from_workbook = _json(
+        runner,
+        db,
+        ["desired-outcomes", "import", document, "--job-id", job_id, "--dry-run", "--json"],
+    )
+
+    assert from_workbook == from_csv
+
+
+def test_a_workbook_with_rows_in_two_sheets_names_the_tabs_it_could_read(tmp_path) -> None:
+    db, job_id = _seed(tmp_path)
+    runner = CliRunner()
+    document = _workbook(
+        tmp_path,
+        "plans.xlsx",
+        {
+            "Backlog": [
+                ["statement", "importance"],
+                ["Minimize the cost of a duplicate charge when the ledger closes twice", 6],
+            ],
+            "Q3": [
+                ["statement"],
+                [
+                    "Minimize the time to reconcile a supplier invoice when the statement "
+                    "arrives late"
+                ],
+            ],
+        },
+    )
+
+    result = _invoke(runner, db, ["desired-outcomes", "import", document, "--job-id", job_id])
+
+    assert result.exit_code == 1
+    assert "Backlog" in result.output and "Q3" in result.output
+    assert "--sheet" in result.output
+    assert _json(runner, db, ["desired-outcomes", "list", "--job-id", job_id, "--json"]) == []
+
+    picked = _json(
+        runner,
+        db,
+        [
+            "desired-outcomes",
+            "import",
+            document,
+            "--job-id",
+            job_id,
+            "--sheet",
+            "Backlog",
+            "--json",
+        ],
+    )
+
+    assert [entry["statement"] for entry in picked["created"]] == [
+        "Minimize the cost of a duplicate charge when the ledger closes twice"
+    ]
+
+
+def test_a_sheet_with_nothing_on_it_is_said_rather_than_skipped(tmp_path) -> None:
+    db, job_id = _seed(tmp_path)
+    runner = CliRunner()
+    document = _workbook(
+        tmp_path,
+        "plans.xlsx",
+        {
+            "Outcomes": [["statement"], ["Minimize the cost of a duplicate charge"]],
+            "Parking": [],
+        },
+    )
+
+    result = _invoke(
+        runner,
+        db,
+        ["desired-outcomes", "import", document, "--job-id", job_id, "--sheet", "Parking"],
+    )
+
+    assert result.exit_code == 1
+    assert "Parking" in result.output and "no rows" in result.output
+
+
+def test_a_build_without_the_xlsx_extra_names_the_install_path(tmp_path, monkeypatch) -> None:
+    import sys
+
+    db, job_id = _seed(tmp_path)
+    runner = CliRunner()
+    document = _workbook(
+        tmp_path, "outcomes.xlsx", {"Outcomes": [["statement"], ["Minimize anything at all"]]}
+    )
+    monkeypatch.setitem(sys.modules, "openpyxl", None)
+
+    result = _invoke(runner, db, ["desired-outcomes", "import", document, "--job-id", job_id])
+
+    assert result.exit_code == 1
+    assert "agentic-odi-core[xlsx]" in result.output
+    assert "csv" in result.output.lower()
+    assert _json(runner, db, ["desired-outcomes", "list", "--job-id", job_id, "--json"]) == []
+
+
+def test_a_suffix_neither_door_reads_exits_one_naming_it(tmp_path) -> None:
+    db, job_id = _seed(tmp_path)
+    runner = CliRunner()
+    document = tmp_path / "notes.txt"
+    document.write_text("statement\nMinimize anything at all\n", encoding="utf-8")
+
+    result = _invoke(runner, db, ["desired-outcomes", "import", str(document), "--job-id", job_id])
+
+    assert result.exit_code == 1
+    assert "'txt'" in result.output
+    assert _json(runner, db, ["desired-outcomes", "list", "--job-id", job_id, "--json"]) == []
+
+
+def test_a_csv_handed_a_sheet_is_refused_the_same_way(tmp_path) -> None:
+    db, job_id = _seed(tmp_path)
+    runner = CliRunner()
+
+    result = _invoke(
+        runner,
+        db,
+        [
+            "desired-outcomes",
+            "import",
+            _csv(tmp_path),
+            "--job-id",
+            job_id,
+            "--sheet",
+            "Backlog",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "CSV has no sheets" in result.output

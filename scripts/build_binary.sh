@@ -37,7 +37,10 @@ restore_build_info() {
 trap restore_build_info EXIT
 
 echo "==> Syncing workspace (uv)"
-uv sync --all-packages --locked
+# --all-extras is not decoration: a PyInstaller bundle cannot `pip install` an extra
+# at runtime, so the frozen CLI either reads .xlsx workbooks or tells the person to
+# save CSV, and the bundle must not be the reason it says the second one.
+uv sync --all-packages --all-extras --locked
 
 echo "==> Writing apps/cli/src/agentic_odi_cli/_build_info.py"
 cat > apps/cli/src/agentic_odi_cli/_build_info.py <<EOF

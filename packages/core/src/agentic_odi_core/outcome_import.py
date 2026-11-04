@@ -17,9 +17,10 @@ from __future__ import annotations
 import csv
 import io
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 from typing import Any, Protocol, runtime_checkable
 
-from agentic_odi_core.errors import OdiError
+from agentic_odi_core.errors import OdiError, ValidationError
 from agentic_odi_core.evaluation import evaluate_outcome_statement
 from agentic_odi_core.models import ClaimCheck, JobStage, Step, Theme
 from agentic_odi_core.services import (
@@ -31,6 +32,8 @@ from agentic_odi_core.services import (
 )
 
 READABLE_FORMAT = "csv"
+#: The workbook path, which needs the optional ``xlsx`` extra and says so when it is missing.
+XLSX_FORMAT = "xlsx"
 
 #: The one column a row cannot do without, and the two synonyms a research file arrives with.
 STATEMENT_HEADERS = ("statement", "outcome", "need")
@@ -48,8 +51,24 @@ IGNORED_HEADERS = {
 }
 
 
-class UnsupportedFormatError(OdiError):
-    """Raised when the import is handed a file this increment does not read."""
+class UnsupportedFormatError(ValidationError):
+    """Raised when the import is handed a file neither door reads.
+
+    A ``ValidationError``, because a wrong suffix is a mistake in the request: the upload answers
+    it with the shared envelope rather than a report, and ``error_status()`` never sends it to 500.
+    """
+
+
+class XlsxExtraMissingError(ValidationError):
+    """Raised when this build was installed without the optional ``xlsx`` extra."""
+
+
+class SheetSelectionError(ValidationError):
+    """Raised when the workbook does not say, unambiguously, which sheet to read.
+
+    Guessing the sheet Excel happens to have marked active is how forty rows of notes become
+    desired Outcomes, and an import has no undo token to take them back.
+    """
 
 
 @dataclass(frozen=True)
@@ -77,6 +96,22 @@ class ParsedTable:
     ignored_columns: dict[str, str] = field(default_factory=dict)
     #: A file-level problem: the whole table is unusable, so ``rows`` is empty.
     problems: list[str] = field(default_factory=list)
+    #: The file's own condition, which the report says before anything the store knew about it.
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class TableLines:
+    """What the two formats genuinely have to agree on: numbered rows of text.
+
+    ``formula_cells`` is the workbook path's extra answer to one question — *was this empty cell a
+    formula nobody recalculated?* — because ``data_only`` cannot tell an empty cell from an
+    uncached one. Only the parser decides what that means: a refusal in a column the import needs,
+    a warning in one it does not.
+    """
+
+    lines: list[tuple[int, list[str]]]
+    formula_cells: dict[int, list[int]] = field(default_factory=dict)
 
 
 def _normalise(header: str) -> str:
@@ -93,19 +128,147 @@ def _number(field_name: str, raw: str) -> tuple[float | None, str | None]:
         return None, f'{field_name} must be a number, got "{raw}"'
 
 
-def parse_outcome_table(source: str | bytes, fmt: str = READABLE_FORMAT) -> ParsedTable:
-    if _normalise(fmt) != READABLE_FORMAT:
-        raise UnsupportedFormatError(
-            f"'{fmt}' is not a format this import reads; only '{READABLE_FORMAT}' is. "
-            "Saving the spreadsheet as CSV loses nothing a research file carries."
-        )
+def _unknown_format(tried: str) -> UnsupportedFormatError:
+    return UnsupportedFormatError(
+        f"'{tried}' is not a format this import reads; only '.{READABLE_FORMAT}' and "
+        f"'.{XLSX_FORMAT}' are. Saving the spreadsheet as {READABLE_FORMAT.upper()} loses "
+        "nothing a research file carries."
+    )
+
+
+def format_for_name(filename: str) -> str:
+    """Which reader a file's name asks for — the one rule both doors share.
+
+    A person names the format by saving the file, so the suffix is not a guess the surface makes;
+    it is the only signal either door has, and it is read the same way here in both.
+    """
+    suffix = PurePosixPath(filename).suffix.lower().lstrip(".")
+    if suffix in ("", READABLE_FORMAT):
+        return READABLE_FORMAT
+    if suffix == XLSX_FORMAT:
+        return XLSX_FORMAT
+    raise _unknown_format(suffix)
+
+
+def read_rows(source: str | bytes) -> TableLines:
+    """Every line of a CSV, numbered the way ``csv`` counts them, blanks included."""
     text = source.decode("utf-8-sig", errors="replace") if isinstance(source, bytes) else source
     reader = csv.reader(io.StringIO(text, newline=""))
+    return TableLines(lines=[(reader.line_num, cells) for cells in reader])
 
-    header: list[str] = []
-    for cells in reader:  # the first non-blank line is the header
-        header = cells
-        break
+
+def _column_letter(index: int) -> str:
+    """The spreadsheet's own name for a 0-based column, so a refusal points at a cell."""
+    letters = ""
+    while index >= 0:
+        index, remainder = divmod(index, 26)
+        letters = chr(ord("A") + remainder) + letters
+        index -= 1
+    return letters
+
+
+def _cell_text(value: Any) -> str:
+    """A cell's stored value as the text a CSV would have carried — never a computed one."""
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _load_workbook() -> Any:
+    """The guarded import that makes the extra optional in every environment."""
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        # ``from None``: the sentence is the whole answer, and a ModuleNotFoundError stack above
+        # it would say less than the install path does.
+        raise XlsxExtraMissingError(
+            f"reading a .{XLSX_FORMAT} needs the optional xlsx extra: "
+            "pip install 'agentic-odi-core[xlsx]' — or save the workbook as "
+            f"{READABLE_FORMAT.upper()}, which this build reads without it"
+        ) from None
+    return load_workbook
+
+
+def _has_rows(worksheet: Any) -> bool:
+    return next(worksheet.iter_rows(values_only=True), None) is not None
+
+
+def _select_sheet(workbook: Any, sheet: str | None) -> Any:
+    """The sheet to read, or the reason this workbook does not say which one it is."""
+    names = list(workbook.sheetnames)
+    with_rows = [name for name in names if _has_rows(workbook[name])]
+    wanted = sheet.strip() if sheet else ""
+    if wanted:
+        if wanted not in names:
+            raise SheetSelectionError(
+                f'no sheet named "{wanted}" in this workbook; it has {", ".join(names)}'
+            )
+        if wanted not in with_rows:
+            raise SheetSelectionError(f'sheet "{wanted}" has no rows; nothing to import')
+        return workbook[wanted]
+    if not with_rows:
+        raise SheetSelectionError("this workbook has no rows in any sheet; nothing to import")
+    if len(with_rows) > 1:
+        raise SheetSelectionError(
+            f"this workbook has rows in {len(with_rows)} sheets ({', '.join(with_rows)}); "
+            "name the one to read with --sheet"
+        )
+    return workbook[with_rows[0]]
+
+
+def read_xlsx_rows(source: bytes, sheet: str | None = None) -> TableLines:
+    """One sheet of a workbook, as numbered rows of text.
+
+    Read with ``data_only`` first: that is the only value a person's file stores for a formula, and
+    this import never computes one. A cell that came back empty in a row that has other content is
+    then asked what it really was, from a second load of the same bytes — an uncached formula is
+    indistinguishable from an empty cell otherwise, and an empty score would otherwise be filed as
+    research nobody measured. A workbook with nothing empty is opened once.
+    """
+    load = _load_workbook()
+    worksheet = _select_sheet(load(io.BytesIO(source), data_only=True), sheet)
+
+    lines: list[tuple[int, list[str]]] = []
+    empty: list[tuple[int, int]] = []
+    for cells in worksheet.iter_rows():
+        number = cells[0].row if cells else 1
+        text = [_cell_text(cell.value) for cell in cells]
+        lines.append((number, text))
+        if any(text):
+            empty.extend((number, cell.column) for cell in cells if not text[cell.column - 1])
+
+    formulas: dict[int, list[int]] = {}
+    if empty:
+        probe = _select_sheet(load(io.BytesIO(source), data_only=False), sheet)
+        for number, column in empty:
+            if probe.cell(row=number, column=column).data_type == "f":
+                formulas.setdefault(number, []).append(column - 1)
+    return TableLines(lines=lines, formula_cells=formulas)
+
+
+def parse_outcome_table(
+    source: str | bytes, fmt: str = READABLE_FORMAT, sheet: str | None = None
+) -> ParsedTable:
+    kind = _normalise(fmt)
+    if kind not in (READABLE_FORMAT, XLSX_FORMAT):
+        raise _unknown_format(kind)
+    if kind == XLSX_FORMAT:
+        raw = source if isinstance(source, bytes) else source.encode("utf-8")
+        return _build_rows(read_xlsx_rows(raw, sheet=sheet))
+    if sheet is not None and sheet.strip():
+        raise SheetSelectionError(
+            f"a {READABLE_FORMAT.upper()} has no sheets; --sheet is for a .{XLSX_FORMAT} workbook"
+        )
+    return _build_rows(read_rows(source))
+
+
+def _build_rows(table: TableLines) -> ParsedTable:
+    """ALH-222's row rules, fed by whichever reader the format asked for."""
+    if not table.lines:
+        return ParsedTable(problems=["no header row: the file must name its columns"])
+    _, header = table.lines[0]
     if not any(cell.strip() for cell in header):
         return ParsedTable(problems=["no header row: the file must name its columns"])
 
@@ -136,15 +299,36 @@ def parse_outcome_table(source: str | bytes, fmt: str = READABLE_FORMAT) -> Pars
             ],
         )
 
+    #: The columns a row cannot be filed without, so an unreadable cell in one is a refusal.
+    needed = {index for index, _ in statement_columns} | {
+        index for index, name in field_columns if name in ("importance", "satisfaction")
+    }
+    names = {index: name for index, name in statement_columns + field_columns}
+    order = {name: index for index, name in enumerate(header)}
+
     rows: list[ImportRow] = []
-    for cells in reader:
-        if not any(cell.strip() for cell in cells):
+    unreadable_optional: dict[str, int] = {}
+    for number, cells in table.lines[1:]:
+        if not any(cell.strip() for cell in cells) and number not in table.formula_cells:
             continue
         values = {
             name: cells[index].strip() if index < len(cells) else ""
             for index, name in field_columns
         }
         problems: list[str] = []
+
+        for index in table.formula_cells.get(number, []):
+            if index in needed:
+                problems.append(
+                    f"cell {_column_letter(index)}{number} is a formula with no stored value; "
+                    "this import reads stored values and never computes them — "
+                    "paste it as values and import again"
+                )
+            else:
+                name = names.get(index) or _normalise(
+                    header[index] if index < len(header) else f"column {_column_letter(index)}"
+                )
+                unreadable_optional[name] = unreadable_optional.get(name, 0) + 1
 
         named = [
             (name, cells[index].strip())
@@ -173,7 +357,7 @@ def parse_outcome_table(source: str | bytes, fmt: str = READABLE_FORMAT) -> Pars
 
         rows.append(
             ImportRow(
-                line=reader.line_num,
+                line=number,
                 statement=statement,
                 importance=scores["importance"],
                 satisfaction=scores["satisfaction"],
@@ -187,11 +371,35 @@ def parse_outcome_table(source: str | bytes, fmt: str = READABLE_FORMAT) -> Pars
             )
         )
 
+    warnings = _unreadable_optional_warning(unreadable_optional, order)
+
     if not rows:
         return ParsedTable(
-            ignored_columns=ignored, problems=["no data rows: the file has nothing to import"]
+            ignored_columns=ignored,
+            problems=["no data rows: the file has nothing to import"],
+            warnings=warnings,
         )
-    return ParsedTable(rows=rows, ignored_columns=ignored)
+    return ParsedTable(rows=rows, ignored_columns=ignored, warnings=warnings)
+
+
+def _unreadable_optional_warning(counts: dict[str, int], order: dict[str, int]) -> list[str]:
+    """One sentence for the optional cells that held a formula and nothing else.
+
+    A note that silently disappears is a filing detail the report can be read and fixed from; a
+    score that silently disappears is a lie about the research, and that case is a refusal instead.
+    """
+    total = sum(counts.values())
+    if not total:
+        return []
+    names = ", ".join(sorted(counts, key=lambda name: order.get(name, len(order))))
+    if total == 1:
+        return [
+            f"1 optional cell holds a formula with no stored value ({names}); it was read as empty"
+        ]
+    return [
+        f"{total} optional cells hold a formula with no stored value ({names}); "
+        "they were read as empty"
+    ]
 
 
 # --------------------------------------------------------------------------- the loop
@@ -344,6 +552,9 @@ def import_outcomes(
     report = ImportReport(
         job_id=job_id, dry_run=dry_run, ignored_columns=dict(table.ignored_columns)
     )
+    #: The file's own condition goes first: it is what the person can fix in their spreadsheet,
+    #: while everything below it is what the store already knew.
+    report.warnings.extend(table.warnings)
     if table.problems:
         report.refused.append({"line": 1, "statement": "", "reason": table.problems[0]})
         return report
