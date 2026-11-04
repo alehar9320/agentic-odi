@@ -59,14 +59,19 @@ is a history; history outlives the thing it is about.
 
 ## Identity and dedupe
 
-`fingerprint = sha256("kind|subject_kind|subject_id|discriminator")`. Recording a
+`fingerprint = sha256("kind|subject_kind|subject_id|discriminator")`, with the id of
+the store event that carried the change appended when the emitter passes one:
+`sha256("kind|subject_kind|subject_id|discriminator|source_event_id")`. Recording a
 signal whose fingerprint already exists returns the existing record instead of
 creating a second one. This is what makes an ingest re-run safe: the inbox does
 not grow by one row per retry.
 
-The discriminator is what distinguishes two real changes to the same subject
-(for example, two different score transitions), so dedupe suppresses echoes
-without suppressing news.
+The discriminator is the value the subject landed on, which cannot separate a retry
+from a second real change that happens to land on the same value — a score taken
+`8 → 5 → 8` would look like the first `8` again. The source event id names the write
+instead of the value: one write is one id, so replaying a change stays one signal
+while a later change is its own item, whatever it lands on. Emitters that do not
+pass an id keep the four-field fingerprint, and rows stored before this keep theirs.
 
 ## Attention budget
 
