@@ -4484,14 +4484,17 @@ details[open] summary {
 }
 
 /* 6. Live status pill dot pulse indicator */
-.studio-pill::before,
-.status-dot::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+
+/* A pill is a label, not an indicator: no pseudo-element here, or the label
+ * grows a dot it never asked for. */
+.studio-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 @keyframes pill-dot-pulse {
@@ -4503,12 +4506,6 @@ details[open] summary {
     opacity: 0.4;
     transform: scale(0.75);
   }
-}
-
-.pill-green::before,
-.pill-amber::before,
-.pill-blue::before {
-  animation: pill-dot-pulse 2s ease-in-out infinite;
 }
 
 /* 16. Evidence stream signal pulse */
@@ -4666,6 +4663,7 @@ details[open] summary {
 }
 
 .status-dot {
+  display: inline-block;
   width: 7px;
   height: 7px;
   flex: none;
@@ -4682,6 +4680,14 @@ details[open] summary {
 .status-dot.is-unknown {
   background: #5b616c;
   box-shadow: none;
+}
+
+/* Forced-colors mode suppresses backgrounds, so the disc would vanish; a ring
+ * keeps the state visible without adding a second dot. */
+@media (forced-colors: active) {
+  .status-dot {
+    border: 1px solid CanvasText;
+  }
 }
 
 .bar__bell {
