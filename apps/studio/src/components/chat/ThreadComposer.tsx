@@ -261,6 +261,17 @@ function ComposerBody({
             if (files.length === 0) {
               return;
             }
+            let text = "";
+            try {
+              text = event.clipboardData?.getData?.("text/plain") ?? "";
+            } catch {
+              text = "";
+            }
+            if (text !== "") {
+              // Let the browser insert text at the caret and attach files alongside it.
+              onFiles(files);
+              return;
+            }
             event.preventDefault();
             onFiles(files);
           }}
