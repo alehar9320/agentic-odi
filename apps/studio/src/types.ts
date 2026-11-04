@@ -58,6 +58,11 @@ export type SegmentVerdict = "underserved" | "overserved" | "appropriately_serve
  * job and evidenced by outcomes. `verdict` is null when an outcome in the group
  * has no score — the studio reports that as "not enough signal" rather than
  * guessing. No demographic field exists here by design.
+ *
+ * `people_inferred` is the provenance of the group itself: true when `people`
+ * was derived from the outcomes rather than supplied, which the board words as
+ * a candidate segment. The `basis` field (#475) will name the derivation more
+ * precisely; it is deliberately not added here.
  */
 export interface Segment {
   id: string;
