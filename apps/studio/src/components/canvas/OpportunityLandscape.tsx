@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
 import {
   formatOpportunityScore,
+  hasScore,
   isUnderserved,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
@@ -136,31 +137,43 @@ export function OpportunityLandscape() {
           </p>
         </div>
 
-        {/* View Mode Switcher */}
-        <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", padding: 3, borderRadius: 8, border: "1px solid var(--studio-border)" }}>
+        {/* The view switcher, and the one action that leaves the screen for a document. */}
+        <div className="field__row">
+          <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", padding: 3, borderRadius: 8, border: "1px solid var(--studio-border)" }}>
+            <button
+              type="button"
+              className={`studio-button ${viewMode === "matrix" ? "studio-button--primary" : ""}`}
+              style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
+              onClick={() => setViewMode("matrix")}
+            >
+              📊 Matrix
+            </button>
+            <button
+              type="button"
+              className={`studio-button ${viewMode === "cards" ? "studio-button--primary" : ""}`}
+              style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
+              onClick={() => setViewMode("cards")}
+            >
+              🎴 Visual Cards
+            </button>
+            <button
+              type="button"
+              className={`studio-button ${viewMode === "table" ? "studio-button--primary" : ""}`}
+              style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
+              onClick={() => setViewMode("table")}
+            >
+              📋 Table View
+            </button>
+          </div>
+
           <button
             type="button"
-            className={`studio-button ${viewMode === "matrix" ? "studio-button--primary" : ""}`}
-            style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
-            onClick={() => setViewMode("matrix")}
+            className="button button--ghost"
+            onClick={() => openPanel("brief")}
+            disabled={!hasRecords}
+            title={hasRecords ? "The document a review reads" : "Nothing to brief yet"}
           >
-            📊 Matrix
-          </button>
-          <button
-            type="button"
-            className={`studio-button ${viewMode === "cards" ? "studio-button--primary" : ""}`}
-            style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
-            onClick={() => setViewMode("cards")}
-          >
-            🎴 Visual Cards
-          </button>
-          <button
-            type="button"
-            className={`studio-button ${viewMode === "table" ? "studio-button--primary" : ""}`}
-            style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
-            onClick={() => setViewMode("table")}
-          >
-            📋 Table View
+            Export brief
           </button>
         </div>
       </div>
@@ -376,6 +389,36 @@ interface PlottedOutcome {
   cy: number;
 }
 
+// The matrix maps (satisfaction, importance) into the 500x360 viewBox. The
+// underserved boundary is `importance = 5 + satisfaction / 2`, derived from
+// `importance + max(importance - satisfaction, 0) > 10`; it runs from
+// (satisfaction 0, importance 5) to (satisfaction 10, importance 10).
+const PLOT_LEFT = 40;
+const PLOT_RIGHT = 480;
+const PLOT_TOP = 20;
+const PLOT_DATA_TOP = 40;
+const PLOT_DATA_BOTTOM = 320;
+const PLOT_WIDTH = PLOT_RIGHT - PLOT_LEFT;
+const PLOT_DATA_HEIGHT = PLOT_DATA_BOTTOM - PLOT_DATA_TOP;
+
+export function plotX(satisfaction: number): number {
+  return (satisfaction / 10) * PLOT_WIDTH + PLOT_LEFT;
+}
+
+export function plotY(importance: number): number {
+  return PLOT_DATA_BOTTOM - (importance / 10) * PLOT_DATA_HEIGHT;
+}
+
+// Underserved zone polygon: top-left, boundary-left, boundary-right, top-right.
+const underservedPolygonPoints = [
+  [PLOT_LEFT, PLOT_TOP],
+  [plotX(0), plotY(5)],
+  [plotX(10), plotY(10)],
+  [PLOT_RIGHT, PLOT_TOP],
+]
+  .map(([x, y]) => `${x},${y}`)
+  .join(" ");
+
 function OpportunityMatrixView({
   outcomes,
   selectedOutcomeId,
@@ -399,8 +442,8 @@ function OpportunityMatrixView({
       score,
       underserved: isUnderserved(score),
       // Map (satisfaction, importance) into the 500x360 viewBox.
-      cx: (satisfaction / 10) * 440 + 40,
-      cy: 320 - (importance / 10) * 280,
+      cx: plotX(satisfaction),
+      cy: plotY(importance),
     };
   });
 
@@ -526,17 +569,17 @@ function OpportunityMatrixView({
 
             {/* Grid lines */}
             {[0, 2, 4, 6, 8, 10].map((val) => {
-              const x = (val / 10) * 440 + 40;
-              const y = 320 - (val / 10) * 280;
+              const x = plotX(val);
+              const y = plotY(val);
               return (
                 <g key={val}>
                   {/* Vertical grid line */}
-                  <line x1={x} y1={20} x2={x} y2={320} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
+                  <line x1={x} y1={PLOT_TOP} x2={x} y2={PLOT_DATA_BOTTOM} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
                   <text x={x} y={338} fill="var(--studio-muted)" fontSize="10" textAnchor="middle">
                     {val}
                   </text>
                   {/* Horizontal grid line */}
-                  <line x1={40} y1={y} x2={480} y2={y} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
+                  <line x1={PLOT_LEFT} y1={y} x2={PLOT_RIGHT} y2={y} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
                   <text x={30} y={y + 3} fill="var(--studio-muted)" fontSize="10" textAnchor="end">
                     {val}
                   </text>
@@ -547,7 +590,7 @@ function OpportunityMatrixView({
             {/* Underserved / High Opportunity Region Polygon (Imp + max(Imp - Sat, 0) > 10) */}
             {/* High importance, low satisfaction area top-left */}
             <polygon
-              points="40,20 280,20 480,220 480,320 40,320"
+              points={underservedPolygonPoints}
               fill="url(#underservedGlow)"
               stroke="rgba(251, 191, 36, 0.2)"
               strokeWidth="1"
@@ -735,8 +778,8 @@ function OpportunityTableView({
         </thead>
         <tbody>
           {outcomes.map((outcome, idx) => {
-            const opp = outcome.opportunity_score ?? 0;
-            const underserved = isUnderserved(opp);
+            const scored = hasScore(outcome.opportunity_score);
+            const underserved = scored && isUnderserved(outcome.opportunity_score);
             const isSelected = selectedOutcomeId === outcome.id;
 
             return (
@@ -783,7 +826,7 @@ function OpportunityTableView({
                     color: underserved ? "var(--studio-amber)" : "inherit",
                   }}
                 >
-                  {formatOpportunityScore(outcome.opportunity_score)}
+                  {scored ? formatOpportunityScore(outcome.opportunity_score) : "—"}
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span
@@ -794,7 +837,7 @@ function OpportunityTableView({
                       fontSize: "0.72rem",
                     }}
                   >
-                    {underserved ? "UNDERSERVED" : "NORMAL"}
+                    {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : "Not scored"}
                   </span>
                 </td>
               </tr>

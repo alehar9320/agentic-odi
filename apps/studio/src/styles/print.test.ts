@@ -24,3 +24,34 @@ describe("print stylesheet", () => {
     expect(themeCss).toContain('@import "./print.css"');
   });
 });
+
+/**
+ * The brief sheet marks the body while the print dialog is open, so the page
+ * can be the document rather than whatever happened to be on screen.
+ */
+function briefRules(css: string): string {
+  return (css.match(/body\.brief-printing[^{]*\{[^}]*\}/g) ?? []).join("\n");
+}
+
+describe("decision brief print", () => {
+  it("keeps the conversation and the studio chrome off the page", () => {
+    const rules = briefRules(printCss);
+    expect(rules).not.toBe("");
+    for (const selector of [".chat", ".bar", ".composer", ".lens__head", ".lens__foot"]) {
+      expect(rules).toContain(selector);
+    }
+    expect(rules).toMatch(/display:\s*none/);
+  });
+
+  it("hides the sheet's own controls, which are not part of the document", () => {
+    const rules = briefRules(printCss);
+    expect(rules).toContain(".brief__bar");
+    expect(rules).toContain(".brief__objection");
+  });
+
+  it("prints the brief dark on white and never orphans a heading or a line", () => {
+    const rules = briefRules(printCss);
+    expect(rules).toMatch(/\.brief__doc[^}]*color:\s*#111/s);
+    expect(rules).toMatch(/\.brief__doc[^}]*break-inside:\s*avoid/s);
+  });
+});
