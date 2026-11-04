@@ -57,6 +57,8 @@ let canvasRecords: Record<string, unknown> = {};
 let bootCorrupt = false;
 let chatAborts = false;
 let chatFailure: Error | null = null;
+let chatHangs = false;
+let releaseChat: (() => void) | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
 let llmUnhealthy = false;
@@ -68,6 +70,7 @@ let featuredFetches = 0;
 let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+let conversationCreates = 0;
 
 // The follow-up queue (#410) needs a turn that stays in flight so later sends
 // actually line up behind it: /api/chat then returns a stream the test closes
@@ -130,6 +133,19 @@ function route(
     }
     if (chatFailure) {
       throw chatFailure;
+    }
+    if (chatHangs) {
+      // A reply still in the air. A browser's fetch rejects on abort, so the
+      // studio's own cancel path can be exercised against this stub.
+      const signal = init?.signal;
+      return new Promise<Response>((resolve, reject) => {
+        releaseChat = () => resolve(sse(chatStream ?? DEFAULT_CHAT_STREAM));
+        signal?.addEventListener("abort", () => {
+          const error = new Error("The user aborted a request.");
+          error.name = "AbortError";
+          reject(error);
+        });
+      });
     }
     if (gateChats) {
       return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
@@ -261,6 +277,7 @@ function route(
   }
   if (url === "/api/conversations") {
     if (init?.method === "POST") {
+      conversationCreates += 1;
       return json({
         conversation: {
           id: "c-new",
@@ -1370,6 +1387,215 @@ describe("StudioContext boot failure", () => {
 
     expect(result.current.bootError).toBeNull();
     expect(result.current.sidecarReachable).toBe(true);
+  });
+});
+
+describe("StudioContext startNewThread (#319)", () => {
+  // A turn that leaves a tool call, an offline flag, and its own conversation
+  // id behind — everything the Undo snapshot has to carry back.
+  const RICH_STREAM =
+    'event: conversation\ndata: {"id":"c-9","title":"thread"}\n\n' +
+    'event: status\ndata: {"phase":"offline"}\n\n' +
+    'event: tool\ndata: {"name":"list_jobs","status":"ok","preview":"3 jobs"}\n\n' +
+    'event: delta\ndata: {"text":"Three jobs."}\n\n' +
+    'event: message\ndata: {"content":"Three jobs."}\n\n';
+
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = RICH_STREAM;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    chatHangs = false;
+    releaseChat = null;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    conversationCreates = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    chatStream = null;
+    chatHangs = false;
+    releaseChat = null;
+    document.body.innerHTML = "";
+  });
+
+  async function booted() {
+    const harness = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(harness.result.current.conversationId).toBe("c-1"));
+    return harness;
+  }
+
+  async function threadWithOneTurn() {
+    const harness = await booted();
+    await act(async () => {
+      await harness.result.current.sendMessage("How many jobs?");
+    });
+    expect(harness.result.current.messages.length).toBeGreaterThan(1);
+    expect(harness.result.current.conversationId).toBe("c-9");
+    return harness;
+  }
+
+  it("refuses to start a new thread while a reply is still coming", async () => {
+    const harness = await booted();
+    chatHangs = true;
+    await act(async () => {
+      void harness.result.current.sendMessage("How many jobs?");
+    });
+    expect(harness.result.current.streaming).toBe(true);
+    const before = harness.result.current.messages;
+
+    const handle = harness.result.current.startNewThread();
+
+    expect(handle).toBeNull();
+    expect(harness.result.current.messages).toEqual(before);
+    expect(harness.result.current.streaming).toBe(true);
+
+    await act(async () => {
+      releaseChat?.();
+    });
+  });
+
+  it("aborts the reply when told to stop it", async () => {
+    const harness = await booted();
+    chatHangs = true;
+    await act(async () => {
+      void harness.result.current.sendMessage("How many jobs?");
+    });
+
+    await act(async () => {
+      harness.result.current.startNewThread({ stop: true });
+      releaseChat?.();
+    });
+
+    expect(harness.result.current.streaming).toBe(false);
+    expect(harness.result.current.messages).toEqual([]);
+  });
+
+  it("creates no conversation until the first message", async () => {
+    const harness = await threadWithOneTurn();
+    expect(conversationCreates).toBe(0);
+
+    await act(async () => {
+      harness.result.current.startNewThread();
+    });
+
+    expect(conversationCreates).toBe(0);
+    expect(harness.result.current.conversationId).toBeNull();
+    expect(harness.result.current.messages).toEqual([]);
+
+    chatStream = null;
+    await act(async () => {
+      await harness.result.current.sendMessage("A new question.");
+    });
+
+    expect(harness.result.current.conversationId).toBe("c-2");
+    expect(chatBody?.conversation_id).toBeNull();
+  });
+
+  it("restores the thread exactly when Undo runs inside the ten seconds", async () => {
+    const viewport = document.createElement("div");
+    viewport.className = "chat__scroll";
+    Object.defineProperty(viewport, "scrollTop", {
+      configurable: true,
+      writable: true,
+      value: 812,
+    });
+    document.body.append(viewport);
+
+    const harness = await threadWithOneTurn();
+    const before = harness.result.current.messages;
+    const beforeToolActivity = harness.result.current.toolActivity;
+    const beforeOfflineReply = harness.result.current.offlineReplyFor;
+    // The undo has to bring something back, not compare two empties.
+    expect(beforeToolActivity.length).toBeGreaterThan(0);
+
+    let handle!: ReturnType<typeof harness.result.current.startNewThread>;
+    await act(async () => {
+      handle = harness.result.current.startNewThread();
+    });
+    expect(handle).not.toBeNull();
+
+    viewport.scrollTop = 0;
+    await act(async () => {
+      handle?.undo();
+    });
+
+    expect(harness.result.current.messages).toEqual(before);
+    expect(harness.result.current.messages.map((message) => message.id)).toEqual(
+      before.map((message) => message.id),
+    );
+    expect(harness.result.current.messages.map((message) => message.parentId)).toEqual(
+      before.map((message) => message.parentId),
+    );
+    expect(harness.result.current.conversationId).toBe("c-9");
+    expect(harness.result.current.toolActivity).toEqual(beforeToolActivity);
+    expect(harness.result.current.offlineReplyFor).toBe(beforeOfflineReply);
+    expect(viewport.scrollTop).toBe(812);
+  });
+
+  it("offers a ten-second Undo and stops offering it once a message is sent", async () => {
+    const harness = await threadWithOneTurn();
+
+    let handle!: ReturnType<typeof harness.result.current.startNewThread>;
+    await act(async () => {
+      handle = harness.result.current.startNewThread();
+    });
+
+    const undoToast = harness.result.current.toasts.at(-1);
+    expect(undoToast?.message).toBe("New thread. Your last one is still saved.");
+    expect(undoToast?.action?.label).toBe("Undo");
+    expect(undoToast?.durationMs).toBe(10_000);
+
+    chatStream = null;
+    await act(async () => {
+      await harness.result.current.sendMessage("A new question.");
+    });
+
+    expect(harness.result.current.toasts.some((toast) => toast.action?.label === "Undo")).toBe(false);
+    expect(harness.result.current.toasts.at(-1)?.message).toBe("New thread started.");
+
+    const messagesAfter = harness.result.current.messages;
+    await act(async () => {
+      handle?.undo();
+    });
+    expect(harness.result.current.messages).toBe(messagesAfter);
+    expect(harness.result.current.conversationId).toBe("c-2");
+  });
+
+  it("leaves the canvas, brief, memory, and connectors where they were", async () => {
+    const harness = await threadWithOneTurn();
+    await waitFor(() => expect(harness.result.current.connectors.length).toBeGreaterThanOrEqual(0));
+    const before = JSON.stringify({
+      canvas: harness.result.current.canvas,
+      brief: harness.result.current.brief,
+      memory: harness.result.current.memory,
+      connectors: harness.result.current.connectors,
+      settings: harness.result.current.settings,
+    });
+
+    await act(async () => {
+      harness.result.current.startNewThread();
+    });
+
+    const after = JSON.stringify({
+      canvas: harness.result.current.canvas,
+      brief: harness.result.current.brief,
+      memory: harness.result.current.memory,
+      connectors: harness.result.current.connectors,
+      settings: harness.result.current.settings,
+    });
+    expect(after).toBe(before);
   });
 });
 
