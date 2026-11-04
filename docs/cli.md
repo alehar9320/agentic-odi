@@ -338,6 +338,24 @@ agentic-odi studies list --job <job-id> --json
 `study_id` scoping them to a study of their own job; a row that predates studies has
 none, and opening studies never invents one for it.
 
+### Extract candidate outcomes
+
+`interviews extract` turns one quote into candidate desired-outcome statements.
+It never writes an Outcome: a valid proposal is stored `proposed`, and a
+proposal that fails the ODI statement check is stored `rejected` with the
+validator's reason, so a bad extractor is visible rather than silent. Running it
+again adds nothing and never resets a decision.
+
+```bash
+agentic-odi interviews extract <quote-id>
+agentic-odi candidates list --status proposed
+agentic-odi candidates list --interview-id <interview-id> --json
+agentic-odi candidates get <candidate-id>
+agentic-odi candidates delete <candidate-id> --yes
+```
+
+Deleting an interview removes its candidates along with its quotes.
+
 ## Schema, scoring, and guidance
 
 ```bash

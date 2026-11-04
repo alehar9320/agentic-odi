@@ -520,6 +520,8 @@ def test_page_weights_are_within_budget(page: str):
     # pole; it is a coverage record, not decoration, so the ceiling moves.
     # The Study entity and its two tools (open_study, list_studies) add the
     # last few KB to the MCP reference page. The interview and quote tools with
-    # their two schema entities bring the reference to ~103 KB, so the ceiling
-    # moves with them.
-    assert size <= 108 * 1024, f"{page}: {size} bytes"
+    # their two schema entities bring the reference to ~103 KB. The candidate
+    # review tools (extract_candidates, list_candidates, get_candidate,
+    # update_candidate, delete_candidate) and the OutcomeCandidate schema
+    # entity bring it to ~113 KB, so the ceiling moves with them.
+    assert size <= 120 * 1024, f"{page}: {size} bytes"
