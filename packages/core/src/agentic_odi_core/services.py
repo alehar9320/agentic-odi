@@ -627,6 +627,7 @@ class ODIService:
         sort: str = "opportunity_score",
         limit: int | None = None,
         offset: int = 0,
+        include_children: bool = False,
     ) -> dict[str, Any]:
         """Narrow the library through the shared query, writing nothing.
 
@@ -660,6 +661,7 @@ class ODIService:
             max_score=max_score,
             job_id=job_id,
             sort=sort,
+            include_children=include_children,
         )
         return search_outcomes(self.repo, query, limit, offset)
 

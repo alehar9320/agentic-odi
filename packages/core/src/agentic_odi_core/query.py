@@ -24,12 +24,13 @@ Decisions settled from the parent's readiness blocker:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from agentic_odi_core.errors import ValidationError
-from agentic_odi_core.models import JobStage, Outcome
+from agentic_odi_core.models import JobStage, Outcome, is_scored
 from agentic_odi_core.repository import OUTCOME_SORTS, Repository, page, sort_outcomes
+from agentic_odi_core.theme_tree import subtree_ids
 
 CONFIDENCE_LEVELS = ("scored", "unscored")
 
@@ -47,6 +48,7 @@ class OutcomeQuery:
     max_score: float | None = None
     job_id: str | None = None
     sort: str = "opportunity_score"
+    include_children: bool = False
 
 
 def _validate_query(repo: Repository, query: OutcomeQuery) -> None:
@@ -81,15 +83,6 @@ def _matches_stage(outcome: Outcome, stage: str, repo: Repository) -> bool:
         return False
     step = repo.get_step(outcome.step_id)
     return step is not None and step.stage is not None and step.stage.value == stage
-
-
-def is_scored(outcome: Outcome) -> bool:
-    """The one definition of *measured* in this library: both scores present.
-
-    Public because the theme rollup counts it and the confidence facet counts it, and a person
-    comparing the two numbers deserves one rule rather than two that happen to agree today.
-    """
-    return outcome.importance is not None and outcome.satisfaction is not None
 
 
 def _passes(
@@ -151,6 +144,18 @@ def search_outcomes(
     dimension would show with that dimension's own filter removed.
     """
     _validate_query(repo, query)
+    if query.include_children and query.theme_ids:
+        # A theme can stand for its whole branch, and it does so here rather than in whatever is
+        # looking at the list: the rollup walks the same ids, so the count beside a theme and the
+        # results under it are the same question answered once.
+        branch = {
+            theme_id
+            for selected in query.theme_ids
+            for theme_id in subtree_ids(repo.themes, selected)
+        }
+        query = replace(
+            query, theme_ids=[*query.theme_ids, *(t for t in branch if t not in query.theme_ids)]
+        )
     candidates = [
         outcome
         for outcome in repo.outcomes.values()

@@ -209,6 +209,7 @@ CORE_LAYERS: dict[str, tuple[str, ...]] = {
         "integrity",
         "recovery",
         "query",
+        "theme_tree",
     ),
     "methodology": (
         "services",

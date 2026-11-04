@@ -12,8 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from agentic_odi_core.models import THEME_DEPTH, Outcome, Theme
-from agentic_odi_core.query import is_scored
+from agentic_odi_core.models import THEME_DEPTH, Outcome, Theme, is_scored
 from agentic_odi_core.repository import rank_outcomes
 
 
@@ -31,7 +30,9 @@ class ThemeRollup(BaseModel):
     name: str
     parent_id: str | None
     outcomes: int = Field(ge=0, description="Outcomes filed under this theme or its children")
-    measured: int = Field(ge=0, description="Of those, the ones with both importance and satisfaction")
+    measured: int = Field(
+        ge=0, description="Of those, the ones with both importance and satisfaction"
+    )
     top_opportunity: float | None = Field(
         None, description="The best opportunity score in the branch, or None if nothing is scored"
     )
@@ -44,9 +45,7 @@ class ThemeRollup(BaseModel):
         return self.model_dump(mode="json")
 
 
-def subtree_ids(
-    themes: Mapping[str, Theme], theme_id: str, depth: int = THEME_DEPTH
-) -> list[str]:
+def subtree_ids(themes: Mapping[str, Theme], theme_id: str, depth: int = THEME_DEPTH) -> list[str]:
     """The theme itself first, then the themes under it, at most ``depth - 1`` levels down.
 
     ``Theme`` forbids only a theme being its own parent, so a store written before the service's

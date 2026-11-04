@@ -62,17 +62,19 @@ The five inputs the spec implies and no task's happy-path test would catch:
 
 **Files:**
 - Modify: `packages/core/src/agentic_odi_core/query.py` (`include_children` field, expansion inside `search_outcomes` after `_validate_query`)
+- Modify: `packages/core/src/agentic_odi_core/services.py` (`search_outcomes` gains the same keyword and hands it to the query)
+- Modify: `tests/test_architecture.py` and `docs/architecture/README.md` together — `theme_tree` joins the persistence group (it imports `repository.rank_outcomes`, so it is not domain, and `query.py` imports it, so it must not be methodology). `test_every_core_module_is_in_exactly_one_group` fails until the new module is in a group.
 - Test: the existing core search test file (`packages/core/tests/test_outcome_search.py` — find it with `ls packages/core/tests | grep -i search`; add there, not a new file)
 
 **Interfaces:**
 - Consumes: `theme_tree.subtree_ids`.
 - Produces: `OutcomeQuery(..., include_children: bool = False)`; `search_outcomes` returns the subtree's `items`/`total` when it is true; facet counts unchanged in meaning.
 
-- [ ] **Step 1: Write the failing tests** — selecting a parent with `include_children=False` returns its own memberships only; with `True` it returns parent + children and `total` equals `theme_rollup(parent).outcomes`; a child selected with `True` returns its own items (a leaf has no children); `theme_ids=["ghost"]` with `True` still refuses `Unknown theme: ghost`; the `theme` facet keeps counting direct memberships of each theme while the list is the subtree.
-- [ ] **Step 2: Run → fail** (unknown keyword / differing totals).
-- [ ] **Step 3: Implement** the field and the expansion — one `if query.include_children and query.theme_ids:` block that rebuilds `theme_ids` from `subtree_ids` over `repo.themes`, deduplicated and order-preserving.
-- [ ] **Step 4: Run → pass**, then `uv run pytest packages/core -q`.
-- [ ] **Step 5: Commit** `feat(core): a theme query that means its whole subtree (ALH-163)`.
+- [x] **Step 1: Write the failing tests** — selecting a parent with `include_children=False` returns its own memberships only; with `True` it returns parent + children and `total` equals `theme_rollup(parent).outcomes`; a child selected with `True` returns its own items (a leaf has no children); `theme_ids=["ghost"]` with `True` still refuses `Unknown theme: ghost`; the `theme` facet keeps counting direct memberships of each theme while the list is the subtree.
+- [x] **Step 2: Run → fail** (unknown keyword / differing totals).
+- [x] **Step 3: Implement** the field and the expansion — one `if query.include_children and query.theme_ids:` block that rebuilds `theme_ids` from `subtree_ids` over `repo.themes`, deduplicated and order-preserving.
+- [x] **Step 4: Run → pass**, then `uv run pytest packages/core -q`.
+- [x] **Step 5: Commit** `feat(core): a theme query that means its whole subtree (ALH-163)`.
 
 ### Task 3: The contract, the server, and the terminal's read path
 
