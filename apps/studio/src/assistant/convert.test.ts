@@ -107,6 +107,58 @@ describe("toThreadMessageLike", () => {
     expect(part.isError).toBe(false);
   });
 
+  it("hands a finished call the arguments it was given and its whole result", () => {
+    const value = { jobs: [{ id: "JOB-1", name: "Retention" }] };
+    const message = toThreadMessageLike(
+      assistant({
+        parts: [
+          {
+            kind: "tool",
+            id: "call-1",
+            name: "get_jobs",
+            status: "ok",
+            preview: '[{"id":',
+            arguments: { query: "Retention" },
+            result: JSON.stringify(value),
+          },
+        ],
+      }),
+    );
+
+    const part = (
+      message.content as unknown as {
+        args?: unknown;
+        argsText?: string;
+        result?: { status?: string; preview?: string; value?: unknown };
+      }[]
+    )[0];
+    expect(part.args).toEqual({ query: "Retention" });
+    expect(part.argsText).toBe('{"query":"Retention"}');
+    // The nested object survives as an object, not as the collapsed preview.
+    expect(part.result?.value).toEqual(value);
+    expect(part.result?.status).toBe("ok");
+    expect(part.result?.preview).toBe('[{"id":');
+  });
+
+  it("keeps a plain-text result as the text it arrived as", () => {
+    const message = toThreadMessageLike(
+      assistant({
+        parts: [
+          {
+            kind: "tool",
+            id: "call-1",
+            name: "add_connector",
+            status: "ok",
+            result: "registered connector Retention",
+          },
+        ],
+      }),
+    );
+
+    const part = (message.content as unknown as { result?: { value?: unknown } }[])[0];
+    expect(part.result?.value).toBe("registered connector Retention");
+  });
+
   it("marks a failed tool call as an error without inventing a result", () => {
     const message = toThreadMessageLike(
       assistant({

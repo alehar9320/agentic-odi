@@ -241,6 +241,21 @@ export interface ChatAttachment {
   dataUrl?: string;
 }
 
+/**
+ * Anything a JSON frame can carry. The sidecar's frames are parsed from JSON
+ * text, so a value read off one is a `JsonValue` by construction — this is the
+ * type the transcript shows a tool's arguments as, without a cast at every use.
+ * Read-only all the way down, which is both what a parsed frame really is and
+ * what the assistant-ui parts expect.
+ */
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly JsonValue[]
+  | { readonly [key: string]: JsonValue };
+
 export type ChatPart =
   | { kind: "text"; text: string }
   | { kind: "reasoning"; text: string }
@@ -250,7 +265,12 @@ export type ChatPart =
       id: string;
       name: string;
       status: ToolStatus;
+      /** The first characters of the answer, for the collapsed line. */
       preview?: string;
+      /** What the model asked the tool for, as the sidecar sent it. */
+      arguments?: Record<string, JsonValue>;
+      /** The whole answer, verbatim — the preview is only its first 280 characters. */
+      result?: string;
       /** Present while the runtime is waiting for the user's answer. */
       approval?: ToolApproval;
     }

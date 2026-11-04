@@ -5072,8 +5072,20 @@ details[open] summary {
   gap: 7px;
   flex-wrap: wrap;
   margin: 3px 0;
+  padding: 1px 0;
+  border: 0;
+  background: none;
   color: var(--faint);
+  font: inherit;
   font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tool-trace:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 .tool-trace.is-error {
@@ -5095,6 +5107,71 @@ details[open] summary {
   white-space: nowrap;
   text-overflow: ellipsis;
   max-width: 46ch;
+}
+
+.tool-call__chevron {
+  opacity: 0.5;
+  transition: transform 0.16s ease;
+}
+
+.tool-call__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.tool-call__body {
+  margin: 4px 0 10px;
+  padding: 9px 11px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.tool-call__section + .tool-call__section {
+  margin-top: 9px;
+}
+
+.tool-call__label {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--faint);
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.tool-call__json {
+  margin: 0;
+  overflow-x: auto;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tool-call__waiting {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.tool-call__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.tool-call__copied {
+  color: var(--green);
+  font-size: 11.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-call__chevron {
+    transition: none;
+  }
 }
 
 .approval {

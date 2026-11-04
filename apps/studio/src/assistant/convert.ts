@@ -26,6 +26,27 @@ const TOOL_RESULT: Record<string, Record<string, unknown>> = {
   declined: { status: "declined" },
 };
 
+/**
+ * The tool's own answer, as far as it can be read: JSON when it is JSON, the
+ * text it arrived as when it is not. A tool that answers in prose is not made
+ * to look like an object, and an object is never flattened into a string.
+ */
+function decodeResult(result: string | undefined): unknown {
+  if (result === undefined) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(result);
+  } catch {
+    return result;
+  }
+}
+
+/** The inverse of {@link decodeResult}: text stays text, structure is re-encoded. */
+function encodeResult(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 function toPart(part: ChatPart): LikePart | null {
   switch (part.kind) {
     case "text":
@@ -56,6 +77,8 @@ function toPart(part: ChatPart): LikePart | null {
 
     case "tool": {
       const approval = part.approval;
+      const args = part.arguments ?? {};
+      const argsText = JSON.stringify(args);
       if (approval) {
         // A pending write is a question, not a result: the runtime keeps the
         // message in `requires-action` until the user answers.
@@ -63,18 +86,25 @@ function toPart(part: ChatPart): LikePart | null {
           type: "tool-call",
           toolCallId: part.id,
           toolName: part.name,
-          args: {},
-          argsText: "{}",
+          args,
+          argsText,
           approval: { id: approval.id, prompt: approval.prompt },
         };
       }
+      const value = decodeResult(part.result);
       return {
         type: "tool-call",
         toolCallId: part.id,
         toolName: part.name,
-        args: {},
-        argsText: "{}",
-        result: { ...(TOOL_RESULT[part.status] ?? {}), preview: part.preview ?? "" },
+        args,
+        argsText,
+        // The envelope keeps what the collapsed line already showed; `value` is
+        // the whole answer next to it, not instead of it.
+        result: {
+          ...(TOOL_RESULT[part.status] ?? {}),
+          preview: part.preview ?? "",
+          ...(value !== undefined ? { value } : {}),
+        },
         isError: part.status === "error",
       };
     }
@@ -206,7 +236,9 @@ export function toChatMessage(
         break;
 
       case "tool-call": {
-        const result = part.result as { status?: string; preview?: string } | undefined;
+        const result = part.result as
+          | { status?: string; preview?: string; value?: unknown }
+          | undefined;
         const approval = part.approval;
         const awaiting = approval !== undefined && approval.approved === undefined && !part.result;
         parts.push({
@@ -221,6 +253,8 @@ export function toChatMessage(
                 ? "declined"
                 : "ok",
           ...(result?.preview ? { preview: result.preview } : {}),
+          ...(part.args ? { arguments: part.args } : {}),
+          ...(result?.value !== undefined ? { result: encodeResult(result.value) } : {}),
           ...(awaiting ? { approval: { id: approval.id, prompt: approval.prompt ?? "" } } : {}),
         });
         break;
