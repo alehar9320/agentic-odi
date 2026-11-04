@@ -21,8 +21,11 @@ only useful if it can be measured and argued with. The contract has five parts:
 5. **A claim check on a score** — a scored outcome carries the questions behind
    the number: what was `asked`, the `answers` that came back, and any `skips`
    with a reason. `verified` is derived from the answers, never typed in.
+6. **The questions come first** — three of them, put to the person, before any
+   number is written. The prompts say so, the card shows them, and
+   `assert_asked_before_scoring` judges a transcript by that order.
 
-Everything else (segments, strategy, the Job Map) is downstream of those five.
+Everything else (segments, strategy, the Job Map) is downstream of those six.
 
 ## Why it exists
 
@@ -38,12 +41,17 @@ hand-edited record cannot disagree about what a valid outcome is.
 |---|---|---|
 | Importance and satisfaction are 1–10 | `Outcome` fields (`packages/core/src/agentic_odi_core/models.py:116-121`) and `ODIService.add_outcome` (`services.py:411-414`) | Pydantic rejects out-of-range values; the service raises `ValueOutOfRangeError` before writing |
 | Opportunity score is computed, not supplied | `compute_opportunity_score` (`models.py:85-87`), called by `add_outcome` and the SQLite update path | A caller cannot store a hand-picked score |
+| A score is compared as stored and shown rounded | `isUnderserved` and `formatOpportunityScore` (`apps/studio/src/lib/odi.ts`); `OpportunityLandscape` sorts and filters on `outcome.opportunity_score` | Rounding happens once, where a score becomes text. Two outcomes that both print `13.0` still have an order, so sorting, filtering and averaging never read the formatted string |
+| A service's reported scores match the shared arithmetic | `assert_outcome_scores_match` (`evaluation.py`) judged against `packages/core/tests/fixtures/opportunity-score.json` | A service that scores through `compute_opportunity_score` passes; one that computes its own fails with the outcome id and both values named. An unscored outcome is allowed |
 | A score carries the questions behind it | `ClaimCheck` on `Outcome` (`models.py`), `require_claim_check` and `ODIService.add_outcome` (`services.py`), the `add_outcome` MCP tool (`apps/mcp-server/.../mcp_server.py`) | The MCP tool refuses a score with no `claim_check`; the check records `asked`/`answers`/`skips` and derives `verified`. Unscored outcomes stay legal; a skip without a reason is rejected |
+| The questions reach the person before the number | `assert_asked_before_scoring` (`evaluation.py`) over an interview transcript; the Studio system prompt (`apps/studio-api/.../studio/chat.py`), the ODI guidelines (`messages.py`) and the `add_outcome` description | The prompts put three questions before any score and forbid answering them yourself. The harness refuses a transcript that scores first, and any answer that is not in a customer turn before the score; an unscored outcome needs no interview |
 | Outcome statements follow the ODI format | `evaluate_outcome_statement` (`evaluation.py:84-147`) via `ODIService.add_outcome(validate_statement=True)` | Invalid statements raise `InvalidOutcomeStatementError` with issues and suggestions |
 | Statements can be checked before writing | `evaluate_outcome` MCP tool, `odi desired-outcomes evaluate`, `odi evaluate` | Returns `valid`, direction, unit, object, clarifier, issues, suggestions |
 | The eight Universal Job Map stages are one constant | `JOB_STAGE_ORDER` and `job_stage_catalog()` (`models.py`), generated to `apps/studio/src/domain/jobStages.ts` | `scripts/gen_job_stages.py` regenerates the file; `tests/scripts/test_gen_job_stages.py` fails if it is stale |
 | Steps occupy a stage | `Step.stage_index` (`ge=1, le=8`) and `Step.stage` (`JobStage`) | Position is optional but bounded when present |
+| A score above 10 is "underserved" | `UNDERSERVED_SCORE` (`evaluation.py:13`) and `isUnderserved` with `UNDERSERVED_THRESHOLD` (`apps/studio/src/lib/odi.ts:9`) | `classify_opportunity` buckets strictly above the line, so exactly 10 reads as served; `tests/test_underserved_threshold_parity.py` fails if the Python and TypeScript numbers ever disagree |
 | Every adapter exposes the same tools | `ToolName` / `TOOL_SPECS` in `contract.py` | `tests/contract/test_mcp_contract.py` and `test_cli_contract.py` fail on drift |
+| A record shown in full is only ever what was stored | `DETAIL_FIELDS` and the honesty sentences (`apps/studio/src/components/records/RecordDetail.tsx`) | The detail names the fields each kind really has and nothing else — `Outcome.telemetry` stays unshown because it has no defined shape — and says in words that no author or timestamp exists. A missing value renders `—`, an unscored outcome `unscored`; `Unknown`, `N/A`, and a guessed date are never rendered |
 
 The statement checker is deliberately mechanical: it requires a leading
 `Minimize`/`Maximize`, a known unit of measure (or a digit), an object after

@@ -8,6 +8,7 @@ import pytest
 from agentic_odi_mcp_server import mcp
 from fastmcp import Client
 from mcp.types import TextContent
+from mcp_failures import failure, sentence
 
 VTT = """WEBVTT
 
@@ -67,8 +68,9 @@ async def test_import_transcript_reports_malformed_input() -> None:
             },
         )
 
-    assert _text(result).startswith("Error: ")
-    assert "cue timing" in _text(result)
+    text = _text(result)
+    assert failure(text).code == "validation"
+    assert "cue timing" in sentence(text)
 
 
 @pytest.mark.asyncio
