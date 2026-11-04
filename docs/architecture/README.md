@@ -126,7 +126,7 @@ persistence group, which may not call the service door":
 
 | Group | Modules | Rule |
 |---|---|---|
-| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
+| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py`, `transcript.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. `transcript.py` is the pure parser behind interview import. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
 | **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `factory.py`, `integrity.py`, `recovery.py` | Stores what the other groups decide, and keeps the file it stores in readable — `integrity.py` gates a boot on a damaged store, `recovery.py` names the backup to restore. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
 | **methodology** | `services.py`, `segmentation.py`, `strategy.py`, `router.py`, `messages.py`, `steve_jobs.py` | The ODI stages and the LLM path. `services.py` owns the service door every caller enters through; may import domain, persistence, and contract. |
 | **contract** | `contract.py`, `errors.py`, `remote.py`, `schema.py`, `connection.py`, `consent.py` | The MCP wire protocol, enforced against the live registry by `tests/contract/test_mcp_contract.py`. May be imported by anything; imports no persistence and no methodology. |
