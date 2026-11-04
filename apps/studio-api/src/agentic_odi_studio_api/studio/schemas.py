@@ -101,6 +101,10 @@ class BulkQuery(BaseModel):
     min_score: float | None = None
     max_score: float | None = None
     job_id: str | None = None
+    #: A theme can stand for the themes filed under it too. The board's bulk dialog has to widen
+    #: to the same set the visible search just counted, or a preview would promise one set of
+    #: rows and write another.
+    include_children: bool = False
 
 
 class BulkRequest(BaseModel):

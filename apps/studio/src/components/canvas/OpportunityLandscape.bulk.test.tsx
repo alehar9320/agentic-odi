@@ -272,6 +272,38 @@ describe("the preview", () => {
       query: { text: "payment" },
     });
   });
+
+  it("carries the branch flag into the run it asks to be counted", async () => {
+    harness.themes.mockResolvedValue([
+      { id: "t-1", name: "Cash timing", ordinal: 0 },
+      { id: "t-1a", name: "Payment windows", parent_id: "t-1", ordinal: 1 },
+    ]);
+    harness.search.mockResolvedValue({
+      items: LIBRARY,
+      total: 3,
+      facets: { stage: {}, theme: { "t-1": 1 }, confidence: {} },
+    });
+    render(<OpportunityLandscape />);
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: /cash timing/i }));
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: /include subthemes/i }));
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(3));
+
+    toCards();
+    check("O-1");
+    draftChange();
+    fireEvent.click(within(bar()).getByRole("button", { name: /preview all 3 matching/i }));
+
+    await waitFor(() => expect(harness.preview).toHaveBeenCalledTimes(1));
+    // The counted set has to be the written set: a preview that counted the branch and
+    // named only the parent would write one row and report three.
+    expect(harness.preview.mock.calls[0]?.[0]).toMatchObject({
+      outcomeIds: ["O-1"],
+      query: { theme_ids: ["t-1"], include_children: true },
+    });
+  });
 });
 
 describe("applying and taking back", () => {

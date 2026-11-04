@@ -2,7 +2,8 @@
  * ALH-195 (M2-02.2) — the landscape asks the sidecar to narrow the library.
  *
  * The URL is the contract ALH-194 fixed: one parameter per narrowing
- * dimension, `theme_ids` repeated for a multi-theme OR, and the envelope
+ * dimension, `theme_ids` repeated for a multi-theme OR, `include_children`
+ * only when a theme is asked to stand for its branch, and the envelope
  * returned exactly as the sidecar answered it. A count the browser recomputed
  * on the way through is how a facet row disagrees with its own results.
  */
@@ -38,6 +39,7 @@ describe("fetchOutcomeSearch", () => {
       text: "three days",
       stage: "execute",
       themeIds: ["t-1", "t-2"],
+      includeChildren: true,
       confidence: "scored",
       minScore: 8,
       maxScore: 12,
@@ -47,7 +49,8 @@ describe("fetchOutcomeSearch", () => {
 
     expect(calls[0]?.url).toBe(
       "/api/outcomes/search?mcp_url=http%3A%2F%2Fmcp&text=three+days&stage=execute" +
-        "&theme_ids=t-1&theme_ids=t-2&confidence=scored&min_score=8&max_score=12&limit=50&offset=50",
+        "&theme_ids=t-1&theme_ids=t-2&include_children=true" +
+        "&confidence=scored&min_score=8&max_score=12&limit=50&offset=50",
     );
   });
 

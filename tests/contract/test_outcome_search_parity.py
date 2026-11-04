@@ -57,6 +57,10 @@ def _seed(service: ODIService) -> dict[str, str]:
     )
     theme = service.add_theme(name="Cash timing", job_id=job.id)
     service.assign_theme([accuracy.id, exceptions.id], theme.id)
+    #: ALH-163: a child holds the one outcome the parent does not, so a branch is a wider answer
+    #: than a theme, and both doors have to say so.
+    child = service.add_theme(name="Payment windows", job_id=job.id, parent_id=theme.id, ordinal=1)
+    service.assign_theme([timing.id], child.id)
     return {
         "job": job.id,
         "other": other.id,
@@ -64,6 +68,7 @@ def _seed(service: ODIService) -> dict[str, str]:
         "accuracy": accuracy.id,
         "exceptions": exceptions.id,
         "theme": theme.id,
+        "child": child.id,
     }
 
 
@@ -92,9 +97,29 @@ def test_every_query_answers_the_same_on_both_surfaces(tmp_path, query: dict[str
         {**query, "job_id": ids["job"]},
         {**query, "job_id": ids["other"]},
         {**query, "job_id": ids["job"], "theme_ids": [ids["theme"]]},
+        {**query, "job_id": ids["job"], "theme_ids": [ids["theme"]], "include_children": True},
     ]
     for variant in variants:
         assert backend.call("search_outcomes", variant) == _api_search(client, variant), variant
+
+
+def test_a_branch_widens_the_same_way_on_both_doors(tmp_path) -> None:
+    """Agreement alone would not catch a flag both doors ignored — so name the widening."""
+    db_path = str(tmp_path / "odi.db")
+    _, client = _pair(db_path)
+    ids = _seed(client.app.state.service)
+    backend, client = _pair(db_path)
+    query = {"job_id": ids["job"], "theme_ids": [ids["theme"]]}
+
+    narrow = backend.call("search_outcomes", query)
+    branch = backend.call("search_outcomes", {**query, "include_children": True})
+
+    assert narrow["total"] == 2
+    assert branch["total"] == 3
+    assert sorted(item["id"] for item in branch["items"]) == sorted(
+        [ids["accuracy"], ids["exceptions"], ids["timing"]]
+    )
+    assert _api_search(client, {**query, "include_children": True}) == branch
 
 
 def test_an_unshared_store_answers_the_same_on_both_surfaces(tmp_path) -> None:

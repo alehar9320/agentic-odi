@@ -356,7 +356,9 @@ export interface paths {
          *     The body is the contract's own ``{items, total, facets}``, so a query spelled
          *     the same here and in ``agentic-odi desired-outcomes search`` returns identical
          *     ids, totals, and facet counts. ``job_id`` is optional on purpose: searching
-         *     across every job is a request, not a missing parameter.
+         *     across every job is a request, not a missing parameter. ``include_children``
+         *     lets each named theme stand for the themes filed under it too, which is the
+         *     same subtree the theme's rollup counts.
          */
         get: operations["search_outcomes_api_api_outcomes_search_get"];
         put?: never;
@@ -1313,6 +1315,11 @@ export interface components {
             max_score?: number | null;
             /** Job Id */
             job_id?: string | null;
+            /**
+             * Include Children
+             * @default false
+             */
+            include_children: boolean;
         };
         /**
          * BulkRequest
@@ -2970,6 +2977,7 @@ export interface operations {
                 min_score?: number | null;
                 max_score?: number | null;
                 job_id?: string | null;
+                include_children?: boolean;
                 sort?: string;
                 limit?: number | null;
                 offset?: number;

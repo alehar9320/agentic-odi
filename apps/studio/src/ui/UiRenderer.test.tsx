@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const toast = vi.hoisted(() => ({ pushToast: vi.fn() }));
@@ -242,6 +242,80 @@ describe("registry parity", () => {
     for (const type of Object.keys(NODE_COMPONENTS)) {
       expect(types.has(type), type).toBe(true);
     }
+  });
+});
+
+describe("theme tree", () => {
+  const tree = {
+    type: "theme-tree",
+    props: {
+      title: "How the library is grouped",
+      themes: [
+        {
+          theme_id: "t-1",
+          name: "Cash timing",
+          outcomes: 4,
+          measured: 2,
+          top_opportunity: 17,
+          top_statement: "Minimize the time to match a remittance when closing a month",
+        },
+        {
+          theme_id: "t-1a",
+          name: "Payment windows",
+          parent_id: "t-1",
+          outcomes: 2,
+          measured: 1,
+          top_opportunity: 15,
+        },
+        { theme_id: "t-2", name: "Bank feeds", outcomes: 0, measured: 0 },
+        { theme_id: "t-3", name: "Unreviewed", outcomes: 1, measured: 0 },
+      ],
+    },
+  };
+
+  function rowOf(name: string): HTMLElement {
+    const row = screen.getAllByRole("row").find((row) => within(row).queryByText(name));
+    expect(row, name).toBeDefined();
+    return row as HTMLElement;
+  }
+
+  it("shows what each branch holds, how much is measured, and its top score", () => {
+    renderSpec(tree);
+
+    const parent = rowOf("Cash timing");
+    expect(within(parent).getByText("4")).toBeInTheDocument();
+    expect(within(parent).getByText("2")).toBeInTheDocument();
+    expect(within(parent).getByText("17.0")).toBeInTheDocument();
+    expect(within(parent).getByText(/remittance/)).toBeInTheDocument();
+  });
+
+  it("indents a child under the theme it hangs from", () => {
+    renderSpec(tree);
+
+    expect(rowOf("Payment windows").className).toContain("ui-themmtree__row--child");
+    expect(rowOf("Cash timing").className).not.toContain("ui-themmtree__row--child");
+  });
+
+  it("says a branch holds nothing rather than printing a score nobody measured", () => {
+    renderSpec(tree);
+
+    expect(within(rowOf("Bank feeds")).getByText("no outcomes yet")).toBeInTheDocument();
+    expect(within(rowOf("Unreviewed")).getByText("nothing measured yet")).toBeInTheDocument();
+    expect(screen.queryByText("0.0")).not.toBeInTheDocument();
+    expect(screen.queryByText("N/A")).not.toBeInTheDocument();
+  });
+
+  it("keeps a null top score from the tool as no score, not a rejected card", () => {
+    renderSpec({
+      type: "theme-tree",
+      props: {
+        themes: [{ theme_id: "t-9", name: "Odd", outcomes: 1, measured: 1, top_opportunity: null }],
+      },
+    });
+
+    // The protocol drops an optional prop it cannot validate, so the pasted null becomes an
+    // absent score — which this card says outright instead of rounding to zero.
+    expect(within(rowOf("Odd")).getByText("no top recorded")).toBeInTheDocument();
   });
 });
 

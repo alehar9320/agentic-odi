@@ -55,6 +55,8 @@ interface Narrowing {
   text?: string;
   stage?: string;
   themeIds?: string[];
+  /** Every selected theme also stands for the themes filed under it. */
+  includeChildren?: boolean;
   confidence?: string;
   minScore?: number;
   maxScore?: number;
@@ -263,7 +265,27 @@ export function OpportunityLandscape() {
     const next = current.includes(themeId)
       ? current.filter((id) => id !== themeId)
       : [...current, themeId];
-    ask({ ...narrowing, themeIds: next.length ? next : undefined });
+    // With no theme left to stand for a branch, the branch goes with it.
+    ask({
+      ...narrowing,
+      themeIds: next.length ? next : undefined,
+      includeChildren: next.length ? narrowing.includeChildren : undefined,
+    });
+  }
+
+  function hasBranch(themeId: string): boolean {
+    return themes.some((theme) => theme.parent_id === themeId);
+  }
+
+  /**
+   * The control only makes sense beside a theme that actually has children, and a leaf never
+   * offers a branch to include. Its count stays the theme's own: the store counts the subtree,
+   * this board does not.
+   */
+  const branchSelected = (narrowing.themeIds ?? []).some((themeId) => hasBranch(themeId));
+
+  function toggleBranch() {
+    ask({ ...narrowing, includeChildren: narrowing.includeChildren ? undefined : true });
   }
 
   function clearDimension(key: "text" | "stage" | "confidence") {
@@ -301,9 +323,10 @@ export function OpportunityLandscape() {
   }
   for (const themeId of narrowing.themeIds ?? []) {
     const theme = themes.find((entry) => entry.id === themeId);
+    const widening = Boolean(narrowing.includeChildren) && hasBranch(themeId);
     activeFilters.push({
       dimension: "theme",
-      label: `theme ${theme?.name ?? themeId}`,
+      label: `theme ${theme?.name ?? themeId}${widening ? " (incl. subthemes)" : ""}`,
       onRemove: () => toggleTheme(themeId),
     });
   }
@@ -366,6 +389,7 @@ export function OpportunityLandscape() {
       text: narrowing.text,
       stage: narrowing.stage,
       theme_ids: narrowing.themeIds,
+      include_children: narrowing.includeChildren,
       confidence: narrowing.confidence,
       min_score: narrowing.minScore,
       max_score: narrowing.maxScore,
@@ -454,6 +478,13 @@ export function OpportunityLandscape() {
   }, [selectedOutcomeId, outcomes, hoveredOutcome, rows]);
 
   const zeroMatches = narrowed && status === "ready" && result?.total === 0;
+
+  /** The theme chips, each labelled with the name the theme list holds for its id. */
+  const themeFacets = Object.entries(result?.facets.theme ?? {}).map(([id, count]) => ({
+    key: id,
+    label: themes.find((theme) => theme.id === id)?.name ?? id,
+    count,
+  }));
 
   return (
     <section className="fade-in">
@@ -648,16 +679,32 @@ export function OpportunityLandscape() {
                   selected={narrowing.stage ? [narrowing.stage] : []}
                   onToggle={(key) => toggleFacet("stage", key)}
                 />
-                <FacetGroup
-                  title="Theme"
-                  entries={Object.entries(result.facets.theme).map(([id, count]) => ({
-                    key: id,
-                    label: themes.find((theme) => theme.id === id)?.name ?? id,
-                    count,
-                  }))}
-                  selected={narrowing.themeIds ?? []}
-                  onToggle={toggleTheme}
-                />
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <FacetGroup
+                    title="Theme"
+                    entries={themeFacets}
+                    selected={narrowing.themeIds ?? []}
+                    onToggle={toggleTheme}
+                  />
+                  {themeFacets.length && branchSelected ? (
+                    <button
+                      type="button"
+                      className="studio-pill"
+                      style={{ fontSize: "0.75rem" }}
+                      aria-pressed={Boolean(narrowing.includeChildren)}
+                      onClick={toggleBranch}
+                    >
+                      include subthemes
+                    </button>
+                  ) : null}
+                </div>
                 <FacetGroup
                   title="Score recorded"
                   entries={Object.entries(result.facets.confidence).map(([level, count]) => ({

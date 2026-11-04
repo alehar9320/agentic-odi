@@ -142,6 +142,45 @@
         }
       },
       {
+        "type": "theme-tree",
+        "title": "Theme tree",
+        "blurb": "Every theme with what its whole branch holds, so the thin parts of the tree are visible.",
+        "data": {
+          "title": "Where the library is thin",
+          "themes": [
+            {
+              "theme_id": "t-billing",
+              "name": "Billing",
+              "outcomes": 9,
+              "measured": 7,
+              "top_opportunity": 15.0,
+              "top_statement": "See the total before approving the invoice"
+            },
+            {
+              "theme_id": "t-card-networks",
+              "name": "Card networks",
+              "parent_id": "t-billing",
+              "outcomes": 4,
+              "measured": 3,
+              "top_opportunity": 12.0
+            },
+            {
+              "theme_id": "t-disputes",
+              "name": "Disputes",
+              "parent_id": "t-billing",
+              "outcomes": 0,
+              "measured": 0
+            },
+            {
+              "theme_id": "t-onboarding",
+              "name": "Onboarding",
+              "outcomes": 2,
+              "measured": 0
+            }
+          ]
+        }
+      },
+      {
         "type": "opportunity-thesis",
         "title": "Thesis",
         "blurb": "One opportunity argued in plain language: the scores, the gap, the thesis, and the next move.",

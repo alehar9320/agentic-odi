@@ -3654,6 +3654,12 @@ button.message__tag:hover {
   color: var(--studio-amber);
 }
 
+/* Theme tree: a child sits under the theme it was filed into. */
+.ui-themmtree__row--child td:first-child {
+  padding-left: 26px;
+  color: var(--studio-muted);
+}
+
 /* Impact simulation */
 .ui-bet {
   display: flex;

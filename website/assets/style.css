@@ -1827,6 +1827,48 @@ html[data-theme="light"] .theme-toggle__moon {
   color: var(--accent);
 }
 
+.themmtree {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.themmtree__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.themmtree__row--child {
+  margin-left: 18px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: transparent;
+}
+
+.themmtree__name {
+  font-weight: 600;
+}
+
+.themmtree__counts {
+  display: flex;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.themmtree__top {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  color: var(--faint);
+}
+
 .compare {
   display: grid;
   gap: 8px;

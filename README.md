@@ -162,7 +162,9 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   reads `no outcomes yet` and a branch nobody has scored reads `nothing measured yet`, never a
   `0.00` that looks like a measurement. The same read answers `get_theme_rollup` and
   `list_theme_rollups` over MCP, and `--with-children` lets one theme stand for its whole branch
-  in `desired-outcomes search` and `bulk`.
+  in `desired-outcomes search` and `bulk`. On the landscape the same rule is an **include
+  subthemes** control beside a theme chip, and the copilot can draw the tree itself as a
+  `theme-tree` card.
 - **Bring a research file in.** `odi desired-outcomes import outcomes.csv --job-id
   <id>` files a spreadsheet of outcomes row by row through the same door as `add`: a
   row the CLI would refuse is refused with its line number in the file and the rest

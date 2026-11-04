@@ -8,11 +8,12 @@ records the protocol and the reasons it is shaped this way.
 
 The protocol has four layers:
 
-1. **The catalog** — `apps/studio/src/ui/catalog.ts:72`. Sixteen entries: nine
+1. **The catalog** — `apps/studio/src/ui/catalog.ts:72`. Nineteen entries: nine
    primitives (`stack`, `grid`, `heading`, `text`, `list`, `stat`, `meter`,
-   `callout`, `divider`) and seven cards (`outcome-card`, `opportunity-board`,
-   `impact-simulation`, `evidence-quote`, `job-map`, `opportunity-thesis`,
-   `decision-record`). Each has a typed prop schema and optional `actions`; cards
+   `callout`, `divider`) and ten cards (`outcome-card`, `opportunity-board`,
+   `impact-simulation`, `evidence-quote`, `job-map`, `theme-tree`,
+   `opportunity-thesis`, `decision-record`, `segment-card`, `strategy-card`).
+   Each has a typed prop schema and optional `actions`; cards
    describe ODI content rather than generic text.
 2. **The manifest** — `catalogManifest()` (`catalog.ts:338`) is sent with a turn
    so the model knows exactly which types and props exist; `catalogPrompt()`
