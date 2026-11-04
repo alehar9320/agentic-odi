@@ -41,6 +41,23 @@ every Adopted row names a file that exists and cites a delivered issue or PR,
 the group counts match the tally, and the projection in
 [Living Studio](living-studio.md) matches the Adopted and Partial rows here.
 
+## The Terminal Tour
+
+`docs/tour/` is generated, not written. `scripts/tour.py` runs every numbered step
+in `docs/tour/script.md` against a throwaway store built by
+`scripts/gen_corpus.py`, and turns the real output into the cast, the README and a
+checksum manifest:
+
+```bash
+uv run python scripts/tour.py --write
+```
+
+Nothing is sent to the tour that the CLI did not print, and a step that no longer
+runs aborts the capture naming the step, leaving the committed assets untouched.
+`tests/scripts/test_tour.py` regenerates into a temporary directory and compares
+bytes, so a stale or hand-edited recording fails there rather than in front of
+someone following the tour.
+
 ## The assistant-ui ledger
 
 The Studio runs on assistant-ui, and "we use assistant-ui" is not a coverage
