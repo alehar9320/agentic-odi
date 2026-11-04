@@ -221,6 +221,87 @@ a {
   position: relative;
 }
 
+/* The bar's new-thread control: a plus that says what it does, an ask that
+ * only interrupts while a reply is in the air, and a reason when there is
+ * nothing to leave. */
+.bar__new-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.bar__new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+}
+
+.bar__new:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.bar__new:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bar__new-ask {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.bar__new-ask p {
+  margin: 0;
+  color: var(--text);
+}
+
+.bar__new-choice {
+  padding: 5px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.bar__new-choice:hover {
+  background: var(--surface-hover);
+}
+
+.bar__new-choice--stop {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-contrast, var(--text));
+}
+
 .bar__menu-list {
   position: absolute;
   top: calc(100% + 8px);
