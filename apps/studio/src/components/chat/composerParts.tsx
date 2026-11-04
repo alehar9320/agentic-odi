@@ -5,6 +5,8 @@
  * queueing); the setup wizard's composer is a controlled textarea because its
  * turns are local until the context is saved. The command palette, the
  * connector chips, and the hint row are the same in both, so they live here.
+ * The focus chip is the exception: it speaks for the canvas, so only the
+ * thread composer mounts it.
  */
 
 import type { ReactNode } from "react";
@@ -155,6 +157,42 @@ export function ConnectorChips() {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * What the agent was told about the screen, so the person can see it, check it,
+ * and take it back.
+ *
+ * Renders only when the canvas can name the selection: a chip for a record this
+ * snapshot cannot read would be claiming something the store never said.
+ */
+export function ContextChip() {
+  const { focusedSubject, focusedSubjectLabel, clearFocus, revealFocusedSubject } = useStudio();
+
+  if (!focusedSubject || !focusedSubjectLabel) {
+    return null;
+  }
+
+  return (
+    <div className="composer__focus" role="status">
+      <button
+        type="button"
+        className="composer__focus-chip"
+        aria-label={`Looking at: ${focusedSubjectLabel}`}
+        onClick={revealFocusedSubject}
+      >
+        <span>Looking at: {focusedSubjectLabel}</span>
+      </button>
+      <button
+        type="button"
+        className="quiet-action"
+        aria-label="Stop telling the agent what you are looking at"
+        onClick={clearFocus}
+      >
+        <span aria-hidden>✕</span>
+      </button>
     </div>
   );
 }
