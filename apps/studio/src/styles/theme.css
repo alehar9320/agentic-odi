@@ -1877,6 +1877,54 @@ a {
   font-weight: 600;
 }
 
+/* The interview behind the number. Verified reads as settled; an unverified
+   score is dashed and amber, so a guess never borrows a measured claim's look. */
+.claim-check {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.claim-check--unverified {
+  border-left-style: dashed;
+}
+
+.claim-check__head {
+  margin: 0 0 4px;
+}
+
+.claim-check__head b {
+  color: var(--muted);
+}
+
+.claim-check--unverified .claim-check__head b {
+  color: var(--amber);
+}
+
+.claim-check__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.claim-check__group {
+  margin-top: 4px;
+  color: var(--faint);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.claim-check__item em {
+  display: block;
+  color: var(--faint);
+  font-style: normal;
+}
+
 .card__evidence {
   margin: 0 0 8px;
   padding-left: 10px;
