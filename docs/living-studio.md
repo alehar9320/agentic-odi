@@ -183,6 +183,13 @@ Studio says so in one place and keeps going:
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
   all.
+- The outbox is shared by every tab in the origin, so two tabs would otherwise
+  drain it and send each record twice. `apps/studio/src/bff/outbox.ts` takes a
+  drain guard for the length of a run: `navigator.locks` where the browser has
+  it, and a lease row in the store's `meta` store — with an expiry, renewed
+  while the drain runs — where it does not. A tab that loses the race leaves the
+  records pending and picks them up on the next trigger, so a closed tab's queue
+  resumes instead of stalling.
 - Where that work sits, and how much room it takes, is one call away:
   `bff/storageFacts.ts` reports the engine, the database name, the record count,
   the newest write the records carry, and whether the browser agreed to keep the
@@ -319,12 +326,13 @@ without giving up the message model the sidecar already understands.
 | **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
 | **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
 | **Claims** | Each declarative sentence ends with an evidence marker, and the reply arrives with a validated claim list. A chip names the source and the record (`Gong · Call with Acme`), never the tool; `Hypothesis` tags an ungrounded guess; an unmarked sentence keeps its place with a dotted underline and the accessible name *Uncited claim*. A chip opens that row in the Evidence lens, and Escape returns focus to the chip. Claims are stored with the turn, so they survive a reload; a record deleted later keeps its snapshot label and stops being a link. A seeded demo reply labels its chips **Sample** and does not count as cited. |
-| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`) and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser, capped at 20,000 characters, and sent with the turn. Nothing is stored server-side. |
+| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter — capped at 20,000 characters with the truncation announced in the extracted text, and sent with the turn. Nothing is stored server-side. |
 | **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
+| **Queue** | A follow-up sent while an answer still streams does not hit a wall: it joins a quiet lane above the composer and runs in the order it was sent once the live turn settles. Each row offers **Run now** — it jumps ahead of the other waiting follow-ups — and a remove that drops only that message. Stop stops the live turn and the lane waits for the next send; it never clears the queue. The lane is in-memory and dies with the page, and the sidecar still sees exactly one SSE turn at a time — the queue sequences, it never parallelises. |
 
 #### What the runtime gives us, and what we did not take
 
@@ -349,6 +357,7 @@ cites the issue or PR that landed it.
 | `onRespondToToolApproval` | Adopted | Allow/Decline on a pending write. | #238 |
 | `adapters.attachments` | Adopted | Text capped at 20k chars, images at 5 MB, refusals explained. | #238 |
 | runtime `suggestions` | Adopted | Starter suggestions computed from canvas state. | #238 |
+| `queue` adapter | Adopted | The follow-up lane: a send while a reply runs joins the queue instead of the wall. | #410 |
 | `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works; the dedicated adapter is unused, branches are inferred from parent ids. | — |
 | `ThreadPrimitive.Root` | Adopted | The transcript's shell. | #238 |
 | `ThreadPrimitive.Viewport` | Adopted | Scrolling and the latest-message affordance. | #238 |
@@ -364,7 +373,11 @@ cites the issue or PR that landed it.
 | `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works through the composer's own handlers with the same accept rules. | — |
 | `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | The quote shows above the input and can be cleared before send. | #435 |
 | `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | The microphone, hidden where unsupported. | #433 |
-| `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | Quote and dictation state are read today; queue and in-transit state arrive with the follow-up lane. | — |
+| `ComposerPrimitive.Queue` | Adopted | The pending lane rendered above the composer. | #410 |
+| `createMessageQueue(driver)` | Adopted | The queue's own driver hook: run with `steer`, optional cancel. | #410 |
+| `MessageQueueController` | Adopted | Busy/idle/cancelled signalling and hold/release — the reason the lane is not hand-rolled. | #410 |
+| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Adopted | One lane row: its text, Run now, and a remove that drops only that message. | #410 |
+| `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | Quote, dictation, and queue state are read today — the follow-up lane is `composer.queue`; in-transit state arrives later. | — |
 | `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | The reply's own controls. | #238 |
 | `ActionBarPrimitive.ExportMarkdown` | Partial | Whole-conversation export is stronger than the per-reply primitive. | — |
 | `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | Alternative N of M, shown only when a branch exists. | #238 |

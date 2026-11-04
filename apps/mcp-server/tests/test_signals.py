@@ -5,6 +5,7 @@ import json
 import pytest
 from agentic_odi_mcp_server import mcp
 from fastmcp import Client
+from mcp_failures import failure, sentence
 
 
 @pytest.mark.asyncio
@@ -47,4 +48,5 @@ async def test_unknown_signal_ids_answer_with_error_strings() -> None:
     async with Client(mcp) as client:
         for tool in ("mark_signal_read", "dismiss_signal"):
             text = (await client.call_tool(tool, {"signal_id": "nope"})).content[0].text
-            assert text == "Error: Signal with ID nope not found."
+            assert failure(text).code.value == "not_found"
+            assert sentence(text) == "Error: Signal with ID nope not found."
