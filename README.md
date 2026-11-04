@@ -105,6 +105,11 @@ per-platform archives with SHA-256 checksums for a manual download. See
   event log and read by the CLI, any MCP client, and the Studio's bell.
   Nothing is invented, and the feed is deduped and budgeted so it stays
   worth opening.
+- **A check on whether onboarding works.** Five counters — launch, first message,
+  first outcome, first score, return session — are appended to the same local
+  event log as the records and read back by `agentic-odi stats`. The numbers never
+  leave the machine, a counter that has not happened reads as zero rather than a
+  guess, and restarting the measurement marks the log instead of erasing history.
 
 ## How it works
 
