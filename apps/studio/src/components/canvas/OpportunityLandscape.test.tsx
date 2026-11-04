@@ -439,9 +439,9 @@ describe("OpportunityLandscape score rendering", () => {
     expect(tile?.textContent).toContain("12.5");
   });
 
-  // An outcome the sidecar never scored rendered "0.0" in the table and "N/A" on
-  // the card. The formatter already owns that distinction.
-  it("shows an unscored outcome as N/A in the table rather than as a zero", () => {
+  // An outcome the sidecar never scored shows "—" and "Not scored" in the table,
+  // never a fabricated "0.0" / "NORMAL".
+  it("shows an unscored outcome as — and Not scored in the table rather than as a zero", () => {
     harness.state.canvasState = {
       kind: "ready",
       data: {
@@ -461,7 +461,33 @@ describe("OpportunityLandscape score rendering", () => {
     fireEvent.click(screen.getByText("📋 Table View"));
 
     const row = screen.getByRole("row", { name: /minimize unanswered support tickets/i });
-    expect(within(row).getByText("N/A")).toBeInTheDocument();
+    expect(within(row).getByText("—")).toBeInTheDocument();
+    expect(within(row).getByText("Not scored")).toBeInTheDocument();
+  });
+
+  it("orders scored outcomes descending, then unscored rows last", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          { id: "O-UNC", statement: "Unrated outcome", importance: 5, satisfaction: 5, opportunity_score: null },
+          { id: "O-LOW", statement: "Low scored outcome", importance: 4, satisfaction: 4, opportunity_score: 8 },
+          { id: "O-HIGH", statement: "High scored outcome", importance: 9, satisfaction: 2, opportunity_score: 16 },
+        ],
+      },
+    } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(3);
+    expect(rows[0].textContent).toContain("O-HIGH");
+    expect(rows[1].textContent).toContain("O-LOW");
+    expect(rows[2].textContent).toContain("O-UNC");
+    expect(within(rows[2]).getByText("Not scored")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("16.0")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("UNDERSERVED")).toBeInTheDocument();
   });
 });
 
