@@ -673,6 +673,56 @@ def render_theme_deleted(result: dict[str, Any], *, as_json: bool) -> str:
     return f"Deleted theme {result.get('name')!r}; moved {len(reparented)} child theme(s) up."
 
 
+def _rollup_top(rollup: dict[str, Any]) -> str:
+    """The branch's top opportunity, or the reason there isn't one.
+
+    A theme nobody has scored has no opportunity to name, and printing ``0.00`` for it would
+    read as a measured low rather than a missing measurement.
+    """
+    top = rollup.get("top_opportunity")
+    if top is None:
+        return "no outcomes yet" if not rollup.get("outcomes") else "nothing measured yet"
+    statement = str(rollup.get("top_statement") or "")
+    return f"{_num(top)} — {_truncate(statement)}" if statement else _num(top)
+
+
+def render_theme_rollup(rollup: Any, *, as_json: bool) -> str:
+    """Render one theme's rollup: what its branch holds and the top of it."""
+    if not isinstance(rollup, dict):
+        return _json(rollup) if as_json else str(rollup)
+    if as_json:
+        return _json(rollup)
+    rows = [("theme", _cell(rollup, "name"))]
+    outcomes = rollup.get("outcomes") or 0
+    if not outcomes:
+        rows.append(("holds", "no outcomes yet"))
+        return _block(rows)
+    rows.append(("holds", f"{outcomes} outcome(s), {rollup.get('measured') or 0} measured"))
+    rows.append(("top", _rollup_top(rollup)))
+    return _block(rows)
+
+
+def render_theme_rollup_list(rollups: Any, *, as_json: bool) -> str:
+    """Render every rollup in scope, in the order a tree is drawn."""
+    if not isinstance(rollups, list):
+        return _json(rollups) if as_json else str(rollups)
+    if as_json:
+        return _json(rollups)
+    return _table(
+        ("theme", "outcomes", "measured", "top"),
+        [
+            (
+                _truncate(_cell(item, "name")),
+                _cell(item, "outcomes"),
+                _cell(item, "measured"),
+                _rollup_top(item),
+            )
+            for item in rollups
+        ],
+        empty="No themes yet — `odi themes add --name <name>` names your first group.",
+    )
+
+
 def render_study_list(studies: Any, *, as_json: bool) -> str:
     """Render studies as a table: a wave is meaningless without its status."""
     if not isinstance(studies, list):

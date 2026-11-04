@@ -107,12 +107,23 @@ Settled while implementing: `capability_manifest`, `capability_summary` and `get
 - Consumes: `run_tool("get_theme_rollup"/"list_theme_rollups", args)`.
 - Produces: `odi themes rollup <theme-id> [--json]` and `odi themes rollup --job <job-id> [--json]`.
 
-- [ ] **Step 1: Write the failing tests** — one theme prints the block (`name`, `4 outcomes · 3 measured`, `top 12.5 — <statement>`); an empty theme prints `no outcomes yet` with no digits invented; an all-unscored theme prints `nothing measured yet`; `--json` carries `top_opportunity: null`; `--job` prints one row per theme, parents before their children; `themes rollup` with neither argument exits 1 with `'rollup wants a theme: name one with THEME_ID or list a scope with --job'`; an unknown id exits 1 and prints the not-found sentence; nothing is written (assert a read-only store's event count via `--dry-run`-free equality, or simply that `run_tool` was called with a `get_`/`list_` tool).
-- [ ] **Step 2: Run → fail** (no such command).
-- [ ] **Step 3: Implement** the command with `theme_id: str = typer.Argument(None, ...)`, and the two renderers using the existing `_block`/`_table` helpers.
-- [ ] **Step 4: Read it by hand:** `uv run odi themes rollup <real-id>`, `uv run odi themes rollup --job <real-job> --json`, `uv run odi themes rollup` (the sentence, exit 1), against a fixture job with an overlapping membership and an unscored theme.
-- [ ] **Step 5: Docs**, then `uv run python scripts/doc_check.py` → exit 0 and `uv run pytest tests/scripts -q`.
-- [ ] **Step 6: Commit** `feat(cli): odi themes rollup reads the tree with its counts (ALH-163)`.
+- [x] **Step 1: Write the failing tests** — one theme prints the block (`name`, `4 outcomes · 3 measured`, `top 12.5 — <statement>`); an empty theme prints `no outcomes yet` with no digits invented; an all-unscored theme prints `nothing measured yet`; `--json` carries `top_opportunity: null`; `--job` prints one row per theme, parents before their children; `themes rollup` with neither argument exits 1 with `'rollup wants a theme: name one with THEME_ID or list a scope with --job'`; an unknown id exits 1 and prints the not-found sentence; nothing is written (assert a read-only store's event count via `--dry-run`-free equality, or simply that `run_tool` was called with a `get_`/`list_` tool).
+- [x] **Step 2: Run → fail** (no such command).
+- [x] **Step 3: Implement** the command with `theme_id: str = typer.Argument(None, ...)`, and the two renderers using the existing `_block`/`_table` helpers.
+- [x] **Step 4: Read it by hand:** `uv run odi themes rollup <real-id>`, `uv run odi themes rollup --job <real-job> --json`, `uv run odi themes rollup` (the sentence, exit 1), against a fixture job with an overlapping membership and an unscored theme.
+- [x] **Step 5: Docs**, then `uv run python scripts/doc_check.py` → exit 0 and `uv run pytest tests/scripts -q`.
+- [x] **Step 6: Commit** `feat(cli): odi themes rollup reads the tree with its counts (ALH-163)`.
+
+Settled while implementing: the block reads `holds 4 outcome(s), 2 measured` / `top 17.00 — <statement>` —
+the `(s)` counts and two-decimal scores are `render.py`'s own precedent (`{n} outcome(s) match`, `_num`),
+not the design doc's illustrative `·` and `12.5`. A theme with no outcomes prints no `top` row at all,
+so `no outcomes yet` appears once. `desired-outcomes add` requires both scores, so the fixture's
+unmeasured outcomes arrive through `import`, which is also how a real library gets one. `--with-children`
+is threaded through `_narrowing`, the one spelling of the filter that `search` and `bulk` already share,
+and `bulk` carries a test so the two cannot quietly narrow different sets. `tests/scripts/test_cli_docs.py`
+needed no edit — it asserts only that each top-level group is named in `docs/cli.md`, so it cannot catch a
+missing subcommand; the reference gained the command, its sentences, and the flag anyway. The no-write
+proof stays in core (Task 1's SQLite event count) rather than being restated weakly at the terminal.
 
 ### Task 5: The board's facet, then the card
 

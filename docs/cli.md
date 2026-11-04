@@ -201,6 +201,12 @@ buckets overlap and are not expected to sum to `total`. `GET
 /api/outcomes/search` runs the identical query and returns identical ids, total,
 and facet counts; `--tag` matches outcomes carrying any of the tags you name.
 
+`--with-children` lets each `--theme` stand for the themes filed under it too, so one filter
+answers for a whole branch. The `theme` facet keeps counting each theme's own memberships while
+the list is the branch, and the rows the branch matches are exactly the count `themes rollup`
+prints beside it — one rule, read from two commands. `bulk` takes the same flag, so a bulk run
+cannot quietly narrow a different set than the one `search` just showed.
+
 `bulk` organises that same narrowed set in one reviewable run. The rows it acts on
 are the `--id` flags unioned with every match of the narrowing, read with no page
 limit — "everything in this theme" means everything, not the first screen of it.
@@ -375,6 +381,9 @@ agentic-odi themes list
 agentic-odi themes list --job <job-id> --json
 agentic-odi themes rename <theme-id> --name "Payment timing"
 agentic-odi themes delete <theme-id>
+agentic-odi themes rollup <theme-id>
+agentic-odi themes rollup --job <job-id>
+agentic-odi themes rollup --job <job-id> --json
 agentic-odi themes assign --theme <theme-id> --outcome <outcome-id> --outcome <outcome-id>
 agentic-odi themes unassign --theme <theme-id> --outcome <outcome-id>
 ```
@@ -382,6 +391,15 @@ agentic-odi themes unassign --theme <theme-id> --outcome <outcome-id>
 `themes assign` files every outcome or none: an unknown outcome, or one from a
 different job under a job-scoped theme, refuses the whole call before anything
 is written.
+
+`themes rollup` reads the tree with its counts — how many outcomes a theme and the themes filed
+under it hold, how many of those carry a score, and the top opportunity in that branch. The count
+is one set, so an outcome sitting on a parent *and* on two children is counted once, and nothing
+is stored to answer it: the numbers are the library's, read again each time. `--job` prints every
+theme in that scope, each parent before the themes under it. A theme nobody has filed anything
+under reads `no outcomes yet`, and a branch nobody has scored reads `nothing measured yet` —
+neither prints `0.00`, which would read as a measurement that was never taken. Naming neither a
+`THEME_ID` nor a `--job` exits non-zero and says which one it wants.
 
 ## Studies and waves
 

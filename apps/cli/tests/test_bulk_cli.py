@@ -294,3 +294,67 @@ def test_bulk_reports_a_row_that_was_already_right_as_no_change(tmp_path) -> Non
     assert second["changed"] == []
     assert second["skipped"] == [{"id": outcome_id, "reason": "no change"}]
     assert second["undo_token"] is None
+
+
+def test_bulk_can_narrow_to_a_whole_theme_branch(tmp_path) -> None:
+    """``--with-children`` narrows here exactly as it does in ``search``.
+
+    The two commands share one spelling of the filter, so a bulk run cannot quietly act on a
+    different set than the one the person just looked at.
+    """
+    db, job_id = _seed(tmp_path, (STATEMENT_ONE, STATEMENT_TWO))
+    runner = CliRunner()
+    first, second = _outcome_ids(runner, db, job_id)
+    parent = _theme(runner, db, job_id, "Cash timing")
+    child = str(
+        _json(
+            runner,
+            db,
+            [
+                "themes",
+                "add",
+                "--name",
+                "Payment windows",
+                "--job",
+                job_id,
+                "--parent",
+                parent,
+                "--json",
+            ],
+        )["id"]
+    )
+    _json(runner, db, ["themes", "assign", "--theme", parent, "--outcome", first, "--json"])
+    _json(runner, db, ["themes", "assign", "--theme", child, "--outcome", second, "--json"])
+
+    own = _json(
+        runner,
+        db,
+        [
+            "desired-outcomes",
+            "bulk",
+            "--theme",
+            parent,
+            "--add-tag",
+            "review",
+            "--dry-run",
+            "--json",
+        ],
+    )
+    assert own["requested"] == 1
+
+    branch = _json(
+        runner,
+        db,
+        [
+            "desired-outcomes",
+            "bulk",
+            "--theme",
+            parent,
+            "--with-children",
+            "--add-tag",
+            "review",
+            "--dry-run",
+            "--json",
+        ],
+    )
+    assert branch["requested"] == 2

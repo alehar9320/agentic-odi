@@ -263,6 +263,11 @@ def search(
     min_score: float | None = typer.Option(None, help="Lowest opportunity score (inclusive)"),
     max_score: float | None = typer.Option(None, help="Highest opportunity score (inclusive)"),
     job_id: str | None = typer.Option(None, help="Limit the search to one job"),
+    with_children: bool = typer.Option(
+        False,
+        "--with-children",
+        help="Let each --theme stand for the themes filed under it too",
+    ),
     sort: str = typer.Option("opportunity_score", help="opportunity_score or insertion"),
     limit: int | None = typer.Option(None, help="Page size"),
     offset: int = typer.Option(0, help="Skip this many results"),
@@ -283,6 +288,7 @@ def search(
             min_score=min_score,
             max_score=max_score,
             job_id=job_id,
+            with_children=with_children,
         ),
         "sort": sort,
         "limit": limit,
@@ -303,6 +309,7 @@ def _narrowing(
     min_score: float | None,
     max_score: float | None,
     job_id: str | None,
+    with_children: bool,
 ) -> dict[str, Any]:
     """One spelling of the shared search options, reused by bulk so a filter means
     the same thing in both commands."""
@@ -313,6 +320,7 @@ def _narrowing(
         "min_score": min_score,
         "max_score": max_score,
         "job_id": job_id,
+        "include_children": with_children,
     }
     if theme:
         args["theme_ids"] = theme
@@ -338,6 +346,11 @@ def bulk(
     min_score: float | None = typer.Option(None, help="Lowest opportunity score (inclusive)"),
     max_score: float | None = typer.Option(None, help="Highest opportunity score (inclusive)"),
     job_id: str | None = typer.Option(None, help="Narrow the set to one job"),
+    with_children: bool = typer.Option(
+        False,
+        "--with-children",
+        help="Let each --theme stand for the themes filed under it too",
+    ),
     set_stage: str | None = typer.Option(
         None, "--set-stage", help="Move every selected outcome onto this job-map stage"
     ),
@@ -365,6 +378,7 @@ def bulk(
         min_score=min_score,
         max_score=max_score,
         job_id=job_id,
+        with_children=with_children,
     )
     ids = list(dict.fromkeys(outcome_id or []))
     if any(narrowing.values()):
