@@ -16,6 +16,7 @@ import type {
   MessageQueueController,
 } from "@assistant-ui/react";
 
+import { focusLabel, focusPointer } from "../lib/focus";
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -67,7 +68,7 @@ import { textOf } from "../assistant/convert";
 import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
-import { loadSession, saveSession, type StudioSession } from "../lib/session";
+import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -85,6 +86,7 @@ import type {
   ConnectorSuggestion,
   ConversationSummary,
   CustomizeTarget,
+  FocusSubject,
   JsonValue,
   MarketplaceListing,
   MarketplaceSearch,
@@ -456,7 +458,13 @@ export interface StudioContextValue {
   focusSignalSubject: (signal: Signal) => void;
   /** Point the studio at a subject and remember it for the next visit. */
   focusSubject: (kind: SignalSubjectKind, id: string) => void;
-  focusedSubject: { kind: SignalSubjectKind; id: string } | null;
+  /** Stop speaking for the screen: forget the selection and the next visit's. */
+  clearFocus: () => void;
+  focusedSubject: FocusSubject | null;
+  /** What the snapshot calls the focused record, or null when it cannot name it. */
+  focusedSubjectLabel: string | null;
+  /** Open the lens that holds the focused record, so the person can check it. */
+  revealFocusedSubject: () => void;
   /** The job that owns the focused subject, so canvas panels can select it. */
   focusedJobId: string | null;
   /** Stage 5: the segments the scored outcomes support, read from the store. */
@@ -484,7 +492,7 @@ function loadSettings(): StudioConfig {
   return EMPTY_CONFIG;
 }
 
-function loadFocusedSubject(): { kind: SignalSubjectKind; id: string } | null {
+function loadFocusedSubject(): FocusSubject | null {
   const session = loadSession();
   if (!session) {
     return null;
@@ -626,10 +634,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [strategy, setStrategy] = useState<Strategy | null>(null);
   const [segmentsError, setSegmentsError] = useState<StudioError | null>(null);
-  const [focusedSubject, setFocusedSubject] = useState<{
-    kind: SignalSubjectKind;
-    id: string;
-  } | null>(loadFocusedSubject);
+  const [focusedSubject, setFocusedSubject] = useState<FocusSubject | null>(loadFocusedSubject);
   const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
@@ -1285,6 +1290,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Stop speaking for the screen. The session slot goes with the selection, so a
+   * reload cannot resurrect a focus the person just dismissed.
+   */
+  const clearFocus = useCallback(() => {
+    setFocusedSubject(null);
+    clearSession();
+  }, []);
+
+  /**
    * What a card does when activated: read the signal, then take the person to
    * the record it names. This is the job `targetId` never did.
    */
@@ -1317,6 +1331,35 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       openPanel("evidence");
     },
     [openPanel],
+  );
+
+  /**
+   * Where the chip's promise came from: open the lens holding the record the
+   * agent was told about, so the person can go read it instead of taking the
+   * composer's word for it.
+   */
+  const revealFocusedSubject = useCallback(() => {
+    if (!focusedSubject) {
+      return;
+    }
+    if (focusedSubject.kind === "evidence") {
+      focusEvidence(focusedSubject.id);
+      return;
+    }
+    const panel = PANEL_FOR_SUBJECT[focusedSubject.kind];
+    if (panel) {
+      openPanel(panel);
+    }
+  }, [focusedSubject, focusEvidence, openPanel]);
+
+  /**
+   * What the snapshot calls the focused record, or null when it holds no such
+   * record. The composer chip renders on this, never on the raw selection: an
+   * indicator the canvas cannot name would claim a fact the store never said.
+   */
+  const focusedSubjectLabel = useMemo(
+    () => focusLabel(canvasState.data, focusedSubject),
+    [canvasState.data, focusedSubject],
   );
 
   /** The job owning the focused subject, so canvas panels can select it. */
@@ -1761,6 +1804,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             attachments,
             approvals: true,
             assistant_id: assistantId,
+            focus: focusPointer(focusedSubject),
           },
           handleEvent,
           controller.signal,
@@ -1813,6 +1857,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       settings,
       brief,
       conversationId,
+      focusedSubject,
       refreshCanvas,
       refreshConnectors,
       refreshConversations,
@@ -2362,7 +2407,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSignal,
       focusSignalSubject,
       focusSubject,
+      clearFocus,
       focusedSubject,
+      focusedSubjectLabel,
+      revealFocusedSubject,
       focusedJobId,
       segments,
       strategy,
@@ -2481,7 +2529,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSignal,
       focusSignalSubject,
       focusSubject,
+      clearFocus,
       focusedSubject,
+      focusedSubjectLabel,
+      revealFocusedSubject,
       focusedJobId,
       segments,
       strategy,

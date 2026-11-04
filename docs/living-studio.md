@@ -72,6 +72,7 @@ the model, so they work when it is offline.
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
 | `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/settings` | Open that lens beside the conversation |
+| `/brief` | Open the decision brief — the document a review reads, ready to download or print |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
 
@@ -190,6 +191,16 @@ Studio says so in one place and keeps going:
   while the drain runs — where it does not. A tab that loses the race leaves the
   records pending and picks them up on the next trigger, so a closed tab's queue
   resumes instead of stalling.
+- The browser store can change shape without losing what is in it. The schema
+  version and one migration per step live in
+  `apps/studio/src/bff/store/migrations.ts`; opening the database runs every
+  registered step from the version the person has up to `DB_VERSION`, so a
+  release that adds a store upgrades an existing database instead of failing to
+  open it. A version bump with no migration is caught by a test before it ships.
+- When a second tab opens a newer schema, the first tab would otherwise hold the
+  old connection and block the upgrade. `IndexedDbLocalStore` closes its
+  connection on `versionchange` and sets `needsReload`, which the app can read
+  to show "Reload to continue" rather than hanging.
 - Where that work sits, and how much room it takes, is one call away:
   `bff/storageFacts.ts` reports the engine, the database name, the record count,
   the newest write the records carry, and whether the browser agreed to keep the
@@ -319,7 +330,7 @@ without giving up the message model the sidecar already understands.
 
 | Capability | What it means here |
 |---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Latest message** control returns you to the live end without interrupting assistant-ui's follow behavior. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
 | **Silence** | A run that stops producing tokens for eight seconds shows *Still working · no new output for Ns* under the reply, while the Stop button keeps its meaning. The signal comes from assistant-ui's stall detection over text, reasoning, tool arguments, and tool results — never from a timer watching the DOM — so a long tool call reads as work, not a freeze. A dropped stream never shows it: that path ends in the failure panel. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
 | **Tools** | Each MCP call is a trace line with its status and a short preview of what came back. Open it and the call shows its **Input** — what the model asked for — and its **Output**, the whole answer as JSON or as the text it arrived in, with **Copy JSON** for the pair. Which calls are open is not remembered: a restored transcript starts with every one collapsed. A call still running shows what it was asked while it waits. |
@@ -330,6 +341,7 @@ without giving up the message model the sidecar already understands.
 | **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
+| **Focus** | Select a job, step, desired outcome, or evidence record and the turn carries *which* one — kind and id, never the words. The sidecar re-reads that record from its own store before the model hears a sentence about it, and adds nothing for an id it does not hold. The composer admits this with a quiet **Looking at: …** chip that opens the record when pressed and can be dismissed; it renders only when the canvas can name the selection, so it cannot claim a record that is not there. |
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 | **Queue** | A follow-up sent while an answer still streams does not hit a wall: it joins a quiet lane above the composer and runs in the order it was sent once the live turn settles. Each row offers **Run now** — it jumps ahead of the other waiting follow-ups — and a remove that drops only that message. Stop stops the live turn and the lane waits for the next send; it never clears the queue. The lane is in-memory and dies with the page, and the sidecar still sees exactly one SSE turn at a time — the queue sequences, it never parallelises. |
@@ -360,7 +372,7 @@ cites the issue or PR that landed it.
 | `queue` adapter | Adopted | The follow-up lane: a send while a reply runs joins the queue instead of the wall. | #410 |
 | `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works; the dedicated adapter is unused, branches are inferred from parent ids. | — |
 | `ThreadPrimitive.Root` | Adopted | The transcript's shell. | #238 |
-| `ThreadPrimitive.Viewport` | Adopted | Scrolling and the latest-message affordance. | #238 |
+| `ThreadPrimitive.Viewport` | Adopted | Scrolling; the jump-to-latest affordance reads its `isAtBottom`. | #238 |
 | `ThreadPrimitive.Messages` | Adopted | The message map. | #238 |
 | `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data is adopted; the pills are hand-rolled because they carry the artifact-preview copy. | — |
 | `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
@@ -392,7 +404,7 @@ cites the issue or PR that landed it.
 | `useAui` | Adopted | Imperative composer actions. | #238 |
 | `AuiIf` | Adopted | The conditional idiom in use. | #238 |
 | `unstable_useComposerInputHistory` | Adopted | Up-arrow recalls what you sent last. | #430 |
-| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the latest-message affordance. | #245 |
+| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count is ours (`arrivalCount.ts`). | #245 |
 | Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
 | Tool result rendering | Adopted | Each MCP call opens to show its input and its whole output. | #389 |
 | `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
@@ -526,7 +538,41 @@ rail, composer, and floating chrome are hidden, the palette switches to paper,
 and cards stay whole instead of splitting across sheets. An open lens prints
 below the thread instead of being clipped off-screen.
 
+### The decision brief
+
+A conversation is hard to hand to a review, so the Studio writes the document
+instead: `/brief`, or **Export brief** in the opportunity landscape's header,
+docks the brief as a lens beside the thread. It is built in the browser from the
+canvas — jobs, steps, outcomes, evidence, theses and the setup context — and not
+by the model, so the same offline studio that scores an outcome can produce the
+page a colleague reads. **Download .md**, **Print / PDF** and **Copy** all
+serialize the one Markdown string the preview is rendering; what a person
+approves is what leaves the app.
+
+The document is eight sections in a fixed order: Provenance, Vision, The
+decision, Top opportunities, Evidence, Dissent, Next evidence, Method. Every
+number in it counts records rather than generating prose, and the Method line
+states the score formula (`importance + max(importance - satisfaction, 0)`) so a
+reader can check the ranking against the Outcome records. Unscored outcomes are
+not opportunities and are not counted. Provenance is the part a reviewer is
+entitled to: seeded demo rows are excluded from every count and the sheet carries
+*Demo data. Nothing here comes from your research.* rather than quietly mixing
+them in, and a canvas served from this device's cached copy says the snapshot may
+be stale. Dissent is assembled from what argues against the bet — saved theses,
+canvas warnings, evidence that belongs to no outcome — plus one optional field on
+the sheet for the objection the studio could not know, which prints labelled
+*author-supplied*. Next evidence names the thinnest of the top three and a
+connector from the preset catalog that could fill it, or says plainly that no
+matching source exists to connect. On an empty canvas the export action is
+disabled and says why: nothing to brief yet.
+
+Print is the brief's own contract. While the print dialog is open the body
+carries `brief-printing`, and the sheet's controls, the objection field, the
+thread and the chrome all disappear — the PDF is the document, not a screenshot
+of the app.
+
 ## Rich responses
+
 
 The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one **inline in the conversation**: a scored
@@ -725,7 +771,7 @@ Each row below names a state to reach and what is worth your own eyes.
 | State | How to reach it | What to judge |
 |---|---|---|
 | Activity line | A turn whose first token is slow: a cold model, or a long prompt | The label moves *Waking the model* → *Opening your studio tools* → *Thinking*, the dots animate, an elapsed count appears after 3 s, and the reply does not jump the layout when it arrives |
-| Streaming prose | Any turn | The caret trails the last word, the send button is a stop button, and scrolling away offers **Latest message** without fighting the follow |
+| Streaming prose | Any turn | The caret trails the last word, the send button is a stop button, and scrolling away offers **Jump to latest** with a count of what arrived, without fighting the follow |
 | Reasoning | A backend that streams `reasoning_content` or `reasoning` | The disclosure opens while it is written, settles to *Thought for Ns*, reopens on click, and never repeats the answer |
 | Tool trace and sources | A model that emits real `tool_calls` | The dot pulses while the tool runs, the chip previews what came back, and the source names the tool the turn actually read |
 | Approval | The same, asking it to write ("add a step to …") | The turn pauses for **Allow**/**Decline**, a decline reads as a tool result and not an error, and a double click runs the tool once |

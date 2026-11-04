@@ -731,6 +731,7 @@ a {
 
 .composer__send:focus-visible,
 .composer__suggestion:focus-visible,
+.composer__focus-chip:focus-visible,
 .palette__item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
@@ -951,6 +952,46 @@ a {
 
 .composer__mic.is-listening {
   color: var(--accent);
+}
+
+/* What the agent was told about the screen. Quiet on purpose — this row is an
+   admission the person can check and take back, not something to act on. A
+   stored statement runs long, so the chip truncates rather than shoving the
+   composer off the screen. */
+.composer__focus {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0 0 6px;
+  padding: 0 4px;
+}
+
+.composer__focus-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.composer__focus-chip:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.composer__focus-chip span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 52ch;
 }
 
 /* A quoted passage sits above the input, verbatim and removable. */

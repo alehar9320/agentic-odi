@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import { COMPOSER, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
 import {
   contrastWalker,
   formatFindings,
@@ -39,15 +39,24 @@ import { KNOWN_PAIRS } from "./a11y/knownPairs";
  * thing this issue is about and does not smuggle in a structural exemption
  * with no owner.
  *
- * Screens: home, the opportunity landscape, the records lens, catch-up, and
- * settings — each in both themes.
+ * Screens: home, the opportunity landscape, the records lens, the decision
+ * brief, catch-up, and settings — each in both themes.
  */
 
 const THEMES = ["dark", "light"] as const;
 type Theme = (typeof THEMES)[number];
 
-/** The five core screens, each reachable through the shipped UI. */
-const SCREENS = ["home", "landscape", "records", "catchup", "settings"] as const;
+/**
+ * Every screen fades in, and both checkers read the painted page: measured mid
+ * animation a partially transparent element fails `color-contrast` for reasons
+ * no user ever sees. The suite runs with reduced motion, which the stylesheet
+ * honors by collapsing animations to their end state (`theme.css`), so the gate
+ * measures the resting page deterministically.
+ */
+test.use({ reducedMotion: "reduce" });
+
+/** The six core screens, each reachable through the shipped UI. */
+const SCREENS = ["home", "landscape", "records", "brief", "catchup", "settings"] as const;
 type Screen = (typeof SCREENS)[number];
 
 const OUTCOME = {
@@ -88,6 +97,11 @@ async function goto(page: Page, screen: Screen): Promise<void> {
   if (screen === "landscape" || screen === "records") {
     const label = screen === "landscape" ? "Landscape" : "Records";
     await rail(page).getByRole("button", { name: new RegExp(`^${label},`) }).click();
+  } else if (screen === "brief") {
+    // The command is the keyboard route, and the only one that reaches the
+    // brief without a model.
+    await page.getByRole("textbox", { name: COMPOSER }).fill("/brief");
+    await page.keyboard.press("Enter");
   } else if (screen === "catchup") {
     await page.locator(".bar__bell").click();
   } else if (screen === "settings") {
