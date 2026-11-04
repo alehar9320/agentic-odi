@@ -185,9 +185,14 @@ class ToolImportTarget:
 @desired_outcomes_app.command("import")
 def import_file(
     path: str = typer.Argument(
-        ..., help="CSV of outcome rows, as a research file or ``export`` writes one"
+        ..., help="CSV or XLSX of outcome rows, as a research file or ``export`` writes one"
     ),
     job_id: str = typer.Option(..., help="Job ID the outcomes belong to"),
+    sheet: str | None = typer.Option(
+        None,
+        "--sheet",
+        help="Read that sheet; required when the workbook holds rows in more than one",
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Report what this file would do without writing it"
     ),
@@ -201,6 +206,9 @@ def import_file(
     by-hand score, because a spreadsheet is not an interview. ``--dry-run``
     writes nothing and reports what the real run would do. There is no undo token
     for an import — take a row back with ``desired-outcomes delete``.
+
+    A ``.xlsx`` is read by its stored values, never by computing a formula: a
+    sheet with rows in more than one tab has to be named with ``--sheet``.
     """
     run_tool("get_job", {"job_id": job_id})
     try:
@@ -209,14 +217,26 @@ def import_file(
         typer.echo(f"Error: cannot read {path}: {exc.strerror or exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    from agentic_odi_core import import_outcomes, parse_outcome_table
-
-    report = import_outcomes(
-        parse_outcome_table(source),
-        ToolImportTarget(),
-        job_id=job_id,
-        dry_run=dry_run,
+    from agentic_odi_core import (
+        SheetSelectionError,
+        UnsupportedFormatError,
+        XlsxExtraMissingError,
+        format_for_name,
+        import_outcomes,
+        parse_outcome_table,
     )
+
+    try:
+        #: The name picks the reader, so a person's ``Save as`` is the only format signal either
+        #: door needs, and both doors read it here rather than in two places.
+        table = parse_outcome_table(source, fmt=format_for_name(path), sheet=sheet)
+    except (UnsupportedFormatError, SheetSelectionError, XlsxExtraMissingError) as exc:
+        #: A file this build cannot read, or a workbook that does not say which sheet it means,
+        #: is a mistake about the request, not a row's fault: one sentence, nothing written.
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    report = import_outcomes(table, ToolImportTarget(), job_id=job_id, dry_run=dry_run)
     typer.echo(render_import_report(report, as_json=json_output))
 
 
