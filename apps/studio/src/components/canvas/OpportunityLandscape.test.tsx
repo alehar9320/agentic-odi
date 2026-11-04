@@ -555,4 +555,23 @@ describe("OpportunityLandscape underserved boundary", () => {
     expect(pointInPolygon(plotX(2), plotY(9), points)).toBe(true);
     expect(pointInPolygon(plotX(8), plotY(3), points)).toBe(false);
   });
+
+  it("offers the decision brief in the header", () => {
+    harness.state.openPanel.mockClear();
+    render(<OpportunityLandscape />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Export brief" }));
+
+    expect(harness.state.openPanel).toHaveBeenCalledWith("brief");
+  });
+
+  it("refuses to brief an empty canvas, and says why", () => {
+    harness.state.canvasState = { kind: "empty", data: null } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+
+    const action = screen.getByRole("button", { name: "Export brief" });
+    expect(action).toBeDisabled();
+    expect(action).toHaveAttribute("title", "Nothing to brief yet");
+  });
 });
