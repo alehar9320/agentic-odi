@@ -134,6 +134,14 @@ function ComposerBody({
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // An input method owns the keyboard while it composes: choosing a Japanese,
+    // Chinese, or Korean candidate must never run a command, move the palette,
+    // recall history, or send. `keyCode === 229` covers WebKit shells that leave
+    // `isComposing` unset on the keydown that commits the candidate.
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+      return;
+    }
+
     if (open) {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();

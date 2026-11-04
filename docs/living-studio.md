@@ -61,8 +61,10 @@ is a trace chip with the source the turn actually read.
 ### Slash commands
 
 Type `/` to open the palette. `Up`/`Down` move, `Enter` or `Tab` runs the
-selected command, `Esc` closes it. Commands are handled in the SPA and never call
-the model, so they work when it is offline.
+selected command, `Esc` closes it. While an input method is composing — Japanese,
+Chinese, Korean, or any other — its keys are never interpreted: `Enter` and the
+arrows choose a candidate, they do not run, move, dismiss, or send. Commands are
+handled in the SPA and never call the model, so they work when it is offline.
 
 | Command | Effect |
 |---|---|
