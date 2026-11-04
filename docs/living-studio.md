@@ -176,6 +176,11 @@ Studio says so in one place and keeps going:
   **Live**, and when it reports the model is not there, **Local mode**.
   **Connecting** is reserved for an endpoint that is configured and has not
   answered yet — nobody spins for a connection they are not trying to make.
+- The light that says which of those it is comes from one primitive,
+  `apps/studio/src/components/status/StatusDot.tsx`: one 7 px disc in the tone's
+  color, `aria-hidden` when a word already states the state, named by `label`
+  when it stands alone. A `.studio-pill` is a label, not an indicator, so it
+  carries no dot of its own.
 - A reply that no model produced carries one line, on that reply: **Local draft,
   no model connected**. It is a button, and it opens Settings. It never repeats
   on the replies around it, and nothing about it covers the thread.

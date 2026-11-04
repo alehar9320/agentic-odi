@@ -19,6 +19,7 @@ import {
   SunIcon,
 } from "../icons";
 import { OdiMascot } from "../OdiMascot";
+import { StatusDot } from "../status/StatusDot";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -367,10 +368,8 @@ export function StudioBar({
           aria-label={`Model status: ${status}. ${statusDetail}`}
           title={statusDetail}
         >
-          <span
-            className={`status-dot${status === "Local mode" ? " is-warn" : ""}${
-              status === "Connecting" ? " is-unknown" : ""
-            }`}
+          <StatusDot
+            tone={status === "Local mode" ? "warn" : status === "Connecting" ? "unknown" : "ok"}
           />
           {status}
         </button>
