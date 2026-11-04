@@ -207,10 +207,13 @@ def add_outcome(
     """
     if service.get_job(job_id) is None:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
-    for score in (importance, satisfaction):
+    for score, name in ((importance, "importance"), (satisfaction, "satisfaction")):
         if score is not None and not (1.0 <= score <= 10.0):
             return _fail(
-                ValueOutOfRangeError("importance and satisfaction must be between 1.0 and 10.0")
+                ValueOutOfRangeError(
+                    f"{name} must be between 1.0 and 10.0", field=name
+                ),
+                f"Error: {name} must be between 1.0 and 10.0",
             )
     scored = importance is not None or satisfaction is not None
     if scored and claim_check is None:
@@ -379,7 +382,9 @@ def delete_customer_outcome(outcome_id: str) -> str:
 def compute_opportunity(importance: float, satisfaction: float) -> str:
     if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
         return _fail(
-            ValueOutOfRangeError("importance and satisfaction must be between 1.0 and 10.0")
+            ValueOutOfRangeError(
+                "importance and satisfaction must be between 1.0 and 10.0"
+            )
         )
     score = compute_opportunity_score(importance, satisfaction)
     return f"Opportunity score: {score:.2f}"
