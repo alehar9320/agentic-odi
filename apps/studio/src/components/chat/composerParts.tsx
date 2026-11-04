@@ -5,6 +5,8 @@
  * queueing); the setup wizard's composer is a controlled textarea because its
  * turns are local until the context is saved. The command palette, the
  * connector chips, and the hint row are the same in both, so they live here.
+ * The focus chip is the exception: it speaks for the canvas, so only the
+ * thread composer mounts it.
  */
 
 import type { ReactNode } from "react";
@@ -25,7 +27,6 @@ interface QuickPill {
   label: string;
   icon: ReactNode;
   run: () => void;
-  conversational?: boolean;
 }
 
 /**
@@ -34,7 +35,7 @@ interface QuickPill {
  * the same store, so they cannot drift apart.
  */
 export function SuggestionPills() {
-  const { canvas, llmHealth, openPanel, streaming, sendMessage } = useStudio();
+  const { canvas, llmHealth, openPanel, sendMessage } = useStudio();
   const suggestions = useAuiState((state) => state.thread.suggestions);
 
   const jobs = canvas?.jobs.length ?? 0;
@@ -44,7 +45,6 @@ export function SuggestionPills() {
     label: suggestion.title ?? suggestion.prompt,
     icon: PILL_ICONS[index % PILL_ICONS.length],
     run: () => void sendMessage(suggestion.prompt),
-    conversational: true,
   }));
 
   pills.push(
@@ -66,13 +66,7 @@ export function SuggestionPills() {
   return (
     <div className="composer__pills" aria-label="Suggested next steps">
       {pills.map((pill) => (
-        <button
-          key={pill.id}
-          type="button"
-          className="suggestion"
-          disabled={Boolean(pill.conversational && streaming)}
-          onClick={pill.run}
-        >
+        <button key={pill.id} type="button" className="suggestion" onClick={pill.run}>
           {pill.icon}
           {pill.label}
         </button>
@@ -163,6 +157,42 @@ export function ConnectorChips() {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * What the agent was told about the screen, so the person can see it, check it,
+ * and take it back.
+ *
+ * Renders only when the canvas can name the selection: a chip for a record this
+ * snapshot cannot read would be claiming something the store never said.
+ */
+export function ContextChip() {
+  const { focusedSubject, focusedSubjectLabel, clearFocus, revealFocusedSubject } = useStudio();
+
+  if (!focusedSubject || !focusedSubjectLabel) {
+    return null;
+  }
+
+  return (
+    <div className="composer__focus" role="status">
+      <button
+        type="button"
+        className="composer__focus-chip"
+        aria-label={`Looking at: ${focusedSubjectLabel}`}
+        onClick={revealFocusedSubject}
+      >
+        <span>Looking at: {focusedSubjectLabel}</span>
+      </button>
+      <button
+        type="button"
+        className="quiet-action"
+        aria-label="Stop telling the agent what you are looking at"
+        onClick={clearFocus}
+      >
+        <span aria-hidden>✕</span>
+      </button>
     </div>
   );
 }

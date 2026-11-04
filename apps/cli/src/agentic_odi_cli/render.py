@@ -465,6 +465,48 @@ def render_segment(segment: Any, *, as_json: bool) -> str:
     )
 
 
+def render_study_list(studies: Any, *, as_json: bool) -> str:
+    """Render studies as a table: a wave is meaningless without its status."""
+    if not isinstance(studies, list):
+        return _json(studies) if as_json else str(studies)
+    if as_json:
+        return _json(studies)
+    return _table(
+        ("id", "name", "wave", "status", "job_id"),
+        [
+            (
+                _cell(item, "id"),
+                _truncate(_cell(item, "name")),
+                _cell(item, "wave"),
+                _cell(item, "status"),
+                _cell(item, "job_id"),
+            )
+            for item in studies
+        ],
+        empty="No studies yet — run `odi studies open` on a job.",
+    )
+
+
+def render_study(study: Any, *, as_json: bool) -> str:
+    """Render one study: the pass it names and where it stands."""
+    if not isinstance(study, dict):
+        return _json(study) if as_json else str(study)
+    if as_json:
+        return _json(study)
+    return _block(
+        [
+            ("id", _cell(study, "id")),
+            ("name", _cell(study, "name")),
+            ("wave", _cell(study, "wave")),
+            ("status", _cell(study, "status")),
+            ("job", _cell(study, "job_id")),
+            ("opened", _cell(study, "opened_at")),
+            ("closed", _cell(study, "closed_at") or "—"),
+            ("method notes", _cell(study, "method_notes") or "—"),
+        ]
+    )
+
+
 def render_strategy(strategy: Any, *, as_json: bool) -> str:
     """Render the chosen path with every path it beat.
 

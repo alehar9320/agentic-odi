@@ -22,10 +22,10 @@ Follow this sequence when guiding a user through the ODI process:
 - **Unit of measure**: A measurable unit (time, cost, number, frequency, rate, percentage, steps, attempts).
 - **Object of control**: The thing being acted on (named after 'the').
 - **Contextual clarifier**: When it happens (when, while, before, after, during, if, as).
-- **Scores**: Both `importance` and `satisfaction` are required (1–10). An outcome without them cannot be compared to anything.
+- **Scores**: `importance` and `satisfaction` (1–10) are optional, but a score must carry its `claim_check`: the questions you asked the customer and what came back. Put three questions to the customer — four when the claim is broad — and wait for their replies before you write any number. An unscored outcome is legal; a bare number is not.
 - **Expectation**: Qualitative interviews typically uncover 50–150 desired outcome statements.
 - **Tools to use**:
-  - `add_outcome(job_id, statement, importance, satisfaction)` — Capture each desired outcome with scores.
+  - `add_outcome(job_id, statement, importance?, satisfaction?, claim_check?)` — Capture each desired outcome. When you set a score, pass `claim_check` with `asked`, `answers`, and `skips` (each skip needs a reason); ask the customer before scoring, never answer your own questions.
   - `get_outcomes(job_id)` — Review all outcomes captured for a Job.
   - `evaluate_outcome(statement, job_id?)` — **Pre-write check**: run this before `add_outcome` to confirm the statement matches the ODI format. It returns coded issues and suggestions for any failure.
   - `update_outcome(outcome_id, ...)` — Correct a statement or scores; the same validation applies.
@@ -107,6 +107,16 @@ def scheduled_work_not_found(work_id: str | None, hint: str | None = None) -> st
     return message
 
 
+def invalid_strategy_request(message: str) -> str:
+    """The one spelling of a refused Stage 6 request.
+
+    Stage 6 refuses rather than inventing a bet, and every adapter reports that
+    refusal the same way: a validation problem with the caller's request, not a
+    server failure.
+    """
+    return f"Invalid strategy request: {message}"
+
+
 def interview_not_found(interview_id: str | None) -> str:
     return f"Interview not found: {interview_id}"
 
@@ -117,13 +127,3 @@ def quote_not_found(quote_id: str | None) -> str:
 
 def candidate_not_found(candidate_id: str | None) -> str:
     return f"Outcome candidate not found: {candidate_id}"
-
-
-def invalid_strategy_request(message: str) -> str:
-    """The one spelling of a refused Stage 6 request.
-
-    Stage 6 refuses rather than inventing a bet, and every adapter reports that
-    refusal the same way: a validation problem with the caller's request, not a
-    server failure.
-    """
-    return f"Invalid strategy request: {message}"

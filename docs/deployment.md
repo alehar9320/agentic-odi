@@ -8,6 +8,11 @@ by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml).
 
 - A push to `main` runs the website tests, builds `_site` from `website/`, and
   deploys the artifact with `actions/deploy-pages`.
+- The same tests run on every pull request in the `website` job of
+  [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), whose result feeds the
+  required `CI green` check, so a failing page cannot merge. `website/tests/test_ci_required.py`
+  pins that wiring — the job runs the suite, carries no `continue-on-error`, and gates
+  both `CI green` and this deploy.
 - No site build output is committed; CI generates `_site` on every push.
 - `workflow_dispatch` republishes the site from the Actions tab without a code
   change.
@@ -15,6 +20,26 @@ by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml).
   `gh-pages` branch. Removing `pages.yml` stops all publishing and the site
   returns 404.
 - The `github-pages` environment only allows deployments from `main`.
+
+### The sample workspace
+
+The site's primary call to action on the landing page points at
+**`website/sample/index.html`**, a read-only sample workspace served at
+`/sample/`. It is generated from `website/content/sample-study.json` by
+`website/tools/build_sample.py` and committed, so it is part of the deployed
+artifact and keeps working when the API is down.
+
+- Regenerate it after editing the fixture or the template:
+  `uv run python website/tools/build_sample.py`.
+- `uv run python website/tools/build_sample.py --check` fails when the committed
+  page disagrees with a fresh render; `test_content_sync.py` runs the same
+  comparison, so the page cannot drift from the fixture.
+- The page is self-contained: no external font, script, image, or stylesheet.
+  `test_content_sync.py` greps the committed file for an external reference, so
+  the no-network rule is enforced rather than promised.
+- Every row carries a sample marker, and every numeral on the page is read from
+  the fixture — the build refuses to publish a number the fixture does not
+  contain.
 
 ## Hosted MCP Server
 
@@ -199,6 +224,24 @@ Workers Builds settings (Workers & Pages → your Worker → Settings → Builds
 
 A Worker has no run command: the Worker script runs on Cloudflare. Set `name` in
 `wrangler.jsonc` to the Worker you created before the first deploy.
+
+### Which release is live
+
+`GET /api/build` answers `{"version": "<tag>"}`, read from `vars.RELEASE_VERSION`
+in `wrangler.jsonc`. The Worker replies before the sidecar proxy, so a deployment
+without a tunnel still identifies itself, and any other method gets a 405 with
+`Allow: GET`. The body carries nothing but the version: no environment values,
+and never a deploy timestamp, so two deploys of one tag report the same string.
+
+`RELEASE_VERSION` is not a release-please `extra-files` entry, so cutting a release
+means editing it in the same commit as the tag. `scripts/check_version_parity.py`
+covers the miss and names `wrangler.jsonc` when the declared value drifts from
+`.release-please-manifest.json`.
+
+```bash
+curl -s https://agentic-odi.alehar.workers.dev/api/build
+uv run python scripts/check_version_parity.py
+```
 
 ### Pull request previews
 

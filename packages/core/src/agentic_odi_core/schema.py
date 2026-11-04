@@ -26,6 +26,7 @@ from agentic_odi_core.models import (
     Segment,
     Step,
     Strategy,
+    Study,
     ValueMetric,
 )
 
@@ -40,6 +41,7 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "Evidence": Evidence,
     "Segment": Segment,
     "Strategy": Strategy,
+    "Study": Study,
     "V2MOM": V2MOM,
     "ScheduledWork": ScheduledWork,
     "Interview": Interview,

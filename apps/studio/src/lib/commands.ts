@@ -103,6 +103,14 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     keywords: ["markets", "verdict", "strategy", "who is this for"],
   },
   {
+    id: "brief",
+    name: "/brief",
+    label: "Decision brief",
+    description: "The document a review reads, ready to download or print.",
+    category: "Act",
+    keywords: ["export", "document", "review", "print", "pdf"],
+  },
+  {
     id: "impact",
     name: "/impact",
     label: "Simulate a bet",
@@ -117,6 +125,14 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     description: "The customer signals behind each outcome.",
     category: "Explore",
     keywords: ["signals", "quotes"],
+  },
+  {
+    id: "records",
+    name: "/records",
+    label: "Records",
+    description: "Every job, step, outcome, and quote on the canvas, in one table.",
+    category: "Explore",
+    keywords: ["table", "all", "stored"],
   },
   {
     id: "capture",

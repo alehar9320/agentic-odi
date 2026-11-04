@@ -56,6 +56,33 @@ describe("fetchConfig", () => {
       model_name: "m",
     });
   });
+
+  it("gives up on a request that never answers instead of hanging forever", async () => {
+    // A proxy that accepts the connection and never replies. Boot cannot wait on
+    // that; the request is bounded so the caller can fall back to its defaults.
+    let aborted = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_input: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              aborted = true;
+              const error = new Error("The operation was aborted.");
+              error.name = "AbortError";
+              reject(error);
+            });
+          }),
+      ),
+    );
+    vi.useFakeTimers();
+    const pending = fetchConfig();
+    const assertion = expect(pending).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(1_200);
+    await assertion;
+    expect(aborted).toBe(true);
+    vi.useRealTimers();
+  });
 });
 
 describe("fetchChangelog", () => {
@@ -459,8 +486,8 @@ describe("typed failures", () => {
 
     expect(problem.code).toBe("mcp_unreachable");
     expect(problem.retryable).toBe(true);
-    expect(problem.suggestion).toMatch(/sidecar/i);
-    expect(problem.message).toMatch(/reachable|not running|unreachable/i);
+    expect(problem.suggestion).toContain("uv run python scripts/dev.py");
+    expect(problem.message).toMatch(/local Studio service isn.t responding/);
   });
 
   it("classifies an empty 502 response as mcp_unreachable", async () => {
@@ -475,7 +502,7 @@ describe("typed failures", () => {
         satisfaction: 3,
       }),
      ).rejects.toMatchObject({
-       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("sidecar") },
+       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
      });
    });
 

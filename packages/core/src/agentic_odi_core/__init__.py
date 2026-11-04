@@ -24,15 +24,25 @@ from agentic_odi_core.errors import (
     OdiError,
     RateLimitError,
     SerializationError,
+    StoreCorrupt,
     StoreError,
     error_status,
 )
 from agentic_odi_core.evaluation import (
+    OutcomeScoreMismatchError,
     OutcomeStatementError,
+    assert_outcome_scores_match,
     evaluate_outcome_statement,
+    load_score_fixture,
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
+from agentic_odi_core.mapping import (
+    HeuristicProposalStrategy,
+    OutcomeProposal,
+    ProposalStatus,
+    ProposalStrategy,
+)
 from agentic_odi_core.messages import (
     CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
@@ -55,6 +65,8 @@ from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
     CandidateStatus,
+    ClaimCheck,
+    ClaimSkip,
     CustomerOutcome,
     CustomerValue,
     Direction,
@@ -76,6 +88,8 @@ from agentic_odi_core.models import (
     Step,
     Strategy,
     StrategyKind,
+    Study,
+    StudyStatus,
     ValueMetric,
     compute_opportunity_score,
     create_job,
@@ -84,11 +98,12 @@ from agentic_odi_core.models import (
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
+    error_envelope,
     parse_tool_result,
     tool_result_text,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
-from agentic_odi_core.router import ModelRouter, ModelTier, OnDeviceLLMEngine, RoutingMode
+from agentic_odi_core.router import LocalOpenAIEngine, ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.segmentation import (
     MIN_OUTCOMES_PER_SEGMENT,
@@ -99,6 +114,7 @@ from agentic_odi_core.segmentation import (
 )
 from agentic_odi_core.services import (
     CandidateNotFoundError,
+    ClaimCheckError,
     CustomerOutcomeNotFoundError,
     EvidenceNotFoundError,
     InterviewNotFoundError,
@@ -114,7 +130,10 @@ from agentic_odi_core.services import (
     SignalNotFoundError,
     StepNotFoundError,
     StrategyNotFoundError,
+    StudyNotFoundError,
     ValueOutOfRangeError,
+    manual_claim_check,
+    require_claim_check,
 )
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
@@ -125,6 +144,9 @@ from agentic_odi_core.strategy import propose_strategy
 __all__ = [
     "ScheduledWork",
     "ScheduledWorkNotFoundError",
+    "OutcomeScoreMismatchError",
+    "assert_outcome_scores_match",
+    "load_score_fixture",
     "ScheduledWorkStatus",
     "ScheduledWorkTriggerType",
     "Segment",
@@ -137,6 +159,9 @@ __all__ = [
     "MIN_OUTCOMES_PER_SEGMENT",
     "Strategy",
     "StrategyKind",
+    "Study",
+    "StudyNotFoundError",
+    "StudyStatus",
     "scheduled_work_not_found",
     "segment_verdict",
     "unclustered_outcomes",
@@ -144,6 +169,9 @@ __all__ = [
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
+    "ClaimCheck",
+    "ClaimCheckError",
+    "ClaimSkip",
     "CandidateNotFoundError",
     "CandidateStatus",
     "ConflictError",
@@ -170,17 +198,23 @@ __all__ = [
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",
     "OdiError",
+    "OnDeviceLLMEngine",
     "Outcome",
     "OutcomeCandidate",
     "OutcomeNotFoundError",
+    "OutcomeProposal",
     "OutcomeStatementError",
-    "OnDeviceLLMEngine",
+    "ProposalStatus",
+    "ProposalStrategy",
+    "HeuristicProposalStrategy",
+    "LocalOpenAIEngine",
     "QuoteNotFoundError",
     "RateLimitError",
     "RoutingMode",
     "SerializationError",
     "Step",
     "StepNotFoundError",
+    "StoreCorrupt",
     "StoreError",
     "Signal",
     "SignalBudget",
@@ -210,14 +244,17 @@ __all__ = [
     "evaluate_outcome_statement",
     "evidence_not_found",
     "format_opportunity_score_insight",
+    "error_envelope",
     "generate_steve_jobs_response",
     "interview_not_found",
     "invalid_strategy_request",
     "job_not_found",
     "job_stage_catalog",
+    "manual_claim_check",
     "odi_schema",
     "outcome_not_found",
     "parse_tool_result",
+    "require_claim_check",
     "quote_not_found",
     "statement_to_dict",
     "step_not_found",

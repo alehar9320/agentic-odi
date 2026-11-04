@@ -86,7 +86,10 @@ async def test_update_candidate_reports_unknown_status() -> None:
         result = await client.call_tool(
             "update_candidate", {"candidate_id": candidates[0]["id"], "status": "sideways"}
         )
-    assert _text(result) == "Error: unknown candidate status: sideways"
+    payload = json.loads(_text(result))
+    assert payload["error"]["code"] == "validation"
+    assert payload["error"]["message"] == "unknown candidate status: sideways"
+    assert payload["message"] == "Error: unknown candidate status: sideways"
 
 
 @pytest.mark.asyncio
@@ -113,4 +116,7 @@ async def test_get_and_delete_candidate() -> None:
 async def test_list_candidates_rejects_unknown_status() -> None:
     async with Client(mcp) as client:
         result = await client.call_tool("list_candidates", {"status": "nope"})
-    assert _text(result) == "Error: unknown candidate status: nope"
+    payload = json.loads(_text(result))
+    assert payload["error"]["code"] == "validation"
+    assert payload["error"]["message"] == "unknown candidate status: nope"
+    assert payload["message"] == "Error: unknown candidate status: nope"
