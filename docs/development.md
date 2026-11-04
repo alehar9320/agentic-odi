@@ -111,11 +111,11 @@ by the presence of one handler.
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
 | `ThreadPrimitive.Root` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | The transcript's shell. |
-| `ThreadPrimitive.Viewport` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | Scrolling and the latest-message affordance. |
+| `ThreadPrimitive.Viewport` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | Scrolling; the jump-to-latest affordance reads its `isAtBottom`. |
 | `ThreadPrimitive.Messages` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | The message map. |
 | `ThreadPrimitive.Empty` | Rejected | — | — | Deprecated; `AuiIf` on `state.thread.isEmpty` is the replacement, and `ChatStage` should move to it the next time it changes (see #408 task 6). |
 | `ThreadPrimitive.If` | Decision | — | — | We use `AuiIf`; do not mix two conditional idioms in one tree. |
-| `ThreadPrimitive.ScrollToBottom` | Decision | — | — | `LatestMessageButton` is hand-rolled over `useThreadViewport`. Adopt only if the primitive keeps the reduced-motion behavior. |
+| `ThreadPrimitive.ScrollToBottom` | Decision | — | — | `LatestMessageButton` is hand-rolled over `useThreadViewport` because it carries the arrival count. Adopt only if the primitive keeps the reduced-motion behavior and the count. |
 | `ThreadPrimitive.LoadEarlier` / `thread.hasEarlier` | Decision | — | — | Needs sidecar paging over a branch tree. Worth it only for very long threads; measure first. |
 | `ThreadPrimitive.ViewportFooter` | Decision | — | — | The composer is outside the viewport by design; no problem to solve. |
 | `ThreadPrimitive.ViewportProvider` | Rejected | — | — | One viewport; the provider exists for multiple viewports on one thread. |
@@ -250,7 +250,7 @@ only the surface is missing.
 | `unstable_useMentionAdapter` / `unstable_useSlashCommandAdapter` | Planned | — | #426 | Composer triggers. |
 | `unstable_useComposerInputHistory` | Adopted | `apps/studio/src/assistant/composerHistory.ts` | #430 | ArrowUp recall. |
 | `useSmooth` | Decision | — | — | Smoothes bursty SSE text. Might read as deliberate rather than laggy — needs a comparison, not a guess. |
-| `useThreadViewport` (viewport state) | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #245 | `isAtBottom` / `scrollToBottom` drive the latest-message affordance. |
+| `useThreadViewport` (viewport state) | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #245 | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count lives in `arrivalCount.ts`. |
 | `useThreadViewportAutoScroll` / `useScrollLock` | Rejected | — | — | The viewport already owns auto-scroll, and the only overlay that could need a scroll lock is the lens rail, which does not scroll the thread. |
 | `unstable_useThreadMessageIds` | Decision | — | — | Only needed if a list needs message identity outside a message scope. |
 | `useToolArgsStatus` | Decision | — | — | Belongs to the tool card work, if it needs per-argument state. |
@@ -365,8 +365,10 @@ compiled stylesheet.
 ### Conversational UI coverage
 
 The agent-composed surfaces, first-minute guidance, and the product tour are
-covered at these levels. `ChatStage.test.tsx` also covers the latest-message
-control while following a streamed turn and returning to the live end:
+covered at these levels. `ChatStage.test.tsx` covers the jump-to-latest control
+while following a streamed turn — the arrival count, the polite announcement, the
+return to the live end, and the keyboard path — and `arrivalCount.test.ts` holds
+the pure count arithmetic:
 
 | File | What it covers |
 |---|---|
