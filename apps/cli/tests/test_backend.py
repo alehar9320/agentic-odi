@@ -599,3 +599,55 @@ def test_local_backend_get_outcome_inputs_reports_the_retained_pairs(tmp_path):
     assert [i["importance"] for i in result["inputs"]] == [8.0, 8.0, 8.0]
     assert [i["satisfaction"] for i in result["inputs"]] == [4.0, 4.0, 4.0]
     assert [i["respondent_id"] for i in result["inputs"]] == ["r0", "r1", "r2"]
+
+
+def _seed_evidence(backend: LocalBackend) -> tuple[dict, dict]:
+    job = backend.call("add_job", {"name": "Secret rotation", "description": "Rotate credentials"})
+    evidence = backend.call(
+        "add_evidence",
+        {
+            "source_name": "gong",
+            "source_kind": "mcp",
+            "name": "Q3 call",
+            "content": ("It takes too long to rotate production secrets before the next deploy."),
+            "job_id": job["id"],
+        },
+    )
+    return job, evidence
+
+
+def test_local_backend_proposal_round_trip(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    job, evidence = _seed_evidence(backend)
+
+    proposal = backend.call("propose_outcome", {"evidence_id": evidence["id"]})
+    assert proposal["status"] == "proposed"
+    assert proposal["job_id"] == job["id"]
+    assert proposal["statement"].startswith("Minimize")
+
+    assert [p["id"] for p in backend.call("list_proposals", {"status": "proposed"})] == [
+        proposal["id"]
+    ]
+    assert backend.call("list_proposals", {"status": "approved"}) == []
+
+    outcome = backend.call("approve_proposal", {"proposal_id": proposal["id"]})
+    assert outcome["job_id"] == job["id"]
+    assert outcome["statement"] == proposal["statement"]
+    assert backend.call("list_proposals", {"status": "proposed"}) == []
+
+
+def test_local_backend_rejects_a_proposal_without_writing(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+    _job, evidence = _seed_evidence(backend)
+    proposal = backend.call("propose_outcome", {"evidence_id": evidence["id"]})
+
+    rejected = backend.call("reject_proposal", {"proposal_id": proposal["id"]})
+    assert rejected["status"] == "rejected"
+    assert backend.call("get_outcomes", {"job_id": _job["id"]}) == []
+
+
+def test_local_backend_rejects_an_unknown_proposal_status(tmp_path):
+    backend = LocalBackend(db_path=str(tmp_path / "odi.db"))
+
+    with pytest.raises(BackendError, match="Invalid proposal status"):
+        backend.call("list_proposals", {"status": "pending"})

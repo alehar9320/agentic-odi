@@ -33,6 +33,10 @@ async def test_add_outcome_records_sample_metadata():
                         "importance_n": 40,
                         "satisfaction_n": 40,
                         "score_method": "survey",
+                        "claim_check": {
+                            "asked": ["How often does this happen?"],
+                            "answers": ["Weekly"],
+                        },
                     },
                 )
             )
@@ -64,13 +68,17 @@ async def test_add_outcome_refuses_an_estimate_with_a_count():
                         "importance": 8.0,
                         "satisfaction": 6.0,
                         "importance_n": 40,
+                        "claim_check": {
+                            "asked": ["How often does this happen?"],
+                            "answers": ["Weekly"],
+                        },
                     },
                 )
             )
             .content[0]
             .text
         )
-        assert text.startswith("Error:")
+        assert "sample count above 1" in text
 
 
 @pytest.mark.asyncio
@@ -96,6 +104,10 @@ async def test_odi_workflow():
                 "statement": "Minimize the time it takes to find a specific song when searching the catalog",
                 "importance": 8.5,
                 "satisfaction": 4.0,
+                "claim_check": {
+                    "asked": ["How long does a search take?"],
+                    "answers": ["Roughly a minute"],
+                },
             },
         )
         outcome_text = outcome_res.content[0].text
@@ -204,6 +216,10 @@ async def test_get_survey_import_plan_reports_every_row_without_writing():
                         "statement": "Minimize the time it takes to onboard a customer when they sign up",
                         "importance": 8.0,
                         "satisfaction": 4.0,
+                        "claim_check": {
+                            "asked": ["How often does this happen?"],
+                            "answers": ["Weekly"],
+                        },
                     },
                 )
             )
@@ -239,6 +255,10 @@ async def test_commit_survey_import_refuses_an_unresolved_row():
                         "statement": "Minimize the time it takes to onboard a customer when they sign up",
                         "importance": 8.0,
                         "satisfaction": 4.0,
+                        "claim_check": {
+                            "asked": ["How often does this happen?"],
+                            "answers": ["Weekly"],
+                        },
                     },
                 )
             )
@@ -248,7 +268,7 @@ async def test_commit_survey_import_refuses_an_unresolved_row():
 
         rows = [*_survey_rows(outcome_id, 40), *_survey_rows("ghost", 1)]
         text = (await client.call_tool("commit_survey_import", {"rows": rows})).content[0].text
-        assert text.startswith("Error:")
+        assert '"error"' in text
 
         # The refusal left the outcome unchanged.
         fetched = (

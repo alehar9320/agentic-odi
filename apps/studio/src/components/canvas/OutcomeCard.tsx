@@ -11,6 +11,7 @@ import {
   formatBandProvenance,
   formatOpportunityScore,
   formatSample,
+  hasScore,
   isUnderserved,
   opportunityPill,
   opportunityScore,
@@ -136,8 +137,23 @@ export function OutcomeCard({
 
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
-  const underserved = isUnderserved(opp);
-  const pill = opportunityPill(opp);
+  const scored = hasScore(opp);
+  const underserved = scored && isUnderserved(opp);
+  const pill = scored
+    ? opportunityPill(opp)
+    : { label: "Not scored — no ratings recorded", variant: "blue" };
+
+  // The interview behind the number. A score the reader cannot interrogate is the
+  // one thing this card must not present as settled, so an unverified score is
+  // marked apart and a bare number says plainly that nothing was asked.
+  const check = outcome.claim_check ?? null;
+  const asked = check?.asked ?? [];
+  const answers = check?.answers ?? [];
+  const skips = check?.skips ?? [];
+  const verified = check?.verified === true;
+  // Sample rows are already badged as not the reader's work; a by-hand notice
+  // belongs to the numbers they are being asked to trust.
+  const bareNumber = scored && check === null && !sample;
 
   return (
     <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>
@@ -201,6 +217,52 @@ export function OutcomeCard({
           ) : null}
         </div>
       ) : null}
+      {(check || bareNumber) && (
+        <div className={`claim-check${verified ? "" : " claim-check--unverified"}`}>
+          {check ? (
+            <>
+              <p className="claim-check__head">
+                <b>{verified ? "Verified" : "Unverified"}</b>
+                <span aria-hidden="true"> · </span>
+                {answers.length} of {asked.length} answered
+                {skips.length > 0 && (
+                  <>
+                    <span aria-hidden="true"> · </span>
+                    {skips.length} skipped
+                  </>
+                )}
+              </p>
+              <ul className="claim-check__list">
+                <li className="claim-check__group">Asked</li>
+                {asked.map((question) => (
+                  <li key={question} className="claim-check__item">
+                    {question}
+                  </li>
+                ))}
+                <li className="claim-check__group">Answered</li>
+                {answers.map((answer) => (
+                  <li key={answer} className="claim-check__item">
+                    {answer}
+                  </li>
+                ))}
+                <li className="claim-check__group">Skipped</li>
+                {skips.map((skip) => (
+                  <li key={skip.question} className="claim-check__item">
+                    {skip.question}
+                    <em>{skip.reason}</em>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="claim-check__head">
+              <b>Unverified</b>
+              <span aria-hidden="true"> · </span>
+              <span>No questions recorded behind this score</span>
+            </p>
+          )}
+        </div>
+      )}
 
       {showEvidence &&
         (linkedEvidence.length > 0 ? (
@@ -268,7 +330,7 @@ export function OutcomeCard({
             />
           </label>
           <p className="score-preview">
-            Opportunity <b>{opportunityScore(importance, satisfaction).toFixed(2)}</b>
+            Opportunity <b>{formatOpportunityScore(opportunityScore(importance, satisfaction))}</b>
           </p>
           <div className="card__edit-actions">
             <button type="submit" className="button button--ghost" disabled={saving}>

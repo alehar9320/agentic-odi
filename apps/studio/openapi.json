@@ -1771,6 +1771,74 @@
         }
       }
     },
+    "/api/studies": {
+      "get": {
+        "summary": "Get Studies",
+        "description": "The opened studies, same records under both backends.\n\nEmpty until the agent has run ``open_study``: a study is opened as a named\npass over a job, never typed into the canvas.",
+        "operationId": "get_studies_api_studies_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Studies Api Studies Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/strategy": {
       "get": {
         "summary": "Get Strategy",
@@ -3060,6 +3128,23 @@
       }
     },
     "/api/conversations": {
+      "get": {
+        "summary": "List Conversations",
+        "description": "The history a switcher lists: at most 20 threads, most recent touch first.\n\nTitles come from the first question, so the list names each thread without\ncarrying a single turn body.",
+        "operationId": "list_conversations_api_conversations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "summary": "Create Conversation",
         "operationId": "create_conversation_api_conversations_post",
@@ -3593,18 +3678,65 @@
         }
       }
     },
-    "/{full_path}": {
+    "/api/proposals": {
+      "post": {
+        "summary": "Propose Outcome Api",
+        "description": "Mine one evidence record into a scored, approvable outcome proposal.",
+        "operationId": "propose_outcome_api_api_proposals_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeOutcomeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Propose Outcome Api Api Proposals Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
-        "summary": "Spa Fallback",
-        "operationId": "spa_fallback__full_path__get",
+        "summary": "List Proposals Api",
+        "description": "List outcome proposals, optionally filtered by status.",
+        "operationId": "list_proposals_api_api_proposals_get",
         "parameters": [
           {
-            "name": "full_path",
-            "in": "path",
-            "required": true,
+            "name": "status",
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
-              "title": "Full Path"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
             }
           }
         ],
@@ -3613,7 +3745,115 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Proposals Api Api Proposals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proposals/{proposal_id}/approve": {
+      "post": {
+        "summary": "Approve Proposal Api",
+        "description": "Approve a proposal and write it as an Outcome.",
+        "operationId": "approve_proposal_api_api_proposals__proposal_id__approve_post",
+        "parameters": [
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveProposalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Approve Proposal Api Api Proposals  Proposal Id  Approve Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proposals/{proposal_id}/reject": {
+      "post": {
+        "summary": "Reject Proposal Api",
+        "description": "Reject a proposal. Nothing is written to the ODI store.",
+        "operationId": "reject_proposal_api_api_proposals__proposal_id__reject_post",
+        "parameters": [
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectProposalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Reject Proposal Api Api Proposals  Proposal Id  Reject Post"
+                }
               }
             }
           },
@@ -3869,16 +4109,40 @@
             "title": "Statement"
           },
           "importance": {
-            "type": "number",
-            "maximum": 10.0,
-            "minimum": 1.0,
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Importance"
           },
           "satisfaction": {
-            "type": "number",
-            "maximum": 10.0,
-            "minimum": 1.0,
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Satisfaction"
+          },
+          "claim_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "importance_n": {
             "anyOf": [
@@ -3931,9 +4195,7 @@
         "required": [
           "mcp_url",
           "job_id",
-          "statement",
-          "importance",
-          "satisfaction"
+          "statement"
         ],
         "title": "AddOutcomeRequest"
       },
@@ -4016,6 +4278,51 @@
           "id"
         ],
         "title": "ApprovalDecisionResponse"
+      },
+      "ApproveProposalRequest": {
+        "properties": {
+          "statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statement"
+          },
+          "importance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance"
+          },
+          "satisfaction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ApproveProposalRequest",
+        "description": "Approve a proposal, optionally with edits."
       },
       "AttachmentRef": {
         "properties": {
@@ -4320,6 +4627,16 @@
               }
             ],
             "title": "Assistant Id"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FocusRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4329,6 +4646,37 @@
           "mcp_url"
         ],
         "title": "ChatRequest"
+      },
+      "ClaimCheck": {
+        "properties": {
+          "asked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Asked",
+            "description": "The questions put to the person"
+          },
+          "answers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Answers",
+            "description": "The answers the person gave, in order"
+          },
+          "skips": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimSkip"
+            },
+            "type": "array",
+            "title": "Skips",
+            "description": "Questions skipped, each with a reason"
+          }
+        },
+        "type": "object",
+        "title": "ClaimCheck",
+        "description": "The questions behind a score: what was asked, answered, or skipped.\n\nTwo numbers are not provenance. A score that carries a claim check says\nwhich questions produced it \u2014 ``asked`` \u2014 and what came back: the\n``answers`` the person gave and the ``skips`` with a recorded reason.\n\n``verified`` is derived, never typed in: a check is verified when at least\none question was answered by the person. A check of only skips is\nunverified, so an outcome built on an assumption says so instead of\nborrowing the confidence of a number."
       },
       "ClaimCitationOut": {
         "properties": {
@@ -4396,6 +4744,27 @@
         "title": "ClaimOut",
         "description": "One declarative sentence and what stands behind it."
       },
+      "ClaimSkip": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question",
+            "description": "The question that was not answered"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why it was skipped; never blank"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "reason"
+        ],
+        "title": "ClaimSkip",
+        "description": "One question that went unanswered, and why it was skipped.\n\nA skip without a reason is not a skip, it is a missing answer, so\n``reason`` is required and must not be blank."
+      },
       "ConnectorListItem": {
         "properties": {
           "name": {
@@ -4436,6 +4805,19 @@
           "name"
         ],
         "title": "ConnectorOperationResponse"
+      },
+      "ConversationListResponse": {
+        "properties": {
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummaryModel"
+            },
+            "type": "array",
+            "title": "Conversations"
+          }
+        },
+        "type": "object",
+        "title": "ConversationListResponse"
       },
       "ConversationModel": {
         "properties": {
@@ -4487,6 +4869,51 @@
           "conversation"
         ],
         "title": "ConversationResponse"
+      },
+      "ConversationSummaryModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "head_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Id"
+          },
+          "turn_count": {
+            "type": "integer",
+            "title": "Turn Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConversationSummaryModel",
+        "description": "A conversation in the history list: its metadata plus how much is in it."
       },
       "ConversationTreeResponse": {
         "properties": {
@@ -4615,6 +5042,34 @@
           "maximize"
         ],
         "title": "Direction"
+      },
+      "FocusRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "job",
+              "step",
+              "outcome",
+              "evidence"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "FocusRef",
+        "description": "Which record the person is looking at, as a pointer and nothing more.\n\nThe client names the id; only the store has the words. Extra keys are\nrejected so a browser cannot slip its own label into the prompt."
       },
       "HTTPValidationError": {
         "properties": {
@@ -5318,6 +5773,25 @@
         "title": "PromoteEvidenceRequest",
         "description": "Turn a captured record into a Job or a Desired Outcome."
       },
+      "ProposeOutcomeRequest": {
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "title": "Evidence Id"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id"
+        ],
+        "title": "ProposeOutcomeRequest",
+        "description": "Propose a desired outcome from an evidence record."
+      },
       "ProposeStrategyRequest": {
         "properties": {
           "job_id": {
@@ -5340,6 +5814,18 @@
         "type": "object",
         "title": "ProposeStrategyRequest",
         "description": "Body for ``POST /api/strategy/propose``.\n\n``job_id`` narrows the bet to one job's segments; omitting it asks across the\nwhole workspace."
+      },
+      "RejectProposalRequest": {
+        "properties": {
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "RejectProposalRequest",
+        "description": "Reject a proposal."
       },
       "ScheduleWorkRequest": {
         "properties": {

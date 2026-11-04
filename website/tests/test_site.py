@@ -54,6 +54,13 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
+    # The agent vendors whose docs the assignment guide cites as sources.
+    "https://docs.openhands.dev",
+    "https://kiro.dev",
+    "https://kilo.ai",
+    "https://docs.qoder.com",
+    "https://docs.github.com",
+    "https://www.theverge.com",
     # A placeholder in the connector documentation. It is not routable, and
     # it is shown as an example of what a connector URL looks like.
     "https://mcp.internal.example",
@@ -90,6 +97,7 @@ EMOJI = re.compile("[\u2600-\u27bf\U0001f300-\U0001faff]")
 # The pages rendered verbatim from the repository's guides. Their prose is
 # the maintainers', so the site's own copy rules do not apply to them.
 MIRRORED_GUIDES = {
+    "docs/agents/index.html",
     "docs/architecture/index.html",
     "docs/cli/index.html",
     "docs/connectors/index.html",
@@ -464,6 +472,24 @@ def test_the_404_page_is_self_contained():
     assert "<img" not in html
 
 
+def test_the_sample_page_is_self_contained():
+    # The sample workspace is the landing page's primary call to action. It
+    # must render with no network, so it carries its own style and references
+    # nothing external. This is the same contract as the 404 page, asserted the
+    # same way.
+    html = read_page("sample/index.html")
+    assert 'lang="en"' in html
+    assert '<meta charset="utf-8">' in html
+    assert "width=device-width" in html
+    assert html.count("<h1") == 1
+    assert "<main" in html and "<footer" in html
+    assert "<link" not in html
+    assert "<script" not in html
+    assert "<img" not in html
+    assert not EMOJI.search(html)
+    assert not QUARTER.search(html) and not MONTH_YEAR.search(html)
+
+
 # ---------------------------------------------------------------- weight & links
 
 
@@ -482,12 +508,14 @@ def test_every_page_resolves_its_own_assets(page: str):
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference is the long pole: every tool's argument table and the
+    # The MCP reference was the long pole: every tool's argument table and the
     # whole ODI schema live on that one page, so it grows with each paginated
     # list tool and each entity we add. The V2MOM entity, the scheduled-work
     # tools, the signal tools, the score-history tool, the ScoreSnapshot entity,
     # the survey-import plan/commit tools, the Alternative/AlternativeLink
     # entities and the four Stage 5 and 6 tools (segment_market, get_segments,
     # get_strategy, propose_strategy) together bring the page close to the
-    # ceiling below.
-    assert size <= 116 * 1024, f"{page}: {size} bytes"
+    # ceiling below. The assistant-ui ledger (issue #429) puts 129 rows on the
+    # Development page, and the Study entity with its two tools adds the last few
+    # KB to the MCP reference page.
+    assert size <= 124 * 1024, f"{page}: {size} bytes"

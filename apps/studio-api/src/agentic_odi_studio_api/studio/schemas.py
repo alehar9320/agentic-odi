@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from agentic_odi_core import BusinessValue, CustomerValue
+from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
 from agentic_odi_core.models import JobStage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
     from agentic_odi_connectors.marketplace import MarketplaceListing
@@ -52,8 +52,12 @@ class AddOutcomeRequest(BaseModel):
     mcp_url: str
     job_id: str
     statement: str
-    importance: float = Field(ge=1.0, le=10.0)
-    satisfaction: float = Field(ge=1.0, le=10.0)
+    importance: float | None = Field(default=None, ge=1.0, le=10.0)
+    satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
+    #: The questions behind the score. Required when either score is set; a
+    #: score without it is refused by the MCP tool, and the by-hand HTTP path
+    #: records it as an unverified check rather than an interrogated one.
+    claim_check: ClaimCheck | None = None
     importance_n: int | None = Field(default=None, ge=1)
     satisfaction_n: int | None = Field(default=None, ge=1)
     score_method: Literal["estimate", "survey", "import"] = "estimate"
@@ -189,6 +193,19 @@ class AttachmentRef(BaseModel):
     data_url: str | None = Field(default=None, max_length=8_000_000)
 
 
+class FocusRef(BaseModel):
+    """Which record the person is looking at, as a pointer and nothing more.
+
+    The client names the id; only the store has the words. Extra keys are
+    rejected so a browser cannot slip its own label into the prompt.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["job", "step", "outcome", "evidence"]
+    id: str = Field(min_length=1, max_length=64)
+
+
 class ChatRequest(BaseModel):
     base_url: str
     api_key: str = ""
@@ -206,6 +223,8 @@ class ChatRequest(BaseModel):
     #: The id the client is streaming this reply under, so the persisted branch
     #: tree matches the one on screen.
     assistant_id: str | None = None
+    #: The record the person has selected on screen, if any.
+    focus: FocusRef | None = None
 
 
 class ApprovalDecisionRequest(BaseModel):
@@ -329,6 +348,16 @@ class ConversationModel(BaseModel):
     head_id: str | None = None
 
 
+class ConversationSummaryModel(ConversationModel):
+    """A conversation in the history list: its metadata plus how much is in it."""
+
+    turn_count: int = 0
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationSummaryModel] = Field(default_factory=list)
+
+
 class ConversationResponse(BaseModel):
     conversation: ConversationModel
 
@@ -450,3 +479,47 @@ class PromoteEvidenceRequest(BaseModel):
     importance: float | None = None
     satisfaction: float | None = None
     mcp_url: str = ""
+
+
+class ProposeOutcomeRequest(BaseModel):
+    """Propose a desired outcome from an evidence record."""
+
+    evidence_id: str
+    mcp_url: str = ""
+
+
+class ApproveProposalRequest(BaseModel):
+    """Approve a proposal, optionally with edits."""
+
+    statement: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    mcp_url: str = ""
+
+
+class RejectProposalRequest(BaseModel):
+    """Reject a proposal."""
+
+    mcp_url: str = ""
+
+
+class ProposalOut(BaseModel):
+    """Serialized OutcomeProposal for the API."""
+
+    id: str
+    evidence_id: str
+    job_id: str | None = None
+    step_id: str | None = None
+    statement: str
+    direction: str
+    unit_of_measure: str | None = None
+    object_of_control: str | None = None
+    contextual_clarifier: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    confidence: float
+    rationale: str
+    quote: str | None = None
+    source_name: str
+    status: str
+    created_at: str

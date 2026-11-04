@@ -262,6 +262,7 @@ class LocalBackend(Backend):
 
     def _add_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
+            ClaimCheckError,
             JobNotFoundError,
             SnapshotNoteError,
             StepNotFoundError,
@@ -273,6 +274,7 @@ class LocalBackend(Backend):
         step_id = args.get("step_id")
         from pydantic import ValidationError
 
+        claim_check = args.get("claim_check")
         try:
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
@@ -284,6 +286,7 @@ class LocalBackend(Backend):
                 satisfaction_n=args.get("satisfaction_n"),
                 score_method=args.get("score_method", "estimate"),
                 note=args.get("note"),
+                claim_check=claim_check,
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -301,6 +304,8 @@ class LocalBackend(Backend):
             raise BackendError(
                 _SAMPLE_METHOD_ERROR if "estimate" in str(exc) else str(exc)
             ) from exc
+        except ClaimCheckError as exc:
+            raise BackendError(str(exc)) from exc
         return outcome.model_dump()
 
     def _get_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -809,6 +814,42 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return artifact.model_dump()
 
+    def _propose_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import EvidenceNotFoundError, evidence_not_found
+
+        evidence_id = args["evidence_id"]
+        try:
+            proposal = self.service.propose_outcome_from_evidence(evidence_id)
+        except EvidenceNotFoundError as exc:
+            raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None
+        return proposal.model_dump()
+
+    def _list_proposals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import ProposalStatus
+
+        status = args.get("status")
+        try:
+            proposal_status = ProposalStatus(status) if status is not None else None
+        except ValueError:
+            raise BackendError(
+                f"Invalid proposal status '{status}'. Use proposed, approved, rejected, or edited."
+            ) from None
+        proposals = self.service.list_proposals(status=proposal_status)
+        return [proposal.model_dump() for proposal in proposals]
+
+    def _approve_proposal(self, args: dict[str, Any]) -> dict[str, Any]:
+        outcome = self.service.approve_proposal(
+            args["proposal_id"],
+            statement=args.get("statement"),
+            importance=args.get("importance"),
+            satisfaction=args.get("satisfaction"),
+        )
+        return outcome.model_dump()
+
+    def _reject_proposal(self, args: dict[str, Any]) -> dict[str, Any]:
+        proposal = self.service.reject_proposal(args["proposal_id"])
+        return proposal.model_dump()
+
     def _schedule_work(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import JobNotFoundError, job_not_found
 
@@ -962,6 +1003,26 @@ class LocalBackend(Backend):
         segments = self.service.list_segments(job_id=args.get("job_id"))
         return [segment.model_dump(mode="json") for segment in segments]
 
+    def _open_study(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, OdiError, job_not_found
+
+        try:
+            study = self.service.open_study(
+                job_id=args["job_id"],
+                name=args["name"],
+                wave=int(args["wave"]),
+                method_notes=args.get("method_notes"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id") or "")) from None
+        except OdiError as exc:
+            raise BackendError(str(exc)) from None
+        return study.model_dump(mode="json")
+
+    def _list_studies(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        studies = self.service.list_studies(job_id=args.get("job_id"))
+        return [study.model_dump(mode="json") for study in studies]
+
     def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
         strategy = self.service.get_strategy()
         return None if strategy is None else strategy.model_dump(mode="json")
@@ -1020,6 +1081,10 @@ _LOCAL_HANDLERS = {
     "list_evidence": LocalBackend._list_evidence,
     "delete_evidence": LocalBackend._delete_evidence,
     "promote_evidence": LocalBackend._promote_evidence,
+    "propose_outcome": LocalBackend._propose_outcome,
+    "list_proposals": LocalBackend._list_proposals,
+    "approve_proposal": LocalBackend._approve_proposal,
+    "reject_proposal": LocalBackend._reject_proposal,
     "schedule_work": LocalBackend._schedule_work,
     "get_scheduled_work": LocalBackend._get_scheduled_work,
     "list_scheduled_work": LocalBackend._list_scheduled_work,
@@ -1036,6 +1101,8 @@ _LOCAL_HANDLERS = {
     "dismiss_signal": LocalBackend._dismiss_signal,
     "segment_market": LocalBackend._segment_market,
     "get_segments": LocalBackend._get_segments,
+    "open_study": LocalBackend._open_study,
+    "list_studies": LocalBackend._list_studies,
     "get_strategy": LocalBackend._get_strategy,
     "propose_strategy": LocalBackend._propose_strategy,
     "get_health": LocalBackend._get_health,

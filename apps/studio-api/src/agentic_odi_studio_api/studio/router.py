@@ -19,18 +19,22 @@ from agentic_odi_connectors.registry import (
 )
 from agentic_odi_core import (
     EvidenceNotFoundError,
+    InvalidOutcomeStatementError,
     JobNotFoundError,
     NoStrategyEvidenceError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
+    OutcomeProposal,
     OutcomeStatementError,
+    ProposalStatus,
     SegmentNotFoundError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
     error_status,
     invalid_strategy_request,
+    manual_claim_check,
 )
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, Query, Request
@@ -72,12 +76,14 @@ from agentic_odi_studio_api.studio.schemas import (
     AddStepRequest,
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
+    ApproveProposalRequest,
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
     ClaimOut,
     ConnectorListItem,
     ConnectorOperationResponse,
+    ConversationListResponse,
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
@@ -94,7 +100,10 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationResponse,
     ObservationUpdateRequest,
     PromoteEvidenceRequest,
+    ProposalOut,
+    ProposeOutcomeRequest,
     ProposeStrategyRequest,
+    RejectProposalRequest,
     ScheduleWorkRequest,
     SignalActionRequest,
     TurnNode,
@@ -632,20 +641,36 @@ async def delete_step(step_id: str, request: Request, mcp_url: str | None = Quer
 
 @router.post("/outcomes")
 async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
+    #: This endpoint is the by-hand capture path. A person typing two numbers is
+    #: not an interview, so a score with no supplied check is recorded as an
+    #: unverified one that says so — never as an interrogated score. The agent's
+    #: own writes go through the MCP tool directly and are gated there.
+    claim_check = body.claim_check
+    if claim_check is None and (body.importance is not None or body.satisfaction is not None):
+        claim_check = manual_claim_check()
+    arguments: dict[str, Any] = {
+        "job_id": body.job_id,
+        "statement": body.statement,
+    }
+    if body.importance is not None:
+        arguments["importance"] = body.importance
+    if body.satisfaction is not None:
+        arguments["satisfaction"] = body.satisfaction
+    if claim_check is not None:
+        arguments["claim_check"] = claim_check.model_dump(mode="json")
+    if body.importance_n is not None:
+        arguments["importance_n"] = body.importance_n
+    if body.satisfaction_n is not None:
+        arguments["satisfaction_n"] = body.satisfaction_n
+    if body.score_method is not None:
+        arguments["score_method"] = body.score_method
+    if body.note is not None:
+        arguments["note"] = body.note
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.ADD_OUTCOME.value,
-            {
-                "job_id": body.job_id,
-                "statement": body.statement,
-                "importance": body.importance,
-                "satisfaction": body.satisfaction,
-                "importance_n": body.importance_n,
-                "satisfaction_n": body.satisfaction_n,
-                "score_method": body.score_method,
-                "note": body.note,
-            },
+            arguments,
         )
         return _payload_from_text(result)
     try:
@@ -658,6 +683,7 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             satisfaction_n=body.satisfaction_n,
             score_method=body.score_method,
             note=body.note,
+            claim_check=claim_check,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
@@ -942,6 +968,31 @@ async def get_segments(
     return [
         segment.model_dump(mode="json")
         for segment in _service(request).list_segments(job_id=job_id)
+    ]
+
+
+@router.get("/studies", response_model=list[dict[str, Any]])
+async def get_studies(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The opened studies, same records under both backends.
+
+    Empty until the agent has run ``open_study``: a study is opened as a named
+    pass over a job, never typed into the canvas.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_STUDIES.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [
+        study.model_dump(mode="json") for study in _service(request).list_studies(job_id=job_id)
     ]
 
 
@@ -1413,6 +1464,19 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
     )
 
 
+@router.get("/conversations", response_model=ConversationListResponse)
+def list_conversations(request: Request) -> ConversationListResponse:
+    """The history a switcher lists: at most 20 threads, most recent touch first.
+
+    Titles come from the first question, so the list names each thread without
+    carrying a single turn body.
+    """
+    conversations = _memory(request).list_conversations()
+    return ConversationListResponse(
+        conversations=[conversation.to_dict() for conversation in conversations]
+    )
+
+
 @router.post("/conversations", response_model=ConversationResponse)
 def create_conversation(request: Request) -> ConversationResponse:
     return ConversationResponse(conversation=_memory(request).create_conversation().to_dict())
@@ -1805,3 +1869,131 @@ async def promote_evidence(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True, "result": artifact.model_dump(mode="json")}
+
+
+def _proposal_out(proposal: OutcomeProposal) -> ProposalOut:
+    """Serialize one proposal for the Studio."""
+    return ProposalOut(
+        id=proposal.id,
+        evidence_id=proposal.evidence_id,
+        job_id=proposal.job_id,
+        step_id=proposal.step_id,
+        statement=proposal.statement,
+        direction=proposal.direction.value,
+        unit_of_measure=proposal.unit_of_measure,
+        object_of_control=proposal.object_of_control,
+        contextual_clarifier=proposal.contextual_clarifier,
+        importance=proposal.importance,
+        satisfaction=proposal.satisfaction,
+        confidence=proposal.confidence,
+        rationale=proposal.rationale,
+        quote=proposal.quote,
+        source_name=proposal.source_name,
+        status=proposal.status.value,
+        created_at=proposal.created_at.isoformat(),
+    )
+
+
+@router.post("/proposals")
+async def propose_outcome_api(body: ProposeOutcomeRequest, request: Request) -> dict:
+    """Mine one evidence record into a scored, approvable outcome proposal."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.PROPOSE_OUTCOME.value,
+            {"evidence_id": body.evidence_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposal = _service(request).propose_outcome_from_evidence(body.evidence_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": _proposal_out(proposal).model_dump(mode="json")}
+
+
+@router.get("/proposals")
+async def list_proposals_api(request: Request, status: str | None = Query(None)) -> dict:
+    """List outcome proposals, optionally filtered by status."""
+    try:
+        proposal_status = ProposalStatus(status) if status is not None else None
+    except ValueError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message=f"invalid status '{status}'. Use proposed, approved, rejected, or edited.",
+            ),
+            status_code=422,
+        ) from exc
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(request.query_params.get("mcp_url", "")),
+            ToolName.LIST_PROPOSALS.value,
+            {"status": status} if status else {},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposals = _service(request).list_proposals(status=proposal_status)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": [_proposal_out(p) for p in proposals],
+    }
+
+
+@router.post("/proposals/{proposal_id}/approve")
+async def approve_proposal_api(
+    proposal_id: str, body: ApproveProposalRequest, request: Request
+) -> dict:
+    """Approve a proposal and write it as an Outcome."""
+    if _uses_mcp(request):
+        args: dict[str, Any] = {"proposal_id": proposal_id}
+        if body.statement is not None:
+            args["statement"] = body.statement
+        if body.importance is not None:
+            args["importance"] = body.importance
+        if body.satisfaction is not None:
+            args["satisfaction"] = body.satisfaction
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.APPROVE_PROPOSAL.value,
+            args,
+        )
+        return {"ok": True, "result": result}
+    try:
+        outcome = _service(request).approve_proposal(
+            proposal_id,
+            statement=body.statement,
+            importance=body.importance,
+            satisfaction=body.satisfaction,
+        )
+    except InvalidOutcomeStatementError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            status_code=422,
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": outcome.model_dump(mode="json")}
+
+
+@router.post("/proposals/{proposal_id}/reject")
+async def reject_proposal_api(
+    proposal_id: str, body: RejectProposalRequest, request: Request
+) -> dict:
+    """Reject a proposal. Nothing is written to the ODI store."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.REJECT_PROPOSAL.value,
+            {"proposal_id": proposal_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposal = _service(request).reject_proposal(proposal_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": _proposal_out(proposal).model_dump(mode="json"),
+    }

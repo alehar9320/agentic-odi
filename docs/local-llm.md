@@ -81,12 +81,28 @@ You can either set these in your shell or adjust them in the Living Studio's
   details from the underlying error. Use that message together with the steps
   above to fix your local LLM setup.
 
-## 6. On-Device LLM & Fallback Routing
+## 6. Model routing tiers and fallback
 
-Agentic ODI includes a built-in multi-tier **Model Router** (`agentic_odi_core.router`) that ensures an instant, delightful on-device fallback experience:
+Agentic ODI includes a multi-tier **Model Router** (`agentic_odi_core.router`)
+that ensures an honest, graceful experience when no model is reachable:
 
-- **Tier 0 (`rule_based`)**: Instant zero-latency rule-based engine formatted with Steve Jobs clarity for stage guidelines, opportunity score calculations, and impact simulations.
-- **Tier 1 (`on_device_llm`)**: Local on-device LLM runner for standalone offline experience.
-- **Tier 2 (`remote_llm`)**: Smartest remote or local OpenAI-compatible LLM endpoint.
+| Tier | Name | What it is | Availability |
+|---|---|---|---|
+| 0 | `deterministic` | Honest rule-based responder. Never fabricates numbers, scores, or customer names. Points at `compute_opportunity` for scoring instead of inventing a number. | Always available |
+| 1 | `local` | OpenAI-compatible client for a locally-run model server you run yourself (the Studio does **not** bundle a model). | Available only when the endpoint answers — probed with a 2s timeout, TTL-cached at 30s |
+| 2 | `remote` | The configured OpenAI-compatible cloud endpoint. | Probed via `check_llm_health` |
 
-In default **`auto`** mode, the system automatically routes requests to the smartest available tier, falling back silently and instantly when remote models are unreachable. The mode is a field on the chat request (`routing_mode` in the `/api/chat` payload) and accepts `auto`, `rule_based`, `on_device` or `remote`; the studio sends `auto` unless a caller overrides it.
+In default **`auto`** mode, the router selects the smartest available tier:
+`remote` → `local` → `deterministic`. If a tier fails mid-turn, the router
+demotes to the next tier and reports the demotion visibly in the transcript —
+it never silently substitutes or fabricates an answer.
+
+The routing mode is a field on the chat request (`routing_mode` in the
+`/api/chat` payload) and accepts `auto`, `deterministic`, `local`, or `remote`;
+the studio sends `auto` unless a caller overrides it. A forced mode that fails
+reports the failure rather than silently falling back.
+
+The Studio shows which tier answered via a status indicator, and the
+**Settings** panel's **Model** section lets you configure the base URL, API key,
+and model name, and test the connection with **Find models**. The CLI's
+`/status` command reports the tier in use.

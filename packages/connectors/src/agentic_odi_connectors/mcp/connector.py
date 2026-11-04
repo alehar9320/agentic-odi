@@ -158,7 +158,9 @@ class MCPClientConnector(Connector):
                         batch.errors.append(f"Tool not found: {tool_name}")
                         continue
                     try:
-                        result = await client.call_tool(tool_name, {})
+                        result = await client.call_tool(
+                            tool_name, self.settings.tool_args.get(tool_name, {})
+                        )
                         batch.records.append(
                             IngestRecord(
                                 source_name=self.name,

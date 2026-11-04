@@ -200,7 +200,7 @@ def test_chat_offline_default_points_at_manual_work() -> None:
     events = _stream("/api/chat", _chat_body("hello world"))
 
     content = json.loads(events["message"][-1])["content"]
-    assert "no model is reachable" in content
+    assert "no model is reachable" in content.lower()
     assert "/capture" in content
     assert "/help" in content
 
@@ -601,6 +601,38 @@ def test_chat_resumes_an_existing_conversation() -> None:
     assert conversation["id"] == created["id"]
     latest = client.get("/api/conversations/latest").json()
     assert len(latest["turns"]) == 2
+
+
+def test_the_conversation_list_is_empty_before_the_first_chat() -> None:
+    client = _client()
+
+    response = client.get("/api/conversations")
+
+    assert response.status_code == 200
+    assert response.json() == {"conversations": []}
+
+
+def test_the_conversation_list_leads_with_the_most_recent_thread() -> None:
+    client = _client()
+    first = client.post("/api/conversations").json()["conversation"]["id"]
+    second = client.post("/api/conversations").json()["conversation"]["id"]
+
+    listed = client.get("/api/conversations").json()["conversations"]
+
+    assert [item["id"] for item in listed] == [second, first]
+
+
+def test_the_conversation_list_reports_the_turns_a_chat_persisted() -> None:
+    client = _client()
+    events = _stream_with(client, "/api/chat", _chat_body("hello there"))
+    conversation_id = json.loads(events["conversation"][0])["id"]
+
+    item = client.get("/api/conversations").json()["conversations"][0]
+
+    assert set(item) == {"id", "title", "created_at", "updated_at", "head_id", "turn_count"}
+    assert item["id"] == conversation_id
+    assert item["title"] == "hello there"
+    assert item["turn_count"] == 2
 
 
 def test_clear_memory_removes_conversations_and_observations() -> None:

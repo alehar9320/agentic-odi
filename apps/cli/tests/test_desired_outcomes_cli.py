@@ -57,6 +57,64 @@ def test_outcomes_add_computes_score(tmp_path):
     )
 
 
+def test_outcomes_add_records_the_claim_check_behind_the_score(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job_id(runner, db)
+    claim = json.dumps(
+        {
+            "asked": ["How often does this happen?", "What do you do today?"],
+            "answers": ["Every week", "A spreadsheet"],
+        }
+    )
+
+    added = _add(runner, db, job_id, "--claim-check", claim)
+
+    assert added["claim_check"]["verified"] is True
+    assert added["claim_check"]["answers"] == ["Every week", "A spreadsheet"]
+
+
+def test_outcomes_add_without_a_claim_check_is_recorded_as_unverified(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job_id(runner, db)
+
+    added = _add(runner, db, job_id)
+
+    # A score typed without questions is honest about that, not silent.
+    assert added["claim_check"]["verified"] is False
+    assert added["claim_check"]["skips"][0]["reason"]
+
+
+def test_outcomes_add_rejects_malformed_claim_check_json(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job_id(runner, db)
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "add",
+            "--job-id",
+            job_id,
+            "--statement",
+            "Minimize the onboarding time when a customer signs up",
+            "--importance",
+            "8",
+            "--satisfaction",
+            "4",
+            "--claim-check",
+            "{not json}",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "valid JSON" in result.output
+
+
 def test_outcomes_full_lifecycle(tmp_path):
     db = str(tmp_path / "odi.db")
     runner = CliRunner()

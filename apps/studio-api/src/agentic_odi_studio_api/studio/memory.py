@@ -21,6 +21,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agentic_odi_core.errors import StoreCorrupt
+from agentic_odi_core.integrity import ensure_intact
+
 from agentic_odi_studio_api.studio.claims import (
     Claim,
     EvidenceSnapshot,
@@ -45,6 +48,10 @@ MAX_TEXT = 2_000
 MAX_CONTEXT_TEXT = 500
 MAX_CONTEXT_CHARS = 4_000
 MAX_SUGGESTED_IN_CONTEXT = 10
+
+#: How many threads the history list carries. The switcher's full UI (#408)
+#: owns paging; this slice shows the recent ones and stops.
+MAX_CONVERSATIONS = 20
 
 
 class MemoryError(ValueError):
@@ -99,6 +106,28 @@ class Conversation:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "head_id": self.head_id,
+        }
+
+
+@dataclass
+class ConversationSummary:
+    """A conversation as the history switcher sees it: metadata plus a count."""
+
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+    head_id: str | None
+    turn_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "head_id": self.head_id,
+            "turn_count": self.turn_count,
         }
 
 
@@ -286,24 +315,51 @@ class StudioMemory:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._lock = threading.RLock()
+        self._closed = False
         self._connection = sqlite3.connect(
             ":memory:" if self._memory else str(self.db_path),
             check_same_thread=False,
         )
         self._connection.row_factory = sqlite3.Row
-        self._connection.execute("PRAGMA foreign_keys = ON")
-        if not self._memory:
-            self._connection.execute("PRAGMA journal_mode = WAL")
-            # Another process may be mid-write; wait for it briefly rather
-            # than failing the turn with "database is locked".
-            self._connection.execute("PRAGMA busy_timeout = 5000")
-        with self._connection:
-            self._connection.executescript(_SCHEMA)
-            _migrate(self._connection)
+        try:
+            if not self._memory:
+                # Same gate as the ODI store, but a distinct label: losing the
+                # conversation history is recoverable in a way the canvas is
+                # not, and the message should say so.
+                ensure_intact(self._connection, str(self.db_path), label="Your Studio memory")
+            self._connection.execute("PRAGMA foreign_keys = ON")
+            if not self._memory:
+                self._connection.execute("PRAGMA journal_mode = WAL")
+                # Another process may be mid-write; wait for it briefly rather
+                # than failing the turn with "database is locked".
+                self._connection.execute("PRAGMA busy_timeout = 5000")
+            with self._connection:
+                self._connection.executescript(_SCHEMA)
+                _migrate(self._connection)
+        except sqlite3.DatabaseError as exc:
+            self._connection.close()
+            raise StoreCorrupt(str(self.db_path), [str(exc)], label="Your Studio memory") from exc
+        except BaseException:
+            self._connection.close()
+            raise
 
     def close(self) -> None:
         with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            if not self._memory:
+                # Fold the write-ahead log back so a clean stop leaves no
+                # sidecar for the next process to recover.
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             self._connection.close()
+
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """Fold the write-ahead log back into the database file."""
+        with self._lock:
+            if self._memory or self._closed:
+                return
+            self._connection.execute(f"PRAGMA wal_checkpoint({mode})")
 
     # -- conversations -----------------------------------------------------
 
@@ -339,6 +395,39 @@ class StudioMemory:
                 "SELECT * FROM conversations ORDER BY updated_at DESC, created_at DESC LIMIT 1"
             ).fetchone()
         return None if row is None else self._conversation_from_row(row)
+
+    def list_conversations(self, limit: int = MAX_CONVERSATIONS) -> list[ConversationSummary]:
+        """The recent conversations, most recently touched first, with turn counts.
+
+        The title is whatever the first question set; a thread nobody has spoken
+        in yet carries an empty one. No turn bodies are read: the list is metadata
+        and a count, so a history strip never pays for the prose behind it.
+        """
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT conversations.id, conversations.title,
+                       conversations.created_at, conversations.updated_at,
+                       conversations.head_id,
+                       (SELECT COUNT(*) FROM turns
+                         WHERE turns.conversation_id = conversations.id) AS turn_count
+                  FROM conversations
+                 ORDER BY conversations.updated_at DESC, conversations.created_at DESC
+                 LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            ConversationSummary(
+                id=row["id"],
+                title=row["title"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                head_id=row["head_id"],
+                turn_count=row["turn_count"],
+            )
+            for row in rows
+        ]
 
     def append_turn(
         self,
@@ -724,6 +813,7 @@ class StudioMemory:
 
 __all__ = [
     "MAX_CONTEXT_CHARS",
+    "MAX_CONVERSATIONS",
     "MAX_SUGGESTED_IN_CONTEXT",
     "OBSERVATION_KINDS",
     "OBSERVATION_STATUSES",

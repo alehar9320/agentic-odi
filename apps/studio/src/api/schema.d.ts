@@ -574,6 +574,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Studies
+         * @description The opened studies, same records under both backends.
+         *
+         *     Empty until the agent has run ``open_study``: a study is opened as a named
+         *     pass over a job, never typed into the canvas.
+         */
+        get: operations["get_studies_api_studies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategy": {
         parameters: {
             query?: never;
@@ -881,7 +904,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Conversations
+         * @description The history a switcher lists: at most 20 threads, most recent touch first.
+         *
+         *     Titles come from the first question, so the list names each thread without
+         *     carrying a single turn body.
+         */
+        get: operations["list_conversations_api_conversations_get"];
         put?: never;
         /** Create Conversation */
         post: operations["create_conversation_api_conversations_post"];
@@ -1080,17 +1110,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/{full_path}": {
+    "/api/proposals": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Spa Fallback */
-        get: operations["spa_fallback__full_path__get"];
+        /**
+         * List Proposals Api
+         * @description List outcome proposals, optionally filtered by status.
+         */
+        get: operations["list_proposals_api_api_proposals_get"];
         put?: never;
-        post?: never;
+        /**
+         * Propose Outcome Api
+         * @description Mine one evidence record into a scored, approvable outcome proposal.
+         */
+        post: operations["propose_outcome_api_api_proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals/{proposal_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Proposal Api
+         * @description Approve a proposal and write it as an Outcome.
+         */
+        post: operations["approve_proposal_api_api_proposals__proposal_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Proposal Api
+         * @description Reject a proposal. Nothing is written to the ODI store.
+         */
+        post: operations["reject_proposal_api_api_proposals__proposal_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1192,9 +1269,10 @@ export interface components {
             /** Statement */
             statement: string;
             /** Importance */
-            importance: number;
+            importance?: number | null;
             /** Satisfaction */
-            satisfaction: number;
+            satisfaction?: number | null;
+            claim_check?: components["schemas"]["ClaimCheck"] | null;
             /** Importance N */
             importance_n?: number | null;
             /** Satisfaction N */
@@ -1241,6 +1319,23 @@ export interface components {
             ok: boolean;
             /** Id */
             id: string;
+        };
+        /**
+         * ApproveProposalRequest
+         * @description Approve a proposal, optionally with edits.
+         */
+        ApproveProposalRequest: {
+            /** Statement */
+            statement?: string | null;
+            /** Importance */
+            importance?: number | null;
+            /** Satisfaction */
+            satisfaction?: number | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
         };
         /**
          * AttachmentRef
@@ -1353,6 +1448,37 @@ export interface components {
             approvals: boolean;
             /** Assistant Id */
             assistant_id?: string | null;
+            focus?: components["schemas"]["FocusRef"] | null;
+        };
+        /**
+         * ClaimCheck
+         * @description The questions behind a score: what was asked, answered, or skipped.
+         *
+         *     Two numbers are not provenance. A score that carries a claim check says
+         *     which questions produced it — ``asked`` — and what came back: the
+         *     ``answers`` the person gave and the ``skips`` with a recorded reason.
+         *
+         *     ``verified`` is derived, never typed in: a check is verified when at least
+         *     one question was answered by the person. A check of only skips is
+         *     unverified, so an outcome built on an assumption says so instead of
+         *     borrowing the confidence of a number.
+         */
+        ClaimCheck: {
+            /**
+             * Asked
+             * @description The questions put to the person
+             */
+            asked?: string[];
+            /**
+             * Answers
+             * @description The answers the person gave, in order
+             */
+            answers?: string[];
+            /**
+             * Skips
+             * @description Questions skipped, each with a reason
+             */
+            skips?: components["schemas"]["ClaimSkip"][];
         };
         /**
          * ClaimCitationOut
@@ -1388,6 +1514,25 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /**
+         * ClaimSkip
+         * @description One question that went unanswered, and why it was skipped.
+         *
+         *     A skip without a reason is not a skip, it is a missing answer, so
+         *     ``reason`` is required and must not be blank.
+         */
+        ClaimSkip: {
+            /**
+             * Question
+             * @description The question that was not answered
+             */
+            question: string;
+            /**
+             * Reason
+             * @description Why it was skipped; never blank
+             */
+            reason: string;
+        };
         /** ConnectorListItem */
         ConnectorListItem: {
             /** Name */
@@ -1407,6 +1552,11 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** ConversationListResponse */
+        ConversationListResponse: {
+            /** Conversations */
+            conversations?: components["schemas"]["ConversationSummaryModel"][];
+        };
         /** ConversationModel */
         ConversationModel: {
             /** Id */
@@ -1423,6 +1573,27 @@ export interface components {
         /** ConversationResponse */
         ConversationResponse: {
             conversation: components["schemas"]["ConversationModel"];
+        };
+        /**
+         * ConversationSummaryModel
+         * @description A conversation in the history list: its metadata plus how much is in it.
+         */
+        ConversationSummaryModel: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Head Id */
+            head_id?: string | null;
+            /**
+             * Turn Count
+             * @default 0
+             */
+            turn_count: number;
         };
         /** ConversationTreeResponse */
         ConversationTreeResponse: {
@@ -1470,6 +1641,22 @@ export interface components {
          * @enum {string}
          */
         Direction: "minimize" | "maximize";
+        /**
+         * FocusRef
+         * @description Which record the person is looking at, as a pointer and nothing more.
+         *
+         *     The client names the id; only the store has the words. Extra keys are
+         *     rejected so a browser cannot slip its own label into the prompt.
+         */
+        FocusRef: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "job" | "step" | "outcome" | "evidence";
+            /** Id */
+            id: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1768,6 +1955,19 @@ export interface components {
             mcp_url: string;
         };
         /**
+         * ProposeOutcomeRequest
+         * @description Propose a desired outcome from an evidence record.
+         */
+        ProposeOutcomeRequest: {
+            /** Evidence Id */
+            evidence_id: string;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
          * ProposeStrategyRequest
          * @description Body for ``POST /api/strategy/propose``.
          *
@@ -1777,6 +1977,17 @@ export interface components {
         ProposeStrategyRequest: {
             /** Job Id */
             job_id?: string | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
+         * RejectProposalRequest
+         * @description Reject a proposal.
+         */
+        RejectProposalRequest: {
             /**
              * Mcp Url
              * @default
@@ -3256,6 +3467,40 @@ export interface operations {
             };
         };
     };
+    get_studies_api_studies_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_strategy_api_strategy_get: {
         parameters: {
             query?: {
@@ -4120,6 +4365,26 @@ export interface operations {
             };
         };
     };
+    list_conversations_api_conversations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationListResponse"];
+                };
+            };
+        };
+    };
     create_conversation_api_conversations_post: {
         parameters: {
             query?: never;
@@ -4504,13 +4769,13 @@ export interface operations {
             };
         };
     };
-    spa_fallback__full_path__get: {
+    list_proposals_api_api_proposals_get: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                full_path: string;
+            query?: {
+                status?: string | null;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -4521,7 +4786,118 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_outcome_api_api_proposals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_proposal_api_api_proposals__proposal_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveProposalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_proposal_api_api_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectProposalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
