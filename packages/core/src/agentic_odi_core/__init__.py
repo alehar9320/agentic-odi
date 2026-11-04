@@ -147,6 +147,7 @@ from agentic_odi_core.steve_jobs import (
     generate_steve_jobs_response,
 )
 from agentic_odi_core.strategy import propose_strategy
+from agentic_odi_core.theme_tree import ThemeRollup
 
 __all__ = [
     "ScheduledWork",
@@ -171,6 +172,7 @@ __all__ = [
     "StrategyKind",
     "Theme",
     "ThemeNotFoundError",
+    "ThemeRollup",
     "scheduled_work_not_found",
     "segment_verdict",
     "unclustered_outcomes",

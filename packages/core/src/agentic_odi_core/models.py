@@ -380,6 +380,14 @@ class Strategy(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+THEME_DEPTH = 2
+"""How many levels a theme tree may hold: a parent and the themes filed under it.
+
+One number for both directions through the tree. The service refuses a third level with it, and
+the rollup stops its walk at it, so the write that forbids deep nesting and the read that counts
+a branch cannot drift apart."""
+
+
 class Theme(BaseModel):
     """A named branch of the outcome library — one level of a shallow tree.
 

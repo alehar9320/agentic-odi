@@ -83,7 +83,12 @@ def _matches_stage(outcome: Outcome, stage: str, repo: Repository) -> bool:
     return step is not None and step.stage is not None and step.stage.value == stage
 
 
-def _is_scored(outcome: Outcome) -> bool:
+def is_scored(outcome: Outcome) -> bool:
+    """The one definition of *measured* in this library: both scores present.
+
+    Public because the theme rollup counts it and the confidence facet counts it, and a person
+    comparing the two numbers deserves one rule rather than two that happen to agree today.
+    """
     return outcome.importance is not None and outcome.satisfaction is not None
 
 
@@ -100,7 +105,7 @@ def _passes(
         if not any(tag in query.tags for tag in outcome.tags):
             return False
     if skip != "confidence" and query.confidence is not None:
-        if (query.confidence == "scored") != _is_scored(outcome):
+        if (query.confidence == "scored") != is_scored(outcome):
             return False
     if query.min_score is not None and (
         outcome.opportunity_score is None or outcome.opportunity_score < query.min_score
@@ -129,7 +134,7 @@ def _facet_counts(candidates: list[Outcome], repo: Repository) -> dict[str, Any]
                 themes[theme_id] += 1
     confidence = {"scored": 0, "unscored": 0}
     for outcome in candidates:
-        confidence["scored" if _is_scored(outcome) else "unscored"] += 1
+        confidence["scored" if is_scored(outcome) else "unscored"] += 1
     return {"stage": stages, "theme": themes, "confidence": confidence}
 
 

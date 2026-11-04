@@ -123,12 +123,16 @@ not `top 0.0`.
 
 ### 4. The walk is bounded and cycle-safe because the model does not guarantee it
 
-`Theme` only validates "a theme is not its own parent", so a two-theme cycle is reachable through
-`rename_theme` on a store that was written before that rule existed, or through a hand-edited
-event log. The walker therefore takes at most `THEME_DEPTH − 1 = 1` descent below the named theme,
-and carries a `visited` set so a corrupt parent chain returns what it has instead of spinning.
-`_validate_theme_placement` loses its hard-coded prose number and uses `THEME_DEPTH`, so the write
-that forbids a third level and the read that stops at the second cannot drift.
+`Theme` only validates "a theme is not its own parent", so a two-theme cycle is reachable on a
+store written before the service's two-level check, or through a hand-edited event log. The walker
+therefore takes at most `THEME_DEPTH − 1 = 1` descent below the named theme, and carries a `visited`
+set so a corrupt parent chain returns what it has instead of spinning.
+
+The bound is one constant, `models.THEME_DEPTH = 2`, that the walk reads. The write that refuses a
+third level already states the same fact structurally — it refuses a parent that has a parent of
+its own — and carries a comment naming the constant rather than interpolating it into the sentence,
+because that sentence is pinned word for word by two existing tests and "themes go 2 levels deep"
+is worse copy than "themes go two levels deep" for the sake of one number.
 
 ### 5. The union is by outcome id, and only live outcomes (*my call*)
 
