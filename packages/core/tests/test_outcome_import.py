@@ -6,6 +6,10 @@ a person would use for one outcome, so an import cannot smuggle in a row the CLI
 and it accounts for every line it read. Both halves are shared by the CLI and the Studio upload,
 so a person gets the same answer whichever door they came to, and the row numbers in a report
 are the numbers in their spreadsheet app.
+
+ALH-223 adds a second way to hand these two halves a file. The workbook reader produces the same
+numbered lines and nothing else, so the equivalence test at the end of this module is the claim
+the issue was written for: the same cells in a `.xlsx` run the same loop and leave the same job.
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ import pytest
 from agentic_odi_core.errors import error_status
 from agentic_odi_core.models import ClaimCheck, JobStage, Step, Theme
 from agentic_odi_core.outcome_import import (
+    XLSX_FORMAT,
     ImportAbortedError,
     ImportReport,
     ImportRow,
@@ -28,6 +33,7 @@ from agentic_odi_core.outcome_import import (
 )
 from agentic_odi_core.repository import InMemoryRepository
 from agentic_odi_core.services import ODIService
+from fixtures.xlsx_workbook import xlsx_from_csv
 
 FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "outcomes_mixed_40.csv"
 
@@ -595,3 +601,50 @@ def test_a_transport_failure_aborts_the_run_and_keeps_the_written_rows() -> None
     assert "unreachable" in report.aborted["reason"]
     assert max(_lines(report.created)) == 22
     assert len(service.get_outcomes(job_id)) == 19
+
+
+# --- ALH-223: the same loop, fed by a workbook ----------------------------------
+
+
+def _without_ids(report: ImportReport) -> dict[str, Any]:
+    """The report as a person reads it, minus the identities two runs can never share.
+
+    An outcome id and a theme id are this store's business, not the file's, so a count stands in
+    for a list of them: two runs agree on how many candidates a name matched, not on their ids.
+    """
+    body = report.as_dict()
+    body.pop("job_id")
+    for key in ("created", "refused", "ambiguous_themes"):
+        for entry in body[key]:
+            for field in list(entry):
+                if field.endswith("_id"):
+                    entry.pop(field)
+                elif field.endswith("_ids"):
+                    entry[field] = len(entry[field])
+    return body
+
+
+def test_a_workbook_and_a_csv_of_the_same_rows_run_the_same_loop() -> None:
+    """The acceptance line of ALH-223, read at the door a person actually stands at.
+
+    Not that two parsers agree — the table test above pins that — but that the report and the
+    outcomes it leaves behind are identical, line numbers included, whether the research arrived
+    as a CSV or as the workbook the person saved from the same cells. The loop never learns which
+    one it was handed, and this is where that would show.
+    """
+    csv_service, csv_job = _seeded()
+    workbook_service, workbook_job = _seeded()
+    document = xlsx_from_csv(FIXTURE.read_text(encoding="utf-8"))
+
+    from_csv = _run(csv_service, csv_job)
+    from_workbook = _run(
+        workbook_service, workbook_job, parse_outcome_table(document, fmt=XLSX_FORMAT)
+    )
+
+    assert _without_ids(from_workbook) == _without_ids(from_csv)
+    #: The numbers a report quotes are the rows the person's spreadsheet app shows: the fixture's
+    #: header is line 1, so nothing written can be outside 2 to 41.
+    assert all(2 <= line <= 41 for line in _lines(from_workbook.created))
+    assert [outcome.statement for outcome in workbook_service.get_outcomes(workbook_job)] == [
+        outcome.statement for outcome in csv_service.get_outcomes(csv_job)
+    ]
