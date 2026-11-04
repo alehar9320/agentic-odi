@@ -67,6 +67,8 @@ class ToolName(str, Enum):
     RENAME_THEME = "rename_theme"
     DELETE_THEME = "delete_theme"
     LIST_THEMES = "list_themes"
+    GET_THEME_ROLLUP = "get_theme_rollup"
+    LIST_THEME_ROLLUPS = "list_theme_rollups"
     ASSIGN_THEME = "assign_theme"
     UNASSIGN_THEME = "unassign_theme"
     SEARCH_OUTCOMES = "search_outcomes"
@@ -584,6 +586,27 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         returns="A list of Themes.",
         stage="2",
     ),
+    ToolName.GET_THEME_ROLLUP.value: ToolSpec(
+        name="get_theme_rollup",
+        summary="Count what a theme and the themes filed under it hold, as one set of outcomes.",
+        effect=_derive_effect("get_theme_rollup"),
+        arguments=("theme_id",),
+        required=("theme_id",),
+        returns=(
+            "The rollup: theme_id, name, parent_id, outcomes, measured, top_opportunity and "
+            "top_statement. The two top fields are null when nothing in the branch is scored, "
+            "never a zero."
+        ),
+        stage="2",
+    ),
+    ToolName.LIST_THEME_ROLLUPS.value: ToolSpec(
+        name="list_theme_rollups",
+        summary="Roll up every theme in scope, each parent before the themes under it.",
+        effect=_derive_effect("list_theme_rollups"),
+        arguments=("job_id",),
+        returns="A list of rollups in tree order, one per theme, with the same fields as one read.",
+        stage="2",
+    ),
     ToolName.ASSIGN_THEME.value: ToolSpec(
         name="assign_theme",
         summary="File outcomes under a theme; the whole call is refused if any outcome is unknown.",
@@ -604,7 +627,10 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.SEARCH_OUTCOMES.value: ToolSpec(
         name="search_outcomes",
-        summary="Narrow the outcome library by text, stage, theme, confidence, and score band.",
+        summary=(
+            "Narrow the outcome library by text, stage, theme, confidence, and score band; "
+            "include_children widens each selected theme to the themes under it."
+        ),
         #: A search writes nothing; the read effect must be stated because no
         #: get_/list_ prefix would infer it, same as evaluate_outcome.
         effect=ToolEffect.READ,
@@ -618,10 +644,15 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "max_score",
             "job_id",
             "sort",
+            "include_children",
             "limit",
             "offset",
         ),
-        returns="Items, the pre-pagination total, and facet counts for the current filters.",
+        returns=(
+            "Items, the pre-pagination total, and facet counts for the current filters. The "
+            "theme facet stays each theme's own counts, so a subtree search and its facet answer "
+            "two different questions on purpose."
+        ),
         stage="2",
     ),
     ToolName.BULK_UPDATE_OUTCOMES.value: ToolSpec(

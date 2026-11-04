@@ -88,11 +88,13 @@ The five inputs the spec implies and no task's happy-path test would catch:
 - Consumes: `ODIService.theme_rollup` / `list_theme_rollups`, `OutcomeQuery.include_children`.
 - Produces: tool names `get_theme_rollup(theme_id)`, `list_theme_rollups(job_id=None)` returning `ThemeRollup.as_dict()` JSON (one object / an array); `search_outcomes(..., include_children: bool = False)`.
 
-- [ ] **Step 1: Write the failing tests** — `get_theme_rollup` answers JSON with the four counts and no `0.0` when nothing is measured; `list_theme_rollups` answers an array ordered like the service; both appear in `TOOL_NAMES`, in `capability_manifest()["tools"]` and in `capability_summary()` (the existing parametrized assertions cover them once the specs exist — add the two sentences to the specs first); `validate_tool_specs(tools=_live_tools()) == []`; the two tools' effect is READ without stating `effect=`; `search_outcomes` with `include_children=true` returns the subtree through the server.
-- [ ] **Step 2: Run → fail** (`ToolName member has no TOOL_SPECS entry`, and the CLI contract set-equality failure).
-- [ ] **Step 3: Implement** the specs (arguments `["theme_id"]` / `["job_id"]`, required `["theme_id"]` / `[]`, stage `"2"`, `returns` sentences naming the four fields and the absent-top rule), the two handlers in the `list_themes` shape (`json.dumps(...model_dump(mode="json"))`, `_fail(exc)` on error), and the two local backend methods.
-- [ ] **Step 4: Run** `uv run pytest apps/mcp-server packages/core/tests/test_capability_manifest.py tests/contract -q` → pass; then `uv run pytest -q` once to catch every enumeration test.
-- [ ] **Step 5: Commit** `feat(mcp): read a theme's rollup over the contract (ALH-163)`.
+- [x] **Step 1: Write the failing tests** — `get_theme_rollup` answers JSON with the four counts and no `0.0` when nothing is measured; `list_theme_rollups` answers an array ordered like the service; both appear in `TOOL_NAMES`, in `capability_manifest()["tools"]` and in `capability_summary()` (the existing parametrized assertions cover them once the specs exist — add the two sentences to the specs first); `validate_tool_specs(tools=_live_tools()) == []`; the two tools' effect is READ without stating `effect=`; `search_outcomes` with `include_children=true` returns the subtree through the server.
+- [x] **Step 2: Run → fail** (`ToolName member has no TOOL_SPECS entry`, and the CLI contract set-equality failure).
+- [x] **Step 3: Implement** the specs (arguments `["theme_id"]` / `["job_id"]`, required `["theme_id"]` / `[]`, stage `"2"`, `returns` sentences naming the four fields and the absent-top rule), the two handlers in the `list_themes` shape (`json.dumps(...model_dump(mode="json"))`, `_fail(exc)` on error), and the two local backend methods.
+- [x] **Step 4: Run** `uv run pytest apps/mcp-server packages/core/tests/test_capability_manifest.py tests/contract -q` → pass; then `uv run pytest -q` once to catch every enumeration test.
+- [x] **Step 5: Commit** `feat(mcp): read a theme's rollup over the contract (ALH-163)`.
+
+Settled while implementing: `capability_manifest`, `capability_summary` and `get_capabilities` are all generated from `TOOL_SPECS`, and `tests/contract/test_cli_contract.py` plus `test_capability_manifest.py` needed no edit — the enumeration loops caught the two new names on their own. `include_children` joins the search spec **after `sort`**, with the other query fields rather than after the paging, because `packages/core/tests/test_outcome_search_contract.py` pins `FIELDS + ("limit", "offset")` and a subtree is a property of the query, not of the page; the handler and service signatures follow that order.
 
 ### Task 4: `odi themes rollup`
 

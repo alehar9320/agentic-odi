@@ -625,9 +625,9 @@ class ODIService:
         max_score: float | None = None,
         job_id: str | None = None,
         sort: str = "opportunity_score",
+        include_children: bool = False,
         limit: int | None = None,
         offset: int = 0,
-        include_children: bool = False,
     ) -> dict[str, Any]:
         """Narrow the library through the shared query, writing nothing.
 

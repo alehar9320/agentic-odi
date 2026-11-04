@@ -14,6 +14,9 @@ FIELDS = (
     "max_score",
     "job_id",
     "sort",
+    #: A theme can stand for the themes under it, and that is a property of the query, not of
+    #: the page — so it sits with the fields beside ``sort`` rather than with the paging below.
+    "include_children",
 )
 
 
