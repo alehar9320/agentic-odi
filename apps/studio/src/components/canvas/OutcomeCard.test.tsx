@@ -43,6 +43,14 @@ describe("OutcomeCard copy", () => {
     vi.restoreAllMocks();
   });
 
+  it("shows Not scored instead of a fabricated verdict for an unscored outcome", () => {
+    const unscored = { ...outcome, opportunity_score: null };
+    render(<OutcomeCard outcome={unscored} />);
+    expect(screen.getByText("Not scored — no ratings recorded")).toBeInTheDocument();
+    expect(screen.queryByText("NORMAL")).toBeNull();
+    expect(screen.queryByText("Served")).toBeNull();
+  });
+
   it("copies the statement and confirms with a toast", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
