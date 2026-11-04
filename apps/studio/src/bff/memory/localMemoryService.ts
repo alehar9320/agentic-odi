@@ -35,6 +35,8 @@ const MAX_TEXT = 2000;
 const MAX_CONTEXT_TEXT = 500;
 const MAX_CONTEXT_CHARS = 4000;
 const MAX_SUGGESTED_IN_CONTEXT = 10;
+/** How many threads the history list carries; the switcher UI (#408) owns paging. */
+const MAX_CONVERSATIONS = 20;
 
 function cleanText(text: string): string {
   const cleaned = text.trim();
@@ -173,11 +175,12 @@ export class LocalMemoryService {
     return this.store.getConversation(id);
   }
 
-  /** The history list: every thread, most recent touch first, with its size. */
+  /** The recent threads, most recent touch first, with their size. */
   async listConversations(): Promise<ConversationSummary[]> {
     const conversations = await this.store.listConversations();
+    const recent = conversations.slice(0, MAX_CONVERSATIONS);
     return Promise.all(
-      conversations.map(async (conversation) => ({
+      recent.map(async (conversation) => ({
         ...conversation,
         turn_count: await this.store.countTurns(conversation.id),
       })),
