@@ -114,4 +114,27 @@ describe("ThreadComposer recall", () => {
 
     expect(sendMessage).toHaveBeenCalledWith("Send this", expect.anything());
   });
+
+  it("keeps pasted text when the clipboard also contains a supported image", async () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: "first line\nsecond line" } });
+    input.setSelectionRange("first line".length, "first line".length);
+
+    const file = new File(["abc"], "shot.png", { type: "image/png" });
+    const clipboardData = {
+      files: [file],
+      getData: (type: string) => (type === "text/plain" ? "inserted" : ""),
+    };
+
+    fireEvent.paste(input, { clipboardData });
+
+    // Simulate default insertion in jsdom
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    input.value = input.value.slice(0, start) + "inserted" + input.value.slice(end);
+    fireEvent.input(input);
+
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect((await screen.findAllByText("shot.png")).length).toBeGreaterThan(0);
+  });
 });
