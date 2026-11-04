@@ -3846,6 +3846,93 @@ button.message__tag:hover {
   color: #e2e8f0;
 }
 
+/* Segment member outcomes: one row per outcome, each a way into the landscape. */
+.ui-members {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-members__label {
+  margin: 0;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--studio-muted);
+}
+
+.ui-members__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ui-member {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ui-member:hover,
+.ui-member:focus-visible {
+  background: rgba(129, 140, 248, 0.12);
+  border-color: rgba(129, 140, 248, 0.4);
+}
+
+.ui-member__id {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--studio-indigo);
+}
+
+.ui-member__statement {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.84rem;
+  color: var(--studio-text);
+}
+
+.ui-member__score {
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--studio-muted);
+}
+
+.ui-member__score--underserved {
+  color: var(--studio-amber);
+}
+
+.ui-members__mean {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--studio-text);
+}
+
+/* Where the segment's people came from: candidate or named. */
+.ui-basis {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--studio-muted);
+}
+
 /* Segment and strategy cards */
 .ui-bets {
   margin: 10px 0 0;
