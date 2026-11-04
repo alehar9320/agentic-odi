@@ -135,7 +135,7 @@ it("gives the landscape's empty state a surface", async () => {
   themed("light");
   const screen = await render(<OpportunityLandscape />);
 
-  await expect.element(screen.getByText("No opportunities yet")).toBeVisible();
+  await expect.element(screen.getByText("No saved copy on this device")).toBeVisible();
 
   const empty = painted(screen.container, ".studio-empty");
   expect(empty.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
