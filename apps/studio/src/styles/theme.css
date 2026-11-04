@@ -221,6 +221,87 @@ a {
   position: relative;
 }
 
+/* The bar's new-thread control: a plus that says what it does, an ask that
+ * only interrupts while a reply is in the air, and a reason when there is
+ * nothing to leave. */
+.bar__new-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.bar__new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+}
+
+.bar__new:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.bar__new:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bar__new-ask {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.bar__new-ask p {
+  margin: 0;
+  color: var(--text);
+}
+
+.bar__new-choice {
+  padding: 5px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.bar__new-choice:hover {
+  background: var(--surface-hover);
+}
+
+.bar__new-choice--stop {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-contrast, var(--text));
+}
+
 .bar__menu-list {
   position: absolute;
   top: calc(100% + 8px);
@@ -254,6 +335,44 @@ a {
 .bar__menu-item:disabled {
   color: var(--faint);
   cursor: not-allowed;
+}
+
+.bar__history {
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.bar__history-empty {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--faint);
+  font-size: 0.8rem;
+}
+
+.bar__history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bar__history-item[aria-current="true"] {
+  background: var(--surface-hover);
+}
+
+.bar__history-item[aria-current="true"] .bar__history-title {
+  color: var(--text);
+}
+
+.bar__history-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar__history-meta {
+  color: var(--faint);
+  font-size: 0.72rem;
 }
 
 /* ------------------------------------------------------------------ */
@@ -693,6 +812,7 @@ a {
 
 .composer__send:focus-visible,
 .composer__suggestion:focus-visible,
+.composer__focus-chip:focus-visible,
 .palette__item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
@@ -915,6 +1035,46 @@ a {
   color: var(--accent);
 }
 
+/* What the agent was told about the screen. Quiet on purpose — this row is an
+   admission the person can check and take back, not something to act on. A
+   stored statement runs long, so the chip truncates rather than shoving the
+   composer off the screen. */
+.composer__focus {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0 0 6px;
+  padding: 0 4px;
+}
+
+.composer__focus-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.composer__focus-chip:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.composer__focus-chip span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 52ch;
+}
+
 /* A quoted passage sits above the input, verbatim and removable. */
 .composer__quote {
   display: flex;
@@ -943,6 +1103,62 @@ a {
 }
 
 .composer__quote-dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Follow-ups waiting for the live turn to settle (#410). A quiet list, not a
+   second transcript: one row per message, actions small and keyboard-reachable. */
+.queue-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.queue-lane__item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.queue-lane__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-lane__steer,
+.queue-lane__remove {
+  flex: none;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 2px 7px;
+}
+
+.queue-lane__steer {
+  border: 1px solid var(--line, rgba(127, 127, 127, 0.35));
+}
+
+.queue-lane__steer:hover,
+.queue-lane__remove:hover {
+  color: var(--accent);
+}
+
+.queue-lane__steer:focus-visible,
+.queue-lane__remove:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -3709,6 +3925,93 @@ button.message__tag:hover {
   margin: 0;
   font-size: 0.88rem;
   color: #e2e8f0;
+}
+
+/* Segment member outcomes: one row per outcome, each a way into the landscape. */
+.ui-members {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-members__label {
+  margin: 0;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--studio-muted);
+}
+
+.ui-members__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ui-member {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ui-member:hover,
+.ui-member:focus-visible {
+  background: rgba(129, 140, 248, 0.12);
+  border-color: rgba(129, 140, 248, 0.4);
+}
+
+.ui-member__id {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--studio-indigo);
+}
+
+.ui-member__statement {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.84rem;
+  color: var(--studio-text);
+}
+
+.ui-member__score {
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--studio-muted);
+}
+
+.ui-member__score--underserved {
+  color: var(--studio-amber);
+}
+
+.ui-members__mean {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--studio-text);
+}
+
+/* Where the segment's people came from: candidate or named. */
+.ui-basis {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--studio-muted);
 }
 
 /* Segment and strategy cards */

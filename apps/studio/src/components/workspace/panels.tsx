@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { WorkspacePanelId } from "../../types";
+import { BriefLens } from "../brief/BriefLens";
 import { DirectCapture } from "../canvas/DirectCapture";
 import { EvidenceStream } from "../canvas/EvidenceStream";
 import { JobMap } from "../canvas/JobMap";
@@ -17,6 +18,7 @@ import {
   CaptureIcon,
   ClusterIcon,
   CompassIcon,
+  FileIcon,
   RouteIcon,
   SettingsIcon,
   SignalIcon,
@@ -83,6 +85,14 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
       label: "Ask which to chase",
       intent: "Looking at my landscape, which opportunity should I chase first, and why?",
     },
+  },
+  {
+    id: "brief",
+    label: "Decision brief",
+    title: "Decision brief",
+    blurb: "The document a review reads: the vision, the ranked bets, their evidence, the dissent.",
+    icon: <FileIcon />,
+    render: () => <BriefLens />,
   },
   {
     id: "jobmap",

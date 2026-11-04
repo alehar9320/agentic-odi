@@ -105,6 +105,7 @@ describe("ThreadComposer attachment guidance", () => {
 
     const attachment = screen.getByRole("button", { name: "Attach a file" });
     expect(attachment).toHaveAccessibleDescription(/\.md.*\.json.*PNG.*JPEG.*WEBP.*GIF/i);
+    expect(attachment).toHaveAccessibleDescription(/\.docx/i);
     expect(attachment).toHaveAccessibleDescription(/5 MB/);
     expect(attachment).toHaveAccessibleDescription(/20,000 characters/);
   });
@@ -162,6 +163,30 @@ describe("ThreadComposer attachments", () => {
 
     expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("deck.pdf"));
     expect(screen.queryByText("deck.pdf")).toBeNull();
+  });
+
+  it("accepts a dropped .docx as an attachment chip", async () => {
+    const { container } = await renderThreadComposer();
+    const root = container.querySelector(".composer") as HTMLElement;
+    const file = new File(["x"], "brief.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file] } });
+
+    expect(await screen.findByText("brief.docx")).toBeInTheDocument();
+  });
+
+  it("refuses a legacy .doc and names the reason", async () => {
+    const pushToast = vi.fn();
+    const { container } = await renderThreadComposer({ pushToast });
+    const root = container.querySelector(".composer") as HTMLElement;
+    const file = new File(["x"], "old.doc", { type: "application/msword" });
+
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file] } });
+
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("Save it as .docx or .txt first"));
+    expect(screen.queryByText("old.doc")).toBeNull();
   });
 
   it("attaches a pasted screenshot from the clipboard", async () => {

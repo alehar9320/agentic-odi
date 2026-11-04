@@ -1,8 +1,12 @@
 import {
+  formatMemberMean,
   formatOpportunityScore,
   isUnderserved,
   opportunityScore,
+  segmentBasisLine,
+  summarizeMemberScores,
 } from "../lib/odi";
+import { useStudio } from "../state/StudioContext";
 import { readActions } from "./actions";
 import { ActionRow, MeterBar, ScorePill, type NodeProps } from "./primitives";
 import { num, str, type Tone } from "./props";
@@ -24,6 +28,44 @@ function stringList(value: unknown): string[] {
 
 function recordList(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.map(record) : [];
+}
+
+/** One member outcome as the board resolved it: id, statement, stored score. */
+interface SegmentMember {
+  id: string;
+  statement: string;
+  opportunityScore: number | null;
+}
+
+/**
+ * Read the resolved member list defensively. The catalog guarantees the shape;
+ * this keeps a hand-built node from crashing the card. A missing score stays
+ * `null` — it is never coerced to a number here.
+ */
+function memberList(value: unknown): SegmentMember[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const members: SegmentMember[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const candidate = entry as Record<string, unknown>;
+    if (typeof candidate.id !== "string" || candidate.id === "") {
+      continue;
+    }
+    const score = candidate.opportunityScore;
+    members.push({
+      id: candidate.id,
+      statement:
+        typeof candidate.statement === "string" && candidate.statement !== ""
+          ? candidate.statement
+          : candidate.id,
+      opportunityScore: typeof score === "number" && Number.isFinite(score) ? score : null,
+    });
+  }
+  return members;
 }
 
 function scoreOf(source: Record<string, unknown>): number | null {
@@ -458,6 +500,18 @@ export function SegmentCard({ node }: NodeProps) {
   const outcomeIds = stringList(node.props.outcomeIds);
   const unclustered = stringList(node.props.unclustered);
   const inferred = node.props.peopleInferred === true;
+  const members = memberList(node.props.members);
+  const missingMembers = num(node.props, "missingMembers", 0);
+  const scoreSummary = summarizeMemberScores(members.map((member) => member.opportunityScore));
+  const { focusSubject, openPanel } = useStudio();
+
+  function openMember(outcomeId: string) {
+    // The same focus path the landscape's own table uses, then the lens that
+    // shows it. The board keeps its place: reopening the segments lens draws it
+    // from the store, unchanged.
+    focusSubject("outcome", outcomeId);
+    openPanel("landscape");
+  }
 
   return (
     <article className="ui-card ui-card--segment" aria-label={`Segment: ${name}`}>
@@ -499,6 +553,52 @@ export function SegmentCard({ node }: NodeProps) {
           </div>
         ) : null}
       </dl>
+
+      {members.length > 0 ? (
+        <div className="ui-members">
+          <p className="ui-members__label">Member outcomes</p>
+          <ul className="ui-members__list">
+            {members.map((member) => (
+              <li key={member.id}>
+                <button
+                  type="button"
+                  className="ui-member"
+                  onClick={() => openMember(member.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      // Handle the activation ourselves and stop the native
+                      // click, so Enter fires exactly one focus, not two.
+                      event.preventDefault();
+                      openMember(member.id);
+                    }
+                  }}
+                  aria-label={`Open ${member.id}: ${member.statement}`}
+                >
+                  <span className="ui-member__id">{member.id}</span>
+                  <span className="ui-member__statement">{member.statement}</span>
+                  <span
+                    className={`ui-member__score${
+                      isUnderserved(member.opportunityScore) ? " ui-member__score--underserved" : ""
+                    }`}
+                  >
+                    {formatOpportunityScore(member.opportunityScore)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="ui-members__mean">{formatMemberMean(scoreSummary)}</p>
+          {missingMembers > 0 ? (
+            <p className="ui-caption">
+              {`${missingMembers} member outcome(s) are not on the canvas and are not shown.`}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* The group's provenance is never left implicit: an inferred group is a
+          candidate, not a researched market. */}
+      <p className="ui-basis">{segmentBasisLine(inferred)}</p>
 
       {unclustered.length > 0 ? (
         <p className="ui-caption">
