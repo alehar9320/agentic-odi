@@ -167,6 +167,10 @@ export interface StudioError {
   suggestion?: string | null;
   retryable: boolean;
   request_id?: string | null;
+  /** The input field that failed, when the failure names one. Omitted when the
+   * failure is not field-specific — a client can tell "no field" from "the
+   * field is the whole form" rather than guessing at a default. */
+  field?: string | null;
 }
 
 export type StudioTheme = "light" | "dark";

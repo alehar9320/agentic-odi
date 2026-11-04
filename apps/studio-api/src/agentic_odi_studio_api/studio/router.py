@@ -164,7 +164,7 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         )
     if isinstance(exc, OutcomeStatementError):
         return StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field=exc.field),
             status_code=422,
         )
     if isinstance(
@@ -189,7 +189,9 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             status_code=422,
         )
     if isinstance(exc, ValueOutOfRangeError):
-        return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))
+        return StudioHTTPError(
+            StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc), field=exc.field)
+        )
     if isinstance(exc, OdiError):
         status = error_status(exc)
         return StudioHTTPError(
@@ -1614,7 +1616,7 @@ async def approve_proposal_api(
         )
     except InvalidOutcomeStatementError as exc:
         raise StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field=exc.field),
             status_code=422,
         ) from exc
     except Exception as exc:  # noqa: BLE001
