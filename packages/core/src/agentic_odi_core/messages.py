@@ -22,7 +22,7 @@ Follow this sequence when guiding a user through the ODI process:
 - **Unit of measure**: A measurable unit (time, cost, number, frequency, rate, percentage, steps, attempts).
 - **Object of control**: The thing being acted on (named after 'the').
 - **Contextual clarifier**: When it happens (when, while, before, after, during, if, as).
-- **Scores**: `importance` and `satisfaction` (1–10) are optional, but a score must carry its `claim_check`: the questions you asked the customer and what came back. An unscored outcome is legal; a bare number is not.
+- **Scores**: `importance` and `satisfaction` (1–10) are optional, but a score must carry its `claim_check`: the questions you asked the customer and what came back. Put three questions to the customer — four when the claim is broad — and wait for their replies before you write any number. An unscored outcome is legal; a bare number is not.
 - **Expectation**: Qualitative interviews typically uncover 50–150 desired outcome statements.
 - **Tools to use**:
   - `add_outcome(job_id, statement, importance?, satisfaction?, claim_check?)` — Capture each desired outcome. When you set a score, pass `claim_check` with `asked`, `answers`, and `skips` (each skip needs a reason); ask the customer before scoring, never answer your own questions.

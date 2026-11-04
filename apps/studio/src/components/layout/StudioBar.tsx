@@ -1,13 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import { formatRelativeTime } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
-import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
+import {
+  BellIcon,
+  HistoryIcon,
+  MenuIcon,
+  MoonIcon,
+  PlugIcon,
+  PlusIcon,
+  SettingsIcon,
+  SunIcon,
+} from "../icons";
 import { OdiMascot } from "../OdiMascot";
+import { StatusDot } from "../status/StatusDot";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -20,15 +32,23 @@ export function StudioBar({
   onChangelog,
 }: {
   onHome: () => void;
-  onNew: () => void;
+  onNew: (options?: { stop?: boolean }) => void;
   onChangelog: () => void;
 }) {
   const {
+    conversationId,
+    conversations,
     llmHealth,
     messages,
+    openConversation,
+    refreshConversations,
     sidecarReachable,
+    streaming,
     unreadSignalCount,
     openPanel,
+    activePanel,
+    customizeOpen,
+    setupOpen,
     openCustomize,
     pushToast,
     saveSettings,
@@ -38,7 +58,18 @@ export function StudioBar({
   const theme = resolveTheme(settings.theme);
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const wide = useMediaQuery("(min-width: 720px)");
+  const [askOpen, setAskOpen] = useState(false);
+  const askRef = useRef<HTMLDivElement>(null);
+  const keepWritingRef = useRef<HTMLButtonElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  // An empty transcript is only nothing to lose when nothing is on screen to
+  // leave: the plus is the documented way out of the first-run setup, and a
+  // disabled control there would strand the person in it.
+  const nothingToLeave =
+    messages.length === 0 && !streaming && !setupOpen && !customizeOpen && activePanel === null;
 
   useEffect(() => {
     if (!menuOpen) {
@@ -61,6 +92,84 @@ export function StudioBar({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!askOpen) {
+      return;
+    }
+    // The ask is an interruption, not a mode: focus lands on the choice that
+    // changes nothing, so an accidental Enter keeps the reply.
+    keepWritingRef.current?.focus();
+    function onPointerDown(event: MouseEvent) {
+      if (askRef.current && !askRef.current.contains(event.target as Node)) {
+        setAskOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [askOpen]);
+
+  function startThread() {
+    if (streaming) {
+      setAskOpen((open) => !open);
+      return;
+    }
+    onNew();
+  }
+
+  function onAskKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape" || !askOpen) {
+      return;
+    }
+    // Stop the keystroke before the shell's global Escape hears it: closing the
+    // ask is not the same as cancelling the reply still streaming behind it.
+    event.stopPropagation();
+    setAskOpen(false);
+  }
+
+  // The history list is read when it opens, not polled: a thread created by a
+  // turn is added to the list by the turn itself.
+  useEffect(() => {
+    if (!historyOpen) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (historyRef.current && !historyRef.current.contains(event.target as Node)) {
+        setHistoryOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setHistoryOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [historyOpen]);
+
+  function toggleHistory() {
+    setHistoryOpen((open) => {
+      if (!open) {
+        void refreshConversations();
+      }
+      return !open;
+    });
+  }
+
+  function selectConversation(id: string) {
+    setHistoryOpen(false);
+    if (id !== conversationId) {
+      void openConversation(id).catch(() =>
+        pushToast("error", "I couldn't open that conversation."),
+      );
+    }
+  }
 
   function exportConversation() {
     const exportedAt = new Date();
@@ -134,15 +243,98 @@ export function StudioBar({
           ✨ What's New
         </button>
 
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="New conversation"
-          title="New conversation"
-          onClick={onNew}
-        >
-          <PlusIcon size={17} />
-        </button>
+        <div className="bar__new-wrap" ref={askRef} onKeyDown={onAskKeyDown}>
+          <button
+            type="button"
+            className="bar__new"
+            onClick={startThread}
+            disabled={nothingToLeave}
+            aria-label="Start a new thread"
+            aria-describedby={nothingToLeave ? "bar-new-reason" : undefined}
+            aria-haspopup={streaming ? "dialog" : undefined}
+            aria-expanded={streaming ? askOpen : undefined}
+            title="New thread. Your jobs, outcomes, and evidence stay."
+          >
+            <PlusIcon size={17} />
+            {wide && <span>New thread</span>}
+          </button>
+
+          {nothingToLeave && (
+            <span id="bar-new-reason" className="sr-only">
+              This thread is already new.
+            </span>
+          )}
+
+          {askOpen && (
+            <div className="bar__new-ask" role="dialog" aria-label="Stop the reply and start a new thread?">
+              <p>A reply is still coming. Stop it and start a new thread?</p>
+              <button
+                type="button"
+                ref={keepWritingRef}
+                className="bar__new-choice"
+                onClick={() => setAskOpen(false)}
+              >
+                Keep writing
+              </button>
+              <button
+                type="button"
+                className="bar__new-choice bar__new-choice--stop"
+                onClick={() => {
+                  setAskOpen(false);
+                  onNew({ stop: true });
+                }}
+              >
+                Stop and start
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="bar__menu" ref={historyRef}>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Conversation history"
+            title="Conversation history"
+            aria-haspopup="menu"
+            aria-expanded={historyOpen}
+            onClick={toggleHistory}
+          >
+            <HistoryIcon size={17} />
+          </button>
+          {historyOpen && (
+            <div
+              className="bar__menu-list bar__history"
+              role="menu"
+              aria-label="Recent conversations"
+            >
+              {conversations.length === 0 ? (
+                <p className="bar__history-empty">No conversations yet.</p>
+              ) : (
+                conversations.map((conversation) => {
+                  const current = conversation.id === conversationId;
+                  return (
+                    <button
+                      key={conversation.id}
+                      type="button"
+                      role="menuitem"
+                      className="bar__menu-item bar__history-item"
+                      aria-current={current ? "true" : undefined}
+                      onClick={() => selectConversation(conversation.id)}
+                    >
+                      <span className="bar__history-title">
+                        {conversation.title.trim() || "New conversation"}
+                      </span>
+                      <span className="bar__history-meta">
+                        {formatRelativeTime(conversation.updated_at)}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+
 
         <button
           type="button"
@@ -176,10 +368,8 @@ export function StudioBar({
           aria-label={`Model status: ${status}. ${statusDetail}`}
           title={statusDetail}
         >
-          <span
-            className={`status-dot${status === "Local mode" ? " is-warn" : ""}${
-              status === "Connecting" ? " is-unknown" : ""
-            }`}
+          <StatusDot
+            tone={status === "Local mode" ? "warn" : status === "Connecting" ? "unknown" : "ok"}
           />
           {status}
         </button>

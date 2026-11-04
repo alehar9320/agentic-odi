@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 from agentic_odi_core import messages
+from agentic_odi_core.contract import TOOL_SPECS
 
 
 def test_framework_guidelines_are_exposed() -> None:
     assert messages.get_odi_framework_guidelines() == messages.ODI_FRAMEWORK_GUIDELINES
     assert "Opportunity Score" in messages.get_odi_framework_guidelines()
+
+
+def test_the_guidelines_put_three_questions_before_a_score() -> None:
+    """The interview is stated where the model reads it, not only enforced on write."""
+    guidelines = messages.get_odi_framework_guidelines()
+
+    assert "three questions" in guidelines
+    assert "never answer your own question" in guidelines
+    assert "three questions" in TOOL_SPECS["add_outcome"].summary
 
 
 def test_framework_guidelines_cover_segmentation_and_strategy() -> None:
