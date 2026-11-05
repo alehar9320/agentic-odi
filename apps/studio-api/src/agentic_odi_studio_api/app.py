@@ -10,6 +10,7 @@ from pathlib import Path
 
 from agentic_odi_core import ODIService
 from agentic_odi_core.errors import StoreCorrupt
+from agentic_odi_core.funnel import count_launch, start_session
 from agentic_odi_core.messages import CAPABILITIES
 from agentic_odi_core.recovery import corrupt_store_message, latest_backup
 from agentic_odi_core.remote import StudioError, StudioErrorCode
@@ -180,6 +181,10 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        # One app session is one sidecar launch, so the session id is drawn here
+        # and nowhere else. The per-install device id is a different identity and
+        # is never used as this one.
+        count_launch(repo, start_session())
         idle_task: asyncio.Task[None] | None = None
         if checkpoint_interval > 0:
             idle_task = asyncio.create_task(_idle_checkpoint())
