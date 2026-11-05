@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 
 import { fetchChangelog } from "../../api/studioApi";
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
@@ -13,8 +19,8 @@ import type { ChangelogRelease } from "../../types";
 import { useUpdateSnapshot } from "../../updater";
 import {
   BellIcon,
+  ExportIcon,
   HistoryIcon,
-  MenuIcon,
   MoonIcon,
   PlugIcon,
   PlusIcon,
@@ -60,10 +66,8 @@ export function StudioBar({
   const update = useUpdateSnapshot();
   const theme = resolveTheme(settings.theme);
   const nextTheme = theme === "dark" ? "light" : "dark";
-  const [menuOpen, setMenuOpen] = useState(false);
   const [unreadReleaseCount, setUnreadReleaseCount] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
   const [askOpen, setAskOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
@@ -100,28 +104,6 @@ export function StudioBar({
   // disabled control there would strand the person in it.
   const nothingToLeave =
     messages.length === 0 && !streaming && !setupOpen && !customizeOpen && activePanel === null;
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    function onPointerDown(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
-    }
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [menuOpen]);
 
   useEffect(() => {
     if (!askOpen) {
@@ -201,12 +183,30 @@ export function StudioBar({
     }
   }
 
-  function exportConversation() {
+  const exportConversation = useCallback(() => {
     const exportedAt = new Date();
     downloadMarkdown(conversationToMarkdown(messages, exportedAt), exportFilename(exportedAt));
-    setMenuOpen(false);
     pushToast("success", "Conversation exported as Markdown.");
-  }
+  }, [messages, pushToast]);
+
+  // Export without the mouse. Inert when there is no thread, because an empty
+  // Markdown file is not an export anybody asked for (#695).
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (
+        event.key.toLowerCase() !== "e" ||
+        !event.shiftKey ||
+        !(event.metaKey || event.ctrlKey) ||
+        messages.length === 0
+      ) {
+        return;
+      }
+      event.preventDefault();
+      exportConversation();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [exportConversation, messages.length]);
 
   // A measured answer outranks an inference from the settings. The shipped desktop
   // default points at the sidecar's own proxy — a loopback address the browser cannot
@@ -439,32 +439,16 @@ export function StudioBar({
           <SettingsIcon size={17} />
         </button>
 
-        <div className="bar__menu" ref={menuRef}>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="More actions"
-            title="More actions"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <MenuIcon size={17} />
-          </button>
-          {menuOpen && (
-            <div className="bar__menu-list" role="menu" aria-label="More actions">
-              <button
-                type="button"
-                role="menuitem"
-                className="bar__menu-item"
-                onClick={exportConversation}
-                disabled={messages.length === 0}
-              >
-                Export → Markdown
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Export conversation as Markdown"
+          title="Export conversation as Markdown (Ctrl/Cmd+Shift+E)"
+          onClick={exportConversation}
+          disabled={messages.length === 0}
+        >
+          <ExportIcon size={17} />
+        </button>
       </div>
 
       {/* The bell's label carries the current count; this announces changes. */}

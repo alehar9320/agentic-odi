@@ -168,7 +168,7 @@ describe("StudioBar", () => {
     expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "light" }));
   });
 
-  it("exports the conversation as Markdown from the overflow menu", () => {
+  it("exports the conversation as Markdown from one icon button (#695)", () => {
     const createObjectURL = vi.fn(() => "blob:conversation");
     const revokeObjectURL = vi.fn();
     Object.defineProperty(URL, "createObjectURL", {
@@ -191,8 +191,10 @@ describe("StudioBar", () => {
     );
 
     render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /export.*markdown/i }));
+    // Export is the control, not an entry behind another control.
+    expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Export conversation as Markdown" }));
 
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
@@ -588,6 +590,47 @@ describe("StudioBar new thread control (#319)", () => {
     );
     await waitFor(() => expect(fetchChangelog).toHaveBeenCalledTimes(2));
     expect(second.container.querySelector(".pill-changelog__dot")).toBeNull();
+  });
+
+  it("exports with Ctrl/Cmd+Shift+E when a thread exists, and stays inert without one (#695)", () => {
+    const createObjectURL = vi.fn(() => "blob:conversation");
+    Object.defineProperty(URL, "createObjectURL", {
+      value: createObjectURL,
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        messages: [
+          { role: "user", content: "Show me the top outcomes." },
+          { role: "assistant", content: "Here they are." },
+        ],
+      }) as never,
+    );
+    const { unmount } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+
+    fireEvent.keyDown(window, { key: "e", ctrlKey: true, shiftKey: true });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+
+    // Without a modifier, or without Option/Shift on the mac, nothing happens.
+    fireEvent.keyDown(window, { key: "e" });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    unmount();
+
+    vi.mocked(useStudio).mockReturnValue(stubContext({ messages: [] }) as never);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.keyDown(window, { key: "e", ctrlKey: true, shiftKey: true });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    // The button that offers the same action says why it is unavailable.
+    expect(
+      screen.getByRole("button", { name: "Export conversation as Markdown" }),
+    ).toBeDisabled();
+    click.mockRestore();
   });
 
 });
