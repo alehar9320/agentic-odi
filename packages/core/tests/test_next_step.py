@@ -159,3 +159,143 @@ def test_the_in_memory_repository_matches(tmp_path) -> None:
         updated = repo.update_next_step(step.id, {"text": "Draft the screener"})
         assert updated is not None and updated.text == "Draft the screener"
         assert repo.update_next_step("nope", {"text": "x"}) is None
+
+
+def _service(tmp_path=None):
+    from agentic_odi_core.repository import InMemoryRepository
+    from agentic_odi_core.services import ODIService
+
+    return ODIService(InMemoryRepository())
+
+
+def test_only_one_step_is_ever_open() -> None:
+    svc = _service()
+    first = svc.set_next_step("Talk to two support leads")
+    second = svc.set_next_step("Ask the payer what they do today")
+
+    open_steps = [s for s in svc.list_next_steps() if s.is_open]
+    assert [s.id for s in open_steps] == [second.id]
+    # Closed rather than deleted: the first promise is still the record of what
+    # was said, and it says plainly that it was replaced.
+    still_there = svc.repo.get_next_step(first.id)
+    assert still_there is not None
+    assert still_there.superseded_at is not None
+    assert still_there.text == "Talk to two support leads"
+
+
+def test_an_open_step_is_what_a_returning_visit_reads() -> None:
+    svc = _service()
+    assert svc.open_next_step() is None
+    step = svc.set_next_step("Draft the screener")
+    assert svc.open_next_step().id == step.id
+    svc.resolve_next_step(step.id, "Sent it to the recruiter")
+    assert svc.open_next_step() is None
+
+
+def test_resolving_records_what_happened_as_evidence() -> None:
+    svc = _service()
+    step = svc.set_next_step("Talk to two support leads")
+
+    record = svc.resolve_next_step(step.id, "Both still hand-carry the spreadsheet")
+
+    assert record.source_kind == "manual"
+    assert record.item_type == "manual"
+    assert record.content == "Both still hand-carry the spreadsheet"
+    assert record.raw["next_step_id"] == step.id
+    assert record.raw["origin"] == "user"
+    assert record.name  # labelled, so the library shows what it is
+    assert [e.id for e in svc.repo.evidence.values() if e.raw.get("next_step_id") == step.id] == [
+        record.id
+    ]
+    answered = svc.repo.get_next_step(step.id)
+    assert answered is not None and answered.is_open is False
+    assert answered.resolution == "Both still hand-carry the spreadsheet"
+    assert answered.resolved_at is not None
+
+
+def test_resolving_a_step_twice_keeps_the_first_answer() -> None:
+    svc = _service()
+    step = svc.set_next_step("Talk to two support leads")
+    first = svc.resolve_next_step(step.id, "Spoke to Ana")
+    answered_once = svc.repo.get_next_step(step.id)
+    assert answered_once is not None
+
+    again = svc.resolve_next_step(step.id, "Spoke to Bram")
+
+    assert again.id == first.id
+    still = svc.repo.get_next_step(step.id)
+    assert still is not None
+    assert still.resolution == "Spoke to Ana"
+    assert still.resolved_at == answered_once.resolved_at
+
+
+def test_an_answer_must_say_something() -> None:
+    from agentic_odi_core.services import ValidationError
+
+    svc = _service()
+    step = svc.set_next_step("Talk to two support leads")
+    with pytest.raises(ValidationError):
+        svc.resolve_next_step(step.id, "   ")
+
+
+def test_a_superseded_step_cannot_be_answered_as_if_it_were_open() -> None:
+    """Answering a replaced promise would credit work against the wrong intention."""
+    from agentic_odi_core.services import ValidationError
+
+    svc = _service()
+    first = svc.set_next_step("Talk to two support leads")
+    svc.set_next_step("Ask the payer what they do today")
+
+    with pytest.raises(ValidationError):
+        svc.resolve_next_step(first.id, "Eventually spoke to Ana")
+
+
+def test_not_yet_keeps_reschedules_or_drops(tmp_path) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    svc = _service()
+    step = svc.set_next_step("Draft the interview guide")
+    kept = svc.keep_next_step(step.id)
+    assert kept.is_open is True and kept.superseded_at is None
+
+    later = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    rescheduled = svc.reschedule_next_step(step.id, later)
+    assert rescheduled.is_open is True
+    assert rescheduled.due_at is not None and rescheduled.due_at > rescheduled.created_at
+
+    dropped = svc.drop_next_step(step.id)
+    assert dropped.is_open is False
+    assert dropped.superseded_at is not None
+    assert svc.open_next_step() is None
+    # Dropping answers nothing, so it must not manufacture evidence.
+    assert not [e for e in svc.repo.evidence.values() if e.raw.get("next_step_id") == step.id]
+
+
+def test_a_step_about_a_known_outcome_carries_it_and_links_the_evidence() -> None:
+    from agentic_odi_core.services import OutcomeNotFoundError
+
+    svc = _service()
+    job_id = svc.add_job("Reconcile supplier invoices", "Match invoices to orders").id
+    outcome = svc.add_outcome(
+        job_id,
+        "Minimize the time to reconcile a failed payment before the next shift",
+        importance=8.0,
+        satisfaction=3.0,
+    )
+    step = svc.set_next_step("Check the queue with a dispatcher", outcome_id=outcome.id)
+    assert step.outcome_id == outcome.id
+
+    record = svc.resolve_next_step(step.id, "Four of five queues need a human")
+    assert record.outcome_id == outcome.id
+    assert record.job_id == job_id
+
+    with pytest.raises(OutcomeNotFoundError):
+        svc.set_next_step("Something", outcome_id="nope")
+
+
+def test_the_step_must_say_something() -> None:
+    from agentic_odi_core.services import ValidationError
+
+    svc = _service()
+    with pytest.raises(ValidationError):
+        svc.set_next_step("  ")
