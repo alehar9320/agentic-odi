@@ -152,6 +152,10 @@ def test_a_figure_must_be_a_number_the_page_states():
     assert make_og.figure_for("<p>16 presets and 31 tools</p>") == "31 tools"
     assert make_og.figure_for("<svg><path d='M12 31 tools'/></svg>") is None
     assert make_og.figure_for("<script>var s = '31 tools'</script>") is None
+    # A spaced end tag is still an end tag: CodeQL's bad-filter check caught
+    # that `</script >` used to leave the body behind for the tag strip.
+    assert make_og.figure_for("<script>var s = '31 tools'</script >") is None
+    assert make_og.figure_for("<style>/* 31 tools */</style >") is None
 
 
 def test_a_year_or_example_number_never_becomes_a_figure():

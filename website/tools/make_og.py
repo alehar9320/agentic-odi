@@ -277,9 +277,9 @@ def _visible_text(html: str) -> str:
     A figure must come from what the page says, not from markup that merely
     contains a number (an SVG path, an inline script, a data attribute).
     """
-    text = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
-    text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
-    text = re.sub(r"<svg.*?</svg>", " ", text, flags=re.S | re.I)
+    text = re.sub(r"<script\b[^>]*>.*?</script\s*>", " ", html, flags=re.S | re.I)
+    text = re.sub(r"<style\b[^>]*>.*?</style\s*>", " ", text, flags=re.S | re.I)
+    text = re.sub(r"<svg\b[^>]*>.*?</svg\s*>", " ", text, flags=re.S | re.I)
     text = re.sub(r"<[^>]+>", " ", text)
     return re.sub(r"\s+", " ", html_module.unescape(text))
 
