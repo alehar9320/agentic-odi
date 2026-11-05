@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 
 import { parseMarkdown, type MdBlock, type MdInline } from "../../lib/markdown";
+import { CodeBlock } from "./CodeBlock";
 
 function renderSpans(spans: MdInline[]) {
   return spans.map((span, index) => {
@@ -40,11 +41,7 @@ function Block({ block }: { block: MdBlock }) {
       return <Tag className="md-heading">{renderSpans(block.spans)}</Tag>;
     }
     case "code":
-      return (
-        <pre className="md-pre">
-          <code>{block.code}</code>
-        </pre>
-      );
+      return <CodeBlock code={block.code} preClassName="md-pre" />;
     case "list": {
       const items = block.items.map((item, index) => <li key={index}>{renderSpans(item)}</li>);
       return block.ordered ? (

@@ -57,11 +57,19 @@ describe("BANNER_CATALOG", () => {
     expect(`${entry.title} ${entry.body}`).not.toMatch(/sync/i);
   });
 
-  it("keeps the toast kinds transient and in the corner", () => {
-    for (const kind of ["info", "success", "error"] as const) {
+  it("keeps the info and success toasts transient and in the corner", () => {
+    for (const kind of ["info", "success"] as const) {
       expect(BANNER_CATALOG[kind].life).toBe("transient");
+      expect(BANNER_CATALOG[kind].durationMs).toBe(6000);
       expect(BANNER_CATALOG[kind].dock).toBe("corner");
     }
+  });
+
+  it("keeps an error on screen until it is dismissed (#693)", () => {
+    const entry = BANNER_CATALOG.error;
+    expect(entry.life).toBe("persistent");
+    expect(entry.dismissible).toBe(true);
+    expect(resolveSpec({ kind: "error", body: "Late failure." }).durationMs).toBe(0);
   });
 });
 

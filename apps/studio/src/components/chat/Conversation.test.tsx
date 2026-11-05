@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
@@ -422,5 +422,38 @@ describe("Conversation failures", () => {
     fireEvent.click(retry);
 
     expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
+  });
+});
+
+describe("copying a reply (#693)", () => {
+  it("says Copied for 1600 ms and announces it once without renaming the button", () => {
+    harness.state.streaming = false;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn(async () => {}) },
+    });
+    vi.useFakeTimers();
+    try {
+      renderTurn([{ id: "a-1", parentId: null, role: "assistant", content: "A useful reply." }]);
+
+      const copy = screen.getByRole("button", { name: "Copy reply" });
+      expect(copy).toHaveTextContent("Copy");
+
+      fireEvent.click(copy);
+
+      expect(screen.getByRole("button", { name: "Copy reply" })).toHaveTextContent("Copied");
+      expect(screen.getByText("Reply copied")).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(1600);
+      });
+
+      expect(screen.getByRole("button", { name: "Copy reply" })).toHaveTextContent("Copy");
+
+      fireEvent.click(screen.getByRole("button", { name: "Copy reply" }));
+      expect(screen.getByRole("button", { name: "Copy reply" })).toHaveTextContent("Copied");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

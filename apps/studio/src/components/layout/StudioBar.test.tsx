@@ -517,3 +517,34 @@ describe("StudioBar new thread control (#319)", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
+
+describe("export confirmation (#693)", () => {
+  it("names the file it wrote, with the date the name was built from", () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      value: vi.fn(() => "blob:conversation"),
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: vi.fn(),
+      configurable: true,
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const pushToast = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        messages: [{ role: "user", content: "Show me the top outcomes." }],
+        pushToast,
+      }) as never,
+    );
+
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /export.*markdown/i }));
+
+    expect(pushToast).toHaveBeenCalledWith(
+      "success",
+      `Exported agentic-odi-conversation-${new Date().toISOString().slice(0, 10)}.md`,
+    );
+    click.mockRestore();
+  });
+});

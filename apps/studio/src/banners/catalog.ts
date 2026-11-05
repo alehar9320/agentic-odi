@@ -89,13 +89,15 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     durationMs: DEFAULT_DURATION_MS,
     dismissible: true,
   },
+  // An error is the one toast that must not leave while it is being read: it
+  // names what failed and the way out, and six seconds is not enough to copy
+  // it or act on it. Success and info still expire.
   error: {
     severity: "critical",
-    life: "transient",
+    life: "persistent",
     dock: "corner",
     title: "",
     body: "",
-    durationMs: DEFAULT_DURATION_MS,
     dismissible: true,
   },
 };
