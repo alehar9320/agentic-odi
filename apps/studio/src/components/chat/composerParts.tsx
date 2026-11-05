@@ -14,6 +14,7 @@ import { useAuiState } from "@assistant-ui/react";
 
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
+import { detectPlatform, shortcutLabels } from "../../updater/platform";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
 
 const PILL_ICONS: ReactNode[] = [
@@ -200,11 +201,15 @@ export function ContextChip() {
 export function ComposerHint({ trailing }: { trailing?: ReactNode } = {}) {
   const { settings, llmHealth, brief } = useStudio();
   const offline = llmHealth.healthy === false;
+  // The keycaps are the machine's, not ours: macOS prints ⌘ and ↵ where the
+  // other desktops spell them out.
+  const keys = shortcutLabels(detectPlatform());
 
   return (
     <div className="composer__hint">
       <span>
-        <kbd>Enter</kbd> to send · <kbd>/</kbd> for commands
+        <kbd>{keys.focus}</kbd> to focus · <kbd>{keys.send}</kbd> to send · <kbd>/</kbd> for
+        commands
         {brief ? ` · ${brief.product_name || "your job"}` : ""}
       </span>
       <span className="composer__hint-end">
