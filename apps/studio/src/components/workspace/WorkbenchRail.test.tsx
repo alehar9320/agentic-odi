@@ -249,6 +249,20 @@ describe("WorkbenchRail", () => {
     expect(studio.openPanel).toHaveBeenCalledWith("memory");
   });
 
+  it("marks the note row only while a suggestion is waiting to be accepted", () => {
+    studio.canvas = canvas();
+    studio.memory = [{ id: "o-1", text: "Owns activation.", status: "suggested" }];
+
+    const { rerender } = render(<WorkbenchRail />);
+
+    expect(map().querySelector('[data-panel="memory"] .rail__dot')).not.toBeNull();
+
+    studio.memory = [{ id: "o-1", text: "Owns activation.", status: "confirmed" }];
+    rerender(<WorkbenchRail />);
+
+    expect(map().querySelector('[data-panel="memory"] .rail__dot')).toBeNull();
+  });
+
   it("counts the segments the outcomes support", () => {
     studio.canvas = canvas({ outcomes: [{ id: "O-1" }, { id: "O-2" }] });
     studio.segments = [{ id: "seg-1" }, { id: "seg-2" }, { id: "seg-3" }];
