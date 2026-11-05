@@ -247,7 +247,7 @@ drift from the workspace. The distributions are:
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) answers a navigation it cannot reach with `public/offline.html`, so an uncached deep link opened offline gets a themed page instead of the browser's error page. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
-| **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |
+| **`scripts/`** | — | Dev launcher, binary build, installer tests, the deterministic study-corpus generator (`gen_corpus.py`), and the hosted probe that asks the production URL whether it keeps the promises this README makes (`verify-hosted-first-run.sh`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
 
 Inside `packages/core` there are four groups, and the rules between them are
