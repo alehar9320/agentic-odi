@@ -4784,6 +4784,7 @@ details[open] summary {
 }
 
 .rail__chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -4815,6 +4816,25 @@ details[open] summary {
 .rail__icon {
   display: inline-flex;
   opacity: 0.8;
+}
+
+/* What a chip opens, said on hover and on focus, not in an empty title (#696). */
+.rail__tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
 }
 
 .rail__count {
