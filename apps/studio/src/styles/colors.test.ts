@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 /**
  * The raw-colour gate (issue #543, parent #331).
  *
- * `theme.css` owns the palette. Everything else reads it through `var(--…)`,
+ * `tokens.css` owns the palette. Everything else reads it through `var(--…)`,
  * so a colour written as a literal is a colour that does not follow the theme
  * and cannot be measured by `theme.test.ts`. This test is the thing that
  * notices a component inlining a hex value: it fails with the file and line,
  * so the next person can delete the literal instead of shipping it.
  *
- * `theme.css` is the one file allowed to hold literals — it is where the
+ * `tokens.css` is the one file allowed to hold literals — it is where the
  * tokens are defined. Files that legitimately sit outside the token system
  * (generated artwork, print media, SVG chart colour that encodes a score) are
  * named in `ALLOWED_FILES` with a reason and an issue. That list is a
@@ -46,7 +46,15 @@ const ALLOWED_FILES: Record<string, { reason: string; issue: number }> = {
 };
 
 /** The palette's own home; it is the one file that may hold literals. */
-const TOKEN_FILE = "src/styles/theme.css";
+const TOKEN_FILE = "src/styles/tokens.css";
+
+/**
+ * `theme.css` is still exempt while it holds the values ALH-216 (M5-01.2) has not
+ * yet moved onto tokens. It is listed here rather than in `ALLOWED_FILES` because
+ * the exemption is the file's own history, not a structural need like print media
+ * or generated artwork; deleting this line is the sibling's finish line.
+ */
+const CONSUMERS_IN_PROGRESS = new Set(["src/styles/theme.css"]);
 
 /** Above this the baseline has become a dumping ground rather than a record. */
 const ALLOWED_CAP = 6;
@@ -191,7 +199,10 @@ function colorLiterals(file: string, source: string): Finding[] {
 
 const scanned = Object.entries(SOURCES)
   .filter(([file]) => !/\.(test|spec)\./.test(file))
-  .filter(([file]) => file.replace(/^\//, "") !== TOKEN_FILE);
+  .filter(([file]) => {
+    const name = file.replace(/^\//, "");
+    return name !== TOKEN_FILE && !CONSUMERS_IN_PROGRESS.has(name);
+  });
 
 const findings = scanned.flatMap(([file, source]) =>
   colorLiterals(file.replace(/^\//, ""), source),
@@ -202,7 +213,7 @@ for (const finding of findings) {
 }
 
 describe("raw colours", () => {
-  it("keeps the palette in theme.css and nothing else", () => {
+  it("keeps the palette in tokens.css and nowhere else", () => {
     const offenders = findings
       .filter((finding) => !(finding.file in ALLOWED_FILES))
       .map((finding) => `${finding.file}:${finding.line} ${finding.literal}`);

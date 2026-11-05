@@ -200,7 +200,8 @@ build red without a separate command:
     element computes as transparent-on-white and axe cannot measure real
     colours. Contrast is covered by the next two bullets instead.
 - **theme contrast** — `src/styles/theme.test.ts` derives both palettes from
-  `theme.css` and asserts every text token (`--text`, `--muted`, `--faint`,
+  `tokens.css` — the single palette source, which `theme.css` imports — and
+  asserts every text token (`--text`, `--muted`, `--faint`,
   `--accent`, `--green`, `--amber`) clears 4.5:1 on `--bg` and `--bg-raised`,
   and that the focus ring (`--accent`) clears the 3:1 non-text minimum. The
   same file fails if the stylesheet references a custom property that nothing
@@ -240,8 +241,11 @@ The job is required: `.github/workflows/ci.yml` runs it as `Contrast gate` and
   `Function.prototype.toString`, and `src/test/contrast.test.ts` runs the same
   source in jsdom.
 - **the raw-colour gate** — `src/styles/colors.test.ts` fails on a hex or
-  `rgb()` literal outside `theme.css`, naming the file and line, so a component
-  cannot inline a colour the theme does not own. A handful of files whose
+  `rgb()` literal outside `tokens.css`, naming the file and line, so a component
+  cannot inline a colour the palette does not own. `theme.css` is exempted
+  separately, by a set named for its reason: it still holds the values ALH-216
+  (M5-01.2) has not yet moved onto tokens, and deleting that line is that
+  issue's finish line. A handful of files whose
   colours are structural (generated artwork, print media, SVG chart fills) are
   named in `ALLOWED_FILES` with a reason and an issue; the list is capped and
   fails on a stale entry, so it can only shrink.

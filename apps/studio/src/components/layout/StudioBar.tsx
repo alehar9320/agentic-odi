@@ -4,7 +4,6 @@ import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
 import { formatRelativeTime } from "../../lib/relativeTime";
-import { resolveTheme } from "../../lib/theme";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
@@ -53,9 +52,9 @@ export function StudioBar({
     pushToast,
     saveSettings,
     settings,
+    theme,
   } = useStudio();
   const update = useUpdateSnapshot();
-  const theme = resolveTheme(settings.theme);
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);

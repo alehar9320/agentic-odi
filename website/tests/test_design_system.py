@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 import extract
-from site_support import SITE, STUDIO_THEME, _built_root
+from site_support import SITE, STUDIO_PALETTE, STUDIO_THEME, _built_root
 
 STYLE = SITE / "assets" / "style.css"
 
@@ -14,8 +14,8 @@ def _css() -> str:
     return STYLE.read_text(encoding="utf-8")
 
 
-def test_tokens_come_from_the_studio_theme():
-    tokens = extract.read_tokens(STUDIO_THEME)
+def test_tokens_come_from_the_studio_palette():
+    tokens = extract.read_tokens(STUDIO_PALETTE)
     assert tokens["--bg"] == "#0a0b0e"
     assert tokens["--bg-raised"] == "#0e1014"
     assert tokens["--text"] == "#f1f2f4"

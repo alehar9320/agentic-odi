@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
+import type { StudioTheme } from "../types";
 import { resolveTheme } from "./theme";
 
 function stubMatchMedia(matches: boolean): void {
@@ -51,5 +52,30 @@ describe("resolveTheme", () => {
       value: undefined,
     });
     expect(resolveTheme(undefined)).toBe("dark");
+  });
+
+  it("treats a stored system choice as the operating system's answer", () => {
+    stubMatchMedia(true);
+    expect(resolveTheme("system")).toBe("light");
+    stubMatchMedia(false);
+    expect(resolveTheme("system")).toBe("dark");
+  });
+
+  it("uses the operating system's answer the caller is holding, not a fresh read", () => {
+    // A component that subscribed to the media query has a current answer in
+    // hand; reading `matchMedia` again here would be a second, uncoupled source
+    // of truth that can disagree with the value that triggered the render.
+    stubMatchMedia(true);
+    expect(resolveTheme("system", false)).toBe("dark");
+    expect(resolveTheme(undefined, false)).toBe("dark");
+    expect(resolveTheme("light", false)).toBe("light");
+  });
+
+  it("follows the operating system when the stored value is not a theme", () => {
+    // Settings are read straight out of `localStorage`, so anything can be in
+    // there. A value the app never offered must not decide the palette.
+    stubMatchMedia(true);
+    expect(resolveTheme("midnight" as StudioTheme, false)).toBe("dark");
+    expect(resolveTheme("midnight" as StudioTheme, true)).toBe("light");
   });
 });

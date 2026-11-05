@@ -52,8 +52,10 @@
       }
     </style>
     <!-- Resolve the theme before React runs, so the shell and the app agree on
-         one class. It reads the value the app does and consults the OS only when
-         nothing is stored; theme state stays owned by state/StudioContext.tsx. -->
+         one class. A pinned light/dark wins; a stored "system" — and anything
+         else, including nothing — is answered by the OS, which is what a
+         "system" choice asks for. Theme state stays owned by
+         state/StudioContext.tsx, whose resolveTheme() this mirrors. -->
     <script>
       (function () {
         var theme = null;

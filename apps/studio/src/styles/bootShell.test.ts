@@ -12,7 +12,9 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import themeCss from "./theme.css?raw";
+import type { StudioTheme } from "../types";
+import { resolveTheme } from "../lib/theme";
+import paletteCss from "./tokens.css?raw";
 
 // Vitest runs with the studio package as its working directory.
 const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
@@ -37,11 +39,11 @@ function bootToken(selector: string, token: string): string | null {
   return block.match(new RegExp(`--${token}:\\s*([^;]+);`))?.[1].trim() ?? null;
 }
 
-/** The value of a token inside a block of `theme.css`. */
-function themeToken(selector: string, token: string): string | null {
-  const start = themeCss.indexOf(selector);
-  const open = themeCss.indexOf("{", start);
-  const block = themeCss.slice(open, themeCss.indexOf("}", open));
+/** The value of a token inside a block of the palette. */
+function paletteToken(selector: string, token: string): string | null {
+  const start = paletteCss.indexOf(selector);
+  const open = paletteCss.indexOf("{", start);
+  const block = paletteCss.slice(open, paletteCss.indexOf("}", open));
   return block.match(new RegExp(`--${token}:\\s*([^;]+);`))?.[1].trim() ?? null;
 }
 
@@ -73,21 +75,21 @@ describe("the bootstrap shell", () => {
 });
 
 describe("the bootstrap colours", () => {
-  it("copies the dark --bg and --line from theme.css", () => {
-    expect(bootToken(":root", "boot-bg")).toBe(themeToken(":root {", "bg"));
-    expect(bootToken(":root", "boot-line")).toBe(themeToken(":root {", "line"));
+  it("copies the dark --bg and --line from the palette", () => {
+    expect(bootToken(":root", "boot-bg")).toBe(paletteToken(":root {", "bg"));
+    expect(bootToken(":root", "boot-line")).toBe(paletteToken(":root {", "line"));
   });
 
-  it("copies the light --bg and --line from theme.css", () => {
-    expect(bootToken("html.theme-light", "boot-bg")).toBe(themeToken("html.theme-light", "bg"));
-    expect(bootToken("html.theme-light", "boot-line")).toBe(themeToken("html.theme-light", "line"));
+  it("copies the light --bg and --line from the palette", () => {
+    expect(bootToken("html.theme-light", "boot-bg")).toBe(paletteToken("html.theme-light", "bg"));
+    expect(bootToken("html.theme-light", "boot-line")).toBe(paletteToken("html.theme-light", "line"));
   });
 
   it("resolves the dark class to the dark tokens", () => {
     // Dark is the `:root` default; `html:not(.theme-dark)` in the media block
     // keeps a resolved dark class from being overridden by a light system.
-    expect(bootToken(":root", "boot-bg")).toBe(themeToken(":root {", "bg"));
-    expect(bootToken(":root", "boot-line")).toBe(themeToken(":root {", "line"));
+    expect(bootToken(":root", "boot-bg")).toBe(paletteToken(":root {", "bg"));
+    expect(bootToken(":root", "boot-line")).toBe(paletteToken(":root {", "line"));
   });
 
   it("follows the operating system before the script runs, without overriding a resolved class", () => {
@@ -161,6 +163,38 @@ describe("the inline theme script", () => {
     expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
   });
 
+  it("paints a stored system choice from the operating system, before the bundle runs", () => {
+    // ALH-201 makes "system" a choice the app offers, so the pre-paint script
+    // may not treat it as an unknown value and let the app disagree after the
+    // bundle takes over.
+    runScript({ stored: JSON.stringify({ theme: "system" }), prefersLight: true });
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(document.documentElement.style.colorScheme).toBe("light");
+
+    runScript({ stored: JSON.stringify({ theme: "system" }), prefersLight: false });
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+  });
+
+  it("resolves the stored choice exactly the way the app resolves it", () => {
+    // Two implementations of one decision — the script that paints and the app
+    // that keeps painting — so this compares them across every value each side
+    // can be handed rather than checking the script in isolation.
+    for (const stored of ["light", "dark", "system", undefined]) {
+      for (const prefersLight of [true, false]) {
+        runScript({ stored: JSON.stringify({ theme: stored }), prefersLight });
+        const painted = document.documentElement.classList.contains("theme-light")
+          ? "light"
+          : "dark";
+        const expected = resolveTheme(stored as StudioTheme | undefined, prefersLight);
+        expect(
+          painted,
+          `stored ${String(stored)} on a ${prefersLight ? "light" : "dark"} system`,
+        ).toBe(expected);
+      }
+    }
+  });
+
   it("falls back to the media query when the stored value is unusable", () => {
     runScript({ stored: "{ not json", prefersLight: true });
     expect(document.documentElement.classList.contains("theme-light")).toBe(true);
@@ -179,9 +213,9 @@ describe("the inline theme script", () => {
   });
 
   it("tells the browser chrome the same two colours", () => {
-    expect(html).toContain(`<meta name="theme-color" content="${themeToken(":root {", "bg")}" />`);
+    expect(html).toContain(`<meta name="theme-color" content="${paletteToken(":root {", "bg")}" />`);
     expect(html).toContain(
-      `<meta name="theme-color" content="${themeToken("html.theme-light", "bg")}" media="(prefers-color-scheme: light)" />`,
+      `<meta name="theme-color" content="${paletteToken("html.theme-light", "bg")}" media="(prefers-color-scheme: light)" />`,
     );
   });
 });

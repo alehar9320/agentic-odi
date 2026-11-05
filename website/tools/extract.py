@@ -28,21 +28,21 @@ def _root_block(css: str, index: int) -> str:
     return blocks[index]
 
 
-def read_tokens(studio_theme: Path) -> dict[str, str]:
-    """The Studio theme's first ``:root`` block: the canonical palette.
+def read_tokens(studio_palette: Path) -> dict[str, str]:
+    """The palette file's ``:root`` block: the canonical palette.
 
-    The Studio declares its palette first and its easings in a second ``:root``
-    block appended much later. This returns the palette; use
-    :func:`read_easings` for the motion curves.
+    The Studio keeps its palette in ``src/styles/tokens.css`` and its motion
+    easings in a ``:root`` block in ``src/styles/theme.css``, which imports the
+    palette. Use :func:`read_easings` for the curves.
     """
-    css = studio_theme.read_text(encoding="utf-8")
+    css = studio_palette.read_text(encoding="utf-8")
     return {name: value.strip() for name, value in _TOKEN.findall(_root_block(css, 0))}
 
 
 def read_easings(studio_theme: Path) -> dict[str, str]:
-    """The Studio theme's second ``:root`` block: the motion easings."""
+    """The ``:root`` block of the Studio theme that holds the motion easings."""
     css = studio_theme.read_text(encoding="utf-8")
-    return {name: value.strip() for name, value in _TOKEN.findall(_root_block(css, 1))}
+    return {name: value.strip() for name, value in _TOKEN.findall(_root_block(css, 0))}
 
 
 def read_odi_formula(core_models: Path) -> str:
