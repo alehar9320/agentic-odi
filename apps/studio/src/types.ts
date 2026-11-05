@@ -136,6 +136,26 @@ export interface Strategy {
   created_at: string;
 }
 
+/**
+ * The one thing the user said they would do before coming back (ALH-146).
+ *
+ * Openness is derived from the two stamps rather than carried as a field, so the
+ * studio derives it the same way the store and the terminal do: a row is
+ * outstanding until it is answered or replaced. `resolution` is what happened,
+ * and it exists as an Evidence record too — the greeting can quote it, the
+ * library keeps it.
+ */
+export interface NextStep {
+  id: string;
+  text: string;
+  created_at: string;
+  due_at?: string | null;
+  resolved_at?: string | null;
+  resolution?: string | null;
+  superseded_at?: string | null;
+  outcome_id?: string | null;
+}
+
 export type CanvasProvenanceKind = "live" | "seed" | "empty";
 
 /**

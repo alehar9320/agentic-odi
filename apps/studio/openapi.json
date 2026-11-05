@@ -110,7 +110,7 @@
     "/api/stats/reset": {
       "post": {
         "summary": "Reset Stats",
-        "description": "Start the measurement over and return the counters as they now stand.\n\nA reset appends a marker; the events it supersedes stay in the log. The\nasking happens in whatever surface calls this — a click that erases a\nmeasurement should not be the kind that fires straight away.",
+        "description": "Start the measurement over and return the counters as they now stand.\n\nA reset appends a marker; the events it supersedes stay in the log. The\nasking happens in whatever surface calls this \u2014 a click that erases a\nmeasurement should not be the kind that fires straight away.",
         "operationId": "reset_stats_api_stats_reset_post",
         "responses": {
           "200": {
@@ -639,7 +639,7 @@
       },
       "post": {
         "summary": "Post Job",
-        "description": "Create a Job — works with the model offline because it is manual.",
+        "description": "Create a Job \u2014 works with the model offline because it is manual.",
         "operationId": "post_job_api_jobs_post",
         "requestBody": {
           "required": true,
@@ -1713,6 +1713,205 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Post Strategy Propose Api Strategy Propose Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/next-step": {
+      "get": {
+        "summary": "Get Next Step",
+        "description": "The one thing left outstanding, or ``null`` when nothing was promised.\n\n``null`` and never an empty list: a greeting that reads this to decide\nwhether to ask about last time must not mistake \"no step\" for \"a step with\nblank text\".",
+        "operationId": "get_next_step_api_next_step_get",
+        "parameters": [
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Next Step Api Next Step Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Post Next Step",
+        "description": "Record what the person means to do next; the step it replaces stays as history.",
+        "operationId": "post_next_step_api_next_step_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNextStepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Post Next Step Api Next Step Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/next-step/{step_id}/resolve": {
+      "post": {
+        "summary": "Post Next Step Resolve",
+        "description": "Answer the step with what happened, which is the one answer worth keeping.\n\nThe route is a verb rather than a field on the PATCH because it produces a\ndifferent record \u2014 an Evidence row \u2014 the way ``/evidence/{id}/promote``\nproduces a job or an outcome.",
+        "operationId": "post_next_step_resolve_api_next_step__step_id__resolve_post",
+        "parameters": [
+          {
+            "name": "step_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Step Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveNextStepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Post Next Step Resolve Api Next Step  Step Id  Resolve Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/next-step/{step_id}": {
+      "patch": {
+        "summary": "Patch Next Step",
+        "description": "Move the open step without claiming anything happened: reschedule or drop.\n\n\"Not yet\" is deliberately absent \u2014 it changes nothing, so it has no write to\nmake, and a route that recorded it would pretend the product learned\nsomething it did not.",
+        "operationId": "patch_next_step_api_next_step__step_id__patch",
+        "parameters": [
+          {
+            "name": "step_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Step Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchNextStepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Patch Next Step Api Next Step  Step Id  Patch"
                 }
               }
             }
@@ -3916,7 +4115,7 @@
         },
         "type": "object",
         "title": "ClaimCheck",
-        "description": "The questions behind a score: what was asked, answered, or skipped.\n\nTwo numbers are not provenance. A score that carries a claim check says\nwhich questions produced it — ``asked`` — and what came back: the\n``answers`` the person gave and the ``skips`` with a recorded reason.\n\n``verified`` is derived, never typed in: a check is verified when at least\none question was answered by the person. A check of only skips is\nunverified, so an outcome built on an assumption says so instead of\nborrowing the confidence of a number."
+        "description": "The questions behind a score: what was asked, answered, or skipped.\n\nTwo numbers are not provenance. A score that carries a claim check says\nwhich questions produced it \u2014 ``asked`` \u2014 and what came back: the\n``answers`` the person gave and the ``skips`` with a recorded reason.\n\n``verified`` is derived, never typed in: a check is verified when at least\none question was answered by the person. A check of only skips is\nunverified, so an outcome built on an assumption says so instead of\nborrowing the confidence of a number."
       },
       "ClaimCitationOut": {
         "properties": {
@@ -4890,6 +5089,36 @@
         "type": "object",
         "title": "ObservationUpdateRequest"
       },
+      "PatchNextStepRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "PatchNextStepRequest",
+        "description": "An answer that moves the row and records nothing.\n\n``action`` is a plain string, not a ``Literal``: an unknown step must still\nread as a 404, and request validation would answer 422 before the route ever\nlooked the id up."
+      },
       "PromoteEvidenceRequest": {
         "properties": {
           "target": {
@@ -5022,6 +5251,25 @@
         "title": "RejectProposalRequest",
         "description": "Reject a proposal."
       },
+      "ResolveNextStepRequest": {
+        "properties": {
+          "resolution": {
+            "type": "string",
+            "title": "Resolution"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "resolution"
+        ],
+        "title": "ResolveNextStepRequest",
+        "description": "What actually happened \u2014 the answer that becomes an evidence record."
+      },
       "ScheduleWorkRequest": {
         "properties": {
           "mcp_url": {
@@ -5070,6 +5318,36 @@
           "schedule_expression"
         ],
         "title": "ScheduleWorkRequest"
+      },
+      "SetNextStepRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "outcome_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Id"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "SetNextStepRequest",
+        "description": "The one thing the person means to do when they come back (ALH-146).\n\nAn empty promise is refused by the service rather than by a length rule here,\nso the terminal and the sidecar say it the same way."
       },
       "SignalActionRequest": {
         "properties": {
@@ -5324,7 +5602,7 @@
         },
         "type": "object",
         "title": "UpdateCustomerOutcomeRequest",
-        "description": "Both values are replaced wholesale — a partial score would be ambiguous."
+        "description": "Both values are replaced wholesale \u2014 a partial score would be ambiguous."
       },
       "UpdateJobRequest": {
         "properties": {

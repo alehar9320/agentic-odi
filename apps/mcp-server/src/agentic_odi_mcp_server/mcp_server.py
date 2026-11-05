@@ -837,6 +837,34 @@ def resolve_next_step(step_id: str, resolution: str) -> str:
 
 
 @mcp.tool
+def reschedule_next_step(step_id: str, due_at: str) -> str:
+    """Keep an open next step, with a new moment to ask about it.
+
+    ``due_at`` is an ISO-8601 instant with a timezone. Nothing is recorded as
+    having happened: a later promise is not a kept one.
+    """
+    try:
+        step = service.reschedule_next_step(step_id=step_id, due_at=due_at)
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps(step.model_dump(mode="json"))
+
+
+@mcp.tool
+def drop_next_step(step_id: str) -> str:
+    """Close a next step the user is not going to do.
+
+    The row is superseded, not deleted, and no evidence is written — the product
+    did intend the thing, and still does not know what happened.
+    """
+    try:
+        step = service.drop_next_step(step_id=step_id)
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps(step.model_dump(mode="json"))
+
+
+@mcp.tool
 def get_strategy() -> str:
     """The latest recorded strategy, or ``null`` when Stage 6 has not run."""
     strategy = service.get_strategy()

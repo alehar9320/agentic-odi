@@ -9,6 +9,8 @@ new one supersedes the old, and answering one turns what happened into evidence.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import typer
 
 from agentic_odi_cli.backend import run_tool
@@ -57,3 +59,47 @@ def resolve_next_step(
             as_json=json_output,
         )
     )
+
+
+@next_step_app.command("later")
+def reschedule_next_step(
+    step_id: str = typer.Argument(..., help="The step being moved"),
+    when: str = typer.Argument(..., help="When to ask again, e.g. 2026-12-01"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """ "Not yet." The reminder moves and nothing is recorded as having happened."""
+    typer.echo(
+        render_next_step(
+            run_tool("reschedule_next_step", {"step_id": step_id, "due_at": _due_at(when)}),
+            as_json=json_output,
+        )
+    )
+
+
+@next_step_app.command("drop")
+def drop_next_step(
+    step_id: str = typer.Argument(..., help="The step being retired"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Stop asking about it. The step stays as history rather than disappearing."""
+    typer.echo(
+        render_next_step(run_tool("drop_next_step", {"step_id": step_id}), as_json=json_output)
+    )
+
+
+def _due_at(text: str) -> str:
+    """Turn a date typed at a terminal into the instant the store records.
+
+    The store keeps a reminder as a moment, not a day, because a step made in
+    London and reopened in Berlin should still be asked about on the same
+    afternoon. A date with no zone means the zone this terminal is standing in.
+    """
+    try:
+        when = datetime.fromisoformat(text)
+    except ValueError:
+        raise typer.BadParameter(
+            f"Say when as a date or a date and time — for example 2026-12-01, not {text!r}."
+        ) from None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=datetime.now().astimezone().tzinfo)
+    return when.isoformat()

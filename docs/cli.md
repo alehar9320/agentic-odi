@@ -325,10 +325,15 @@ agentic-odi next-step set "Ask the payer what they do today" --outcome <outcome-
 agentic-odi next-step show
 agentic-odi next-step list --json
 agentic-odi next-step resolve <step-id> "Both still hand-carry the spreadsheet"
+agentic-odi next-step later <step-id> 2026-12-01
+agentic-odi next-step drop <step-id>
 ```
 
 `next-step show` reads only the outstanding step — that is what the Studio greeting
 asks about on the next visit — and prints "No next step yet" until one is set.
+`later` and `drop` are the two answers that record nothing: a step that was not done
+did not happen, so only `resolve` writes to the evidence library. A date typed
+without a zone is taken in the terminal's own zone.
 
 ## Schema, scoring, and guidance
 

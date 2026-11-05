@@ -250,13 +250,16 @@ def test_a_superseded_step_cannot_be_answered_as_if_it_were_open() -> None:
         svc.resolve_next_step(first.id, "Eventually spoke to Ana")
 
 
-def test_not_yet_keeps_reschedules_or_drops(tmp_path) -> None:
+def test_rescheduling_and_dropping_never_write_an_answer() -> None:
+    """Two ways the step closes or moves, and neither claims anything happened.
+
+    "Later" and "not doing it" are the honest answers a returning visit can
+    give, so the row must not end up looking answered by them.
+    """
     from datetime import datetime, timedelta, timezone
 
     svc = _service()
     step = svc.set_next_step("Draft the interview guide")
-    kept = svc.keep_next_step(step.id)
-    assert kept.is_open is True and kept.superseded_at is None
 
     later = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
     rescheduled = svc.reschedule_next_step(step.id, later)

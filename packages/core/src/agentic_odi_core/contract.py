@@ -67,6 +67,8 @@ class ToolName(str, Enum):
     GET_NEXT_STEP = "get_next_step"
     LIST_NEXT_STEPS = "list_next_steps"
     RESOLVE_NEXT_STEP = "resolve_next_step"
+    RESCHEDULE_NEXT_STEP = "reschedule_next_step"
+    DROP_NEXT_STEP = "drop_next_step"
 
 
 class ToolEffect(str, Enum):
@@ -589,6 +591,22 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("step_id", "resolution"),
         required=("step_id", "resolution"),
         returns="The Evidence row recording what happened.",
+    ),
+    ToolName.RESCHEDULE_NEXT_STEP.value: ToolSpec(
+        name="reschedule_next_step",
+        summary="Keep an open next step and say when to ask about it again.",
+        effect=_derive_effect("reschedule_next_step"),
+        arguments=("step_id", "due_at"),
+        required=("step_id", "due_at"),
+        returns="The step with its new due date. Nothing is recorded as having happened.",
+    ),
+    ToolName.DROP_NEXT_STEP.value: ToolSpec(
+        name="drop_next_step",
+        summary="Close a next step the user is not going to do, without claiming an answer.",
+        effect=_derive_effect("drop_next_step"),
+        arguments=("step_id",),
+        required=("step_id",),
+        returns="The step, superseded rather than deleted, and no evidence.",
     ),
 }
 

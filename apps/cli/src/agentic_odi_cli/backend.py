@@ -746,6 +746,26 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return record.model_dump(mode="json")
 
+    def _reschedule_next_step(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OdiError
+
+        try:
+            step = self.service.reschedule_next_step(
+                step_id=args["step_id"], due_at=args["due_at"]
+            )
+        except OdiError as exc:
+            raise BackendError(str(exc)) from None
+        return step.model_dump(mode="json")
+
+    def _drop_next_step(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OdiError
+
+        try:
+            step = self.service.drop_next_step(step_id=args["step_id"])
+        except OdiError as exc:
+            raise BackendError(str(exc)) from None
+        return step.model_dump(mode="json")
+
     def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
         strategy = self.service.get_strategy()
         return None if strategy is None else strategy.model_dump(mode="json")
@@ -813,6 +833,8 @@ _LOCAL_HANDLERS = {
     "get_next_step": LocalBackend._get_next_step,
     "list_next_steps": LocalBackend._list_next_steps,
     "resolve_next_step": LocalBackend._resolve_next_step,
+    "reschedule_next_step": LocalBackend._reschedule_next_step,
+    "drop_next_step": LocalBackend._drop_next_step,
     "get_strategy": LocalBackend._get_strategy,
     "propose_strategy": LocalBackend._propose_strategy,
     "get_health": LocalBackend._get_health,

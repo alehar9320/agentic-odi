@@ -106,6 +106,45 @@ def test_resolve_refuses_an_unknown_step(tmp_path):
     assert "next step not found" in missing.output.lower()
 
 
+def test_later_moves_the_when_without_claiming_anything_happened(tmp_path):
+    """``later`` is the honest answer to "not yet": the row moves, nothing is learned.
+
+    A bare date is what a person types, and the store records a reminder as a
+    moment, so the terminal supplies the timezone it is standing in rather than
+    refusing the input.
+    """
+    from datetime import datetime
+
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    step = _json(runner, ["--db", db, "next-step", "set", "Draft the interview guide", "--json"])
+
+    moved = _json(
+        runner, ["--db", db, "next-step", "later", str(step["id"]), "2026-12-01", "--json"]
+    )  # noqa: E501
+
+    assert moved["id"] == step["id"]  # type: ignore[index]
+    when = datetime.fromisoformat(moved["due_at"])  # type: ignore[arg-type]
+    assert when.year == 2026 and when.month == 12 and when.day == 1
+    assert when.tzinfo is not None
+    assert moved["resolved_at"] is None and moved["superseded_at"] is None  # type: ignore[index]
+    assert _json(runner, ["--db", db, "evidence", "list", "--json"]) == []
+
+
+def test_drop_closes_the_step_and_records_no_answer(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    step = _json(runner, ["--db", db, "next-step", "set", "Draft the interview guide", "--json"])
+
+    dropped = _json(runner, ["--db", db, "next-step", "drop", str(step["id"]), "--json"])
+
+    assert dropped["superseded_at"] is not None  # type: ignore[index]
+    assert dropped["resolved_at"] is None  # type: ignore[index]
+    shown = runner.invoke(app, ["--db", db, "next-step", "show"])
+    assert "No next step" in shown.output
+    assert _json(runner, ["--db", db, "evidence", "list", "--json"]) == []
+
+
 def test_next_step_commands_resolve_through_the_backend_seam(monkeypatch):
     from agentic_odi_cli import backend as backend_module
 
@@ -150,10 +189,14 @@ def test_next_step_commands_resolve_through_the_backend_seam(monkeypatch):
     assert runner.invoke(app, ["next-step", "show"]).exit_code == 0
     assert runner.invoke(app, ["next-step", "list"]).exit_code == 0
     assert runner.invoke(app, ["next-step", "resolve", "ns-1", "Did it"]).exit_code == 0
+    assert runner.invoke(app, ["next-step", "later", "ns-1", "2026-12-01"]).exit_code == 0
+    assert runner.invoke(app, ["next-step", "drop", "ns-1"]).exit_code == 0
 
     assert [name for name, _ in calls] == [
         "set_next_step",
         "get_next_step",
         "list_next_steps",
         "resolve_next_step",
+        "reschedule_next_step",
+        "drop_next_step",
     ]

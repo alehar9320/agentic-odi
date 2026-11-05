@@ -1099,6 +1099,14 @@ class ODIService:
     def list_next_steps(self) -> list[NextStep]:
         return self.repo.list_next_steps()
 
+    def get_next_step(self, step_id: str) -> NextStep | None:
+        """The step with this id, open or not; None when the store never had it.
+
+        A route needs to tell "that id is not a step" apart from "that step is
+        closed" before it answers anything else about the row.
+        """
+        return self.repo.get_next_step(step_id)
+
     def open_next_step(self) -> NextStep | None:
         """The step a returning visit should ask about, or None if there is none.
 
@@ -1154,10 +1162,6 @@ class ODIService:
         if updated is None:
             raise NextStepNotFoundError(step_id)
         return record
-
-    def keep_next_step(self, step_id: str) -> NextStep:
-        """The step is not done yet, so it stays open exactly as it was."""
-        return self._require_open_step(step_id)
 
     def reschedule_next_step(self, step_id: str, due_at: str) -> NextStep:
         """Keep the step, and say when to ask about it again."""
