@@ -26,10 +26,11 @@ twelve calls it names are why each task is shaped the way it is.
 - The existing class contract stays: `html.theme-light` / `html.theme-dark` on `document.documentElement`,
   plus `root.style.colorScheme`.
 - Labels read *Light*, *Dark*, *Follow the system*.
-- From the repo root, `uv run pytest -q` currently reports **2227 passed** on `main` — it must stay green
+- From the repo root, `uv run pytest -q` on this base reports **2038 passed** — it must stay green
   (this slice touches no Python, but every task ends with the whole gate set).
-- In `apps/studio`: `npx tsc -b --noEmit` clean, `npx eslint .` zero errors (5 standing react-refresh
-  warnings are pre-existing), `npx vitest run` currently **1090 passed / 115 files**.
+- In `apps/studio`: `npx tsc -b --noEmit` clean, `npx vitest run` on this base reports **1200 passed /
+  119 files**, and `npx eslint .` must stay at zero errors (the standing react-refresh warnings are
+  pre-existing).
 
 ---
 
@@ -93,25 +94,25 @@ twelve calls it names are why each task is shaped the way it is.
 - Produces: `export function useSystemTheme(): StudioTheme` — the live OS palette, re-rendering its caller
   when it changes, and `dark` when `matchMedia` is unavailable. Task 3 calls it exactly once.
 
-- [ ] **Step 1: Write the failing test.** In `src/lib/theme.test.ts` import `renderHook` from
-  `@testing-library/react` and `act`. Build a stub `matchMedia` factory that returns an object with a
-  mutable `matches`, records the `(event, handler)` pairs passed to `addEventListener` and removes them in
-  `removeEventListener`, and installs itself with `Object.defineProperty(window, "matchMedia", …)` the way
-  `stubMatchMedia` in this file already does. Then: `renderHook(() => useSystemTheme())` reports the
-  palette the stub advertises; setting `matches` and invoking the recorded `change` handler inside `act`
-  flips `result.current`; `unmount()` clears the recorded handler list to empty. Add a case where
-  `window.matchMedia` is `undefined`: the hook returns `"dark"`, `result.all` has length 1, and nothing
-  throws.
+- [ ] **Step 1: Write the failing test.** In `src/lib/theme.test.ts` import `renderHook` and `act` from
+  `@testing-library/react`. The stub `matchMedia` is shared: `src/test/matchMedia.ts` exports
+  `stubLiveMatchMedia(matches)` returning `{ set, fire, subscribed, asked, restore }`, where `set` moves
+  `matches`, `fire()` invokes the recorded handlers, `subscribed` counts live listeners, and `asked`
+  records every query the app passed in. Then: `renderHook(() => useSystemTheme())` reports the palette
+  the stub advertises; `act(() => { media.set(…); media.fire(); })` flips `result.current`; `unmount()`
+  drops `subscribed` to 0. Add a case where `window.matchMedia` is `undefined`: the hook returns `"dark"`
+  on the first render and again after a `rerender()`, and nothing throws.
 
 - [ ] **Step 2: Run it, expect a failure** — `npx vitest run src/lib/theme`; `useSystemTheme` is not
   exported.
 
-- [ ] **Step 3: Implement** with `useState(() => resolveTheme(undefined))` for the initial value and a
-  `useEffect` that subscribes to `matchMedia("(prefers-color-scheme: light)")`'s `change` event and
-  unsubscribes on cleanup. Guard the whole effect on `typeof window.matchMedia === "function"`; return
-  `"dark"` when absent. The query string is the same one `systemPrefersLight` reads and `index.html`
-  uses — put that in a module-level `const LIGHT_QUERY` and use it in all three places the code can reach.
-  One `useEffect`, no `useSyncExternalStore` (the repo has no store to adapt), no context.
+- [ ] **Step 3: Implement** `useSystemTheme()` as one line over the store the repo already has:
+  `return useMediaQuery(LIGHT_QUERY) ? "light" : "dark";` (`src/lib/useMediaQuery.ts` is
+  `useSyncExternalStore`-based and already serves `prefers-reduced-motion` and the layout breakpoints,
+  including the "no `matchMedia`" guard, so this adds a subscriber rather than a mechanism — the reuse
+  ladder in `docs/architecture/reuse.md`, rung 1). The query string is the same one `systemPrefersLight`
+  reads and `index.html` uses — put that in a module-level `const LIGHT_QUERY` and use it in all three
+  places the code can reach.
 
 - [ ] **Step 4: Verify** — `npx vitest run src/lib/theme` green; `npx eslint .` clean.
 
@@ -122,8 +123,9 @@ twelve calls it names are why each task is shaped the way it is.
 ### Task 3: Resolve it once, in the provider, and let the bar see it
 
 **Files:**
-- Modify: `apps/studio/src/state/StudioContext.tsx` (`:583` resolution, `:919-925` effect,
-  `StudioContextValue` at `:315`, the `useMemo` at `:2422`)
+- Modify: `apps/studio/src/state/StudioContext.tsx` (`StudioContextValue` at `:315-323`, the provider's
+  resolution at `:633-642`, the painting effect at `:1081-1088`, the `useMemo` at `:2432` and its
+  dependency array at `:2560`)
 - Modify: `apps/studio/src/components/layout/StudioBar.tsx` (`:7` import, `:52-53`, `:254-258`)
 - Test: `apps/studio/src/state/StudioContext.test.tsx`
 - Test: `apps/studio/src/components/layout/StudioBar.test.tsx`
@@ -145,11 +147,12 @@ twelve calls it names are why each task is shaped the way it is.
   `undefined`, since the context value does not carry it.
 
 - [ ] **Step 3: Implement.** In `StudioProvider`: `const systemTheme = useSystemTheme();` and
-  `const theme = resolveTheme(settings.theme, systemTheme);` replacing line 583's local resolution; add
+  `const theme = resolveTheme(settings.theme, systemTheme === "light");` replacing the local resolution
+  that sat beside `settings`; add
   `theme: StudioTheme` to `StudioContextValue` next to `settings`, with a one-line comment saying it is the
   palette actually painted, not the stored preference; add `theme` to the object in the `useMemo` at
-  `:2422` **and to its dependency array** (omitting it there is how a stale palette gets shipped).
-  The effect at `:919-925` does not change — it already depends on `theme`, and now `theme` can move.
+  `:2432` **and to its dependency array** (omitting it there is how a stale palette gets shipped).
+  The effect at `:1081-1088` does not change — it already depends on `theme`, and now `theme` can move.
 
 - [ ] **Step 4: Move the bar onto the context.** In `StudioBar.tsx`, delete the `resolveTheme` import and
   read `theme` from `useStudio()` (its `stubContext()` in `StudioBar.test.tsx` gains

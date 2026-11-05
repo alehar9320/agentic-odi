@@ -16,9 +16,9 @@ Two of its acceptance lines are not met, and they are the two a reader actually 
   studio bar, which writes `light` or `dark` and nothing else. Once a person has pressed it, the app is
   pinned: the OS can move to the other palette and the Studio will not follow.
 - **Nothing listens to the system.** `resolveTheme(settings.theme)` is called during render
-  (`state/StudioContext.tsx:583`) and its result is painted by an effect that depends on that value
-  (`:919-925`). No `matchMedia` change subscription exists anywhere in `src/`, so choosing "follow the
-  system" — even if it were expressible — would only take effect on the next reload. A person who flips
+  (`state/StudioContext.tsx:632`) and its result is painted by an effect that depends on that value
+  (`:1074-1078`). No `matchMedia` change subscription exists anywhere in `src/`, so choosing "follow the
+  system" — even if it were expressible — would only take effect on the next reload. A reader who flips
   their OS to dark at 23:00 keeps a bright window until they reopen the app.
 
 Linear: [ALH-201](https://linear.app/agentic-odi/issue/ALH-201) · M5-01.1 · epic Pillar 5 ·
@@ -61,8 +61,11 @@ colour vocabulary. Details and the cost of each call are below.
    `"light"`/`"dark"` as "no stored choice", and the bootstrap in `index.html` checks exactly those two
    strings, so a stored `"system"` falls through to the OS branch with no edit to that script. *My call.*
 4. **One subscription, and the resolved palette becomes context.** `useSystemTheme()` in
-   `src/lib/theme.ts` returns the OS's current preference and re-renders its caller when it changes;
-   `StudioProvider` calls it once, computes `theme = resolveTheme(settings.theme, systemLight)`, and
+   `src/lib/theme.ts` returns the OS's current preference and re-renders its caller when it changes. The
+   subscription is `useMediaQuery` (`src/lib/useMediaQuery.ts`), the `useSyncExternalStore` wrapper the
+   Studio already runs for `prefers-reduced-motion` and its layout breakpoints — this slice adds a
+   caller to it, not a second mechanism for the same job.
+   `StudioProvider` calls it once, computes `theme = resolveTheme(settings.theme, systemTheme === "light")`, and
    puts `theme` in its context value. The existing effect that depends on `theme` stays the only place
    that paints `<html>`. The context field is not a second store — it is the value the provider already
    resolves and today keeps to itself, and without it the studio bar cannot know the palette moved:

@@ -2,6 +2,7 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, expect, it, vi, afterEach } from "vitest";
 
 import { LIGHT_QUERY, resolveTheme, storedPreference, useSystemTheme } from "./theme";
+import { stubLiveMatchMedia } from "../test/matchMedia";
 import type { StudioThemePreference } from "../types";
 
 function stubMatchMedia(matches: boolean): void {
@@ -76,7 +77,8 @@ describe("resolveTheme", () => {
   });
 });
 
-describe("storedPreference", () => {  it("reads a choice that was never made as following the system", () => {
+describe("storedPreference", () => {
+  it("reads a choice that was never made as following the system", () => {
     expect(storedPreference(undefined)).toBe("system");
   });
 
@@ -86,59 +88,6 @@ describe("storedPreference", () => {  it("reads a choice that was never made as 
     expect(storedPreference("system")).toBe("system");
   });
 });
-
-/**
- * A `matchMedia` whose answer can move while the app is open, the way an
- * operating system's setting does at sunset.
- */
-function stubLiveMatchMedia(matches: boolean) {
-  const asked: string[] = [];
-  const list = {
-    media: LIGHT_QUERY,
-    matches,
-    onchange: null,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    dispatchEvent: vi.fn(() => false),
-  };
-  const handlers: Array<() => void> = [];
-  list.addEventListener.mockImplementation((event: string, handler: () => void) => {
-    if (event === "change") {
-      handlers.push(handler);
-    }
-  });
-  list.removeEventListener.mockImplementation((event: string, handler: () => void) => {
-    if (event === "change") {
-      handlers.splice(handlers.indexOf(handler), 1);
-    }
-  });
-  Object.defineProperty(window, "matchMedia", {
-    configurable: true,
-    writable: true,
-    value: (query: string) => {
-      asked.push(query);
-      return list;
-    },
-  });
-  return {
-    get asked(): string[] {
-      return asked;
-    },
-    set(next: boolean): void {
-      list.matches = next;
-    },
-    fire(): void {
-      for (const handler of handlers.slice()) {
-        handler();
-      }
-    },
-    get subscribed(): number {
-      return handlers.length;
-    },
-  };
-}
 
 describe("useSystemTheme", () => {
   const original = window.matchMedia;

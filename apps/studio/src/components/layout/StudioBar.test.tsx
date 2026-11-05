@@ -26,6 +26,9 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   pushToast: vi.fn(),
   saveSettings: vi.fn(),
   settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "dark" },
+  // The palette actually painted. A bar that guessed it from `settings.theme`
+  // would go stale the moment the operating system moved.
+  theme: "dark" as const,
   ...overrides,
 });
 
@@ -158,6 +161,26 @@ describe("StudioBar", () => {
     fireEvent.click(getByRole("button", { name: "Switch to light theme" }));
 
     expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "light" }));
+  });
+
+  it("offers the palette opposite the one it is painting, not the stored choice", () => {
+    const saveSettings = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        saveSettings,
+        theme: "light",
+        settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "system" },
+      }) as never,
+    );
+    const { getByRole } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
+    );
+
+    // Following the system, and the system is light: the bar offers dark and
+    // pins it, rather than reasoning about a stored value that names no palette.
+    fireEvent.click(getByRole("button", { name: "Switch to dark theme" }));
+
+    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "dark" }));
   });
 
   it("exports the conversation as Markdown from the overflow menu", () => {

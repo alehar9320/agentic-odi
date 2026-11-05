@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
+import { stubLiveMatchMedia } from "../test/matchMedia";
 import { queuedUserMessage } from "../assistant/queue";
 import { StudioProvider, useStudio } from "./StudioContext";
 
@@ -1023,6 +1024,8 @@ describe("StudioContext signal inbox", () => {
 });
 
 describe("StudioContext theme", () => {
+  let live: ReturnType<typeof stubLiveMatchMedia> | null = null;
+
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.className = "";
@@ -1039,6 +1042,8 @@ describe("StudioContext theme", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    live?.restore();
+    live = null;
     document.documentElement.className = "";
   });
 
@@ -1067,6 +1072,50 @@ describe("StudioContext theme", () => {
     const second = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(second.result.current.settings.theme).toBe("light"));
     expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+  });
+
+  it("follows the operating system, without a reload, when asked to", async () => {
+    live = stubLiveMatchMedia(false);
+    localStorage.setItem("studio.settings", JSON.stringify({ theme: "system" }));
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.theme).toBe("dark"));
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+
+    act(() => {
+      live?.set(true);
+      live?.fire();
+    });
+
+    await waitFor(() => expect(result.current.theme).toBe("light"));
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(JSON.parse(localStorage.getItem("studio.settings") ?? "{}").theme).toBe("system");
+  });
+
+  it("stays put when the reader pinned a palette", async () => {
+    live = stubLiveMatchMedia(false);
+    localStorage.setItem("studio.settings", JSON.stringify({ theme: "light" }));
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.theme).toBe("light"));
+
+    act(() => {
+      live?.set(true);
+      live?.fire();
+    });
+
+    expect(result.current.theme).toBe("light");
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(false);
+  });
+
+  it("publishes the palette it painted, not the choice that produced it", async () => {
+    live = stubLiveMatchMedia(false);
+    localStorage.setItem("studio.settings", JSON.stringify({ theme: "system" }));
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.theme).toBe("dark"));
+
+    expect(result.current.settings.theme).toBe("system");
+    expect(result.current.theme).toBe("dark");
   });
 });
 
