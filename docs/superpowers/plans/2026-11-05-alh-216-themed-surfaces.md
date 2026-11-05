@@ -61,6 +61,14 @@ pins each.
   `--tint-amber` `rgba(240, 179, 74, 0.15)` / `rgba(180, 83, 9, 0.12)`,
   `--brand-tile` `#131722` / *(not overridden — the mascot tile is brand, not a theme surface)*.
 
+**Amended as built.** Step 3's contrast test measured the pair this task shipped and refused it: white on
+`#8b8cf8` is 2.90:1 and dark ink on it is 6.69, but nothing in the stylesheet fills with `#8b8cf8` — every
+filled control uses `--accent-strong` (`#6366f1`) under white ink, which is **4.46:1** in both themes. So
+`--accent-fill`/`--on-accent` are `#4f46e5`/`#ffffff`, declared once and *not* overridden in light; the
+override list above drops to four names (`plot-surface`, `tint-accent`, `tint-accent-strong`, `tint-amber`),
+and the test asserts the pair is absent from `html.theme-light` rather than present. Task 2 carries the
+seven background re-points that follow from it.
+
 - [ ] **Step 1: Write the failing tests** in `theme.test.ts`, in a new `describe("role tokens")`. Reuse the file's existing `readBlock`, `colorTokens`, `contrast` helpers; add one helper that sees through rgba values too:
 
 ```ts
@@ -133,6 +141,24 @@ git commit -m "feat(studio): name the roles the canvas and filled controls need 
 - [ ] **Step 5: Give the unknown status a shape, not a duller colour.** Step 3 left `.status-dot.is-unknown` as `background: var(--faint)`, which is still only a colour. Turn it into a square ring — `background: transparent; border-radius: 2px; box-shadow: inset 0 0 0 1.5px var(--faint)` — so *unknown* is a shape while *known* and *warn* stay filled discs. Add the assertion to `theme.test.ts`: `it("makes an unknown status a shape, not only a colour")`.
 - [ ] **Step 6: Run the suite** — `npx vitest run src/styles`. Green.
 - [ ] **Step 7: Commit** — `feat(studio): hold the palette file to its own tokens (ALH-216)`
+
+**As built.** The gate counts literals, so 48 declarations hold **49** of them (`.message__avatar`'s
+gradient has two stops) and `OPAQUE_CEILING = 0` names all 49 at once. The wash count measured **208**, not
+194: the earlier figure was per line, and a few lines carry two. Beyond the table, seven controls moved
+from `background: var(--accent-strong)` to `var(--accent-fill)` so the ink shipped above them has a fill the
+pair test can measure (`.bell-badge`, `.ui-action--primary`, `.changelog-modal__unread`, `.approval__allow`,
+`.banner__action--primary`, `.suggestion-modal__primary`, and `.studio-button--primary`, whose
+`--studio-indigo → --studio-indigo-strong` gradient flattened to the fill: white on its light stop was
+2.90:1), and `.composer__send` went from `background: var(--text)` — ink on ink in the light theme — to the
+pair. Three destinations differ from the table, each because the table read a value without reading the
+rule: `.pill-changelog:hover`'s `#ffffff` is `var(--text)`, not `--on-accent`, because the hover ground is a
+30%-alpha wash rather than a fill and white ink on a light theme's wash is invisible; its `border-color` is
+`var(--accent)`, the same hue the pill already tints with; `.ui-action--primary:hover` keeps a lift by
+ringing (`box-shadow: 0 0 0 3px var(--tint-accent-strong)`) once its fill stops changing; and
+`.message__avatar`'s gradient starts on `--accent-fill` so its glyph sits on ink the pair test measured.
+Step 4 gained a fourth pin beyond the plan: **a rule may read `color: var(--on-accent)` only if the same
+rule paints with `--accent-fill`** — the invariant that would have caught the 4.46:1 defect, held open-ended
+rather than by selector list.
 
 **Review Focus 4 lives here:** a role token declared only in `:root` keeps its dark value in the light theme; the two-palette tests in Step 1 of Task 1 and the staleness assertions in Step 1 above are what catch it.
 

@@ -12,15 +12,17 @@ The mechanism is sound and the surfaces are not all inside it. Measured on `f6f6
 - **`html.theme-light` appears exactly once in `src/styles/theme.css` — at line 41, the token block.** The
   file is 6764 lines. Every rule below line 57 is theme-blind, which is fine while it reads `var(--token)`
   and a problem the moment it does not.
-- **48 colour declarations outside the token block carry an opaque value** — 47 literals plus one `var()`
-  fallback: 39 `color:`, 5 `background:` (one a two-stop gradient, one the `var()` fallback), 3
-  `border-left-color:` — two inside a keyframe — and 1 `border-color:`. Each one is a value that cannot change with the theme, so each is
+- **48 colour declarations outside the token block carry an opaque value, and they hold 49 literals** —
+  one declaration is a two-stop gradient: 39 `color:`, 5 `background:` (that gradient, and a `var()`
+  fallback), 3 `border-left-color:` — two inside a keyframe — and 1 `border-color:`. 49 is the number the
+  gate counts, because the rule is on the value rather than the line. Each one is a value that cannot change with the theme, so each is
   a light-theme defect waiting to be painted — `.notice { color: #d6c19b }`,
   `.evidence blockquote { color: #dfe1e7 }`, `.ui-card__evidence { color: #cbd5e1 }`,
   `.message__tag { color: #f0b45a }`, `.failure__icon { color: #f87171 }` are light ink on
   `--bg: #f5f6f8`. Several are near-duplicates of a token that already exists: `#f87171` *is* the dark
   `--red` byte for byte, `#6366f1` *is* the dark `--accent-strong`, and `#0b0c10` is within two of `--bg`.
-- **194 `rgba(…)` literals sit outside the block too**, most of them white at 0.01–0.14 alpha. On the dark
+- **208 `rgba(…)` literals sit outside the block too** (194 lines; a few carry more than one wash), most
+  of them white at 0.01–0.14 alpha. On the dark
   ground they are a whisper of paper; on `#f5f6f8` they are nothing at all. They are the same defect class
   at lower volume and they are *not* all fixed here — see *What stays*.
 - `colors.test.ts` cannot see any of it. The gate's `TOKEN_FILE` is excluded from the scan by design
@@ -95,7 +97,7 @@ the acceptance line each one touches:
 3. `JobMap.tsx` is div-based, not SVG, despite its `ALLOWED_FILES` reason saying *"SVG job-map strokes"*.
    The reason is stale on its face; the entry goes.
 
-What stays out of this slice, deliberately: the 194 alpha-blended surface literals in `theme.css`, the
+What stays out of this slice, deliberately: the 208 alpha-blended surface literals in `theme.css`, the
 `onboarding.css` scrim (a fixed dark intro is the design), and `OdiMascot.tsx` (brand artwork gated by
 `brand/tools/render.py --check`). They are named, counted, and left under the new count baseline rather
 than pretend-fixed.
@@ -131,12 +133,13 @@ than pretend-fixed.
    (b) `theme.css` itself: **any** declaration outside a token block whose value contains an opaque colour
    literal fails at **zero tolerance** — nested in a `linear-gradient()` or hiding in a `var()` fallback
    counts, and no property list is needed because the rule is on the value. Measured: 48 such declarations
-   today (39 `color`, 5 `background`, 3 `border-left-color`, 1 `border-color`), and clearing all 48 is what
-   makes zero tolerance reachable. (c) The alpha-blended
+   holding 49 literals (39 `color`, 5 `background`, 3 `border-left-color`, 1 `border-color`), and clearing
+   all 49 is what makes zero tolerance reachable. (c) The alpha-blended
    literals get a **count baseline** with the same one-way ratchet as `ALLOWED_FILES`: the test holds the
    measured number, fails when a run produces more, and fails when a run produces fewer, so the number can
-   only move down and someone who improves it is told to bank the improvement. The two `html.theme-light`
-   token-block ranges are the only place a literal is legal.
+   only move down and someone who improves it is told to bank the improvement. The token blocks — `:root`,
+   `html.theme-light`, and the second `:root` that adds the easing curves — are the only place a literal is
+   legal, and the test derives those ranges by walking brace depth rather than trusting a line number.
 6. **The two #335 `KNOWN_PAIRS` entries are deleted in this change, not after it.** Once the plot's ground
    is `--plot-surface` and the axis text is `--text`, the light theme paints `#15171c` on a light ground and
    the pair stops failing; `a11y.spec.ts`'s staleness test is what proves I did not merely move the problem
@@ -156,10 +159,21 @@ than pretend-fixed.
    themes. The other axe rules still report violations on this repository's own markup (the banner dock's
    Radix `<ol>`, #625), and ALH-131 owns that audit; widening the screen list without widening the rule set
    keeps this issue's promise honest and costs CI time, nothing else. *My call.*
+10. **The filled control is a pair, and the pair is one indigo in both palettes.** The token test measured
+    the pair this file proposed — `--accent-fill: #8b8cf8` with `--on-accent: #0b0c10` — and then measured
+    what the stylesheet actually paints: every filled control reads `background: var(--accent-strong)`
+    (`#6366f1`) under white ink, which is **4.46:1**. Under AA, in both themes, on the primary action of
+    the composer, the approval bar, the banner dock and the changelog. Neither existing gate could see it:
+    `theme.test.ts` measures token pairs against token surfaces, and no token surface is `#6366f1`. So
+    `--accent-fill` is `#4f46e5` with `--on-accent` white — 6.31:1 — declared once and deliberately *not*
+    overridden in light, because the brand colour as a *surface* is the one place the two palettes can
+    share a value, and seven controls moved onto it. A rule may now read `color: var(--on-accent)` only if
+    the same rule paints with `--accent-fill`; the gate says so. *Found by measurement, mine to fix.*
 
 ## What the change looks like
 
-`theme.css` gains the seven tokens with light overrides; the 48 opaque declarations are replaced one by one,
+`theme.css` gains the seven tokens, six of them overridden for light; the 49 opaque literals are replaced
+one by one,
 each by the token that names its role (`.composer__send` → `--accent-fill` + `--on-accent`; `.notice` →
 `--amber`; `.ui-card__evidence` → `--text`; `.ui-tone-bg--neutral` → `--faint`; and so on — the plan carries
 the full table). `OpportunityLandscape.tsx` and `JobMap.tsx` lose their colour `style` objects and SVG
