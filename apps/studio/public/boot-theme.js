@@ -9,7 +9,9 @@
   try {
     var stored = JSON.parse(window.localStorage.getItem("studio.settings") || "null");
     if (stored && (stored.theme === "light" || stored.theme === "dark")) theme = stored.theme;
-  } catch (error) {}
+  } catch {
+    // Unreadable or absent settings: fall through to the media query.
+  }
   if (!theme) {
     var light =
       typeof window.matchMedia === "function" &&
