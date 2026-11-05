@@ -142,6 +142,9 @@ function ComposerBody({
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (open) {
+      if (event.nativeEvent.isComposing || event.keyCode === 229) {
+        return;
+      }
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         if (!matches.length) {
