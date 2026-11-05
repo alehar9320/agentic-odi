@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { resolveTheme } from "./theme";
+import { resolveTheme, storedPreference } from "./theme";
+import type { StudioThemePreference } from "../types";
 
 function stubMatchMedia(matches: boolean): void {
   Object.defineProperty(window, "matchMedia", {
@@ -51,5 +52,37 @@ describe("resolveTheme", () => {
       value: undefined,
     });
     expect(resolveTheme(undefined)).toBe("dark");
+  });
+
+  it("follows the operating system when the reader asked it to", () => {
+    expect(resolveTheme("system", true)).toBe("light");
+    expect(resolveTheme("system", false)).toBe("dark");
+  });
+
+  it("keeps a stored palette over a system that disagrees", () => {
+    expect(resolveTheme("light", false)).toBe("light");
+    expect(resolveTheme("dark", true)).toBe("dark");
+  });
+
+  it("treats a value that is not a theme as no choice at all", () => {
+    expect(resolveTheme("neon" as StudioThemePreference, true)).toBe("light");
+    expect(resolveTheme("neon" as StudioThemePreference, false)).toBe("dark");
+  });
+
+  it("reads an untouched setting and an explicit system choice as the same request", () => {
+    expect(resolveTheme(undefined, true)).toBe(resolveTheme("system", true));
+    expect(resolveTheme(undefined, false)).toBe(resolveTheme("system", false));
+  });
+});
+
+describe("storedPreference", () => {
+  it("reads a choice that was never made as following the system", () => {
+    expect(storedPreference(undefined)).toBe("system");
+  });
+
+  it("leaves a choice that was made exactly as it was stored", () => {
+    expect(storedPreference("light")).toBe("light");
+    expect(storedPreference("dark")).toBe("dark");
+    expect(storedPreference("system")).toBe("system");
   });
 });

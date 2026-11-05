@@ -157,21 +157,22 @@ colour vocabulary. Details and the cost of each call are below.
 `src/lib/theme.ts`
 
 ```ts
-export type StudioTheme = "light" | "dark";                    // unchanged
-export type StudioThemePreference = StudioTheme | "system";    // new
-
-/** The operating system's answer right now; false when it cannot answer. */
-export function systemPrefersLight(): boolean;                 // extracted from resolveTheme's body
 /** The live OS palette, re-rendering the caller when it changes. */
 export function useSystemTheme(): StudioTheme;                 // new — the only subscription
 /** What the Settings control shows as checked. */
 export function storedPreference(stored: StudioThemePreference | undefined): StudioThemePreference;
+/** The operating system's answer right now; false when it cannot answer. */
+export function systemPrefersLight(): boolean;                 // extracted from resolveTheme's body
 
 export function resolveTheme(
   stored: StudioThemePreference | undefined,
   prefersLight?: boolean,     // omitted = read matchMedia, which is today's behaviour
 ): StudioTheme;
 ```
+
+`src/types.ts` holds the vocabulary — `StudioTheme` already lives there, so
+`export type StudioThemePreference = StudioTheme | "system";` goes beside it rather than into
+`lib/theme.ts`, which would import the palette type back out of the module that imports it. *My call.*
 
 `src/types.ts` — `StudioConfig.theme?: StudioThemePreference`.
 

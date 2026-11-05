@@ -199,12 +199,20 @@ export interface StudioError {
 
 export type StudioTheme = "light" | "dark";
 
+/**
+ * What the reader asked for, as opposed to what is painted. `undefined` and
+ * `"system"` mean the same behaviour — follow the operating system — and the
+ * difference is kept because a person who chose *Follow the system* made a
+ * decision the Settings control must still be able to show after a reload.
+ */
+export type StudioThemePreference = StudioTheme | "system";
+
 export interface StudioConfig {
   base_url: string;
   api_key: string;
   model_name: string;
   mcp_url: string;
-  theme?: StudioTheme;
+  theme?: StudioThemePreference;
 }
 
 export interface LlmHealth {
