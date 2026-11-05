@@ -2,6 +2,7 @@ import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isUnderserved, opportunityScore, UNDERSERVED_THRESHOLD } from "../../lib/odi";
+import { literalPaint } from "../../test/paintedColors";
 import type { CanvasState } from "../../types";
 import { OpportunityLandscape, plotX, plotY } from "./OpportunityLandscape";
 
@@ -518,7 +519,7 @@ describe("OpportunityLandscape underserved boundary", () => {
 
   it("renders the underserved polygon derived from the score formula", () => {
     const { container } = render(<OpportunityLandscape />);
-    const polygon = container.querySelector("polygon");
+    const polygon = container.querySelector(".opportunity-matrix__band");
     expect(polygon).not.toBeNull();
     expect(polygon?.getAttribute("points")).toBe("40,20 40,180 480,40 480,20");
   });
@@ -550,7 +551,7 @@ describe("OpportunityLandscape underserved boundary", () => {
 
   it("places (9,2) inside the shaded polygon and (3,8) outside", () => {
     const { container } = render(<OpportunityLandscape />);
-    const polygon = container.querySelector("polygon")!;
+    const polygon = container.querySelector<SVGPolygonElement>(".opportunity-matrix__band")!;
     const points = polygon.getAttribute("points")!;
     expect(pointInPolygon(plotX(2), plotY(9), points)).toBe(true);
     expect(pointInPolygon(plotX(8), plotY(3), points)).toBe(false);
@@ -573,5 +574,86 @@ describe("OpportunityLandscape underserved boundary", () => {
     const action = screen.getByRole("button", { name: "Export brief" });
     expect(action).toBeDisabled();
     expect(action).toHaveAttribute("title", "Nothing to brief yet");
+  });
+});
+
+describe("the map draws from the palette and from shape, not from a hex", () => {
+  /** Three outcomes, one per band, so the encoding can be counted. */
+  function seedThreeBands() {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [{ id: "JOB-1", name: "Deploy Service" }],
+        steps: [],
+        outcomes: [
+          { id: "O-201", statement: "Served", importance: 6, satisfaction: 6, opportunity_score: 6 },
+          { id: "O-202", statement: "Underserved", importance: 8, satisfaction: 5, opportunity_score: 11 },
+          { id: "O-203", statement: "Deep", importance: 9, satisfaction: 2, opportunity_score: 16 },
+        ],
+        source: "seed",
+      },
+    } as unknown as CanvasState;
+  }
+
+  beforeEach(() => {
+    seedThreeBands();
+  });
+
+  it("marks a band by shape as well as colour", () => {
+    const { container } = render(<OpportunityLandscape />);
+    expect(container.querySelectorAll("circle.opportunity-matrix__node--served")).toHaveLength(1);
+    expect(container.querySelectorAll("rect.opportunity-matrix__node--underserved")).toHaveLength(1);
+    expect(container.querySelectorAll("polygon.opportunity-matrix__node--deep")).toHaveLength(1);
+  });
+
+  it("names every band shape in a legend the reader can read", () => {
+    const { container } = render(<OpportunityLandscape />);
+    const legend = container.querySelector(".opportunity-matrix__legend");
+    expect(legend).not.toBeNull();
+    const text = legend?.textContent ?? "";
+    for (const word of ["Served", "circle", "Underserved", "square", "Deep", "triangle"]) {
+      expect(text.toLowerCase()).toContain(word.toLowerCase());
+    }
+  });
+
+  it("paints the map only through classes the theme can reach", () => {
+    const { container } = render(<OpportunityLandscape />);
+    expect(literalPaint(container)).toEqual([]);
+    const plot = container.querySelector(".opportunity-matrix__plot");
+    expect(plot?.querySelector(".opportunity-matrix__band")).not.toBeNull();
+    expect(plot?.querySelectorAll(".opportunity-matrix__grid").length).toBeGreaterThan(0);
+    expect(plot?.querySelectorAll(".opportunity-matrix__axis").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the decorative gradient out of the plot", () => {
+    const { container } = render(<OpportunityLandscape />);
+    expect(container.querySelector("linearGradient")).toBeNull();
+    expect(container.querySelector("[fill^='url(']")).toBeNull();
+  });
+
+  it("holds still under reduced motion and still shows the band", () => {
+    const { container } = render(<OpportunityLandscape />);
+    // The pulse is decoration: a reader who never sees it still learns which
+    // band each marker is in, because the marker itself says so.
+    container.querySelectorAll("animate").forEach((node) => node.remove());
+    expect(container.querySelectorAll("circle.opportunity-matrix__node--served")).toHaveLength(1);
+    expect(container.querySelectorAll("rect.opportunity-matrix__node--underserved")).toHaveLength(1);
+    expect(container.querySelectorAll("polygon.opportunity-matrix__node--deep")).toHaveLength(1);
+  });
+
+  it("draws the map without referencing an outside resource", () => {
+    const { container } = render(<OpportunityLandscape />);
+    const svg = container.querySelector("svg");
+    expect(svg?.innerHTML ?? "").not.toMatch(/xlink:href|https?:\/\//);
+  });
+
+  it("carries the selected row and the underserved pill as classes", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+    const row = document.querySelector(".opportunity-matrix__row--underserved");
+    expect(row).not.toBeNull();
+    expect(document.querySelector(".opportunity-matrix__pill--underserved")).not.toBeNull();
+    fireEvent.click(row!);
+    expect(row).toHaveClass("opportunity-matrix__row--selected");
   });
 });

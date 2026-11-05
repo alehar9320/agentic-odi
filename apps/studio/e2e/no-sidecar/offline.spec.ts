@@ -48,6 +48,29 @@ test.describe("the offline fallback", () => {
     await expect(page.getByText(/Still yours, on this device/)).toBeVisible();
   });
 
+  test("follows the operating system for a reader who chose to, offline", async ({
+    page,
+    context,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("studio.settings", JSON.stringify({ theme: "system" }));
+    });
+    await openStudioWithWorker(page);
+
+    // The third branch is the one that was missing: a stored "system" is not a
+    // palette, it is the question "what does the machine want?". Answering it
+    // with the dark palette gave a reader on a light laptop, with no network, a
+    // black sheet — the page they can only reach when nothing else loads.
+    await page.emulateMedia({ colorScheme: "light" });
+    await context.setOffline(true);
+    await page.goto("/records/never-visited-while-online");
+
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+      .toBe("rgb(245, 246, 248)");
+  });
+
   test("opens the offline page in the stored theme", async ({ page, context }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem(

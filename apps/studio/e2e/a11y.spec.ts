@@ -1,7 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { COMPOSER, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import {
+  openStudio,
+  resetRepository,
+  seedMemory,
+  seedOutcomes,
+  setTheme,
+} from "./helpers";
 import {
   contrastWalker,
   formatFindings,
@@ -10,6 +16,8 @@ import {
   type ContrastFinding,
 } from "../src/test/contrast";
 import { KNOWN_PAIRS } from "./a11y/knownPairs";
+import { SURFACES, type Surface } from "./a11y/screens";
+import { ROUTES } from "./a11y/routes";
 
 /**
  * Contrast as a build gate (issue #543, parent #331).
@@ -39,12 +47,11 @@ import { KNOWN_PAIRS } from "./a11y/knownPairs";
  * thing this issue is about and does not smuggle in a structural exemption
  * with no owner.
  *
- * Screens: home, the opportunity landscape, the records lens, the decision
- * brief, catch-up, and settings — each in both themes.
+ * Screens: every surface in `e2e/a11y/screens.ts` — home, every lens the
+ * workspace can open, and settings — each in both themes.
  */
 
 const THEMES = ["dark", "light"] as const;
-type Theme = (typeof THEMES)[number];
 
 /**
  * Every screen fades in, and both checkers read the painted page: measured mid
@@ -55,9 +62,12 @@ type Theme = (typeof THEMES)[number];
  */
 test.use({ reducedMotion: "reduce" });
 
-/** The six core screens, each reachable through the shipped UI. */
-const SCREENS = ["home", "landscape", "records", "brief", "catchup", "settings"] as const;
-type Screen = (typeof SCREENS)[number];
+/**
+ * Every surface the workspace can paint. The list and the routes to it live in
+ * `e2e/a11y/screens.ts` and `e2e/a11y/routes.ts`, and
+ * `src/components/workspace/panels.test.tsx` holds them against the registry
+ * the app renders from, so a lens cannot be added and quietly go unmeasured.
+ */
 
 const OUTCOME = {
   statement: "Minimize the time to deploy a service when releasing a hotfix",
@@ -71,16 +81,6 @@ declare global {
   }
 }
 
-/** Force a theme before the app boots, the way the Settings panel would. */
-async function setTheme(page: Page, theme: Theme): Promise<void> {
-  await page.addInitScript((value) => {
-    const raw = window.localStorage.getItem("studio.settings");
-    const settings = raw ? JSON.parse(raw) : {};
-    settings.theme = value;
-    window.localStorage.setItem("studio.settings", JSON.stringify(settings));
-  }, theme);
-}
-
 /**
  * Install the walker in the page. It is self-contained, so this is the whole
  * module: no bundling, no build step, no second copy to drift. Playwright
@@ -92,21 +92,13 @@ async function installWalker(page: Page): Promise<void> {
   });
 }
 
-async function goto(page: Page, screen: Screen): Promise<void> {
+async function goto(page: Page, surface: Surface): Promise<void> {
   await openStudio(page);
-  if (screen === "landscape" || screen === "records") {
-    const label = screen === "landscape" ? "Landscape" : "Records";
-    await rail(page).getByRole("button", { name: new RegExp(`^${label},`) }).click();
-  } else if (screen === "brief") {
-    // The command is the keyboard route, and the only one that reaches the
-    // brief without a model.
-    await page.getByRole("textbox", { name: COMPOSER }).fill("/brief");
-    await page.keyboard.press("Enter");
-  } else if (screen === "catchup") {
-    await page.locator(".bar__bell").click();
-  } else if (screen === "settings") {
-    await page.getByRole("button", { name: "Open settings" }).click();
-  }
+  const route = ROUTES[surface.id];
+  // A surface listed with no route would measure the home page twice and call
+  // that coverage, so the list and the routes are checked against each other.
+  expect(route, `${surface.id} has no route in e2e/a11y/routes.ts`).toBeTruthy();
+  await route(page);
   await expect(page.getByRole("main")).toBeVisible();
 }
 
@@ -118,26 +110,36 @@ async function goto(page: Page, screen: Screen): Promise<void> {
 const observed: ContrastFinding[] = [];
 
 for (const theme of THEMES) {
-  for (const screen of SCREENS) {
-    test(`${screen} has no unlisted contrast pair in the ${theme} theme`, async ({ page, request }) => {
+  for (const surface of SURFACES) {
+    test(`${surface.id} has no unlisted contrast pair in the ${theme} theme`, async ({
+      page,
+      request,
+    }) => {
       await resetRepository(request);
       await seedOutcomes(request, [OUTCOME]);
+      // The memory chip is the rail's one count that is not an artifact of the
+      // canvas, so that lens needs the agent to have learned something.
+      if (surface.panel === "memory") {
+        await seedMemory(request, [
+          { kind: "evidence", text: "Two of three customers opened the runbook before paging." },
+        ]);
+      }
       await setTheme(page, theme);
       await installWalker(page);
-      await goto(page, screen);
+      await goto(page, surface);
 
       const results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
       expect(
         results.violations.map(
           (violation) =>
-            `screen=${screen} theme=${theme} rule=${violation.id} ` +
+            `screen=${surface.id} theme=${theme} rule=${violation.id} ` +
             `selectors=${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`,
         ),
       ).toEqual([]);
 
       const findings = await page.evaluate(
         ([name, value]) => window.__odiContrastScan(document.body, name, value),
-        [screen, theme] as const,
+        [surface.id, theme] as const,
       );
       observed.push(...findings);
 
