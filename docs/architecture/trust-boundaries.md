@@ -68,6 +68,13 @@ LLM directly; the sidecar is its only backend.
   record and its own evidence — never the canvas, the memory, a conversation, or
   a connector secret — and every dead token answers the same `404`. See
   [Running the Living Studio](../living-studio.md#sharing-one-artifact).
+- **Focus is a pointer, never prose.** A chat turn may carry `focus: {kind, id}`
+  for the record the person selected, and `FocusRef` rejects any extra key
+  (`schemas.py`). The sidecar re-reads that id from its own store before the
+  model sees a word of it, and adds nothing for an id it does not hold
+  (`chat.py:_focus_context`). The browser therefore cannot author the sentence
+  the model reads about a record, and the fallback tiers, which never receive
+  this context, cannot be fed client text through it.
 
 ## What the alternatives were
 

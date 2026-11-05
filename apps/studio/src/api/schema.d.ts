@@ -75,6 +75,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stats
+         * @description The onboarding funnel, counted from this machine's own event log.
+         *
+         *     Every counter is always named, and one that has not happened answers with a
+         *     zero and no timestamps rather than an invented history. Nothing leaves the
+         *     machine: these numbers come from the same store the records do.
+         */
+        get: operations["get_stats_api_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Stats
+         * @description Start the measurement over and return the counters as they now stand.
+         *
+         *     A reset appends a marker; the events it supersedes stay in the log. The
+         *     asking happens in whatever surface calls this — a click that erases a
+         *     measurement should not be the kind that fires straight away.
+         */
+        post: operations["reset_stats_api_stats_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/changelog": {
         parameters: {
             query?: never;
@@ -964,68 +1012,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/share": {
+    "/{full_path}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * List Shares
-         * @description The owner's links, without tokens: id, artifact, and the key dates.
-         */
-        get: operations["list_shares_api_share_get"];
-        put?: never;
-        /**
-         * Mint Share
-         * @description Mint a scoped, expiring, read-only link for one artifact.
-         *
-         *     The raw token is returned exactly once; only its hash is stored. Creation
-         *     happens through this route only, so the token is never minted by a page.
-         */
-        post: operations["mint_share_api_share_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/share/{share_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Revoke Share
-         * @description Revoke a link. Effective immediately, and idempotent.
-         */
-        delete: operations["revoke_share_api_share__share_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/share/{token}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read Shared
-         * @description Read exactly the one artifact a token names, and its own evidence.
-         *
-         *     A malformed, unknown, expired, or revoked token is the same ``404``; the
-         *     response never says which. There is no list and no canvas here.
-         */
-        get: operations["read_shared_api_share__token__get"];
+        /** Spa Fallback */
+        get: operations["spa_fallback__full_path__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1275,6 +1270,7 @@ export interface components {
             approvals: boolean;
             /** Assistant Id */
             assistant_id?: string | null;
+            focus?: components["schemas"]["FocusRef"] | null;
         };
         /**
          * ClaimCheck
@@ -1467,6 +1463,22 @@ export interface components {
          * @enum {string}
          */
         Direction: "minimize" | "maximize";
+        /**
+         * FocusRef
+         * @description Which record the person is looking at, as a pointer and nothing more.
+         *
+         *     The client names the id; only the store has the words. Extra keys are
+         *     rejected so a browser cannot slip its own label into the prompt.
+         */
+        FocusRef: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "job" | "step" | "outcome" | "evidence";
+            /** Id */
+            id: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2139,6 +2151,50 @@ export interface operations {
         };
     };
     get_diagnostics_api_diagnostics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_stats_api_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    reset_stats_api_stats_reset_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -4285,67 +4341,12 @@ export interface operations {
             };
         };
     };
-    list_shares_api_share_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
-                };
-            };
-        };
-    };
-    mint_share_api_share_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MintShareRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ShareMintResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_share_api_share__share_id__delete: {
+    spa_fallback__full_path__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                share_id: string;
+                full_path: string;
             };
             cookie?: never;
         };
@@ -4357,40 +4358,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: boolean;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_shared_api_share__token__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SharedArtifactResponse"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

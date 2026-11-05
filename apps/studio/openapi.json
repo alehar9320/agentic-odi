@@ -86,6 +86,48 @@
         }
       }
     },
+    "/api/stats": {
+      "get": {
+        "summary": "Get Stats",
+        "description": "The onboarding funnel, counted from this machine's own event log.\n\nEvery counter is always named, and one that has not happened answers with a\nzero and no timestamps rather than an invented history. Nothing leaves the\nmachine: these numbers come from the same store the records do.",
+        "operationId": "get_stats_api_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Stats Api Stats Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats/reset": {
+      "post": {
+        "summary": "Reset Stats",
+        "description": "Start the measurement over and return the counters as they now stand.\n\nA reset appends a marker; the events it supersedes stay in the log. The\nasking happens in whatever surface calls this — a click that erases a\nmeasurement should not be the kind that fires straight away.",
+        "operationId": "reset_stats_api_stats_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Reset Stats Api Stats Reset Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/changelog": {
       "get": {
         "summary": "Get Changelog Route",
@@ -597,7 +639,7 @@
       },
       "post": {
         "summary": "Post Job",
-        "description": "Create a Job \u2014 works with the model offline because it is manual.",
+        "description": "Create a Job — works with the model offline because it is manual.",
         "operationId": "post_job_api_jobs_post",
         "requestBody": {
           "required": true,
@@ -3121,80 +3163,18 @@
         }
       }
     },
-    "/api/share": {
+    "/{full_path}": {
       "get": {
-        "summary": "List Shares",
-        "description": "The owner's links, without tokens: id, artifact, and the key dates.",
-        "operationId": "list_shares_api_share_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
-                  "type": "array",
-                  "title": "Response List Shares Api Share Get"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Mint Share",
-        "description": "Mint a scoped, expiring, read-only link for one artifact.\n\nThe raw token is returned exactly once; only its hash is stored. Creation\nhappens through this route only, so the token is never minted by a page.",
-        "operationId": "mint_share_api_share_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MintShareRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ShareMintResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/{share_id}": {
-      "delete": {
-        "summary": "Revoke Share",
-        "description": "Revoke a link. Effective immediately, and idempotent.",
-        "operationId": "revoke_share_api_share__share_id__delete",
+        "summary": "Spa Fallback",
+        "operationId": "spa_fallback__full_path__get",
         "parameters": [
           {
-            "name": "share_id",
+            "name": "full_path",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Share Id"
+              "title": "Full Path"
             }
           }
         ],
@@ -3203,53 +3183,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "boolean"
-                  },
-                  "title": "Response Revoke Share Api Share  Share Id  Delete"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/{token}": {
-      "get": {
-        "summary": "Read Shared",
-        "description": "Read exactly the one artifact a token names, and its own evidence.\n\nA malformed, unknown, expired, or revoked token is the same ``404``; the\nresponse never says which. There is no list and no canvas here.",
-        "operationId": "read_shared_api_share__token__get",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SharedArtifactResponse"
-                }
+                "schema": {}
               }
             }
           },
@@ -3933,6 +3867,16 @@
               }
             ],
             "title": "Assistant Id"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FocusRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3972,7 +3916,7 @@
         },
         "type": "object",
         "title": "ClaimCheck",
-        "description": "The questions behind a score: what was asked, answered, or skipped.\n\nTwo numbers are not provenance. A score that carries a claim check says\nwhich questions produced it \u2014 ``asked`` \u2014 and what came back: the\n``answers`` the person gave and the ``skips`` with a recorded reason.\n\n``verified`` is derived, never typed in: a check is verified when at least\none question was answered by the person. A check of only skips is\nunverified, so an outcome built on an assumption says so instead of\nborrowing the confidence of a number."
+        "description": "The questions behind a score: what was asked, answered, or skipped.\n\nTwo numbers are not provenance. A score that carries a claim check says\nwhich questions produced it — ``asked`` — and what came back: the\n``answers`` the person gave and the ``skips`` with a recorded reason.\n\n``verified`` is derived, never typed in: a check is verified when at least\none question was answered by the person. A check of only skips is\nunverified, so an outcome built on an assumption says so instead of\nborrowing the confidence of a number."
       },
       "ClaimCitationOut": {
         "properties": {
@@ -4338,6 +4282,34 @@
           "maximize"
         ],
         "title": "Direction"
+      },
+      "FocusRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "job",
+              "step",
+              "outcome",
+              "evidence"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "FocusRef",
+        "description": "Which record the person is looking at, as a pointer and nothing more.\n\nThe client names the id; only the store has the words. Extra keys are\nrejected so a browser cannot slip its own label into the prompt."
       },
       "HTTPValidationError": {
         "properties": {
@@ -5447,7 +5419,7 @@
         },
         "type": "object",
         "title": "UpdateCustomerOutcomeRequest",
-        "description": "Both values are replaced wholesale \u2014 a partial score would be ambiguous."
+        "description": "Both values are replaced wholesale — a partial score would be ambiguous."
       },
       "UpdateJobRequest": {
         "properties": {
