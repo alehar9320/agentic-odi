@@ -13,7 +13,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
-import { dialogOpen, focusComposer } from "./lib/composerFocus";
+import { dialogOpen, focusComposer, startComposerCommand } from "./lib/composerFocus";
+import { isEditableTarget } from "./lib/commands";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
@@ -86,6 +87,25 @@ function StudioShell() {
         return;
       }
       if (focusComposer()) {
+        event.preventDefault();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // `/` starts a command from anywhere it cannot be a character. Inside any
+  // field the slash belongs to what the person is typing, so the shell asks
+  // before it acts.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      if (dialogOpen() || isEditableTarget(event.target)) {
+        return;
+      }
+      if (startComposerCommand()) {
         event.preventDefault();
       }
     }

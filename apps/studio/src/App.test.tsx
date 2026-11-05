@@ -769,6 +769,33 @@ describe("composer shortcuts (#692)", () => {
     expect(composer).toHaveFocus();
   });
 
+  it("starts a command from outside an editable field with /", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    expect(composer).toHaveValue("");
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    fireEvent.keyDown(document.body, { key: "/" });
+
+    expect(composer).toHaveValue("/");
+    expect(composer).toHaveFocus();
+    expect(await screen.findByRole("listbox", { name: /commands/i })).toBeInTheDocument();
+  });
+
+  it("lets / be a character inside a field", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    composer.focus();
+
+    fireEvent.keyDown(composer, { key: "/" });
+
+    expect(composer).toHaveValue("");
+    expect(composer).toHaveFocus();
+    expect(screen.queryByRole("listbox", { name: /commands/i })).toBeNull();
+  });
+
   it("leaves the composer alone while a modal owns the screen", async () => {
     render(<App />);
 
