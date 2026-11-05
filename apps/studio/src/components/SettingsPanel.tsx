@@ -16,6 +16,7 @@ import type { ConnectionReport } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
 import { StatusDot } from "./status/StatusDot";
+import { AppearanceSection } from "./settings/sections/AppearanceSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ModelSection } from "./settings/sections/ModelSection";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
@@ -233,6 +234,11 @@ export function SettingsPanel() {
           onChange={(event) => setDisplayName(event.target.value)}
         />
       </div>
+
+      <AppearanceSection
+        settings={settings}
+        saveSettings={saveSettings}
+      />
 
       <ModelSection
         settings={settings}
