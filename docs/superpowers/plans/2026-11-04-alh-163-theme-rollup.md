@@ -153,11 +153,13 @@ Execution notes: the catalog type is **`theme-tree`**, kebab-case like every oth
 - Modify: `docs/roadmap.md` (In-flight line **See the tree with its rollup**, this change)
 - Test: whatever `website/` assertion the two new tools move (run the suite and read the reported byte count before touching the ceiling)
 
-- [ ] **Step 1: Add the cross-surface test** — for a seeded job with an overlapping membership: `theme_rollup(parent).outcomes == search_outcomes(theme_ids=[parent], include_children=True)["total"]`, and the Studio card's numbers come from the same `list_theme_rollups` payload the CLI prints. One assertion per pair, named for the drift it prevents.
-- [ ] **Step 2: `uv run --directory website pytest tests/ -q`.** If the MCP reference page breaks 110 KB, extend the existing comment with the two one-argument tools and move the ceiling to the measured figure plus headroom — the pattern the comment already records five times. Do not split the page here.
-- [ ] **Step 3: Roadmap line**, then `uv run python scripts/doc_check.py` → exit 0.
-- [ ] **Step 4: Full gate set from the root:** `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy apps brand packages`, `uv run pytest -q`, `uv run python scripts/check_version_parity.py`.
-- [ ] **Step 5: Commit** `test(core): the rollup and the facet answer for the same outcomes (ALH-163)`.
+- [x] **Step 1: Add the cross-surface test** — for a seeded job with an overlapping membership: `theme_rollup(parent).outcomes == search_outcomes(theme_ids=[parent], include_children=True)["total"]`, and the Studio card's numbers come from the same `list_theme_rollups` payload the CLI prints. One assertion per pair, named for the drift it prevents.
+- [x] **Step 2: `uv run --directory website pytest tests/ -q`.** If the MCP reference page breaks 110 KB, extend the existing comment with the two one-argument tools and move the ceiling to the measured figure plus headroom — the pattern the comment already records five times. Do not split the page here.
+- [x] **Step 3: Roadmap line**, then `uv run python scripts/doc_check.py` → exit 0.
+- [x] **Step 4: Full gate set from the root:** `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy apps brand packages`, `uv run pytest -q`, `uv run python scripts/check_version_parity.py`.
+- [x] **Step 5: Commit** `test(core): the rollup and the facet answer for the same outcomes (ALH-163)`.
+
+Execution notes: the equivalence test went into `tests/contract/test_outcome_search_parity.py` rather than a new file — it already owns the seeded parent/child branch, both doors and `_api_search`, so the claim is argued beside the pair it extends (rung 1). It pins `outcomes` against the branch total on **both** doors, `measured` against the same query with `confidence=scored`, and `top_opportunity`/`top_statement` against that scored list's first item; the parent's top (14.0) is reachable only through its child, which is what makes the assertion non-vacuous. Step 2 moved **no ceiling**: 283 passed as they were, because the two new tools fit the MCP page. What the site did need was not a byte count — `test_the_catalog_cards_on_the_site_match_the_studio` failed on the new card type, so `website/` gained the thing it asserts: a `theme-tree` macro and dispatch in `templates/_cards.html`, a sample branch in `content/landing.json` (with an empty child and an unscored leaf, so the honest wording is the one shown), and the `.themmtree` rules in `assets/style.css`. That work rode in Task 5's commit.
 
 ## Ship
 
