@@ -11,9 +11,9 @@ export type NavigationCounts = Partial<Record<WorkspacePanelId, number>>;
  *
  * Every number here is the array the destination's own panel maps over, so a
  * count that disagrees with the list below it is a bug in one place and the fix
- * is in this file. Two exceptions are deliberate and stated in `railCounts`:
- * Catch up counts what is unread rather than what the feed renders, and Brief,
- * Capture and Settings have no list to count.
+ * is in this file. Two exceptions are deliberate: Catch up counts what is
+ * unread rather than what the feed renders, and Brief, Capture and Settings
+ * have no list to count.
  */
 export function useNavigationCounts(): NavigationCounts {
   const { canvas, memory, segments, unreadSignalCount } = useStudio();
