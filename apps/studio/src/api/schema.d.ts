@@ -1245,6 +1245,7 @@ export interface components {
             approvals: boolean;
             /** Assistant Id */
             assistant_id?: string | null;
+            focus?: components["schemas"]["FocusRef"] | null;
         };
         /**
          * ClaimCheck
@@ -1437,6 +1438,22 @@ export interface components {
          * @enum {string}
          */
         Direction: "minimize" | "maximize";
+        /**
+         * FocusRef
+         * @description Which record the person is looking at, as a pointer and nothing more.
+         *
+         *     The client names the id; only the store has the words. Extra keys are
+         *     rejected so a browser cannot slip its own label into the prompt.
+         */
+        FocusRef: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "job" | "step" | "outcome" | "evidence";
+            /** Id */
+            id: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */

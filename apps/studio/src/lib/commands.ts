@@ -103,6 +103,14 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     keywords: ["markets", "verdict", "strategy", "who is this for"],
   },
   {
+    id: "brief",
+    name: "/brief",
+    label: "Decision brief",
+    description: "The document a review reads, ready to download or print.",
+    category: "Act",
+    keywords: ["export", "document", "review", "print", "pdf"],
+  },
+  {
     id: "impact",
     name: "/impact",
     label: "Simulate a bet",

@@ -196,7 +196,10 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.ADD_OUTCOME.value: ToolSpec(
         name="add_outcome",
-        summary="Add a desired Outcome to a Job; a score must carry a claim_check.",
+        summary=(
+            "Add a desired Outcome to a Job; three questions and the person's answers "
+            "come before any score, and the score carries them as a claim_check."
+        ),
         effect=_derive_effect("add_outcome"),
         arguments=(
             "job_id",
