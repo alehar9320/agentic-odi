@@ -72,17 +72,21 @@ export function BannerStack(props: BannerStackProps) {
   const onAction = props.onAction ?? (() => {});
   const onIntent = props.onIntent ?? (() => {});
 
+  const topBanners = banners.filter((banner) => banner.dock === "top");
+
   return (
     <>
-      <Dock
-        dock="top"
-        label="Studio notices"
-        banners={banners.filter((banner) => banner.dock === "top")}
-        overflow={overflow}
-        onDismiss={onDismiss}
-        onAction={onAction}
-        onIntent={onIntent}
-      />
+      {(topBanners.length > 0 || overflow > 0) && (
+        <Dock
+          dock="top"
+          label="Studio notices"
+          banners={topBanners}
+          overflow={overflow}
+          onDismiss={onDismiss}
+          onAction={onAction}
+          onIntent={onIntent}
+        />
+      )}
       <Dock
         dock="corner"
         label="Studio notifications"

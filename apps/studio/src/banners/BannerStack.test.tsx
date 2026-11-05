@@ -109,16 +109,27 @@ describe("BannerStack", () => {
     expect(screen.getByText(/2 more/i)).toBeInTheDocument();
   });
 
-  it("hides the dismiss control for a banner that is not dismissible", () => {
+  it("hides the top dock when there are no top banners", () => {
     render(
       <BannerStack
-        banners={[banner({ dismissible: false })]}
+        banners={[
+          banner({ id: "toast-1", kind: "success", title: "Saved.", body: "", dock: "corner" }),
+        ]}
         overflow={0}
         onDismiss={() => {}}
         onIntent={() => {}}
       />,
     );
-    expect(screen.queryByRole("button", { name: /dismiss/i })).not.toBeInTheDocument();
+    expect(document.querySelector(".banner-dock--top")).not.toBeInTheDocument();
+    expect(document.querySelector(".banner-dock--corner")).toBeInTheDocument();
+  });
+
+  it("shows the top dock when only overflow exists", () => {
+    render(
+      <BannerStack banners={[]} overflow={2} onDismiss={() => {}} onIntent={() => {}} />,
+    );
+    expect(document.querySelector(".banner-dock--top")).toBeInTheDocument();
+    expect(screen.getByText(/2 more/i)).toBeInTheDocument();
   });
 });
 
