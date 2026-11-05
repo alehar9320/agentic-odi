@@ -233,12 +233,15 @@ jobs:
         run: |
           uv run python scripts/dev.py > /tmp/clientrun.log 2>&1 &
           RUN_PID=$!
+          # The earlier sidecar step already minted the per-install token, so the
+          # MCP server started here gates /mcp as well: both probes send it.
           TOKEN_FILE="${AGENTIC_ODI_STUDIO_TOKEN:-$HOME/.config/agentic-odi/studio-token}"
           for _ in $(seq 1 60); do [ -s "$TOKEN_FILE" ] && break; sleep 1; done
           TOKEN="$(cat "$TOKEN_FILE")"
           probe() {
             curl -sf -H "Authorization: Bearer $TOKEN" -o /dev/null http://127.0.0.1:8100/api/config &&
               curl -sfX POST http://127.0.0.1:8000/mcp \
+                -H "Authorization: Bearer $TOKEN" \
                 -H 'Content-Type: application/json' \
                 -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
                 -o /dev/null
