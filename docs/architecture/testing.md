@@ -156,6 +156,24 @@ download, and install), `transport.test.ts` (Tauri boundary), and the
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
+The outbox drain guard in `apps/studio/src/bff/outbox.ts` is covered by
+`outbox.test.ts`, which races two drains twice: once with a `navigator.locks`
+stub and once with `navigator.locks` deleted so the lease row runs. Both assert
+exactly one send per record, and the lease path also proves a crashed holder's
+lease is reclaimed only after it expires and that a running drain renews it.
+
+The IndexedDB schema and its migrations are covered by two files under
+`apps/studio/src/bff/store/`. `migrations.test.ts` asserts the registry has a
+step for every version up to `DB_VERSION` and that a gap fails with a message
+naming the missing version, so raising the version without a migration fails the
+suite instead of throwing `ConstraintError` on an existing database.
+`indexedDbStore.test.ts` seeds a v1 database with a row in all seven stores,
+opens it with the current code, and asserts every row is unchanged and the
+migrated schema equals a fresh database's (store names, key paths,
+auto-increment flags, and index names). The same file opens a second connection
+at a higher version and asserts the first closes and sets `needsReload` instead
+of blocking the upgrade.
+
 Copied UI is guarded structurally: `src/vendor/boundary.test.ts` reads every
 `.ts` and `.tsx` file under `apps/studio/src/vendor/` and fails on a specifier
 that resolves into a product slice (`state`, `api`, `assistant`, `bff`). It is

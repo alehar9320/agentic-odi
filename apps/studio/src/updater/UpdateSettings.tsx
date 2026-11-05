@@ -1,3 +1,4 @@
+import { StatusDot } from "../components/status/StatusDot";
 import { useUpdateService, useUpdateSnapshot } from "./UpdateProvider";
 
 /**
@@ -19,14 +20,6 @@ export function UpdateSettings() {
     snapshot.available !== null &&
     !snapshot.installed &&
     (snapshot.phase === "error" || snapshot.phase === "ready");
-  const dotClass =
-    snapshot.phase === "error"
-      ? " is-warn"
-      : snapshot.phase === "ready"
-        ? " is-ready"
-        : busy
-          ? " is-busy"
-          : "";
 
   return (
     <section className="update-settings" aria-labelledby="software-update-heading">
@@ -38,7 +31,17 @@ export function UpdateSettings() {
       </div>
 
       <p className="update-settings__status">
-        <span className={`status-dot${dotClass}`} aria-hidden="true" />
+        <StatusDot
+          tone={
+            snapshot.phase === "error"
+              ? "warn"
+              : snapshot.phase === "ready"
+                ? "ready"
+                : busy
+                  ? "busy"
+                  : "ok"
+          }
+        />
         <span>{service.statusLine()}</span>
       </p>
 

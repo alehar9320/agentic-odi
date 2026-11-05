@@ -18,6 +18,7 @@ from agentic_odi_core.models import (
     Signal,
     Step,
     Strategy,
+    Study,
 )
 
 _Item = TypeVar("_Item")
@@ -122,6 +123,7 @@ class Repository(Protocol):
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    studies: dict[str, Study]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -196,6 +198,10 @@ class Repository(Protocol):
     def get_segment(self, segment_id: str) -> Segment | None: ...
     def list_segments(self, job_id: str | None = None) -> list[Segment]: ...
     def update_segment(self, segment_id: str, updates: dict) -> Segment | None: ...
+    def add_study(self, study: Study) -> Study: ...
+    def get_study(self, study_id: str) -> Study | None: ...
+    def list_studies(self, job_id: str | None = None) -> list[Study]: ...
+    def update_study(self, study_id: str, updates: dict) -> Study | None: ...
     def add_strategy(self, strategy: Strategy) -> Strategy: ...
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
@@ -204,6 +210,8 @@ class Repository(Protocol):
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
     def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
     def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None: ...
+
+    def last_event_id(self) -> int: ...
 
     def clear(self) -> None: ...
     def reload(self) -> None: ...
@@ -227,8 +235,25 @@ class InMemoryRepository:
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.studies: dict[str, Study] = {}
+        self._last_event_id = 0
+
+    def last_event_id(self) -> int:
+        """Id of the most recent stored write, 0 before any.
+
+        Mirrors ``SQLiteRepository.last_event_id``: the id names the change, so
+        a signal can point at what produced it. In the event-sourced store the id
+        is the appended row's rowid and these two are the same thing.
+        """
+        return self._last_event_id
+
+    def _append_event(self) -> None:
+        #: Spend an id only where the event-sourced store would append an event:
+        #: a write that found nothing to change must not look like a new change.
+        self._last_event_id += 1
 
     def add_job(self, job: Job) -> Job:
+        self._append_event()
         self.jobs[job.id] = job
         return job
 
@@ -242,6 +267,7 @@ class InMemoryRepository:
         job = self.jobs.get(job_id)
         if not job:
             return None
+        self._append_event()
         current = job.model_dump(exclude_unset=True)
         current.update(updates)
         new_job = job.model_validate(current)
@@ -251,6 +277,7 @@ class InMemoryRepository:
     def delete_job(self, job_id: str) -> bool:
         if job_id not in self.jobs:
             return False
+        self._append_event()
         del self.jobs[job_id]
         deleted_steps = {k for k, v in self.steps.items() if v.job_id == job_id}
         for key in deleted_steps:
@@ -277,6 +304,7 @@ class InMemoryRepository:
         return True
 
     def add_step(self, step: Step) -> Step:
+        self._append_event()
         self.steps[step.id] = step
         return step
 
@@ -293,6 +321,7 @@ class InMemoryRepository:
         step = self.steps.get(step_id)
         if not step:
             return None
+        self._append_event()
         current = step.model_dump(exclude_unset=True)
         current.update(updates)
         new_step = step.model_validate(current)
@@ -302,6 +331,7 @@ class InMemoryRepository:
     def delete_step(self, step_id: str) -> bool:
         if step_id not in self.steps:
             return False
+        self._append_event()
         del self.steps[step_id]
         for key in [k for k, v in self.outcomes.items() if v.step_id == step_id]:
             del self.outcomes[key]
@@ -319,6 +349,7 @@ class InMemoryRepository:
         return page(list(self.steps.values()), limit, offset)
 
     def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal:
+        self._append_event()
         self.proposals[proposal.id] = proposal
         return proposal
 
@@ -335,6 +366,7 @@ class InMemoryRepository:
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return None
+        self._append_event()
         current = proposal.model_dump(exclude_unset=True)
         current.update(updates)
         new_proposal = OutcomeProposal.model_validate(current)
@@ -342,6 +374,7 @@ class InMemoryRepository:
         return new_proposal
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
+        self._append_event()
         self.outcomes[outcome.id] = outcome
         return outcome
 
@@ -365,6 +398,7 @@ class InMemoryRepository:
         outcome = self.outcomes.get(outcome_id)
         if not outcome:
             return None
+        self._append_event()
         current = outcome.model_dump(exclude_unset=True)
         current.update(updates)
         new_outcome = outcome.model_validate(current)
@@ -373,6 +407,7 @@ class InMemoryRepository:
 
     def delete_outcome(self, outcome_id: str) -> bool:
         if outcome_id in self.outcomes:
+            self._append_event()
             del self.outcomes[outcome_id]
             #: Unlink evidence instead of destroying it: point outcome_id to NULL
             #: so the quote survives the outcome's removal.
@@ -385,6 +420,7 @@ class InMemoryRepository:
         return False
 
     def add_customer_outcome(self, co: CustomerOutcome) -> CustomerOutcome:
+        self._append_event()
         self.customer_outcomes[co.id] = co
         return co
 
@@ -407,6 +443,7 @@ class InMemoryRepository:
         co = self.customer_outcomes.get(outcome_id)
         if not co:
             return None
+        self._append_event()
         current = co.model_dump(exclude_unset=True)
         current.update(updates)
         new_co = co.model_validate(current)
@@ -415,11 +452,13 @@ class InMemoryRepository:
 
     def delete_customer_outcome(self, outcome_id: str) -> bool:
         if outcome_id in self.customer_outcomes:
+            self._append_event()
             del self.customer_outcomes[outcome_id]
             return True
         return False
 
     def add_evidence(self, evidence: Evidence) -> Evidence:
+        self._append_event()
         self.evidence[evidence.id] = evidence
         return evidence
 
@@ -445,6 +484,7 @@ class InMemoryRepository:
 
     def delete_evidence(self, evidence_id: str) -> bool:
         if evidence_id in self.evidence:
+            self._append_event()
             del self.evidence[evidence_id]
             return True
         return False
@@ -480,6 +520,7 @@ class InMemoryRepository:
         evidence = self.evidence.get(evidence_id)
         if not evidence:
             return None
+        self._append_event()
         current = evidence.model_dump(exclude_unset=True)
         current.update(updates)
         new_evidence = evidence.model_validate(current)
@@ -487,6 +528,7 @@ class InMemoryRepository:
         return new_evidence
 
     def add_signal(self, signal: Signal) -> Signal:
+        self._append_event()
         self.signals[signal.id] = signal
         return signal
 
@@ -506,6 +548,7 @@ class InMemoryRepository:
         if signal is None:
             return None
         if signal.read_at is None:
+            self._append_event()
             signal.read_at = datetime.now(timezone.utc)
         return signal
 
@@ -514,6 +557,7 @@ class InMemoryRepository:
         if signal is None:
             return None
         if signal.dismissed_at is None:
+            self._append_event()
             signal.dismissed_at = datetime.now(timezone.utc)
         return signal
 
@@ -521,6 +565,7 @@ class InMemoryRepository:
         return len(unread_signals(list(self.signals.values())))
 
     def add_scheduled_work(self, work: ScheduledWork) -> ScheduledWork:
+        self._append_event()
         self.scheduled_work[work.id] = work
         return work
 
@@ -541,6 +586,7 @@ class InMemoryRepository:
         work = self.scheduled_work.get(work_id)
         if not work:
             return None
+        self._append_event()
         current = work.model_dump(exclude_unset=True)
         current.update(updates)
         new_work = work.model_validate(current)
@@ -549,11 +595,13 @@ class InMemoryRepository:
 
     def delete_scheduled_work(self, work_id: str) -> bool:
         if work_id in self.scheduled_work:
+            self._append_event()
             del self.scheduled_work[work_id]
             return True
         return False
 
     def add_segment(self, segment: Segment) -> Segment:
+        self._append_event()
         self.segments[segment.id] = segment
         return segment
 
@@ -570,13 +618,40 @@ class InMemoryRepository:
         segment = self.segments.get(segment_id)
         if segment is None:
             return None
+        self._append_event()
         current = segment.model_dump(exclude_unset=True)
         current.update(updates)
         new_segment = segment.model_validate(current)
         self.segments[segment_id] = new_segment
         return new_segment
 
+    def add_study(self, study: Study) -> Study:
+        self._append_event()
+        self.studies[study.id] = study
+        return study
+
+    def get_study(self, study_id: str) -> Study | None:
+        return self.studies.get(study_id)
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        items = list(self.studies.values())
+        if job_id is not None:
+            items = [study for study in items if study.job_id == job_id]
+        return items
+
+    def update_study(self, study_id: str, updates: dict) -> Study | None:
+        study = self.studies.get(study_id)
+        if study is None:
+            return None
+        self._append_event()
+        current = study.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_study = study.model_validate(current)
+        self.studies[study_id] = new_study
+        return new_study
+
     def add_strategy(self, strategy: Strategy) -> Strategy:
+        self._append_event()
         self.strategies[strategy.id] = strategy
         return strategy
 
@@ -593,6 +668,7 @@ class InMemoryRepository:
         strategy = self.strategies.get(strategy_id)
         if strategy is None:
             return None
+        self._append_event()
         current = strategy.model_dump(exclude_unset=True)
         current.update(updates)
         new_strategy = strategy.model_validate(current)
@@ -600,6 +676,9 @@ class InMemoryRepository:
         return new_strategy
 
     def clear(self) -> None:
+        #: The event-sourced store empties its log and restarts numbering, so the
+        #: counter starts over with it.
+        self._last_event_id = 0
         self.jobs.clear()
         self.scheduled_work.clear()
         self.steps.clear()
