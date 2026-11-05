@@ -1,7 +1,14 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { openDB, type IDBPDatabase } from "idb";
 
 import type { Observation } from "../../types";
 import { nowIso } from "../id";
+import {
+  DB_NAME,
+  DB_VERSION,
+  migrationSteps,
+  type MetaValue,
+  type StudioDb,
+} from "./migrations";
 import {
   byCreated,
   bySeq,
@@ -17,90 +24,60 @@ import {
   type WorkspaceSnapshot,
 } from "./types";
 
-export const DB_NAME = "agentic-odi-studio";
-const DB_VERSION = 2;
+export { DB_NAME };
+
 const DRAIN_LEASE_KEY = "drain_lease";
-
-type MetaValue = number | DrainLease;
-
-interface StudioDb extends DBSchema {
-  meta: { key: string; value: { key: string; value: MetaValue } };
-  jobs: { key: string; value: StoredJob; indexes: { "by-seq": number } };
-  steps: {
-    key: string;
-    value: StoredStep;
-    indexes: { "by-job": string; "by-seq": number };
-  };
-  outcomes: {
-    key: string;
-    value: StoredOutcome;
-    indexes: { "by-job": string; "by-seq": number };
-  };
-  observations: {
-    key: string;
-    value: Observation;
-    indexes: { "by-created": string };
-  };
-  outbox: {
-    key: string;
-    value: OutboxRecord;
-    indexes: { "by-state": string; "by-created": string };
-  };
-  conversations: {
-    key: string;
-    value: StoredConversation;
-    indexes: { "by-updated": string };
-  };
-  turns: {
-    key: number;
-    value: StoredTurn;
-    indexes: { "by-conversation": string };
-  };
-}
 
 export class IndexedDbLocalStore implements LocalStore {
   readonly durable = true;
   private readonly db: IDBPDatabase<StudioDb>;
+  private reloadNeeded = false;
+  private readonly reloadListeners = new Set<(needsReload: boolean) => void>();
 
   private constructor(db: IDBPDatabase<StudioDb>) {
     this.db = db;
+    // Another tab upgrading to a newer schema asks this connection to move
+    // aside; the browser also drops the connection on its own (`close`). Either
+    // way this page holds a dead handle and must reload before it writes again.
+    db.addEventListener("versionchange", () => this.markNeedsReload());
+    db.addEventListener("close", () => this.markNeedsReload());
   }
 
   static async open(): Promise<IndexedDbLocalStore> {
     const db = await openDB<StudioDb>(DB_NAME, DB_VERSION, {
-      upgrade(database, oldVersion) {
-        if (oldVersion < 1) {
-          database.createObjectStore("meta", { keyPath: "key" });
-          const jobs = database.createObjectStore("jobs", { keyPath: "id" });
-          jobs.createIndex("by-seq", "seq");
-          const steps = database.createObjectStore("steps", { keyPath: "id" });
-          steps.createIndex("by-job", "job_id");
-          steps.createIndex("by-seq", "seq");
-          const outcomes = database.createObjectStore("outcomes", { keyPath: "id" });
-          outcomes.createIndex("by-job", "job_id");
-          outcomes.createIndex("by-seq", "seq");
-          const observations = database.createObjectStore("observations", {
-            keyPath: "id",
-          });
-          observations.createIndex("by-created", "created_at");
-          const conversations = database.createObjectStore("conversations", {
-            keyPath: "id",
-          });
-          conversations.createIndex("by-updated", "updated_at");
-          const turns = database.createObjectStore("turns", {
-            keyPath: "id",
-            autoIncrement: true,
-          });
-          turns.createIndex("by-conversation", "conversation_id");
-        }
-        if (oldVersion < 2) {
-          const outbox = database.createObjectStore("outbox", { keyPath: "id" });
-          outbox.createIndex("by-state", "state");
-          outbox.createIndex("by-created", "created_at");
+      upgrade(database, oldVersion, newVersion) {
+        // Run the registered ladder from the version the person has up to the
+        // one this build ships. A v1 database runs only `MIGRATIONS[2]`; a fresh
+        // one runs 1 then 2. `migrationSteps` throws by name if a version has no
+        // registered step, so a bump without a migration fails loudly here.
+        for (const step of migrationSteps(oldVersion, newVersion ?? DB_VERSION)) {
+          step(database);
         }
       },
     });
     return new IndexedDbLocalStore(db);
+  }
+
+  get needsReload(): boolean {
+    return this.reloadNeeded;
+  }
+
+  onVersionChange(listener: (needsReload: boolean) => void): () => void {
+    this.reloadListeners.add(listener);
+    return () => {
+      this.reloadListeners.delete(listener);
+    };
+  }
+
+  private markNeedsReload(): void {
+    if (this.reloadNeeded) {
+      return;
+    }
+    this.reloadNeeded = true;
+    this.db.close();
+    for (const listener of this.reloadListeners) {
+      listener(true);
+    }
   }
 
   async nextSeq(): Promise<number> {

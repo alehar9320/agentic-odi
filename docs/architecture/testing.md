@@ -170,6 +170,17 @@ list), and an unreadable version is refused with the version it found.
 `agentic-odi-workspace.json`, Import into a non-empty workspace asks first and
 cancelling changes nothing, and a version mismatch is reported before anything is
 replaced.
+The IndexedDB schema and its migrations are covered by two files under
+`apps/studio/src/bff/store/`. `migrations.test.ts` asserts the registry has a
+step for every version up to `DB_VERSION` and that a gap fails with a message
+naming the missing version, so raising the version without a migration fails the
+suite instead of throwing `ConstraintError` on an existing database.
+`indexedDbStore.test.ts` seeds a v1 database with a row in all seven stores,
+opens it with the current code, and asserts every row is unchanged and the
+migrated schema equals a fresh database's (store names, key paths,
+auto-increment flags, and index names). The same file opens a second connection
+at a higher version and asserts the first closes and sets `needsReload` instead
+of blocking the upgrade.
 
 Copied UI is guarded structurally: `src/vendor/boundary.test.ts` reads every
 `.ts` and `.tsx` file under `apps/studio/src/vendor/` and fails on a specifier

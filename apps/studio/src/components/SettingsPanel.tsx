@@ -15,6 +15,7 @@ import { useStudio } from "../state/StudioContext";
 import type { ConnectionReport } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
+import { StatusDot } from "./status/StatusDot";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ModelSection } from "./settings/sections/ModelSection";
 import { WorkspaceSection } from "./settings/sections/WorkspaceSection";
@@ -246,10 +247,8 @@ export function SettingsPanel() {
       <ConnectionsSection settings={settings} saveSettings={saveSettings}>
         <ul className="connection-list">
           <li>
-            <span
-              className={`status-dot${modelHealthy === false ? " is-warn" : ""}${
-                modelHealthy === null ? " is-unknown" : ""
-              }`}
+            <StatusDot
+              tone={modelHealthy === false ? "warn" : modelHealthy === null ? "unknown" : "ok"}
             />
             <span>Model</span>
             <span className="connection-list__value">
@@ -261,8 +260,8 @@ export function SettingsPanel() {
             </span>
           </li>
           <li>
-            <span
-              className={`status-dot${sidecarKnown === false ? " is-warn" : sidecarKnown === null ? " is-unknown" : ""}`}
+            <StatusDot
+              tone={sidecarKnown === false ? "warn" : sidecarKnown === null ? "unknown" : "ok"}
             />
             <span>Sidecar</span>
             <span className="connection-list__value">
@@ -270,7 +269,7 @@ export function SettingsPanel() {
             </span>
           </li>
           <li>
-            <span className={`status-dot${mcpKnown ? "" : " is-unknown"}`} />
+            <StatusDot tone={mcpKnown ? "ok" : "unknown"} />
             <span>Local FastMCP server</span>
             <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
           </li>
@@ -284,11 +283,7 @@ export function SettingsPanel() {
         <ul className="connection-list">
           {capabilities.map((capability) => (
             <li key={capability.id}>
-              <span
-                className={`status-dot${
-                  capability.status === "available" ? "" : " is-warn"
-                }`}
-              />
+              <StatusDot tone={capability.status === "available" ? "ok" : "warn"} />
               <span>{capability.label}</span>
               <span className="connection-list__value">
                 {capability.status === "available" ? "available" : "unavailable"}
