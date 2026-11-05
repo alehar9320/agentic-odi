@@ -9,7 +9,7 @@ describe("print stylesheet", () => {
   });
 
   it("hides the studio chrome so only the work prints", () => {
-    for (const selector of [".bar", ".composer", ".rail", ".scrim"]) {
+    for (const selector of [".bar", ".composer", ".rail", ".rail__opener", ".scrim"]) {
       expect(printCss).toContain(selector);
     }
     expect(printCss).toMatch(/display:\s*none/);
@@ -37,7 +37,7 @@ describe("decision brief print", () => {
   it("keeps the conversation and the studio chrome off the page", () => {
     const rules = briefRules(printCss);
     expect(rules).not.toBe("");
-    for (const selector of [".chat", ".bar", ".composer", ".lens__head", ".lens__foot"]) {
+    for (const selector of [".chat", ".bar", ".composer", ".rail__opener", ".lens__head", ".lens__foot"]) {
       expect(rules).toContain(selector);
     }
     expect(rules).toMatch(/display:\s*none/);

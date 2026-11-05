@@ -3107,10 +3107,6 @@ button.message__tag:hover {
     padding: 18px 16px 32px;
   }
 
-  .rail {
-    padding-inline: 18px;
-  }
-
   .setup__meta {
     width: calc(100% - 36px);
   }
@@ -4758,42 +4754,62 @@ details[open] summary {
 }
 
 /* ------------------------------------------------------------------ */
-/* Rail: what the thread has made, above the thread                   */
+/* The map: every destination, beside the thread, always there        */
 /* ------------------------------------------------------------------ */
 .rail {
+  display: flex;
   flex: none;
-  padding: 0 22px;
+  flex-direction: column;
+  gap: 10px;
+  width: 232px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.rail__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.rail__title {
+  flex: 1;
+  color: var(--faint);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.rail__toggle {
+  flex: none;
+  color: var(--faint);
 }
 
 .rail__list {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 2px;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 0 0 6px;
+  margin: 0;
+  padding: 0;
   list-style: none;
-  overflow-x: auto;
-  scrollbar-width: none;
-  animation: fade-in 0.24s ease;
 }
 
-.rail__list::-webkit-scrollbar {
-  display: none;
-}
-
-.rail__chip {
-  display: inline-flex;
+.rail__row {
+  display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 9px;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: var(--faint);
-  font-size: 0.76rem;
-  white-space: nowrap;
+  font-size: 0.8rem;
+  text-align: left;
   cursor: pointer;
   transition:
     color 0.14s ease,
@@ -4801,29 +4817,94 @@ details[open] summary {
     border-color 0.14s ease;
 }
 
-.rail__chip:hover {
+.rail__row:hover {
   color: var(--text);
-  background: var(--surface);
+  background: var(--surface-hover);
 }
 
-.rail__chip.is-open {
+.rail__row.is-open {
   color: var(--text);
   background: var(--surface);
-  border-color: var(--line);
+  border-color: var(--line-strong);
 }
 
 .rail__icon {
   display: inline-flex;
+  flex: none;
   opacity: 0.8;
 }
 
-.rail__count {
-  color: var(--faint);
-  font-variant-numeric: tabular-nums;
+.rail__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.rail__chip.is-open .rail__count {
+.rail__count {
+  flex: none;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+}
+
+.rail__row.is-open .rail__count {
   color: var(--muted);
+}
+
+.rail__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* Collapsed: the icons stay, the words go. The row keeps its label in
+   `title` and `aria-label`, so the map is still readable aloud. */
+.rail--collapsed {
+  width: 56px;
+  padding: 12px 6px;
+}
+
+.rail--collapsed .rail__head {
+  justify-content: center;
+  padding: 0;
+}
+
+.rail--collapsed .rail__title,
+.rail--collapsed .rail__label {
+  display: none;
+}
+
+.rail--collapsed .rail__row {
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 4px;
+}
+
+/* Narrow: the map is a drawer, so the thread keeps the whole stage. */
+.rail__opener {
+  flex: none;
+  align-self: flex-start;
+  margin: 10px 0 0 10px;
+}
+
+.rail--drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 60;
+  width: 280px;
+  max-width: 84vw;
+  border-right: 1px solid var(--line-strong);
+  background: var(--bg);
+  box-shadow: 12px 0 32px rgba(0, 0, 0, 0.35);
+  animation: fade-in 0.18s ease;
+}
+
+.rail--drawer.is-closed {
+  display: none;
 }
 
 /* ------------------------------------------------------------------ */

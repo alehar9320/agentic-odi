@@ -86,7 +86,10 @@ per-platform archives with SHA-256 checksums for a manual download. See
   that produced it, and a number with no customer answer behind it reads as
   unverified instead of settling the matter. The bar's history list keeps
   the last twenty threads one click away, each named by its first question and
-  marked when it is the one on screen.
+  marked when it is the one on screen. A map down the left lists every view with
+  the count of what it holds, so a newcomer has somewhere to go before the
+  thread has produced anything; it narrows to icons on a small window and to a
+  drawer on a phone.
 - **A document when the conversation needs one.** `/brief` writes the decision
   brief from the canvas — the ranked bets, the records behind each, what argues
   against them, and the next evidence to collect — as Markdown a review can read

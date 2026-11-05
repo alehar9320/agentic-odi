@@ -44,11 +44,15 @@
         position: fixed;
         inset: 0;
         display: grid;
-        grid-template-rows: 56px 34px 1fr;
+        grid-template: 56px 1fr / 232px 1fr;
         background: var(--boot-bg);
       }
       .boot-shell__bar {
+        grid-column: 1 / -1;
         border-bottom: 1px solid var(--boot-line);
+      }
+      .boot-shell__rail {
+        border-right: 1px solid var(--boot-line);
       }
     </style>
     <!-- Resolve the theme before React runs, so the shell and the app agree on

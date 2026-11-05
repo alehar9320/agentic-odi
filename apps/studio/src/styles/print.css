@@ -36,6 +36,7 @@
      page. The conversation and any docked lens are the document. */
   .bar,
   .rail,
+  .rail__opener,
   .composer,
   .chat__dock,
   .scrim,
@@ -141,6 +142,7 @@
   body.brief-printing .bar,
   body.brief-printing .composer,
   body.brief-printing .rail,
+  body.brief-printing .rail__opener,
   body.brief-printing .lens__head,
   body.brief-printing .lens__foot,
   body.brief-printing .brief__bar,
