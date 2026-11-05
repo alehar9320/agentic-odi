@@ -520,10 +520,11 @@ PAGE_WEIGHT_BUDGET = 96 * 1024
 # The development guide mirrors the generated coverage map, which grows with
 # the test tree, so it needs its own ceiling rather than a raised one for
 # every page. Every test file in the workspace is one row, and the row count
-# roughly doubled as the pillar work landed, which is why the guide sits near
-# 147 KB while every other page stays under the base budget.
+# roughly doubled as the pillar work landed; the guides main added since push it
+# to ~155 KB, which is why its own ceiling is 160 KB while every other page stays
+# under the base budget.
 PAGE_WEIGHT_OVERRIDES = {
-    "docs/development/index.html": 152 * 1024,
+    "docs/development/index.html": 160 * 1024,
 }
 
 
