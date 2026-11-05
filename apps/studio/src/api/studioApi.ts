@@ -30,6 +30,8 @@ import type {
   Step,
   Strategy,
   StudioConfig,
+  SharedArtifactPayload,
+  ShareLink,
   StudioError,
   Study,
 } from "../types";
@@ -799,4 +801,29 @@ export function promoteEvidence(
     `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
     payload,
   );
+}
+
+
+/**
+ * The one artifact a share token names.
+ *
+ * Unlike every other read, this does not fall through to the browser BFF: a
+ * shared payload exists only where the token was minted, and there is no local
+ * copy to invent. A token the sidecar refuses is a real failure, not a reason to
+ * serve something else.
+ */
+export function fetchSharedArtifact(token: string): Promise<SharedArtifactPayload> {
+  return getJson<SharedArtifactPayload>(`/api/share/${encodeURIComponent(token)}`);
+}
+
+/**
+ * Mint a read-only link for one artifact. The returned token is shown once;
+ * the store keeps only its hash.
+ */
+export function createShareLink(payload: {
+  kind: SharedArtifactPayload["kind"];
+  expires_in_days?: number;
+  mcp_url?: string;
+}): Promise<ShareLink> {
+  return postJson<ShareLink>("/api/share", payload);
 }

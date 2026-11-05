@@ -10,9 +10,11 @@ import { ChatStage } from "./components/chat/ChatStage";
 import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
 import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { SharedArtifact } from "./components/SharedArtifact";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
+import { sharedTokenFromPath } from "./lib/share";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
@@ -120,6 +122,20 @@ function StudioShell() {
 export { StudioShell };
 
 export default function App() {
+  // A shared link opens one artifact and nothing else. It must render without
+  // the workspace boot — no canvas fetch, no rail, no composer, no sidecar
+  // config — so it is decided before any provider mounts.
+  const sharedToken =
+    typeof window === "undefined" ? null : sharedTokenFromPath(window.location.pathname);
+
+  if (sharedToken) {
+    return (
+      <ErrorBoundary>
+        <SharedArtifact token={sharedToken} />
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <UpdateProvider>

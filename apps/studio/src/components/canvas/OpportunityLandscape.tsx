@@ -10,6 +10,7 @@ import {
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { ShareAction } from "../ShareAction";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
 
@@ -175,6 +176,7 @@ export function OpportunityLandscape() {
           >
             Export brief
           </button>
+          <ShareAction />
         </div>
       </div>
 

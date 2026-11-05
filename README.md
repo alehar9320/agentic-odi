@@ -93,6 +93,10 @@ per-platform archives with SHA-256 checksums for a manual download. See
   with or without the Studio. Provenance travels with it: demo rows are excluded
   from every count and labelled, and every number counts records instead of
   generating prose.
+- **One artifact you can hand over.** A read-only link opens a single artifact
+  and its evidence on its own page — no rail, no composer, no way into the rest
+  of the workspace — and states when the link expires. The link is a capability,
+  not a copy of the database.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **Evidence becomes outcomes.** An ingested record is mined into a scored,
