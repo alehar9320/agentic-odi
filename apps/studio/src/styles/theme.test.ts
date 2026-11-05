@@ -85,6 +85,53 @@ describe("theme tokens", () => {
     );
     expect(missing).toEqual([]);
   });
+
+  /**
+   * The value a top-level rule declares for a property, read out of the file.
+   *
+   * The leading newline in each selector pins the lookup to the rule itself: a
+   * media query may restate the selector to change only its size.
+   */
+  function declaration(selector: string, property: string): string | undefined {
+    const body = readBlock(selector);
+    return new RegExp(`\\n\\s*${property}:\\s*([^;]+);`).exec(body)?.[1].trim();
+  }
+
+  it("paints a notice, an evidence quote and a neutral meter from the palette, not from a stray hex", () => {
+    expect(declaration("\n.notice {", "color")).toBe("var(--amber)");
+    expect(declaration("\n.ui-card__evidence {", "color")).toBe("var(--text)");
+    expect(declaration("\n.ui-tone-bg--neutral {", "background")).toBe("var(--faint)");
+    expect(declaration("\n.brand__mark {", "background")).toBe("var(--brand-tile)");
+    // The send disc used to be painted with the page's own ink, which in the
+    // light theme meant ink on ink.
+    expect(declaration("\n.composer__send {", "background")).toBe("var(--accent-fill)");
+    expect(declaration("\n.composer__send {", "color")).toBe("var(--on-accent)");
+  });
+
+  it("never puts the filled control's ink on a ground it is not legible on", () => {
+    // `--on-accent` is measured against `--accent-fill` and nothing else, so a
+    // rule that reads one without the other is the defect the pair exists to
+    // close: white ink on a brand colour chosen by a different theme.
+    const lonely = themeCss
+      .split("}")
+      .map((rule) => rule.slice(rule.lastIndexOf("{") + 1))
+      .filter(
+        (body) =>
+          /(^|\n)\s*color:\s*var\(--on-accent\)\s*;/.test(body) &&
+          !body.includes("var(--accent-fill)"),
+      )
+      .map((body) => body.trim().split("\n")[0]);
+    expect(lonely).toEqual([]);
+  });
+
+  it("makes an unknown status a shape, not only a colour", () => {
+    const body = readBlock("\n.status-dot.is-unknown {");
+    expect(body).toMatch(/background:\s*transparent/);
+    expect(body).toMatch(/border-radius:\s*2px/);
+    expect(body).toMatch(/box-shadow:\s*inset 0 0 0 1\.5px var\(--faint\)/);
+    // Two box-shadows in one rule and the later one wins: the ring would vanish.
+    expect(body).not.toMatch(/box-shadow:\s*none/);
+  });
 });
 
 describe("role tokens", () => {
@@ -111,8 +158,18 @@ describe("role tokens", () => {
   });
 
   it("overrides each role that changes with the theme, in the same block as the palette", () => {
-    const themed = ["accent-fill", "on-accent", "plot-surface", "tint-accent", "tint-accent-strong", "tint-amber"];
+    const themed = [
+      "plot-surface",
+      "tint-accent",
+      "tint-accent-strong",
+      "tint-amber",
+    ];
     expect(themed.filter((name) => !lightNames.has(name))).toEqual([]);
+    // The filled control is the one role that is brand rather than surface, so
+    // both palettes read the same declaration. If a future light theme wants
+    // its own fill, it must carry its own ink with it: the pair is what the
+    // contrast test below measures, and it passes here only as a pair.
+    expect([...lightNames].filter((name) => name === "accent-fill" || name === "on-accent")).toEqual([]);
     // The mascot's tile is brand, not a surface: declared once, in both palettes.
     expect(lightNames.has("brand-tile")).toBe(false);
   });

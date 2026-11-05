@@ -18,11 +18,12 @@
   --surface-hover: rgba(255, 255, 255, 0.06);
 
   /* Roles, named for what they are for, so the theme and the printer can both
-     reach them. The filled control is a pair: the ink is only legible against
-     the fill it ships with, and the two diverge between palettes — dark fills
-     light, light fills dark. */
-  --accent-fill: #8b8cf8;
-  --on-accent: #0b0c10;
+     reach them. The filled control is a pair — the ink is only legible against
+     the fill it ships with — and the pair is deliberately the same indigo in
+     both palettes: it is the one place the brand colour is a surface rather
+     than a word, and it is the value the AA gate measures the ink against. */
+  --accent-fill: #4f46e5;
+  --on-accent: #ffffff;
   --plot-surface: #0b0d13;
   --tint-accent: rgba(139, 140, 248, 0.12);
   --tint-accent-strong: rgba(139, 140, 248, 0.2);
@@ -67,8 +68,6 @@ html.theme-light {
   --line-strong: rgba(15, 23, 42, 0.18);
   --surface: rgba(15, 23, 42, 0.035);
   --surface-hover: rgba(15, 23, 42, 0.07);
-  --accent-fill: #4f46e5;
-  --on-accent: #ffffff;
   --plot-surface: #ffffff;
   --tint-accent: rgba(79, 70, 229, 0.1);
   --tint-accent-strong: rgba(79, 70, 229, 0.18);
@@ -765,7 +764,7 @@ a {
   flex: none;
   width: 84px;
   padding-top: 1px;
-  color: #c7c8ff;
+  color: var(--accent);
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.76rem;
 }
@@ -852,7 +851,7 @@ a {
 }
 
 .composer__input::placeholder {
-  color: #6f7480;
+  color: var(--faint);
 }
 
 /* iOS zooms into a field under 16px; the composer should never lurch. */
@@ -881,8 +880,8 @@ a {
   height: 34px;
   border: 0;
   border-radius: 50%;
-  background: var(--text);
-  color: #0b0c10;
+  background: var(--accent-fill);
+  color: var(--on-accent);
   cursor: pointer;
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
@@ -1381,8 +1380,8 @@ a {
   flex: none;
   margin-top: 3px;
   border-radius: 8px;
-  background: linear-gradient(140deg, #6366f1, #8b5cf6);
-  color: #f8f8ff;
+  background: linear-gradient(140deg, var(--accent-fill), var(--accent-strong));
+  color: var(--on-accent);
 }
 
 .message__body {
@@ -1390,7 +1389,7 @@ a {
   min-width: 0;
   font-size: 0.92rem;
   line-height: 1.62;
-  color: #e8e9ed;
+  color: var(--text);
 }
 
 .message__actions {
@@ -2318,7 +2317,7 @@ input[type="range"] {
   border: 1px solid rgba(240, 179, 74, 0.2);
   border-radius: 10px;
   background: rgba(240, 179, 74, 0.06);
-  color: #d6c19b;
+  color: var(--amber);
   font-size: 0.74rem;
   line-height: 1.5;
 }
@@ -2370,7 +2369,7 @@ input[type="range"] {
 
 .evidence blockquote {
   margin: 0;
-  color: #dfe1e7;
+  color: var(--text);
   font-size: 0.83rem;
   font-style: italic;
   line-height: 1.55;
@@ -2578,7 +2577,7 @@ input[type="range"] {
   padding: 2px 7px;
   border: 1px solid rgba(245, 158, 11, 0.3);
   border-radius: 999px;
-  color: #f0b45a;
+  color: var(--amber);
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -2599,7 +2598,7 @@ button.message__tag {
 
 button.message__tag:hover {
   border-color: rgba(245, 158, 11, 0.55);
-  color: #f5c67a;
+  color: var(--amber);
 }
 
 /* A failure shown in place of the thing that failed. */
@@ -2618,7 +2617,7 @@ button.message__tag:hover {
 .failure__icon {
   display: inline-flex;
   padding-top: 2px;
-  color: #f87171;
+  color: var(--red);
 }
 
 .failure__body {
@@ -2627,14 +2626,14 @@ button.message__tag:hover {
 
 .failure__message {
   margin: 0;
-  color: #fca5a5;
+  color: var(--red);
   font-size: 0.82rem;
   line-height: 1.45;
 }
 
 .failure__detail {
   margin-top: 6px;
-  color: #d6d3d1;
+  color: var(--muted);
   font-size: 0.72rem;
 }
 
@@ -2680,7 +2679,7 @@ button.message__tag:hover {
 
 .failure__suggestion {
   margin: 6px 0 0;
-  color: #e7e5e4;
+  color: var(--text);
   font-size: 0.78rem;
 }
 
@@ -2922,7 +2921,7 @@ button.message__tag:hover {
 }
 
 .quiet-action--danger:hover {
-  color: #fca5a5;
+  color: var(--red);
 }
 
 .suggestion--quiet {
@@ -2993,8 +2992,8 @@ button.message__tag:hover {
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--accent-strong);
-  color: #ffffff;
+  background: var(--accent-fill);
+  color: var(--on-accent);
   font-size: 0.62rem;
   font-weight: 700;
   box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
@@ -3308,8 +3307,8 @@ button.message__tag:hover {
 }
 
 .studio-button--primary {
-  background: linear-gradient(135deg, var(--studio-indigo) 0%, var(--studio-indigo-strong) 100%);
-  color: #ffffff;
+  background: var(--accent-fill);
+  color: var(--on-accent);
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
@@ -3331,7 +3330,7 @@ button.message__tag:hover {
 
 .panel-failure__message {
   margin: 0;
-  color: #fca5a5;
+  color: var(--red);
   font-size: 0.84rem;
 }
 
@@ -3349,7 +3348,7 @@ button.message__tag:hover {
   border: 1px solid rgba(245, 158, 11, 0.3);
   border-radius: 8px;
   background: rgba(245, 158, 11, 0.08);
-  color: #f0b45a;
+  color: var(--amber);
   font-size: 0.78rem;
 }
 
@@ -3575,7 +3574,7 @@ button.message__tag:hover {
   background: rgba(15, 23, 42, 0.5);
   border-radius: 0 8px 8px 0;
   font-size: 0.84rem;
-  color: #cbd5e1;
+  color: var(--text);
 }
 
 /* Pills */
@@ -3594,7 +3593,7 @@ button.message__tag:hover {
 .ui-pill--neutral {
   background: rgba(148, 163, 184, 0.12);
   border-color: rgba(148, 163, 184, 0.22);
-  color: #cbd5e1;
+  color: var(--text);
 }
 
 .ui-pill--positive {
@@ -3631,7 +3630,7 @@ button.message__tag:hover {
 }
 
 .ui-meter__value {
-  color: #cbd5e1;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3650,7 +3649,7 @@ button.message__tag:hover {
 }
 
 .ui-tone-bg--neutral {
-  background: #94a3b8;
+  background: var(--faint);
 }
 
 .ui-tone-bg--positive {
@@ -3794,19 +3793,20 @@ button.message__tag:hover {
 }
 
 .ui-action--primary {
-  background: var(--studio-indigo-strong);
+  background: var(--accent-fill);
   border-color: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .ui-action--primary:hover {
-  background: #7c7ff5;
+  background: var(--accent-fill);
+  box-shadow: 0 0 0 3px var(--tint-accent-strong);
 }
 
 .ui-action--ghost {
   background: transparent;
   border-color: var(--studio-border);
-  color: #cbd5e1;
+  color: var(--text);
 }
 
 .ui-action--ghost:hover {
@@ -3873,7 +3873,7 @@ button.message__tag:hover {
   display: block;
   margin-top: 3px;
   line-height: 1.4;
-  color: #cbd5e1;
+  color: var(--text);
 }
 
 .ui-table__row--urgent .ui-card__id {
@@ -3901,7 +3901,7 @@ button.message__tag:hover {
 
 .ui-bet__value {
   font-size: 0.88rem;
-  color: #e2e8f0;
+  color: var(--text);
 }
 
 .ui-phase {
@@ -3936,7 +3936,7 @@ button.message__tag:hover {
   flex-direction: column;
   gap: 5px;
   font-size: 0.84rem;
-  color: #cbd5e1;
+  color: var(--text);
 }
 
 /* Evidence */
@@ -3947,7 +3947,7 @@ button.message__tag:hover {
   font-size: 0.95rem;
   font-style: italic;
   line-height: 1.55;
-  color: #e2e8f0;
+  color: var(--text);
 }
 
 /* Job map */
@@ -4028,7 +4028,7 @@ button.message__tag:hover {
 .ui-field dd {
   margin: 0;
   font-size: 0.88rem;
-  color: #e2e8f0;
+  color: var(--text);
 }
 
 /* Segment member outcomes: one row per outcome, each a way into the landscape. */
@@ -4207,7 +4207,7 @@ button.message__tag:hover {
 /* ------------------------------------------------------------------ */
 .pill-changelog {
   background: rgba(129, 140, 248, 0.18);
-  color: #a5b4fc;
+  color: var(--accent);
   border: 1px solid rgba(129, 140, 248, 0.4);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -4215,8 +4215,8 @@ button.message__tag:hover {
 
 .pill-changelog:hover {
   background: rgba(129, 140, 248, 0.3);
-  border-color: #818cf8;
-  color: #ffffff;
+  border-color: var(--accent);
+  color: var(--text);
   box-shadow: 0 0 12px rgba(129, 140, 248, 0.25);
 }
 
@@ -4266,7 +4266,7 @@ button.message__tag:hover {
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.1em;
-  color: #818cf8;
+  color: var(--accent);
   margin-bottom: 4px;
 }
 
@@ -4275,8 +4275,8 @@ button.message__tag:hover {
   margin: 6px 0 0;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--accent-strong);
-  color: #ffffff;
+  background: var(--accent-fill);
+  color: var(--on-accent);
   font-size: 0.68rem;
   font-weight: 700;
 }
@@ -4287,7 +4287,7 @@ button.message__tag:hover {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #818cf8;
+  color: var(--accent);
 }
 
 .changelog-modal__title {
@@ -4349,7 +4349,7 @@ button.message__tag:hover {
 .changelog-release__version {
   font-weight: 700;
   font-size: 1rem;
-  color: #818cf8;
+  color: var(--accent);
 }
 
 .changelog-release__date {
@@ -4368,7 +4368,7 @@ button.message__tag:hover {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #a5b4fc;
+  color: var(--accent);
   margin: 0 0 6px;
 }
 
@@ -4383,7 +4383,7 @@ button.message__tag:hover {
 .changelog-category__item {
   font-size: 0.88rem;
   line-height: 1.45;
-  color: #cbd5e1;
+  color: var(--text);
 }
 
 .changelog-modal__footer {
@@ -4623,11 +4623,11 @@ details[open] summary {
   0%,
   100% {
     box-shadow: 0 0 12px rgba(245, 158, 11, 0.25), inset 0 0 6px rgba(245, 158, 11, 0.08);
-    border-left-color: #f59e0b;
+    border-left-color: var(--amber);
   }
   50% {
     box-shadow: 0 0 24px rgba(245, 158, 11, 0.5), inset 0 0 12px rgba(245, 158, 11, 0.15);
-    border-left-color: #fbbf24;
+    border-left-color: var(--amber);
   }
 }
 
@@ -4740,7 +4740,7 @@ details[open] summary {
   flex: none;
   overflow: hidden;
   border-radius: 9px;
-  background: var(--odi-tile, #131722);
+  background: var(--brand-tile);
   border: 1px solid rgba(139, 140, 248, 0.35);
 }
 
@@ -4782,8 +4782,9 @@ details[open] summary {
 }
 
 .status-dot.is-unknown {
-  background: #5b616c;
-  box-shadow: none;
+  background: transparent;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1.5px var(--faint);
 }
 
 /* Forced-colors mode suppresses backgrounds, so the disc would vanish; a ring
@@ -5450,9 +5451,9 @@ details[open] summary {
 }
 
 .approval__allow {
-  background: var(--accent-strong);
+  background: var(--accent-fill);
   border-color: transparent;
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .approval__allow:hover:not(:disabled),
@@ -5922,8 +5923,8 @@ details[open] summary {
 
 .banner__action--primary {
   border-color: transparent;
-  background: var(--accent-strong);
-  color: #fff;
+  background: var(--accent-fill);
+  color: var(--on-accent);
 }
 
 .banner__dismiss {
@@ -5944,7 +5945,7 @@ details[open] summary {
 }
 
 .banner--critical {
-  border-left-color: #ef4444;
+  border-left-color: var(--red);
 }
 
 .banner-overflow {
@@ -6450,8 +6451,8 @@ details[open] summary {
 }
 
 .suggestion-modal__primary {
-  background: var(--accent-strong);
-  color: #ffffff;
+  background: var(--accent-fill);
+  color: var(--on-accent);
 }
 
 /* ------------------------------------------------------------------ */
