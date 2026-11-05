@@ -12,13 +12,14 @@ The mechanism is sound and the surfaces are not all inside it. Measured on `f6f6
 - **`html.theme-light` appears exactly once in `src/styles/theme.css` — at line 41, the token block.** The
   file is 6764 lines. Every rule below line 57 is theme-blind, which is fine while it reads `var(--token)`
   and a problem the moment it does not.
-- **43 opaque colour declarations sit outside the token block** in that file: 39 `color:`, 3 `background:`,
-  1 `border-color:`. Each one is a value that cannot change with the theme, so each is a light-theme defect
-  waiting to be painted — `.notice { color: #d6c19b }`, `.evidence blockquote { color: #dfe1e7 }`,
-  `.ui-card__evidence { color: #cbd5e1 }`, `.message__tag { color: #f0b45a }`,
-  `.failure__icon { color: #f87171 }` are light ink on `--bg: #f5f6f8`. Several are near-duplicates of a
-  token that already exists: `#f87171` *is* the dark `--red` byte for byte, and `#0b0c10` is within two of
-  `--bg`.
+- **48 colour declarations outside the token block carry an opaque value** — 47 literals plus one `var()`
+  fallback: 39 `color:`, 5 `background:` (one a two-stop gradient, one the `var()` fallback), 3
+  `border-left-color:` — two inside a keyframe — and 1 `border-color:`. Each one is a value that cannot change with the theme, so each is
+  a light-theme defect waiting to be painted — `.notice { color: #d6c19b }`,
+  `.evidence blockquote { color: #dfe1e7 }`, `.ui-card__evidence { color: #cbd5e1 }`,
+  `.message__tag { color: #f0b45a }`, `.failure__icon { color: #f87171 }` are light ink on
+  `--bg: #f5f6f8`. Several are near-duplicates of a token that already exists: `#f87171` *is* the dark
+  `--red` byte for byte, `#6366f1` *is* the dark `--accent-strong`, and `#0b0c10` is within two of `--bg`.
 - **194 `rgba(…)` literals sit outside the block too**, most of them white at 0.01–0.14 alpha. On the dark
   ground they are a whisper of paper; on `#f5f6f8` they are nothing at all. They are the same defect class
   at lower volume and they are *not* all fixed here — see *What stays*.
@@ -106,12 +107,15 @@ than pretend-fixed.
    `html.theme-light` or by `@media print` without `!important`, and the repo's own print sheet already
    leans on plain specificity. Class rules put every canvas colour where both the theme and the printer can
    reach it, and they are what lets the two `ALLOWED_FILES` entries be deleted. *My call.*
-2. **Six new tokens, named by role, not the parent's `--chart-1..6`.** The map needs a ground, a band, a
+2. **Seven new tokens, named by role, not the parent's `--chart-1..6`.** The map needs a ground, a band, a
    tint for "this row is the urgent one", two tints for selection, and ink for a filled control. It does not
    need six series colours, because the Studio has exactly one chart and it encodes *state*, not *series*.
-   The proposed names: `--plot-surface`, `--plot-band`, `--tint-accent`, `--tint-accent-strong`,
-   `--tint-amber`, `--accent-fill` with its paired ink `--on-accent`. Each gets a dark value and a light
-   override in the token block and nothing else; every one is measured by `theme.test.ts` before it ships.
+   The proposed names: `--plot-surface` (opaque in both palettes, so the gate can measure the axis text on
+   the ground it actually sits on), `--tint-accent`, `--tint-accent-strong`, `--tint-amber`,
+   `--accent-fill` with its paired ink `--on-accent`, and `--brand-tile` for the mascot's fixed dark tile.
+   The underserved zone needs no new hue: `--amber` already is the palette's warning colour, so the band
+   reads `var(--amber)` drawn at an opacity. Each token gets a dark value and, where the role changes with
+   the theme, a light override in the token block; every one is measured by `theme.test.ts` before it ships.
    *My call*, and the one a reviewer should push on hardest — it declines part of the parent epic's letter.
 3. **Score-band colour comes from tokens the bands already own** — `--accent` for served, `--amber` for
    underserved, `--red` for a score of 15 or more — not from new chart hues. Those three are already the
@@ -124,9 +128,11 @@ than pretend-fixed.
    is allowed. *My call.*
 5. **The guard splits into three rules, and the palette file is finally inside the scan.** (a) The existing
    whole-file rule for everything except `theme.css` is unchanged, minus the two canvas entries.
-   (b) `theme.css` itself: an opaque literal (`#hex` or `rgb(` with alpha 1) in a `color`, `background`,
-   `background-color`, `border-color`, `fill` or `stroke` declaration outside a token block fails at
-   **zero tolerance** — reachable because I am clearing all 43 in this change. (c) The alpha-blended
+   (b) `theme.css` itself: **any** declaration outside a token block whose value contains an opaque colour
+   literal fails at **zero tolerance** — nested in a `linear-gradient()` or hiding in a `var()` fallback
+   counts, and no property list is needed because the rule is on the value. Measured: 48 such declarations
+   today (39 `color`, 5 `background`, 3 `border-left-color`, 1 `border-color`), and clearing all 48 is what
+   makes zero tolerance reachable. (c) The alpha-blended
    literals get a **count baseline** with the same one-way ratchet as `ALLOWED_FILES`: the test holds the
    measured number, fails when a run produces more, and fails when a run produces fewer, so the number can
    only move down and someone who improves it is told to bank the improvement. The two `html.theme-light`
@@ -139,7 +145,7 @@ than pretend-fixed.
    by a test.** `light` means light, `dark` means dark, anything else — including the new `system` and a
    missing key — follows `matchMedia("(prefers-color-scheme: dark)")`. Still inline, still zero requests,
    still no settings API: the acceptance line says a shared snapshot must not depend on a live server, and
-   `localStorage` plus a media query is what a cold cache has. A new jsdom test then compares each token
+   `localStorage` plus a media query is what a cold cache has. A new node-side vitest test then compares each token
    name `offline.html` declares against the value in `theme.css`, so the copy cannot drift silently.
 8. **Print gets rules for the surfaces that become reachable, in ink rather than tokens.** Paper is opaque;
    the print sheet keeps its own literals (that is `print.css`'s existing allow-list reason) and names the
@@ -153,7 +159,7 @@ than pretend-fixed.
 
 ## What the change looks like
 
-`theme.css` gains the six tokens with light overrides; the 43 opaque declarations are replaced one by one,
+`theme.css` gains the seven tokens with light overrides; the 48 opaque declarations are replaced one by one,
 each by the token that names its role (`.composer__send` → `--accent-fill` + `--on-accent`; `.notice` →
 `--amber`; `.ui-card__evidence` → `--text`; `.ui-tone-bg--neutral` → `--faint`; and so on — the plan carries
 the full table). `OpportunityLandscape.tsx` and `JobMap.tsx` lose their colour `style` objects and SVG
