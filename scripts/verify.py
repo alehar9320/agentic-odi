@@ -8,12 +8,9 @@ CI still owns the full matrix.
 from __future__ import annotations
 
 import argparse
-import os
 import subprocess
 import sys
 import time
-from pathlib import Path
-
 
 WORKSPACE_MEMBERS = (
     "apps/cli",
@@ -45,7 +42,7 @@ def run_cmd(cmd: list[str], env: dict[str, str] | None = None) -> tuple[int, flo
         elapsed = time.time() - start
         print(f"    elapsed: {elapsed:.1f}s")
         return result.returncode, elapsed
-    except Exception as e:
+    except (subprocess.SubprocessError, OSError, ValueError) as e:
         elapsed = time.time() - start
         print(f"    elapsed: {elapsed:.1f}s (error: {e})")
         return 127, elapsed
@@ -55,8 +52,7 @@ def get_changed_files(base: str = "origin/main", head: str = "HEAD") -> list[str
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", f"{base}...{head}"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             check=False,
         )
@@ -64,8 +60,7 @@ def get_changed_files(base: str = "origin/main", head: str = "HEAD") -> list[str
             # try without merge-base
             result = subprocess.run(
                 ["git", "diff", "--name-only", base, head],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 check=False,
             )
@@ -73,14 +68,13 @@ def get_changed_files(base: str = "origin/main", head: str = "HEAD") -> list[str
             # try just HEAD vs working tree
             result = subprocess.run(
                 ["git", "diff", "--name-only", "HEAD"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 check=False,
             )
         files = [f.strip() for f in result.stdout.splitlines() if f.strip()]
         return files
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         return []
 
 
@@ -266,7 +260,7 @@ def verify_default(base: str = "origin/main", head: str = "HEAD") -> int:
 
 def verify_full(base: str = "origin/main", head: str = "HEAD") -> int:
     print("Tier: --full (CI's responsibility)")
-    print(f"Budget: full matrix as in .agents/workflows/test.md; per-job budgets 5-20 min")
+    print("Budget: full matrix as in .agents/workflows/test.md; per-job budgets 5-20 min")
     print()
     failed = False
 
