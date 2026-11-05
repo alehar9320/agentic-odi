@@ -38,6 +38,7 @@ SAMPLE_OUTPUT = "sample/index.html"
 PAGES_URL = "https://alehar9320.github.io/agentic-odi/"
 
 STUDIO_THEME = ROOT / "apps" / "studio" / "src" / "styles" / "theme.css"
+STUDIO_PALETTE = ROOT / "apps" / "studio" / "src" / "styles" / "tokens.css"
 MCP_SERVER_PY = ROOT / "apps" / "mcp-server" / "src" / "agentic_odi_mcp_server" / "mcp_server.py"
 CONTRACT_PY = ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "contract.py"
 CATALOG_PY = ROOT / "packages" / "connectors" / "src" / "agentic_odi_connectors" / "catalog.py"
@@ -61,8 +62,8 @@ def environment() -> Environment:
 
 
 def _tokens_css() -> str:
-    """The site's token file, generated from the Studio's own theme."""
-    tokens = extract.read_tokens(STUDIO_THEME)
+    """The site's token file, generated from the Studio's own palette."""
+    tokens = extract.read_tokens(STUDIO_PALETTE)
     easings = extract.read_easings(STUDIO_THEME)
     site_only = {
         "--bg-sunken": "#060709",
@@ -119,7 +120,8 @@ def _tokens_css() -> str:
     return (
         "\n\n".join(
             [
-                "/* Generated from apps/studio/src/styles/theme.css. Do not edit by hand. */",
+                "/* Generated from apps/studio/src/styles/tokens.css and theme.css."
+                " Do not edit by hand. */",
                 block(tokens),
                 block(easings),
                 block(site_only),

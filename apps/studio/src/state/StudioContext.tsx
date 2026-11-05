@@ -97,7 +97,7 @@ import type {
   StudioBrief,
   StudioConfig,
   StudioError,
-  StudioTheme,
+  StudioPalette,
   Thesis,
   ToolStatus,
   TurnNode,
@@ -106,6 +106,7 @@ import type {
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
 import { resolveTheme } from "../lib/theme";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
 
 /**
@@ -315,6 +316,12 @@ export interface ConnectionReport {
 export interface StudioContextValue {
   settings: StudioConfig;
   saveSettings: (config: StudioConfig) => void;
+  /**
+   * The palette this studio paints. `settings.theme` is the choice; this is that
+   * choice after a `system` answer has been resolved, and it is the value the
+   * class on `<html>` follows.
+   */
+  theme: StudioPalette;
   displayName: string;
   setDisplayName: (name: string) => void;
   brief: StudioBrief | null;
@@ -626,10 +633,15 @@ function loadTheses(): Thesis[] {
 
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StudioConfig>(loadSettings);
-  // The stored choice, or the operating system when there is none — the same
-  // resolution the inline bootstrap in index.html runs before React, so the
+  // The stored choice, or the operating system when it defers to one — the
+  // same resolution the inline bootstrap in index.html runs before React, so the
   // class it painted and the class the app keeps are the same one.
-  const theme: StudioTheme = resolveTheme(settings.theme);
+  //
+  // The media query is subscribed rather than read: a person who switches the
+  // operating system's palette while the studio is open expects the studio to
+  // follow, and nothing here would re-render to tell them it changed.
+  const prefersLight = useMediaQuery("(prefers-color-scheme: light)");
+  const theme: StudioPalette = resolveTheme(settings.theme, prefersLight);
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   // The context conversation is never a gate. It opens from the stage, from a
@@ -2423,6 +2435,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     () => ({
       settings,
       saveSettings,
+      theme,
       displayName,
       setDisplayName,
       brief,
@@ -2546,6 +2559,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [
       settings,
       saveSettings,
+      theme,
       displayName,
       setDisplayName,
       brief,

@@ -43,6 +43,8 @@ missing.
 | HTTP with retries | `packages/connectors/src/agentic_odi_connectors/http.py` | `urllib.request.urlopen` in `rest/connector.py` and `marketplace.py` |
 | HTTP from the CLI | `httpx` (declared by `apps/cli`) | `urllib.request.urlopen` in `apps/cli/src/agentic_odi_cli/update.py` |
 | ISO-8601 timestamps | `datetime.isoformat()` | `strftime("%Y-%m-%dT%H:%M:%SZ")` in `apps/cli/src/agentic_odi_cli/profile.py` and `apps/cli/src/agentic_odi_cli/flags.py` |
+| Colour values | `apps/studio/src/styles/tokens.css` — each palette declares its values once, and `src/styles/theme.test.ts` measures them | `apps/studio/src/styles/theme.css`, which still carries the values ALH-216 (M5-01.2) has not moved onto tokens; `colors.test.ts` exempts that file by name until they move |
+| A media query the UI has to follow | `apps/studio/src/lib/useMediaQuery.ts` | the pre-paint bootstrap in `apps/studio/index.html`, which cannot subscribe because it runs before the bundle exists. It mirrors `src/lib/theme.ts` on purpose, and `src/styles/bootShell.test.ts` fails if the two resolve differently |
 
 These rows are the record of an audit, not a to-do list with a deadline. Fixing them
 is ordinary refactoring, one pull request per concern.

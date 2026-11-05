@@ -193,7 +193,17 @@ export interface StudioError {
   request_id?: string | null;
 }
 
-export type StudioTheme = "light" | "dark";
+/**
+ * The palette choice a person makes in Settings.
+ *
+ * `system` is a choice, not an absence: it is stored so a reload keeps deference
+ * to the operating system, and so it can be told apart from a machine nobody has
+ * configured yet.
+ */
+export type StudioTheme = "light" | "dark" | "system";
+
+/** The palette actually painted, once a `system` choice has been resolved. */
+export type StudioPalette = "light" | "dark";
 
 export interface StudioConfig {
   base_url: string;

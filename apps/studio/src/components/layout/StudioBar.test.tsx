@@ -25,6 +25,9 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   openPanel: vi.fn(),
   pushToast: vi.fn(),
   saveSettings: vi.fn(),
+  // The bar reads the palette the studio paints, not the stored choice, so the
+  // stub has to answer for both.
+  theme: "dark",
   settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "dark" },
   ...overrides,
 });

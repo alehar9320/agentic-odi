@@ -1068,6 +1068,117 @@ describe("StudioContext theme", () => {
     await waitFor(() => expect(second.result.current.settings.theme).toBe("light"));
     expect(document.documentElement.classList.contains("theme-light")).toBe(true);
   });
+
+  /**
+   * A `matchMedia` the test can change its mind about.
+   *
+   * jsdom answers media queries statically, so the one behaviour these cases
+   * need — an operating system that switches palette while the page is open —
+   * cannot be reached without a list that keeps the registered listeners.
+   */
+  function stubMediaQuery(initial: boolean) {
+    const original = window.matchMedia;
+    const listeners = new Set<() => void>();
+    const state = { matches: initial };
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query.includes("prefers-color-scheme") ? state.matches : false,
+        media: query,
+        onchange: null,
+        addEventListener: (_type: string, cb: () => void) => void listeners.add(cb),
+        removeEventListener: (_type: string, cb: () => void) => void listeners.delete(cb),
+        addListener: (cb: () => void) => void listeners.add(cb),
+        removeListener: (cb: () => void) => void listeners.delete(cb),
+        dispatchEvent: () => false,
+      }),
+    });
+    restored.push(original);
+    return {
+      set(matches: boolean) {
+        state.matches = matches;
+        for (const cb of listeners) cb();
+      },
+    };
+  }
+  const restored: typeof window.matchMedia[] = [];
+  afterEach(() => {
+    const original = restored.pop();
+    if (original) {
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        writable: true,
+        value: original,
+      });
+    }
+  });
+
+  it("paints a stored system choice from the operating system", () => {
+    stubMediaQuery(false);
+    localStorage.setItem("studio.settings", JSON.stringify({ theme: "system" }));
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    expect(result.current.theme).toBe("dark");
+  });
+
+  it("follows an operating system that changes palette while the page is open", () => {
+    const media = stubMediaQuery(false);
+    localStorage.setItem("studio.settings", JSON.stringify({ theme: "system" }));
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    expect(result.current.theme).toBe("dark");
+
+    // No reload. The class on <html> is what every surface, portal, and native
+    // control reads, so it has to move with the answer, not only on boot.
+    act(() => {
+      media.set(true);
+    });
+
+    expect(result.current.theme).toBe("light");
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(false);
+    expect(document.documentElement.style.colorScheme).toBe("light");
+  });
+
+  it("follows the operating system when nothing is stored", () => {
+    const media = stubMediaQuery(true);
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    expect(result.current.theme).toBe("light");
+
+    act(() => {
+      media.set(false);
+    });
+
+    expect(result.current.theme).toBe("dark");
+  });
+
+  it("keeps a stored override when the operating system changes", () => {
+    const media = stubMediaQuery(false);
+    localStorage.setItem("studio.settings", JSON.stringify({ theme: "dark" }));
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // The stored choice outranks the OS in both directions, or the control in
+    // Settings would mean nothing on a machine set to the other palette.
+    act(() => {
+      media.set(true);
+    });
+
+    expect(result.current.theme).toBe("dark");
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+  });
+
+  it("paints the default instead of crashing on a stored value it never offered", () => {
+    stubMediaQuery(false);
+    localStorage.setItem("studio.settings", JSON.stringify({ theme: "midnight" }));
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    expect(result.current.theme).toBe("dark");
+  });
 });
 
 describe("StudioContext canvas state", () => {

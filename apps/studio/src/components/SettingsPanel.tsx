@@ -9,13 +9,13 @@ import {
 } from "../diagnostics/bundle";
 import { DiagnosticsModal } from "../diagnostics/DiagnosticsModal";
 import { PRODUCT_NAME } from "../lib/brand";
-import { resolveTheme } from "../lib/theme";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { ConnectionReport } from "../state/StudioContext";
-import type { ConnectorPreset, StudioConfig } from "../types";
+import type { ConnectorPreset, StudioConfig, StudioPalette } from "../types";
 import { FailurePanel } from "./FailurePanel";
 import { StatusDot } from "./status/StatusDot";
+import { AppearanceSection } from "./settings/sections/AppearanceSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ModelSection } from "./settings/sections/ModelSection";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
@@ -37,9 +37,11 @@ const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
  */
 function AboutSection({
   settings,
+  theme,
   capabilities,
 }: {
   settings: StudioConfig;
+  theme: StudioPalette;
   capabilities: unknown[];
 }) {
   const service = useUpdateService();
@@ -62,7 +64,7 @@ function AboutSection({
       version: snapshot.currentVersion ?? STUDIO_VERSION,
       build: __STUDIO_BUILD_DATE__,
       platform: PLATFORM_LABELS[platform],
-      theme: resolveTheme(settings.theme),
+      theme,
       reachable,
       defaults: {
         base_url: settings.base_url,
@@ -140,6 +142,7 @@ export function SettingsPanel() {
   const {
     settings,
     saveSettings,
+    theme,
     displayName,
     setDisplayName,
     brief,
@@ -233,6 +236,8 @@ export function SettingsPanel() {
           onChange={(event) => setDisplayName(event.target.value)}
         />
       </div>
+
+      <AppearanceSection settings={settings} saveSettings={saveSettings} />
 
       <ModelSection
         settings={settings}
@@ -411,7 +416,7 @@ export function SettingsPanel() {
 
       <UpdateSettings />
 
-      <AboutSection settings={settings} capabilities={capabilities} />
+      <AboutSection settings={settings} theme={theme} capabilities={capabilities} />
 
       <details className="disclosure">
         <summary>How the studio works</summary>

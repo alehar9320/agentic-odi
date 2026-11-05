@@ -30,6 +30,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
   ({
     settings: { base_url: "http://x", api_key: "k", model_name: "m", mcp_url: "u", display_name: "" },
     saveSettings: vi.fn(),
+    theme: "dark",
     displayName: "Ada",
     setDisplayName: vi.fn(),
     brief: null,
@@ -112,6 +113,23 @@ describe("SettingsPanel model catalog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /find models/i }));
     expect(refresh).toHaveBeenCalled();
+  });
+});
+
+describe("SettingsPanel appearance", () => {
+  it("offers the palette control where a person can see it", () => {
+    const save = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings: save }));
+
+    renderPanel();
+
+    // The settings stub stores no theme, so the choice on screen is the one
+    // that defers to the operating system.
+    const group = screen.getByRole("radiogroup", { name: "Theme" });
+    expect(within(group).getByRole("radio", { name: "System" })).toBeChecked();
+
+    fireEvent.click(within(group).getByRole("radio", { name: "Light" }));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ theme: "light" }));
   });
 });
 

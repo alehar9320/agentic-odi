@@ -1,0 +1,89 @@
+/*
+ * The palette.
+ *
+ * Every colour the studio paints is decided here, once per theme, so a surface
+ * needs only a `var(--…)` to follow the person's choice. `theme.test.ts` reads
+ * its ratios out of these declarations: a colour defined anywhere else is a
+ * colour nothing measures.
+ *
+ * Dark is the default rather than a theme. A browser that runs no script, a
+ * store the app cannot read, and a first visit all land on the palette the
+ * app itself falls back to, so there is no in-between state to design for. The
+ * class that switches the light values on is set before first paint by the
+ * inline script in `index.html` and kept in step by `state/StudioContext.tsx`.
+ */
+
+:root {
+  color-scheme: dark;
+  --bg: #0a0b0e;
+  --bg-raised: #0e1014;
+  --text: #f1f2f4;
+  --muted: #a2a7b3;
+  --faint: #7d828c;
+  --accent: #8b8cf8;
+  --accent-strong: #6366f1;
+  --green: #4ade80;
+  --amber: #f0b34a;
+  --red: #f87171;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --surface: rgba(255, 255, 255, 0.03);
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Series colours for a chart that has to tell six things apart. Four come
+     straight from the palette so the studio keeps one colour vocabulary; the
+     last two are hues no other token occupies. `theme.test.ts` holds each of
+     them at 3:1 — WCAG's minimum for a graphic that carries meaning — against
+     both surfaces, in both palettes. ALH-216 (M5-01.2) converts the SVG
+     surfaces onto these; until then they are the seam, not a second palette. */
+  --chart-1: #8b8cf8;
+  --chart-2: #4ade80;
+  --chart-3: #f0b34a;
+  --chart-4: #f87171;
+  --chart-5: #22d3ee;
+  --chart-6: #f472b6;
+
+  /* Canvas components were written against the original palette; the aliases
+     keep them on the live tokens so both themes stay in step. */
+  --studio-text: var(--text);
+  --studio-muted: var(--muted);
+  --studio-indigo: var(--accent);
+  --studio-indigo-strong: var(--accent-strong);
+  --studio-green: var(--green);
+  --studio-amber: var(--amber);
+  --studio-red: var(--red);
+  --studio-surface: var(--surface);
+  --studio-border: var(--line);
+  --studio-radius: 12px;
+}
+
+html.theme-dark {
+  color-scheme: dark;
+}
+
+/* Light keeps the same token names, so every surface follows the choice. */
+html.theme-light {
+  color-scheme: light;
+  --bg: #f5f6f8;
+  --bg-raised: #ffffff;
+  --text: #15171c;
+  --muted: #565d6b;
+  --faint: #687080;
+  --accent: #5b5bd6;
+  --accent-strong: #4f46e5;
+  --green: #15803d;
+  --amber: #b45309;
+  --red: #b91c1c;
+  --line: rgba(15, 23, 42, 0.09);
+  --line-strong: rgba(15, 23, 42, 0.18);
+  --surface: rgba(15, 23, 42, 0.035);
+  --surface-hover: rgba(15, 23, 42, 0.07);
+  --chart-1: #5b5bd6;
+  --chart-2: #15803d;
+  --chart-3: #b45309;
+  --chart-4: #b91c1c;
+  --chart-5: #0e7490;
+  --chart-6: #a21caf;
+}

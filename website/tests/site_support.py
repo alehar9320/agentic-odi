@@ -18,6 +18,7 @@ TOOLS = SITE / "tools"
 sys.path.insert(0, str(TOOLS))
 
 STUDIO_THEME = ROOT / "apps" / "studio" / "src" / "styles" / "theme.css"
+STUDIO_PALETTE = ROOT / "apps" / "studio" / "src" / "styles" / "tokens.css"
 MCP_SERVER_PY = ROOT / "apps" / "mcp-server" / "src" / "agentic_odi_mcp_server" / "mcp_server.py"
 CONTRACT_PY = ROOT / "packages" / "core" / "src" / "agentic_odi_core" / "contract.py"
 CATALOG_PY = ROOT / "packages" / "connectors" / "src" / "agentic_odi_connectors" / "catalog.py"
