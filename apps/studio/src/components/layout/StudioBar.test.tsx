@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -9,6 +9,12 @@ vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 
+vi.mock("../../api/studioApi", () => ({
+  fetchChangelog: vi.fn(),
+}));
+
+import { fetchChangelog } from "../../api/studioApi";
+import { markReleasesRead } from "../../lib/changelogRead";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import type { UpdateSnapshot } from "../../updater/types";
@@ -47,6 +53,8 @@ const stubSnapshot = (overrides: Partial<UpdateSnapshot> = {}): UpdateSnapshot =
 describe("StudioBar", () => {
   beforeEach(() => {
     vi.mocked(useUpdateSnapshot).mockReturnValue(stubSnapshot() as never);
+    vi.mocked(fetchChangelog).mockResolvedValue({ releases: [] } as never);
+    window.localStorage.clear();
   });
   it("shows the Odi mark at 32 pixels so the pixel art stays crisp", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext() as never);
@@ -160,7 +168,7 @@ describe("StudioBar", () => {
     expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "light" }));
   });
 
-  it("exports the conversation as Markdown from the overflow menu", () => {
+  it("exports the conversation as Markdown from one icon button (#695)", () => {
     const createObjectURL = vi.fn(() => "blob:conversation");
     const revokeObjectURL = vi.fn();
     Object.defineProperty(URL, "createObjectURL", {
@@ -183,8 +191,10 @@ describe("StudioBar", () => {
     );
 
     render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /export.*markdown/i }));
+    // Export is the control, not an entry behind another control.
+    expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Export conversation as Markdown" }));
 
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
@@ -516,4 +526,111 @@ describe("StudioBar new thread control (#319)", () => {
     expect(onNew).not.toHaveBeenCalledWith({ stop: true });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+  it("shows one accent dot when there are release notes nobody has read (#695)", async () => {
+    vi.mocked(fetchChangelog).mockResolvedValue({
+      releases: [
+        { version: "0.15.0", date: "2026-11-01", categories: [] },
+        { version: "0.14.0", date: "2026-10-20", categories: [] },
+      ],
+    } as never);
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+
+    const { container } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+
+    expect(await screen.findByText("new release notes")).toBeInTheDocument();
+    expect(container.querySelectorAll(".pill-changelog__dot")).toHaveLength(1);
+    // The dot is not the only announcement: the button says it too.
+    expect(
+      screen.getByRole("button", { name: "Open What's New changelog, new release notes" }),
+    ).toBeInTheDocument();
+  });
+
+  it("clears the dot the moment Mark all read acknowledges the notes (#695)", async () => {
+    vi.mocked(fetchChangelog).mockResolvedValue({
+      releases: [{ version: "0.15.0", date: "2026-11-01", categories: [] }],
+    } as never);
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+
+    const { container } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+    expect(await screen.findByText("new release notes")).toBeInTheDocument();
+
+    act(() => {
+      markReleasesRead(["0.15.0"]);
+    });
+
+    await waitFor(() => expect(container.querySelector(".pill-changelog__dot")).toBeNull());
+    expect(screen.queryByText("new release notes")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Open What's New changelog" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no dot for versions already read, or when the notes cannot be fetched (#695)", async () => {
+    vi.mocked(fetchChangelog).mockClear();
+    window.localStorage.setItem("agentic-odi.changelog.read", JSON.stringify(["0.15.0"]));
+    vi.mocked(fetchChangelog).mockResolvedValue({
+      releases: [{ version: "0.15.0", date: "2026-11-01", categories: [] }],
+    } as never);
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+
+    const { container, unmount } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+    await waitFor(() => expect(fetchChangelog).toHaveBeenCalledTimes(1));
+    expect(container.querySelector(".pill-changelog__dot")).toBeNull();
+    unmount();
+
+    vi.mocked(fetchChangelog).mockRejectedValue(new Error("offline"));
+    const second = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+    await waitFor(() => expect(fetchChangelog).toHaveBeenCalledTimes(2));
+    expect(second.container.querySelector(".pill-changelog__dot")).toBeNull();
+  });
+
+  it("exports with Ctrl/Cmd+Shift+E when a thread exists, and stays inert without one (#695)", () => {
+    const createObjectURL = vi.fn(() => "blob:conversation");
+    Object.defineProperty(URL, "createObjectURL", {
+      value: createObjectURL,
+      configurable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        messages: [
+          { role: "user", content: "Show me the top outcomes." },
+          { role: "assistant", content: "Here they are." },
+        ],
+      }) as never,
+    );
+    const { unmount } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+
+    fireEvent.keyDown(window, { key: "e", ctrlKey: true, shiftKey: true });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+
+    // Without a modifier, or without Option/Shift on the mac, nothing happens.
+    fireEvent.keyDown(window, { key: "e" });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    unmount();
+
+    vi.mocked(useStudio).mockReturnValue(stubContext({ messages: [] }) as never);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.keyDown(window, { key: "e", ctrlKey: true, shiftKey: true });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    // The button that offers the same action says why it is unavailable.
+    expect(
+      screen.getByRole("button", { name: "Export conversation as Markdown" }),
+    ).toBeDisabled();
+    click.mockRestore();
+  });
+
 });

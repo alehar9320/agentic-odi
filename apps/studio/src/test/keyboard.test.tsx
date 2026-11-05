@@ -20,6 +20,11 @@ vi.mock("../state/StudioContext", () => ({
     closeCustomize: vi.fn(),
     streaming: false,
     stopStreaming: vi.fn(),
+    // The shell reads these for the window title (#695).
+    messages: [],
+    conversations: [],
+    conversationId: null,
+    unreadSignalCount: 0,
   }),
 }));
 // The children keep one control each, so the tab order asserted below is the
