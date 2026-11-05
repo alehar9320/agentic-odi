@@ -13,7 +13,8 @@ const harness = vi.hoisted(() => ({
     streaming: false,
     thinkingPhase: null as string | null,
     toolActivity: [] as unknown[],
-    offlineReply: false,
+    offlineReplyFor: null as string | null,
+    openPanel: vi.fn<(panel: string) => void>(),
     canvas: null,
     regenerateFrom: vi.fn(),
     editFrom: vi.fn(),
@@ -292,11 +293,18 @@ describe("Conversation", () => {
 });
 
 describe("Conversation offline context", () => {
-  it("marks a content-less offline turn as local guidance", () => {
-    harness.state.offlineReply = true;
+  it("names the provenance on the one reply that needs it and offers the fix", () => {
+    harness.state.offlineReplyFor = "m-2";
     const { container } = renderTurn([
       {
         id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "From the model.",
+        parts: [{ kind: "text", text: "From the model." }],
+      },
+      {
+        id: "m-2",
         parentId: null,
         role: "assistant",
         content: "",
@@ -304,9 +312,15 @@ describe("Conversation offline context", () => {
       },
     ]);
 
-    expect(screen.getByText("Local guidance")).toBeInTheDocument();
-    expect(container.querySelector(".message__tag")).not.toBeNull();
-    harness.state.offlineReply = false;
+    const chips = container.querySelectorAll("button.message__tag");
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent("Local draft, no model connected");
+
+    fireEvent.click(chips[0] as HTMLButtonElement);
+    expect(harness.state.openPanel).toHaveBeenCalledWith("settings");
+
+    harness.state.offlineReplyFor = null;
+    harness.state.openPanel.mockClear();
   });
 });
 

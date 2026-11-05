@@ -284,6 +284,7 @@ def _render_docs(env: Environment, nav: dict[str, Any], context: dict[str, Any])
             # The guide's own top-level heading is its title.
             page_context["page"]["title"] = own_title
         page_context["page"]["body"] = body
+        page_context["page"]["has_diagram"] = 'class="mermaid"' in body
         page_context["page"]["toc"] = toc
         page_context["prefix"] = "../../"
         rendered[output] = env.get_template("doc.html").render(**page_context)

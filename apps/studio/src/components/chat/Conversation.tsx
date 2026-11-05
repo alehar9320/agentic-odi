@@ -43,6 +43,7 @@ import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon } from "../icons";
 import { RunRow } from "./RunRow";
 import { Markdown } from "./Markdown";
+import { StallNotice } from "./StallNotice";
 
 const PHASE_LABEL: Record<string, string> = {
   health_check: "Waking the model",
@@ -74,7 +75,8 @@ function isLiveRun(
 }
 
 function AssistantMessage() {
-  const { thinkingPhase, offlineReply, sendMessage } = useStudio();
+  const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
+  const id = useAuiState((state) => state.message.id);
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
   const hasText = useAuiState((state) =>
@@ -96,7 +98,17 @@ function AssistantMessage() {
     <article className="message message--assistant" aria-busy={running}>
       <AssistantAvatar />
       <div className="message__body">
-        {offlineReply ? <span className="message__tag">Local guidance</span> : null}
+        {/* Named on the reply it describes, never on every reply on screen, and
+            said once instead of warned about in a strip above the work. */}
+        {offlineReplyFor === id ? (
+          <button
+            type="button"
+            className="message__tag"
+            onClick={() => openPanel("settings")}
+          >
+            Local draft, no model connected
+          </button>
+        ) : null}
 
         <MessagePrimitive.GroupedParts
           indicator="never"
@@ -148,6 +160,10 @@ function AssistantMessage() {
 
         {running && !hasText ? <TypingPart label={phaseLabel(thinkingPhase)} /> : null}
         {running && hasText ? <span className="caret" aria-hidden="true" /> : null}
+
+        {/* Silence is not failure: a long tool call gets one honest line, and
+            a dropped run falls through to the failure panel instead. */}
+        <StallNotice />
 
         {error ? (
           <FailurePanel
@@ -226,7 +242,7 @@ function UserMessage() {
           const size = ready ? formatFileSize(ready.size) : "";
 
           return (
-            <span className="attachment-chip">
+            <span className="attachment-chip" data-aui-quote-selectable="false">
               {ready?.dataUrl ? (
                 <img className="attachment-chip__thumb" src={ready.dataUrl} alt="" />
               ) : null}

@@ -309,6 +309,47 @@ def test_natural_language_rules_never_fail_the_build() -> None:
     assert result.errors == []
 
 
+def test_a_new_source_file_with_no_reuse_report_warns() -> None:
+    result = _truth("Adds a retry helper.", added_paths=["packages/core/retry.py"])
+
+    assert result.errors == []
+    assert any("Reuses" in warning for warning in result.warnings)
+
+
+def test_a_reuse_report_silences_the_new_source_warning() -> None:
+    body = "Adds a retry helper.\n\nReuses: apps/cli/cli.py\n"
+
+    result = _truth(body, added_paths=["packages/core/retry.py"])
+
+    assert result.warnings == []
+
+
+def test_a_bolded_reuse_label_counts_as_a_report() -> None:
+    result = _truth(
+        "**Reuses:** nothing available", added_paths=["apps/studio/lib/relativeTime.ts"]
+    )
+
+    assert result.warnings == []
+
+
+def test_a_new_test_or_document_owes_no_reuse_report() -> None:
+    added = ["tests/test_retry.py", "docs/architecture/reuse.md"]
+
+    result = _truth("Adds coverage.", added_paths=added)
+
+    assert result.warnings == []
+
+
+def test_several_new_source_files_are_named_once_in_the_warning() -> None:
+    result = _truth("", added_paths=["a.py", "b.py", "c.py", "d.py", "e.py", "f.py"])
+
+    warnings = [warning for warning in result.warnings if "Reuses" in warning]
+
+    assert len(warnings) == 1
+    assert "6 new source file(s)" in warnings[0]
+    assert "f.py" not in warnings[0]
+
+
 # --- Body truth: machine-readable JSON block (failure) -----------------------
 
 
@@ -530,19 +571,31 @@ def test_the_default_config_documents_the_thresholds() -> None:
     assert "uv.lock" in config["generated_exclusions"]
 
 
-def test_the_allowlist_only_approves_banner_component_replacements() -> None:
+def test_the_allowlist_only_approves_reviewed_deletions() -> None:
+    """Every approved deletion is named here, grouped by the change that made it.
+
+    Pinning the exact paths per issue keeps the allowlist from growing silently:
+    a new entry fails this test until someone adds it deliberately.
+    """
     import yaml
 
     allowlist = yaml.safe_load(ALLOWLIST.read_text(encoding="utf-8"))
 
-    assert {entry["path"] for entry in allowlist} == {
-        "apps/studio/src/components/Toasts.test.tsx",
-        "apps/studio/src/components/Toasts.tsx",
-        "apps/studio/src/components/chat/OfflineNotice.tsx",
-        "apps/studio/src/components/notices/SidecarNotice.test.tsx",
-        "apps/studio/src/components/notices/SidecarNotice.tsx",
+    approved: dict[int, set[str]] = {}
+    for entry in allowlist:
+        approved.setdefault(entry["issue"], set()).add(entry["path"])
+
+    assert approved == {
+        264: {
+            "apps/studio/src/components/Toasts.test.tsx",
+            "apps/studio/src/components/Toasts.tsx",
+            "apps/studio/src/components/chat/OfflineNotice.tsx",
+            "apps/studio/src/components/notices/SidecarNotice.test.tsx",
+            "apps/studio/src/components/notices/SidecarNotice.tsx",
+        },
+        497: {"tests/scripts/test_roadmap_check.py"},
     }
-    assert all(entry["issue"] == 264 and entry["reason"] for entry in allowlist)
+    assert all(entry["reason"] for entry in allowlist)
 
 
 def test_the_template_asks_for_experience_verification_and_scope() -> None:

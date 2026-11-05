@@ -142,6 +142,7 @@ only when you intentionally need to stage a map before capturing outcomes.
 
 # Desired Outcomes
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4 --claim-check '{"asked": ["How long does setup take?"], "answers": ["About a day"]}'
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
@@ -157,6 +158,15 @@ agentic-odi summary <job-id> --top 3 --json
 
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
 checks a statement against the ODI format rules before saving.
+
+A score must carry the questions behind it. `--claim-check` takes the JSON you
+collected — `asked`, `answers`, and `skips` (each skip needs a reason). Omit it
+and the score is recorded as unverified, saying no customer questions were
+asked, so a by-hand score is never mistaken for an interrogated one. The MCP
+`add_outcome` tool is stricter: it refuses a score with no `claim_check` at all,
+and a score with no numbers is always legal. Its description puts the interview
+first — three questions to the customer before any number, and their replies as
+the answers.
 
 Job names are validated by the core model: 3–64 characters drawn from letters,
 digits, spaces, underscores, and hyphens. Descriptions may be up to 500
@@ -266,6 +276,25 @@ agentic-odi strategy show --json
 When no path has evidence, `strategy propose` exits non-zero and says what is
 missing rather than inventing a bet. Until one exists, `strategy show` prints
 "No strategy recorded" and points at `strategy propose`.
+
+## Studies and waves
+
+A study is one named pass over a job — its interviews, its outcomes, its dates.
+Opening the same study again is a new **wave**, not a second copy of the first, so
+"the market last quarter" and "the market this quarter" stay comparable. A study
+opens `planned`; the same `(job, name)` may not repeat a wave, which refuses an
+accidental re-run while leaving a deliberate later wave expressible.
+
+```bash
+agentic-odi studies open --job <job-id> --name "Invoice sweep" --wave 1
+agentic-odi studies open --job <job-id> --name "Invoice sweep" --wave 2 --method-notes "revisit after the price change"
+agentic-odi studies list
+agentic-odi studies list --job <job-id> --json
+```
+
+`studies list` is empty until a study has been opened. Outcomes carry an optional
+`study_id` scoping them to a study of their own job; a row that predates studies has
+none, and opening studies never invents one for it.
 
 ## Schema, scoring, and guidance
 
