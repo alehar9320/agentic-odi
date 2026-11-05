@@ -156,6 +156,10 @@ def test_a_figure_must_be_a_number_the_page_states():
     # that `</script >` used to leave the body behind for the tag strip.
     assert make_og.figure_for("<script>var s = '31 tools'</script >") is None
     assert make_og.figure_for("<style>/* 31 tools */</style >") is None
+    # An end tag may carry junk before ">", which browsers still honour as
+    # an end tag; the body must go either way.
+    assert make_og.figure_for("<script>var s = '31 tools'</script bar>") is None
+    assert make_og.figure_for("<style>/* 31 tools */</style junk>") is None
 
 
 def test_a_year_or_example_number_never_becomes_a_figure():
