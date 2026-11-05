@@ -4205,19 +4205,20 @@ button.message__tag:hover {
 /* ------------------------------------------------------------------ */
 /* Discrete Changelog Modal (Steve Jobs Quality)                     */
 /* ------------------------------------------------------------------ */
+/* The changelog pill is a chip, not a filled control: its ground is a tint, and
+   the ink that survives a tint in both palettes is the text colour. The indigo
+   stays where a colour can carry meaning without carrying contrast — the ring. */
 .pill-changelog {
-  background: rgba(129, 140, 248, 0.18);
-  color: var(--accent);
-  border: 1px solid rgba(129, 140, 248, 0.4);
+  background: var(--tint-accent);
+  color: var(--text);
+  border: 1px solid var(--accent);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .pill-changelog:hover {
-  background: rgba(129, 140, 248, 0.3);
-  border-color: var(--accent);
-  color: var(--text);
-  box-shadow: 0 0 12px rgba(129, 140, 248, 0.25);
+  background: var(--tint-accent-strong);
+  box-shadow: 0 0 12px var(--tint-accent-strong);
 }
 
 .changelog-overlay {
@@ -6780,5 +6781,169 @@ details[open] summary {
 .segments-board__refusal {
   margin: 0;
   font-size: 0.8rem;
+  color: var(--amber);
+}
+
+/* ------------------------------------------------------------------ */
+/* Opportunity landscape                                                */
+/* ------------------------------------------------------------------ */
+
+/* The map paints nothing itself. Every colour below is a role token, so the
+   plot inverts with the theme and prints in ink; the score band rides on the
+   marker's shape, which survives a greyscale sheet and a colour-blind reader
+   the way a colour alone cannot. */
+
+.opportunity-matrix__toggle {
+  display: flex;
+  background: var(--surface-hover);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.opportunity-matrix__panel {
+  background: var(--plot-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.opportunity-matrix__axes {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.opportunity-matrix__grid {
+  stroke: var(--line);
+}
+
+.opportunity-matrix__axis {
+  fill: var(--muted);
+}
+
+.opportunity-matrix__band {
+  fill: var(--tint-amber);
+  stroke: var(--amber);
+  stroke-width: 1;
+}
+
+.opportunity-matrix__zone-label {
+  font-weight: 600;
+}
+
+.opportunity-matrix__zone-label--underserved {
+  fill: var(--amber);
+}
+
+.opportunity-matrix__zone-label--overserved {
+  fill: var(--faint);
+}
+
+.opportunity-matrix__node {
+  stroke: var(--plot-surface);
+  stroke-width: 2;
+}
+
+.opportunity-matrix__node--served {
+  fill: var(--accent);
+}
+
+.opportunity-matrix__node--underserved {
+  fill: var(--amber);
+}
+
+.opportunity-matrix__node--deep {
+  fill: var(--red);
+}
+
+.opportunity-matrix__node-edge {
+  stroke-width: 1.5;
+  opacity: 0.4;
+}
+
+.opportunity-matrix__node-edge--underserved {
+  stroke: var(--amber);
+}
+
+.opportunity-matrix__node-edge--deep {
+  stroke: var(--red);
+}
+
+.opportunity-matrix__label {
+  fill: var(--muted);
+  font-weight: 500;
+}
+
+.opportunity-matrix__label--active {
+  fill: var(--text);
+  font-weight: 700;
+}
+
+/* The legend repeats the shapes in words, because a marker's geometry is not
+   something a screen reader can infer from the picture. */
+.opportunity-matrix__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.opportunity-matrix__legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.opportunity-matrix__key {
+  width: 12px;
+  height: 12px;
+}
+
+.opportunity-matrix__key--served {
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.opportunity-matrix__key--underserved {
+  background: var(--amber);
+}
+
+.opportunity-matrix__key--deep {
+  background: var(--red);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.opportunity-matrix__header-row {
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.opportunity-matrix__row--underserved {
+  /* An inset ring rather than a wash: a table row holds no colour of its own,
+     and the amber the row is short of is spelled out in its status pill. */
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+
+.opportunity-matrix__row--selected {
+  background: var(--tint-accent);
+}
+
+.opportunity-matrix__pill {
+  background: var(--surface-hover);
+  color: var(--muted);
+}
+
+.opportunity-matrix__pill--underserved {
+  background: var(--tint-amber);
   color: var(--amber);
 }

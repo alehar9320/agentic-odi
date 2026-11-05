@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  bandOf,
+  DEEP_SCORE,
   formatMemberMean,
   formatOpportunityScore,
   hasScore,
@@ -20,6 +22,28 @@ describe("opportunityScore", () => {
   it("never subtracts when satisfaction exceeds importance", () => {
     expect(opportunityScore(4, 9)).toBeCloseTo(4, 5);
     expect(opportunityScore(8, 8)).toBeCloseTo(8, 5);
+  });
+});
+
+describe("bandOf", () => {
+  it("splits the score range into the three bands the map draws", () => {
+    expect(bandOf(null)).toBe("served");
+    expect(bandOf(4)).toBe("served");
+    expect(bandOf(10)).toBe("served");
+    expect(bandOf(10.5)).toBe("underserved");
+    expect(bandOf(14.9)).toBe("underserved");
+    expect(bandOf(DEEP_SCORE)).toBe("deep");
+    expect(bandOf(20)).toBe("deep");
+  });
+
+  it("agrees with isUnderserved below the deep threshold, so one score cannot be two things", () => {
+    for (let score = 0; score <= 20; score = Number((score + 0.1).toFixed(1))) {
+      const band = bandOf(score);
+      expect(band === "underserved" || band === "deep").toBe(isUnderserved(score));
+      if (score < DEEP_SCORE) {
+        expect(band === "underserved").toBe(isUnderserved(score));
+      }
+    }
   });
 });
 

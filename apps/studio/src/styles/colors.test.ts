@@ -35,10 +35,6 @@ const ALLOWED_FILES: Record<string, { reason: string; issue: number }> = {
     reason: "The first-run introduction is a fixed dark scrim with its own gradients.",
     issue: 330,
   },
-  "src/components/canvas/OpportunityLandscape.tsx": {
-    reason: "SVG chart colour encodes the score band; it is data, not theme.",
-    issue: 335,
-  },
   "src/components/canvas/JobMap.tsx": {
     reason: "SVG job-map strokes and fills are structural geometry, not theme.",
     issue: 335,
@@ -48,8 +44,10 @@ const ALLOWED_FILES: Record<string, { reason: string; issue: number }> = {
 /** The palette's own home; it is the one file that may hold literals. */
 const TOKEN_FILE = "src/styles/theme.css";
 
-/** Above this the baseline has become a dumping ground rather than a record. */
-const ALLOWED_CAP = 6;
+/** Above this the baseline has become a dumping ground rather than a record.
+ * 5 since the opportunity map was converted: its colours became role tokens and
+ * a shape, so the file has no literal left to excuse. */
+const ALLOWED_CAP = 5;
 
 /** Source text for every file the gate reads, loaded the way Vite serves it. */
 const SOURCES = {
@@ -376,9 +374,10 @@ const OPAQUE_CEILING = 0;
  * Measured 2026-11-05, per literal rather than per line. Exact rather than a
  * ceiling, so the number moves only when someone converts a wash and banks the
  * new count here — the same one-way ratchet the `ALLOWED_FILES` staleness test
- * runs on.
+ * runs on. 208 at the themed-surface work's start; the opportunity map and the
+ * changelog chip moved onto the tint tokens and banked the four that left.
  */
-const ALPHA_BASELINE = 208;
+const ALPHA_BASELINE = 204;
 
 describe("raw colours", () => {
   it("keeps the palette in theme.css and nothing else", () => {

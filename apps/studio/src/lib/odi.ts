@@ -16,6 +16,25 @@ export function isUnderserved(score: number | null | undefined): boolean {
   return score != null && score > UNDERSERVED_THRESHOLD;
 }
 
+/** The score at which an underserved outcome stops being a gap and becomes a
+ * deep one. The map gives it its own shape, so the number lives here and not
+ * in a component that cannot be measured. */
+export const DEEP_SCORE = 15;
+
+export type ScoreBand = "served" | "underserved" | "deep";
+
+/**
+ * Which of the three bands the map draws a score falls in. An unscored outcome
+ * is `served`: the map plots what the store holds, and a missing score is not
+ * evidence of a gap.
+ */
+export function bandOf(score: number | null | undefined): ScoreBand {
+  if (score != null && score >= DEEP_SCORE) {
+    return "deep";
+  }
+  return isUnderserved(score) ? "underserved" : "served";
+}
+
 /** True only when the store actually holds a numeric score for this outcome.
  * A real score of `0` is scored; `null`, `undefined`, and non-finite values are not. */
 export function hasScore(value: unknown): value is number {
