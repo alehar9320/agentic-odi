@@ -1,5 +1,5 @@
 {#
-  The nine ODI cards the agent may compose, rendered as the shipped catalog
+  The ten ODI cards the agent may compose, rendered as the shipped catalog
   renders them. These are the agent's closed catalog — a stable contract —
   not the Studio's canvas view names, which are in flux.
 #}
@@ -67,6 +67,38 @@
     </li>
     {% endfor %}
   </ol>
+</article>
+{% endmacro %}
+
+{% macro theme_tree(data) %}
+<article class="surface" data-surface="theme-tree">
+  <div class="surface__head">
+    <span class="surface__id">{{ data.title | default("Theme tree") }}</span>
+    <span class="pill">{{ data.themes | length }} themes</span>
+  </div>
+  <ul class="themmtree">
+    {% for row in data.themes %}
+    <li class="themmtree__row{% if row.parent_id %} themmtree__row--child{% endif %}">
+      <span class="themmtree__name">{{ row.name }}</span>
+      <span class="themmtree__counts">
+        <span>{{ row.outcomes }} outcome{{ "" if row.outcomes == 1 else "s" }}</span>
+        <span aria-hidden="true">·</span>
+        <span>{{ row.measured }} measured</span>
+      </span>
+      <span class="themmtree__top">
+        {%- if row.top_opportunity is defined and row.top_opportunity is not none -%}
+          Top {{ row.top_opportunity }}
+        {%- elif not row.outcomes -%}
+          No outcomes yet
+        {%- elif not row.measured -%}
+          Nothing measured yet
+        {%- else -%}
+          No top recorded
+        {%- endif -%}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
 </article>
 {% endmacro %}
 
@@ -172,6 +204,7 @@
   {% if card.type == "outcome-card" %}{{ outcome_card(card.data) }}
   {% elif card.type == "opportunity-board" %}{{ opportunity_board(card.data) }}
   {% elif card.type == "job-map" %}{{ job_map(card.data) }}
+  {% elif card.type == "theme-tree" %}{{ theme_tree(card.data) }}
   {% elif card.type == "impact-simulation" %}{{ impact_simulation(card.data) }}
   {% elif card.type == "evidence-quote" %}{{ evidence_quote(card.data) }}
   {% elif card.type == "opportunity-thesis" %}{{ opportunity_thesis(card.data) }}

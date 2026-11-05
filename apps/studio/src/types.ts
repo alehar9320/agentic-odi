@@ -79,6 +79,8 @@ export interface BulkNarrowing {
   text?: string;
   stage?: string;
   theme_ids?: string[];
+  /** The run covers each named theme's whole branch, exactly as the visible search did. */
+  include_children?: boolean;
   confidence?: string;
   tags?: string[];
   min_score?: number;

@@ -10,6 +10,7 @@ import {
   OutcomeCard,
   SegmentCard,
   StrategyCard,
+  ThemeTree,
 } from "./cards";
 import {
   Callout,
@@ -46,6 +47,7 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
   "impact-simulation": ImpactSimulation,
   "evidence-quote": EvidenceQuote,
   "job-map": JobMap,
+  "theme-tree": ThemeTree,
   "decision-record": DecisionRecord,
   "segment-card": SegmentCard,
   "strategy-card": StrategyCard,

@@ -128,6 +128,102 @@ def test_search_scopes_to_one_job(tmp_path) -> None:
     assert theirs["total"] == 0
 
 
+def test_a_theme_can_stand_for_its_whole_branch(tmp_path) -> None:
+    """``--with-children`` is the same read the theme's rollup count answers for."""
+    db, job_id, outcome_id = _seed(tmp_path)
+    runner = CliRunner()
+    parent = _json(
+        runner, ["--db", db, "themes", "add", "--name", "Cash timing", "--job", job_id, "--json"]
+    )
+    child = _json(
+        runner,
+        [
+            "--db",
+            db,
+            "themes",
+            "add",
+            "--name",
+            "Payment windows",
+            "--job",
+            job_id,
+            "--parent",
+            str(parent["id"]),
+            "--json",
+        ],
+    )
+    _json(
+        runner,
+        [
+            "--db",
+            db,
+            "themes",
+            "assign",
+            "--theme",
+            str(parent["id"]),
+            "--outcome",
+            outcome_id,
+            "--json",
+        ],
+    )
+    child_outcome = _json(
+        runner,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "add",
+            "--job-id",
+            job_id,
+            "--statement",
+            "Minimize the number of exceptions a reviewer handles while closing",
+            "--importance",
+            "5",
+            "--satisfaction",
+            "5",
+            "--json",
+        ],
+    )
+    _json(
+        runner,
+        [
+            "--db",
+            db,
+            "themes",
+            "assign",
+            "--theme",
+            str(child["id"]),
+            "--outcome",
+            str(child_outcome["id"]),
+            "--json",
+        ],
+    )
+
+    own = _json(
+        runner, ["--db", db, "desired-outcomes", "search", "--theme", str(parent["id"]), "--json"]
+    )
+    assert [item["id"] for item in own["items"]] == [outcome_id]
+
+    branch = _json(
+        runner,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "search",
+            "--theme",
+            str(parent["id"]),
+            "--with-children",
+            "--json",
+        ],
+    )
+    assert sorted(item["id"] for item in branch["items"]) == sorted(
+        [outcome_id, str(child_outcome["id"])]
+    )
+    assert branch["total"] == 2
+    #: The facet still counts each theme's own memberships, so the tree keeps its shape.
+    assert branch["facets"]["theme"][str(child["id"])] == 1
+
+
 def test_a_malformed_query_fails_as_an_error_not_a_crash(tmp_path) -> None:
     db, _, _ = _seed(tmp_path)
 

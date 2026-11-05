@@ -226,3 +226,79 @@ def test_mcp_backend_uses_the_contract_tool(monkeypatch) -> None:
 def test_mcp_backend_requires_mcp_url_with_the_existing_400_shape() -> None:
     client = _client(backend="mcp")
     assert client.get("/api/outcomes/search").status_code == 400
+
+
+# --- a theme that stands for its branch (ALH-163) --------------------------
+
+
+def _branch(client: TestClient) -> dict[str, str]:
+    """The seeded store plus a child theme holding the one outcome the parent does not."""
+    ids = _seed(client)
+    service = _service(client)
+    child = service.add_theme(
+        name="Payment windows", job_id=ids["job"], parent_id=ids["theme"], ordinal=1
+    )
+    service.assign_theme([ids["timing"]], child.id)
+    return {**ids, "child": child.id}
+
+
+def test_a_theme_filter_can_answer_for_a_whole_branch() -> None:
+    client = _client()
+    ids = _branch(client)
+
+    own = _get(client, f"job_id={ids['job']}&theme_ids={ids['theme']}")
+    assert {item["id"] for item in own["items"]} == {ids["accuracy"], ids["unscored"]}
+
+    subtree = _get(client, f"job_id={ids['job']}&theme_ids={ids['theme']}&include_children=true")
+    assert {item["id"] for item in subtree["items"]} == {
+        ids["accuracy"],
+        ids["unscored"],
+        ids["timing"],
+    }
+    assert subtree["total"] == 3
+    # The facet keeps each theme's own count while the list is the branch, so the tree a person
+    # clicks through is the same tree `themes rollup` counts beside.
+    assert subtree["facets"]["theme"] == {ids["theme"]: 2, ids["child"]: 1}
+
+
+def test_a_branch_filter_with_no_theme_named_has_nothing_to_widen() -> None:
+    """The flag widens a theme filter; on its own it changes nothing and refuses nothing."""
+    client = _client()
+    ids = _branch(client)
+
+    plain = _get(client, f"job_id={ids['job']}")
+    widened = _get(client, f"job_id={ids['job']}&include_children=true")
+
+    assert widened == plain
+
+
+def test_a_branch_filter_refuses_an_unknown_theme_as_a_bad_request() -> None:
+    """The refusal is the same 400 the plain theme filter gives — never a widened empty page."""
+    client = _client()
+    _branch(client)
+
+    response = client.get("/api/outcomes/search?theme_ids=t-ghost&include_children=true")
+
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert error["code"] == "validation"
+    assert error["message"] == "Unknown theme: t-ghost"
+
+
+def test_mcp_backend_forwards_the_branch_flag_and_nothing_else(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    async def _call(mcp_url: str, tool: str, arguments: dict) -> str:
+        calls.append((tool, arguments))
+        return json.dumps({"items": [], "total": 0, "facets": {}})
+
+    monkeypatch.setattr(router_module, "call_mcp_tool", _call)
+    client = _client(backend="mcp")
+
+    client.get("/api/outcomes/search?mcp_url=http://mcp&theme_ids=t-1")
+    client.get("/api/outcomes/search?mcp_url=http://mcp&theme_ids=t-1&include_children=true")
+
+    assert [arguments for _tool, arguments in calls] == [
+        {"theme_ids": ["t-1"]},
+        {"theme_ids": ["t-1"], "include_children": True},
+    ]

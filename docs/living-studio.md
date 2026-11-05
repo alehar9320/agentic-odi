@@ -296,10 +296,14 @@ happens to be on screen. The search field, the stage, theme and score-recorded
 facets, the score band, and the pager all come from `GET /api/outcomes/search` —
 the same `OutcomeQuery` the CLI and the `search_outcomes` tool run — so the
 counts beside each facet are the sidecar's dimension-removed counts and not a
-count this browser derived. That query needs a store to run against, so a
-demonstration board says so in one line instead of answering with zero matches,
-and a sidecar that cannot be reached is reported as a failure with a retry
-rather than as an empty library.
+count this browser derived. A theme that has themes filed under it offers
+**include subthemes** beside the chip: that is the store's own
+`include_children` — the same subtree the theme's rollup counts and the CLI's
+`--with-children` selects — so the chip widens the query rather than intersecting
+two answers in the browser, and the counts next to it stay each theme's own. That
+query needs a store to run against, so a demonstration board says so in one line
+instead of answering with zero matches, and a sidecar that cannot be reached is
+reported as a failure with a retry rather than as an empty library.
 
 Organising many outcomes at once starts from that same board. A checkbox on each
 card and each table row adds the row to a selection; the docked bar that appears
@@ -307,9 +311,12 @@ holds the drafted change — a stage, themes to add or remove, tags — and offe
 **Preview N selected** and, when a filter is on, **Preview all M matching**. The
 checked rows are exactly the run, and widening is its own named action that
 states the number it is about to write, so expanding the set is never a side
-effect of pressing a button that said something else. Both go to
-`POST /api/outcomes/bulk`, which answers with the change table the CLI prints:
-one row per field written, one line per row the service skipped with its reason.
+effect of pressing a button that said something else. An open
+**include subthemes** rides in that widening: the branch the search counted is
+the branch the run writes, rather than a preview of three that applied to one.
+Both go to `POST /api/outcomes/bulk`, which answers with the change table the CLI
+prints: one row per field written, one line per row the service skipped with its
+reason.
 Apply sends the same request without the preview flag, and the dialog that
 reports it counts what changed and what was skipped rather than calling a partial
 run a success.
@@ -552,12 +559,13 @@ below the thread instead of being clipped off-screen.
 The copilot does not only talk. When a surface carries the evidence better than a
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
-customer quote with its lineage, the eight-stage job map, an opportunity thesis,
-a decision record, an outcome-based segment, or the strategy it implies.
+customer quote with its lineage, the eight-stage job map, the theme tree with
+what each branch holds and its top score, an opportunity thesis, a decision
+record, an outcome-based segment, or the strategy it implies.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and nine cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and ten cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.

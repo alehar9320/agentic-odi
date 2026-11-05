@@ -181,6 +181,34 @@ def test_a_narrowing_widens_the_run_to_every_match_it_named() -> None:
     assert _stored(repo, "o-3").theme_ids == []
 
 
+def test_a_narrowing_that_stands_for_a_theme_branch_widens_the_run_to_it() -> None:
+    """The preview has to sweep the same rows the visible search counted.
+
+    The board shows one number above the dialog and sends one ``query``; if the widening
+    stopped at the theme the person clicked, a preview of two would write one.
+    """
+    repo = _store()
+    client = _client(repo)
+    service = ODIService(repo)
+    parent = service.add_theme("Billing", job_id="j-1").id
+    child = service.add_theme("Card networks", job_id="j-1", parent_id=parent).id
+    service.assign_theme(["o-1"], parent)
+    service.assign_theme(["o-2"], child)
+
+    narrowed = _bulk(client, query={"theme_ids": [parent]}, add_tags=["review"], dry_run=True)
+    branch = _bulk(
+        client,
+        query={"theme_ids": [parent], "include_children": True},
+        add_tags=["review"],
+        dry_run=True,
+    )
+
+    assert narrowed["changed"] == ["o-1"]
+    assert sorted(branch["changed"]) == ["o-1", "o-2"]
+    assert [narrowed["requested"], branch["requested"]] == [1, 2]
+    assert [_stored(repo, "o-1").tags, _stored(repo, "o-2").tags] == [[], []]
+
+
 # --- the mcp backend takes the same arguments ---------------------------------
 
 

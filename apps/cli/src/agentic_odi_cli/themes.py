@@ -15,6 +15,8 @@ from agentic_odi_cli.render import (
     render_theme,
     render_theme_deleted,
     render_theme_list,
+    render_theme_rollup,
+    render_theme_rollup_list,
 )
 
 themes_app = typer.Typer(help="Group desired outcomes into a named theme tree.")
@@ -57,6 +59,37 @@ def list_themes(
     if job_id is not None:
         args["job_id"] = job_id
     typer.echo(render_theme_list(run_tool("list_themes", args), as_json=json_output))
+
+
+@themes_app.command("rollup")
+def rollup_themes(
+    theme_id: str = typer.Argument(
+        None, help="Theme ID to count, together with the themes filed under it"
+    ),
+    job_id: str = typer.Option(
+        None, "--job", help="Roll up every theme in this scope, each parent before its children"
+    ),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Read what a theme's branch holds, how much of it is measured, and its top opportunity.
+
+    The counts are read from the library each time, never stored beside it: an outcome filed on a
+    parent *and* on two children counts once, and a branch nobody has scored says so rather than
+    showing a zero that reads as a low measurement.
+    """
+    if theme_id is not None:
+        rollup = run_tool("get_theme_rollup", {"theme_id": theme_id})
+        typer.echo(render_theme_rollup(rollup, as_json=json_output))
+        return
+    if job_id is None:
+        typer.secho(
+            "rollup wants a theme: name one with THEME_ID or list a scope with --job",
+            fg="red",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    rollups = run_tool("list_theme_rollups", {"job_id": job_id})
+    typer.echo(render_theme_rollup_list(rollups, as_json=json_output))
 
 
 @themes_app.command("rename")

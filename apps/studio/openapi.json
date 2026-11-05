@@ -1019,7 +1019,7 @@
     "/api/outcomes/search": {
       "get": {
         "summary": "Search Outcomes Api",
-        "description": "Narrow the library the way the terminal does, and get the same answer.\n\nThe body is the contract's own ``{items, total, facets}``, so a query spelled\nthe same here and in ``agentic-odi desired-outcomes search`` returns identical\nids, totals, and facet counts. ``job_id`` is optional on purpose: searching\nacross every job is a request, not a missing parameter.",
+        "description": "Narrow the library the way the terminal does, and get the same answer.\n\nThe body is the contract's own ``{items, total, facets}``, so a query spelled\nthe same here and in ``agentic-odi desired-outcomes search`` returns identical\nids, totals, and facet counts. ``job_id`` is optional on purpose: searching\nacross every job is a request, not a missing parameter. ``include_children``\nlets each named theme stand for the themes filed under it too, which is the\nsame subtree the theme's rollup counts.",
         "operationId": "search_outcomes_api_api_outcomes_search_get",
         "parameters": [
           {
@@ -1154,6 +1154,16 @@
                 }
               ],
               "title": "Job Id"
+            }
+          },
+          {
+            "name": "include_children",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Children"
             }
           },
           {
@@ -4098,6 +4108,11 @@
               }
             ],
             "title": "Job Id"
+          },
+          "include_children": {
+            "type": "boolean",
+            "title": "Include Children",
+            "default": false
           }
         },
         "type": "object",

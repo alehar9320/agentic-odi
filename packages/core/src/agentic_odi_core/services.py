@@ -70,6 +70,7 @@ from agentic_odi_core.segmentation import (
     unclustered_outcomes,
 )
 from agentic_odi_core.strategy import propose_strategy as build_strategy
+from agentic_odi_core.theme_tree import ThemeRollup, build_rollup, tree_order
 
 
 class JobNotFoundError(NotFoundError):
@@ -624,6 +625,7 @@ class ODIService:
         max_score: float | None = None,
         job_id: str | None = None,
         sort: str = "opportunity_score",
+        include_children: bool = False,
         limit: int | None = None,
         offset: int = 0,
     ) -> dict[str, Any]:
@@ -659,6 +661,7 @@ class ODIService:
             max_score=max_score,
             job_id=job_id,
             sort=sort,
+            include_children=include_children,
         )
         return search_outcomes(self.repo, query, limit, offset)
 
@@ -1427,6 +1430,8 @@ class ODIService:
         parent = self.repo.get_theme(parent_id)
         if parent is None:
             raise ValidationError(f"Theme parent {parent_id} does not exist; add it first.")
+        # The refusal below and the rollup's walk are the same fact: `THEME_DEPTH` levels, so a
+        # branch never counts what the write refuses to store.
         if parent.parent_id is not None:
             raise ValidationError(
                 f"Theme {parent_id} is already a child of {parent.parent_id}; themes go two "
@@ -1449,6 +1454,28 @@ class ODIService:
 
     def list_themes(self, job_id: str | None = None) -> list[Theme]:
         return self.repo.list_themes(job_id=job_id)
+
+    def theme_rollup(self, theme_id: str) -> ThemeRollup:
+        """What one branch of the tree holds, counted once per outcome, writing nothing.
+
+        The parent's number is the union of its own memberships and its children's, so an outcome
+        filed in three places is one outcome. A theme with nothing under it answers with zeroes and
+        no top; a theme whose outcomes are all unscored answers with its count, no measured and no
+        top — never a ``0.0`` nobody scored.
+        """
+        return build_rollup(self.get_theme(theme_id), self.repo.themes, self.repo.outcomes.values())
+
+    def list_theme_rollups(self, job_id: str | None = None) -> list[ThemeRollup]:
+        """Every theme in scope with its rollup, ordered as the tree is read: parents first.
+
+        One walk of the memberships for the whole tree, because a screen that asked theme by theme
+        would read the store once per row and leave each client to add up its own numbers.
+        """
+        themes = self.repo.list_themes(job_id=job_id)
+        return [
+            build_rollup(theme, self.repo.themes, self.repo.outcomes.values())
+            for theme in tree_order(themes)
+        ]
 
     def rename_theme(
         self,

@@ -447,3 +447,78 @@ describe("a refreshed library refreshes the counts", () => {
     expect(harness.search).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("a theme that stands for the themes filed under it", () => {
+  const BRANCH = [
+    { id: "t-1", name: "Cash timing", ordinal: 0 },
+    { id: "t-1a", name: "Payment windows", parent_id: "t-1", ordinal: 1 },
+    { id: "t-2", name: "Exception handling", ordinal: 2 },
+  ];
+
+  beforeEach(() => {
+    harness.themes.mockResolvedValue(BRANCH);
+  });
+
+  it("offers the branch only once a selected theme has children under it", async () => {
+    render(<OpportunityLandscape />);
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: /exception handling/i }));
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(2));
+
+    // A leaf has no branch to include, so it gets no control promising one.
+    expect(screen.queryByRole("button", { name: /include subthemes/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /exception handling/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cash timing/i }));
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(4));
+
+    expect(screen.getByRole("button", { name: /include subthemes/i })).toBeInTheDocument();
+  });
+
+  it("sends the flag and says so on the chip the person is looking at", async () => {
+    render(<OpportunityLandscape />);
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: /cash timing/i }));
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(screen.getByRole("button", { name: /include subthemes/i }));
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(3));
+
+    expect(filtersOf(2)).toMatchObject({ themeIds: ["t-1"], includeChildren: true });
+    expect(screen.getByText(/theme Cash timing \(incl\. subthemes\)/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /include subthemes/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /include subthemes/i }));
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(4));
+
+    // Off means off: the query is back to the theme alone, so the URL never carries
+    // the flag empty (the sidecar's own spelling is pinned in studioApi.search.test.ts).
+    expect(filtersOf(3)).toEqual({ themeIds: ["t-1"], limit: 50, offset: 0 });
+    expect(screen.queryByText(/incl\. subthemes/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the facet counts the store's own while the branch is open", async () => {
+    harness.search.mockResolvedValue(
+      answer(
+        [LIBRARY[0]],
+        1,
+        facets({ theme: { "t-1": 1, "t-1a": 1 }, confidence: { scored: 1, unscored: 0 } }),
+      ),
+    );
+    render(<OpportunityLandscape />);
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: /cash timing/i }));
+    await waitFor(() => expect(harness.search).toHaveBeenCalledTimes(2));
+
+    // Each chip still carries the store's own direct count — the board never adds a
+    // parent's number to its child's and calls the sum a facet.
+    expect(screen.getByRole("button", { name: /payment windows 1/i })).toBeInTheDocument();
+    expect(screen.getByText("1 outcome matches these filters")).toBeInTheDocument();
+  });
+});

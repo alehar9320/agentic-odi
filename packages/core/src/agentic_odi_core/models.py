@@ -87,6 +87,16 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
     return float(importance + max(importance - satisfaction, 0.0))
 
 
+def is_scored(outcome: Outcome) -> bool:
+    """Whether an outcome has a score at all: both importance and satisfaction recorded.
+
+    One definition for the whole library — the search's confidence facet, the score band, the
+    landscape and a theme's rollup all count *measured* with this, so two numbers that happen to
+    agree today cannot stop agreeing tomorrow.
+    """
+    return outcome.importance is not None and outcome.satisfaction is not None
+
+
 JOB_NAME_PATTERN = r"^[A-Za-z0-9 _-]+$"
 JOB_NAME_MIN_LENGTH = 3
 JOB_NAME_MAX_LENGTH = 64
@@ -378,6 +388,14 @@ class Strategy(BaseModel):
         default_factory=list, description='[{"kind": "disruptive", "why": "..."}]'
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+THEME_DEPTH = 2
+"""How many levels a theme tree may hold: a parent and the themes filed under it.
+
+One number for both directions through the tree. The service refuses a third level with it, and
+the rollup stops its walk at it, so the write that forbids deep nesting and the read that counts
+a branch cannot drift apart."""
 
 
 class Theme(BaseModel):

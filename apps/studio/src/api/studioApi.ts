@@ -579,6 +579,8 @@ export interface OutcomeSearchFilters {
   text?: string;
   stage?: string;
   themeIds?: string[];
+  /** Let each named theme stand for the themes filed under it too. */
+  includeChildren?: boolean;
   confidence?: string;
   minScore?: number;
   maxScore?: number;
@@ -607,6 +609,9 @@ export async function fetchOutcomeSearch(
   }
   for (const themeId of filters.themeIds ?? []) {
     params.append("theme_ids", themeId);
+  }
+  if (filters.includeChildren) {
+    params.set("include_children", "true");
   }
   if (filters.confidence) {
     params.set("confidence", filters.confidence);

@@ -403,3 +403,87 @@ def test_the_service_refuses_a_negative_page_with_the_established_error(
 
     with pytest.raises(ValidationError, match="offset"):
         service.search_outcomes(offset=-1)
+
+
+# --- the subtree dimension (ALH-163) -------------------------------------------
+
+
+def _under_a_branch(repo: InMemoryRepository) -> str:
+    from agentic_odi_core.models import Theme
+
+    repo.add_theme(Theme(id="t-1a", name="Payment windows", job_id=JOB, parent_id="t-1"))
+    repo.outcomes["o-2"].theme_ids = ["t-1a"]
+    return "t-1a"
+
+
+def test_a_theme_filter_without_the_branch_flag_means_that_theme_alone(
+    repo: InMemoryRepository,
+) -> None:
+    _under_a_branch(repo)
+
+    assert ids(run(repo, theme_ids=["t-1"])) == ["o-1", "o-3"]
+
+
+def test_the_branch_flag_widens_a_theme_filter_to_the_branch_it_names(
+    repo: InMemoryRepository,
+) -> None:
+    _under_a_branch(repo)
+
+    result = run(repo, theme_ids=["t-1"], include_children=True)
+
+    assert ids(result) == ["o-1", "o-3", "o-2"]
+    assert result["total"] == 3
+
+
+def test_a_leaf_theme_is_already_the_whole_of_its_branch(
+    repo: InMemoryRepository,
+) -> None:
+    child = _under_a_branch(repo)
+
+    assert ids(run(repo, theme_ids=[child], include_children=True)) == ["o-2"]
+
+
+def test_a_branch_widens_once_however_many_themes_are_selected(
+    repo: InMemoryRepository,
+) -> None:
+    child = _under_a_branch(repo)
+
+    result = run(repo, theme_ids=["t-1", child], include_children=True)
+
+    assert result["total"] == 3
+
+
+def test_the_branch_flag_does_not_relabel_what_a_facet_row_counts(
+    repo: InMemoryRepository,
+) -> None:
+    _under_a_branch(repo)
+
+    result = run(repo, theme_ids=["t-1"], include_children=True)
+
+    # The list is the branch; each row is still that theme's own memberships, so a
+    # person can add the child from its row without the number meaning two things.
+    assert result["facets"]["theme"] == {"t-1": 2, "t-2": 0, "t-1a": 1}
+
+
+def test_an_unknown_theme_is_refused_before_any_branch_is_walked(
+    repo: InMemoryRepository,
+) -> None:
+    _under_a_branch(repo)
+
+    with pytest.raises(ValidationError, match="Unknown theme: t-ghost"):
+        run(repo, theme_ids=["t-ghost"], include_children=True)
+
+
+def test_the_branch_flag_never_reaches_into_another_scopes_theme(
+    repo: InMemoryRepository,
+) -> None:
+    from agentic_odi_core.models import Theme
+
+    other = Theme(id="t-other", name="Ward beds", job_id="j-other")
+    child = Theme(id="t-othera", name="Empty beds", job_id="j-other", parent_id="t-other")
+    repo.add_theme(other)
+    repo.add_theme(child)
+    repo.outcomes["o-4"].theme_ids = [other.id, child.id]
+
+    assert ids(run(repo, theme_ids=["t-1"], include_children=True)) == ["o-1", "o-3"]
+    assert ids(run(repo, theme_ids=[other.id], include_children=True)) == ["o-4"]

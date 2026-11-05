@@ -949,6 +949,40 @@ def list_themes(job_id: str | None = None) -> str:
 
 
 @mcp.tool
+def get_theme_rollup(theme_id: str) -> str:
+    """Count what a theme and the themes filed under it hold (M2-01.2).
+
+    A theme stands for its whole branch: ``outcomes`` is one set of outcome ids
+    across the theme and its children, never the sum of their separate counts,
+    because an outcome filed in both would be counted twice. ``measured`` is the
+    subset with both scores recorded. When nothing in the branch is scored the
+    top fields come back null rather than a zero — an unscored theme has no
+    opportunity to name, and inventing one is the failure this rule exists to
+    prevent.
+    """
+    try:
+        rollup = service.theme_rollup(theme_id)
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps(rollup.as_dict())
+
+
+@mcp.tool
+def list_theme_rollups(job_id: str | None = None) -> str:
+    """Roll up every theme in scope, a parent before the themes under it (M2-01.2).
+
+    One read for a whole tree: a screen that needs every theme's counts takes
+    this rather than looping ``get_theme_rollup``, and the counts are computed
+    here, not in whatever is drawing the picture.
+    """
+    try:
+        rollups = service.list_theme_rollups(job_id=job_id)
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps([rollup.as_dict() for rollup in rollups])
+
+
+@mcp.tool
 def assign_theme(outcome_ids: list[str], theme_id: str) -> str:
     """File outcomes under a theme; the whole call is refused if any outcome is unknown.
 
@@ -983,10 +1017,17 @@ def search_outcomes(
     max_score: float | None = None,
     job_id: str | None = None,
     sort: str = "opportunity_score",
+    include_children: bool = False,
     limit: int | None = None,
     offset: int = 0,
 ) -> str:
-    """Narrow the outcome library; the reply also carries the facet counts."""
+    """Narrow the outcome library; the reply also carries the facet counts.
+
+    ``include_children`` makes each selected theme stand for its whole branch,
+    so a parent's results match the count beside it. The ``theme`` facet keeps
+    counting each theme's own memberships either way — a facet row is that
+    theme's own tally, which is why it does not widen with the list.
+    """
     try:
         result = service.search_outcomes(
             text=text,
@@ -1000,6 +1041,7 @@ def search_outcomes(
             sort=sort,
             limit=limit,
             offset=offset,
+            include_children=include_children,
         )
     except OdiError as exc:
         return _fail(exc)

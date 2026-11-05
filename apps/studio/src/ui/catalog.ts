@@ -299,6 +299,33 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     ["job", "steps"],
   ),
   entry(
+    "theme-tree",
+    "leaf",
+    "The theme tree with what each branch holds: outcomes counted once across its children, how many of them are measured, and the branch's top opportunity. Use to show how the library is organised and where it is still thin. Pass the rows straight from `list_theme_rollups`; leave `top_opportunity` out when nothing in the branch is scored — a zero there would claim a score nobody made.",
+    {
+      title: { type: "string" },
+      themes: {
+        type: "array",
+        minItems: 1,
+        maxItems: 24,
+        items: {
+          type: "object",
+          properties: {
+            theme_id: { type: "string" },
+            name: { type: "string" },
+            parent_id: { type: "string", description: "Present only on a theme filed under another." },
+            outcomes: { type: "integer", minimum: 0 },
+            measured: { type: "integer", minimum: 0 },
+            top_opportunity: { type: "number", minimum: 0, maximum: 20 },
+            top_statement: { type: "string" },
+          },
+          required: ["theme_id", "name", "outcomes", "measured"],
+        },
+      },
+    },
+    ["themes"],
+  ),
+  entry(
     "opportunity-thesis",
     "leaf",
     "One opportunity argued in plain language: the scores, the gap, the thesis, and the next move. Use when the PM is deciding what to chase.",

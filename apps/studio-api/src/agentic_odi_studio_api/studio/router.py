@@ -557,6 +557,7 @@ async def search_outcomes_api(
     min_score: float | None = Query(None),
     max_score: float | None = Query(None),
     job_id: str | None = Query(None),
+    include_children: bool = Query(False),
     sort: str = Query("opportunity_score"),
     limit: int | None = Query(None),
     offset: int = Query(0),
@@ -567,7 +568,9 @@ async def search_outcomes_api(
     The body is the contract's own ``{items, total, facets}``, so a query spelled
     the same here and in ``agentic-odi desired-outcomes search`` returns identical
     ids, totals, and facet counts. ``job_id`` is optional on purpose: searching
-    across every job is a request, not a missing parameter.
+    across every job is a request, not a missing parameter. ``include_children``
+    lets each named theme stand for the themes filed under it too, which is the
+    same subtree the theme's rollup counts.
     """
     filters = {
         "text": text,
@@ -583,6 +586,8 @@ async def search_outcomes_api(
         arguments["theme_ids"] = list(theme_ids)
     if tags:
         arguments["tags"] = list(tags)
+    if include_children:
+        arguments["include_children"] = True
     if sort != "opportunity_score":
         arguments["sort"] = sort
     if offset:

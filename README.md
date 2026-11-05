@@ -155,6 +155,16 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   token that takes those rows back. The same run lives on the board: tick the
   cards or table rows, preview the table the CLI prints, apply it, and undo it
   from the dialog, which counts what was skipped as well as what changed.
+- **See the tree with its counts.** `odi themes rollup <id>` says how many outcomes a theme and
+  the themes filed under it hold, how many of them carry a score, and what the top opportunity in
+  that branch is. It is one set of ids, so an outcome sitting on a parent *and* on two children
+  counts once, and nothing is stored to make the number — a theme nothing has been filed under
+  reads `no outcomes yet` and a branch nobody has scored reads `nothing measured yet`, never a
+  `0.00` that looks like a measurement. The same read answers `get_theme_rollup` and
+  `list_theme_rollups` over MCP, and `--with-children` lets one theme stand for its whole branch
+  in `desired-outcomes search` and `bulk`. On the landscape the same rule is an **include
+  subthemes** control beside a theme chip, and the copilot can draw the tree itself as a
+  `theme-tree` card.
 - **Bring a research file in.** `odi desired-outcomes import outcomes.csv --job-id
   <id>` files a spreadsheet of outcomes row by row through the same door as `add`: a
   row the CLI would refuse is refused with its line number in the file and the rest
@@ -179,6 +189,7 @@ odi studies open --job <id> --name "Invoice sweep" --wave 1   # one pass; re-run
 odi segments run --job <id>          # Stage 5: who the scored outcomes point at
 odi strategy propose                 # Stage 6: the bet, and the paths it beat
 odi themes assign --theme <id> --outcome <id>  # file outcomes under a named theme
+odi themes rollup <id>                    # what that theme's branch holds, and its top score
 odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal

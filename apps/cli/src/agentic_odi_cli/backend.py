@@ -742,6 +742,13 @@ class LocalBackend(Backend):
         themes = self.service.list_themes(job_id=args.get("job_id"))
         return [theme.model_dump(mode="json") for theme in themes]
 
+    def _get_theme_rollup(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.theme_rollup(args["theme_id"]).as_dict()
+
+    def _list_theme_rollups(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        rollups = self.service.list_theme_rollups(job_id=args.get("job_id"))
+        return [rollup.as_dict() for rollup in rollups]
+
     def _assign_theme(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         outcomes = self.service.assign_theme(args["outcome_ids"], args["theme_id"])
         return [outcome.model_dump(mode="json") for outcome in outcomes]
@@ -761,6 +768,7 @@ class LocalBackend(Backend):
             max_score=args.get("max_score"),
             job_id=args.get("job_id"),
             sort=args.get("sort", "opportunity_score"),
+            include_children=bool(args.get("include_children", False)),
             limit=args.get("limit"),
             offset=args.get("offset", 0),
         )
@@ -868,6 +876,8 @@ _LOCAL_HANDLERS = {
     "rename_theme": LocalBackend._rename_theme,
     "delete_theme": LocalBackend._delete_theme,
     "list_themes": LocalBackend._list_themes,
+    "get_theme_rollup": LocalBackend._get_theme_rollup,
+    "list_theme_rollups": LocalBackend._list_theme_rollups,
     "assign_theme": LocalBackend._assign_theme,
     "unassign_theme": LocalBackend._unassign_theme,
     "search_outcomes": LocalBackend._search_outcomes,

@@ -376,6 +376,81 @@ export function JobMap({ node }: NodeProps) {
 }
 
 /* ------------------------------------------------------------------ */
+/* theme-tree                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The branch's best score, or the reason it has none. A theme that holds nothing and a theme
+ * whose outcomes were never scored are two different sayings, and neither is a zero: an
+ * unmeasured branch is not evidence of low opportunity.
+ */
+function rollupTop(theme: Record<string, unknown>): string {
+  const top = theme.top_opportunity;
+  if (typeof top === "number" && Number.isFinite(top)) {
+    return formatOpportunityScore(top);
+  }
+  if (!num(theme, "outcomes", 0)) {
+    return "no outcomes yet";
+  }
+  if (!num(theme, "measured", 0)) {
+    return "nothing measured yet";
+  }
+  return "no top recorded";
+}
+
+export function ThemeTree({ node }: NodeProps) {
+  const title = str(node.props, "title");
+  const rows = recordList(node.props.themes).map((theme) => ({
+    id: str(theme, "theme_id", "—"),
+    name: str(theme, "name"),
+    isChild: typeof theme.parent_id === "string" && theme.parent_id !== "",
+    outcomes: num(theme, "outcomes", 0),
+    measured: num(theme, "measured", 0),
+    top: rollupTop(theme),
+    statement: str(theme, "top_statement"),
+  }));
+
+  return (
+    <article className="ui-card ui-card--board" aria-label={title || "Theme tree"}>
+      {title ? <h4 className="ui-card__title">{title}</h4> : null}
+
+      <div className="ui-table-wrap">
+        <table className="ui-table">
+          <thead>
+            <tr>
+              <th scope="col">Theme</th>
+              <th scope="col">Outcomes</th>
+              <th scope="col">Measured</th>
+              <th scope="col">Top opportunity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr
+                className={row.isChild ? "ui-themmtree__row--child" : undefined}
+                key={`${row.id}-${index}`}
+              >
+                <td>{row.name}</td>
+                <td>{row.outcomes}</td>
+                <td>{row.measured}</td>
+                <td>
+                  {row.top}
+                  {row.statement ? (
+                    <span className="ui-table__statement">{row.statement}</span>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* decision-record                                                     */
 /* ------------------------------------------------------------------ */
 

@@ -11,6 +11,7 @@ const DOMAIN_CARDS = [
   "impact-simulation",
   "evidence-quote",
   "job-map",
+  "theme-tree",
   "opportunity-thesis",
   "decision-record",
   "segment-card",

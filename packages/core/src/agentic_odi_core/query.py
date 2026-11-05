@@ -24,12 +24,13 @@ Decisions settled from the parent's readiness blocker:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from agentic_odi_core.errors import ValidationError
-from agentic_odi_core.models import JobStage, Outcome
+from agentic_odi_core.models import JobStage, Outcome, is_scored
 from agentic_odi_core.repository import OUTCOME_SORTS, Repository, page, sort_outcomes
+from agentic_odi_core.theme_tree import subtree_ids
 
 CONFIDENCE_LEVELS = ("scored", "unscored")
 
@@ -47,6 +48,7 @@ class OutcomeQuery:
     max_score: float | None = None
     job_id: str | None = None
     sort: str = "opportunity_score"
+    include_children: bool = False
 
 
 def _validate_query(repo: Repository, query: OutcomeQuery) -> None:
@@ -83,10 +85,6 @@ def _matches_stage(outcome: Outcome, stage: str, repo: Repository) -> bool:
     return step is not None and step.stage is not None and step.stage.value == stage
 
 
-def _is_scored(outcome: Outcome) -> bool:
-    return outcome.importance is not None and outcome.satisfaction is not None
-
-
 def _passes(
     outcome: Outcome, repo: Repository, query: OutcomeQuery, skip: str | None = None
 ) -> bool:
@@ -100,7 +98,7 @@ def _passes(
         if not any(tag in query.tags for tag in outcome.tags):
             return False
     if skip != "confidence" and query.confidence is not None:
-        if (query.confidence == "scored") != _is_scored(outcome):
+        if (query.confidence == "scored") != is_scored(outcome):
             return False
     if query.min_score is not None and (
         outcome.opportunity_score is None or outcome.opportunity_score < query.min_score
@@ -129,7 +127,7 @@ def _facet_counts(candidates: list[Outcome], repo: Repository) -> dict[str, Any]
                 themes[theme_id] += 1
     confidence = {"scored": 0, "unscored": 0}
     for outcome in candidates:
-        confidence["scored" if _is_scored(outcome) else "unscored"] += 1
+        confidence["scored" if is_scored(outcome) else "unscored"] += 1
     return {"stage": stages, "theme": themes, "confidence": confidence}
 
 
@@ -146,6 +144,18 @@ def search_outcomes(
     dimension would show with that dimension's own filter removed.
     """
     _validate_query(repo, query)
+    if query.include_children and query.theme_ids:
+        # A theme can stand for its whole branch, and it does so here rather than in whatever is
+        # looking at the list: the rollup walks the same ids, so the count beside a theme and the
+        # results under it are the same question answered once.
+        branch = {
+            theme_id
+            for selected in query.theme_ids
+            for theme_id in subtree_ids(repo.themes, selected)
+        }
+        query = replace(
+            query, theme_ids=[*query.theme_ids, *(t for t in branch if t not in query.theme_ids)]
+        )
     candidates = [
         outcome
         for outcome in repo.outcomes.values()
