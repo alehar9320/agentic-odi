@@ -223,6 +223,8 @@ twelve calls it names are why each task is shaped the way it is.
 **Files:**
 - Modify: `apps/studio/src/styles/theme.test.ts`
 - Modify: `apps/studio/src/styles/bootShell.test.ts`
+- Create: `apps/studio/src/test/storage.ts`
+- Modify: `apps/studio/src/lib/session.ts`, `apps/studio/src/lib/session.test.ts`
 - Test: `apps/studio/src/state/StudioContext.test.tsx`
 
 **Interfaces:**
@@ -235,25 +237,34 @@ twelve calls it names are why each task is shaped the way it is.
   is a pass already measured, and a failure means the palette — not the test — is wrong and must be
   corrected in `theme.css`.
 
-- [ ] **Step 2: Pin the bootstrap against a stored `"system"`.** In `bootShell.test.ts`, add to the
-  existing inline-script assertions that `index.html` accepts only the literal strings `"light"` and
-  `"dark"` from storage, so a stored `"system"` falls through to the media query — and state in the test
-  name that this is why the app and the bootstrap cannot disagree. Read the shipped document as the file
-  already does; do not evaluate the script in jsdom.
+- [ ] **Step 2: Pin the bootstrap against a stored `"system"`.** In `bootShell.test.ts`, add a case to
+  the existing `describe("the inline theme script")` — which already runs the shipped script with
+  `new Function(inlineScript)()`, so the assertion is of the resolution and not of its text — that a
+  stored `"system"` falls through to the media query in both directions. Add a second case pinning that
+  the inline script contains `LIGHT_QUERY` imported from `lib/theme`: one question, two callers.
 
 - [ ] **Step 3: Pin the storage-failure trio** in `StudioContext.test.tsx`: a corrupt JSON value at the
-  settings key; `localStorage.getItem` throwing; `localStorage.setItem` throwing. Each must leave the app
-  on the default palette with the provider usable, and in the third case a theme chosen in the session
-  still repaints `<html>` even though the write was refused. Restore whatever the stub replaced. This is
-  design call 11: the behaviour is asserted, and the limitation (a refused write is invisible, as it is
-  for every other settings field today) is stated, not papered over.
+  settings key; `getItem` throwing; `setItem` throwing. Each must leave the app on the default palette
+  with the provider usable, and in the third case a theme chosen in the session still repaints `<html>`
+  even though the write was refused. Stub it with `refusingStorage(method)` from
+  `src/test/storage.ts` — `vi.spyOn(Storage.prototype, …)` does not intercept jsdom's `localStorage`,
+  which made the first version of these tests pass while testing nothing, and `attempts()` is what
+  catches that. Restore in `afterEach`. This is design call 11: the behaviour is asserted, and the
+  limitation (a refused write is invisible, as it is for every other settings field today) is stated,
+  not papered over.
 
-- [ ] **Step 4: Verify** — `npx vitest run` from `apps/studio`, then the whole repo gate set:
+- [ ] **Step 4: Guard the one boundary the trio found unguarded.** `loadSession` read `localStorage`
+  outside a `try`, so a browser that refuses the read crashed the provider on its first render;
+  `saveSession` and `clearSession` wrote unguarded. Put a `try` around each in `src/lib/session.ts` —
+  a refusal answers `null` for a read and does nothing for a write — and add the case to
+  `src/lib/session.test.ts` rather than leaving the proof inside the provider test.
+
+- [ ] **Step 5: Verify** — `npx vitest run` from `apps/studio`, then the whole repo gate set:
   `npx tsc -b --noEmit`, `npx eslint .`, and from the root `uv run ruff check .`,
   `uv run ruff format --check .`, `uv run mypy apps brand packages`, `uv run pytest -q`,
   `uv run python scripts/doc_check.py`, `uv run --directory website pytest tests/ -q`.
 
-- [ ] **Step 5: Commit** — `git commit -m "test(studio): the theme gate covers red, the bootstrap, and a refusing store (ALH-201)"`.
+- [ ] **Step 6: Commit** — `git commit -m "test(studio): the theme gate covers red, the bootstrap, and a refusing store (ALH-201)"`.
 
 ---
 

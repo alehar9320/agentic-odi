@@ -16,8 +16,18 @@ function asId(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
+/**
+ * The stored context, or nothing. A browser with storage disabled throws on the
+ * read rather than handing back `null`, and "where was I" is never worth a
+ * broken page — so a refusal is the same answer as an empty store.
+ */
 export function loadSession(): StudioSession | null {
-  const raw = localStorage.getItem(SESSION_KEY);
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
   if (!raw) {
     return null;
   }
@@ -38,10 +48,19 @@ export function loadSession(): StudioSession | null {
   };
 }
 
+/** Remember where the reader is sitting. A store that refuses is not their fault. */
 export function saveSession(session: StudioSession): void {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 export function clearSession(): void {
-  localStorage.removeItem(SESSION_KEY);
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* storage unavailable */
+  }
 }

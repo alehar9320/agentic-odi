@@ -3,9 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The browser BFF is the first-run answer path, and it lives in IndexedDB.
 import "fake-indexeddb/auto";
 
+import { queuedUserMessage } from "../assistant/queue";
 import { SESSION_KEY } from "../lib/session";
 import { stubLiveMatchMedia } from "../test/matchMedia";
-import { queuedUserMessage } from "../assistant/queue";
+import { refusingStorage } from "../test/storage";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -1119,8 +1120,83 @@ describe("StudioContext theme", () => {
   });
 });
 
-describe("StudioContext canvas state", () => {
+describe("StudioContext when the browser will not keep anything", () => {
+  let live: ReturnType<typeof stubLiveMatchMedia> | null = null;
+  let refusing: ReturnType<typeof refusingStorage> | null = null;
+
   beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.className = "";
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    refusing?.restore();
+    refusing = null;
+    live?.restore();
+    live = null;
+    vi.unstubAllGlobals();
+    document.documentElement.className = "";
+  });
+
+  it("opens on the default palette when the stored settings are not readable as JSON", async () => {
+    live = stubLiveMatchMedia(false);
+    localStorage.setItem("studio.settings", "{ not json");
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    expect(result.current.settings.theme).toBeUndefined();
+    expect(result.current.theme).toBe("dark");
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+    expect(result.current.bootError).toBeNull();
+  });
+
+  it("opens with the defaults when the store refuses to be read at all", async () => {
+    // A browser with storage disabled throws on the read itself rather than
+    // handing back null. Nothing above that boundary is allowed to notice.
+    live = stubLiveMatchMedia(false);
+    refusing = refusingStorage("getItem");
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    expect(refusing.attempts()).toBeGreaterThan(0);
+    expect(result.current.settings.theme).toBeUndefined();
+    expect(result.current.theme).toBe("dark");
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+    expect(result.current.bootError).toBeNull();
+  });
+
+  it("paints a theme chosen in the session even when the store refuses the write", async () => {
+    // The refusal is invisible, as it is for every other settings field today:
+    // the choice holds until the next load, and the palette on screen is the
+    // truth while the reader is in the room.
+    live = stubLiveMatchMedia(false);
+    refusing = refusingStorage("setItem");
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+
+    expect(result.current.theme).toBe("light");
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(refusing.attempts()).toBeGreaterThan(0);
+  });
+});
+
+describe("StudioContext canvas state", () => {  beforeEach(() => {
     localStorage.clear();
     chatBody = null;
     chatStream = null;

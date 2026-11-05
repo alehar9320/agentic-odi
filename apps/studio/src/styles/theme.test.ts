@@ -47,7 +47,7 @@ function contrast(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-const TEXT_TOKENS = ["text", "muted", "faint", "accent", "green", "amber"];
+const TEXT_TOKENS = ["text", "muted", "faint", "accent", "green", "amber", "red"];
 const SURFACES = ["bg", "bg-raised"];
 
 describe("theme contrast", () => {

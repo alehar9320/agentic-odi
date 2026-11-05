@@ -109,8 +109,8 @@ colour vocabulary. Details and the cost of each call are below.
     bootstrap already implements "OS unless stored", and `index.html`'s own boot media block stays
     because `bootShell.test.ts` requires it. *My call.*
 11. **Storage that is corrupt, absent, or refuses a write is a default, never a crash — and a refused
-    write is not this slice's API change.** `loadSettings` (`state/StudioContext.tsx:474`) and
-    `saveSettings` (`:927-934`) already try/catch. This design pins that with tests: a corrupt stored
+    write is not this slice's API change.** `loadSettings` (`state/StudioContext.tsx:529`) and
+    `saveSettings` (`:1090-1097`) already try/catch. This design pins that with tests: a corrupt stored
     object, a `getItem` that throws, and a `setItem` that throws all resolve to the existing default,
     apply the choice for the session, and leave the app usable. It does **not** turn `saveSettings` into
     a call that reports whether the write landed. `saveSettings` returns `void` today and every sibling
@@ -118,6 +118,13 @@ colour vocabulary. Details and the cost of each call are below.
     *your choice is in effect*, not *this survived a browser restart* — for theme as for the API key
     beside it. Making storage failures visible is a change to the settings mechanism, not to one field
     of it, and it is called out in the PR body as the limitation it is. *My call.*
+    The tests found one unguarded boundary: `loadSession` (`lib/session.ts:18`) read `localStorage`
+    outside a `try`, so a browser that refuses the read crashed the provider during its first render,
+    and `saveSession`/`clearSession` wrote unguarded from event paths. Those three are guarded now.
+    What is left, and named in the PR body rather than fixed here: `recheckBoot`
+    (`state/StudioContext.tsx:2404`) treats any throw in its block — including a storage refusal — as
+    "the sidecar is unreachable", which is the wrong answer for the wrong cause. It is a settings
+    mechanism bug, not a theme one.
 12. **The `AboutSection` extraction in #716 is a rebase, not a blocker.** Open PR #716 splits
     `SettingsPanel.tsx` into five section modules and moves that file's diagnostics call into
     `sections/AboutSection.tsx`; its tests live flat at `src/components/settings/<Name>Section.test.tsx`.
