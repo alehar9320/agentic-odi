@@ -114,6 +114,26 @@ describe("ThreadComposer recall", () => {
 
     expect(sendMessage).toHaveBeenCalledWith("Send this", expect.anything());
   });
+
+  it("keeps pasted text when clipboard also contains an image", () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: "first line\nsecond line" } });
+    input.setSelectionRange(10, 10);
+
+    const file = new File(["png"], "screenshot.png", { type: "image/png" });
+    const pasteEvent = {
+      clipboardData: {
+        files: [file],
+        getData: (type: string) => (type === "text/plain" ? "inserted" : ""),
+      },
+      preventDefault: vi.fn(),
+    } as unknown as ClipboardEvent;
+
+    fireEvent.paste(input, pasteEvent);
+
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(pasteEvent.preventDefault).not.toHaveBeenCalled();
+  });
 });
 
 describe("ThreadComposer focus chip", () => {

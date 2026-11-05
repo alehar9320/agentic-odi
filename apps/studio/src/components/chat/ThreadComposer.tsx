@@ -269,6 +269,21 @@ function ComposerBody({
             if (files.length === 0) {
               return;
             }
+            const text = event.clipboardData?.getData("text/plain") ?? "";
+            if (text !== "") {
+              onFiles(files);
+              // Do not prevent default so the browser inserts the text
+              const target = event.target as HTMLTextAreaElement | null;
+              if (target) {
+                const start = target.selectionStart ?? target.value.length;
+                const end = target.selectionEnd ?? start;
+                const value = target.value;
+                target.value = value.slice(0, start) + text + value.slice(end);
+                target.setSelectionRange(start + text.length, start + text.length);
+                target.dispatchEvent(new Event("input", { bubbles: true }));
+              }
+              return;
+            }
             event.preventDefault();
             onFiles(files);
           }}
