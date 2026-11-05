@@ -18,11 +18,10 @@ test.describe("the workspace", () => {
     await resetRepository(request);
   });
 
-  test("opens a view from the workbench rail", async ({ page, request }) => {
+  test("opens a view from the map", async ({ page, request }) => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    // The rail only appears once there is something to look at.
     const landscape = rail(page).getByRole("button", { name: /^Landscape,/ });
     await expect(landscape).toBeVisible();
 
@@ -70,6 +69,53 @@ test.describe("the workspace", () => {
 
     await expect(lens(page)).toHaveAttribute("aria-label", "Settings");
     await expect(lens(page).getByLabel("MCP server URL")).toBeVisible();
+  });
+
+  test("maps every destination before the repository holds anything", async ({ page }) => {
+    await openStudio(page);
+
+    for (const label of [
+      "Records",
+      "Catch up",
+      "Landscape",
+      "Job map",
+      "Evidence",
+      "What I know",
+      "Schedule",
+      "Capture",
+      "Settings",
+    ]) {
+      await expect(rail(page).getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
+    }
+  });
+
+  test("keeps the map collapsed after a reload", async ({ page }) => {
+    await openStudio(page);
+
+    await page.keyboard.press("Control+b");
+    await expect(rail(page)).toHaveClass(/rail--collapsed/);
+
+    await page.reload();
+    await expect(rail(page)).toHaveClass(/rail--collapsed/);
+
+    await page.keyboard.press("Control+b");
+    await expect(rail(page)).not.toHaveClass(/rail--collapsed/);
+  });
+
+  test("opens the map as a drawer that holds focus", async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 900 });
+    await openStudio(page);
+
+    await expect(page.getByRole("navigation", { name: "Studio" })).toBeHidden();
+
+    await page.getByRole("button", { name: "Studio map" }).click();
+
+    const drawer = page.getByRole("dialog", { name: "Studio" });
+    await expect(drawer).toBeVisible();
+    await expect(drawer).toHaveAttribute("aria-modal", "true");
+
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
   });
 
   test("says so when no model is reachable", async ({ page }) => {

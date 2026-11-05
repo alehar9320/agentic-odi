@@ -42,7 +42,7 @@ vi.mock("../components/chat/ChatStage", () => ({
 }));
 vi.mock("../components/workspace/WorkbenchRail", () => ({
   WorkbenchRail: () => (
-    <nav aria-label="Your work">
+    <nav aria-label="Studio">
       <button type="button">Open inbox</button>
     </nav>
   ),
@@ -124,7 +124,7 @@ describe("studio shell landmarks", () => {
     expect(main).toHaveAttribute("id", "studio-stage");
     expect(main).toHaveAttribute("tabindex", "-1");
     expect(screen.getByRole("banner")).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Your work" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Studio" })).toBeInTheDocument();
   });
 
   it("walks the tab path in order: skip link, top bar, rail, transcript", () => {

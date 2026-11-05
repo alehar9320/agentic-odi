@@ -59,6 +59,15 @@ describe("the bootstrap shell", () => {
     }
   });
 
+  it("puts the rail placeholder where the map is drawn, not above the stage", () => {
+    // The strip above the thread became a column beside it. The shell may be
+    // bare, but it must not paint a band the app then has to move.
+    const mapWidth = themeCss.match(/^\.rail\s*\{[^}]*width:\s*(\d+px)/sm)?.[1];
+    expect(mapWidth, "theme.css should declare the map's width").toBeTruthy();
+    expect(inlineStyle).toContain(`grid-template: 56px 1fr / ${mapWidth} 1fr`);
+    expect(inlineStyle).toMatch(/\.boot-shell__rail\s*\{[^}]*border-right/s);
+  });
+
   it("requests neither a font nor an image", () => {
     expect(inlineStyle).not.toMatch(/url\(/);
     expect(inlineStyle).not.toMatch(/@font-face/);

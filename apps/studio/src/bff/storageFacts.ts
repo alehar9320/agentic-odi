@@ -41,6 +41,7 @@ export const APP_STORAGE_KEYS: readonly string[] = [
   "studio.settings",
   "studio.setupDraft",
   "studio.setupStep",
+  "studio.sidebar",
   "studio.sidecarNoticeDismissed",
   "studio.theses",
   "studio.update.autoCheck",
