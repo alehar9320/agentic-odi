@@ -135,3 +135,12 @@ export function startsNewDay(isoString: string, previousIso: string | undefined)
   }
   return startOfDay(date).getTime() !== startOfDay(previous).getTime();
 }
+
+/** The wall-clock time of a moment, e.g. "2:05 PM"; empty when unreadable. */
+export function formatClockTime(isoString: string): string {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
+}

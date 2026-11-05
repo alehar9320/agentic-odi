@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { daySection, formatDayHeading, formatRelativeTime, groupByDay, startsNewDay } from "./relativeTime";
+import {
+  daySection,
+  formatClockTime,
+  formatDayHeading,
+  formatRelativeTime,
+  groupByDay,
+  startsNewDay,
+} from "./relativeTime";
 
 describe("formatRelativeTime", () => {
   afterEach(() => {
@@ -92,5 +99,12 @@ describe("transcript day headings (#694 D14)", () => {
     expect(startsNewDay(beforeMidnight, undefined)).toBe(false);
     expect(startsNewDay(sameEvening, beforeMidnight)).toBe(false);
     expect(startsNewDay(afterMidnight, beforeMidnight)).toBe(true);
+  });
+});
+
+describe("clock time (#694 D15)", () => {
+  it("reads a clock time and refuses to invent one", () => {
+    expect(formatClockTime(new Date(2026, 9, 22, 14, 5).toISOString())).toMatch(/\d/);
+    expect(formatClockTime("not a date")).toBe("");
   });
 });

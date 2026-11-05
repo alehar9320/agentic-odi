@@ -32,7 +32,7 @@ import {
   ToolPart,
   TypingPart,
 } from "../../assistant/parts";
-import { formatDayHeading, startsNewDay } from "../../lib/relativeTime";
+import { formatClockTime, formatDayHeading, startsNewDay } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
 import type { ChatMessage, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
@@ -66,6 +66,7 @@ const TranscriptClockContext = createContext<{
 
 interface MessageStamp {
   iso: string;
+  clock: string;
   previousIso?: string;
 }
 
@@ -80,7 +81,7 @@ function useMessageStamp(): MessageStamp | null {
   if (!iso) {
     return null;
   }
-  return { iso, previousIso: transcript.messages[index - 1]?.createdAt };
+  return { iso, clock: formatClockTime(iso), previousIso: transcript.messages[index - 1]?.createdAt };
 }
 
 /**
@@ -190,12 +191,20 @@ function AssistantMessage() {
         </AuiIf>
 
         {!running ? (
+          // The exact time rides with the actions: visible on hover or focus,
+          // and spoken as part of the group's name for touch and for readers
+          // who never see a hover at all.
           <ActionBarPrimitive.Root
             className="message__actions"
             role="group"
-            aria-label="Reply actions"
+            aria-label={stamp ? `Reply actions, ${stamp.clock}` : "Reply actions"}
             hideWhenRunning
           >
+            {stamp ? (
+              <time className="message__time" dateTime={stamp.iso}>
+                {stamp.clock}
+              </time>
+            ) : null}
             <ActionBarPrimitive.Copy
               className="quiet-action"
               aria-label={copied ? "Reply copied" : "Copy reply"}
@@ -250,8 +259,13 @@ function UserMessage() {
       <ActionBarPrimitive.Root
         className="message__actions message__actions--user"
         role="group"
-        aria-label="Message actions"
+        aria-label={stamp ? `Message actions, ${stamp.clock}` : "Message actions"}
       >
+        {stamp ? (
+          <time className="message__time" dateTime={stamp.iso}>
+            {stamp.clock}
+          </time>
+        ) : null}
         <ActionBarPrimitive.Edit className="quiet-action" aria-label="Edit message">
           Edit
         </ActionBarPrimitive.Edit>

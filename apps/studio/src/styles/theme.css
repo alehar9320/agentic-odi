@@ -1403,6 +1403,29 @@ a {
   opacity: 1;
 }
 
+/* The exact time is there for whoever asks for it: never on the page at rest,
+   one hover or one tab stop away otherwise. */
+.message__time {
+  align-self: center;
+  margin-right: 2px;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.message:hover .message__time,
+.message:focus-within .message__time {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message__time {
+    transition: none;
+  }
+}
+
 /* A rule across the log where the calendar day changes, and nowhere else. */
 .conversation__day {
   display: flex;

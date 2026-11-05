@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
+import { formatClockTime } from "../../lib/relativeTime";
 import type { ChatMessage } from "../../types";
 import { catalogManifest } from "../../ui/catalog";
 import { parseUiSpec, type UiNode } from "../../ui/protocol";
@@ -485,5 +486,30 @@ describe("transcript day dividers (#694 D14)", () => {
     ]);
 
     expect(screen.queryAllByRole("separator")).toHaveLength(0);
+  });
+});
+
+describe("message timestamps (#694 D15)", () => {
+  it("keeps the exact time off the page until the message is asked for", () => {
+    const at = new Date(2026, 9, 22, 9, 30).toISOString();
+    const clock = formatClockTime(at);
+
+    renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "A question", createdAt: at },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer", createdAt: at },
+    ]);
+
+    const times = Array.from(document.querySelectorAll("time.message__time")) as HTMLTimeElement[];
+    expect(times).toHaveLength(2);
+    for (const time of times) {
+      expect(time).toHaveAttribute("datetime", at);
+      expect(time.textContent).toBe(clock);
+      // It lives with the actions, which the stylesheet only reveals on hover
+      // or focus, so it is never on the page at rest.
+      expect(time.closest(".message__actions")).not.toBeNull();
+    }
+
+    expect(screen.getByRole("group", { name: `Reply actions, ${clock}` })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: `Message actions, ${clock}` })).toBeInTheDocument();
   });
 });
