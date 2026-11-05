@@ -63,6 +63,18 @@ def _token_path() -> Path:
     return Path.home() / ".config" / "agentic-odi" / "studio-token"
 
 
+def _configured_token() -> str:
+    """The token a studio has already minted, or "" when none has been.
+
+    ``_studio_token`` issues one; this only reports, so starting the server is
+    not itself the act of turning the gate on.
+    """
+    path = _token_path()
+    if path.is_file():
+        return path.read_text(encoding="utf-8").strip()
+    return ""
+
+
 def _studio_token() -> str:
     """Issue (or return) the per-install sidecar token shared with the sidecar."""
     path = _token_path()
@@ -1024,8 +1036,12 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     validate_at_startup()
     setup_graceful_shutdown()
-    token = _studio_token()
-    app = _AuthMiddleware(mcp.http_app(), token)
+    # Gate only a token a studio has already minted. Minting one here would 401
+    # every documented boot (smoke, `python -m agentic_odi_mcp_server`, the
+    # dev script) on a machine that has never paired a studio, which is the
+    # opposite of what those instructions promise.
+    token = _configured_token()
+    app = _AuthMiddleware(mcp.http_app(), token) if token else mcp.http_app()
     uvicorn.run(app, host="127.0.0.1", port=resolve_port(args.port))
 
 

@@ -228,7 +228,7 @@ def _capture_uvicorn(monkeypatch) -> list[dict]:
         "run",
         lambda app, **kwargs: calls.append({"app": app, **kwargs}),
     )
-    monkeypatch.setattr(server, "_studio_token", lambda: "test-token")
+    monkeypatch.setattr(server, "_configured_token", lambda: "test-token")
     return calls
 
 
