@@ -9,6 +9,7 @@ import pytest
 from agentic_odi_core.models import V2MOM
 from agentic_odi_mcp_server import mcp, mcp_server
 from fastmcp import Client
+from mcp_failures import sentence
 
 _METHOD = "Cut time-to-first-value"
 
@@ -86,7 +87,8 @@ async def test_linking_unknown_text_is_refused_and_names_what_exists() -> None:
             )
         )
 
-    assert refused.startswith("Error:")
+    # The handler answers through _fail(); the prose lives in the envelope.
+    assert sentence(refused).startswith("Error:")
     assert _METHOD in refused
 
 

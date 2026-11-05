@@ -48,6 +48,8 @@ from agentic_odi_core.models import (
     SignalKind,
     Step,
     Strategy,
+    Study,
+    StudyStatus,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
@@ -89,6 +91,14 @@ class CustomerOutcomeNotFoundError(NotFoundError):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
         super().__init__(outcome_id, "customer_outcome")
+
+
+class StudyNotFoundError(NotFoundError):
+    """Raised when a study id does not resolve."""
+
+    def __init__(self, study_id: str, hint: str | None = None) -> None:
+        self.study_id = study_id
+        super().__init__(study_id, "study", hint)
 
 
 class ScheduledWorkNotFoundError(NotFoundError, ValueError):
@@ -310,19 +320,22 @@ class ODIService:
         severity: str = "info",
         detail: str | None = None,
         discriminator: str = "",
+        source_event_id: int | None = None,
     ) -> Signal:
         """Record one fact. A signal with the same fingerprint already exists.
 
-        ``discriminator`` is the thing that changed (a new score, a record id);
-        the fingerprint is sha256 over ``kind|subject_kind|subject_id|
-        discriminator``, so re-recording the same fact returns the first signal
-        instead of spamming the feed.
+        ``discriminator`` is the thing that changed (a new score, a record id) and
+        ``source_event_id`` the store event that carried the change. The fingerprint
+        is sha256 over ``kind|subject_kind|subject_id|discriminator``, with the source
+        id appended when one is given. Naming the change and not only the value it
+        landed on is what lets a second move to the same score be its own signal,
+        while a retry of one change stays one signal. Without a source id the
+        fingerprint is exactly what it was before, so stored signals still dedupe.
         """
-        fingerprint = hashlib.sha256(
-            "|".join([kind.value, subject_kind or "", subject_id or "", discriminator]).encode(
-                "utf-8"
-            )
-        ).hexdigest()
+        fact = [kind.value, subject_kind or "", subject_id or "", discriminator]
+        if source_event_id is not None:
+            fact.append(str(source_event_id))
+        fingerprint = hashlib.sha256("|".join(fact).encode("utf-8")).hexdigest()
         for existing in self.repo.signals.values():
             if existing.fingerprint == fingerprint:
                 return existing
@@ -417,6 +430,9 @@ class ODIService:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
             raise OutcomeNotFoundError(outcome_id)
+        study_id = updates.get("study_id")
+        if study_id is not None:
+            self._validate_study_scope(existing, study_id)
         statement = updates.get("statement", existing.statement)
         importance = updates.get("importance", existing.importance)
         satisfaction = updates.get("satisfaction", existing.satisfaction)
@@ -438,6 +454,9 @@ class ODIService:
         return res
 
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
+        #: The write that produced these facts: two changes landing on the same
+        #: score are two changes, one change reported twice is one signal.
+        source_event_id = self.repo.last_event_id()
         if before.importance != after.importance or before.satisfaction != after.satisfaction:
             self.record_signal(
                 SignalKind.OUTCOME_SCORED,
@@ -449,6 +468,7 @@ class ODIService:
                     f"satisfaction {before.satisfaction} -> {after.satisfaction}"
                 ),
                 discriminator=f"importance={after.importance},satisfaction={after.satisfaction}",
+                source_event_id=source_event_id,
             )
         crossing = _opportunity_crossing(before.opportunity_score, after.opportunity_score)
         if crossing is not None:
@@ -462,6 +482,7 @@ class ODIService:
                 severity=severity,
                 detail=f"{before.opportunity_score} -> {after.opportunity_score}",
                 discriminator=f"{direction}:{after.opportunity_score}",
+                source_event_id=source_event_id,
             )
 
     def _emit_job_map_completed(self, job_id: str) -> None:
@@ -577,6 +598,72 @@ class ODIService:
         sort: str = "opportunity_score",
     ) -> list[Outcome]:
         return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset, sort=sort)
+
+    # -- Studies: one named pass over a Job, and the wave inside it ----------
+
+    def open_study(
+        self, job_id: str, name: str, wave: int, method_notes: str | None = None
+    ) -> Study:
+        """Open a study — one named pass over a Job, at a given wave number.
+
+        A study opens ``planned``; ``fielding`` and ``closed`` are later
+        transitions and nothing here moves to them automatically. The same
+        ``(job_id, name)`` may not repeat a wave, so an accidental re-run of a
+        pass is refused while a deliberate later wave is expressible.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        clash = next(
+            (
+                study
+                for study in self.repo.list_studies(job_id)
+                if study.name == name and study.wave == wave
+            ),
+            None,
+        )
+        if clash is not None:
+            raise ValidationError(
+                f"Study '{name}' already has wave {wave} for this job; open wave {wave + 1} instead."
+            )
+        study = Study(job_id=job_id, name=name, wave=wave, method_notes=method_notes)
+        return self.repo.add_study(study)
+
+    def close_study(self, study_id: str) -> Study:
+        """Close a study once. A second close keeps the first ``closed_at``."""
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id)
+        if study.status is StudyStatus.CLOSED:
+            return study
+        closed = self.repo.update_study(
+            study_id,
+            {
+                "status": StudyStatus.CLOSED.value,
+                "closed_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        if closed is None:
+            raise StudyNotFoundError(study_id)
+        return closed
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        return self.repo.list_studies(job_id=job_id)
+
+    def get_study(self, study_id: str) -> Study:
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id, "open a study first")
+        return study
+
+    def _validate_study_scope(self, outcome: Outcome, study_id: str) -> None:
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id)
+        if study.job_id != outcome.job_id:
+            raise ValidationError(
+                f"Study {study_id} belongs to job {study.job_id}, not the outcome's job "
+                f"{outcome.job_id}; an outcome may only join a study of its own job."
+            )
 
     def add_customer_outcome(
         self,
@@ -1034,6 +1121,7 @@ class ODIService:
             severity=severity,
             detail=segment.rationale[:500],
             discriminator=f"verdict={segment.verdict},confidence={segment.confidence}",
+            source_event_id=self.repo.last_event_id(),
         )
 
     def unclustered_outcomes(self, job_id: str | None = None) -> list[Outcome]:

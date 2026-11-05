@@ -200,8 +200,24 @@ CORE = ROOT / "packages/core/src/agentic_odi_core"
 # re-exports the whole package and would belong to all four.
 CORE_LAYERS: dict[str, tuple[str, ...]] = {
     "domain": ("models", "evaluation", "mapping", "corpus"),
-    "persistence": ("repository", "sqlite_repository", "intent_store", "events", "factory"),
-    "methodology": ("services", "segmentation", "strategy", "router", "messages", "steve_jobs"),
+    "persistence": (
+        "repository",
+        "sqlite_repository",
+        "intent_store",
+        "events",
+        "factory",
+        "integrity",
+        "recovery",
+    ),
+    "methodology": (
+        "services",
+        "segmentation",
+        "strategy",
+        "router",
+        "messages",
+        "steve_jobs",
+        "traceability",
+    ),
     "contract": ("contract", "errors", "remote", "schema", "connection", "consent"),
 }
 
