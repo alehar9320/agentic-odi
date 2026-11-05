@@ -270,8 +270,10 @@ function ComposerBody({
               return;
             }
             const text = event.clipboardData?.getData("text/plain") ?? "";
-            // Mixed payload: let the browser insert the text at the caret and
-            // attach the files alongside it.
+            if (text !== "") {
+              onFiles(files);
+              return;
+            }
             if (text !== "") {
               onFiles(files);
               return;
