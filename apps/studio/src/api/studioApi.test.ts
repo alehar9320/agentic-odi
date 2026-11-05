@@ -24,10 +24,14 @@ import {
   fetchConnectors,
   healthLlm,
   healthMcp,
+  healthSidecar,
   streamChat,
   asStudioError,
   StudioApiError,
 } from "./studioApi";
+
+/** The shape of the global `fetch` a test installs. */
+type FetchStub = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -117,6 +121,90 @@ describe("health probes", () => {
     await expect(
       healthLlm({ base_url: "u", api_key: "k", model: "m" }),
     ).resolves.toEqual({ healthy: true, message: "ok" });
+  });
+});
+
+describe("healthSidecar", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A fetch that answers /health with a healthy process, and records what it was asked. */
+  const answeringHealth = () =>
+    vi.fn<FetchStub>(async () =>
+      new Response(JSON.stringify({ status: "ok" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+  it("asks the cheap health route and stamps the answer", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-05T09:00:00Z"));
+    const fetchMock = answeringHealth();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(healthSidecar()).resolves.toEqual({
+      ok: true,
+      degraded: null,
+      checked_at: Date.now(),
+    });
+
+    const [asked, init] = fetchMock.mock.calls[0];
+    expect(String(asked)).toMatch(/\/health$/);
+    expect(init?.method ?? "GET").toBe("GET");
+  });
+
+  it("never reads configuration to learn whether the process is alive", async () => {
+    // `fetchConfig` answers with the model endpoint, so using it as the liveness
+    // probe made a dead model look like a dead application.
+    const fetchMock = answeringHealth();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await healthSidecar();
+
+    const paths = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(paths.some((path) => path.includes("/api/config"))).toBe(false);
+    expect(paths).toHaveLength(1);
+  });
+
+  it("reports the process alive when the store is degraded", async () => {
+    mockJson({ status: "degraded", reason: "store_corrupt" });
+
+    await expect(healthSidecar()).resolves.toMatchObject({
+      ok: true,
+      degraded: { reason: "store_corrupt" },
+    });
+  });
+
+  it("resolves a refused connection instead of throwing", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+
+    await expect(healthSidecar()).resolves.toMatchObject({ ok: false, degraded: null });
+  });
+
+  it("gives up on a health route that never answers", async () => {
+    // A sidecar that accepts the socket and says nothing must leave the bar on
+    // "down" rather than holding the liveness probe open forever.
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_input: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              const error = new Error("The operation was aborted.");
+              error.name = "AbortError";
+              reject(error);
+            });
+          }),
+      ),
+    );
+
+    const pending = healthSidecar();
+    const assertion = expect(pending).resolves.toMatchObject({ ok: false });
+    await vi.advanceTimersByTimeAsync(2_000);
+    await assertion;
   });
 });
 

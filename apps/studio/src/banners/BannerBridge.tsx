@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { useOnlineStatus } from "../lib/onlineStatus";
+import { isAliveFlag } from "../state/connection";
 import { useStudio } from "../state/StudioContext";
 import { useBanner } from "./BannerProvider";
 import type { BannerActionId } from "./types";
@@ -18,7 +19,7 @@ import type { BannerActionId } from "./types";
 export function BannerBridge() {
   const { raise, resolve } = useBanner();
   const {
-    sidecarReachable,
+    connection,
     dismissedSidecarNotice,
     llmHealth,
   } = useStudio();
@@ -38,12 +39,12 @@ export function BannerBridge() {
   useEffect(() => {
     // The offline strip is the one line while the browser has no network: this
     // strip's Recheck and Start-the-sidecar actions could not succeed anyway.
-    if (sidecarReachable === false && !dismissedSidecarNotice && online) {
+    if (isAliveFlag(connection.liveness) === false && !dismissedSidecarNotice && online) {
       raise({ kind: "sidecar-down" });
     } else {
       resolve("sidecar-down");
     }
-  }, [sidecarReachable, dismissedSidecarNotice, online, raise, resolve]);
+  }, [connection.liveness, dismissedSidecarNotice, online, raise, resolve]);
 
   useEffect(() => {
     // Same reason as the sidecar strip: the offline line says what still works.

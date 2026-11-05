@@ -24,6 +24,7 @@ const api = vi.hoisted(() => ({
     outcomes: [],
     source: "local" as const,
   })),
+  healthSidecar: vi.fn(async () => ({ ok: true, degraded: null, checked_at: 1 })),
   healthMcp: vi.fn(async () => ({ reachable: true })),
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend reachable" })),
   addStep: vi.fn(async () => ({ ok: true })),

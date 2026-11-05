@@ -1,7 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { ConnectionSnapshot } from "../state/connection";
+import { probeResult, snapshotOf } from "../test/connection";
 import { ONBOARDING_STORAGE_KEY } from "./storage";
+
+/** The provider's own text, which must never reach the screen. */
+const REJECTED_KEY =
+  "error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-abc'}}";
 
 const studio = vi.hoisted(() => ({
   settings: {
@@ -11,9 +17,8 @@ const studio = vi.hoisted(() => ({
     mcp_url: "http://localhost:8000/mcp",
   },
   saveSettings: vi.fn(),
-  sidecarReachable: true as boolean | null,
-  mcpReachable: true,
   llmHealth: { healthy: true as boolean | null, message: "ok" },
+  connection: null as unknown as ConnectionSnapshot,
   checkConnections: vi.fn(),
   openPanel: vi.fn(),
   openSetup: vi.fn(),
@@ -76,16 +81,21 @@ function continueButton() {
 describe("FirstRunWizard", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    studio.sidecarReachable = true;
-    studio.mcpReachable = true;
-    studio.llmHealth = { healthy: true, message: "ok" };
+
+    studio.connection = snapshotOf({
+      liveness: probeResult("live", "The local Studio service is answering."),
+      mcp: probeResult("live", "The MCP server is answering."),
+      model: probeResult("live", "ok"),
+    });
     studio.saveSettings.mockClear();
     studio.checkConnections.mockReset();
-    studio.checkConnections.mockResolvedValue({
-      sidecarReachable: true,
-      mcpReachable: true,
-      llmHealthy: true,
-    });
+    studio.checkConnections.mockResolvedValue(
+      snapshotOf({
+        liveness: probeResult("live", "The local Studio service is answering."),
+        mcp: probeResult("live", "The MCP server is answering."),
+        model: probeResult("live", "ok"),
+      }),
+    );
     studio.openPanel.mockClear();
     studio.openSetup.mockClear();
     studio.closeSetup.mockClear();
@@ -272,8 +282,7 @@ describe("FirstRunWizard", () => {
   });
 
   it("probes the instruments when their state is unknown", async () => {
-    studio.sidecarReachable = null;
-    studio.llmHealth = { healthy: null, message: "checking" };
+    studio.connection = snapshotOf({});
     renderWizard();
 
     fireEvent.click(continueButton());
@@ -284,14 +293,19 @@ describe("FirstRunWizard", () => {
   });
 
   it("offers inline repair when the model is unreachable", async () => {
-    studio.llmHealth = { healthy: false, message: "Connection refused" };
+    studio.connection = snapshotOf({
+      liveness: probeResult("live", "The local Studio service is answering."),
+      model: probeResult("down", "Not ready — nothing is listening at that address."),
+    });
     renderWizard();
 
     fireEvent.click(continueButton());
     fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
     fireEvent.click(continueButton());
 
-    expect(screen.getByText("Connection refused")).toBeInTheDocument();
+    expect(
+      screen.getByText("Not ready — nothing is listening at that address."),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Base URL"), {
       target: { value: "http://127.0.0.1:11434/v1" },
     });
@@ -308,6 +322,43 @@ describe("FirstRunWizard", () => {
     await waitFor(() =>
       expect(screen.getByText("The model answered. You are ready.")).toBeInTheDocument(),
     );
+  });
+
+  it("calls a service that answered-but-degraded connected", () => {
+    // Liveness is about the process, not about how it is feeling: a store that failed
+    // its integrity check still proved the sidecar is running.
+    studio.connection = snapshotOf({
+      liveness: probeResult("degraded", "Running, but its store failed the integrity check."),
+      model: probeResult("live", "ok"),
+    });
+    renderWizard();
+
+    fireEvent.click(continueButton());
+    fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
+    fireEvent.click(continueButton());
+
+    const row = screen.getByText("Studio service").closest(".wizard-check");
+    expect(row).toHaveTextContent("Connected");
+  });
+
+  it("phrases an unreachable model in the studio's words", async () => {
+    // #534: the wizard printed the model probe's message straight from the SDK, which
+    // on a rejected key put the provider's 401 body — key and all — on the screen.
+    studio.connection = snapshotOf({
+      liveness: probeResult("live", "The local Studio service is answering."),
+      model: probeResult("degraded", "Not ready — the endpoint rejected the key."),
+    });
+    studio.llmHealth = { healthy: false, message: REJECTED_KEY };
+    renderWizard();
+
+    fireEvent.click(continueButton());
+    fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
+    fireEvent.click(continueButton());
+
+    expect(
+      screen.getByText("Not ready — the endpoint rejected the key."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/401|sk-proj-abc/)).not.toBeInTheDocument();
   });
 
   it("can be replayed from anywhere in the app", async () => {

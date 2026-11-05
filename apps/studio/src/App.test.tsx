@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { fetchConfig, healthLlm } from "./api/studioApi";
+import { fetchConfig, healthLlm, healthSidecar } from "./api/studioApi";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -26,6 +26,7 @@ vi.mock("./api/studioApi", () => ({
     ],
     source: "local" as const,
   })),
+  healthSidecar: vi.fn(async () => ({ ok: true, degraded: null, checked_at: 1 })),
   healthMcp: vi.fn(async () => ({ reachable: true })),
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend is reachable." })),
   addStep: vi.fn(async () => ({ ok: true, result: "created" })),
@@ -324,9 +325,14 @@ describe("studio shell", () => {
         "studio.settings",
         JSON.stringify({ base_url: "", api_key: "", model_name: "", mcp_url: "", theme }),
       );
-      const { fetchConfig, healthLlm } = await import("./api/studioApi");
+      const { fetchConfig, healthLlm, healthSidecar } = await import("./api/studioApi");
       vi.mocked(fetchConfig).mockRejectedValueOnce(new Error("no sidecar"));
       vi.mocked(healthLlm).mockRejectedValueOnce(new Error("no sidecar"));
+      vi.mocked(healthSidecar).mockResolvedValueOnce({
+        ok: false,
+        degraded: null,
+        checked_at: Date.now(),
+      });
 
       render(<App />);
 
@@ -343,6 +349,11 @@ describe("studio shell", () => {
     // a strip across the top of the window.
     vi.mocked(fetchConfig).mockRejectedValue(new Error("no sidecar"));
     vi.mocked(healthLlm).mockRejectedValue(new Error("no sidecar"));
+    vi.mocked(healthSidecar).mockResolvedValue({
+      ok: false,
+      degraded: null,
+      checked_at: Date.now(),
+    });
     vi.useFakeTimers();
     try {
       render(<App />);
@@ -361,13 +372,22 @@ describe("studio shell", () => {
     // studio that was talking to a sidecar and then was not has a real outage to name.
     vi.useFakeTimers();
     try {
+      vi.mocked(healthSidecar).mockResolvedValue({
+        ok: true,
+        degraded: null,
+        checked_at: Date.now(),
+      });
       render(<App />);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(4_000);
       });
       expect(document.querySelectorAll(".banner")).toHaveLength(0);
 
-      vi.mocked(fetchConfig).mockRejectedValue(new Error("the sidecar went away"));
+      vi.mocked(healthSidecar).mockResolvedValue({
+        ok: false,
+        degraded: null,
+        checked_at: Date.now(),
+      });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(31_000);
       });

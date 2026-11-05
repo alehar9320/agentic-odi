@@ -12,6 +12,8 @@ vi.mock("../../state/StudioContext", () => ({
 
 import { useStudio } from "../../state/StudioContext";
 import type { StudioContextValue } from "../../state/StudioContext";
+import { probeResult, snapshotOf } from "../../test/connection";
+
 
 const transport: UpdateTransport = {
   supported: () => false,
@@ -40,11 +42,11 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     clearChat: vi.fn(),
     refreshCanvas: vi.fn().mockResolvedValue(undefined),
     llmHealth: { healthy: null, message: "" },
+    connection: snapshotOf({}),
     models: [] as string[],
     modelsLoading: false,
     modelsMessage: null as string | null,
     refreshModels: vi.fn().mockResolvedValue(undefined),
-    mcpReachable: false,
     pushToast: vi.fn(),
     connectors: [],
     presets: [],
@@ -53,12 +55,13 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     refreshPresets: vi.fn().mockResolvedValue(undefined),
     refreshCapabilities: vi.fn().mockResolvedValue(undefined),
-    surveyConnections: vi.fn().mockResolvedValue({
-      sidecarReachable: true,
-      mcpReachable: false,
-      llmHealthy: true,
-      llmMessage: "ok",
-    }),
+    surveyConnections: vi.fn().mockResolvedValue(
+      snapshotOf({
+        liveness: probeResult("live", "The local Studio service is answering."),
+        mcp: probeResult("down", "Not ready — no MCP server answered."),
+        model: probeResult("live", "ok"),
+      }),
+    ),
     capabilities: [],
     ...overrides,
   }) as unknown as StudioContextValue;

@@ -8,6 +8,8 @@ import { SettingsPanel } from "../components/SettingsPanel";
 import { useStudio } from "../state/StudioContext";
 import type { StudioContextValue } from "../state/StudioContext";
 import { DiagnosticsModal } from "./DiagnosticsModal";
+import { probeResult, snapshotOf } from "../test/connection";
+
 
 vi.mock("../state/StudioContext", () => ({ useStudio: vi.fn() }));
 
@@ -46,12 +48,11 @@ function stubContext(): StudioContextValue {
     clearChat: vi.fn(),
     refreshCanvas: vi.fn().mockResolvedValue(undefined),
     llmHealth: { healthy: null, message: "" },
+    connection: snapshotOf({}),
     models: [],
     modelsLoading: false,
     modelsMessage: null,
     refreshModels: vi.fn().mockResolvedValue(undefined),
-    mcpReachable: false,
-    sidecarReachable: false,
     connectors: [],
     presets: [],
     addConnector: vi.fn().mockResolvedValue(undefined),
@@ -59,12 +60,13 @@ function stubContext(): StudioContextValue {
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     refreshPresets: vi.fn().mockResolvedValue(undefined),
     refreshCapabilities: vi.fn().mockResolvedValue(undefined),
-    surveyConnections: vi.fn().mockResolvedValue({
-      sidecarReachable: false,
-      mcpReachable: false,
-      llmHealthy: false,
-      llmMessage: "no sidecar",
-    }),
+    surveyConnections: vi.fn().mockResolvedValue(
+      snapshotOf({
+        liveness: probeResult("down", "The local Studio service isn't responding."),
+        mcp: probeResult("down", "Not ready — no MCP server answered."),
+        model: probeResult("down", "no sidecar"),
+      }),
+    ),
     capabilities: [],
     toasts: [],
     pushToast: vi.fn(),
