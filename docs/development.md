@@ -761,6 +761,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/cli/tests/test_settings_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_signals_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_startup_perf.py` | — no direct source pair |
+| `apps/cli/tests/test_stats_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`packages/core/src/agentic_odi_core/funnel.py`<br>`packages/core/src/agentic_odi_core/intent_store.py` |
 | `apps/cli/tests/test_steps_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_studies_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_summary_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
@@ -939,6 +940,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio-api/tests/test_studio_errors.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
 | `apps/studio-api/tests/test_studio_evidence.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_focus.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
+| `apps/studio-api/tests/test_studio_funnel.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`packages/core/src/agentic_odi_core/events.py`<br>`packages/core/src/agentic_odi_core/funnel.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `apps/studio-api/tests/test_studio_llm_proxy.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_manual_crud.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_marketplace.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/connectors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/marketplace.py`<br>`packages/connectors/src/agentic_odi_connectors/marketplace.py` |
@@ -980,6 +982,8 @@ the code disagree, so do not edit it by hand — run
 | `packages/core/tests/test_evaluation_harness.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
 | `packages/core/tests/test_events.py` | `packages/core/src/agentic_odi_core/intent_store.py` |
 | `packages/core/tests/test_evidence_not_found.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_funnel.py` | `packages/core/src/agentic_odi_core/events.py`<br>`packages/core/src/agentic_odi_core/funnel.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_funnel_service.py` | `packages/core/src/agentic_odi_core/funnel.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_intent_store.py` | `packages/core/src/agentic_odi_core/intent_store.py` |
 | `packages/core/tests/test_job_validation.py` | `packages/core/src/agentic_odi_core/models.py` |
 | `packages/core/tests/test_messages.py` | `packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/messages.py` |
@@ -1035,6 +1039,7 @@ the code disagree, so do not edit it by hand — run
 | `tests/test_architecture.py` | — no direct source pair |
 | `tests/test_dev_entrypoint.py` | — no direct source pair |
 | `tests/test_docs_code_overview.py` | — no direct source pair |
+| `tests/test_docs_method.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
 | `tests/test_underserved_threshold_parity.py` | `packages/core/src/agentic_odi_core/evaluation.py` |
 | `tests/test_worker_build_route.py` | — no direct source pair |
 | `tests/test_worker_error_shape.py` | — no direct source pair |

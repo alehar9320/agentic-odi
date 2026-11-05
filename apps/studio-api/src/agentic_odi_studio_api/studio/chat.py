@@ -23,6 +23,7 @@ from typing import Any
 
 from agentic_odi_core import ModelRouter, ModelTier, ODIService, Outcome, RoutingMode
 from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
+from agentic_odi_core.funnel import FIRST_MESSAGE, count_milestone
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
@@ -1034,6 +1035,12 @@ async def stream_chat(
             outcome=outcome,
             error_code=error_code,
         )
+        if outcome != "failed":
+            # A turn that reached an ending is the first message of this
+            # workspace's funnel. A partial or rounds-exhausted turn still
+            # counts: the person did get an answer, which is what the counter
+            # is for. Failed turns do not, and neither path writes twice.
+            count_milestone(local_service, FIRST_MESSAGE)
 
 
 __all__ = [
