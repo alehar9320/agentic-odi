@@ -15,6 +15,25 @@ export function productTitle(): string {
   return PRODUCT_NAME;
 }
 
+/**
+ * The window title: it says what the window holds.
+ *
+ * Home names the product and the company; a thread names itself and says the
+ * product once; unread signals come first, the way a mailbox counts before the
+ * subject. The shell sets this and nothing else does (#695).
+ */
+export function studioWindowTitle(options: {
+  threadTitle?: string | null;
+  unreadSignals?: number;
+}): string {
+  const unread = options.unreadSignals ?? 0;
+  const prefix = unread > 0 ? `(${unread}) ` : "";
+  const thread = options.threadTitle?.trim();
+  return thread
+    ? `${prefix}${thread} — ${PRODUCT_NAME}`
+    : `${prefix}The ${PRODUCT_NAME} | ${COMPANY_NAME}`;
+}
+
 /** The version, named without the product: the banner is already inside it. */
 export function versionLabel(version: string): string {
   return `Version ${version}`;

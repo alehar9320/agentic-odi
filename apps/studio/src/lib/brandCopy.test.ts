@@ -10,7 +10,14 @@ import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { COMPANY_NAME, PRODUCT_NAME, productTitle, updateTitle, versionLabel } from "./brand";
+import {
+  COMPANY_NAME,
+  PRODUCT_NAME,
+  productTitle,
+  studioWindowTitle,
+  updateTitle,
+  versionLabel,
+} from "./brand";
 
 // Vitest runs with the studio package as its working directory.
 const STUDIO = process.cwd();
@@ -52,6 +59,21 @@ describe("brand copy", () => {
     expect(tauri.app.windows[0].title).toBe(PRODUCT_NAME);
     // Changing the identifier would move the data directory and break updates.
     expect(tauri.identifier).toBe("com.agenticodi.livingstudio");
+  });
+
+  it("titles the window after the work in it (#695)", () => {
+    expect(studioWindowTitle({})).toBe("The Living Studio | Agentic ODI");
+    expect(studioWindowTitle({ threadTitle: "   " })).toBe("The Living Studio | Agentic ODI");
+    expect(studioWindowTitle({ threadTitle: "Where quotes stall" })).toBe(
+      "Where quotes stall — Living Studio",
+    );
+    // The count comes before the subject; zero says nothing at all.
+    expect(studioWindowTitle({ threadTitle: "Where quotes stall", unreadSignals: 3 })).toBe(
+      "(3) Where quotes stall — Living Studio",
+    );
+    expect(studioWindowTitle({ threadTitle: "Where quotes stall", unreadSignals: 0 })).toBe(
+      "Where quotes stall — Living Studio",
+    );
   });
 
   it("states the company separately from the product", () => {
