@@ -91,7 +91,7 @@ by the presence of one handler.
 | `adapters.attachments` | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text capped at 20k chars, images at 5 MB, refusals explained. |
 | runtime `suggestions` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `suggestionsFor`, computed from canvas state. |
 | `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | `apps/studio/src/state/StudioContext.tsx` | — | Branching works through `setMessages` and `head_id`; the dedicated adapter is unused, so the runtime infers branches from parent ids. |
-| `queue` adapter | Planned | — | #410 | Keeps a follow-up while a reply runs. |
+| `queue` adapter | Adopted | `apps/studio/src/assistant/queue.ts` | #410 | Keeps a follow-up while a reply runs. |
 | `onResume` / `thread.canResume` | Planned | — | #424 | Continues a dropped run. |
 | `adapters.threadList` switch bridge | Planned | — | #408 | The same row as the Thread list group's `adapters.threadList`, listed here because the runtime side is where the handlers switch on. |
 | `onDelete` (message) | Rejected | — | — | The transcript is the audit trail behind every claim. A turn can be edited, regenerated, or branched; deleting it breaks the record the ODI method depends on. |
@@ -111,11 +111,11 @@ by the presence of one handler.
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
 | `ThreadPrimitive.Root` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | The transcript's shell. |
-| `ThreadPrimitive.Viewport` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | Scrolling and the latest-message affordance. |
+| `ThreadPrimitive.Viewport` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | Scrolling; the jump-to-latest affordance reads its `isAtBottom`. |
 | `ThreadPrimitive.Messages` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | The message map. |
 | `ThreadPrimitive.Empty` | Rejected | — | — | Deprecated; `AuiIf` on `state.thread.isEmpty` is the replacement, and `ChatStage` should move to it the next time it changes (see #408 task 6). |
 | `ThreadPrimitive.If` | Decision | — | — | We use `AuiIf`; do not mix two conditional idioms in one tree. |
-| `ThreadPrimitive.ScrollToBottom` | Decision | — | — | `LatestMessageButton` is hand-rolled over `useThreadViewport`. Adopt only if the primitive keeps the reduced-motion behavior. |
+| `ThreadPrimitive.ScrollToBottom` | Decision | — | — | `LatestMessageButton` is hand-rolled over `useThreadViewport` because it carries the arrival count. Adopt only if the primitive keeps the reduced-motion behavior and the count. |
 | `ThreadPrimitive.LoadEarlier` / `thread.hasEarlier` | Decision | — | — | Needs sidecar paging over a branch tree. Worth it only for very long threads; measure first. |
 | `ThreadPrimitive.ViewportFooter` | Decision | — | — | The composer is outside the viewport by design; no problem to solve. |
 | `ThreadPrimitive.ViewportProvider` | Rejected | — | — | One viewport; the provider exists for multiple viewports on one thread. |
@@ -147,7 +147,7 @@ by the presence of one handler.
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer's skeleton. |
 | `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | Bounded by `apps/studio/src/assistant/attachments.ts`. |
 | `ComposerPrimitive.AttachmentDropzone` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | Dropping works: the composer has its own `onDragOver`/`onDrop` with the same accept rules as `attachmentRejection`. Adopting the primitive would only relocate the same logic. |
-| `ComposerPrimitive.Queue` | Planned | — | #410 | Renders the pending lane. |
+| `ComposerPrimitive.Queue` | Adopted | `apps/studio/src/components/chat/QueueLane.tsx` | #410 | Renders the pending lane. |
 | `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #435 | Shows and clears the quote before send. |
 | `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | `apps/studio/src/assistant/dictation.ts` | #433 | Dictation, hidden where unsupported. |
 | `ComposerPrimitive.Resume` | Planned | — | #424 | Appears only with a checkpoint. |
@@ -202,9 +202,9 @@ only the surface is missing.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| `createMessageQueue(driver)` | Planned | — | #410 | `driver.run(message, {steer})`, optional `driver.cancel`. |
-| `MessageQueueController` | Planned | — | #410 | `notifyBusy` / `notifyIdle` / `notifyCancelled` / `hold` / `release` / `clear` / `subscribe` — the cancel pause is why we must not hand-roll. |
-| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Planned | — | #410 | One lane above the composer. |
+| `createMessageQueue(driver)` | Adopted | `apps/studio/src/assistant/queue.ts` | #410 | `driver.run(message, {steer})`, optional `driver.cancel`. |
+| `MessageQueueController` | Adopted | `apps/studio/src/assistant/queue.ts` | #410 | `notifyBusy` / `notifyIdle` / `notifyCancelled` / `hold` / `release` / `clear` / `subscribe` — the cancel pause is why we must not hand-roll. |
+| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Adopted | `apps/studio/src/components/chat/QueueLane.tsx` | #410 | One lane above the composer. |
 | `QueueItemState.prompt` | Rejected | — | — | Deprecated in the installed types; derive text from `parts`. |
 
 ### Reasoning and work
@@ -250,7 +250,7 @@ only the surface is missing.
 | `unstable_useMentionAdapter` / `unstable_useSlashCommandAdapter` | Planned | — | #426 | Composer triggers. |
 | `unstable_useComposerInputHistory` | Adopted | `apps/studio/src/assistant/composerHistory.ts` | #430 | ArrowUp recall. |
 | `useSmooth` | Decision | — | — | Smoothes bursty SSE text. Might read as deliberate rather than laggy — needs a comparison, not a guess. |
-| `useThreadViewport` (viewport state) | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #245 | `isAtBottom` / `scrollToBottom` drive the latest-message affordance. |
+| `useThreadViewport` (viewport state) | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #245 | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count lives in `arrivalCount.ts`. |
 | `useThreadViewportAutoScroll` / `useScrollLock` | Rejected | — | — | The viewport already owns auto-scroll, and the only overlay that could need a scroll lock is the lens rail, which does not scroll the thread. |
 | `unstable_useThreadMessageIds` | Decision | — | — | Only needed if a list needs message identity outside a message scope. |
 | `useToolArgsStatus` | Decision | — | — | Belongs to the tool card work, if it needs per-argument state. |
@@ -262,8 +262,8 @@ only the surface is missing.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| `useAssistantContext` / `ModelContextRegistry` / `mergeModelContexts` / `useModelContextSnapshot` | Planned | — | #425 | Register the focused record and the open lens, attach them to the turn. |
-| `makeAssistantVisible` | Planned | — | #425 | Wrap canvas cards so their state is describable. |
+| `useAssistantContext` / `ModelContextRegistry` / `mergeModelContexts` / `useModelContextSnapshot` | Rejected | — | — | Focus reaches the model as a pointer the sidecar re-reads (`apps/studio/src/lib/focus.ts`, `chat.py:_focus_context`), which is what makes the description true. The registry feeds a prompt a client authors, and `useExternalStoreRuntime` has no send path that carries it — a prototype proved `getModelContext()` returns nothing here. #425 delivered the pointer instead. |
+| `makeAssistantVisible` | Rejected | — | — | Wrapping canvas cards to make them describable is not needed: the composer already names the focused record from the snapshot it holds, and refuses to name it when the snapshot cannot (`focusedSubjectLabel`). Per-card visibility declarations would be a second description of the same screen. |
 | `useAssistantInstructions` | Rejected | — | — | The sidecar assembles the ODI system prompt. A client-side instruction layer would be a second authority and would drift from the methodology guardrails. |
 | `AssistantFrameHost` / `AssistantFrameProvider` / `useAssistantFrameHost` / `frame` transport | Decision | — | — | Embeds the assistant in someone else's page. The Studio is the product surface, not an embedded widget. |
 
@@ -300,15 +300,15 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 39 |
+| Adopted | 44 |
 | Partial | 8 |
-| Planned | 25 |
+| Planned | 18 |
 | Decision | 26 |
-| Rejected | 31 |
+| Rejected | 33 |
 | Total | 129 |
 
-Read it as: **47** of the library's 129 relevant capabilities already deliver
-something a person can use, **25** more are carried by open issues, **26** rows
+Read it as: **52** of the library's 129 relevant capabilities already deliver
+something a person can use, **20** more are carried by open issues, **26** rows
 wait on a named decision, and **31** are rejected with a reason. Every row is
 accounted for — that is the whole point of the page.
 
@@ -365,14 +365,17 @@ compiled stylesheet.
 ### Conversational UI coverage
 
 The agent-composed surfaces, first-minute guidance, and the product tour are
-covered at these levels. `ChatStage.test.tsx` also covers the latest-message
-control while following a streamed turn and returning to the live end:
+covered at these levels. `ChatStage.test.tsx` covers the jump-to-latest control
+while following a streamed turn — the arrival count, the polite announcement, the
+return to the live end, and the keyboard path — and `arrivalCount.test.ts` holds
+the pure count arithmetic:
 
 | File | What it covers |
 |---|---|
 | `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
 | `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
+| `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | The segment board's members and basis (#559): each segment lists its member outcomes with their stored scores, the mean is over scored members only with "Not scored" for none, an inferred group is called a candidate, a missing member is dropped and counted, a member opens in the landscape by mouse and keyboard, and the empty state names the next step |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
 | `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
 | `apps/studio/src/diagnostics/` | Recursive secret/URL/path redaction, 256 KiB cap, opt-in memory-only capture, local-only metadata fetch, and accessible diagnostics preview/export |
@@ -385,12 +388,13 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
 | `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
 | `apps/studio/src/components/chat/ThreadComposer.test.tsx` | Recall of previously sent messages with `ArrowUp`/`ArrowDown`, draft restoration, and the editing and sending keys it must not break |
+| `apps/studio/src/assistant/queue.test.ts`, `src/components/chat/QueueLane.test.tsx` | The follow-up lane (#410): enqueue preserves order, steer interrupts once, a cancel pauses instead of draining, a failed dispatch restores rather than drops; the lane rows read their text from parts and their Run-now and remove controls act on one item only |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
 | `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
 | `apps/studio/src/assistant/starterCopy.test.ts` | The first-run starter lint: situation-first titles, material-first prompts, a promised artifact, no quality adjectives, no claim literal, and the untouched returning-user swaps |
-| `apps/studio/src/components/chat/SuggestionPills.test.tsx` | A starter click sends its exported prompt verbatim, and the starters stay disabled while a reply streams |
+| `apps/studio/src/components/chat/SuggestionPills.test.tsx` | A starter click sends its exported prompt verbatim, and a starter clicked while a reply streams enqueues instead of being dropped (#410) |
 | `apps/studio-api/tests/test_studio_models.py` | Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, `/api/models` response shape |
-| `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, branch switching, approval answers |
+| `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, the follow-up queue against a gated stream (#410), branch switching, approval answers |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
 | `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
 | `apps/studio-api/tests/test_studio_chat_stream.py` | Reasoning and source events, attachment prompt assembly, terminal-event invariants |
@@ -758,6 +762,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/cli/tests/test_signals_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_startup_perf.py` | — no direct source pair |
 | `apps/cli/tests/test_steps_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_studies_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_summary_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
 | `apps/cli/tests/test_update.py` | `apps/cli/src/agentic_odi_cli/update.py` |
 | `apps/cli/tests/test_update_check.py` | `apps/cli/src/agentic_odi_cli/update.py` |
@@ -765,6 +770,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/cli/tests/test_update_edges.py` | `apps/cli/src/agentic_odi_cli/update.py` |
 | `apps/cli/tests/test_version_flag.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`apps/cli/src/agentic_odi_cli/version.py` |
 | `apps/cli/tests/test_wizard_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/mcp-server/tests/mcp_failures.py` | `packages/core/src/agentic_odi_core/remote.py` |
 | `apps/mcp-server/tests/test_context_tools.py` | — no direct source pair |
 | `apps/mcp-server/tests/test_customer_outcomes.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
 | `apps/mcp-server/tests/test_graceful_shutdown.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
@@ -773,19 +779,21 @@ the code disagree, so do not edit it by hand — run
 | `apps/mcp-server/tests/test_parity.py` | — no direct source pair |
 | `apps/mcp-server/tests/test_port_config.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
 | `apps/mcp-server/tests/test_segments.py` | — no direct source pair |
-| `apps/mcp-server/tests/test_server_tools.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_server_tools.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
 | `apps/mcp-server/tests/test_signals.py` | — no direct source pair |
 | `apps/mcp-server/tests/test_tool_branches.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
 | `apps/mcp-server/tests/test_tool_progress.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
 | `apps/mcp-server/tests/test_tool_spec_validation.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
 | `apps/mcp-server/tests/test_tools.py` | — no direct source pair |
 | `apps/studio/e2e/a11y.spec.ts` | `apps/studio/e2e/a11y/knownPairs.ts`<br>`apps/studio/e2e/helpers.ts`<br>`apps/studio/src/test/contrast.ts` |
+| `apps/studio/e2e/brief.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/capture.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/chat.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/first-paint.spec.ts` | — no direct source pair |
 | `apps/studio/e2e/first-run.spec.ts` | — no direct source pair |
 | `apps/studio/e2e/landscape.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/mcp-backend.spec.ts` | `apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/no-sidecar/offline.spec.ts` | — no direct source pair |
 | `apps/studio/e2e/starters.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/workspace.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/src/App.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/api/studioApi.ts` |
@@ -796,7 +804,10 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/assistant/claims.test.ts` | `apps/studio/src/assistant/claims.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/assistant/convert.test.ts` | `apps/studio/src/assistant/convert.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
 | `apps/studio/src/assistant/dictation.test.ts` | `apps/studio/src/assistant/dictation.ts` |
+| `apps/studio/src/assistant/extract/common.test.ts` | `apps/studio/src/assistant/extract/common.ts` |
+| `apps/studio/src/assistant/extract/docx.test.ts` | `apps/studio/src/assistant/extract/common.ts`<br>`apps/studio/src/assistant/extract/docx.ts` |
 | `apps/studio/src/assistant/parts.test.tsx` | `apps/studio/src/assistant/parts.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/assistant/queue.test.ts` | `apps/studio/src/assistant/queue.ts` |
 | `apps/studio/src/assistant/quote.test.ts` | `apps/studio/src/assistant/quote.ts` |
 | `apps/studio/src/assistant/starterCopy.test.ts` | `apps/studio/src/assistant/StudioRuntime.tsx` |
 | `apps/studio/src/banners/BannerBridge.test.tsx` | `apps/studio/src/banners/BannerBridge.tsx`<br>`apps/studio/src/banners/BannerProvider.tsx`<br>`apps/studio/src/banners/BannerStack.tsx` |
@@ -811,14 +822,17 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/bff/data/localDataService.test.ts` | `apps/studio/src/bff/data/localDataService.ts`<br>`apps/studio/src/bff/store/memoryStore.ts` |
 | `apps/studio/src/bff/index.test.ts` | `apps/studio/src/bff/index.ts`<br>`apps/studio/src/bff/store/memoryStore.ts` |
 | `apps/studio/src/bff/memory/localMemoryService.test.ts` | `apps/studio/src/bff/memory/localMemoryService.ts`<br>`apps/studio/src/bff/store/memoryStore.ts` |
+| `apps/studio/src/bff/outbox.test.ts` | `apps/studio/src/bff/outbox.ts`<br>`apps/studio/src/bff/store/memoryStore.ts`<br>`apps/studio/src/bff/store/types.ts` |
 | `apps/studio/src/bff/storageFacts.test.ts` | `apps/studio/src/bff/storageFacts.ts`<br>`apps/studio/src/bff/store/indexedDbStore.ts`<br>`apps/studio/src/bff/store/memoryStore.ts` |
-| `apps/studio/src/bff/store/indexedDbStore.test.ts` | `apps/studio/src/bff/store/indexedDbStore.ts`<br>`apps/studio/src/bff/store/memoryStore.ts` |
+| `apps/studio/src/bff/store/indexedDbStore.test.ts` | `apps/studio/src/bff/store/indexedDbStore.ts`<br>`apps/studio/src/bff/store/memoryStore.ts`<br>`apps/studio/src/bff/store/migrations.ts`<br>`apps/studio/src/bff/store/types.ts` |
+| `apps/studio/src/bff/store/migrations.test.ts` | `apps/studio/src/bff/store/migrations.ts` |
 | `apps/studio/src/bridge/desktopBridge.test.ts` | `apps/studio/src/bridge/desktopBridge.ts` |
 | `apps/studio/src/components/BootFailurePage.test.tsx` | `apps/studio/src/components/BootFailurePage.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/ChangelogModal.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/ChangelogModal.tsx`<br>`apps/studio/src/lib/changelogRead.ts` |
 | `apps/studio/src/components/FailurePanel.visual.test.tsx` | `apps/studio/src/components/FailurePanel.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/OdiMascot.test.tsx` | `apps/studio/src/components/OdiMascot.tsx` |
 | `apps/studio/src/components/SettingsPanel.test.tsx` | `apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/brief/BriefLens.test.tsx` | `apps/studio/src/components/brief/BriefLens.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/canvas/DirectCapture.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/canvas/DirectCapture.tsx` |
 | `apps/studio/src/components/canvas/EvidenceStream.test.tsx` | `apps/studio/src/components/canvas/EvidenceStream.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/canvas/JobMap.test.tsx` | `apps/studio/src/components/canvas/JobMap.tsx`<br>`apps/studio/src/domain/jobStages.ts` |
@@ -827,6 +841,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/components/canvas/OutcomeCard.test.tsx` | `apps/studio/src/components/canvas/OutcomeCard.tsx` |
 | `apps/studio/src/components/canvas/OutcomeCardSample.test.tsx` | `apps/studio/src/components/canvas/OutcomeCard.tsx` |
 | `apps/studio/src/components/canvas/SchedulePanel.test.tsx` | `apps/studio/src/components/canvas/SchedulePanel.tsx` |
+| `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | `apps/studio/src/components/canvas/SegmentBoard.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/canvas/ThesisAction.test.tsx` | `apps/studio/src/components/canvas/OutcomeCard.tsx` |
 | `apps/studio/src/components/canvas/opportunityLandscape.perf.test.tsx` | `apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/chat/ChatStage.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ChatStage.tsx`<br>`apps/studio/src/types.ts` |
@@ -835,13 +850,16 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/components/chat/Conversation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
 | `apps/studio/src/components/chat/Dictation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | `apps/studio/src/components/chat/ModelPicker.tsx` |
+| `apps/studio/src/components/chat/QueueLane.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/components/chat/QueueLane.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/SelectionToolbar.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/SelectionToolbar.tsx` |
 | `apps/studio/src/components/chat/StallNotice.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/components/chat/StallNotice.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/chat/SuggestionPills.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/composerParts.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/ThreadComposer.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/arrivalCount.test.ts` | `apps/studio/src/components/chat/arrivalCount.ts` |
 | `apps/studio/src/components/customize/ConnectorSuggestionModal.test.tsx` | `apps/studio/src/components/customize/ConnectorSuggestionModal.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/customize/CustomizePage.test.tsx` | `apps/studio/src/components/customize/CustomizePage.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/layout/StudioBar.test.tsx` | `apps/studio/src/components/layout/StudioBar.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/layout/StudioBar.visual.test.tsx` | `apps/studio/src/components/layout/StudioBar.tsx` |
 | `apps/studio/src/components/notifications/CatchUpFeed.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/notifications/CatchUpFeed.tsx`<br>`apps/studio/src/components/notifications/__fixtures__/signals.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/notifications/noFabricatedSignals.test.ts` | — no direct source pair |
 | `apps/studio/src/components/records/RecordDetail.test.tsx` | `apps/studio/src/components/records/RecordDetail.tsx`<br>`apps/studio/src/components/records/RecordsPanel.tsx`<br>`apps/studio/src/lib/records.ts`<br>`apps/studio/src/types.ts` |
@@ -850,6 +868,8 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/components/settings/saves.test.ts` | `apps/studio/src/components/settings/saves.ts`<br>`apps/studio/src/components/settings/validation.ts` |
 | `apps/studio/src/components/setup/IntroConversation.test.tsx` | `apps/studio/src/components/setup/IntroConversation.tsx`<br>`apps/studio/src/lib/intro.ts` |
 | `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | `apps/studio/src/components/setup/IntroConversation.tsx` |
+| `apps/studio/src/components/status/StatusDot.test.tsx` | `apps/studio/src/components/status/StatusDot.tsx` |
+| `apps/studio/src/components/status/StatusDot.visual.test.tsx` | `apps/studio/src/components/icons.tsx`<br>`apps/studio/src/components/status/StatusDot.tsx` |
 | `apps/studio/src/components/workspace/WorkbenchRail.test.tsx` | `apps/studio/src/components/workspace/WorkbenchRail.tsx` |
 | `apps/studio/src/components/workspace/WorkspacePanel.test.tsx` | `apps/studio/src/components/workspace/WorkspacePanel.tsx` |
 | `apps/studio/src/components/workspace/panels.test.tsx` | `apps/studio/src/components/workspace/panels.tsx` |
@@ -859,24 +879,31 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/features/flags.test.ts` | `apps/studio/src/features/flags.ts` |
 | `apps/studio/src/lib/boot.test.ts` | `apps/studio/src/lib/boot.ts` |
 | `apps/studio/src/lib/brandCopy.test.ts` | `apps/studio/src/lib/brand.ts` |
+| `apps/studio/src/lib/brief.test.ts` | `apps/studio/src/lib/brief.ts`<br>`apps/studio/src/lib/export.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/lib/canvasProvenance.test.ts` | `apps/studio/src/lib/canvasProvenance.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/lib/changelogRead.test.ts` | `apps/studio/src/lib/changelogRead.ts` |
 | `apps/studio/src/lib/commands.test.ts` | `apps/studio/src/lib/commands.ts` |
 | `apps/studio/src/lib/export.test.ts` | `apps/studio/src/lib/export.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
+| `apps/studio/src/lib/focus.test.ts` | `apps/studio/src/lib/focus.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/lib/greeting.test.ts` | `apps/studio/src/lib/greeting.ts` |
 | `apps/studio/src/lib/guidance.test.ts` | `apps/studio/src/lib/guidance.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/lib/intro.test.ts` | `apps/studio/src/lib/intro.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/lib/markdown.test.ts` | `apps/studio/src/lib/markdown.ts` |
 | `apps/studio/src/lib/modelEndpoint.test.ts` | `apps/studio/src/lib/modelEndpoint.ts` |
 | `apps/studio/src/lib/odi.test.ts` | `apps/studio/src/lib/odi.ts` |
+| `apps/studio/src/lib/offlinePage.test.ts` | — no direct source pair |
+| `apps/studio/src/lib/onlineStatus.test.tsx` | `apps/studio/src/lib/onlineStatus.ts` |
 | `apps/studio/src/lib/records.test.ts` | `apps/studio/src/lib/records.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/lib/relativeTime.test.ts` | `apps/studio/src/lib/relativeTime.ts` |
 | `apps/studio/src/lib/session.test.ts` | `apps/studio/src/lib/session.ts` |
 | `apps/studio/src/lib/setup.test.ts` | `apps/studio/src/lib/setup.ts` |
+| `apps/studio/src/lib/swRouting.test.ts` | `apps/studio/src/lib/swRouting.ts` |
 | `apps/studio/src/lib/theme.test.ts` | `apps/studio/src/lib/theme.ts` |
 | `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | `apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/onboarding/storage.ts` |
 | `apps/studio/src/onboarding/machine.test.ts` | `apps/studio/src/onboarding/machine.ts`<br>`apps/studio/src/onboarding/storage.ts` |
-| `apps/studio/src/state/StudioContext.test.tsx` | `apps/studio/src/lib/session.ts`<br>`apps/studio/src/state/StudioContext.tsx` |
+| `apps/studio/src/state/StudioContext.test.tsx` | `apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/lib/session.ts`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/styles/bootShell.test.ts` | — no direct source pair |
+| `apps/studio/src/styles/brief.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/colors.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/print.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/theme.test.ts` | — no direct source pair |
@@ -901,6 +928,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio-api/tests/test_studio_brief.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
 | `apps/studio-api/tests/test_studio_capabilities.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_chat_branches.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/connectors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
+| `apps/studio-api/tests/test_studio_chat_prompt.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py` |
 | `apps/studio-api/tests/test_studio_chat_stream.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
 | `apps/studio-api/tests/test_studio_chat_ui.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
 | `apps/studio-api/tests/test_studio_claims.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/claims.py` |
@@ -910,6 +938,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio-api/tests/test_studio_diagnostics.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `apps/studio-api/tests/test_studio_errors.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
 | `apps/studio-api/tests/test_studio_evidence.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_focus.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
 | `apps/studio-api/tests/test_studio_llm_proxy.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_manual_crud.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_marketplace.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/connectors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/marketplace.py`<br>`packages/connectors/src/agentic_odi_connectors/marketplace.py` |
@@ -924,6 +953,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio-api/tests/test_studio_router.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
 | `apps/studio-api/tests/test_studio_segments.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
 | `apps/studio-api/tests/test_studio_signals.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
+| `apps/studio-api/tests/test_studio_studies.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py` |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/ui_spec.py` |
 | `brand/tests/test_brand_assets.py` | — no direct source pair |
 | `brand/tests/test_generated_sources.py` | — no direct source pair |
@@ -942,6 +972,7 @@ the code disagree, so do not edit it by hand — run
 | `packages/connectors/tests/test_sink.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/rate_limit.py`<br>`packages/connectors/src/agentic_odi_connectors/sink.py` |
 | `packages/core/tests/test_capability_manifest.py` | `packages/core/src/agentic_odi_core/contract.py` |
 | `packages/core/tests/test_claim_check.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_claim_interview.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py` |
 | `packages/core/tests/test_connection.py` | `packages/core/src/agentic_odi_core/connection.py` |
 | `packages/core/tests/test_consent_pause.py` | `packages/core/src/agentic_odi_core/consent.py`<br>`packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
 | `packages/core/tests/test_errors.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/services.py` |
@@ -951,7 +982,7 @@ the code disagree, so do not edit it by hand — run
 | `packages/core/tests/test_evidence_not_found.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
 | `packages/core/tests/test_intent_store.py` | `packages/core/src/agentic_odi_core/intent_store.py` |
 | `packages/core/tests/test_job_validation.py` | `packages/core/src/agentic_odi_core/models.py` |
-| `packages/core/tests/test_messages.py` | `packages/core/src/agentic_odi_core/messages.py` |
+| `packages/core/tests/test_messages.py` | `packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/messages.py` |
 | `packages/core/tests/test_models.py` | `packages/core/src/agentic_odi_core/models.py` |
 | `packages/core/tests/test_opportunity_ranking.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
 | `packages/core/tests/test_opportunity_score.py` | `packages/core/src/agentic_odi_core/models.py` |
@@ -960,7 +991,7 @@ the code disagree, so do not edit it by hand — run
 | `packages/core/tests/test_pagination.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_perf_cold_open.py` | `packages/core/src/agentic_odi_core/corpus.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_proposals.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/factory.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/services.py` |
-| `packages/core/tests/test_remote.py` | `packages/core/src/agentic_odi_core/remote.py` |
+| `packages/core/tests/test_remote.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/services.py` |
 | `packages/core/tests/test_repository.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
 | `packages/core/tests/test_repository_factory.py` | `packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_repository_health.py` | `packages/core/src/agentic_odi_core/factory.py` |
@@ -974,8 +1005,9 @@ the code disagree, so do not edit it by hand — run
 | `packages/core/tests/test_sqlite_integrity.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/integrity.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/recovery.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_sqlite_repository.py` | `packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_strategy.py` | `packages/core/src/agentic_odi_core/strategy.py` |
+| `packages/core/tests/test_study.py` | `packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/schema.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `tests/contract/test_cli_contract.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
-| `tests/contract/test_mcp_contract.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
+| `tests/contract/test_mcp_contract.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/services.py` |
 | `tests/contract/test_protected_files.py` | — no direct source pair |
 | `tests/scripts/test_assistant_ui_ledger.py` | `scripts/doc_check.py` |
 | `tests/scripts/test_ci_release.py` | `scripts/ci_release.py` |
@@ -997,6 +1029,7 @@ the code disagree, so do not edit it by hand — run
 | `tests/scripts/test_release_instructions.py` | `scripts/release_instructions.py` |
 | `tests/scripts/test_release_version_gate.py` | — no direct source pair |
 | `tests/scripts/test_release_workflow.py` | — no direct source pair |
+| `tests/scripts/test_vendor_policy.py` | `scripts/vendor_policy.py` |
 | `tests/scripts/test_version_sync.py` | `apps/cli/src/agentic_odi_cli/_build_info.py`<br>`scripts/check_version_parity.py` |
 | `tests/scripts/test_workflow_triggers.py` | — no direct source pair |
 | `tests/test_architecture.py` | — no direct source pair |
