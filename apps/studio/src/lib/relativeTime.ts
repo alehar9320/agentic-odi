@@ -99,3 +99,39 @@ export function groupByDay<T>(
     return bucket?.length ? [{ section, label: daySectionLabel(section), items: bucket }] : [];
   });
 }
+
+/**
+ * What a divider between two days says. Beyond yesterday the date itself is
+ * more use than the word "Earlier", and a different year is named.
+ */
+export function formatDayHeading(isoString: string, now: Date = new Date()): string {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return SECTION_LABEL.earlier;
+  }
+  const section = daySection(isoString, now);
+  if (section !== "earlier") {
+    return SECTION_LABEL[section];
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
+/**
+ * Whether a message opens a new calendar day in the transcript. The first
+ * message never does: a divider above it separates nothing.
+ */
+export function startsNewDay(isoString: string, previousIso: string | undefined): boolean {
+  if (!previousIso) {
+    return false;
+  }
+  const date = new Date(isoString);
+  const previous = new Date(previousIso);
+  if (Number.isNaN(date.getTime()) || Number.isNaN(previous.getTime())) {
+    return false;
+  }
+  return startOfDay(date).getTime() !== startOfDay(previous).getTime();
+}

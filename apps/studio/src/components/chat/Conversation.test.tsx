@@ -424,3 +424,66 @@ describe("Conversation failures", () => {
     expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
   });
 });
+
+describe("transcript day dividers (#694 D14)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("puts one separator between calendar days and none inside a day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 9, 0));
+    try {
+      renderTurn([
+        {
+          id: "u-1",
+          parentId: null,
+          role: "user",
+          content: "Before midnight",
+          createdAt: new Date(2026, 9, 21, 23, 50).toISOString(),
+        },
+        {
+          id: "a-1",
+          parentId: "u-1",
+          role: "assistant",
+          content: "Still the same evening",
+          createdAt: new Date(2026, 9, 21, 23, 55).toISOString(),
+        },
+        {
+          id: "u-2",
+          parentId: "a-1",
+          role: "user",
+          content: "After midnight",
+          createdAt: new Date(2026, 9, 22, 0, 10).toISOString(),
+        },
+      ]);
+
+      const separators = screen.getAllByRole("separator");
+      expect(separators).toHaveLength(1);
+      expect(separators[0]).toHaveAttribute("aria-label", "Today");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("separates nothing when a thread stays inside one day", () => {
+    renderTurn([
+      {
+        id: "u-1",
+        parentId: null,
+        role: "user",
+        content: "Morning",
+        createdAt: new Date(2026, 8, 3, 9, 0).toISOString(),
+      },
+      {
+        id: "a-1",
+        parentId: "u-1",
+        role: "assistant",
+        content: "Afternoon",
+        createdAt: new Date(2026, 8, 3, 15, 0).toISOString(),
+      },
+    ]);
+
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+  });
+});

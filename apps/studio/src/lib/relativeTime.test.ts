@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { daySection, formatRelativeTime, groupByDay } from "./relativeTime";
+import { daySection, formatDayHeading, formatRelativeTime, groupByDay, startsNewDay } from "./relativeTime";
 
 describe("formatRelativeTime", () => {
   afterEach(() => {
@@ -63,5 +63,34 @@ describe("history day buckets (#694 D13)", () => {
     expect(groups[0].items.map((item) => item.id)).toEqual(["morning", "noon"]);
     expect(groups[1].items.map((item) => item.id)).toEqual(["late"]);
     expect(groups.flatMap((group) => group.items)).toHaveLength(items.length);
+  });
+});
+
+describe("transcript day headings (#694 D14)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("names today and yesterday, and dates anything older", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    expect(formatDayHeading(new Date(2026, 9, 22, 9, 0).toISOString())).toBe("Today");
+    expect(formatDayHeading(new Date(2026, 9, 21, 9, 0).toISOString())).toBe("Yesterday");
+
+    const older = formatDayHeading(new Date(2026, 8, 3, 9, 0).toISOString());
+    expect(older).not.toBe("Today");
+    expect(older).not.toBe("Yesterday");
+    expect(older).toContain("3");
+  });
+
+  it("only separates two messages that fall on different days", () => {
+    const beforeMidnight = new Date(2026, 9, 21, 23, 50).toISOString();
+    const afterMidnight = new Date(2026, 9, 22, 0, 5).toISOString();
+    const sameEvening = new Date(2026, 9, 21, 22, 0).toISOString();
+
+    expect(startsNewDay(beforeMidnight, undefined)).toBe(false);
+    expect(startsNewDay(sameEvening, beforeMidnight)).toBe(false);
+    expect(startsNewDay(afterMidnight, beforeMidnight)).toBe(true);
   });
 });

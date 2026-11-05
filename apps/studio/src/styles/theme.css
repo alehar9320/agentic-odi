@@ -1403,6 +1403,28 @@ a {
   opacity: 1;
 }
 
+/* A rule across the log where the calendar day changes, and nowhere else. */
+.conversation__day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 4px;
+  color: var(--faint);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.conversation__day::before,
+.conversation__day::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-strong);
+  opacity: 0.5;
+}
+
+
 .quiet-action {
   display: inline-flex;
   align-items: center;

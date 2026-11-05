@@ -7,7 +7,7 @@
  * added in exactly two files.
  */
 
-import { useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
 
 import {
   ActionBarPrimitive,
@@ -32,8 +32,9 @@ import {
   ToolPart,
   TypingPart,
 } from "../../assistant/parts";
+import { formatDayHeading, startsNewDay } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
-import type { StudioError } from "../../types";
+import type { ChatMessage, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon } from "../icons";
@@ -53,9 +54,56 @@ function phaseLabel(phase: string | null): string {
   return PHASE_LABEL[phase] ?? "Thinking";
 }
 
+/**
+ * Where each turn sits in the studio's own list, so a message can read its own
+ * timestamp and the one before it. The runtime draws the turns but keeps no
+ * clock of its own; the model that does is the one the transcript came from.
+ */
+const TranscriptClockContext = createContext<{
+  order: Map<string, number>;
+  messages: ChatMessage[];
+} | null>(null);
+
+interface MessageStamp {
+  iso: string;
+  previousIso?: string;
+}
+
+function useMessageStamp(): MessageStamp | null {
+  const transcript = useContext(TranscriptClockContext);
+  const id = useAuiState((state) => state.message.id);
+  const index = transcript?.order.get(id);
+  if (!transcript || index === undefined) {
+    return null;
+  }
+  const iso = transcript.messages[index]?.createdAt;
+  if (!iso) {
+    return null;
+  }
+  return { iso, previousIso: transcript.messages[index - 1]?.createdAt };
+}
+
+/**
+ * The line between two calendar days: Today and Yesterday are said in words,
+ * anything older is dated. Only drawn where the day actually changes.
+ */
+function DayDivider() {
+  const stamp = useMessageStamp();
+  if (!stamp || !startsNewDay(stamp.iso, stamp.previousIso)) {
+    return null;
+  }
+  const heading = formatDayHeading(stamp.iso);
+  return (
+    <div className="conversation__day" role="separator" aria-label={heading}>
+      {heading}
+    </div>
+  );
+}
+
 function AssistantMessage() {
   const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
   const id = useAuiState((state) => state.message.id);
+  const stamp = useMessageStamp();
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
   const hasText = useAuiState((state) =>
@@ -69,9 +117,11 @@ function AssistantMessage() {
   );
 
   return (
-    // `aria-busy` keeps a screen reader from announcing every streamed token;
-    // it reads the reply once the turn settles.
-    <article className="message message--assistant" aria-busy={running}>
+    <>
+      <DayDivider />
+      {/* `aria-busy` keeps a screen reader from announcing every streamed token;
+          it reads the reply once the turn settles. */}
+      <article className="message message--assistant" aria-busy={running}>
       <AssistantAvatar />
       <div className="message__body">
         {/* Named on the reply it describes, never on every reply on screen, and
@@ -159,15 +209,19 @@ function AssistantMessage() {
           </ActionBarPrimitive.Root>
         ) : null}
       </div>
-    </article>
+      </article>
+    </>
   );
 }
 
 function UserMessage() {
   const copied = useAuiState((state) => state.message.isCopied);
+  const stamp = useMessageStamp();
 
   return (
-    <article className="message message--user">
+    <>
+      <DayDivider />
+      <article className="message message--user">
       <div className="message__bubble">
         <MessagePrimitive.Parts components={{ Text: TextPart }} />
       </div>
@@ -208,15 +262,19 @@ function UserMessage() {
           {copied ? "Copied" : "Copy"}
         </ActionBarPrimitive.Copy>
       </ActionBarPrimitive.Root>
-    </article>
+      </article>
+    </>
   );
 }
 
 function SystemMessage() {
   return (
-    <article className="message message--notice">
-      <MessagePrimitive.Parts components={{ Text: TextPart }} />
-    </article>
+    <>
+      <DayDivider />
+      <article className="message message--notice">
+        <MessagePrimitive.Parts components={{ Text: TextPart }} />
+      </article>
+    </>
   );
 }
 
@@ -258,6 +316,15 @@ export function Conversation() {
     return "";
   }, [messages]);
 
+  // The clock the transcript reads from, kept beside the turn list it describes.
+  const clock = useMemo(
+    () => ({
+      order: new Map(messages.map((message, index) => [message.id, index])),
+      messages,
+    }),
+    [messages],
+  );
+
   return (
     <UiActionContext.Provider
       value={{ onIntent: (intent) => void sendMessage(intent), busy: streaming }}
@@ -269,16 +336,18 @@ export function Conversation() {
       <p className="sr-only" role="status" aria-live="polite" aria-busy={streaming}>
         {streaming ? phaseLabel(thinkingPhase) : latestReply}
       </p>
-      <div className="conversation" role="log" aria-label="Conversation">
-        <ThreadPrimitive.Messages
-          components={{
-            UserMessage,
-            AssistantMessage,
-            SystemMessage,
-            EditComposer,
-          }}
-        />
-      </div>
+      <TranscriptClockContext.Provider value={clock}>
+        <div className="conversation" role="log" aria-label="Conversation">
+          <ThreadPrimitive.Messages
+            components={{
+              UserMessage,
+              AssistantMessage,
+              SystemMessage,
+              EditComposer,
+            }}
+          />
+        </div>
+      </TranscriptClockContext.Provider>
     </UiActionContext.Provider>
   );
 }
