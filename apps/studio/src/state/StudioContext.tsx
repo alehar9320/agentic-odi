@@ -49,6 +49,7 @@ import {
   fetchUnreadSignalCount,
   healthLlm,
   healthMcp,
+  healthSidecar,
   listConversations as apiListConversations,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
@@ -69,6 +70,19 @@ import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
+import {
+  emptySnapshot,
+  isAlive,
+  isReady,
+  isReadyFlag,
+  livenessProbe,
+  mcpProbe,
+  modelProbe,
+  recordProbes,
+  withLiveness,
+  type ConnectionSnapshot,
+  type ProbeResult,
+} from "./connection";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -235,6 +249,13 @@ const BRIEF_KEY = "studio.brief";
 const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const THESES_KEY = "studio.theses";
 
+/** The banner and the bar read the model row through this shape. `null` means "not measured yet". */
+type LlmHealthView = { healthy: boolean | null; message: string };
+
+function llmHealthView(model: ProbeResult): LlmHealthView {
+  return { healthy: isReadyFlag(model), message: model.message };
+}
+
 /** How often the studio re-probes the model and the MCP server. */
 const HEALTH_POLL_INTERVAL_MS = 30_000;
 
@@ -305,13 +326,6 @@ export interface ToolActivity {
   preview?: string;
 }
 
-export interface ConnectionReport {
-  sidecarReachable: boolean;
-  mcpReachable: boolean;
-  llmHealthy: boolean;
-  llmMessage: string;
-}
-
 export interface StudioContextValue {
   settings: StudioConfig;
   saveSettings: (config: StudioConfig) => void;
@@ -331,15 +345,15 @@ export interface StudioContextValue {
   /** The failure behind `canvasState.kind === "error"`, if any. */
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
-  llmHealth: { healthy: boolean | null; message: string };
+  llmHealth: LlmHealthView;
+  /** What the three probes last answered, and when. The one place connection state lives. */
+  connection: ConnectionSnapshot;
   /** Model ids the configured endpoint publishes. Empty means "type one". */
   models: string[];
   modelsLoading: boolean;
   /** Why the endpoint would not list models, if it would not. */
   modelsMessage: string | null;
   refreshModels: (config?: { base_url: string; api_key: string }) => Promise<void>;
-  mcpReachable: boolean;
-  sidecarReachable: boolean | null;
   /**
    * A store that failed its integrity check on boot. When set, the Studio
    * shows the failure page instead of a half-empty board: the database is the
@@ -354,9 +368,9 @@ export interface StudioContextValue {
   recheckConnections: () => Promise<void>;
   dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
-  checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
+  checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionSnapshot>;
   /** Measure the same three connections for one panel, without changing what the studio believes. */
-  surveyConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
+  surveyConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionSnapshot>;
   messages: ChatMessage[];
   streaming: boolean;
   thinkingPhase: string | null;
@@ -641,15 +655,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
   });
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
-  const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
-    healthy: null,
-    message: "Health not checked yet.",
-  });
+  const [connection, setConnection] = useState<ConnectionSnapshot>(emptySnapshot);
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
-  const [mcpReachable, setMcpReachable] = useState(false);
-  const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -1126,6 +1135,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     ]);
   }, []);
 
+/**
+ * An unrequested probe that could not reach the process retires a belief rather
+ * than founding a new one: nobody asked, and a hosted studio has no sidecar to lose.
+ */
+function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResult {
+  return previous.state === "unknown" ? previous : measured;
+}
+
   /**
    * Measure the sidecar, the MCP server, and the model without recording the result.
    *
@@ -1134,12 +1151,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    * turn into a red strip across the window about a connection nobody was using.
    */
   const surveyConnections = useCallback(
-    async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
+    async (override: Partial<StudioConfig> = {}): Promise<ConnectionSnapshot> => {
       const target = { ...settings, ...override };
       const [sidecar, mcp, llm] = await Promise.all([
-        fetchConfig()
-          .then(() => true)
-          .catch(() => false),
+        healthSidecar(),
         healthMcp(target.mcp_url)
           .then((result) => result.reachable)
           .catch(() => false),
@@ -1148,17 +1163,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           api_key: target.api_key,
           model: target.model_name,
         }).catch((error: unknown) => ({
-          healthy: false,
-          message: (error as Error).message || "The model did not answer.",
+          healthy: false as const,
+          message: asStudioError(error).message || "The model did not answer.",
         })),
       ]);
       void refreshCapabilities();
-      return {
-        sidecarReachable: sidecar,
-        mcpReachable: mcp,
-        llmHealthy: llm.healthy,
-        llmMessage: llm.message,
-      };
+      const checked_at = Date.now();
+      return recordProbes(emptySnapshot(), {
+        liveness: livenessProbe(sidecar),
+        mcp: mcpProbe(mcp, checked_at),
+        model: modelProbe(llm, checked_at),
+      });
     },
     [settings, refreshCapabilities],
   );
@@ -1182,29 +1197,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     async (
       override: Partial<StudioConfig> = {},
       mode: "evidence" | "recovery" = "evidence",
-    ): Promise<ConnectionReport> => {
+    ): Promise<ConnectionSnapshot> => {
       const report = await surveyConnections(override);
-      const sidecar = report.sidecarReachable;
-      const llm = { healthy: report.llmHealthy, message: report.llmMessage };
-
-      if (sidecar) {
-        setSidecarReachable(true);
-      } else if (mode === "evidence") {
-        setSidecarReachable(false);
-      } else {
-        setSidecarReachable((previous) => (previous === true ? false : previous));
-      }
-      setMcpReachable(report.mcpReachable);
+      const sidecar = isAlive(report.liveness);
       // A model that answers is always news. A model that does not is news only when
       // the sidecar took part in the check — the browser asks it to reach the model, so
       // a negative it reports is measured rather than guessed — or when we previously
       // believed the model was alive and it has since stopped. On a hosted first run the
       // sidecar is absent too, and its silence is not a message about the model.
-      if (llm.healthy || mode === "evidence" || sidecar) {
-        setLlmHealth(llm);
-      } else {
-        setLlmHealth((previous) => (previous.healthy === true ? llm : previous));
-      }
+      const modelAnswers = (previous: ProbeResult) =>
+        isReady(report.model) || mode === "evidence" || sidecar
+          ? report.model
+          : previous.state === "live"
+            ? report.model
+            : previous;
+
+      setConnection((previous) =>
+        recordProbes(previous, {
+          liveness: sidecar || mode === "evidence" ? report.liveness : retireLiveness(previous.liveness, report.liveness),
+          mcp: report.mcp,
+          model: modelAnswers(previous.model),
+        }),
+      );
       if (sidecar) {
         setDismissedSidecarNotice(false);
       }
@@ -2288,12 +2302,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     // damaged database is the one exception: the sidecar is up and telling us the
     // only copy is damaged, so the failure page replaces the shell rather than
     // letting the board look merely empty.
+    void healthSidecar().then((answer) => {
+      const liveness = livenessProbe(answer);
+      // Only a process that answered is news here: a hosted studio with no
+      // sidecar is the design working, and an unrequested probe must not raise
+      // an outage over it.
+      if (!cancelled && isAlive(liveness)) {
+        setConnection((previous) => withLiveness(previous, liveness));
+      }
+    });
+
     fetchConfig()
       .then((defaults) => {
         if (cancelled) {
           return;
         }
-        setSidecarReachable(true);
         setBootError(null);
         if (localStorage.getItem(SETTINGS_KEY) === null) {
           saveSettings(defaults);
@@ -2306,7 +2329,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         const problem = asStudioError(error);
         if (problem.code === "store_corrupt") {
           setBootError(problem);
-          setSidecarReachable(true);
         }
       });
 
@@ -2377,6 +2399,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshSignals]);
 
+  // The model row keeps one derived view because the banner and the bar predate
+  // the snapshot; everything else reads `connection` and the probe helpers.
+  const llmHealth = useMemo(() => llmHealthView(connection.model), [connection.model]);
+
   // The canvas is one state, not four booleans: an empty board and a failed
   // board must never look the same.
   const canvas = canvasState.data;
@@ -2386,9 +2412,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   // Re-probe after the person restored a backup: a clean answer clears the boot
   // page and re-hydrates the studio in place.
   const recheckBoot = useCallback(async () => {
+    const liveness = livenessProbe(await healthSidecar());
+    setConnection((previous) => withLiveness(previous, liveness));
     try {
       const defaults = await fetchConfig();
-      setSidecarReachable(true);
       setBootError(null);
       if (localStorage.getItem(SETTINGS_KEY) === null) {
         saveSettings(defaults);
@@ -2397,10 +2424,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const problem = asStudioError(error);
       if (problem.code === "store_corrupt") {
         setBootError(problem);
-        setSidecarReachable(true);
-        return;
       }
-      setSidecarReachable(false);
       return;
     }
     void refreshCapabilities();
@@ -2437,12 +2461,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      connection,
       models,
       modelsLoading,
       modelsMessage,
       refreshModels,
-      mcpReachable,
-      sidecarReachable,
       bootError,
       recheckBoot,
       dismissedSidecarNotice,
@@ -2560,12 +2583,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      connection,
       models,
       modelsLoading,
       modelsMessage,
       refreshModels,
-      mcpReachable,
-      sidecarReachable,
       bootError,
       recheckBoot,
       dismissedSidecarNotice,

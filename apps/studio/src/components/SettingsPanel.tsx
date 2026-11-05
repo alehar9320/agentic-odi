@@ -12,7 +12,8 @@ import { PRODUCT_NAME } from "../lib/brand";
 import { resolveTheme } from "../lib/theme";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
-import type { ConnectionReport } from "../state/StudioContext";
+import type { ConnectionSnapshot } from "../state/connection";
+import { livenessWord, mcpWord, probeTone } from "../state/connection";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
 import { StatusDot } from "./status/StatusDot";
@@ -147,12 +148,11 @@ export function SettingsPanel() {
     closeSetup,
     clearChat,
     refreshCanvas,
-    llmHealth,
+    connection,
     models,
     modelsLoading,
     modelsMessage,
     refreshModels,
-    mcpReachable,
     connectors,
     connectorsError,
     presets,
@@ -162,7 +162,6 @@ export function SettingsPanel() {
     addConnector,
     deleteConnector,
     openCustomize,
-    sidecarReachable,
     capabilities,
     surveyConnections,
   } = useStudio();
@@ -172,7 +171,7 @@ export function SettingsPanel() {
   // a probe is owed to them. The answer is kept here, in the panel that asked: a passive
   // read of a settings page must not restyle the window, because the hosted studio
   // cannot reach a sidecar by design and its silence is not an outage to announce.
-  const [survey, setSurvey] = useState<ConnectionReport | null>(null);
+  const [survey, setSurvey] = useState<ConnectionSnapshot | null>(null);
   useEffect(() => {
     let cancelled = false;
     void surveyConnections()
@@ -189,9 +188,7 @@ export function SettingsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const modelHealthy = survey ? survey.llmHealthy : llmHealth.healthy;
-  const sidecarKnown = survey ? survey.sidecarReachable : sidecarReachable;
-  const mcpKnown = survey ? survey.mcpReachable : mcpReachable;
+  const measured = survey ?? connection;
 
   const presetGroups = PRESET_AREAS.map((area) => ({
     area,
@@ -246,31 +243,19 @@ export function SettingsPanel() {
       <ConnectionsSection settings={settings} saveSettings={saveSettings}>
         <ul className="connection-list">
           <li>
-            <StatusDot
-              tone={modelHealthy === false ? "warn" : modelHealthy === null ? "unknown" : "ok"}
-            />
+            <StatusDot tone={probeTone(measured.model)} />
             <span>Model</span>
-            <span className="connection-list__value">
-              {modelHealthy === false
-                ? "offline"
-                : modelHealthy === null
-                  ? "not checked"
-                  : "reachable"}
-            </span>
+            <span className="connection-list__value">{measured.model.message}</span>
           </li>
           <li>
-            <StatusDot
-              tone={sidecarKnown === false ? "warn" : sidecarKnown === null ? "unknown" : "ok"}
-            />
+            <StatusDot tone={probeTone(measured.liveness)} />
             <span>Sidecar</span>
-            <span className="connection-list__value">
-              {sidecarKnown === false ? "unavailable" : sidecarKnown === null ? "unknown" : "reachable"}
-            </span>
+            <span className="connection-list__value">{livenessWord(measured.liveness)}</span>
           </li>
           <li>
-            <StatusDot tone={mcpKnown ? "ok" : "unknown"} />
+            <StatusDot tone={probeTone(measured.mcp)} />
             <span>Local FastMCP server</span>
-            <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
+            <span className="connection-list__value">{mcpWord(measured.mcp)}</span>
           </li>
         </ul>
         <p className="muted">
@@ -292,7 +277,7 @@ export function SettingsPanel() {
           ))}
         </ul>
 
-        {sidecarKnown === false ? (
+        {measured.liveness.state === "down" ? (
           <p className="muted">
             Connectors require the local sidecar. Data and conversation still work
             without it; connect a sidecar to add MCP or REST data sources.

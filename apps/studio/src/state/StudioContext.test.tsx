@@ -5,6 +5,7 @@ import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
+import { isAlive } from "./connection";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -54,6 +55,9 @@ let canvasFails = false;
 /** Extra records the canvas route serves; empty keeps every other test as-is. */
 let canvasRecords: Record<string, unknown> = {};
 let bootCorrupt = false;
+/** What the sidecar reports when the model refuses; the SDK's own text is the point. */
+let llmHealthMessage: string | null = null;
+let healthFetches = 0;
 let chatAborts = false;
 let chatFailure: Error | null = null;
 let chatHangs = false;
@@ -150,6 +154,15 @@ function route(
       return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
+  }
+  if (url === "/health") {
+    healthFetches += 1;
+    if (configFails) {
+      throw new TypeError("fetch failed");
+    }
+    return bootCorrupt
+      ? json({ status: "degraded", reason: "store_corrupt" })
+      : json({ status: "ok" });
   }
   if (url === "/api/config") {
     if (configHangs) {
@@ -314,7 +327,7 @@ function route(
     llmHealthFetches += 1;
     return json(
       llmUnhealthy
-        ? { healthy: false, message: "connection refused" }
+        ? { healthy: false, message: llmHealthMessage ?? "connection refused" }
         : { healthy: true, message: "ok" },
     );
   }
@@ -728,7 +741,7 @@ describe("StudioContext first run in a browser with no server", () => {
     // Boot completed: the person's own work is on screen, the shell is usable, and
     // the sidecar stays unknown because config never answered.
     expect(result.current.canvas).not.toBeNull();
-    expect(result.current.sidecarReachable).toBeNull();
+    expect(result.current.connection.liveness.state).toBe("unknown");
     expect(typeof result.current.sendMessage).toBe("function");
   });
 
@@ -746,7 +759,7 @@ describe("StudioContext first run in a browser with no server", () => {
     // The shell is up and usable, and the sidecar is still unknown.
     expect(typeof result.current.sendMessage).toBe("function");
     expect(result.current.settings).toBeDefined();
-    expect(result.current.sidecarReachable).toBeNull();
+    expect(result.current.connection.liveness.state).toBe("unknown");
   });
 
   it("answers the first message instead of refusing it", async () => {
@@ -783,12 +796,12 @@ describe("StudioContext first run in a browser with no server", () => {
     // The idle survey ran and found nothing — and a server that was never there
     // is not an outage, so the banner bridge still has nothing to raise.
     expect(llmHealthFetches).toBeGreaterThan(0);
-    expect(result.current.sidecarReachable).toBeNull();
+    expect(result.current.connection.liveness.state).toBe("unknown");
 
     await act(async () => {
       await result.current.recheckConnections();
     });
-    expect(result.current.sidecarReachable).toBe(false);
+    expect(result.current.connection.liveness.state).toBe("down");
   });
 
   it("gives up the survey when the person starts talking", async () => {
@@ -936,9 +949,98 @@ describe("StudioContext on a desktop install whose model is down", () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
 
-    expect(result.current.sidecarReachable).toBe(true);
+    expect(isAlive(result.current.connection.liveness)).toBe(true);
     expect(result.current.llmHealth.healthy).toBe(false);
-    expect(result.current.llmHealth.message).toBe("connection refused");
+    // The refusal is phrased by the studio, not quoted from the provider.
+    expect(result.current.llmHealth.message).toBe("Not ready — nothing is listening at that address.");
+  });
+});
+
+describe("StudioContext connection snapshot (#534)", () => {
+  const REJECTED_KEY =
+    "error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-abc'}}";
+
+  beforeEach(() => {
+    llmUnhealthy = true;
+    llmHealthMessage = REJECTED_KEY;
+    healthFetches = 0;
+    configHangs = false;
+    bootCorrupt = false;
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    llmUnhealthy = false;
+    llmHealthMessage = null;
+    configHangs = false;
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("holds a live process and a rejected key as two separate answers", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    expect(result.current.connection.liveness.state).toBe("live");
+    expect(result.current.connection.model.state).toBe("degraded");
+    expect(isAlive(result.current.connection.liveness)).toBe(true);
+    expect(result.current.llmHealth.healthy).toBe(false);
+    expect(result.current.llmHealth.message).toBe("Not ready — the endpoint rejected the key.");
+  });
+
+  it("asks the process itself whether it is up, not its configuration", async () => {
+    // The config request is what the old liveness probe waited on, so a laptop
+    // whose sidecar was alive but slow read as a dead application.
+    configHangs = true;
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    expect(healthFetches).toBeGreaterThan(0);
+    expect(result.current.connection.liveness.state).toBe("live");
+    expect(isAlive(result.current.connection.liveness)).toBe(true);
+  });
+
+  it("stamps each probe with the moment it answered", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    expect(typeof result.current.connection.model.checked_at).toBe("number");
+    expect(typeof result.current.connection.liveness.checked_at).toBe("number");
+    expect(result.current.connection.next_check_at).toBeNull();
+  });
+
+  it("keeps the snapshot as the only thing that stores the answer", async () => {
+    // A degraded store is the process answering badly: still alive, so the rest
+    // of the studio must not treat it as an outage.
+    llmUnhealthy = false;
+    llmHealthMessage = null;
+    bootCorrupt = true;
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    expect(result.current.connection.liveness.state).toBe("degraded");
+    expect(isAlive(result.current.connection.liveness)).toBe(true);
   });
 });
 
@@ -1244,7 +1346,7 @@ describe("StudioContext boot failure", () => {
     expect(result.current.bootError?.code).toBe("store_corrupt");
     expect(result.current.bootError?.message).toContain("/home/me/.odi.db");
     // The sidecar answered, so it is reachable; the database is the problem.
-    expect(result.current.sidecarReachable).toBe(true);
+    expect(isAlive(result.current.connection.liveness)).toBe(true);
   });
 
   it("clears the failure page once a restored store answers cleanly", async () => {
@@ -1259,7 +1361,7 @@ describe("StudioContext boot failure", () => {
     });
 
     expect(result.current.bootError).toBeNull();
-    expect(result.current.sidecarReachable).toBe(true);
+    expect(isAlive(result.current.connection.liveness)).toBe(true);
   });
 });
 

@@ -10,24 +10,54 @@ vi.mock("../../state/StudioContext", () => ({
 }));
 
 import { useStudio } from "../../state/StudioContext";
+import type { ProbeState } from "../../state/connection";
 import { useUpdateSnapshot } from "../../updater";
 import type { UpdateSnapshot } from "../../updater/types";
 import { StudioBar } from "./StudioBar";
+import { probeResult, snapshotOf } from "../../test/connection";
 
-const stubContext = (overrides: Record<string, unknown> = {}) => ({
-  conversationId: null,
-  conversations: [],
-  llmHealth: { healthy: true, message: "ok" },
-  messages: [],
-  openConversation: vi.fn(),
-  refreshConversations: vi.fn(),
-  unreadSignalCount: 0,
-  openPanel: vi.fn(),
-  pushToast: vi.fn(),
-  saveSettings: vi.fn(),
-  settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "dark" },
-  ...overrides,
-});
+/** The provider's own text, which used to reach the screen through the bar. */
+const REJECTED_KEY =
+  "error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-abc'}}";
+
+const stubContext = (overrides: Record<string, unknown> = {}) => {
+  const llmHealth = (overrides.llmHealth ?? { healthy: true, message: "ok" }) as {
+    healthy: boolean | null;
+    message: string;
+  };
+  const liveness = (overrides.liveness ?? "unknown") as ProbeState;
+  return {
+    conversationId: null,
+    conversations: [],
+    llmHealth,
+    // The bar reads the snapshot, so a stub that only names the legacy views still
+    // describes one coherent set of probe answers.
+    connection:
+      overrides.connection ??
+      snapshotOf({
+        model: probeResult(
+          llmHealth.healthy === true ? "live" : llmHealth.healthy === false ? "down" : "unknown",
+          llmHealth.message,
+        ),
+        liveness: probeResult(
+          liveness,
+          liveness === "down"
+            ? "The local Studio service is not answering."
+            : "The local Studio service is answering.",
+        ),
+        mcp: probeResult("unknown", "Not checked yet."),
+      }),
+    messages: [],
+    openConversation: vi.fn(),
+    refreshConversations: vi.fn(),
+    unreadSignalCount: 0,
+    openPanel: vi.fn(),
+    pushToast: vi.fn(),
+    saveSettings: vi.fn(),
+    settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "dark" },
+    ...overrides,
+  };
+};
 
 const stubSnapshot = (overrides: Partial<UpdateSnapshot> = {}): UpdateSnapshot => ({
   phase: "up-to-date",
@@ -101,7 +131,7 @@ describe("StudioBar", () => {
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
         llmHealth: { healthy: true, message: "qwen3 is answering." },
-        sidecarReachable: true,
+        liveness: "live",
         settings: {
           base_url: "http://localhost:8001/v1",
           api_key: "local",
@@ -115,6 +145,53 @@ describe("StudioBar", () => {
 
     expect(
       screen.getByRole("button", { name: /model status: live\. qwen3 is answering\./i }),
+    ).toBeInTheDocument();
+  });
+
+  it("phrases a rejected key in the studio's words, never the provider's", () => {
+    // The accessible name used to interpolate whatever the model probe returned,
+    // which was the SDK's own 401 body. The snapshot holds the sentence.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connection: snapshotOf({
+          liveness: probeResult("live", "The local Studio service is answering."),
+          model: probeResult("degraded", "Not ready — the endpoint rejected the key."),
+        }),
+        llmHealth: { healthy: false, message: REJECTED_KEY },
+        settings: {
+          base_url: "https://model.example.com/v1",
+          api_key: "sk-proj-abc",
+          model_name: "gpt-5",
+          mcp_url: "",
+          theme: "dark",
+        },
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    const health = screen.getByRole("button", {
+      name: /model status: not ready\. not ready — the endpoint rejected the key\./i,
+    });
+    expect(health.getAttribute("title")).toBe("Not ready — the endpoint rejected the key.");
+    expect(health.getAttribute("aria-label")).not.toMatch(/401|sk-proj-abc/);
+  });
+
+  it("says the process is up in the bar's own words when the model merely timed out", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connection: snapshotOf({
+          liveness: probeResult("live", "The local Studio service is answering."),
+          model: probeResult("degraded", "Not ready — the endpoint did not answer in time."),
+        }),
+        llmHealth: { healthy: false, message: "connection_error: Request timed out." },
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(
+      screen.getByRole("button", {
+        name: /model status: not ready\. not ready — the endpoint did not answer in time\./i,
+      }),
     ).toBeInTheDocument();
   });
 

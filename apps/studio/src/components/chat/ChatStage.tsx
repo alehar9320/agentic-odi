@@ -13,6 +13,7 @@ import {
 } from "../../lib/commands";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
+import { mcpWord } from "../../state/connection";
 import type { WorkspacePanelId } from "../../types";
 import { IntroConversation } from "../setup/IntroConversation";
 import { SetupConversation } from "../setup/SetupConversation";
@@ -95,7 +96,7 @@ export function ChatStage() {
     canvas,
     brief,
     settings,
-    mcpReachable,
+    connection,
     llmHealth,
   } = useStudio();
 
@@ -161,7 +162,7 @@ export function ChatStage() {
                   ? "reachable"
                   : "offline"
             }`,
-            `- MCP: ${mcpReachable ? "connected" : "offline"} (${settings.mcp_url})`,
+            `- MCP: ${mcpWord(connection.mcp)} (${settings.mcp_url})`,
             `- Context: ${
               brief ? `${brief.product_name || "named job"} — ${brief.job_statement}` : "not set"
             }`,

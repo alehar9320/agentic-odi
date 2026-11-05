@@ -7,6 +7,12 @@ import { formatRelativeTime } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
+import {
+  LOCAL_MODEL_SENTENCE,
+  isAlive,
+  isReady,
+  probeTone,
+} from "../../state/connection";
 import { useUpdateSnapshot } from "../../updater";
 import {
   BellIcon,
@@ -38,11 +44,10 @@ export function StudioBar({
   const {
     conversationId,
     conversations,
-    llmHealth,
+    connection,
     messages,
     openConversation,
     refreshConversations,
-    sidecarReachable,
     streaming,
     unreadSignalCount,
     openPanel,
@@ -188,16 +193,17 @@ export function StudioBar({
     api_key: settings.api_key,
     model_name: settings.model_name,
   });
-  const status =
-    llmHealth.healthy === true
-      ? "Live"
-      : llmHealth.healthy === false
+  const model = connection.model;
+  const status = isReady(model)
+    ? "Live"
+    : model.state === "degraded"
+      ? "Not ready"
+      : model.state === "down"
         ? "Local mode"
-        : endpointConfigured || sidecarReachable === true
+        : endpointConfigured || isAlive(connection.liveness)
           ? "Connecting"
           : "Local";
-  const statusDetail =
-    status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
+  const statusDetail = status === "Local" ? LOCAL_MODEL_SENTENCE : model.message;
   const updateReady = update.phase === "ready";
   const versionText = updateReady
     ? "Update ready"
@@ -368,9 +374,7 @@ export function StudioBar({
           aria-label={`Model status: ${status}. ${statusDetail}`}
           title={statusDetail}
         >
-          <StatusDot
-            tone={status === "Local mode" ? "warn" : status === "Connecting" ? "unknown" : "ok"}
-          />
+          <StatusDot tone={probeTone(model)} />
           {status}
         </button>
 
