@@ -87,6 +87,55 @@ describe("theme tokens", () => {
   });
 });
 
+describe("role tokens", () => {
+  /** Every custom property a block declares, alpha values included. */
+  function declaredNames(block: string): Set<string> {
+    return new Set(Array.from(block.matchAll(/--([a-z0-9-]+)\s*:/g), (match) => match[1]));
+  }
+
+  const darkNames = declaredNames(readBlock(":root {"));
+  const lightBody = readBlock("html.theme-light");
+  const lightNames = declaredNames(lightBody);
+
+  it("defines every role the canvas and the filled controls read", () => {
+    const roles = [
+      "accent-fill",
+      "on-accent",
+      "plot-surface",
+      "tint-accent",
+      "tint-accent-strong",
+      "tint-amber",
+      "brand-tile",
+    ];
+    expect(roles.filter((name) => !darkNames.has(name))).toEqual([]);
+  });
+
+  it("overrides each role that changes with the theme, in the same block as the palette", () => {
+    const themed = ["accent-fill", "on-accent", "plot-surface", "tint-accent", "tint-accent-strong", "tint-amber"];
+    expect(themed.filter((name) => !lightNames.has(name))).toEqual([]);
+    // The mascot's tile is brand, not a surface: declared once, in both palettes.
+    expect(lightNames.has("brand-tile")).toBe(false);
+  });
+
+  for (const [name, tokens] of [
+    ["dark", dark],
+    ["light", light],
+  ] as const) {
+    it(`keeps the ink on a filled control at WCAG AA in the ${name} theme`, () => {
+      const ratio = contrast(tokens["on-accent"], tokens["accent-fill"]);
+      expect(ratio, `${tokens["on-accent"]} on ${tokens["accent-fill"]}`).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`measures the canvas text on the ground the canvas paints, in the ${name} theme`, () => {
+      const failures = ["text", "muted"]
+        .map((token) => [token, contrast(tokens[token], tokens["plot-surface"])] as const)
+        .filter(([, ratio]) => ratio < 4.5)
+        .map(([token, ratio]) => `--${token} on --plot-surface: ${ratio.toFixed(2)}:1`);
+      expect(failures).toEqual([]);
+    });
+  }
+});
+
 describe("composer focus ring", () => {
   it("follows the capsule's shape instead of floating inside it", () => {
     expect(themeCss).toMatch(
