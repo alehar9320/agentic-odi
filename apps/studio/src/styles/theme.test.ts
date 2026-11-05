@@ -30,6 +30,19 @@ function colorTokens(body: string): Record<string, string> {
 const dark = colorTokens(readBlock(":root {"));
 const light = { ...dark, ...colorTokens(readBlock("html.theme-light")) };
 
+/** A wash is a transparency, not a colour, so `colorTokens` never sees one. */
+function washTokens(body: string): Record<string, string> {
+  return Object.fromEntries(
+    Array.from(body.matchAll(/--(tint-[a-z0-9-]+):\s*(rgba?\([^)]*\))\s*;/g), (match) => [
+      match[1],
+      match[2],
+    ]),
+  );
+}
+
+const darkWashes = washTokens(readBlock(":root {"));
+const lightWashes = { ...darkWashes, ...washTokens(readBlock("html.theme-light")) };
+
 function channels(hex: string): number[] {
   return Array.from(hex.replace("#", "").matchAll(/../g), (pair) => {
     const value = parseInt(pair[0], 16) / 255;
@@ -73,6 +86,98 @@ describe("theme contrast", () => {
       expect(failures).toEqual([]);
     });
   }
+});
+
+describe("ink on a tint", () => {
+  /**
+   * A tint is a wash over whatever is behind it, so an ink that clears AA on the
+   * page does not clear it on the tint: `--accent` is 5.37:1 on white and 4.28:1
+   * on the light theme's indigo tint, and `--amber` on the amber tint it ships
+   * with is 3.95:1. Both were written into a rule and neither was visible to the
+   * token gates above, which measure tokens against tokens and never meet a rule.
+   */
+  function channelsOf(value: string | undefined): { rgb: number[]; alpha: number } | null {
+    if (!value) {
+      return null;
+    }
+    if (value.startsWith("#")) {
+      const rgb = Array.from(value.replace("#", "").matchAll(/../g), (pair) =>
+        parseInt(pair[0], 16),
+      );
+      return { rgb: rgb.slice(0, 3), alpha: 1 };
+    }
+    const parts = value
+      .replace(/^\s*rgba?\(|\)\s*$/g, "")
+      .split(/[\s,/]+/)
+      .filter(Boolean)
+      .map(Number);
+    if (parts.length < 3 || parts.slice(0, 3).some(Number.isNaN)) {
+      return null;
+    }
+    return { rgb: parts.slice(0, 3), alpha: parts.length >= 4 ? parts[3] : 1 };
+  }
+
+  /** The ink's ratio against the wash laid over the surface it will meet. */
+  function contrastOverWash(
+    ink: string | undefined,
+    wash: string | undefined,
+    surface: string | undefined,
+  ): number | null {
+    const tint = channelsOf(wash);
+    const ground = channelsOf(surface);
+    const inkChannels = channelsOf(ink);
+    if (!tint || !ground || !inkChannels) {
+      return null;
+    }
+    const composited = ground.rgb.map(
+      (channel, index) => tint.alpha * tint.rgb[index] + (1 - tint.alpha) * channel,
+    );
+    const hex = `#${composited
+      .map((channel) => Math.round(channel).toString(16).padStart(2, "0"))
+      .join("")}`;
+    return contrast(`#${inkChannels.rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}`, hex);
+  }
+
+  /** Every rule in the file, as its selector line and its body. */
+  function rules(): Array<{ selector: string; body: string }> {
+    return themeCss.split("}").flatMap((chunk) => {
+      const brace = chunk.lastIndexOf("{");
+      if (brace < 0) {
+        return [];
+      }
+      const head = chunk.slice(0, brace).split("\n");
+      return [{ selector: (head[head.length - 1] ?? "").trim(), body: chunk.slice(brace + 1) }];
+    });
+  }
+
+  it("keeps every ink a rule paints on a tint readable in both palettes", () => {
+    const failures: string[] = [];
+    for (const rule of rules()) {
+      const tint = /(?:^|\n)\s*background:\s*var\(--(tint-[a-z-]+)\)\s*;/.exec(rule.body)?.[1];
+      const ink = /(?:^|\n)\s*color:\s*var\(--([a-z-]+)\)\s*;/.exec(rule.body)?.[1];
+      if (!tint || !ink) {
+        continue;
+      }
+      for (const [theme, tokens, washes] of [
+        ["dark", dark, darkWashes],
+        ["light", light, lightWashes],
+      ] as const) {
+        for (const surface of SURFACES) {
+          const ratio = contrastOverWash(tokens[ink], washes[tint], tokens[surface]);
+          if (ratio === null) {
+            failures.push(
+              `${rule.selector}: --${ink} or --${tint} is not a colour this gate can measure (${theme})`,
+            );
+          } else if (ratio < 4.5) {
+            failures.push(
+              `${rule.selector}: --${ink} on --${tint} over --${surface} (${theme}) ${ratio.toFixed(2)}:1`,
+            );
+          }
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
 });
 
 describe("theme tokens", () => {

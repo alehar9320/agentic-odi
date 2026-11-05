@@ -2,6 +2,7 @@ import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isUnderserved, opportunityScore, UNDERSERVED_THRESHOLD } from "../../lib/odi";
+import { literalPaint } from "../../test/paintedColors";
 import type { CanvasState } from "../../types";
 import { OpportunityLandscape, plotX, plotY } from "./OpportunityLandscape";
 
@@ -597,21 +598,6 @@ describe("the map draws from the palette and from shape, not from a hex", () => 
   beforeEach(() => {
     seedThreeBands();
   });
-
-  /** Every colour the markup paints with a literal rather than a class. */
-  function literalPaint(root: HTMLElement): string[] {
-    const painted: string[] = [];
-    for (const element of Array.from(root.querySelectorAll("[fill], [stroke], [stop-color], [style]"))) {
-      const value = ["fill", "stroke", "stop-color", "style"]
-        .map((name) => element.getAttribute(name))
-        .filter((name): name is string => name !== null)
-        .join(" ");
-      for (const literal of value.match(/#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)/g) ?? []) {
-        painted.push(`${element.tagName} ${literal}`);
-      }
-    }
-    return painted;
-  }
 
   it("marks a band by shape as well as colour", () => {
     const { container } = render(<OpportunityLandscape />);

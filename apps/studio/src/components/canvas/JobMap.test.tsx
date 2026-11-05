@@ -2,6 +2,8 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JOB_STAGES } from "../../domain/jobStages";
+import themeCss from "../../styles/theme.css?raw";
+import { literalPaint } from "../../test/paintedColors";
 import { JobMap } from "./JobMap";
 
 const mockCanvasData = {
@@ -295,5 +297,54 @@ describe("JobMap canvas cache", () => {
     expect(screen.getByText("No saved copy on this device")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /capture what you know/i }));
     expect(harness.state.openPanel).toHaveBeenCalledWith("capture");
+  });
+});
+
+describe("the job map paints from the palette", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData };
+    harness.state.canvasCached = false;
+    harness.state.focusedJobId = null;
+  });
+
+  it("marks a phase with no steps as empty, in a class and not a colour", () => {
+    const { container } = render(<JobMap />);
+
+    // Two of the eight phases hold a step; the other six are the empty state.
+    expect(container.querySelectorAll(".jobmap__tile")).toHaveLength(JOB_STAGES.length);
+    expect(container.querySelectorAll(".jobmap__tile--empty")).toHaveLength(JOB_STAGES.length - 2);
+    expect(container.querySelectorAll(".jobmap__pill--empty")).toHaveLength(JOB_STAGES.length - 2);
+    expect(container.querySelectorAll(".jobmap__pill--filled")).toHaveLength(2);
+  });
+
+  it("keeps the empty phase's count readable in both palettes", () => {
+    // The defect this closes is `color: rgba(255,255,255,0.2)`: white ink that
+    // vanishes on a light theme, on paper, and for most readers. The rule the
+    // component now leans on is declared once, from tokens.
+    const rule = new RegExp("\\n\\.jobmap__pill--empty\\s*\\{([^}]*)\\}").exec(themeCss)?.[1] ?? "";
+    expect(rule).toMatch(/color:\s*var\(--muted\)/);
+    expect(rule).toMatch(/background:\s*transparent/);
+    // `--faint` is 4.29:1 on a tile ground in light (the open #542 pair), so the
+    // count that has to be read is set in `--muted`, not the dimmest token.
+    expect(rule).not.toMatch(/var\(--faint\)/);
+  });
+
+  it("never paints the pipeline with a literal", () => {
+    const { container } = render(<JobMap />);
+    expect(literalPaint(container)).toEqual([]);
+  });
+
+  it("selects a phase through a class, and lets go the same way", () => {
+    const { container } = render(<JobMap />);
+    const tiles = container.querySelectorAll<HTMLButtonElement>(".jobmap__tile");
+    const third = tiles[2];
+
+    fireEvent.click(third);
+    expect(third).toHaveClass("jobmap__tile--selected");
+    expect(third).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(third);
+    expect(third).not.toHaveClass("jobmap__tile--selected");
+    expect(third).toHaveAttribute("aria-pressed", "false");
   });
 });

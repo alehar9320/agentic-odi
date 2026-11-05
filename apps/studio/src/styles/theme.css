@@ -6945,5 +6945,84 @@ details[open] summary {
 
 .opportunity-matrix__pill--underserved {
   background: var(--tint-amber);
-  color: var(--amber);
+  /* The amber the pill is short of is already stated by the row's inset ring;
+     the ink has to be readable on the wash, and --amber is 3.95:1 on it. */
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------------ */
+/* Job map: the phase pipeline                                         */
+/* ------------------------------------------------------------------ */
+
+/* A phase's tile is the only place it says what it holds, so "no steps here" is
+   a class on the button rather than a wash mixed in its style attribute: mixed
+   white never follows the theme, and never reaches paper. */
+.jobmap__tile {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.jobmap__tile--empty {
+  background: transparent;
+  border-style: dashed;
+}
+
+/* Declared after the empty state so a selected phase stays a phase you chose:
+   the dashed edge keeps saying it holds nothing. */
+.jobmap__tile--selected {
+  background: var(--tint-accent-strong);
+  border-color: var(--accent);
+}
+
+.jobmap__phase {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.jobmap__phase--empty {
+  color: var(--muted);
+}
+
+.jobmap__desc {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 2px;
+  height: 28px;
+  overflow: hidden;
+}
+
+.jobmap__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.jobmap__pill {
+  padding: 2px 6px;
+}
+
+.jobmap__pill--filled {
+  background: var(--tint-accent);
+  color: var(--text);
+}
+
+/* A zero is worth reading. `--faint` is 4.29:1 on a light tile, so the count
+   that carries the empty state is set in `--muted`. */
+.jobmap__pill--empty {
+  background: transparent;
+  color: var(--muted);
 }

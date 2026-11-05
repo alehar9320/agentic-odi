@@ -35,19 +35,15 @@ const ALLOWED_FILES: Record<string, { reason: string; issue: number }> = {
     reason: "The first-run introduction is a fixed dark scrim with its own gradients.",
     issue: 330,
   },
-  "src/components/canvas/JobMap.tsx": {
-    reason: "SVG job-map strokes and fills are structural geometry, not theme.",
-    issue: 335,
-  },
 };
 
 /** The palette's own home; it is the one file that may hold literals. */
 const TOKEN_FILE = "src/styles/theme.css";
 
 /** Above this the baseline has become a dumping ground rather than a record.
- * 5 since the opportunity map was converted: its colours became role tokens and
- * a shape, so the file has no literal left to excuse. */
-const ALLOWED_CAP = 5;
+ * 4 since the job map's pipeline tiles moved onto the palette: the file had no
+ * literal left, so its #335 excuse went with them. */
+const ALLOWED_CAP = 4;
 
 /** Source text for every file the gate reads, loaded the way Vite serves it. */
 const SOURCES = {
