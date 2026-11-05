@@ -109,6 +109,17 @@ export interface WorkspaceSnapshot {
  */
 export interface LocalStore {
   readonly durable: boolean;
+  /**
+   * True once another tab has upgraded the schema past what this page can
+   * write, or the browser dropped the connection. The app must reload before
+   * using the store again; a memory-only store never needs a reload.
+   */
+  readonly needsReload: boolean;
+  /**
+   * Subscribe to the reload guard. The listener is called with `true` when the
+   * connection closes under a schema change. Returns an unsubscribe function.
+   */
+  onVersionChange(listener: (needsReload: boolean) => void): () => void;
   nextSeq(): Promise<number>;
   listJobs(): Promise<StoredJob[]>;
   getJob(id: string): Promise<StoredJob | undefined>;

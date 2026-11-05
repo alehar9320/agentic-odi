@@ -250,3 +250,15 @@ def test_main_passes_an_explicit_port_through(monkeypatch) -> None:
     server.main(["--port", "8010"])
 
     assert calls[0]["port"] == 8010
+
+
+@pytest.mark.asyncio
+async def test_open_study_reports_a_missing_job_as_an_envelope() -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "open_study", {"job_id": "missing", "name": "Q3 sweep", "wave": 1}
+        )
+
+    text = _text(result)
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Job not found: missing"

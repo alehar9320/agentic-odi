@@ -311,19 +311,22 @@ class ODIService:
         severity: str = "info",
         detail: str | None = None,
         discriminator: str = "",
+        source_event_id: int | None = None,
     ) -> Signal:
         """Record one fact. A signal with the same fingerprint already exists.
 
-        ``discriminator`` is the thing that changed (a new score, a record id);
-        the fingerprint is sha256 over ``kind|subject_kind|subject_id|
-        discriminator``, so re-recording the same fact returns the first signal
-        instead of spamming the feed.
+        ``discriminator`` is the thing that changed (a new score, a record id) and
+        ``source_event_id`` the store event that carried the change. The fingerprint
+        is sha256 over ``kind|subject_kind|subject_id|discriminator``, with the source
+        id appended when one is given. Naming the change and not only the value it
+        landed on is what lets a second move to the same score be its own signal,
+        while a retry of one change stays one signal. Without a source id the
+        fingerprint is exactly what it was before, so stored signals still dedupe.
         """
-        fingerprint = hashlib.sha256(
-            "|".join([kind.value, subject_kind or "", subject_id or "", discriminator]).encode(
-                "utf-8"
-            )
-        ).hexdigest()
+        fact = [kind.value, subject_kind or "", subject_id or "", discriminator]
+        if source_event_id is not None:
+            fact.append(str(source_event_id))
+        fingerprint = hashlib.sha256("|".join(fact).encode("utf-8")).hexdigest()
         for existing in self.repo.signals.values():
             if existing.fingerprint == fingerprint:
                 return existing
@@ -442,6 +445,9 @@ class ODIService:
         return res
 
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
+        #: The write that produced these facts: two changes landing on the same
+        #: score are two changes, one change reported twice is one signal.
+        source_event_id = self.repo.last_event_id()
         if before.importance != after.importance or before.satisfaction != after.satisfaction:
             self.record_signal(
                 SignalKind.OUTCOME_SCORED,
@@ -453,6 +459,7 @@ class ODIService:
                     f"satisfaction {before.satisfaction} -> {after.satisfaction}"
                 ),
                 discriminator=f"importance={after.importance},satisfaction={after.satisfaction}",
+                source_event_id=source_event_id,
             )
         crossing = _opportunity_crossing(before.opportunity_score, after.opportunity_score)
         if crossing is not None:
@@ -466,6 +473,7 @@ class ODIService:
                 severity=severity,
                 detail=f"{before.opportunity_score} -> {after.opportunity_score}",
                 discriminator=f"{direction}:{after.opportunity_score}",
+                source_event_id=source_event_id,
             )
 
     def _emit_job_map_completed(self, job_id: str) -> None:
@@ -1116,6 +1124,7 @@ class ODIService:
             severity=severity,
             detail=segment.rationale[:500],
             discriminator=f"verdict={segment.verdict},confidence={segment.confidence}",
+            source_event_id=self.repo.last_event_id(),
         )
 
     def unclustered_outcomes(self, job_id: str | None = None) -> list[Outcome]:

@@ -486,8 +486,8 @@ describe("typed failures", () => {
 
     expect(problem.code).toBe("mcp_unreachable");
     expect(problem.retryable).toBe(true);
-    expect(problem.suggestion).toMatch(/sidecar/i);
-    expect(problem.message).toMatch(/reachable|not running|unreachable/i);
+    expect(problem.suggestion).toContain("uv run python scripts/dev.py");
+    expect(problem.message).toMatch(/local Studio service isn.t responding/);
   });
 
   it("classifies an empty 502 response as mcp_unreachable", async () => {
@@ -502,7 +502,7 @@ describe("typed failures", () => {
         satisfaction: 3,
       }),
      ).rejects.toMatchObject({
-       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("sidecar") },
+       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
      });
    });
 

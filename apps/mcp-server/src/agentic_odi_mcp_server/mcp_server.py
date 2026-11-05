@@ -244,9 +244,12 @@ def add_outcome(
 ) -> str:
     """Add a desired Outcome to a Job.
 
-    A score needs the questions behind it. When you supply ``importance`` or
-    ``satisfaction`` you must also supply ``claim_check`` — the questions you
-    asked the customer and what came back::
+    A score needs the questions behind it. Put three questions to the person —
+    four when the claim is broad — before any number, and let them answer or skip
+    with a reason; never answer your own question and count it.
+
+    When you supply ``importance`` or ``satisfaction`` you must also supply
+    ``claim_check`` — the questions you asked and what came back::
 
         {
           "asked": ["How often does this happen?", "What do you do today?"],
@@ -822,9 +825,9 @@ def open_study(job_id: str, name: str, wave: int, method_notes: str | None = Non
     try:
         study = service.open_study(job_id=job_id, name=name, wave=wave, method_notes=method_notes)
     except JobNotFoundError:
-        return job_not_found(job_id)
+        return _fail(JobNotFoundError(job_id), job_not_found(job_id))
     except OdiError as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps(study.model_dump(mode="json"))
 
 
