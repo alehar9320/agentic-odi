@@ -69,3 +69,93 @@ def test_the_entity_is_part_of_the_published_schema() -> None:
     assert "NextStep" in schema
     assert "text" in schema["NextStep"]["properties"]
     assert "is_open" not in schema["NextStep"]["properties"]
+
+
+def _both_repositories(tmp_path):
+    """The same expectations against the event-sourced store and the plain one.
+
+    ``SQLiteRepository`` replays ``NEXT_STEP_*`` events; ``InMemoryRepository``
+    holds dicts. A greeting that reads a step the store cannot return identically
+    in both is a greeting that will lie on one backend.
+    """
+    from agentic_odi_core.repository import InMemoryRepository
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    return [InMemoryRepository(), SQLiteRepository(str(tmp_path / "odi.db"))]
+
+
+def test_a_step_survives_a_reopen(tmp_path) -> None:
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db)
+    step = NextStep(text="Talk to two support leads")
+
+    assert repo.add_next_step(step).id == step.id
+    reopened = SQLiteRepository(db)
+    assert reopened.get_next_step(step.id) == step
+    assert [s.id for s in reopened.list_next_steps()] == [step.id]
+
+
+def test_a_resolution_survives_a_reopen(tmp_path) -> None:
+    from datetime import datetime, timezone
+
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db)
+    repo.add_next_step(NextStep(text="Rewrite the screener"))
+    resolved_at = datetime.now(timezone.utc).replace(microsecond=0)
+
+    updated = repo.update_next_step(
+        repo.list_next_steps()[0].id,
+        {"resolved_at": resolved_at.isoformat(), "resolution": "Cut two questions"},
+    )
+    assert updated is not None and updated.is_open is False
+
+    reopened = SQLiteRepository(db)
+    stored = reopened.list_next_steps()[0]
+    assert stored.resolved_at == resolved_at
+    assert stored.resolution == "Cut two questions"
+
+
+def test_supersede_is_expressed_in_the_events_not_only_in_the_service(tmp_path) -> None:
+    """Replaying a stream that already carries a superseded step yields one open step.
+
+    The supersede has to be part of what is written down. If it lived only in the
+    service call, a second machine opening the same file would show two
+    outstanding promises, and the greeting would pick one at random.
+    """
+    from datetime import datetime, timezone
+
+    from agentic_odi_core.intent_store import IntentStore
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    db = str(tmp_path / "odi.db")
+    first = NextStep(text="Talk to two support leads")
+    second = NextStep(text="Ask the payer what they do today")
+    stamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+    store = IntentStore(db)
+    store.append("NEXT_STEP_CREATED", first.model_dump(mode="json"))
+    store.append("NEXT_STEP_UPDATED", {"id": first.id, "updates": {"superseded_at": stamp}})
+    store.append("NEXT_STEP_CREATED", second.model_dump(mode="json"))
+    store.close()
+
+    repo = SQLiteRepository(db)
+    open_steps = [s for s in repo.list_next_steps() if s.is_open]
+    assert [s.id for s in open_steps] == [second.id]
+    superseded = repo.get_next_step(first.id)
+    assert superseded is not None and superseded.superseded_at is not None
+
+
+def test_the_in_memory_repository_matches(tmp_path) -> None:
+    for repo in _both_repositories(tmp_path):
+        step = NextStep(text="Draft the interview guide")
+        repo.add_next_step(step)
+        assert repo.get_next_step(step.id) == step
+        assert repo.get_next_step("nope") is None
+        assert step in repo.list_next_steps()
+        updated = repo.update_next_step(step.id, {"text": "Draft the screener"})
+        assert updated is not None and updated.text == "Draft the screener"
+        assert repo.update_next_step("nope", {"text": "x"}) is None
