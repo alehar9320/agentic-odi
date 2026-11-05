@@ -1,10 +1,13 @@
+import ast
+import inspect
 import json
 import re
 from uuid import uuid4
 
 import pytest
-from agentic_odi_mcp_server import mcp
+from agentic_odi_mcp_server import mcp, mcp_server
 from fastmcp import Client
+from mcp_failures import failure, sentence
 
 
 def _extract_id(result_text: str) -> str | None:
@@ -68,7 +71,8 @@ async def test_get_job_not_found_returns_error_message():
         random_id = str(uuid4())
         res = await client.call_tool("get_job", {"job_id": random_id})
         text = res.content[0].text
-        assert text == f"Error: Job with ID {random_id} not found."
+        assert failure(text).code.value == "not_found"
+        assert sentence(text) == f"Error: Job with ID {random_id} not found."
 
 
 @pytest.mark.asyncio
@@ -85,7 +89,8 @@ async def test_add_outcome_job_not_found_returns_error():
             },
         )
         text = res.content[0].text
-        assert text == f"Error: Job with ID {random_id} not found."
+        assert failure(text).code.value == "not_found"
+        assert sentence(text) == f"Error: Job with ID {random_id} not found."
 
 
 @pytest.mark.asyncio
@@ -94,7 +99,8 @@ async def test_get_job_map_job_not_found_returns_error():
         random_id = str(uuid4())
         res = await client.call_tool("get_job_map", {"job_id": random_id})
         text = res.content[0].text
-        assert text == f"Error: Job with ID {random_id} not found."
+        assert failure(text).code.value == "not_found"
+        assert sentence(text) == f"Error: Job with ID {random_id} not found."
 
 
 @pytest.mark.asyncio
@@ -103,7 +109,8 @@ async def test_get_outcomes_job_not_found_returns_error():
         random_id = str(uuid4())
         res = await client.call_tool("get_outcomes", {"job_id": random_id})
         text = res.content[0].text
-        assert text == f"Error: Job with ID {random_id} not found."
+        assert failure(text).code.value == "not_found"
+        assert sentence(text) == f"Error: Job with ID {random_id} not found."
 
 
 @pytest.mark.asyncio
@@ -136,6 +143,17 @@ async def test_add_outcome_requires_both_scores():
 
 
 @pytest.mark.asyncio
+async def test_add_outcome_description_puts_three_questions_before_the_score():
+    #: The docstring below the tool is what the model reads before it decides to
+    #: call it, so the interview requirement has to be in it, not only in the gate.
+    async with Client(mcp) as client:
+        tool = {item.name: item for item in await client.list_tools()}["add_outcome"]
+
+    assert "three questions" in tool.description
+    assert "never answer your own question" in tool.description
+
+
+@pytest.mark.asyncio
 async def test_add_outcome_refuses_a_score_without_a_claim_check():
     async with Client(mcp) as client:
         create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
@@ -153,9 +171,10 @@ async def test_add_outcome_refuses_a_score_without_a_claim_check():
         )
 
         text = res.content[0].text
-        assert text.startswith("Error:")
-        assert "claim_check" in text
-        assert "ask" in text.lower()
+        assert failure(text).code.value == "validation"
+        assert sentence(text).startswith("Error:")
+        assert "claim_check" in sentence(text)
+        assert "ask" in sentence(text).lower()
         # Nothing was written.
         listed = await client.call_tool("get_outcomes", {"job_id": job_id})
         assert json.loads(listed.content[0].text) == []
@@ -197,8 +216,9 @@ async def test_add_outcome_rejects_a_vague_statement_with_the_fix():
         )
 
         text = res.content[0].text
-        assert text.startswith("Error: Outcome statement does not match the ODI format")
-        assert "Minimize" in text
+        assert failure(text).code.value == "validation"
+        assert sentence(text).startswith("Error: Outcome statement does not match the ODI format")
+        assert "Minimize" in sentence(text)
 
 
 @pytest.mark.asyncio
@@ -275,5 +295,92 @@ async def test_add_step_rejects_an_order_outside_the_job_map():
             "add_step", {"job_id": job_id, "name": "stage 9", "order": 9}
         )
 
-        assert result.content[0].text.startswith("Error:")
-        assert "between 1 and 8" in result.content[0].text
+        text = result.content[0].text
+        assert failure(text).code.value == "out_of_range"
+        assert "between 1 and 8" in sentence(text)
+
+
+def _failure_payload(text: str) -> dict:
+    """Read a failing tool's text the way the envelope makes it readable."""
+    payload = json.loads(text)
+    assert set(payload) == {"error", "message"}, payload
+    return payload
+
+
+@pytest.mark.asyncio
+async def test_add_outcome_reports_a_missing_job_with_a_code():
+    async with Client(mcp) as client:
+        random_id = str(uuid4())
+        res = await client.call_tool(
+            "add_outcome", {"job_id": random_id, "statement": "Minimize the wait at the counter"}
+        )
+        payload = _failure_payload(res.content[0].text)
+
+        assert payload["error"]["code"] == "not_found"
+        assert payload["error"]["retryable"] is False
+        assert payload["message"] == f"Error: Job with ID {random_id} not found."
+
+
+@pytest.mark.asyncio
+async def test_a_refused_score_range_carries_the_range_code():
+    async with Client(mcp) as client:
+        created = await client.call_tool("add_job", {"name": "Deploy a service"})
+        job_id = _extract_id(created.content[0].text)
+        assert job_id is not None
+
+        res = await client.call_tool(
+            "add_outcome",
+            {
+                "job_id": job_id,
+                "statement": "Minimize the time to deploy a service",
+                "importance": 11.0,
+                "satisfaction": 4.0,
+                "claim_check": _claim_check(),
+            },
+        )
+        payload = _failure_payload(res.content[0].text)
+
+        assert payload["error"]["code"] == "out_of_range"
+        assert (
+            payload["message"] == "Error: importance and satisfaction must be between 1.0 and 10.0"
+        )
+
+
+@pytest.mark.asyncio
+async def test_a_successful_tool_returns_no_envelope():
+    async with Client(mcp) as client:
+        res = await client.call_tool(
+            "add_job", {"name": "Music", "description": "Listen on the go"}
+        )
+
+        assert res.content[0].text.startswith("Job created successfully:")
+
+
+def _is_tool_handler(node: ast.FunctionDef) -> bool:
+    for decorator in node.decorator_list:
+        if isinstance(decorator, ast.Attribute) and decorator.attr == "tool":
+            return True
+    return False
+
+
+def _reads_like_a_prose_error(unparsed: str) -> bool:
+    text = unparsed.lstrip("fFr").strip("\"'")
+    return text.startswith("Error:") or " not found:" in text
+
+
+def test_no_handler_returns_a_bare_prose_error():
+    """A failure that travels as prose is the bug this file exists to keep fixed."""
+    tree = ast.parse(inspect.getsource(mcp_server))
+
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or not _is_tool_handler(node):
+            continue
+        for returned in ast.walk(node):
+            if not isinstance(returned, ast.Return) or returned.value is None:
+                continue
+            unparsed = ast.unparse(returned.value)
+            if _reads_like_a_prose_error(unparsed):
+                offenders.append(f"mcp_server.py:{returned.lineno} {node.name} -> {unparsed}")
+
+    assert not offenders, "bare prose error returns, which carry no code:\n" + "\n".join(offenders)

@@ -1,0 +1,99 @@
+/* ------------------------------------------------------------------ */
+/* Decision brief lens                                                 */
+/* ------------------------------------------------------------------ */
+/* The exported document is previewed here, so the lens holds two things:
+   the controls that move it out of the studio, and a column that already
+   reads like the file. Anything the print stylesheet does not hide has to
+   be worth ink. */
+
+.brief {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.brief__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Same register as the other "the thing you asked for happened" lines. */
+.brief__notice {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* The objection is a field the studio cannot ask you for, so it is set apart
+   from the document it is about to join. A border groups it: a filled block
+   would put the theme's quiet text on a fourth background, and the contrast
+   gate measures what the screen actually paints. */
+.brief__objection {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.brief__objection textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.brief__objection textarea:hover {
+  border-color: var(--line-strong);
+}
+
+/* The preview is the document: a paper column with its own edges, so the
+   reader can tell they are looking at the deliverable and not the chat. */
+.brief__doc {
+  max-width: 780px;
+  padding: 22px 26px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  color: var(--text);
+  line-height: 1.55;
+}
+
+/* .md-heading flattens every level to 1rem, which is right in a chat bubble
+   and wrong in a document with one title. */
+.brief__doc h1 {
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+}
+
+.brief__doc h2 {
+  margin-top: 22px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.brief__doc h2:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.brief__doc em {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.brief__doc .md-list {
+  gap: 6px;
+}
