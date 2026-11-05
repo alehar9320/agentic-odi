@@ -101,6 +101,26 @@ test.describe("the theme is resolved before React", () => {
     await expect(page.locator("html")).toHaveClass(/theme-light/);
     expect(await shellBackground(page)).toBe(LIGHT_BG);
   });
+
+  test("a stored system choice is not a palette, without the bundle", async ({ page }) => {
+    // The Settings control can now store `system`, and the bootstrap has never
+    // seen that word. It must read it as "no palette pinned" rather than as an
+    // unknown value that happens to fall through to the default.
+    await page.addInitScript(() => {
+      window.localStorage.setItem("studio.settings", JSON.stringify({ theme: "system" }));
+    });
+    await page.route("**/*.js", (route) => route.abort());
+
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveClass(/theme-light/);
+    expect(await shellBackground(page)).toBe(LIGHT_BG);
+
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveClass(/theme-dark/);
+    expect(await shellBackground(page)).toBe(DARK_BG);
+  });
 });
 
 test.describe("the handover", () => {
@@ -137,5 +157,29 @@ test.describe("the handover", () => {
     await expect(page.locator("html")).toHaveClass(/theme-light/);
     const body = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     expect(body).toBe(LIGHT_BG);
+  });
+});
+
+test.describe("a stored system choice keeps following", () => {
+  test("the page changes palette when the system does, without a reload", async ({ page }) => {
+    // The provider holds one media-query subscription, which is what turns the
+    // third Settings choice from a load-time answer into a live one. Emulating
+    // the colour scheme moves the real query in the real browser, so this is the
+    // only place that can ask the question the acceptance line poses.
+    await page.addInitScript(() => {
+      window.localStorage.setItem("studio.settings", JSON.stringify({ theme: "system" }));
+    });
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/");
+
+    await expect(page.locator("html")).toHaveClass(/theme-light/);
+    await expect(page.getByRole("textbox", { name: "Message the studio" })).toBeVisible();
+
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    await expect(page.locator("html")).toHaveClass(/theme-dark/);
+    await expect(page.locator("html")).not.toHaveClass(/theme-light/);
+    const body = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    expect(body).toBe(DARK_BG);
   });
 });

@@ -79,7 +79,10 @@ per-platform archives with SHA-256 checksums for a manual download. See
   problem, what they are trying to win, where it breaks, and what you already
   have. The answers come back as a brief you can edit line by line, not a
   settings dialog. Its optional four-step tour stays out of the way, and
-  in-place guidance appears only after the first exchange. It turns "a customer
+  in-place guidance appears only after the first exchange. It paints in light or
+  dark as the reader asks. **Settings → Appearance** offers light, dark, and
+  *Follow the system*, and the third keeps following the operating system while
+  the window is open rather than only at load. It turns "a customer
   still reconciles invoices by hand" into a scored outcome, a job map, and a
   ranked opportunity board — inline in the thread. Every claim in a reply names
   the record behind it, or says it is a hypothesis. A score names the questions

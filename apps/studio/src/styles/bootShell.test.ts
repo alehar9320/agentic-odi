@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import themeCss from "./theme.css?raw";
+import { LIGHT_QUERY } from "../lib/theme";
 
 // Vitest runs with the studio package as its working directory.
 const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
@@ -167,6 +168,28 @@ describe("the inline theme script", () => {
 
     runScript({ stored: JSON.stringify({ theme: "sepia" }), prefersLight: false });
     expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+  });
+
+  it("reads a stored system choice as no palette at all", () => {
+    // The app's `resolveTheme` treats "system" exactly like no value at all. The
+    // bootstrap accepts only the two literals, so both reach the media query and
+    // paint the same class — the handover from this script to the bundle changes
+    // nothing. A change here that made the bootstrap read "system" as a palette
+    // would flash the wrong colour on every cold load for a reader following the
+    // operating system.
+    runScript({ stored: JSON.stringify({ theme: "system" }), prefersLight: true });
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(document.documentElement.style.colorScheme).toBe("light");
+
+    runScript({ stored: JSON.stringify({ theme: "system" }), prefersLight: false });
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+  });
+
+  it("asks the operating system the same question the app asks", () => {
+    // One query string, two callers. If they drifted, the class painted here and
+    // the palette `useSystemTheme` subscribes to would be answers to different
+    // questions.
+    expect(inlineScript).toContain(LIGHT_QUERY);
   });
 
   it("is plain and synchronous, so nothing can defer it", () => {
