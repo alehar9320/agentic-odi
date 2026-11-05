@@ -296,7 +296,7 @@ describe("StudioBar", () => {
     expect(refreshConversations).toHaveBeenCalledOnce();
     expect(within(menu).getByText("Where does onboarding leak?")).toBeInTheDocument();
     expect(within(menu).getByText("Price the churn spike")).toBeInTheDocument();
-    expect(within(menu).getByText("Just now")).toBeInTheDocument();
+    expect(within(menu).getByText(/Just now · 4 turns/)).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -595,5 +595,36 @@ describe("history opens on the thread in view (#694 D11)", () => {
       }
       Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia });
     }
+  });
+});
+
+describe("history says when and how much (#694 D12)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads when it happened and how many turns it holds", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    const { menu } = openHistory({
+      conversations: [
+        conversation("c-1", "Pricing the churn spike", new Date(2026, 9, 22, 8, 0).toISOString(), 6),
+      ],
+    });
+
+    expect(within(menu).getByText("2h ago · 6 turns")).toBeInTheDocument();
+  });
+
+  it("gives a thread with no turns no meta line at all", () => {
+    const { menu } = openHistory({
+      conversations: [
+        conversation("c-1", "A fresh thread", new Date(2026, 9, 22, 9, 0).toISOString(), 0),
+      ],
+    });
+
+    expect(within(menu).getByText("A fresh thread")).toBeInTheDocument();
+    expect(menu.querySelector(".bar__history-meta")).toBeNull();
+    expect(within(menu).queryByText(/turns?/)).toBeNull();
   });
 });
