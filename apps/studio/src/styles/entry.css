@@ -1,0 +1,20 @@
+/*
+ * The one file that orders the cascade (issue #384).
+ *
+ * An unlayered rule outranks every layered one, specificity included. While the
+ * product sheets were imported unlayered, a copied component's utility lost to
+ * `button { color: inherit }` in theme.css, so anything in src/vendor rendered
+ * half-restyled inside the Studio. Declaring `product` before `utilities` hands
+ * the win back to the utility where one is actually used; declaring it after
+ * `theme` keeps the app's own tokens in charge of the custom properties the
+ * product sheet defines.
+ *
+ * src/vendor/index.css states Tailwind's own order and is left exactly as
+ * generated: this statement is seen first, so it is the one that counts.
+ */
+@layer theme, base, components, product, utilities;
+
+@import "./theme.css" layer(product);
+@import "./records.css" layer(product);
+@import "./brief.css" layer(product);
+@import "../vendor/index.css";
