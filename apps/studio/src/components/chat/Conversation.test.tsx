@@ -564,6 +564,7 @@ describe("Conversation markup without calls", () => {
     expect(shape(container.querySelector(".message__body") as HTMLElement)).toMatchInlineSnapshot(`
       "div md
       p md-paragraph
+      span 
       div ui-surface
       article ui-card ui-card--outcome ui-card--urgent
       header ui-card__head
