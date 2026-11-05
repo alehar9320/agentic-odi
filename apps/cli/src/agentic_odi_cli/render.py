@@ -508,6 +508,61 @@ def render_study(study: Any, *, as_json: bool) -> str:
     )
 
 
+def _next_step_status(step: dict[str, Any]) -> str:
+    """How a next step reads: outstanding, answered, or replaced.
+
+    The model derives this from the two stamps rather than carrying a field, so
+    the terminal derives it the same way and cannot disagree with the store.
+    """
+    if step.get("resolved_at"):
+        return "resolved"
+    if step.get("superseded_at"):
+        return "superseded"
+    return "open"
+
+
+def render_next_step(step: Any, *, as_json: bool) -> str:
+    """Render the step a session ended with, or the fact that there is none."""
+    if step is None:
+        return "null" if as_json else "No next step yet — end a session with `odi next-step set`."
+    if not isinstance(step, dict):
+        return _json(step) if as_json else str(step)
+    if as_json:
+        return _json(step)
+    return _block(
+        [
+            ("id", _cell(step, "id")),
+            ("next step", _truncate(_cell(step, "text"))),
+            ("status", _next_step_status(step)),
+            ("said", _cell(step, "created_at")),
+            ("due", step.get("due_at") or "—"),
+            ("outcome", step.get("outcome_id") or "—"),
+            ("happened", _truncate(str(step.get("resolution"))) if step.get("resolution") else "—"),
+        ]
+    )
+
+
+def render_next_step_list(steps: Any, *, as_json: bool) -> str:
+    """Render every step recorded, so a superseded promise stays visible."""
+    if not isinstance(steps, list):
+        return _json(steps) if as_json else str(steps)
+    if as_json:
+        return _json(steps)
+    return _table(
+        ("id", "next step", "status", "said"),
+        [
+            (
+                _cell(item, "id"),
+                _truncate(_cell(item, "text")),
+                _next_step_status(item),
+                _cell(item, "created_at"),
+            )
+            for item in steps
+        ],
+        empty="No next steps yet — end a session with `odi next-step set`.",
+    )
+
+
 def render_strategy(strategy: Any, *, as_json: bool) -> str:
     """Render the chosen path with every path it beat.
 

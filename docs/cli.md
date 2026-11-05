@@ -311,6 +311,25 @@ agentic-odi studies list --job <job-id> --json
 `study_id` scoping them to a study of their own job; a row that predates studies has
 none, and opening studies never invents one for it.
 
+## The next step
+
+A next step is the one thing the user said they would do before coming back. It is
+stored rather than remembered by the terminal, so a return visit can ask about it,
+and answering one records what happened as evidence — the learning, not a checkbox.
+Exactly one step is outstanding: `set` supersedes the previous step instead of
+deleting it, and `resolve` refuses a step that has already been replaced.
+
+```bash
+agentic-odi next-step set "Talk to two support leads"
+agentic-odi next-step set "Ask the payer what they do today" --outcome <outcome-id>
+agentic-odi next-step show
+agentic-odi next-step list --json
+agentic-odi next-step resolve <step-id> "Both still hand-carry the spreadsheet"
+```
+
+`next-step show` reads only the outstanding step — that is what the Studio greeting
+asks about on the next visit — and prints "No next step yet" until one is set.
+
 ## Schema, scoring, and guidance
 
 ```bash

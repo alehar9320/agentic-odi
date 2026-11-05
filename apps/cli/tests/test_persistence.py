@@ -80,3 +80,30 @@ def test_every_entity_type_survives_reopen(tmp_path):
     evidence = repo.list_evidence(job_id=job_id)[0]
     assert evidence.step_id == step_id
     assert evidence.outcome_id == outcome["id"]
+
+
+def test_a_next_step_and_its_answer_survive_reopen(tmp_path):
+    """The promise and what happened to it are both written down (ALH-146).
+
+    A greeting that reads a step the reopened store cannot show identically is a
+    greeting that will lie the second time the workspace opens.
+    """
+    db = str(tmp_path / "odi.db")
+    backend = LocalBackend(db_path=db)
+
+    step = backend.call("set_next_step", {"text": "Talk to two support leads"})
+    backend.call(
+        "resolve_next_step",
+        {"step_id": step["id"], "resolution": "Both still hand-carry the spreadsheet"},
+    )
+    backend.call("set_next_step", {"text": "Ask the payer what they do today"})
+
+    repo = SQLiteRepository(db_path=db)
+    answered = repo.get_next_step(step["id"])
+    assert answered is not None
+    assert answered.resolution == "Both still hand-carry the spreadsheet"
+    assert answered.resolved_at is not None and answered.is_open is False
+    outstanding = [item for item in repo.list_next_steps() if item.is_open]
+    assert [item.text for item in outstanding] == ["Ask the payer what they do today"]
+    answer = [item for item in repo.list_evidence() if item.raw.get("next_step_id") == step["id"]]
+    assert [item.content for item in answer] == ["Both still hand-carry the spreadsheet"]
