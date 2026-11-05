@@ -255,7 +255,7 @@ describe("studio shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to play/i }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /go to home/i }));
@@ -263,7 +263,7 @@ describe("studio shell", () => {
     // Home closes what is open; the transcript is the other control's to
     // discard, and only after asking what is being lost.
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /where to play/i })).toBeNull();
     });
     expect(screen.getByText("Where do I start?")).toBeInTheDocument();
   });
