@@ -170,4 +170,20 @@ describe("LocalMemoryService conversations", () => {
       "c-quiet": 0,
     });
   });
+
+  it("caps the list at twenty threads, newest first", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    for (let index = 0; index < 25; index += 1) {
+      const stamp = `2026-02-${String(index + 1).padStart(2, "0")}T00:00:00Z`;
+      await seed(store, `c-${index}`, `Thread ${index}`, stamp);
+    }
+
+    const listed = await memory.listConversations();
+
+    expect(listed).toHaveLength(20);
+    // Newest first: the five oldest threads fall off the end.
+    expect(listed[0].id).toBe("c-24");
+    expect(listed.map((item) => item.id)).not.toContain("c-4");
+  });
 });

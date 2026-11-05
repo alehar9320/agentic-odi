@@ -658,3 +658,25 @@ def test_a_segment_update_for_an_unknown_id_is_not_recorded(tmp_path) -> None:
     assert repo.update_strategy("missing", {"thesis": "Nothing"}) is None
     assert repo.get_segment("missing") is None
     assert repo.get_strategy("missing") is None
+
+
+def test_last_event_id_is_zero_before_any_write(tmp_path) -> None:
+    repo = SQLiteRepository(db_path=str(tmp_path / "odi.db"))
+
+    assert repo.last_event_id() == 0
+    repo.close()
+
+
+def test_last_event_id_is_the_rowid_of_the_event_just_appended(tmp_path) -> None:
+    repo = SQLiteRepository(db_path=str(tmp_path / "odi.db"))
+    repo.add_job(Job(id="j1", name="Job"))
+    after_job = repo.last_event_id()
+    repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
+    after_step = repo.last_event_id()
+
+    assert [event["id"] for event in repo.store.get_stream()][-1] == after_step
+    assert after_step == after_job + 1
+
+    repo.update_step("missing", {"name": "Prepare"})
+    assert repo.last_event_id() == after_step
+    repo.close()

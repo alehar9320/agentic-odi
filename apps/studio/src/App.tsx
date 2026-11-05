@@ -29,10 +29,10 @@ import { UpdateBanner, UpdateProvider } from "./updater";
 function StudioShell() {
   const {
     closePanel,
-    clearChat,
     closeSetup,
     customizeOpen,
     closeCustomize,
+    startNewThread,
     streaming,
     stopStreaming,
     bootError,
@@ -43,14 +43,15 @@ function StudioShell() {
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
-    clearChat();
+    // Home closes what is open and leaves the thread alone. Discarding it is
+    // the other control's job, and only after asking what is being lost.
     closePanel();
     closeSetup();
     closeCustomize();
   }
 
-  function newConversation() {
-    clearChat();
+  function newThread(options?: { stop?: boolean }) {
+    startNewThread(options);
     closePanel();
     closeSetup();
     closeCustomize();
@@ -93,7 +94,7 @@ function StudioShell() {
       />
       <StudioBar
         onHome={goHome}
-        onNew={newConversation}
+        onNew={newThread}
         onChangelog={() => setShowChangelog(true)}
       />
       <UpdateBanner />
