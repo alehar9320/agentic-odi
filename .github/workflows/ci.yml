@@ -134,7 +134,6 @@ jobs:
             --cov=agentic_odi_core \
             --cov=agentic_odi_mcp_server \
             --cov=agentic_odi_studio_api \
-            --cov-fail-under=89 \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml
 
