@@ -134,6 +134,25 @@ describe("WorkspacePanel", () => {
     chip.remove();
   });
 
+  it("remembers where a lens was scrolled and starts another at the top (#696)", () => {
+    const { rerender } = render(<WorkspacePanel />);
+    const landscape = document.querySelector(".lens__body") as HTMLDivElement;
+    landscape.scrollTop = 400;
+    fireEvent.scroll(landscape);
+
+    studio.activePanel = null;
+    rerender(<WorkspacePanel />);
+    studio.activePanel = "landscape";
+    rerender(<WorkspacePanel />);
+
+    expect((document.querySelector(".lens__body") as HTMLDivElement).scrollTop).toBe(400);
+
+    studio.activePanel = "jobmap";
+    rerender(<WorkspacePanel />);
+
+    expect((document.querySelector(".lens__body") as HTMLDivElement).scrollTop).toBe(0);
+  });
+
   it("renders nothing when no view is open", () => {
     studio.activePanel = null;
 

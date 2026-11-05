@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { useFocusTrap } from "../../lib/useFocusTrap";
 import { useStudio } from "../../state/StudioContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { CloseIcon } from "../icons";
 import { PanelBoundary } from "./PanelBoundary";
+import type { WorkspacePanelId } from "../../types";
 import { findPanel, type PanelDefinition } from "./panels";
 
 const MOBILE_QUERY = "(max-width: 1023px)";
@@ -33,6 +34,10 @@ export function WorkspacePanel() {
   const panelId = panel?.id ?? null;
   const panelRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // Where each lens was left. The body remounts with the lens, so the position
+  // has to outlive the DOM to come back with it — per panel, never global (#696).
+  const scrollByPanel = useRef(new Map<WorkspacePanelId, number>());
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
   useFocusTrap(panelRef, isMobile && Boolean(panel));
@@ -102,6 +107,26 @@ export function WorkspacePanel() {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [isMobile, activePanel, closePanel]);
 
+  // A lens opens where it was left; a different lens starts at its top.
+  useLayoutEffect(() => {
+    if (!panelId) {
+      return;
+    }
+    const body = bodyRef.current;
+    if (!body) {
+      return;
+    }
+    body.scrollTop = scrollByPanel.current.get(panelId) ?? 0;
+  }, [panelId]);
+
+  function rememberScroll() {
+    const body = bodyRef.current;
+    if (!body || !panelId) {
+      return;
+    }
+    scrollByPanel.current.set(panelId, body.scrollTop);
+  }
+
   if (!panel) {
     return null;
   }
@@ -156,7 +181,7 @@ export function WorkspacePanel() {
           </button>
         </header>
 
-        <div className="lens__body">
+        <div className="lens__body" ref={bodyRef} onScroll={rememberScroll}>
           <div className="lens__content">
             <PanelBoundary name={panel.id}>
               <PanelBody panel={panel} />
