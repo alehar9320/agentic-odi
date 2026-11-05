@@ -556,17 +556,19 @@ labels only and never posts PR comments.
 
 ## Testing
 
-Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
-in-memory — no running server required. Tests live next to the package they
-cover, and every test runs from the repository root:
+See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
 
 ```bash
-uv run pytest                        # everything
-uv run pytest apps/cli               # one app
-uv run pytest packages/core          # one package
-uv run pytest tests/contract         # cross-package contracts
-uv run pytest tests/scripts          # dev launcher
+uv run python scripts/verify.py --changed   # fast gate on touched files (PR bar)
+uv run python scripts/verify.py --default   # adds mypy + vitest for touched areas
+uv run python scripts/verify.py --full      # full matrix (CI's job)
 ```
+
+Per-command ceiling is 300s; designed for a 10–30 minute agent budget. CI owns `--full`. The PR body must list the tiers run and skipped.
+
+Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
+in-memory — no running server required. Tests live next to the package they
+cover. Legacy manual invocations (for reference):
 
 The MCP server contract test compares the live FastMCP registry with
 `packages/core/src/agentic_odi_core/contract.py`, so add or change a tool in
