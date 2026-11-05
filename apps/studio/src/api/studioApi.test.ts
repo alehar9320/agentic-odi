@@ -26,6 +26,7 @@ import {
   healthMcp,
   streamChat,
   asStudioError,
+  StudioApiError,
 } from "./studioApi";
 import { StorageFullError } from "../bff/errors";
 
@@ -496,8 +497,8 @@ describe("typed failures", () => {
 
     expect(problem.code).toBe("mcp_unreachable");
     expect(problem.retryable).toBe(true);
-    expect(problem.suggestion).toMatch(/sidecar/i);
-    expect(problem.message).toMatch(/reachable|not running|unreachable/i);
+    expect(problem.suggestion).toContain("uv run python scripts/dev.py");
+    expect(problem.message).toMatch(/local Studio service isn.t responding/);
   });
 
   it("classifies an empty 502 response as mcp_unreachable", async () => {
@@ -512,7 +513,7 @@ describe("typed failures", () => {
         satisfaction: 3,
       }),
      ).rejects.toMatchObject({
-       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("sidecar") },
+       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
      });
    });
 
@@ -528,8 +529,62 @@ describe("typed failures", () => {
         satisfaction: 3,
       }),
     ).rejects.toMatchObject({ error: { code: "not_found" } });
-  });
-});
+   });
+
+   it("carries the optional field through from the server's error body", async () => {
+     mockFailure(422, {
+       error: {
+         code: "validation",
+         message: "Outcome statement does not match the ODI format.",
+         field: "statement",
+         suggestion: "Fix the input and try again.",
+         retryable: false,
+       },
+     });
+
+     let thrown: StudioApiError | null = null;
+     try {
+       await addOutcome({
+         mcp_url: "u",
+         job_id: "JOB-402",
+         statement: "fast",
+         importance: 8,
+         satisfaction: 3,
+       });
+     } catch (caught) {
+       thrown = caught as StudioApiError;
+     }
+     expect(thrown).not.toBeNull();
+     expect(thrown!.error.code).toBe("validation");
+     expect(thrown!.error.field).toBe("statement");
+   });
+
+   it("leaves field undefined when the server omits it", async () => {
+     mockFailure(422, {
+       error: {
+         code: "validation",
+         message: "Invalid input.",
+         suggestion: "Fix the input and try again.",
+         retryable: false,
+       },
+     });
+
+     let thrown: StudioApiError | null = null;
+     try {
+       await addOutcome({
+         mcp_url: "u",
+         job_id: "JOB-402",
+         statement: "fast",
+         importance: 8,
+         satisfaction: 3,
+       });
+     } catch (caught) {
+       thrown = caught as StudioApiError;
+     }
+     expect(thrown).not.toBeNull();
+     expect(thrown!.error.field).toBeUndefined();
+   });
+ });
 
 describe("signal inbox", () => {
   function mockStore(body: unknown): { url: string; method: string; body: string }[] {

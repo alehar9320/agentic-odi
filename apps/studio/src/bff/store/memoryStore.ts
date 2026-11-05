@@ -47,6 +47,14 @@ export class MemoryLocalStore implements LocalStore {
     return this.guard.run(run);
   }
 
+  // A Map-backed store has no second connection to lose, so it never asks for a
+  // reload. The accessors exist to satisfy `LocalStore`.
+  readonly needsReload = false;
+
+  onVersionChange(): () => void {
+    return () => undefined;
+  }
+
   async nextSeq(): Promise<number> {
     return this.write(async () => {
       this.seq += 1;

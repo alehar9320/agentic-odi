@@ -86,6 +86,48 @@
         }
       }
     },
+    "/api/stats": {
+      "get": {
+        "summary": "Get Stats",
+        "description": "The onboarding funnel, counted from this machine's own event log.\n\nEvery counter is always named, and one that has not happened answers with a\nzero and no timestamps rather than an invented history. Nothing leaves the\nmachine: these numbers come from the same store the records do.",
+        "operationId": "get_stats_api_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Stats Api Stats Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats/reset": {
+      "post": {
+        "summary": "Reset Stats",
+        "description": "Start the measurement over and return the counters as they now stand.\n\nA reset appends a marker; the events it supersedes stay in the log. The\nasking happens in whatever surface calls this — a click that erases a\nmeasurement should not be the kind that fires straight away.",
+        "operationId": "reset_stats_api_stats_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Reset Stats Api Stats Reset Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/changelog": {
       "get": {
         "summary": "Get Changelog Route",
@@ -597,7 +639,7 @@
       },
       "post": {
         "summary": "Post Job",
-        "description": "Create a Job \u2014 works with the model offline because it is manual.",
+        "description": "Create a Job — works with the model offline because it is manual.",
         "operationId": "post_job_api_jobs_post",
         "requestBody": {
           "required": true,
@@ -2381,7 +2423,7 @@
     "/api/conversations": {
       "get": {
         "summary": "List Conversations",
-        "description": "The history a switcher lists: every thread, most recent touch first.",
+        "description": "The history a switcher lists: at most 20 threads, most recent touch first.\n\nTitles come from the first question, so the list names each thread without\ncarrying a single turn body.",
         "operationId": "list_conversations_api_conversations_get",
         "responses": {
           "200": {
@@ -3120,6 +3162,43 @@
           }
         }
       }
+    },
+    "/{full_path}": {
+      "get": {
+        "summary": "Spa Fallback",
+        "operationId": "spa_fallback__full_path__get",
+        "parameters": [
+          {
+            "name": "full_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Full Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3788,6 +3867,16 @@
               }
             ],
             "title": "Assistant Id"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FocusRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3827,7 +3916,7 @@
         },
         "type": "object",
         "title": "ClaimCheck",
-        "description": "The questions behind a score: what was asked, answered, or skipped.\n\nTwo numbers are not provenance. A score that carries a claim check says\nwhich questions produced it \u2014 ``asked`` \u2014 and what came back: the\n``answers`` the person gave and the ``skips`` with a recorded reason.\n\n``verified`` is derived, never typed in: a check is verified when at least\none question was answered by the person. A check of only skips is\nunverified, so an outcome built on an assumption says so instead of\nborrowing the confidence of a number."
+        "description": "The questions behind a score: what was asked, answered, or skipped.\n\nTwo numbers are not provenance. A score that carries a claim check says\nwhich questions produced it — ``asked`` — and what came back: the\n``answers`` the person gave and the ``skips`` with a recorded reason.\n\n``verified`` is derived, never typed in: a check is verified when at least\none question was answered by the person. A check of only skips is\nunverified, so an outcome built on an assumption says so instead of\nborrowing the confidence of a number."
       },
       "ClaimCitationOut": {
         "properties": {
@@ -4193,6 +4282,34 @@
           "maximize"
         ],
         "title": "Direction"
+      },
+      "FocusRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "job",
+              "step",
+              "outcome",
+              "evidence"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "FocusRef",
+        "description": "Which record the person is looking at, as a pointer and nothing more.\n\nThe client names the id; only the store has the words. Extra keys are\nrejected so a browser cannot slip its own label into the prompt."
       },
       "HTTPValidationError": {
         "properties": {
@@ -5207,7 +5324,7 @@
         },
         "type": "object",
         "title": "UpdateCustomerOutcomeRequest",
-        "description": "Both values are replaced wholesale \u2014 a partial score would be ambiguous."
+        "description": "Both values are replaced wholesale — a partial score would be ambiguous."
       },
       "UpdateJobRequest": {
         "properties": {
