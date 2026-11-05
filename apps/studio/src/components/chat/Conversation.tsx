@@ -32,6 +32,7 @@ import {
   ToolPart,
   TypingPart,
 } from "../../assistant/parts";
+import { announce, useAnnouncement, useCopyFeedback } from "../../lib/copyFeedback";
 import { useStudio } from "../../state/StudioContext";
 import type { StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
@@ -57,7 +58,7 @@ function AssistantMessage() {
   const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
   const id = useAuiState((state) => state.message.id);
   const running = useAuiState((state) => state.message.status?.type === "running");
-  const copied = useAuiState((state) => state.message.isCopied);
+  const { copied, confirm } = useCopyFeedback();
   const hasText = useAuiState((state) =>
     state.message.content.some((part) => part.type === "text" && part.text.trim().length > 0),
   );
@@ -148,7 +149,11 @@ function AssistantMessage() {
           >
             <ActionBarPrimitive.Copy
               className="quiet-action"
-              aria-label={copied ? "Reply copied" : "Copy reply"}
+              aria-label="Copy reply"
+              onClickCapture={() => {
+                confirm();
+                announce("Reply copied");
+              }}
             >
               {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
               {copied ? "Copied" : "Copy"}
@@ -164,7 +169,7 @@ function AssistantMessage() {
 }
 
 function UserMessage() {
-  const copied = useAuiState((state) => state.message.isCopied);
+  const { copied, confirm } = useCopyFeedback();
 
   return (
     <article className="message message--user">
@@ -203,7 +208,11 @@ function UserMessage() {
         </ActionBarPrimitive.Edit>
         <ActionBarPrimitive.Copy
           className="quiet-action"
-          aria-label={copied ? "Message copied" : "Copy message"}
+          aria-label="Copy message"
+          onClickCapture={() => {
+            confirm();
+            announce("Message copied");
+          }}
         >
           {copied ? "Copied" : "Copy"}
         </ActionBarPrimitive.Copy>
@@ -241,6 +250,9 @@ function EditComposer() {
 
 export function Conversation() {
   const { sendMessage, streaming, thinkingPhase, messages } = useStudio();
+  // The one voice a copy has: the label stays what the button does, and the
+  // confirmation is spoken here instead of rewriting the button's own name.
+  const announcement = useAnnouncement();
 
   // Only the newest reply is announcement-worthy. Keeping it out of the log
   // means a reader can move through history without every delta replaying it.
@@ -266,6 +278,11 @@ export function Conversation() {
           and a status message inside it would not be announced until the
           answer finished — the one moment it is no longer useful. The region
           holds the newest reply while it streams, then settles on it. */}
+      {/* A copy speaks through its own polite region: the reply's status above
+          is busy while streaming, which would swallow it. */}
+      <span className="sr-only" aria-live="polite">
+        {announcement}
+      </span>
       <p className="sr-only" role="status" aria-live="polite" aria-busy={streaming}>
         {streaming ? phaseLabel(thinkingPhase) : latestReply}
       </p>
