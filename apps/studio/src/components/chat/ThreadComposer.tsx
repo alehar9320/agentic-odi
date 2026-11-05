@@ -277,10 +277,6 @@ function ComposerBody({
               onFiles(files);
               return;
             }
-            if (text !== "") {
-              onFiles(files);
-              return;
-            }
             event.preventDefault();
             onFiles(files);
           }}
