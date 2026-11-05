@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import type { StudioTheme, StudioThemePreference } from "../types";
 
 /** The query every part of the app asks the same question with. */
@@ -51,4 +53,29 @@ export function resolveTheme(
     return stored;
   }
   return (prefersLight ?? systemPrefersLight()) ? "light" : "dark";
+}
+
+/**
+ * The palette the operating system wants right now, kept current.
+ *
+ * `resolveTheme` is a snapshot; this is the subscription the *Follow the
+ * system* choice needs, so an OS change at sunset repaints the Studio instead of
+ * waiting for the next reload. It belongs to one caller — the provider, which
+ * folds it into the theme it paints and publishes. A browser that cannot answer
+ * the query is answered the same way everywhere else: dark, no subscription.
+ */
+export function useSystemTheme(): StudioTheme {
+  const [prefersLight, setPrefersLight] = useState(systemPrefersLight);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const media = window.matchMedia(LIGHT_QUERY);
+    const onChange = () => setPrefersLight(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  return prefersLight ? "light" : "dark";
 }
