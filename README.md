@@ -155,9 +155,10 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its
   sidecar-owned transcript, with attachments, tool traces, opt-in approvals for
-  chat writes and unknown tools, and branch-aware editing and regeneration.
-  Settings → About also offers an opt-in, redacted local diagnostics preview; no
-  report is uploaded. See
+  chat writes and unknown tools, run rows that fold a finished turn's tool calls
+  into one line the reader expands on demand, and branch-aware editing and
+  regeneration. Settings → About also offers an opt-in, redacted local
+  diagnostics preview; no report is uploaded. See
   [The Living Studio](docs/living-studio.md).
 - **The agent knows what you are looking at.** Select a job, step, outcome, or
   evidence record and the Studio tells the sidecar only *which* record — kind and
