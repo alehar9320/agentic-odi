@@ -649,6 +649,46 @@ within a month. The deterministic guard is
 rather than seconds, and a return to the full rescan (206,010 rows) fails it on
 any machine.
 
+## Render budget
+
+The cold-open number above is one screen appearing. The second cost is a screen
+that re-renders while you use it, and that is what the Studio's state splits
+(#503, #504, #505) are for. Their precondition is a number, so
+`apps/studio/src/test/renderCounts.tsx` counts renders and
+`src/state/StudioContext.test.tsx` pins them.
+
+Four surfaces are instrumented — the composer, the opportunity landscape, the
+workbench rail, and the banner area — mounted inside the real provider stack.
+A counter rendered *beside* a context consumer cannot see that consumer re-render
+(React bails out below a provider whose children element is stable), so each
+surface is wrapped in a `Profiler` and the number is commits that included it.
+
+| Scenario | composer | landscape | rail | banners |
+|---|---|---|---|---|
+| Forty streamed deltas | 5 | 2 | 2 | 2 |
+| Twenty keystrokes in the composer | 40 | 0 | 0 | 0 |
+| One health poll turning unhealthy | 1 | 1 | 1 | 5 |
+
+Baseline recorded on 2026-11-05 at commit `c403ba17`.
+
+```bash
+npm --prefix apps/studio test -- --run src/state/StudioContext.test.tsx   # the budget
+npm --prefix apps/studio test -- --run src/test/renderCounts.test.tsx     # the harness
+```
+
+Two things make these numbers usable. They are **exact, not ceilings**: the split
+issues may only lower a row, and a rise — or a drop — fails with the surface
+named, so it has to be argued with and re-recorded in the same pull request. And
+the scenario starts only once the boot has gone quiet: the harness waits for the
+fetches the boot left in flight, because a health answer landing mid-typing
+otherwise measures the race instead of the interaction.
+
+The harness is imported by tests alone, and the shipped bundle is byte-identical
+to the baseline it was taken against (`index-BLu6eXb1.js`, 1,321.24 kB / 392.52 kB
+gzip; `index-BXj2fr1g.css`, 106.89 kB / 20.56 kB gzip). A wall-clock render
+budget is deliberately not asserted: it would fail on a busy runner for reasons
+unrelated to the code under review.
+
 ## Test Coverage
 
 CI runs the suite on Python **3.10, 3.11, and 3.12** and uploads one combined
