@@ -83,4 +83,18 @@ describe("Composer command palette", () => {
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(screen.getByRole("textbox")).not.toHaveAttribute("aria-activedescendant");
   });
+
+  it("reaches the records lens by typing its name", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext);
+    const onCommand = vi.fn();
+
+    render(<Composer {...baseProps} value="/rec" onCommand={onCommand} />);
+
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.getByRole("option")).toHaveTextContent("/records");
+
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+
+    expect(onCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "records" }));
+  });
 });

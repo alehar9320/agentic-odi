@@ -37,6 +37,7 @@ missing.
 | --- | --- | --- |
 | Markdown rendering | `@assistant-ui/react-markdown` (declared, imported nowhere) | `apps/studio/src/lib/markdown.ts` |
 | Dialog, focus trap, dismissal | `radix-ui` (declared; used only under `src/vendor`) | `apps/studio/src/lib/useFocusTrap.ts`, four hand-built `role="dialog"` surfaces |
+| Opportunity score wording | `apps/studio/src/lib/odi.ts` (`formatOpportunityScore`, `isUnderserved`, `UNDERSERVED_THRESHOLD`) | `apps/studio/src/lib/records.ts` prints the stored number as-is, on purpose — that table reports what the store returned |
 | Number clamping | `apps/studio/src/ui/primitives.tsx` | `apps/studio/src/ui/cards.tsx`, `apps/studio/src/components/canvas/OpportunityLandscape.tsx` |
 | Id minting | `apps/studio/src/bff/id.ts` | inline id construction in `apps/studio/src/state/StudioContext.tsx` |
 | HTTP with retries | `packages/connectors/src/agentic_odi_connectors/http.py` | `urllib.request.urlopen` in `rest/connector.py` and `marketplace.py` |
@@ -94,7 +95,8 @@ commit can be re-fetched:
 
 | What copied | Where recorded | Enforced by |
 | --- | --- | --- |
-| Studio UI under `apps/studio/src/vendor` | `apps/studio/vendor.lock.json`, plus a `vendored:` header per file | `apps/studio/src/vendor/ledger.test.ts` |
+| Studio UI under `apps/studio/src/vendor` | `apps/studio/vendor.lock.json`, plus a `vendored:` header per file | `apps/studio/src/vendor/ledger.test.ts` and `tests/scripts/test_vendor_policy.py` |
+| The npm packages those copies depend on | the dependency table in `docs/architecture/vendor.md` | `tests/scripts/test_vendor_policy.py`, which also holds every recorded licence to its SPDX allowlist |
 | Reference prose under `.agents/skills/reuse-first/references` | a `vendored:` HTML header naming upstream, commit, SPDX id, retrieval date, and drift | review, and the re-copy rule in `docs/architecture/vendor.md` |
 | Skills from an upstream pack | `skills-lock.json` | `npx skills update` — never hand-edit this file, and never add a skill to it that upstream does not publish |
 

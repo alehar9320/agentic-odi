@@ -63,6 +63,34 @@ class StoreError(OdiError):
     """The persistence layer could not complete the operation."""
 
 
+class StoreCorrupt(StoreError):
+    """The database failed its integrity check and must not be read or written.
+
+    Raised at open when the store is damaged, so a caller can stop and tell the
+    person which file is damaged and where the last good copy is. The file is
+    never deleted, rewritten, or replaced with an empty one: a damaged store
+    fails reads rather than answering them with nothing.
+    """
+
+    def __init__(
+        self,
+        path: str,
+        problems: list[str] | None = None,
+        *,
+        label: str = "Your database",
+        detail: str | None = None,
+    ) -> None:
+        self.path = path
+        self.problems = list(problems or [])
+        self.label = label
+        self.detail = detail
+        count = len(self.problems)
+        summary = f"{label} failed its integrity check: {path}"
+        if count:
+            summary = f"{summary} ({count} problem{'s' if count != 1 else ''} found)"
+        super().__init__(summary)
+
+
 class SerializationError(OdiError):
     """A payload could not be converted to or from its wire format."""
 

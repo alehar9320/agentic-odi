@@ -4,6 +4,7 @@ import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge"
 import { BannerProvider, useBanner } from "./banners/BannerProvider";
 import { BannerStack } from "./banners/BannerStack";
 import { BannerToasts } from "./banners/BannerToasts";
+import { BootFailurePage } from "./components/BootFailurePage";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
@@ -28,26 +29,29 @@ import { UpdateBanner, UpdateProvider } from "./updater";
 function StudioShell() {
   const {
     closePanel,
-    clearChat,
     closeSetup,
     customizeOpen,
     closeCustomize,
+    startNewThread,
     streaming,
     stopStreaming,
+    bootError,
+    recheckBoot,
   } = useStudio();
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
-    clearChat();
+    // Home closes what is open and leaves the thread alone. Discarding it is
+    // the other control's job, and only after asking what is being lost.
     closePanel();
     closeSetup();
     closeCustomize();
   }
 
-  function newConversation() {
-    clearChat();
+  function newThread(options?: { stop?: boolean }) {
+    startNewThread(options);
     closePanel();
     closeSetup();
     closeCustomize();
@@ -67,6 +71,13 @@ function StudioShell() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closePanel, streaming, stopStreaming]);
 
+  // A damaged database is not a broken screen: the file is intact on disk and
+  // the only honest thing to show is that failure, not a zeroed-out studio.
+  // This return sits after every hook so the hook order never changes.
+  if (bootError) {
+    return <BootFailurePage error={bootError} onRecheck={() => void recheckBoot()} />;
+  }
+
   return (
     <div className="studio-app">
       <a className="skip-link" href="#studio-stage">
@@ -83,7 +94,7 @@ function StudioShell() {
       />
       <StudioBar
         onHome={goHome}
-        onNew={newConversation}
+        onNew={newThread}
         onChangelog={() => setShowChangelog(true)}
       />
       <UpdateBanner />

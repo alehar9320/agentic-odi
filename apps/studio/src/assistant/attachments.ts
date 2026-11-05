@@ -11,9 +11,20 @@
 import type { AttachmentAdapter, CompleteAttachment, PendingAttachment } from "@assistant-ui/react";
 
 import type { ChatAttachment } from "../types";
+import { MAX_EXTRACTED_CHARS, MAX_DOCUMENT_BYTES } from "./extract/common";
+import {
+  DOCX_CONTENT_TYPE,
+  LEGACY_DOC_REFUSAL,
+  extractDocx,
+  isDocxLike,
+  isLegacyDoc,
+} from "./extract/docx";
 
-/** How much of a text file the model sees. */
-export const MAX_ATTACHMENT_CHARS = 20_000;
+/** How much of a text file the model sees. Shared with the document formats. */
+export const MAX_ATTACHMENT_CHARS = MAX_EXTRACTED_CHARS;
+
+/** The largest document we will try to read, re-exported for the composer. */
+export { MAX_DOCUMENT_BYTES } from "./extract/common";
 
 /** A single image, bounded so a data URL cannot bloat the request. */
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -27,6 +38,8 @@ export const ATTACHMENT_ACCEPT = [
   ".yaml",
   ".yml",
   ".log",
+  ".docx",
+  DOCX_CONTENT_TYPE,
   "image/png",
   "image/jpeg",
   "image/webp",
@@ -66,10 +79,19 @@ export function attachmentRejection(file: File): string | null {
     }
     return null;
   }
+  if (isLegacyDoc(file.name, file.type)) {
+    return `${file.name}: ${LEGACY_DOC_REFUSAL}`;
+  }
+  if (isDocxLike(file.name, file.type)) {
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      return `${file.name} is larger than ${Math.floor(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB.`;
+    }
+    return null;
+  }
   if (isTextLike(file.name, file.type)) {
     return null;
   }
-  return `${file.name} is not a text or image file the studio can read.`;
+  return `${file.name} is not a text, Word, or image file the studio can read.`;
 }
 
 /** A short size for an attachment chip; empty when there is nothing to say. */
@@ -110,6 +132,10 @@ export async function prepareAttachment(file: File): Promise<ChatAttachment> {
   try {
     if (isImageLike(base.contentType) && file.size <= MAX_IMAGE_BYTES) {
       return { ...base, dataUrl: await readAsDataUrl(file) };
+    }
+    if (isDocxLike(file.name, base.contentType) && file.size <= MAX_DOCUMENT_BYTES) {
+      const { text } = await extractDocx(file);
+      return { ...base, text };
     }
     if (isTextLike(file.name, base.contentType)) {
       const text = await file.text();
