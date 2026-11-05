@@ -10,6 +10,13 @@ import type { ChangelogRelease } from "../types";
 
 export const CHANGELOG_READ_KEY = "agentic-odi.changelog.read";
 
+/**
+ * Announced after an acknowledgement is stored, so the dot that advertised the
+ * notes clears at the same moment the modal says they are read (#695). The
+ * event carries nothing: every listener re-reads the same acknowledgement.
+ */
+export const CHANGELOG_READ_EVENT = "agentic-odi:changelog-read";
+
 /** Old versions fall off the end; nobody scrolls back further than this. */
 const MAX_REMEMBERED = 200;
 
@@ -37,6 +44,11 @@ export function markReleasesRead(versions: readonly string[]): string[] {
     window.localStorage.setItem(CHANGELOG_READ_KEY, JSON.stringify(next));
   } catch {
     /* storage unavailable: the badge still clears for this session */
+  }
+  try {
+    window.dispatchEvent(new Event(CHANGELOG_READ_EVENT));
+  } catch {
+    /* no window to tell: the next read of the acknowledgement still agrees */
   }
   return next;
 }

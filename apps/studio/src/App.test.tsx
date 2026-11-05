@@ -5,6 +5,7 @@ import App from "./App";
 import { fetchConfig, healthLlm } from "./api/studioApi";
 
 vi.mock("./api/studioApi", () => ({
+  fetchChangelog: vi.fn(async () => ({ releases: [] })),
   fetchConfig: vi.fn(async () => ({
     base_url: "http://localhost:8001/v1",
     api_key: "local",

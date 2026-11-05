@@ -6732,3 +6732,18 @@ details[open] summary {
   font-size: 0.8rem;
   color: var(--amber);
 }
+
+/* The What's New dot: one accent mark, never a number (#695). */
+.pill-changelog {
+  position: relative;
+}
+
+.pill-changelog__dot {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+}

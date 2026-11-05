@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -9,6 +9,12 @@ vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 
+vi.mock("../../api/studioApi", () => ({
+  fetchChangelog: vi.fn(),
+}));
+
+import { fetchChangelog } from "../../api/studioApi";
+import { markReleasesRead } from "../../lib/changelogRead";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import type { UpdateSnapshot } from "../../updater/types";
@@ -47,6 +53,8 @@ const stubSnapshot = (overrides: Partial<UpdateSnapshot> = {}): UpdateSnapshot =
 describe("StudioBar", () => {
   beforeEach(() => {
     vi.mocked(useUpdateSnapshot).mockReturnValue(stubSnapshot() as never);
+    vi.mocked(fetchChangelog).mockResolvedValue({ releases: [] } as never);
+    window.localStorage.clear();
   });
   it("shows the Odi mark at 32 pixels so the pixel art stays crisp", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext() as never);
@@ -516,4 +524,70 @@ describe("StudioBar new thread control (#319)", () => {
     expect(onNew).not.toHaveBeenCalledWith({ stop: true });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+  it("shows one accent dot when there are release notes nobody has read (#695)", async () => {
+    vi.mocked(fetchChangelog).mockResolvedValue({
+      releases: [
+        { version: "0.15.0", date: "2026-11-01", categories: [] },
+        { version: "0.14.0", date: "2026-10-20", categories: [] },
+      ],
+    } as never);
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+
+    const { container } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+
+    expect(await screen.findByText("new release notes")).toBeInTheDocument();
+    expect(container.querySelectorAll(".pill-changelog__dot")).toHaveLength(1);
+    // The dot is not the only announcement: the button says it too.
+    expect(
+      screen.getByRole("button", { name: "Open What's New changelog, new release notes" }),
+    ).toBeInTheDocument();
+  });
+
+  it("clears the dot the moment Mark all read acknowledges the notes (#695)", async () => {
+    vi.mocked(fetchChangelog).mockResolvedValue({
+      releases: [{ version: "0.15.0", date: "2026-11-01", categories: [] }],
+    } as never);
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+
+    const { container } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+    expect(await screen.findByText("new release notes")).toBeInTheDocument();
+
+    act(() => {
+      markReleasesRead(["0.15.0"]);
+    });
+
+    await waitFor(() => expect(container.querySelector(".pill-changelog__dot")).toBeNull());
+    expect(screen.queryByText("new release notes")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Open What's New changelog" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no dot for versions already read, or when the notes cannot be fetched (#695)", async () => {
+    vi.mocked(fetchChangelog).mockClear();
+    window.localStorage.setItem("agentic-odi.changelog.read", JSON.stringify(["0.15.0"]));
+    vi.mocked(fetchChangelog).mockResolvedValue({
+      releases: [{ version: "0.15.0", date: "2026-11-01", categories: [] }],
+    } as never);
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+
+    const { container, unmount } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+    await waitFor(() => expect(fetchChangelog).toHaveBeenCalledTimes(1));
+    expect(container.querySelector(".pill-changelog__dot")).toBeNull();
+    unmount();
+
+    vi.mocked(fetchChangelog).mockRejectedValue(new Error("offline"));
+    const second = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+    await waitFor(() => expect(fetchChangelog).toHaveBeenCalledTimes(2));
+    expect(second.container.querySelector(".pill-changelog__dot")).toBeNull();
+  });
+
 });
