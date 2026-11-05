@@ -115,6 +115,25 @@ describe("WorkspacePanel", () => {
     expect(studio.sendMessage).not.toHaveBeenCalled();
   });
 
+  it("moves focus into the lens and gives it back to the chip when it closes (#696)", () => {
+    const chip = document.createElement("button");
+    chip.textContent = "Landscape";
+    document.body.append(chip);
+    chip.focus();
+
+    const { rerender } = render(<WorkspacePanel />);
+
+    const heading = screen.getByRole("heading", { name: /opportunity landscape/i });
+    expect(heading).toHaveFocus();
+    expect(heading).toHaveAttribute("tabindex", "-1");
+
+    studio.activePanel = null;
+    rerender(<WorkspacePanel />);
+
+    expect(chip).toHaveFocus();
+    chip.remove();
+  });
+
   it("renders nothing when no view is open", () => {
     studio.activePanel = null;
 

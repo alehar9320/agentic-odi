@@ -30,9 +30,32 @@ export function WorkspacePanel() {
   const { activePanel, closePanel, sendMessage } = useStudio();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const panel = activePanel ? findPanel(activePanel) : null;
+  const panelId = panel?.id ?? null;
   const panelRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   useFocusTrap(panelRef, isMobile && Boolean(panel));
+
+  // On a wide screen the lens opens under the keyboard, so focus goes to the
+  // heading and comes back to the chip that opened it. The mobile sheet keeps
+  // its trap and its own return path; this effect stays out of its way (#696).
+  useEffect(() => {
+    if (!panelId) {
+      const target = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (target?.isConnected) {
+        target.focus();
+      }
+      return;
+    }
+    if (isMobile) {
+      return;
+    }
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    headingRef.current?.focus();
+  }, [panelId, isMobile]);
 
   // Everything behind the sheet is out of reach while it is open.
   useEffect(() => {
@@ -116,7 +139,9 @@ export function WorkspacePanel() {
               {panel.icon}
             </span>
             <div>
-              <h2 className="lens__title">{panel.title}</h2>
+              <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
+                {panel.title}
+              </h2>
               <p className="lens__blurb">{panel.blurb}</p>
             </div>
           </div>
