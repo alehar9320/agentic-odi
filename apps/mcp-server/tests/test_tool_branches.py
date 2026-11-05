@@ -216,6 +216,18 @@ async def test_delete_customer_outcome_reports_missing_ids() -> None:
     assert sentence(text) == "Customer outcome not found: missing"
 
 
+@pytest.mark.asyncio
+async def test_open_study_reports_a_missing_job_as_an_envelope() -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "open_study", {"job_id": "missing", "name": "Q3 sweep", "wave": 1}
+        )
+
+    text = _text(result)
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Job not found: missing"
+
+
 def test_main_runs_the_http_transport(monkeypatch) -> None:
     calls: list[dict] = []
     monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))

@@ -82,9 +82,17 @@ per-platform archives with SHA-256 checksums for a manual download. See
   in-place guidance appears only after the first exchange. It turns "a customer
   still reconciles invoices by hand" into a scored outcome, a job map, and a
   ranked opportunity board — inline in the thread. Every claim in a reply names
-  the record behind it, or says it is a hypothesis. The bar's history list keeps
+  the record behind it, or says it is a hypothesis. A score names the questions
+  that produced it, and a number with no customer answer behind it reads as
+  unverified instead of settling the matter. The bar's history list keeps
   the last twenty threads one click away, each named by its first question and
   marked when it is the one on screen.
+- **A document when the conversation needs one.** `/brief` writes the decision
+  brief from the canvas — the ranked bets, the records behind each, what argues
+  against them, and the next evidence to collect — as Markdown a review can read
+  with or without the Studio. Provenance travels with it: demo rows are excluded
+  from every count and labelled, and every number counts records instead of
+  generating prose.
 - **One artifact you can hand over.** A read-only link opens a single artifact
   and its evidence on its own page — no rail, no composer, no way into the rest
   of the workspace — and states when the link expires. The link is a capability,
@@ -155,6 +163,12 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   Settings → About also offers an opt-in, redacted local diagnostics preview; no
   report is uploaded. See
   [The Living Studio](docs/living-studio.md).
+- **The agent knows what you are looking at.** Select a job, step, outcome, or
+  evidence record and the Studio tells the sidecar only *which* record — kind and
+  id — never what it says. The sidecar re-reads that record from the store and
+  answers about it in the store's own words; an id the store does not have earns
+  no sentence. A quiet chip in the composer names what was said on your behalf,
+  opens the record when you press it, and can be dismissed.
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
 ```bash

@@ -1,3 +1,4 @@
+import type { RecordKind } from "./lib/records";
 import type { UiCatalogManifest, UiNode } from "./ui/protocol";
 
 export interface Job {
@@ -13,6 +14,24 @@ export interface Step {
   order?: number;
 }
 
+/** A question put to the person that they did not answer, and why not. */
+export interface ClaimSkip {
+  question: string;
+  reason?: string;
+}
+
+/**
+ * The questions behind a score. `verified` arrives derived from the core model —
+ * a check is verified when at least one question was answered — so a card must
+ * read it rather than compare the lists itself.
+ */
+export interface ClaimCheck {
+  asked?: string[];
+  answers?: string[];
+  skips?: ClaimSkip[];
+  verified?: boolean;
+}
+
 export interface Outcome {
   id?: string;
   job_id?: string;
@@ -20,6 +39,7 @@ export interface Outcome {
   importance?: number | null;
   satisfaction?: number | null;
   opportunity_score?: number | null;
+  claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
 }
@@ -57,6 +77,11 @@ export type SegmentVerdict = "underserved" | "overserved" | "appropriately_serve
  * job and evidenced by outcomes. `verdict` is null when an outcome in the group
  * has no score — the studio reports that as "not enough signal" rather than
  * guessing. No demographic field exists here by design.
+ *
+ * `people_inferred` is the provenance of the group itself: true when `people`
+ * was derived from the outcomes rather than supplied, which the board words as
+ * a candidate segment. The `basis` field (#475) will name the derivation more
+ * precisely; it is deliberately not added here.
  */
 export interface Segment {
   id: string;
@@ -360,6 +385,7 @@ export interface StudioBrief {
 export type WorkspacePanelId =
   | "records"
   | "landscape"
+  | "brief"
   | "jobmap"
   | "segments"
   | "evidence"
@@ -395,6 +421,23 @@ export type SignalSubjectKind =
   | "segment"
   | "strategy";
 
+/** A selected record on screen, whatever kind it is. */
+export interface FocusSubject {
+  kind: SignalSubjectKind;
+  id: string;
+}
+
+/**
+ * A record the sidecar can read back from its own store.
+ *
+ * The kinds are the ones `lib/records.ts` already enumerates: a pointer may
+ * only name a record the store is able to show.
+ */
+export type FocusPointer = {
+  kind: RecordKind;
+  id: string;
+};
+
 export interface Signal {
   id: string;
   kind: SignalKind;
@@ -428,6 +471,8 @@ export interface ChatStreamRequest {
   approvals?: boolean;
   /** The id this client is streaming the reply under. */
   assistant_id?: string | null;
+  /** The record the person has selected, as a pointer and nothing more. */
+  focus?: FocusPointer | null;
 }
 
 /** One turn in a persisted conversation, as the branch tree exposes it. */
