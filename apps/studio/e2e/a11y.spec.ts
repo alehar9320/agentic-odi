@@ -1,7 +1,14 @@
 import { expect, type Page, test } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { COMPOSER, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import {
+  COMPOSER,
+  openStudio,
+  rail,
+  resetRepository,
+  seedOutcomes,
+  setTheme,
+} from "./helpers";
 import {
   contrastWalker,
   formatFindings,
@@ -44,7 +51,6 @@ import { KNOWN_PAIRS } from "./a11y/knownPairs";
  */
 
 const THEMES = ["dark", "light"] as const;
-type Theme = (typeof THEMES)[number];
 
 /**
  * Every screen fades in, and both checkers read the painted page: measured mid
@@ -69,16 +75,6 @@ declare global {
   interface Window {
     __odiContrastScan: (root: Element, screen: string, theme: string) => ContrastFinding[];
   }
-}
-
-/** Force a theme before the app boots, the way the Settings panel would. */
-async function setTheme(page: Page, theme: Theme): Promise<void> {
-  await page.addInitScript((value) => {
-    const raw = window.localStorage.getItem("studio.settings");
-    const settings = raw ? JSON.parse(raw) : {};
-    settings.theme = value;
-    window.localStorage.setItem("studio.settings", JSON.stringify(settings));
-  }, theme);
 }
 
 /**

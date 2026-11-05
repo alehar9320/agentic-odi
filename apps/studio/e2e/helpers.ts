@@ -146,3 +146,21 @@ export async function seedOutcomes(
 
   return jobId as string;
 }
+
+export type Theme = "dark" | "light" | "system";
+
+/**
+ * Force a theme before the app boots, the way the Settings panel would.
+ *
+ * The setting is read at startup, so it has to be in `localStorage` before
+ * navigation — after, and the page you measure is the one the previous theme
+ * painted.
+ */
+export async function setTheme(page: Page, theme: Theme): Promise<void> {
+  await page.addInitScript((value) => {
+    const raw = window.localStorage.getItem("studio.settings");
+    const settings = raw ? JSON.parse(raw) : {};
+    settings.theme = value;
+    window.localStorage.setItem("studio.settings", JSON.stringify(settings));
+  }, theme);
+}
