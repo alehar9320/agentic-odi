@@ -1324,6 +1324,28 @@ a {
   word-break: break-word;
 }
 
+/* A pasted document is a message, not the screen: eight lines, a fade, and one
+   control that says there is more (#696). */
+.message--user .message__bubble.is-clamped {
+  position: relative;
+  max-height: 12.8em;
+  overflow: hidden;
+}
+
+.message--user .message__bubble.is-clamped::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2.4em;
+  background: linear-gradient(to bottom, transparent, var(--surface-hover));
+  pointer-events: none;
+}
+
+.message__more {
+  margin-top: 4px;
+}
+
 /* Editing a question happens in the bubble it was asked in. */
 .message__bubble--edit {
   width: 82%;
