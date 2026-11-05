@@ -61,10 +61,12 @@ export function StudioBar({
   const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [askOpen, setAskOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
+  const activeHistoryRef = useRef<HTMLButtonElement>(null);
   // An empty transcript is only nothing to lose when nothing is on screen to
   // leave: the plus is the documented way out of the first-run setup, and a
   // disabled control there would strand the person in it.
@@ -152,6 +154,18 @@ export function StudioBar({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [historyOpen]);
+  // Opening the list lands on the thread already on screen: with forty in the
+  // list the one being read can be well below the fold, and hunting for it is
+  // work the app can do. Reduced motion gets the jump instead of the glide.
+  useEffect(() => {
+    if (!historyOpen) {
+      return;
+    }
+    const active = activeHistoryRef.current;
+    if (active && typeof active.scrollIntoView === "function") {
+      active.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+    }
+  }, [historyOpen, reduceMotion]);
 
   function toggleHistory() {
     setHistoryOpen((open) => {
@@ -315,6 +329,7 @@ export function StudioBar({
                   return (
                     <button
                       key={conversation.id}
+                      ref={current ? activeHistoryRef : undefined}
                       type="button"
                       role="menuitem"
                       className="bar__menu-item bar__history-item"

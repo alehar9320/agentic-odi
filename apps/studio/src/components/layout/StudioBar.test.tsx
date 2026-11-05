@@ -517,3 +517,83 @@ describe("StudioBar new thread control (#319)", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
+
+// Shared by the history tests: one thread, and a bar with its list open.
+const conversation = (id: string, title: string, updatedAt: string, turnCount: number) => ({
+  id,
+  title,
+  created_at: updatedAt,
+  updated_at: updatedAt,
+  head_id: null,
+  turn_count: turnCount,
+});
+
+function openHistory(overrides: Record<string, unknown>) {
+  vi.mocked(useStudio).mockReturnValue(stubContext(overrides) as never);
+  const view = render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+  return {
+    menu: screen.getByRole("menu", { name: "Recent conversations" }),
+    unmount: view.unmount,
+  };
+}
+
+describe("history opens on the thread in view (#694 D11)", () => {
+  it("opens on the thread in view, gliding unless motion is reduced", () => {
+    const scrollIntoView = vi.fn();
+    const received: Element[] = [];
+    const original = (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: function (this: Element, options: ScrollIntoViewOptions) {
+        received.push(this);
+        scrollIntoView(options);
+      },
+    });
+
+    const media = (matches: boolean) =>
+      vi.fn((query: string) => ({
+        matches: query.includes("prefers-reduced-motion") ? matches : false,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }));
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: media(true) });
+
+    try {
+      const conversations = [
+        conversation("c-2", "The thread on screen", new Date(2026, 9, 22, 9, 0).toISOString(), 2),
+        conversation("c-1", "An older thread", new Date(2026, 9, 20, 9, 0).toISOString(), 1),
+      ];
+
+      const reduced = openHistory({ conversationId: "c-2", conversations });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" });
+      expect(received[0]).toBe(
+        within(reduced.menu).getByRole("menuitem", { name: /the thread on screen/i }),
+      );
+
+      reduced.unmount();
+      scrollIntoView.mockClear();
+      received.length = 0;
+      Object.defineProperty(window, "matchMedia", { configurable: true, value: media(false) });
+
+      openHistory({ conversationId: "c-2", conversations });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+    } finally {
+      if (original === undefined) {
+        delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      } else {
+        Object.defineProperty(Element.prototype, "scrollIntoView", {
+          configurable: true,
+          value: original,
+        });
+      }
+      Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia });
+    }
+  });
+});
