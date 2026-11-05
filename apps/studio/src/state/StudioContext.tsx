@@ -392,6 +392,10 @@ export interface StudioContextValue {
   conversationId: string | null;
   /** The recent threads, newest first, as the history list shows them. */
   conversations: ConversationSummary[];
+  /** True until boot has decided whether a stored thread exists (#695). */
+  restoringThread: boolean;
+  /** The stored thread existed and could not be reopened (#695). */
+  restoreFailed: boolean;
   /** Re-read the history list; called when it opens and after a turn persists. */
   refreshConversations: () => Promise<void>;
   /** Open a past thread by loading its turns; never a conversation without them. */
@@ -654,6 +658,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  // A stored thread is not home until it is known to be missing: the stage
+  // waits for the restore it is already doing instead of flashing the welcome
+  // screen first (#695).
+  const [restoringThread, setRestoringThread] = useState(true);
+  const [restoreFailed, setRestoreFailed] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
@@ -2267,18 +2276,30 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       void refreshCanvas();
       void refreshMemory();
       void refreshConversations();
-      const { conversation } = await fetchLatestConversation();
-      if (cancelled || !conversation) {
-        return;
+      try {
+        const { conversation } = await fetchLatestConversation();
+        if (cancelled || !conversation) {
+          return;
+        }
+        setConversationId(conversation.id);
+        // The tree, not the flat turn list: a conversation with branches
+        // must open on the branch that was visible when it was left.
+        const tree = await fetchConversationTree(conversation.id);
+        if (cancelled) {
+          return;
+        }
+        setMessages(turnsToMessages(tree.messages, tree.head_id));
+      } catch {
+        // Home is still the right place to be; it just has to say so once.
+        if (!cancelled) {
+          setRestoreFailed(true);
+        }
+      } finally {
+        // Every path settles the wait, so the stage can never stay a placeholder.
+        if (!cancelled) {
+          setRestoringThread(false);
+        }
       }
-      setConversationId(conversation.id);
-      // The tree, not the flat turn list: a conversation with branches
-      // must open on the branch that was visible when it was left.
-      const tree = await fetchConversationTree(conversation.id);
-      if (cancelled) {
-        return;
-      }
-      setMessages(turnsToMessages(tree.messages, tree.head_id));
     };
     void loadLocalData().catch(() => undefined);
 
@@ -2464,6 +2485,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearChat,
       startNewThread,
       conversationId,
+      restoringThread,
+      restoreFailed,
       conversations,
       refreshConversations,
       openConversation,
@@ -2589,6 +2612,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversationId,
       conversations,
       refreshConversations,
+      restoringThread,
+      restoreFailed,
       openConversation,
       memory,
       memoryLoading,

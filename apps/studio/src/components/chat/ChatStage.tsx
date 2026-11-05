@@ -97,6 +97,8 @@ export function ChatStage() {
     settings,
     mcpReachable,
     llmHealth,
+    restoringThread,
+    restoreFailed,
   } = useStudio();
 
   const empty = messages.length === 0;
@@ -192,12 +194,30 @@ export function ChatStage() {
     return isFeatureEnabled("firstRunIntro") ? <IntroConversation /> : <SetupConversation />;
   }
 
+  // A restore is not home. The stage waits for the thread it already knows
+  // exists, so a reload never paints the welcome screen and then replaces it
+  // (#695). Every path out of the restore settles this flag.
+  if (restoringThread) {
+    return (
+      <section
+        className="chat chat--empty"
+        aria-label="Studio conversation"
+        aria-busy="true"
+      />
+    );
+  }
+
   if (empty) {
     return (
       <section className="chat chat--empty" aria-label="Studio conversation">
         <div className="chat__welcome">
           <div className="chat__welcome-inner">
             <Hero />
+            {restoreFailed && (
+              <p className="chat__restore-note" role="status">
+                That thread couldn't be reopened.
+              </p>
+            )}
             <ThreadComposer
               onCommand={(command) => runCommand(command)}
               onSlashCommand={submitCommand}
