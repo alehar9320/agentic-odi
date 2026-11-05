@@ -77,11 +77,17 @@ class Violation:
 
 @dataclass
 class _Table:
-    """One open `<table>`, accumulating what its rules will ask for."""
+    """One `<table>`, accumulating what its rules will ask for.
+
+    The naming rule is decided at the end of the document, not at the closing
+    tag, because the element a table is labelled by may appear anywhere in it —
+    checking early would report a label that resolves as a missing one.
+    """
 
     start_tag: str
     line: int
     caption: bool = False
+    references: tuple[str, ...] = ()
     headers: int = 0
     unscoped: list[tuple[str, int]] = field(default_factory=list)
 
@@ -90,11 +96,19 @@ class _Table:
         if (scope or "").lower() not in SCOPES:
             self.unscoped.append((start_tag, line))
 
-    def check(self, report: Callable[[str, str, str, int], None]) -> None:
-        if not self.caption:
+    def named_by(self, ids: set[str]) -> bool:
+        return self.caption or any(reference in ids for reference in self.references)
+
+    def check(
+        self,
+        ids: set[str],
+        report: Callable[[str, str, str, int], None],
+    ) -> None:
+        if not self.named_by(ids):
             report(
                 "table-caption",
-                "a data table needs a <caption> that says what it shows",
+                "a data table needs a <caption>, or aria-labelledby naming the "
+                "heading it belongs to, so a reader knows what it shows",
                 self.start_tag,
                 self.line,
             )
@@ -116,20 +130,29 @@ class _Table:
 
 @dataclass
 class _Chart:
-    """One open `<svg>`, waiting to see whether anything labels it."""
+    """One `<svg>`, waiting to see whether anything labels it."""
 
     start_tag: str
     line: int
-    labelled: bool = False
+    decorative: bool = False
+    titled: bool = False
+    own_label: bool = False
+    references: tuple[str, ...] = ()
 
-    def is_labelled_by(self, attributes: dict[str, str | None]) -> bool:
+    def take(self, attributes: dict[str, str | None]) -> None:
         if (attributes.get("aria-hidden") or "").lower() == "true":
-            self.labelled = True
+            self.decorative = True
         if (attributes.get("aria-label") or "").strip():
-            self.labelled = True
-        if (attributes.get("aria-labelledby") or "").strip():
-            self.labelled = True
-        return self.labelled
+            self.own_label = True
+        self.references = _references(attributes)
+
+    def named_by(self, ids: set[str]) -> bool:
+        return (
+            self.decorative
+            or self.titled
+            or self.own_label
+            or any(reference in ids for reference in self.references)
+        )
 
 
 def audit_html(html: str) -> list[Violation]:
@@ -154,6 +177,8 @@ class _Audit(HTMLParser):
         self._ids: dict[str, tuple[int, str]] = {}
         self._tables: list[_Table] = []
         self._charts: list[_Chart] = []
+        self._open_tables: list[_Table] = []
+        self._open_charts: list[_Chart] = []
 
     @property
     def violations(self) -> list[Violation]:
@@ -166,8 +191,8 @@ class _Audit(HTMLParser):
         # `<svg … />` and `<img …>` have no children, so they arrive here with
         # no matching end tag to close whatever they opened.
         self._visit(tag, attrs, self.get_starttag_text() or f"<{tag}>")
-        if tag == "svg" and self._charts:
-            self._close_chart()
+        if tag == "svg" and self._open_charts:
+            self._open_charts.pop()
 
     def handle_endtag(self, tag: str) -> None:
         if tag in _SUPPRESSED:
@@ -175,18 +200,31 @@ class _Audit(HTMLParser):
             return
         if self._suppressed or tag in _HEADING_TAGS:
             return
-        if tag == "table" and self._tables:
-            self._tables.pop().check(self._report)
-        elif tag == "svg" and self._charts:
-            self._close_chart()
+        if tag == "table" and self._open_tables:
+            self._open_tables.pop()
+        elif tag == "svg" and self._open_charts:
+            self._open_charts.pop()
 
     def close(self) -> None:
-        """Finish an abrupt end: an unclosed table or chart is still a defect."""
+        """Check the document once it is whole.
+
+        A table's name may be an `id` further down the page, and an unclosed
+        table is a defect rather than a silent pass, so nothing is judged while
+        the element set is still arriving.
+        """
         super().close()
-        while self._tables:
-            self._tables.pop().check(self._report)
-        while self._charts:
-            self._close_chart()
+        ids = set(self._ids)
+        for table in self._tables:
+            table.check(ids, self._report)
+        for chart in self._charts:
+            if not chart.named_by(ids):
+                self._report(
+                    "image-label",
+                    'an <svg> is either decoration with aria-hidden="true" or a chart '
+                    "with a label a reader can be told",
+                    chart.start_tag,
+                    chart.line,
+                )
         self._check_title()
         self._check_heading_order()
 
@@ -207,20 +245,24 @@ class _Audit(HTMLParser):
             if tag == "h1":
                 self._h1s.append((line, start_tag))
         elif tag == "table":
-            self._tables.append(_Table(start_tag=start_tag, line=line))
-        elif tag == "caption" and self._tables:
-            self._tables[-1].caption = True
-        elif tag == "th" and self._tables:
-            self._tables[-1].add_header(attributes.get("scope"), start_tag, line)
+            table = _Table(start_tag=start_tag, line=line)
+            table.references = _references(attributes)
+            self._tables.append(table)
+            self._open_tables.append(table)
+        elif tag == "caption" and self._open_tables:
+            self._open_tables[-1].caption = True
+        elif tag == "th" and self._open_tables:
+            self._open_tables[-1].add_header(attributes.get("scope"), start_tag, line)
         elif tag == "img":
             self._check_image(attributes, start_tag, line)
         elif tag == "svg":
             chart = _Chart(start_tag=start_tag, line=line)
+            chart.take(attributes)
             self._charts.append(chart)
-            chart.is_labelled_by(attributes)
-        elif tag == "title" and self._charts:
+            self._open_charts.append(chart)
+        elif tag == "title" and self._open_charts:
             # `<title>` is how an inline SVG names itself without a label.
-            self._charts[-1].labelled = True
+            self._open_charts[-1].titled = True
 
     def _check_id(self, attributes: dict[str, str | None], start_tag: str, line: int) -> None:
         value = (attributes.get("id") or "").strip()
@@ -245,17 +287,6 @@ class _Audit(HTMLParser):
                 'an <img> needs alt=, or alt="" when it is decoration',
                 start_tag,
                 line,
-            )
-
-    def _close_chart(self) -> None:
-        chart = self._charts.pop()
-        if not chart.labelled:
-            self._report(
-                "image-label",
-                'an <svg> is either decoration with aria-hidden="true" or a chart '
-                'with role="img" and a label',
-                chart.start_tag,
-                chart.line,
             )
 
     def _check_title(self) -> None:
@@ -291,3 +322,11 @@ class _Audit(HTMLParser):
 
 def _order(entry: tuple[int, int, Violation]) -> tuple[int, int]:
     return (entry[0], entry[1])
+
+
+def _references(attributes: dict[str, str | None]) -> tuple[str, ...]:
+    """The ids an element is named by, which the document must actually contain."""
+    found: list[str] = []
+    for name in ("aria-labelledby", "aria-describedby"):
+        found.extend((attributes.get(name) or "").split())
+    return tuple(found)

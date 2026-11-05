@@ -123,3 +123,44 @@ def test_a_table_left_open_is_still_checked() -> None:
     html = "<html><body><main><h1>Payments platform</h1><table><tr><td>OUT-1</td>"
     rules = {v.rule for v in audit_html(html)}
     assert rules == {"table-caption", "table-header-scope"}
+
+
+def test_a_table_named_by_the_heading_above_it_passes() -> None:
+    """A caption is the plainest way to name a table; it is not the only one.
+
+    The repository's guides are Markdown, and Markdown has no caption syntax.
+    Rewriting a maintainer's document to satisfy a structural rule would be the
+    worse trade, and this file's own site tests already say so about emoji. So
+    the rule is that a table is *named*, which a `<caption>` does, and which
+    `aria-labelledby` pointing at the heading above it does too — the device
+    `website/tools/markdown_render.py` uses, because it already gives every
+    heading a stable id.
+    """
+    html = """
+      <main>
+        <h1>Payments platform</h1>
+        <h2 id="stages">The eight stages</h2>
+        <table aria-labelledby="stages">
+          <thead><tr><th scope="col">Stage</th><th scope="col">Output</th></tr></thead>
+          <tbody><tr><td>Listen</td><td>Quotes</td></tr></tbody>
+        </table>
+      </main>
+    """
+    assert audit_html(html) == []
+
+
+def test_a_table_labelled_at_an_id_that_is_not_there_fails() -> None:
+    """A label that resolves to nothing is a table with no name, announced as
+    though it had one — worse than the missing caption, because it looks fixed.
+    """
+    html = """
+      <main>
+        <h2>The eight stages</h2>
+        <table aria-labelledby="stages">
+          <thead><tr><th scope="col">Stage</th></tr></thead>
+          <tbody><tr><td>Listen</td></tr></tbody>
+        </table>
+      </main>
+    """
+    violations = audit_html(html)
+    assert {v.rule for v in violations} == {"single-h1", "table-caption"}
