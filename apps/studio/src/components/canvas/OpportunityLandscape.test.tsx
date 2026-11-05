@@ -136,7 +136,7 @@ describe("OpportunityLandscape accessibility", () => {
     const map = screen.getByRole("img", { name: "Opportunity map" });
     expect(map.tagName).toBe("svg");
     expect(map.querySelector("desc")?.textContent).toMatch(
-      /2 outcomes, 1 of them underserved, spanning importance 8 to 9/i,
+      /2 outcomes plotted, 1 of them underserved, 0 not plotted because a rating is missing/i,
     );
     expect(container.querySelector(".opportunity-matrix")).not.toBeNull();
   });
@@ -488,6 +488,82 @@ describe("OpportunityLandscape score rendering", () => {
     expect(within(rows[2]).getByText("Not scored")).toBeInTheDocument();
     expect(within(rows[0]).getByText("16.0")).toBeInTheDocument();
     expect(within(rows[0]).getByText("UNDERSERVED")).toBeInTheDocument();
+  });
+});
+
+describe("OpportunityLandscape matrix unrated outcomes", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  it("does not plot unrated outcomes and lists them as not plotted", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-201",
+            statement: "Minimize time spent syncing secrets",
+            importance: 9,
+            satisfaction: 2,
+            opportunity_score: 16,
+          },
+          {
+            id: "O-202",
+            statement: "Minimize unanswered support tickets",
+            importance: null,
+            satisfaction: 8,
+            opportunity_score: null,
+          },
+          {
+            id: "O-203",
+            statement: "Minimize delayed handoffs",
+            importance: 7,
+            satisfaction: null,
+            opportunity_score: null,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+
+    expect(
+      screen.getByRole("button", {
+        name: /O-201, Minimize time spent syncing secrets, opportunity score 16\.0, underserved/i,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^O-202,/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^O-203,/ })).toBeNull();
+
+    expect(screen.getByText(/Not plotted — missing ratings \(2\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /O-202.*missing importance/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /O-203.*missing satisfaction/i })).toBeInTheDocument();
+
+    const map = screen.getByRole("img", { name: "Opportunity map" });
+    expect(map.querySelector("desc")?.textContent).toBe(
+      "1 outcomes plotted, 1 of them underserved, 2 not plotted because a rating is missing.",
+    );
+  });
+
+  it("shows an empty-plot message when nothing can be plotted", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          { id: "O-202", statement: "Unrated", importance: null, satisfaction: null, opportunity_score: null },
+        ],
+      },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+
+    expect(screen.queryByRole("img", { name: "Opportunity map" })).toBeNull();
+    expect(screen.getByText("Nothing can be plotted until an outcome has both ratings.")).toBeInTheDocument();
+    expect(screen.getByText(/Not plotted — missing ratings \(1\)/i)).toBeInTheDocument();
   });
 });
 

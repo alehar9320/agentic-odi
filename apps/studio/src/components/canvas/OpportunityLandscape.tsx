@@ -431,21 +431,33 @@ function OpportunityMatrixView({
   const [showAll, setShowAll] = useState(false);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
 
-  const plotted: PlottedOutcome[] = outcomes.map((outcome) => {
-    const importance = Math.min(Math.max(outcome.importance ?? 5, 0), 10);
-    const satisfaction = Math.min(Math.max(outcome.satisfaction ?? 5, 0), 10);
-    const score = outcome.opportunity_score ?? importance + Math.max(importance - satisfaction, 0);
-    return {
-      outcome,
-      importance,
-      satisfaction,
-      score,
-      underserved: isUnderserved(score),
-      // Map (satisfaction, importance) into the 500x360 viewBox.
-      cx: plotX(satisfaction),
-      cy: plotY(importance),
-    };
-  });
+  const { plotted, unplotted } = useMemo(() => {
+    const plottedOutcomes: PlottedOutcome[] = [];
+    const unplottedOutcomes: Outcome[] = [];
+    for (const outcome of outcomes) {
+      if (hasScore(outcome.importance) && hasScore(outcome.satisfaction)) {
+        const importance = outcome.importance;
+        const satisfaction = outcome.satisfaction;
+        const score =
+          hasScore(outcome.opportunity_score)
+            ? outcome.opportunity_score
+            : importance + Math.max(importance - satisfaction, 0);
+        plottedOutcomes.push({
+          outcome,
+          importance,
+          satisfaction,
+          score,
+          underserved: isUnderserved(score),
+          // Clamp for the SVG transform only; the stored values stay in labels.
+          cx: plotX(Math.min(Math.max(satisfaction, 0), 10)),
+          cy: plotY(Math.min(Math.max(importance, 0), 10)),
+        });
+      } else {
+        unplottedOutcomes.push(outcome);
+      }
+    }
+    return { plotted: plottedOutcomes, unplotted: unplottedOutcomes };
+  }, [outcomes]);
 
   // Above the fold: the highest-opportunity outcomes, which is what the
   // landscape exists to show. The tail is one click away rather than in the
@@ -456,10 +468,7 @@ function OpportunityMatrixView({
     : plotted;
 
   const underservedCount = plotted.filter((plot) => plot.underserved).length;
-  const importances = plotted.map((plot) => plot.importance);
-  const minImportance = importances.length ? Math.min(...importances) : 0;
-  const maxImportance = importances.length ? Math.max(...importances) : 0;
-  const summary = `${plotted.length} outcomes, ${underservedCount} of them underserved, spanning importance ${minImportance} to ${maxImportance}.`;
+  const summary = `${plotted.length} outcomes plotted, ${underservedCount} of them underserved, ${unplotted.length} not plotted because a rating is missing.`;
 
   // One tab stop for the whole plot; the arrow keys carry focus from there.
   const rovingId =
@@ -546,6 +555,7 @@ function OpportunityMatrixView({
           className="opportunity-matrix__plot"
           style={{ position: "relative", width: "100%", aspectRatio: "500 / 360", minHeight: 320 }}
         >
+          {plotted.length > 0 ? (
           <svg
             role="img"
             aria-labelledby="opportunity-map-title"
@@ -667,6 +677,7 @@ function OpportunityMatrixView({
               );
             })}
           </svg>
+          ) : null}
 
           {rendered.map((plot) => {
             const { outcome } = plot;
@@ -725,6 +736,39 @@ function OpportunityMatrixView({
                 Plot all {plotted.length}
               </button>
             </p>
+          ) : null}
+          {unplotted.length > 0 ? (
+            <section aria-label="Not plotted outcomes" style={{ marginTop: 12 }}>
+              <p style={{ fontWeight: 600, margin: "0 0 6px" }}>
+                Not plotted — missing ratings ({unplotted.length})
+              </p>
+              {plotted.length === 0 ? (
+                <p className="caption" style={{ margin: "0 0 6px" }}>
+                  Nothing can be plotted until an outcome has both ratings.
+                </p>
+              ) : null}
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {unplotted.map((outcome) => {
+                  const missing = [
+                    !hasScore(outcome.importance) ? "missing importance" : null,
+                    !hasScore(outcome.satisfaction) ? "missing satisfaction" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ");
+                  return (
+                    <li key={outcome.id ?? outcome.statement}>
+                      <button
+                        type="button"
+                        className="quiet-action"
+                        onClick={() => outcome.id && onSelectOutcome(outcome.id)}
+                      >
+                        {outcome.id ?? "Outcome"} — {outcome.statement ?? "Outcome"} ({missing})
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           ) : null}
         </div>
       </div>
