@@ -229,6 +229,17 @@ Studio says so in one place and keeps going:
   not, and `isEndpointConfigured` in `apps/studio/src/lib/modelEndpoint.ts` is
   the single place that decides, for the chip, the capability probe, and the
   chat provider.
+- Settings → Your workspace is the escape hatch. **Export my workspace** writes
+  one readable JSON file, `agentic-odi-workspace.json`, holding every stored
+  record at the current snapshot version; **Import workspace** reads such a file
+  back. Nothing is uploaded, and the file is plain JSON — no compression, no
+  binary. A file at an older version is migrated on the way in; a version this
+  build cannot read is named in the message ("This workspace file is version 99,
+  but this build reads up to version 2") before anything is touched. Importing
+  into a workspace that already holds records asks first, naming what will be
+  replaced ("3 jobs and 5 messages"); cancelling changes nothing. Import never
+  runs without that confirmation, so the work on this device is never the price
+  of restoring a file.
 
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
