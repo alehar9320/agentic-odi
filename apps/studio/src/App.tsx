@@ -30,6 +30,7 @@ import { UpdateBanner, UpdateProvider } from "./updater";
  */
 function StudioShell() {
   const {
+    activePanel,
     closePanel,
     closeSetup,
     customizeOpen,
@@ -59,59 +60,57 @@ function StudioShell() {
     closeCustomize();
   }
 
+  // One listener for the keys the whole room shares. The composer registers
+  // how to take the caret (lib/composerFocus), so this is installed once for
+  // the shell instead of once per composer.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      const modifier = event.metaKey || event.ctrlKey;
+
+      if (modifier && !event.altKey && event.key.toLowerCase() === "k") {
+        if (dialogOpen()) {
+          return;
+        }
+        if (focusComposer()) {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      // `/` is a command only where it cannot be a character: inside a field
+      // the slash belongs to what the person is typing.
+      if (event.key === "/" && !modifier && !event.altKey) {
+        if (dialogOpen() || isEditableTarget(event.target)) {
+          return;
+        }
+        if (startComposerCommand()) {
+          event.preventDefault();
+        }
+        return;
+      }
+
       if (event.key === "Escape") {
+        // A dialog owns its Escape. Closing it must not also stop the reply
+        // behind it or move the caret out from under the person.
+        if (dialogOpen()) {
+          return;
+        }
         if (streaming) {
           stopStreaming();
           return;
         }
-        closePanel();
+        if (activePanel) {
+          closePanel();
+          return;
+        }
+        // Nothing is open, so Escape does the one thing it can: it takes you
+        // back to the place where you can type.
+        focusComposer();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePanel, streaming, stopStreaming]);
-
-  // ⌘/Ctrl+K reaches the composer from anywhere. The composer registers how
-  // to take the caret (lib/composerFocus), so this is one listener for the
-  // shell rather than one per composer, and a dialog keeps its own keyboard
-  // while it is open.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const modifier = event.metaKey || event.ctrlKey;
-      if (!modifier || event.altKey || event.key.toLowerCase() !== "k") {
-        return;
-      }
-      if (dialogOpen()) {
-        return;
-      }
-      if (focusComposer()) {
-        event.preventDefault();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  // `/` starts a command from anywhere it cannot be a character. Inside any
-  // field the slash belongs to what the person is typing, so the shell asks
-  // before it acts.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-      if (dialogOpen() || isEditableTarget(event.target)) {
-        return;
-      }
-      if (startComposerCommand()) {
-        event.preventDefault();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [activePanel, closePanel, streaming, stopStreaming]);
 
   // A damaged database is not a broken screen: the file is intact on disk and
   // the only honest thing to show is that failure, not a zeroed-out studio.
