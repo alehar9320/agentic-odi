@@ -69,6 +69,7 @@ vi.mock("./api/studioApi", () => ({
       retryable: false,
     };
   },
+  fetchChangelog: vi.fn(async () => ({ releases: [] })),
   fetchLatestConversation: vi.fn(async () => ({ conversation: null, turns: [] })),
   listConversations: vi.fn(async () => []),
   createConversation: vi.fn(async () => ({
@@ -752,6 +753,32 @@ describe("boot failure", () => {
     // The conversation is not offered: there is nothing to show from a store
     // that failed its check.
     expect(screen.queryByRole("textbox", { name: /message the studio/i })).toBeNull();
+  });
+});
+
+describe("composer shortcuts (#692)", () => {
+  it("puts the caret in the composer with Meta+K from the home stage", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(composer).not.toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    expect(composer).toHaveFocus();
+  });
+
+  it("leaves the composer alone while a modal owns the screen", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.click(screen.getByRole("button", { name: /open what's new changelog/i }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    expect(composer).not.toHaveFocus();
   });
 });
 

@@ -13,6 +13,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
+import { dialogOpen, focusComposer } from "./lib/composerFocus";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
@@ -70,6 +71,27 @@ function StudioShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closePanel, streaming, stopStreaming]);
+
+  // ⌘/Ctrl+K reaches the composer from anywhere. The composer registers how
+  // to take the caret (lib/composerFocus), so this is one listener for the
+  // shell rather than one per composer, and a dialog keeps its own keyboard
+  // while it is open.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const modifier = event.metaKey || event.ctrlKey;
+      if (!modifier || event.altKey || event.key.toLowerCase() !== "k") {
+        return;
+      }
+      if (dialogOpen()) {
+        return;
+      }
+      if (focusComposer()) {
+        event.preventDefault();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // A damaged database is not a broken screen: the file is intact on disk and
   // the only honest thing to show is that failure, not a zeroed-out studio.

@@ -21,6 +21,7 @@ import {
 import { dictationSupported } from "../../assistant/dictation";
 import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
+import { registerComposer } from "../../lib/composerFocus";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import {
@@ -139,6 +140,22 @@ function ComposerBody({
     setDismissedFor("");
     onCommand(command);
   }
+
+  // The runtime owns the textarea, so the shell's shortcuts reach it through
+  // the id this composer already gives its input and label.
+  useEffect(
+    () =>
+      registerComposer({
+        focus: () => document.getElementById(inputId)?.focus(),
+        startCommand: () => {
+          aui.composer.setText("/");
+          setHighlight(0);
+          setDismissedFor("");
+          document.getElementById(inputId)?.focus();
+        },
+      }),
+    [aui, inputId],
+  );
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (open) {
