@@ -95,8 +95,10 @@ export async function lastReply(page: Page): Promise<string> {
  *
  * The sidecar and its repository are shared by the whole run, so a test that
  * left data behind would change what the next one sees. Deleting a job
- * removes the steps and outcomes that belong to it, so clearing the jobs is
- * enough.
+ * removes the steps and outcomes that belong to it. What is not job-scoped
+ * has to be cleared on its own: the agent's observations survive a deleted
+ * job, and the rail counts them, so a run that seeded one would leave the
+ * next run staring at a "What I know" chip nobody asked for.
  */
 export async function resetRepository(request: APIRequestContext): Promise<void> {
   const response = await request.get("/api/canvas");
@@ -107,6 +109,9 @@ export async function resetRepository(request: APIRequestContext): Promise<void>
     const deleted = await request.delete(`/api/jobs/${encodeURIComponent(job.id)}`);
     expect(deleted.ok()).toBeTruthy();
   }
+
+  const cleared = await request.delete("/api/memory");
+  expect(cleared.ok()).toBeTruthy();
 }
 
 export interface SeededOutcome {
@@ -145,6 +150,37 @@ export async function seedOutcomes(
   }
 
   return jobId as string;
+}
+
+/**
+ * Give the agent a note it has learned, so the memory chip exists.
+ *
+ * Observations are the one rail artifact the sidecar accepts directly and the
+ * repository keeps across a deleted job, so the lens that shows them needs its
+ * own seed. `kind` is the bucket the app files the note under.
+ */
+export async function seedMemory(
+  request: APIRequestContext,
+  notes: { kind: string; text: string }[],
+): Promise<void> {
+  for (const note of notes) {
+    const created = await request.post("/api/memory/observations", { data: note });
+    expect(created.ok()).toBeTruthy();
+  }
+}
+
+/**
+ * Open a lens the way the keyboard does: the command the composer completes.
+ *
+ * This is the route that reaches every view without depending on what the
+ * canvas currently holds — the rail only shows a chip once the thread has
+ * produced that artifact, which is a fact about the data rather than about the
+ * surface being measured.
+ */
+export async function runCommand(page: Page, command: string): Promise<void> {
+  await page.getByRole("textbox", { name: COMPOSER }).fill(command);
+  await page.keyboard.press("Enter");
+  await expect(lens(page)).toBeVisible();
 }
 
 export type Theme = "dark" | "light" | "system";

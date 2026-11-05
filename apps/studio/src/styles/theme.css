@@ -1413,7 +1413,9 @@ a {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--faint);
+  /* --faint is AA on the page ground but not on the card washes these buttons
+     sit on as often as anywhere else, and the label is the whole affordance. */
+  color: var(--muted);
   font-size: 0.74rem;
   cursor: pointer;
 }
@@ -2301,7 +2303,8 @@ input[type="range"] {
   border-radius: 10px;
   background: var(--surface);
   font-size: 0.78rem;
-  color: var(--faint);
+  /* The preview is a card wash, where --faint reads at 4.4:1. */
+  color: var(--muted);
 }
 
 .score-preview b {
@@ -5063,7 +5066,8 @@ details[open] summary {
 
 .memory-item__kind {
   margin: 0;
-  color: var(--faint);
+  /* A suggested note carries an amber wash, and --faint is under AA on it. */
+  color: var(--muted);
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.05em;

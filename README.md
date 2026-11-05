@@ -82,7 +82,11 @@ per-platform archives with SHA-256 checksums for a manual download. See
   in-place guidance appears only after the first exchange. It paints in light or
   dark as the reader asks. **Settings → Appearance** offers light, dark, and
   *Follow the system*, and the third keeps following the operating system while
-  the window is open rather than only at load. It turns "a customer
+  the window is open rather than only at load. Every surface reads the one
+  palette — the opportunity map, the job map, the records table, the offline
+  one-pager — and the contrast gate measures each of them in a real browser in
+  both themes. A printed page is ink on paper, and the map marks each band by
+  shape as well as colour, so it still reads in grey. It turns "a customer
   still reconciles invoices by hand" into a scored outcome, a job map, and a
   ranked opportunity board — inline in the thread. Every claim in a reply names
   the record behind it, or says it is a hypothesis. A score names the questions
@@ -241,7 +245,7 @@ drift from the workspace. The distributions are:
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) answers a navigation it cannot reach with `public/offline.html`, so an uncached deep link opened offline gets a themed page instead of the browser's error page. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate that walks every lens the workspace can open, in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) answers a navigation it cannot reach with `public/offline.html`, so an uncached deep link opened offline gets a themed page instead of the browser's error page. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |

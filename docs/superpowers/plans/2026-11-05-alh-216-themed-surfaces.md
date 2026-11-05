@@ -302,8 +302,47 @@ and these class names, emitted by the component and declared in `theme.css`:
 
 ## What stays, and is said out loud
 
-- **194 alpha-blended literals** in `theme.css` remain under the `ALPHA_BASELINE` count. They are the same defect class at lower severity — a white wash is invisible on a light page — and the honest statement is that they are counted, one-way, and not yet zeroed.
+- **Alpha-blended literals** in `theme.css` remain, **204** of them at the time of writing, counted one-way by `ALPHA_BASELINE` in `src/styles/colors.test.ts`. They are the same defect class at lower severity — a white wash is invisible on a light page — and the honest statement is that they are counted, pinned, and not yet zeroed.
 - **`onboarding.css`** (a fixed dark scrim) and **`OdiMascot.tsx`** (brand art gated by `brand/tools/render.py --check`) keep their `ALLOWED_FILES` entries with their existing reasons.
 - **The parent's `--chart-1..6` series palette has no consumer.** There is no evidence chart in the app; `canvas/EvidenceStream.tsx` is a list. Recorded in the PR body as a surface this change does not claim, per the issue's own instruction that missing surfaces be recorded before full coverage is claimed.
 - **The `--studio-*` alias layer** survives wherever Task 4 Step 6 found it still referenced; it resolves to themed tokens, so it is a naming cleanup, not a defect.
 - **ALH-131's screen-reader audit** is not touched. This change only widens the contrast rule's screen list; the other axe rules stay out of the gate, exactly as they were.
+
+---
+
+## As built (Tasks 2-7)
+
+What the plan could not know until the code ran.
+
+- **Task 3.** The card ground is `.opportunity-matrix__panel`, not `__plot`, and the band pill reads
+  `--surface-hover` rather than a new token. The planned `?raw` source assertion became a DOM scan
+  (`literalPaint` in `src/test/paintedColors.ts`): the gate asks what a control is painted with, not what
+  its stylesheet text says.
+- **Task 4.** The pill inks planned as `--faint`/`--accent` shipped as `--muted`/`--text`, because the pills
+  sit on a wash and `--faint` is only AA on the page ground (4.3-4.4:1 on `--surface`).
+- **Task 5.** Thirty-one selectors converted, and the gate asserts the cascade claim itself: `@import
+  "./print.css"` sits at line 1 of `theme.css`, so the print sheet is read *before* the screen rules and
+  every paper value needs `!important` to win. A browser fact the plan did not predict: Chromium restyles
+  on the frame *after* `page.emulateMedia({ media: "print" })`, so a single `getComputedStyle` read returns
+  the screen value even though the paper rule matches. `e2e/print.spec.ts` therefore `expect.poll`s the
+  painted page rather than reading it once.
+- **Task 6.** The offline file is read with `readFileSync(join(process.cwd(), "public/offline.html"))` —
+  vitest rejects `new URL("../..", import.meta.url)` for anything but the file scheme, and the repo already
+  uses the `process.cwd()` form. The palette readers and the `matchMedia` stub moved out of
+  `bootShell.test.ts` into `src/test/paletteTokens.ts` and `src/test/prefersColorScheme.ts` so the bootstrap
+  gate and the new offline gate are one implementation. The gate named three real shipped defects, all
+  fixed rather than excused: `--line` carried twice the palette's alpha in both themes; the filled controls
+  painted `--accent-strong` under white ink, which measures 4.47:1, now the measured
+  `--accent-fill`/`--on-accent` pair at 6.07:1; and the resolver treated a stored `system` as dark instead
+  of asking the operating system.
+- **Task 7.** The rail is not a complete route to the lenses — six of the ten panels get a chip, every chip
+  is data-conditional, and there is no seeding path for segments or evidence. So the surfaces are
+  enumerated in `e2e/a11y/screens.ts`, reached in `e2e/a11y/routes.ts` by the shipped affordance that works
+  from a seeded state (a composer command, the bell, the settings button, one real rail click for memory),
+  and `schedule` is recorded in `UNMEASURED_PANELS` against #95 rather than counted as covered. The
+  enumeration test is `panels.test.tsx`, beside the registry it guards, and it argues both directions:
+  a registered panel missing from both lists fails, and a listed screen or excuse naming an id that is no
+  longer registered fails. `resetRepository` now clears the memory observations too, so the matrix does not
+  read one test's leftovers as another's content. Widening the matrix named two more faint-on-wash pairs
+  (`.score-preview` at 4.39, `.memory-item__kind` and the `.quiet-action` labels beside it at 4.33); they
+  were fixed at the component to `--muted` instead of added to `KNOWN_PAIRS`, which stays at ten entries.
