@@ -28,6 +28,14 @@ export class MemoryLocalStore implements LocalStore {
   private readonly outbox = new Map<string, OutboxRecord>();
   private lease: DrainLease | null = null;
 
+  // A Map-backed store has no second connection to lose, so it never asks for a
+  // reload. The accessors exist to satisfy `LocalStore`.
+  readonly needsReload = false;
+
+  onVersionChange(): () => void {
+    return () => undefined;
+  }
+
   async nextSeq(): Promise<number> {
     this.seq += 1;
     return this.seq;
