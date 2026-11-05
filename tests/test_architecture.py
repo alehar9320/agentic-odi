@@ -205,6 +205,7 @@ CORE_LAYERS: dict[str, tuple[str, ...]] = {
         "sqlite_repository",
         "intent_store",
         "events",
+        "funnel",
         "factory",
         "integrity",
         "recovery",
