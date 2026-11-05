@@ -628,3 +628,66 @@ describe("history says when and how much (#694 D12)", () => {
     expect(within(menu).queryByText(/turns?/)).toBeNull();
   });
 });
+
+describe("history is grouped by day (#694 D13)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function groupingOf(row: Element): number {
+    let groups = 0;
+    for (let node = row.parentElement; node; node = node.parentElement) {
+      if (node.getAttribute("role") === "group") {
+        groups += 1;
+      }
+    }
+    return groups;
+  }
+
+  it("heads the list by day, in order, only where there are rows", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    openHistory({
+      conversations: [
+        conversation("c-3", "This morning", new Date(2026, 9, 22, 9, 0).toISOString(), 2),
+        conversation("c-2", "Last night", new Date(2026, 9, 21, 23, 0).toISOString(), 1),
+        conversation("c-1", "Last week", new Date(2026, 9, 15, 9, 0).toISOString(), 3),
+      ],
+    });
+
+    const headings = Array.from(document.querySelectorAll(".bar__history-day")).map(
+      (node) => node.textContent,
+    );
+    expect(headings).toEqual(["Today", "Yesterday", "Earlier"]);
+
+    expect(
+      within(screen.getByRole("group", { name: "Today" })).getAllByRole("menuitem"),
+    ).toHaveLength(1);
+    expect(
+      within(screen.getByRole("group", { name: "Yesterday" })).getAllByRole("menuitem"),
+    ).toHaveLength(1);
+
+    // A row sits under exactly one heading, never repeated under two.
+    for (const row of screen.getAllByRole("menuitem")) {
+      const group = row.closest('[role="group"]') as HTMLElement;
+      expect(group.querySelectorAll(".bar__history-day")).toHaveLength(1);
+      expect(groupingOf(row)).toBe(1);
+    }
+  });
+
+  it("leaves out a day with nothing in it", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    openHistory({
+      conversations: [
+        conversation("c-1", "This morning", new Date(2026, 9, 22, 9, 0).toISOString(), 1),
+      ],
+    });
+
+    expect(screen.getByRole("group", { name: "Today" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Yesterday" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Earlier" })).toBeNull();
+  });
+});

@@ -375,6 +375,22 @@ a {
   font-size: 0.72rem;
 }
 
+.bar__history-group + .bar__history-group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.bar__history-day {
+  margin: 0;
+  padding: 4px 10px 2px;
+  color: var(--faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+
 /* ------------------------------------------------------------------ */
 /* Conversation                                                       */
 /* ------------------------------------------------------------------ */

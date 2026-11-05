@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
-import { formatRelativeTime } from "../../lib/relativeTime";
+import { formatRelativeTime, groupByDay } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
@@ -324,33 +324,45 @@ export function StudioBar({
               {conversations.length === 0 ? (
                 <p className="bar__history-empty">No conversations yet.</p>
               ) : (
-                conversations.map((conversation) => {
-                  const current = conversation.id === conversationId;
-                  return (
-                    <button
-                      key={conversation.id}
-                      ref={current ? activeHistoryRef : undefined}
-                      type="button"
-                      role="menuitem"
-                      className="bar__menu-item bar__history-item"
-                      aria-current={current ? "true" : undefined}
-                      onClick={() => selectConversation(conversation.id)}
-                    >
-                      <span className="bar__history-title">
-                        {conversation.title.trim() || "New conversation"}
-                      </span>
-                      {/* A thread with no turns has nothing to count, so it
-                          says nothing rather than "0 turns". */}
-                      {conversation.turn_count > 0 ? (
-                        <span className="bar__history-meta">
-                          {formatRelativeTime(conversation.updated_at)} ·{" "}
-                          {conversation.turn_count}{" "}
-                          {conversation.turn_count === 1 ? "turn" : "turns"}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })
+                groupByDay(conversations, (conversation) => conversation.updated_at).map((group) => (
+                  // The group carries the day in its accessible name; the line
+                  // above it is the same word made visible.
+                  <div
+                    key={group.section}
+                    className="bar__history-group"
+                    role="group"
+                    aria-label={group.label}
+                  >
+                    <p className="bar__history-day">{group.label}</p>
+                    {group.items.map((conversation) => {
+                      const current = conversation.id === conversationId;
+                      return (
+                        <button
+                          key={conversation.id}
+                          ref={current ? activeHistoryRef : undefined}
+                          type="button"
+                          role="menuitem"
+                          className="bar__menu-item bar__history-item"
+                          aria-current={current ? "true" : undefined}
+                          onClick={() => selectConversation(conversation.id)}
+                        >
+                          <span className="bar__history-title">
+                            {conversation.title.trim() || "New conversation"}
+                          </span>
+                          {/* A thread with no turns has nothing to count, so
+                              it says nothing rather than "0 turns". */}
+                          {conversation.turn_count > 0 ? (
+                            <span className="bar__history-meta">
+                              {formatRelativeTime(conversation.updated_at)} ·{" "}
+                              {conversation.turn_count}{" "}
+                              {conversation.turn_count === 1 ? "turn" : "turns"}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))
               )}
             </div>
           )}
