@@ -1741,6 +1741,36 @@ a {
   font-family: var(--mono);
 }
 
+/* A block you can copy. The control is always in the tab order; it is only
+   drawn when the block is hovered or something inside it has focus, so it
+   never interrupts the reply\'s reading order. */
+.code-block {
+  position: relative;
+}
+
+.code-block__copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.code-block:hover .code-block__copy,
+.code-block:focus-within .code-block__copy,
+.code-block__copy:focus-visible {
+  opacity: 1;
+}
+
 .md-quote {
   margin: 0 0 10px;
   padding-left: 12px;

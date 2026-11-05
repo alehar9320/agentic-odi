@@ -12,6 +12,7 @@ import { useAuiState, type ToolCallMessagePartProps } from "@assistant-ui/react"
 
 import { formatFileSize, preparedAttachmentById } from "./attachments";
 import { CheckIcon, ChevronDownIcon, SparkIcon } from "../components/icons";
+import { CodeBlock } from "../components/chat/CodeBlock";
 import { Markdown } from "../components/chat/Markdown";
 import { useStudio } from "../state/StudioContext";
 import type { Claim } from "../types";
@@ -143,9 +144,11 @@ export function ClaimText({ content, claims }: { content: string; claims: Claim[
       {blocks.map((block, index) => {
         if (block.kind === "code") {
           return (
-            <pre key={index} className="claim-text__code">
-              <code>{block.items[0]?.[0]?.text ?? ""}</code>
-            </pre>
+            <CodeBlock
+              key={index}
+              code={block.items[0]?.[0]?.text ?? ""}
+              preClassName="claim-text__code"
+            />
           );
         }
         if (block.kind === "heading") {
