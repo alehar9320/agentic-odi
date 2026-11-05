@@ -70,8 +70,9 @@ reports the app's `localStorage` keys with their byte sizes.
 Three constraints shape what it is allowed to say:
 
 - `database` is imported from `apps/studio/src/bff/store/indexedDbStore.ts`, not
-  restated there — the name has one source of truth. A memory store reports
-  `null` and `persistent: false`, because nothing in it survives the tab.
+  restated there — the name is defined once in
+  `apps/studio/src/bff/store/migrations.ts` and re-exported. A memory store
+  reports `null` and `persistent: false`, because nothing in it survives the tab.
 - `lastWrite` is derived. The `meta` store holds only a sequence counter, so no
   write time is recorded anywhere to read; the selector takes the newest
   `updated_at` across jobs, steps, outcomes, observations, and conversations,
@@ -286,6 +287,12 @@ MCP tool result (text)
   produces a readable message. Write routes no longer wrap their result in
   `{"ok": true, "result": ...}`: a success is the object, a delete is
   `{"deleted": id}`.
+- **The same envelope over MCP.** A failing tool returns
+  `{"error": StudioError, "message": "Error: …"}` as its text: the code,
+  retryability, detail, suggestion, and request id travel as data, and the
+  sentence stays for a client that only reads prose. `parse_tool_result` tries
+  that JSON first and falls back to the prose forms, so a server predating the
+  envelope is still understood.
 - **One terminal chat event.** Every `/api/chat` stream ends with exactly one
   `message` or one `error`. A recoverable tool error stays a tool result the
   model can read, but it is reported as `status: "error"` and counted. A fatal

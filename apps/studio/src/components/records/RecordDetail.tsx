@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { RECORD_SECTIONS, score, text, type RecordKind, type RecordRow } from "../../lib/records";
+import { useStudio } from "../../state/StudioContext";
 
 /**
  * The fields each kind actually stores, in the order the detail shows them.
@@ -46,6 +47,39 @@ const OUTCOME_NOTES = [
   "The score is computed from importance and satisfaction; it is not stored input.",
 ];
 
+/** The two numbers a person owns. Both are integers from 1 to 10. */
+const SCORE_FIELDS = ["importance", "satisfaction"] as const;
+
+type ScoreField = (typeof SCORE_FIELDS)[number];
+
+/** Clamp a typed value into the range the two estimates are stored in. */
+function clampScore(value: number): number {
+  return Math.min(10, Math.max(1, Math.round(value)));
+}
+
+/** The stored estimate, or the floor when the record does not carry one. */
+function storedScore(record: Record<string, unknown>, field: ScoreField): number {
+  const value = record[field];
+  return typeof value === "number" && Number.isFinite(value) ? value : 1;
+}
+
+/** The message to show beneath the inputs when a save fails. */
+function saveErrorMessage(error: unknown): string {
+  if (error && typeof error === "object") {
+    const shaped = error as { message?: unknown; suggestion?: unknown };
+    const message =
+      typeof shaped.message === "string" && shaped.message.length > 0
+        ? shaped.message
+        : "The save did not go through.";
+    const suggestion =
+      typeof shaped.suggestion === "string" && shaped.suggestion.length > 0
+        ? ` ${shaped.suggestion}`
+        : "";
+    return `${message}${suggestion}`;
+  }
+  return "The save did not go through.";
+}
+
 interface RecordDetailProps {
   /** The row that was pressed. A record with no id still opens. */
   row: RecordRow;
@@ -67,12 +101,31 @@ function labelFor(kind: RecordKind): string {
  * author, no timestamp, and no date, name or confidence that the person did not record.
  */
 export function RecordDetail({ row, rows, onFilter, onClose }: RecordDetailProps) {
+  const { updateOutcome } = useStudio();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const copyTimer = useRef<number | null>(null);
   const [copied, setCopied] = useState(false);
   const label = labelFor(row.kind);
   const fields = DETAIL_FIELDS[row.kind];
   const record = row.record as Record<string, unknown>;
+  const seedImportance = storedScore(record, "importance");
+  const seedSatisfaction = storedScore(record, "satisfaction");
+  const [draft, setDraft] = useState<Record<ScoreField, number>>({
+    importance: seedImportance,
+    satisfaction: seedSatisfaction,
+  });
+  const [editingRow, setEditingRow] = useState(row.rowKey);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Opening a different record reseeds the editor, adjusted during render rather than in
+  // an effect. A save does not reseed: the record is the source of the new score, and a
+  // failed save keeps what the person typed.
+  if (editingRow !== row.rowKey) {
+    setEditingRow(row.rowKey);
+    setDraft({ importance: seedImportance, satisfaction: seedSatisfaction });
+    setSaveError(null);
+  }
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -82,6 +135,35 @@ export function RecordDetail({ row, rows, onFilter, onClose }: RecordDetailProps
       }
     };
   }, []);
+
+  const currentScores: Record<ScoreField, number> = {
+    importance: seedImportance,
+    satisfaction: seedSatisfaction,
+  };
+  const dirty = SCORE_FIELDS.some((field) => draft[field] !== currentScores[field]);
+
+  function setScore(field: ScoreField, value: number) {
+    setDraft((previous) => ({ ...previous, [field]: value }));
+  }
+
+  async function saveScores() {
+    const outcomeId = row.id;
+    if (!outcomeId || saving) {
+      return;
+    }
+    const importance = clampScore(draft.importance);
+    const satisfaction = clampScore(draft.satisfaction);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await updateOutcome(outcomeId, { importance, satisfaction });
+    } catch (error) {
+      // Keep the editor open and keep what was typed: the message is the sidecar's.
+      setSaveError(saveErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function copyId() {
     if (!row.id) {
@@ -120,12 +202,47 @@ export function RecordDetail({ row, rows, onFilter, onClose }: RecordDetailProps
             <dt>{field}</dt>
             <dd>
               {field === "opportunity_score"
-                ? score(record[field] as number | null | undefined)
+                ? `${score(record[field] as number | null | undefined)}${saving ? " recomputing" : ""}`
                 : text(record[field] as string | number | null | undefined)}
             </dd>
           </div>
         ))}
       </dl>
+
+      {row.kind === "outcome" ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveScores();
+          }}
+        >
+          {SCORE_FIELDS.map((field) => (
+            <div className="field" key={field}>
+              <label htmlFor={`record-${field}`}>
+                {field === "importance" ? "Importance (1–10)" : "Satisfaction (1–10)"}
+              </label>
+              <input
+                id={`record-${field}`}
+                className="input"
+                type="number"
+                min={1}
+                max={10}
+                step={1}
+                value={draft[field]}
+                onChange={(event) => setScore(field, event.target.valueAsNumber)}
+              />
+            </div>
+          ))}
+          <button type="submit" className="button" disabled={!dirty || saving}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+          {saveError ? (
+            <p className="field__save" role="alert">
+              {saveError}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
 
       {parents.length > 0 ? (
         <p className="records__parents">
