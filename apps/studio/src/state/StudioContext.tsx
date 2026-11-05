@@ -87,6 +87,7 @@ import type {
   ConversationSummary,
   CustomizeTarget,
   FocusSubject,
+  JsonValue,
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
@@ -1672,42 +1673,63 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             : [...parts, { kind: "reasoning", text: chunk }];
       };
 
-      /** The open tool part for a name, if one is still waiting. */
-      const openTool = (name: string) =>
+      /**
+       * One tool frame, in the shape the transcript part takes it: the id is
+       * optional because a stream from an older sidecar has none.
+       */
+      type ToolFrame = Omit<
+        Extract<ChatPart, { kind: "tool" }>,
+        "kind" | "approval" | "id"
+      > & {
+        id?: string;
+      };
+
+      /**
+       * The open call a frame belongs to. The id pairs them when the stream
+       * carries one: two calls to the same tool are two cards, and a name
+       * cannot tell them apart.
+       */
+      const openTool = (call: { name: string; id?: string }) =>
         [...parts]
           .reverse()
           .find(
             (part): part is Extract<ChatPart, { kind: "tool" }> =>
-              part.kind === "tool" && part.name === name && part.status === "running",
+              part.kind === "tool" &&
+              part.status === "running" &&
+              (call.id !== undefined ? part.id === call.id : part.name === call.name),
           );
 
-      const applyToolEvent = (
-        name: string,
-        status: ToolStatus,
-        preview?: string,
-        id?: string,
-      ) => {
-        const open = openTool(name);
-        if (status === "running") {
+      const applyToolEvent = (call: ToolFrame) => {
+        const open = openTool(call);
+        if (call.status === "running") {
           if (open) {
             return;
           }
           toolSeq += 1;
-          parts = [
-            ...parts,
-            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status },
-          ];
+          parts = [...parts, { kind: "tool", ...call, id: call.id ?? `tool-${toolSeq}` }];
           return;
         }
+        // Only the fields the frame actually carried: a call with no arguments
+        // keeps none, rather than an empty object invented here.
+        const detail = {
+          ...(call.preview ? { preview: call.preview } : {}),
+          ...(call.arguments ? { arguments: call.arguments } : {}),
+          ...(call.result !== undefined ? { result: call.result } : {}),
+        };
         if (open) {
-          const next = {
-            ...open,
-            status,
-            ...(preview ? { preview } : {}),
-            // A result means the gate was answered; the question is spent.
-            approval: undefined,
-          };
-          parts = [...parts.filter((part) => part !== open), next];
+          // Replaced where it was asked, not appended: two calls to one tool
+          // stay the two cards they were, in the order the model put them.
+          parts = parts.map((part) =>
+            part === open
+              ? {
+                  ...open,
+                  ...detail,
+                  status: call.status,
+                  // A result means the gate was answered; the question is spent.
+                  approval: undefined,
+                }
+              : part,
+          );
           return;
         }
         toolSeq += 1;
@@ -1715,10 +1737,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           ...parts,
           {
             kind: "tool",
-            id: id ?? `tool-${toolSeq}`,
-            name,
-            status,
-            ...(preview ? { preview } : {}),
+            ...detail,
+            id: call.id ?? `tool-${toolSeq}`,
+            name: call.name,
+            status: call.status,
           },
         ];
       };
@@ -1812,11 +1834,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             const status = String(event.data.status ?? "");
             const mapped: ToolStatus =
               status === "ok" || status === "error" || status === "declined" ? status : "running";
-            applyToolEvent(
+            const args = event.data.arguments;
+            applyToolEvent({
               name,
-              mapped,
-              event.data.preview ? String(event.data.preview) : undefined,
-            );
+              status: mapped,
+              ...(event.data.tool_call_id ? { id: String(event.data.tool_call_id) } : {}),
+              ...(event.data.preview ? { preview: String(event.data.preview) } : {}),
+              ...(args && typeof args === "object" && !Array.isArray(args)
+                ? { arguments: args as Record<string, JsonValue> }
+                : {}),
+              ...(event.data.result !== undefined ? { result: String(event.data.result) } : {}),
+            });
             setToolActivity((prev) => [
               ...prev,
               { name, status, ...(event.data.preview ? { preview: String(event.data.preview) } : {}) },

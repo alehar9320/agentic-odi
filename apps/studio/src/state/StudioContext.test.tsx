@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
+import type { ChatMessage, ChatPart } from "../types";
 import { queuedUserMessage } from "../assistant/queue";
 import { StudioProvider, useStudio } from "./StudioContext";
 
@@ -1211,6 +1212,132 @@ describe("StudioContext write approval and branches", () => {
 
     expect(result.current.messages.map((message) => message.id)).toEqual(["b-1", "b-2"]);
     await waitFor(() => expect(headPatches).toEqual([{ head_id: "b-2" }]));
+  });
+});
+
+describe("StudioContext tool calls", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const toolParts = (messages: readonly ChatMessage[]) =>
+    messages
+      .flatMap((message) => message.parts ?? [])
+      .filter((part): part is Extract<ChatPart, { kind: "tool" }> => part.kind === "tool");
+
+  /** One tool frame, as the sidecar puts it on the wire. */
+  const toolFrame = (data: Record<string, unknown>) =>
+    `event: tool\ndata: ${JSON.stringify(data)}\n\n`;
+
+  it("records what a call asked and the whole answer that came back", async () => {
+    const asked = { name: "get_jobs", tool_call_id: "call-1", arguments: { query: "Retention" } };
+    chatStream =
+      toolFrame({ ...asked, status: "start" }) +
+      toolFrame({ ...asked, status: "ok", preview: '[{"id"', result: '[{"id":"JOB-1"}]' }) +
+      'event: message\ndata: {"content":"One job."}\n\n';
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    expect(toolParts(result.current.messages)).toEqual([
+      {
+        kind: "tool",
+        id: "call-1",
+        name: "get_jobs",
+        status: "ok",
+        preview: '[{"id"',
+        arguments: { query: "Retention" },
+        result: '[{"id":"JOB-1"}]',
+      },
+    ]);
+  });
+
+  it("keeps two calls to one tool as two cards", async () => {
+    chatStream =
+      toolFrame({
+        name: "get_jobs",
+        status: "start",
+        tool_call_id: "call-1",
+        arguments: { query: "Retention" },
+      }) +
+      toolFrame({
+        name: "get_jobs",
+        status: "start",
+        tool_call_id: "call-2",
+        arguments: { query: "Activation" },
+      }) +
+      toolFrame({
+        name: "get_jobs",
+        status: "ok",
+        tool_call_id: "call-2",
+        arguments: { query: "Activation" },
+        result: "second",
+      }) +
+      toolFrame({
+        name: "get_jobs",
+        status: "ok",
+        tool_call_id: "call-1",
+        arguments: { query: "Retention" },
+        result: "first",
+      }) +
+      'event: message\ndata: {"content":"Two jobs."}\n\n';
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs twice");
+    });
+
+    const calls = toolParts(result.current.messages);
+    expect(calls.map((call) => call.id)).toEqual(["call-1", "call-2"]);
+    expect(calls.map((call) => call.result)).toEqual(["first", "second"]);
+  });
+
+  it("shows the arguments of a call that has not answered yet", async () => {
+    chatStream =
+      toolFrame({
+        name: "get_jobs",
+        status: "start",
+        tool_call_id: "call-1",
+        arguments: { query: "Retention" },
+      }) + 'event: message\ndata: {"content":"Done."}\n\n';
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    expect(toolParts(result.current.messages)).toEqual([
+      {
+        kind: "tool",
+        id: "call-1",
+        name: "get_jobs",
+        status: "running",
+        arguments: { query: "Retention" },
+      },
+    ]);
   });
 });
 

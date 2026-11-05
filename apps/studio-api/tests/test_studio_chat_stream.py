@@ -609,3 +609,62 @@ def test_the_persistence_warning_quotes_nothing_anyone_said(monkeypatch, caplog)
     assert logged
     assert secret_words not in logged
     assert "sk-supersecret" not in logged
+
+
+def test_a_running_call_already_says_what_it_was_asked(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call('{"query": "Retention"}')])]),
+            _FakeStream([_chunk(content="One job.")]),
+        ],
+    )
+
+    events = _parse(_collect(_request()))
+
+    started = next(data for name, data in events if name == "tool" and data["status"] == "start")
+    assert started["tool_call_id"] == "call-1"
+    assert started["arguments"] == {"query": "Retention"}
+
+
+def test_a_finished_call_carries_the_answer_it_got_in_full(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call('{"query": "Retention"}')])]),
+            _FakeStream([_chunk(content="One job.")]),
+        ],
+    )
+    # Longer than the collapsed preview on purpose: the card reads the whole
+    # result, so a silent truncation cannot hide inside the frame.
+    result = json.dumps({"jobs": [{"id": "JOB-1", "name": "Retention"}], "note": "x" * 400})
+    _Mcp.tool_result = result
+
+    events = _parse(_collect(_request()))
+
+    finished = next(data for name, data in events if name == "tool" and data["status"] == "ok")
+    assert finished["tool_call_id"] == "call-1"
+    assert finished["arguments"] == {"query": "Retention"}
+    assert finished["result"] == result
+    assert finished["preview"] == result[:280]
+
+
+def test_a_failed_call_carries_what_was_asked_too(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call('{"query": "Retention"}')])]),
+            _FakeStream([_chunk(content="It failed.")]),
+        ],
+    )
+
+    async def _raise(self: Any, name: str, arguments: dict[str, Any]) -> str:
+        raise RuntimeError("the connector is offline")
+
+    monkeypatch.setattr(chat.McpClient, "call_tool", _raise)
+
+    events = _parse(_collect(_request()))
+
+    failed = next(data for name, data in events if name == "tool" and data["status"] == "error")
+    assert failed["tool_call_id"] == "call-1"
+    assert failed["arguments"] == {"query": "Retention"}

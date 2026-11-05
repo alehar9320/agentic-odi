@@ -338,7 +338,7 @@ without giving up the message model the sidecar already understands.
 | **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
 | **Silence** | A run that stops producing tokens for eight seconds shows *Still working · no new output for Ns* under the reply, while the Stop button keeps its meaning. The signal comes from assistant-ui's stall detection over text, reasoning, tool arguments, and tool results — never from a timer watching the DOM — so a long tool call reads as work, not a freeze. A dropped stream never shows it: that path ends in the failure panel. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
-| **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
+| **Tools** | Each MCP call is a trace line with its status and a short preview of what came back. Open it and the call shows its **Input** — what the model asked for — and its **Output**, the whole answer as JSON or as the text it arrived in, with **Copy JSON** for the pair. Which calls are open is not remembered: a restored transcript starts with every one collapsed. A call still running shows what it was asked while it waits. |
 | **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
 | **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
 | **Claims** | Each declarative sentence ends with an evidence marker, and the reply arrives with a validated claim list. A chip names the source and the record (`Gong · Call with Acme`), never the tool; `Hypothesis` tags an ungrounded guess; an unmarked sentence keeps its place with a dotted underline and the accessible name *Uncited claim*. A chip opens that row in the Evidence lens, and Escape returns focus to the chip. Claims are stored with the turn, so they survive a reload; a record deleted later keeps its snapshot label and stops being a link. A seeded demo reply labels its chips **Sample** and does not count as cited. |
@@ -411,7 +411,7 @@ cites the issue or PR that landed it.
 | `unstable_useComposerInputHistory` | Adopted | Up-arrow recalls what you sent last. | #430 |
 | `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count is ours (`arrivalCount.ts`). | #245 |
 | Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
-| Tool result rendering | Adopted | Each MCP call is a trace chip. | #238 |
+| Tool result rendering | Adopted | Each MCP call opens to show its input and its whole output. | #389 |
 | `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
 | ODI surfaces as `data` parts | Adopted | A validated `UiNode` rides the transcript and renders through `UiRenderer`. | #55 |
 
@@ -422,17 +422,20 @@ cites the issue or PR that landed it.
 | `apps/studio/src/assistant/convert.ts` | The only mapping between `ChatMessage`/`ChatPart` and assistant-ui parts, in both directions. Pure, and tested without a runtime. |
 | `apps/studio/src/assistant/StudioRuntime.tsx` | `useExternalStoreRuntime`: `onNew`, `onEdit`, `onReload`, `onCancel`, `setMessages`, `onRespondToToolApproval`, suggestions, attachments. |
 | `apps/studio/src/assistant/attachments.ts` | The attachment adapter and the browser-side text/image extraction. |
-| `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface, claims. |
+| `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (its approval card; every other call goes to `ToolCallCard`), source, file, generated surface, claims. |
 | `apps/studio/src/assistant/claims.ts` | Hides claim markers (including one split across streamed chunks), cuts the reply so every chip lands after its own sentence, and counts citations without a seeded demo. The Markdown export reads a claim-bearing reply through this same parser, so the file cannot say something other than what the transcript showed. |
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
+| `apps/studio/src/components/chat/ToolCallCard.tsx` | One tool call: the collapsed trace line, and the Input/Output body underneath it with the copy. Open state lives here and nowhere else. |
 | `apps/studio/src/components/settings/SavedField.tsx` | A field that saves when it is left, states **Saved** in its section, and refuses an unusable value beside itself with the reason. |
 | `apps/studio/src/components/settings/sections/` | The Model and Studio bridge sections, each a module with its own fields and save line. |
 | `apps/studio/src/components/settings/validation.ts` | What Settings accepts before it writes: a full http(s) URL, and a non-empty model name. |
 
 The sidecar remains the source of truth for what happened. Its additions are
-opt-in and additive: `reasoning`, `source`, and `approval` stream events;
+opt-in and additive: `reasoning`, `source`, and `approval` stream events; a
+`tool` frame's `tool_call_id`, `arguments`, and whole `result` beside the
+`preview` it already sent (#389);
 `claims` on the terminal `message` frame and on every restored turn;
 `attachments` and `approvals` on `/api/chat`; `GET
 /api/conversations/{id}/tree`; `PATCH /api/conversations/{id}`; and `POST

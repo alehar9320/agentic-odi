@@ -309,6 +309,37 @@ REMEMBER_TOOL: dict[str, Any] = {
 }
 
 
+def _tool_frame(
+    entry: dict[str, Any],
+    arguments: dict[str, Any],
+    status: str,
+    *,
+    preview: str | None = None,
+    result: str | None = None,
+    error: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """One tool call as the transcript sees it: what was asked, and what came back.
+
+    `preview` is the collapsed line; `result` is the whole answer, so opening a
+    call shows what actually came back instead of its first 280 characters. The
+    arguments ride on every frame, the start included — a call that is still
+    running was still asked something, and the card says so while it waits.
+    """
+    payload: dict[str, Any] = {
+        "name": entry["name"],
+        "status": status,
+        "tool_call_id": entry["id"],
+        "arguments": arguments,
+    }
+    if preview is not None:
+        payload["preview"] = preview
+    if result is not None:
+        payload["result"] = result
+    if error is not None:
+        payload["error"] = error
+    return payload
+
+
 def _apply_add_connector(
     arguments: dict[str, Any], service: ConnectorService
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -852,32 +883,43 @@ async def _turn_frames(
                 if declined is not None:
                     counters["tool_errors"] += 1
                     result_str = declined
-                    yield frame("tool", {"name": name, "status": "declined", "preview": declined})
+                    yield frame(
+                        "tool",
+                        _tool_frame(
+                            entry, arguments, "declined", preview=declined, result=declined
+                        ),
+                    )
                 elif name == "add_connector":
-                    yield frame("tool", {"name": name, "status": "start"})
+                    yield frame("tool", _tool_frame(entry, arguments, "start"))
                     result_str, events = _apply_add_connector(arguments, connector_service)
                     for event in events:
                         yield frame(event["event"], event["data"])
                     if result_str.startswith("Error:"):
                         counters["tool_errors"] += 1
                         yield frame(
-                            "tool", {"name": name, "status": "error", "preview": result_str}
+                            "tool",
+                            _tool_frame(
+                                entry, arguments, "error", preview=result_str, result=result_str
+                            ),
                         )
                     else:
-                        yield frame("tool", {"name": name, "status": "ok"})
+                        yield frame("tool", _tool_frame(entry, arguments, "ok", result=result_str))
                 elif name == "remember":
-                    yield frame("tool", {"name": name, "status": "start"})
+                    yield frame("tool", _tool_frame(entry, arguments, "start"))
                     result_str, memory_event = _apply_remember(arguments, memory)
                     if memory_event is None:
                         counters["tool_errors"] += 1
                         yield frame(
-                            "tool", {"name": name, "status": "error", "preview": result_str}
+                            "tool",
+                            _tool_frame(
+                                entry, arguments, "error", preview=result_str, result=result_str
+                            ),
                         )
                     else:
-                        yield frame("tool", {"name": name, "status": "ok"})
+                        yield frame("tool", _tool_frame(entry, arguments, "ok", result=result_str))
                         yield frame("memory", memory_event)
                 else:
-                    yield frame("tool", {"name": name, "status": "start"})
+                    yield frame("tool", _tool_frame(entry, arguments, "start"))
                     if name == RENDER_UI_TOOL:
                         if catalog is None:
                             result_str = (
@@ -885,7 +927,10 @@ async def _turn_frames(
                             )
                             counters["tool_errors"] += 1
                             yield frame(
-                                "tool", {"name": name, "status": "error", "preview": result_str}
+                                "tool",
+                                _tool_frame(
+                                    entry, arguments, "error", preview=result_str, result=result_str
+                                ),
                             )
                         else:
                             problem = catalog.validate(arguments)
@@ -896,12 +941,21 @@ async def _turn_frames(
                                 )
                                 counters["tool_errors"] += 1
                                 yield frame(
-                                    "tool", {"name": name, "status": "error", "preview": problem}
+                                    "tool",
+                                    _tool_frame(
+                                        entry,
+                                        arguments,
+                                        "error",
+                                        preview=problem,
+                                        result=result_str,
+                                    ),
                                 )
                             else:
                                 ui_count += 1
                                 result_str = "Rendered inline for the user."
-                                yield frame("tool", {"name": name, "status": "ok"})
+                                yield frame(
+                                    "tool", _tool_frame(entry, arguments, "ok", result=result_str)
+                                )
                                 yield frame("ui", {"id": f"ui-{ui_count}", "spec": arguments})
                     else:
                         try:
@@ -911,7 +965,10 @@ async def _turn_frames(
                             result_str = f"Error calling {name}: {exc}"
                             counters["tool_errors"] += 1
                             yield frame(
-                                "tool", {"name": name, "status": "error", "preview": result_str}
+                                "tool",
+                                _tool_frame(
+                                    entry, arguments, "error", preview=result_str, result=result_str
+                                ),
                             )
                         else:
                             failure = parse_tool_result(result_str)
@@ -922,19 +979,27 @@ async def _turn_frames(
                                 counters["tool_errors"] += 1
                                 yield frame(
                                     "tool",
-                                    {
-                                        "name": name,
-                                        "status": "error",
-                                        "preview": result_str[:280],
-                                        "error": failure.model_dump(mode="json"),
-                                    },
+                                    _tool_frame(
+                                        entry,
+                                        arguments,
+                                        "error",
+                                        preview=result_str[:280],
+                                        result=result_str,
+                                        error=failure.model_dump(mode="json"),
+                                    ),
                                 )
                             else:
                                 canvas_dirty = True
                                 evidence.ingest(name, arguments, result_str)
                                 yield frame(
                                     "tool",
-                                    {"name": name, "status": "ok", "preview": result_str[:280]},
+                                    _tool_frame(
+                                        entry,
+                                        arguments,
+                                        "ok",
+                                        preview=result_str[:280],
+                                        result=result_str,
+                                    ),
                                 )
                                 source = _source_frame(counters, name, result_str)
                                 yield frame(source["event"], source["data"])

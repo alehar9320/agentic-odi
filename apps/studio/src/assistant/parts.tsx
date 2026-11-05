@@ -13,8 +13,9 @@ import { useAuiState, type ToolCallMessagePartProps } from "@assistant-ui/react"
 import { formatFileSize, preparedAttachmentById } from "./attachments";
 import { CheckIcon, ChevronDownIcon, SparkIcon } from "../components/icons";
 import { Markdown } from "../components/chat/Markdown";
+import { ToolCallCard } from "../components/chat/ToolCallCard";
 import { useStudio } from "../state/StudioContext";
-import type { Claim } from "../types";
+import type { Claim, ToolStatus } from "../types";
 import type { UiNode } from "../ui/protocol";
 import { UiRenderer } from "../ui/UiRenderer";
 import {
@@ -334,6 +335,8 @@ function toolLabel(name: string): string {
  */
 export function ToolPart({
   toolName,
+  toolCallId,
+  args,
   approval,
   result,
   isError,
@@ -342,7 +345,7 @@ export function ToolPart({
 }: ToolCallMessagePartProps) {
   const [busy, setBusy] = useState(false);
   const [answered, setAnswered] = useState(false);
-  const payload = result as { status?: string; preview?: string } | undefined;
+  const payload = result as { status?: string; preview?: string; value?: unknown } | undefined;
   const pending = approval !== undefined && approval.approved === undefined && !result;
   const running = status?.type === "running";
 
@@ -392,17 +395,23 @@ export function ToolPart({
     );
   }
 
-  const tone = isError || payload?.status === "error" ? " is-error" : "";
+  const callStatus: ToolStatus = running
+    ? "running"
+    : payload?.status === "declined" || payload?.status === "error"
+      ? payload.status
+      : "ok";
+
   return (
-    <p
-      className={`tool-trace${tone}${running ? " is-running" : ""}`}
-      data-aui-quote-selectable="false"
-    >
-      <span className="tool-trace__dot" aria-hidden="true" />
-      {toolLabel(toolName)}
-      {running ? " · working" : payload?.status === "declined" ? " · declined" : ""}
-      {payload?.preview ? <span className="tool-trace__preview">{payload.preview}</span> : null}
-    </p>
+    <ToolCallCard
+      callId={toolCallId}
+      name={toolName}
+      label={toolLabel(toolName)}
+      status={callStatus}
+      input={args}
+      preview={payload?.preview}
+      output={payload?.value}
+      isError={isError}
+    />
   );
 }
 
