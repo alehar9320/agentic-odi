@@ -155,6 +155,12 @@ def _first_validation_error(exc: ValidationError) -> str:
     return f"{location}: {message}" if location else message
 
 
+def _outcome_field(message: str) -> str | None:
+    """Return ``importance`` or ``satisfaction`` when a rating error names one."""
+    first = message.split(maxsplit=1)[0] if message.strip() else ""
+    return first if first in {"importance", "satisfaction"} else None
+
+
 def _as_http_error(exc: Exception) -> StudioHTTPError:
     """Translate domain errors into typed HTTP responses without leaking 500s."""
     if isinstance(exc, ValidationError):
@@ -164,7 +170,7 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         )
     if isinstance(exc, OutcomeStatementError):
         return StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field="statement"),
             status_code=422,
         )
     if isinstance(
@@ -189,7 +195,14 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             status_code=422,
         )
     if isinstance(exc, ValueOutOfRangeError):
-        return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))
+        return StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.OUT_OF_RANGE,
+                message=str(exc),
+                field=_outcome_field(str(exc)),
+            ),
+            status_code=422,
+        )
     if isinstance(exc, OdiError):
         status = error_status(exc)
         return StudioHTTPError(
