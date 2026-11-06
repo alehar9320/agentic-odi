@@ -13,6 +13,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
+import { dialogOpen, focusComposer, startComposerCommand } from "./lib/composerFocus";
+import { isEditableTarget } from "./lib/commands";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
@@ -29,6 +31,7 @@ import { initInstall } from "./install";
  */
 function StudioShell() {
   const {
+    activePanel,
     closePanel,
     closeSetup,
     customizeOpen,
@@ -58,19 +61,57 @@ function StudioShell() {
     closeCustomize();
   }
 
+  // One listener for the keys the whole room shares. The composer registers
+  // how to take the caret (lib/composerFocus), so this is installed once for
+  // the shell instead of once per composer.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      const modifier = event.metaKey || event.ctrlKey;
+
+      if (modifier && !event.altKey && event.key.toLowerCase() === "k") {
+        if (dialogOpen()) {
+          return;
+        }
+        if (focusComposer()) {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      // `/` is a command only where it cannot be a character: inside a field
+      // the slash belongs to what the person is typing.
+      if (event.key === "/" && !modifier && !event.altKey) {
+        if (dialogOpen() || isEditableTarget(event.target)) {
+          return;
+        }
+        if (startComposerCommand()) {
+          event.preventDefault();
+        }
+        return;
+      }
+
       if (event.key === "Escape") {
+        // A dialog owns its Escape. Closing it must not also stop the reply
+        // behind it or move the caret out from under the person.
+        if (dialogOpen()) {
+          return;
+        }
         if (streaming) {
           stopStreaming();
           return;
         }
-        closePanel();
+        if (activePanel) {
+          closePanel();
+          return;
+        }
+        // Nothing is open, so Escape does the one thing it can: it takes you
+        // back to the place where you can type.
+        focusComposer();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePanel, streaming, stopStreaming]);
+  }, [activePanel, closePanel, streaming, stopStreaming]);
 
   // Capture the install prompt as early as possible so the browser's
   // beforeinstallprompt event is not missed before Settings is opened.
