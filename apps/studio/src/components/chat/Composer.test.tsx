@@ -84,6 +84,16 @@ describe("Composer connector suggestions", () => {
     expect(screen.getByRole("button", { name: /hide gong/i })).toBeInTheDocument();
   });
 
+  it("uses the one phrase for local mode in the hint row (#698 D35)", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ llmHealth: { healthy: false, message: "no model" } }),
+    );
+
+    render(<Composer {...baseProps} />);
+
+    expect(screen.getByText("Local mode")).toBeInTheDocument();
+    expect(screen.queryByText(/local guidance/i)).toBeNull();
+  });
 
   it("renders nothing when there are no suggestions", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));

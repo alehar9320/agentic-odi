@@ -41,6 +41,7 @@ import { Markdown } from "./Markdown";
 import { StallNotice } from "./StallNotice";
 import { WorkBlock } from "./WorkBlock";
 import { workGrouping } from "./workGrouping";
+import { LOCAL_MODE_LABEL } from "../../lib/brand";
 
 const PHASE_LABEL: Record<string, string> = {
   health_check: "Waking the model",
@@ -86,7 +87,7 @@ function AssistantMessage() {
             className="message__tag"
             onClick={() => openPanel("settings")}
           >
-            Local draft, no model connected
+            {LOCAL_MODE_LABEL}, no model connected
           </button>
         ) : null}
 

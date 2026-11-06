@@ -86,7 +86,7 @@ describe("BannerBridge", () => {
     studio.llmHealth = { healthy: true, message: "" };
     renderShell();
     expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Local mode/i)).not.toBeInTheDocument();
   });
 
   it("raises nothing while reachability is still unknown", () => {
@@ -94,7 +94,7 @@ describe("BannerBridge", () => {
     studio.llmHealth = { healthy: null, message: "" };
     renderShell();
     expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Local mode/i)).not.toBeInTheDocument();
   });
 
   it("raises a strip when the sidecar is down", () => {
@@ -132,7 +132,7 @@ describe("BannerBridge", () => {
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: false, message: "no model" };
     renderShell();
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
+    expect(screen.getByText(/Local mode/i)).toBeInTheDocument();
   });
 
   it("rechecks the sidecar through the real dispatcher", () => {
@@ -226,18 +226,18 @@ describe("BannerBridge", () => {
     goOffline();
 
     expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Local mode/i)).not.toBeInTheDocument();
   });
 
   it("brings back the working-by-hand line once the browser is back online", () => {
     studio.llmHealth = { healthy: false, message: "no model" };
     renderShell();
     goOffline();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Local mode/i)).not.toBeInTheDocument();
 
     goOnline();
 
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
+    expect(screen.getByText(/Local mode/i)).toBeInTheDocument();
   });
 
   it("keeps the offline line alone while the browser has no network", () => {

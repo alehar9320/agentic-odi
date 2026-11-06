@@ -269,7 +269,7 @@ export function ComposerHint({ trailing }: { trailing?: ReactNode } = {}) {
         {brief ? ` · ${brief.product_name || "your job"}` : ""}
       </span>
       <span className="composer__hint-end">
-        {offline ? <span className="composer__status is-offline">Local guidance</span> : null}
+        {offline ? <span className="composer__status is-offline">{LOCAL_MODE_LABEL}</span> : null}
         {trailing ??
           (offline ? null : <span className="composer__status">{settings.model_name}</span>)}
       </span>

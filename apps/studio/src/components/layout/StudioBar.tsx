@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
-import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
+import { LOCAL_MODE_LABEL, PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
 import { formatRelativeTime } from "../../lib/relativeTime";
@@ -192,7 +192,7 @@ export function StudioBar({
     llmHealth.healthy === true
       ? "Live"
       : llmHealth.healthy === false
-        ? "Local mode"
+        ? LOCAL_MODE_LABEL
         : endpointConfigured || sidecarReachable === true
           ? "Connecting"
           : "Local";
