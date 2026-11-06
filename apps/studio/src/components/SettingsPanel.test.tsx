@@ -6,6 +6,8 @@ import { UpdateProvider, createUpdateService } from "../updater";
 import type { UpdateTransport } from "../updater/types";
 import { SettingsPanel } from "./SettingsPanel";
 
+import pkg from "../../package.json";
+
 vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
@@ -320,6 +322,15 @@ describe("SettingsPanel about section", () => {
     expect(within(about).getByText(__STUDIO_BUILD_DATE__)).toBeInTheDocument();
     expect(within(about).getByText(/macOS|Windows|Linux|Desktop/)).toBeInTheDocument();
     expect(within(about).getByText(aboutService.statusLine())).toBeInTheDocument();
+  });
+
+  it("shows the package version instead of a placeholder when the updater is unavailable", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+    renderPanel();
+
+    const about = screen.getByRole("region", { name: "About" });
+    expect(within(about).getByText(`v${pkg.version}`)).toBeInTheDocument();
+    expect(within(about).queryByText("—")).toBeNull();
   });
 });
 
