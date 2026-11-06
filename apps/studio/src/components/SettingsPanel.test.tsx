@@ -284,6 +284,27 @@ describe("SettingsPanel capabilities", () => {
     expect(llmRow).toBeInTheDocument();
     expect(llmRow).toHaveTextContent(/unavailable/);
   });
+
+  it("says a configured endpoint is not checked instead of unavailable (#515)", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        capabilities: [
+          {
+            id: "endpoint-model",
+            label: "Configured",
+            description: "Calls the model endpoint you configured in Settings directly.",
+            status: "unknown",
+          },
+        ],
+      }),
+    );
+
+    renderPanel();
+
+    const row = screen.getByText("Configured").closest("li");
+    expect(row).toHaveTextContent(/configured, not checked/i);
+    expect(row).not.toHaveTextContent(/unavailable/i);
+  });
 });
 
 describe("SettingsPanel about section", () => {

@@ -13,11 +13,17 @@ export type CapabilityId =
   | "sidecar-mcp"
   | "sidecar-import";
 
+/**
+ * What a probe has actually established. `unknown` is its own answer: a thing
+ * can be configured and still unproven, and that must never read as available.
+ */
+export type CapabilityStatus = "available" | "unavailable" | "unknown";
+
 export interface Capability {
   id: CapabilityId;
   label: string;
   description: string;
-  status: "available" | "unavailable";
+  status: CapabilityStatus;
   reason?: string;
 }
 
@@ -25,6 +31,8 @@ export interface CapabilityProbe {
   id: CapabilityId;
   label: string;
   description: string;
+  /** True when `check` proves configuration only, not that anything answers. */
+  configuredOnly?: boolean;
   check(settings: StudioConfig): Promise<boolean>;
 }
 
@@ -55,7 +63,7 @@ const localStatuses: Record<CapabilityId, Capability> = {
   },
   "endpoint-model": {
     id: "endpoint-model",
-    label: "Configured model endpoint",
+    label: "Configured",
     description: "Calls the model endpoint you configured in Settings directly.",
     status: "unavailable",
   },
@@ -116,6 +124,31 @@ async function probeSidecar(path: string, capabilityId?: CapabilityId): Promise<
   }
 }
 
+/** Ask the sidecar whether the configured MCP server answers.
+ *
+ * The route is POST-only (`apps/studio-api/.../studio/router.py`), so the probe
+ * posts the same body `healthMcp` does. It used to GET, so a healthy sidecar
+ * answered 405 and the row said MCP was missing. The body's `reachable` is the
+ * fact, not the status code: an MCP server that does not answer is unavailable
+ * even when the sidecar itself replied. */
+async function probeMcp(mcpUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(apiUrl("/api/health/mcp"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mcp_url: mcpUrl }),
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!response.ok) {
+      return false;
+    }
+    const body = (await response.json()) as { reachable?: boolean };
+    return body.reachable === true;
+  } catch {
+    return false;
+  }
+}
+
 export class CapabilityRegistry {
   private readonly probes: CapabilityProbe[] = [
     {
@@ -128,6 +161,9 @@ export class CapabilityRegistry {
       id: "endpoint-model",
       label: localStatuses["endpoint-model"].label,
       description: localStatuses["endpoint-model"].description,
+      // Present in Settings is not the same as answering: configuration is all
+      // this check can see, so it can only ever reach `unknown` (#515).
+      configuredOnly: true,
       check: async (settings) => isEndpointConfiguredForSettings(settings),
     },
     {
@@ -146,7 +182,7 @@ export class CapabilityRegistry {
       id: "sidecar-mcp",
       label: localStatuses["sidecar-mcp"].label,
       description: localStatuses["sidecar-mcp"].description,
-      check: async () => probeSidecar("/api/health/mcp"),
+      check: async (settings) => probeMcp(settings.mcp_url),
     },
     {
       id: "sidecar-import",
@@ -167,9 +203,14 @@ export class CapabilityRegistry {
           ok = false;
           reason = error instanceof Error ? error.message : "Probe failed.";
         }
+        const status: Capability["status"] = ok
+          ? probe.configuredOnly
+            ? "unknown"
+            : "available"
+          : "unavailable";
         return {
           ...localStatuses[probe.id],
-          status: (ok ? "available" : "unavailable") as Capability["status"],
+          status,
           ...(ok ? {} : { reason }),
         };
       }),
