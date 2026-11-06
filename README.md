@@ -105,6 +105,11 @@ per-platform archives with SHA-256 checksums for a manual download. See
   event log and read by the CLI, any MCP client, and the Studio's bell.
   Nothing is invented, and the feed is deduped and budgeted so it stays
   worth opening.
+- **A check on whether onboarding works.** Five counters — launch, first message,
+  first outcome, first score, return session — are appended to the same local
+  event log as the records and read back by `agentic-odi stats`. The numbers never
+  leave the machine, a counter that has not happened reads as zero rather than a
+  guess, and restarting the measurement marks the log instead of erasing history.
 
 ## How it works
 
@@ -154,7 +159,8 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its
-  sidecar-owned transcript, with attachments, tool traces, opt-in approvals for
+  sidecar-owned transcript, with attachments, tool traces under one foldable
+  work row per turn, opt-in approvals for
   chat writes and unknown tools, and branch-aware editing and regeneration.
   Settings → About also offers an opt-in, redacted local diagnostics preview; no
   report is uploaded. See
@@ -216,6 +222,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [Scoring](docs/scoring.md) | The opportunity score, its basis, bands, and the landscape |
 | [Decisions](docs/decision.md) | Brief → decision → bet → measure, and the honest empty states |
 | [CLI Reference](docs/cli.md) | Backends, chat, entities, scoring, and environment variables |
+| [The Method, Stage by Stage](docs/method.md) | The eight job-map stages as a practitioner works them — what each is for, the mistakes, and the commands |
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
 | [Integrate an Agent](docs/integration.md) | Connect an external agent over MCP: connect, read, write under consent, and errors |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
@@ -255,7 +262,7 @@ drift from the workspace. The distributions are:
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) answers a navigation it cannot reach with `public/offline.html`, so an uncached deep link opened offline gets a themed page instead of the browser's error page. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
-| **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |
+| **`scripts/`** | — | Dev launcher, binary build, installer tests, the deterministic study-corpus generator (`gen_corpus.py`), and the shared structural audit every artifact HTML passes through (`artifact_a11y.py`, with its renderer inventory in `artifact_renderers.py`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
 
 Inside `packages/core` there are four groups, and the rules between them are

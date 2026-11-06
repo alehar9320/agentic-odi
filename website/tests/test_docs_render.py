@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 import markdown_render
+from artifact_a11y import audit_html
 from site_support import _built_root, all_pages, read_page
 
 
@@ -16,11 +17,29 @@ def test_markdown_features_render():
         "```python\nprint('hi')\n```\n",
         source_path="docs/example.md",
     )
-    assert "<table>" in html
+    assert "<table" in html
     assert "<ul>" in html
     assert "nested" in html
     assert "<pre" in html and "print" in html
     assert 'class="highlight"' in html
+
+
+def test_a_guide_table_is_named_for_a_reader_who_cannot_see_it():
+    """Columns are scoped, and the table takes the name of its heading.
+
+    Markdown has no caption syntax, and rewriting a maintainer's guide to add
+    one would be the worse trade. The renderer already mints a stable anchor for
+    every heading, so the table points at the heading a sighted reader uses to
+    find it — which is the same piece of information, given to the reader who
+    cannot see the layout.
+    """
+    html = markdown_render.render(
+        "## The eight stages\n\n| stage | output |\n|---|---|\n| Listen | quotes |\n",
+        source_path="docs/example.md",
+    )
+    assert '<th scope="col">' in html
+    assert '<table aria-labelledby="the-eight-stages">' in html
+    assert audit_html(f"<main><h1>Guide</h1>{html}</main>") == []
 
 
 def test_markdown_does_not_pass_through_raw_html():

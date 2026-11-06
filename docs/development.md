@@ -103,7 +103,7 @@ by the presence of one handler.
 | `useRemoteThreadListRuntime`, `useCloudThreadListAdapter`, `AssistantCloud` | Rejected | — | — | Local-first: no account, no cloud, no outbound thread sync. |
 | Prebuilt `ExternalThread`, `SingleThreadList`, `InMemoryThreadList`, `RemoteThreadList` | Rejected | — | — | A prebuilt thread cannot carry the ODI part renderers; adopting it would can the three-file part bridge. |
 | `createThreadRowsSelector` / `ThreadRow` | Decision | — | — | Group the conversation list by day once #408 lands. Decide from real list lengths, not now. |
-| `groupPartByType` / `GroupedParts` | Planned | — | #392 | Fallback if `ChainOfThoughtPrimitive` cannot exclude a pending approval. |
+| `groupPartByType` / `GroupedParts` | Partial | `apps/studio/src/components/chat/workGrouping.ts` | — | The fallback fired: the turn's work groups through `GroupedParts` (see the message table), but with our own `workGrouping`. `groupPartByType` keys by part type or tool name alone, so a pending approval — a `tool-call` part — would be folded into the row. |
 | `getExternalStoreMessages` / `bindExternalStoreMessage` | Rejected | — | — | One store. These exist to reconcile foreign messages, which we do not accept. |
 
 ### Thread
@@ -133,7 +133,7 @@ by the presence of one handler.
 | `MessagePrimitive.Quote` | Adopted | `apps/studio/src/assistant/quote.ts` | #435 | Renders the quoted passage on a sent turn. |
 | `MessagePrimitive.Error` / `ErrorPrimitive` | Rejected | — | — | `FailurePanel` already renders the structured error, the retry copy, and the Try again action from `metadata.custom.error`. Swapping adds nothing and loses the ODI failure language. |
 | `GenerativeUIRender` / `MessagePrimitive.GenerativeUI` | Decision | — | — | Would let a model emit UI we did not validate. The ODI catalog is schema-validated; revisit only if validation moves server-side. |
-| `MessagePrimitive.GroupedParts` | Planned | — | #392 | See the runtime table. |
+| `MessagePrimitive.GroupedParts` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #392 | The reasoning and tool calls of one run fold into a single disclosure; `indicator="never"` keeps the activity line and caret where the `components` map put them. |
 | `MessagePrimitive.PartByIndex` / `Content` | Rejected | — | — | `Parts` is the one path; aliases would be a second. |
 | `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | `apps/studio/src/assistant/parts.tsx` | — | Rendered through the `components` map (custom `TextPart`, `FilePart`) rather than the bare primitives, which cannot show claim chips or extraction state. |
 | `MessagePartPrimitive.InProgress` | Decision | — | — | Our `TypingPart` shows a phase ("checking the sidecar"). The primitive would flatten that to a generic indicator. |
@@ -211,9 +211,9 @@ only the surface is missing.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Planned | — | #392 | One disclosure per settled turn. |
+| `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Rejected | — | — | Checked against the installed 0.15.31 rather than the docs: `groupMessageParts` starts a run at any adjacent `tool-call` or `reasoning` part, so its one disclosure would gather a write that is still asking. `GroupedParts` with `workGrouping` ends a run at an unanswered approval. |
 | Pending approvals inside a group | Rejected | — | — | A pending write is a question, not history. It stays ungrouped and visible, always. |
-| `useToolCallElapsed` | Planned | — | #392 | "Worked for Ns · N tools". |
+| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. |
 | `useMessageTiming` | Decision | — | — | Tokens/second is engineering telemetry. Useful to us, not to the PM; expose it only behind a diagnostics toggle if at all. |
 
 ### Selection and quote
@@ -300,11 +300,11 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 44 |
-| Partial | 8 |
-| Planned | 18 |
+| Adopted | 45 |
+| Partial | 9 |
+| Planned | 14 |
 | Decision | 26 |
-| Rejected | 33 |
+| Rejected | 35 |
 | Total | 129 |
 
 Read it as: **52** of the library's 129 relevant capabilities already deliver
@@ -407,7 +407,7 @@ the pure count arithmetic:
 | `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
 | `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
 | `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface with zero violations; contrast is scoped to the token audit and documented there |
+| `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface, the decision brief included, with zero violations; contrast is scoped to the token audit and documented there |
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
 | `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
@@ -579,6 +579,39 @@ The MCP server contract test compares the live FastMCP registry with
 both places. The CLI local-backend contract test keeps `_LOCAL_HANDLERS` aligned
 with the same tool names.
 
+### Artifact structure
+
+An artifact is HTML a person reads without the app: a built website page, the
+sample workspace, the offline shell, the decision brief. All of them are judged
+by one rule set, `scripts/artifact_a11y.py`, which reports six structural defects:
+
+- `single-h1` — the document holds exactly one `<h1>`; none and two are both defects.
+- `heading-order` — a heading never skips a level.
+- `table-caption` — a data table is named, by a `<caption>` or by an
+  `aria-labelledby` that resolves to an `id` the document actually contains.
+- `table-header-scope` — every `<th>` declares `scope` of row, col, rowgroup or colgroup.
+- `image-label` — an `<img>` carries `alt`, and an `<svg>` is either decoration
+  (`aria-hidden="true"`) or a chart with a label a reader can be told.
+- `duplicate-id` — no `id` is used twice, so a link or a label cannot point at the
+  wrong element.
+
+```bash
+uv run pytest tests/scripts/test_artifact_a11y.py           # the rules, on fixtures
+uv run pytest website/tests/test_site.py -k artifact_audit   # every built page against them
+```
+
+`scripts/artifact_renderers.py` is the inventory: one row per renderer, plus the
+artifacts that have none. `tests/scripts/test_artifact_inventory.py` scans the
+artifact roots for the markup that gives a renderer away, so a new file writing
+`<h1>` or `<table>` under one of those roots fails the suite by name until it is
+registered as a `Renderer(...)` row.
+
+Zero violations is a structural check. It is not WCAG conformance and it is not
+a screen-reader certification — nobody has read these artifacts with an actual
+reader, which is ALH-252's work. The memo, the one-pager and the shared page are
+recorded in the inventory as having no renderer at all, so there is nothing here
+to audit for them yet.
+
 ### End-to-end testing
 
 The browser-level suite lives in `apps/studio/e2e/` and runs with
@@ -655,6 +688,46 @@ within a month. The deterministic guard is
 rather than seconds, and a return to the full rescan (206,010 rows) fails it on
 any machine.
 
+## Render budget
+
+The cold-open number above is one screen appearing. The second cost is a screen
+that re-renders while you use it, and that is what the Studio's state splits
+(#503, #504, #505) are for. Their precondition is a number, so
+`apps/studio/src/test/renderCounts.tsx` counts renders and
+`src/state/StudioContext.test.tsx` pins them.
+
+Four surfaces are instrumented — the composer, the opportunity landscape, the
+workbench rail, and the banner area — mounted inside the real provider stack.
+A counter rendered *beside* a context consumer cannot see that consumer re-render
+(React bails out below a provider whose children element is stable), so each
+surface is wrapped in a `Profiler` and the number is commits that included it.
+
+| Scenario | composer | landscape | rail | banners |
+|---|---|---|---|---|
+| Forty streamed deltas | 5 | 2 | 2 | 2 |
+| Twenty keystrokes in the composer | 40 | 0 | 0 | 0 |
+| One health poll turning unhealthy | 1 | 1 | 1 | 5 |
+
+Baseline recorded on 2026-11-05 at commit `c403ba17`.
+
+```bash
+npm --prefix apps/studio test -- --run src/state/StudioContext.test.tsx   # the budget
+npm --prefix apps/studio test -- --run src/test/renderCounts.test.tsx     # the harness
+```
+
+Two things make these numbers usable. They are **exact, not ceilings**: the split
+issues may only lower a row, and a rise — or a drop — fails with the surface
+named, so it has to be argued with and re-recorded in the same pull request. And
+the scenario starts only once the boot has gone quiet: the harness waits for the
+fetches the boot left in flight, because a health answer landing mid-typing
+otherwise measures the race instead of the interaction.
+
+The harness is imported by tests alone, and the shipped bundle is byte-identical
+to the baseline it was taken against (`index-BLu6eXb1.js`, 1,321.24 kB / 392.52 kB
+gzip; `index-BXj2fr1g.css`, 106.89 kB / 20.56 kB gzip). A wall-clock render
+budget is deliberately not asserted: it would fail on a busy runner for reasons
+unrelated to the code under review.
+
 ## Test Coverage
 
 CI runs the suite on Python **3.10, 3.11, and 3.12** and uploads one combined
@@ -711,17 +784,17 @@ uv run pytest \
 | Area | What it covers |
 |---|---|
 | `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, store schema version/migration, and repository factory |
-| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, and the per-segment cold-open budget |
+| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, the onboarding funnel counters, and the per-segment cold-open budget |
 | `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
-| `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, and step/outcome passthrough |
-| `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, connectors, and startup performance |
+| `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, step/outcome passthrough, and the funnel endpoints |
+| `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, the funnel report, connectors, and startup performance |
 | `packages/connectors/tests/` | Catalog presets, registry persistence, factory, MCP and REST connectors, evidence mapping, and sink |
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
-| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift |
+| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift; the artifact structural rules and the renderer inventory gate |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, OG art reproducibility, and README sync |
+| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, every built page through the artifact rule set, OG art reproducibility, and README sync |
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the
