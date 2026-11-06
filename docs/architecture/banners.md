@@ -1,11 +1,11 @@
 # Studio banners
 
 Banners are how the Studio tells the user about the state of the studio: the
-sidecar is down, the model is unreachable, a step was added, a write was
-rejected. Before this system, three of those surfaces were separate components,
-each with its own markup, CSS, and idea of when to appear. Now one system owns
-all three, and a new banner is a catalog entry — never a new component and never
-a new CSS class.
+sidecar you were using stopped, you went offline, a step was added, a write was
+rejected. Before
+this system, three of those surfaces were separate components, each with its own
+markup, CSS, and idea of when to appear. Now one system owns all three, and a new
+banner is a catalog entry — never a new component and never a new CSS class.
 
 ## The shape
 
@@ -28,7 +28,7 @@ have direct tests rather than being inferred from a screenshot.
 
 **Identity decides dedupe.** A banner with a stable identity — a persistent
 condition, or any banner given a `key` — updates in place. A retry loop that
-raises `sidecar-down` ten times paints one strip. A transient banner with no key
+raises `offline` ten times paints one strip. A transient banner with no key
 is an event ("Added connector X"), so two of them are two facts and both stay.
 
 **A kind is a closed set owned by the client.** The agent never composes a
@@ -75,6 +75,26 @@ Two surfaces look like they belong here and do not, by design:
 Keeping them out is the point of a closed catalog: a banner means one specific
 thing, and the system stays legible because it does not absorb everything.
 
+## A supported state is not a banner
+
+The catalog held `model-offline`, raised whenever a probe found no model. It
+described the product working: a turn with no model is carried by the browser and
+labelled for what it is, and the assistant is not paused. It was deleted (#507).
+
+The distinction is worth stating, because the neighbouring kind is easy to
+confuse with it. `sidecar-down` reports the **loss of a sidecar this session was
+using** — the assistant genuinely stops and live data genuinely stops moving — so
+it stays, with its Recheck and Start actions. A studio that never had one raises
+nothing, because `StudioContext` records a negative from a recovery probe only
+when the sidecar itself witnessed it, or when it contradicts what the studio
+already believed.
+
+The rule is also a test, not a habit: a studio with no model and unknown
+reachability raises zero notices. The state is read on request — the capability
+control says what works here — and a blocked action explains itself on the control
+that needed the service. A strip means something happened: a sidecar was lost, the
+connection went, a write was refused, an update landed.
+
 ## Where the old surfaces went
 
 - `components/Toasts.tsx` — replaced by `BannerToasts.tsx`; `pushToast` keeps its
@@ -82,11 +102,14 @@ thing, and the system stays legible because it does not absorb everything.
 - `components/notices/SidecarNotice.tsx` — replaced by the `sidecar-down` kind,
   raised from `BannerBridge`. Dismissing it records a session-long choice, so the
   next failed probe cannot bring it back.
-- `components/chat/OfflineNotice.tsx` — replaced by the `model-offline` kind.
+- `components/chat/OfflineNotice.tsx` — replaced by the `model-offline` kind,
+  which #507 then deleted along with its call sites. `llmHealth` still exists on
+  the context and still feeds Settings, the bar, and the first-run wizard; it no
+  longer raises a strip.
 - The `offline` kind (browser connectivity, #546) is raised from `BannerBridge`
   off `navigator.onLine`. While the browser is offline it is the only strip: the
-  `sidecar-down` and `model-offline` kinds are held back, because their copy and
-  their Recheck action assume a network. Each resumes when the connection does.
+  `sidecar-down` kind is held back, because its Recheck and Start actions assume a
+  network, and it resumes when the connection does.
 
 ## The offline page and the worker
 

@@ -4,6 +4,11 @@
  * A banner is a statement about the state of the studio. `kind` is its identity:
  * raising the same kind twice updates the banner in place rather than adding a
  * second, so a retry loop can never paint ten copies of the same warning.
+ *
+ * Every kind here describes something that went wrong, or something that
+ * changed. A service the studio never needed — no sidecar configured, no model
+ * chosen — is not a kind, because the browser-only studio is the product
+ * working, not an outage.
  */
 
 export type BannerSeverity = "info" | "success" | "warning" | "critical";
@@ -19,7 +24,6 @@ export type BannerDock = "top" | "corner";
 
 export type BannerKind =
   | "sidecar-down"
-  | "model-offline"
   | "offline"
   | "update-available"
   | "update-ready"
@@ -29,13 +33,7 @@ export type BannerKind =
   | "error";
 
 /** A studio action a banner button can invoke directly. */
-export type BannerActionId =
-  | "recheck-sidecar"
-  | "open-setup"
-  | "open-capture"
-  | "open-jobmap"
-  | "install-update"
-  | "restart";
+export type BannerActionId = "recheck-sidecar" | "open-setup" | "install-update" | "restart";
 
 export interface BannerAction {
   label: string;

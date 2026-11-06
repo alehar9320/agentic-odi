@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { lens, offlineNotice, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import { lens, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
 
 /**
  * The Studio is a single surface with views that open beside the
@@ -72,11 +72,13 @@ test.describe("the workspace", () => {
     await expect(lens(page).getByLabel("MCP server URL")).toBeVisible();
   });
 
-  test("says so when no model is reachable", async ({ page }) => {
+  test("names the local mode without apologising for it", async ({ page }) => {
     await openStudio(page);
 
-    // No model is reachable during the test run, so the bar says so.
+    // No model is reachable during the test run. The bar says where the answers
+    // come from; nothing raises a strip, because a studio without a model is
+    // supported rather than broken (#507).
     await expect(page.getByRole("button", { name: "Local mode" })).toBeVisible();
-    await expect(offlineNotice(page)).toBeVisible();
+    await expect(page.locator(".banner")).toHaveCount(0);
   });
 });

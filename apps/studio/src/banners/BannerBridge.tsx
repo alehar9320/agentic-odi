@@ -13,15 +13,15 @@ import type { BannerActionId } from "./types";
  * clears a banner when its condition goes away, a stale warning cannot linger —
  * the sidecar strip disappears the moment the sidecar answers.
  *
- * Adding a state-driven banner is a line here, not a new component.
+ * Two conditions live here, and the difference between them is the whole point.
+ * **Losing a sidecar this session was using** is a failure: the assistant stops
+ * and live data stops moving, and the person is owed a way back. **Never having
+ * one** is the product working — it says so in place, on the action that needed
+ * it, rather than in a strip that blames the studio for shipping as designed.
  */
 export function BannerBridge() {
   const { raise, resolve } = useBanner();
-  const {
-    sidecarReachable,
-    dismissedSidecarNotice,
-    llmHealth,
-  } = useStudio();
+  const { sidecarReachable, dismissedSidecarNotice } = useStudio();
   const online = useOnlineStatus();
 
   useEffect(() => {
@@ -36,23 +36,16 @@ export function BannerBridge() {
   }, [online, raise, resolve]);
 
   useEffect(() => {
-    // The offline strip is the one line while the browser has no network: this
-    // strip's Recheck and Start-the-sidecar actions could not succeed anyway.
+    // Only a measured loss raises this: `StudioContext` records a negative from
+    // a recovery probe just when the sidecar itself witnessed it, or when it
+    // contradicts what the studio already believed. A browser-only visitor's
+    // reachability therefore stays unknown and nothing is said.
     if (sidecarReachable === false && !dismissedSidecarNotice && online) {
       raise({ kind: "sidecar-down" });
     } else {
       resolve("sidecar-down");
     }
   }, [sidecarReachable, dismissedSidecarNotice, online, raise, resolve]);
-
-  useEffect(() => {
-    // Same reason as the sidecar strip: the offline line says what still works.
-    if (llmHealth.healthy === false && online) {
-      raise({ kind: "model-offline" });
-    } else {
-      resolve("model-offline");
-    }
-  }, [llmHealth.healthy, online, raise, resolve]);
 
   return null;
 }
@@ -69,13 +62,7 @@ export function useBannerActionDispatcher(): {
   onDismiss: (id: string) => void;
 } {
   const { dismiss } = useBanner();
-  const {
-    recheckConnections,
-    openSetup,
-    openPanel,
-    dismissSidecarNotice,
-    ask,
-  } = useStudio();
+  const { recheckConnections, openSetup, dismissSidecarNotice, ask } = useStudio();
 
   function onAction(action: BannerActionId) {
     switch (action) {
@@ -84,12 +71,6 @@ export function useBannerActionDispatcher(): {
         break;
       case "open-setup":
         openSetup();
-        break;
-      case "open-capture":
-        openPanel("capture");
-        break;
-      case "open-jobmap":
-        openPanel("jobmap");
         break;
       case "install-update":
       case "restart":

@@ -349,7 +349,12 @@ export interface StudioContextValue {
   bootError: StudioError | null;
   /** Re-probe after a backup is restored; clears `bootError` on a clean answer. */
   recheckBoot: () => Promise<void>;
-  /** Whether the user has dismissed this session's sidecar-down notice. */
+  /**
+   * Whether the person dismissed the sidecar strip this session. The strip was
+   * deleted with #507 — a missing sidecar is a supported state, not an outage —
+   * so nothing reads this today; it is listed here only so the shape stays
+   * honest about what the context still holds.
+   */
   dismissedSidecarNotice: boolean;
   /** Probe again now, e.g. after the user started the sidecar. */
   recheckConnections: () => Promise<void>;
