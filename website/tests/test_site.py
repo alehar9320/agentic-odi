@@ -519,10 +519,10 @@ PAGE_WEIGHT_BUDGET = 100 * 1024
 # the test tree, so it needs its own ceiling rather than a raised one for
 # every page. Every test file in the workspace is one row, and the row count
 # roughly doubled as the pillar work landed; the guides main added since push it
-# to ~163 KB, which is why its own ceiling is 168 KB while every other page stays
+# to ~168 KB, which is why its own ceiling is 172 KB while every other page stays
 # under the base budget.
 PAGE_WEIGHT_OVERRIDES = {
-    "docs/development/index.html": 168 * 1024,
+    "docs/development/index.html": 172 * 1024,
 }
 
 
