@@ -12,6 +12,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../assistant/StudioRuntime";
+import { BriefLens } from "../components/brief/BriefLens";
 import { CatchUpFeed } from "../components/notifications/CatchUpFeed";
 import { JobMap } from "../components/canvas/JobMap";
 import { OpportunityLandscape } from "../components/canvas/OpportunityLandscape";
@@ -24,6 +25,7 @@ import { OnboardingProvider } from "../onboarding/OnboardingProvider";
 import { useOnboarding } from "../onboarding/context";
 import { createUpdateService, UpdateProvider } from "../updater";
 import type { UpdateTransport } from "../updater/types";
+import type { StudioBrief } from "../types";
 import { expectAccessible } from "./axe";
 
 const noop = () => {};
@@ -162,6 +164,14 @@ const signal = {
   fingerprint: "fp-1",
 };
 
+const setupBrief: StudioBrief = {
+  product_name: "Shipwell",
+  target_user: "Release engineers",
+  job_statement: "Ship a hotfix without breaking the rollout",
+  core_problem: "Deploys take a day",
+  v2mom: { vision: "Every team ships the same afternoon it decides to." },
+};
+
 /** A surface rendered as the only page so landmark rules judge it fairly. */
 function Surface({ children }: { children: React.ReactNode }) {
   return (
@@ -192,6 +202,8 @@ function TourOpener() {
 beforeEach(() => {
   localStorage.clear();
   state.canvasState = { kind: "ready", data: canvasData };
+  state.canvas = null;
+  state.brief = null;
   state.signals = [signal];
   state.unreadSignalCount = 1;
 });
@@ -299,6 +311,22 @@ describe("axe sweep", () => {
     );
 
     await waitFor(() => expect(container.querySelector(".changelog-modal__loading")).toBeNull());
+    await expectAccessible(container);
+  });
+
+  it("passes the decision brief", async () => {
+    // A board with outcomes and no captured records, which is the shape the
+    // document is hardest on: a real decision to read, next to sections that
+    // have to say plainly that they hold nothing.
+    state.canvas = { ...canvasData, source: "local" };
+    state.brief = setupBrief;
+
+    const { container } = renderWithUpdates(
+      <Surface>
+        <BriefLens />
+      </Surface>,
+    );
+
     await expectAccessible(container);
   });
 });
