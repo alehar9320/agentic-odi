@@ -18,6 +18,7 @@ from agentic_odi_mcp_server import (  # noqa: E402
     steps_db,
     strategies_db,
 )
+from agentic_odi_mcp_server import mcp_server as server  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -30,4 +31,5 @@ def reset_db() -> Generator[None, Any, None]:
     signals_db.clear()
     segments_db.clear()
     strategies_db.clear()
+    server._repo.themes.clear()
     yield

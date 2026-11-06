@@ -750,6 +750,7 @@ class InMemoryRepository:
         self.signals.clear()
         self.segments.clear()
         self.strategies.clear()
+        self.themes.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

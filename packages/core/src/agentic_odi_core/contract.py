@@ -69,6 +69,7 @@ class ToolName(str, Enum):
     LIST_THEMES = "list_themes"
     ASSIGN_THEME = "assign_theme"
     UNASSIGN_THEME = "unassign_theme"
+    SEARCH_OUTCOMES = "search_outcomes"
 
 
 class ToolEffect(str, Enum):
@@ -600,6 +601,28 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("outcome_ids", "theme_id"),
         required=("outcome_ids", "theme_id"),
         returns="The updated Outcomes.",
+        stage="2",
+    ),
+    ToolName.SEARCH_OUTCOMES.value: ToolSpec(
+        name="search_outcomes",
+        summary="Narrow the outcome library by text, stage, theme, confidence, and score band.",
+        #: A search writes nothing; the read effect must be stated because no
+        #: get_/list_ prefix would infer it, same as evaluate_outcome.
+        effect=ToolEffect.READ,
+        arguments=(
+            "text",
+            "stage",
+            "theme_ids",
+            "confidence",
+            "tags",
+            "min_score",
+            "max_score",
+            "job_id",
+            "sort",
+            "limit",
+            "offset",
+        ),
+        returns="Items, the pre-pagination total, and facet counts for the current filters.",
         stage="2",
     ),
     ToolName.OPEN_STUDY.value: ToolSpec(

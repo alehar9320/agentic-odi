@@ -975,6 +975,40 @@ def unassign_theme(outcome_ids: list[str], theme_id: str) -> str:
     return json.dumps([outcome.model_dump(mode="json") for outcome in outcomes])
 
 
+@mcp.tool
+def search_outcomes(
+    text: str | None = None,
+    stage: str | None = None,
+    theme_ids: list[str] | None = None,
+    confidence: str | None = None,
+    tags: list[str] | None = None,
+    min_score: float | None = None,
+    max_score: float | None = None,
+    job_id: str | None = None,
+    sort: str = "opportunity_score",
+    limit: int | None = None,
+    offset: int = 0,
+) -> str:
+    """Narrow the outcome library; the reply also carries the facet counts."""
+    try:
+        result = service.search_outcomes(
+            text=text,
+            stage=stage,
+            theme_ids=theme_ids,
+            confidence=confidence,
+            tags=tags,
+            min_score=min_score,
+            max_score=max_score,
+            job_id=job_id,
+            sort=sort,
+            limit=limit,
+            offset=offset,
+        )
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps(result)
+
+
 DEFAULT_PORT = 8000
 
 

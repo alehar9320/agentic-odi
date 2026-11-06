@@ -51,6 +51,7 @@ from agentic_odi_core.models import (
     Theme,
     compute_opportunity_score,
 )
+from agentic_odi_core.query import OutcomeQuery, search_outcomes
 from agentic_odi_core.repository import Repository, page
 from agentic_odi_core.segmentation import (
     MIN_OUTCOMES_PER_SEGMENT,
@@ -609,6 +610,55 @@ class ODIService:
         sort: str = "opportunity_score",
     ) -> list[Outcome]:
         return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset, sort=sort)
+
+    def search_outcomes(
+        self,
+        text: str | None = None,
+        stage: str | None = None,
+        theme_ids: list[str] | None = None,
+        confidence: str | None = None,
+        tags: list[str] | None = None,
+        min_score: float | None = None,
+        max_score: float | None = None,
+        job_id: str | None = None,
+        sort: str = "opportunity_score",
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Narrow the library through the shared query, writing nothing.
+
+        This is the composition point for the CLI, the API, and later bulk
+        edit and saved views: same parameters in, same ids, total, and facet
+        counts out on every surface.
+        """
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        #: A dataclass is not a validator, so bounds arriving as prose are
+        #: caught where they first have to behave like a number.
+        for name, bound in (("min_score", min_score), ("max_score", max_score)):
+            if bound is not None:
+                try:
+                    float(bound)
+                except (TypeError, ValueError) as exc:
+                    raise ValidationError(f"{name} must be a number: {exc}") from exc
+        #: ``page()`` guards the slice with a bare ValueError, which every caller
+        #: facing a surface would report as an internal failure. A nonsensical
+        #: number is a bad request, so it arrives as the established error here.
+        for name, number in (("limit", limit), ("offset", offset)):
+            if number is not None and number < 0:
+                raise ValueOutOfRangeError(f"{name} must be >= 0")
+        query = OutcomeQuery(
+            text=text,
+            stage=str(stage) if stage is not None else None,
+            theme_ids=list(theme_ids or []),
+            confidence=confidence,
+            tags=list(tags or []),
+            min_score=min_score,
+            max_score=max_score,
+            job_id=job_id,
+            sort=sort,
+        )
+        return search_outcomes(self.repo, query, limit, offset)
 
     # -- Studies: one named pass over a Job, and the wave inside it ----------
 

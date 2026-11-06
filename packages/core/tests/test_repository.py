@@ -15,6 +15,7 @@ from agentic_odi_core.models import (
     Signal,
     SignalKind,
     Step,
+    Theme,
 )
 from agentic_odi_core.repository import InMemoryRepository
 
@@ -100,6 +101,7 @@ def test_clear_removes_all_entities() -> None:
         )
     )
     repo.add_customer_outcome(_customer_outcome("co-1", job.id))
+    repo.add_theme(Theme(id="t-1", name="Cash timing", job_id=job.id))
 
     repo.clear()
 
@@ -107,6 +109,7 @@ def test_clear_removes_all_entities() -> None:
     assert repo.get_steps_for_job(job.id) == []
     assert repo.get_outcomes(job.id) == []
     assert repo.list_customer_outcomes() == []
+    assert repo.list_themes() == []
 
 
 def _repo_with_graph() -> InMemoryRepository:
