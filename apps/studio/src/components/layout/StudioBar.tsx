@@ -10,6 +10,7 @@ import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import {
   BellIcon,
+  SparkIcon,
   HistoryIcon,
   MenuIcon,
   MoonIcon,
@@ -388,6 +389,20 @@ export function StudioBar({
           onClick={() => openPanel("settings")}
         >
           <SettingsIcon size={17} />
+        </button>
+
+        {/* Release news left the pill row so the bar carries status and
+            navigation, but the changelog still needs one control that is
+            reachable without opening a menu: a quiet icon, not a pill that
+            argues with the brand. */}
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Open What's New changelog"
+          title="What's New"
+          onClick={onChangelog}
+        >
+          <SparkIcon size={17} />
         </button>
 
         <div className="bar__menu" ref={menuRef}>
