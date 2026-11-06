@@ -69,7 +69,9 @@ describe("CapabilityRegistry", () => {
   });
 
   it("probes MCP with the POST its route accepts, carrying the configured url (#515)", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init });
       if (String(input).includes("/api/health/mcp")) {
         return new Response(JSON.stringify({ reachable: true }), {
           status: 200,
@@ -91,8 +93,8 @@ describe("CapabilityRegistry", () => {
     const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
     expect(byId["sidecar-mcp"].status).toBe("available");
 
-    const call = fetchMock.mock.calls.find(([input]) => String(input).includes("/api/health/mcp"));
-    expect(call?.[1]).toMatchObject({
+    const call = calls.find(({ input }) => String(input).includes("/api/health/mcp"));
+    expect(call?.init).toMatchObject({
       method: "POST",
       body: JSON.stringify({ mcp_url: "http://localhost:8000/mcp" }),
     });
