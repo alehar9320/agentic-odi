@@ -135,7 +135,9 @@ def map_files_to_targets(files: list[str]) -> dict[str, set[str]]:
 
 def verify_changed(base: str = "origin/main", head: str = "HEAD") -> int:
     print("Tier: --changed (fast gate)")
-    print(f"Budget: designed for < 5 minutes on warm env; per-command ceiling {BUDGET_CEILING_SECONDS}s; total budget {TOTAL_BUDGET_MINUTES} min including cold uv sync")
+    print(
+        f"Budget: designed for < 5 minutes on warm env; per-command ceiling {BUDGET_CEILING_SECONDS}s; total budget {TOTAL_BUDGET_MINUTES} min including cold uv sync"
+    )
     print()
     files = get_changed_files(base, head)
     print(f"Changed files: {len(files)}")
@@ -147,7 +149,9 @@ def verify_changed(base: str = "origin/main", head: str = "HEAD") -> int:
         print("ERROR: Unmapped touched files (must be mapped to a test target):")
         for f in sorted(targets["unmapped"]):
             print(f"  - {f}")
-        print("\nSelection must never make a failing test invisible. Map these paths or add mapping.")
+        print(
+            "\nSelection must never make a failing test invisible. Map these paths or add mapping."
+        )
         return 1
 
     failed = False
@@ -160,7 +164,12 @@ def verify_changed(base: str = "origin/main", head: str = "HEAD") -> int:
         print()
 
     # Pytest for selected packages
-    if targets["python_packages"] or targets["tests_root"] or targets["scripts"] or targets["brand"]:
+    if (
+        targets["python_packages"]
+        or targets["tests_root"]
+        or targets["scripts"]
+        or targets["brand"]
+    ):
         print("[2/2] pytest (selected packages)")
         pkg_args = []
         for pkg in sorted(targets["python_packages"]):
@@ -182,7 +191,9 @@ def verify_changed(base: str = "origin/main", head: str = "HEAD") -> int:
         print("  (skipping Python tests)")
         print()
 
-    print("Skipped tiers: --default adds mypy (touched packages) + vitest (touched studio); --full runs website, studio build, e2e")
+    print(
+        "Skipped tiers: --default adds mypy (touched packages) + vitest (touched studio); --full runs website, studio build, e2e"
+    )
     print("not run: coverage, e2e, website, desktop")
     print()
     if failed:
@@ -194,7 +205,9 @@ def verify_changed(base: str = "origin/main", head: str = "HEAD") -> int:
 
 def verify_default(base: str = "origin/main", head: str = "HEAD") -> int:
     print("Tier: --default")
-    print(f"Budget: adds type checking and studio units; per-command ceiling {BUDGET_CEILING_SECONDS}s")
+    print(
+        f"Budget: adds type checking and studio units; per-command ceiling {BUDGET_CEILING_SECONDS}s"
+    )
     print()
     files = get_changed_files(base, head)
     print(f"Changed files: {len(files)}")
@@ -214,7 +227,12 @@ def verify_default(base: str = "origin/main", head: str = "HEAD") -> int:
             failed = True
         print()
 
-    if targets["python_packages"] or targets["tests_root"] or targets["scripts"] or targets["brand"]:
+    if (
+        targets["python_packages"]
+        or targets["tests_root"]
+        or targets["scripts"]
+        or targets["brand"]
+    ):
         print("[2/4] pytest (selected packages)")
         pkg_args = []
         for pkg in sorted(targets["python_packages"]):
@@ -306,7 +324,9 @@ def verify_full(base: str = "origin/main", head: str = "HEAD") -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Focused verification gate")
     parser.add_argument("--changed", action="store_true", help="Fast gate on changed files")
-    parser.add_argument("--default", action="store_true", help="Adds mypy and vitest for touched areas")
+    parser.add_argument(
+        "--default", action="store_true", help="Adds mypy and vitest for touched areas"
+    )
     parser.add_argument("--full", action="store_true", help="Full matrix (CI's job)")
     parser.add_argument("--base", default="origin/main", help="Base ref for diff")
     parser.add_argument("--head", default="HEAD", help="Head ref for diff")
