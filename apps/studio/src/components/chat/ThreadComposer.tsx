@@ -8,7 +8,7 @@
  */
 
 import { AuiIf, ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
 import {
   ATTACHMENT_ACCEPT,
@@ -116,6 +116,7 @@ function ComposerBody({
   onFiles,
   placeholder,
   autoFocus = false,
+  inputRef,
   attachmentRefusal,
   onClearAttachmentRefusal,
 }: {
@@ -124,6 +125,7 @@ function ComposerBody({
   onFiles: (files: File[]) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
   attachmentRefusal: string | null;
   onClearAttachmentRefusal: () => void;
 }) {
@@ -289,6 +291,7 @@ function ComposerBody({
         </label>
         <ComposerPrimitive.Input
           id={inputId}
+          ref={inputRef}
           className="composer__input"
           rows={1}
           autoFocus={autoFocus}
@@ -375,6 +378,7 @@ export function ThreadComposer(props: {
   onSlashCommand?: (text: string) => boolean;
   placeholder?: string;
   autoFocus?: boolean;
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
 }) {
   const aui = useAui();
   const { pushToast } = useStudio();
