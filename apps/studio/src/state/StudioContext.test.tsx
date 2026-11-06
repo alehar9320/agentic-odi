@@ -274,6 +274,32 @@ function route(
       head_id: "t-2",
     });
   }
+  if (url === "/api/conversations/c-2/tree") {
+    return json({
+      conversation: {
+        id: "c-2",
+        title: "Stored thread",
+        created_at: "2026-10-22T11:00:00+00:00",
+        updated_at: "2026-10-22T11:00:00+00:00",
+      },
+      messages: [
+        {
+          id: "u-1",
+          parent_id: null,
+          role: "user",
+          content: "I was here before.",
+          created_at: "2026-10-22T11:00:00+00:00",
+        },
+      ],
+      head_id: "u-1",
+    });
+  }
+  if (url === "/api/conversations/c-missing/tree") {
+    return new Response(JSON.stringify({ error: { code: "not_found", message: "Conversation not found" } }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   if (url === "/api/conversations") {
     if (init?.method === "POST") {
       conversationCreates += 1;
@@ -372,6 +398,7 @@ describe("StudioContext memory and resume", () => {
       job_id: "JOB-7",
       step_id: null,
       outcome_id: null,
+      conversation_id: null,
     });
   });
 
@@ -476,6 +503,51 @@ describe("StudioContext memory and resume", () => {
     ]);
   });
 
+  it("reopens the stored conversation on boot", async () => {
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        job_id: null,
+        step_id: null,
+        outcome_id: null,
+        conversation_id: "c-2",
+      }),
+    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-2"));
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I was here before.",
+    ]);
+    const urls = (fetch as unknown as { mock: { calls: Array<[unknown]> } }).mock.calls.map(
+      (call) => String(call[0]),
+    );
+    expect(urls).toContain("/api/conversations/c-2/tree");
+    expect(urls).not.toContain("/api/conversations/latest");
+  });
+
+  it("falls back to latest when the stored conversation is gone", async () => {
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        job_id: null,
+        step_id: null,
+        outcome_id: null,
+        conversation_id: "c-missing",
+      }),
+    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Tell me more.",
+    ]);
+    const urls = (fetch as unknown as { mock: { calls: Array<[unknown]> } }).mock.calls.map(
+      (call) => String(call[0]),
+    );
+    expect(urls).toContain("/api/conversations/c-missing/tree");
+    expect(urls).toContain("/api/conversations/latest");
+  });
+
   it("loads the history list on boot, newest first", async () => {
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
@@ -500,6 +572,14 @@ describe("StudioContext memory and resume", () => {
       "I own activation.",
       "Tell me more.",
     ]);
+  });
+
+  it("persists the conversation id when one becomes active", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    expect(
+      JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}").conversation_id,
+    ).toBe("c-1");
   });
 
   it("toasts after creating a job and recording an outcome", async () => {
