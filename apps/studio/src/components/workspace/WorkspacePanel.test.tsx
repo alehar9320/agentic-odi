@@ -88,7 +88,7 @@ describe("WorkspacePanel", () => {
     render(<WorkspacePanel />);
 
     expect(
-      screen.getByRole("complementary", { name: /opportunity landscape/i }),
+      screen.getByRole("complementary", { name: /where to focus/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/a lens on the conversation, not a separate place/i),
@@ -123,7 +123,7 @@ describe("WorkspacePanel", () => {
 
     const { rerender } = render(<WorkspacePanel />);
 
-    const heading = screen.getByRole("heading", { name: /opportunity landscape/i });
+    const heading = screen.getByRole("heading", { name: /where to focus/i });
     expect(heading).toHaveFocus();
     expect(heading).toHaveAttribute("tabindex", "-1");
 
@@ -195,7 +195,7 @@ describe("WorkspacePanel as a mobile sheet", () => {
   it("opens as a modal dialog with focus inside it", () => {
     render(<WorkspacePanel />);
 
-    const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
+    const dialog = screen.getByRole("dialog", { name: /where to focus/i });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
@@ -203,7 +203,7 @@ describe("WorkspacePanel as a mobile sheet", () => {
   it("keeps Tab inside the sheet and wraps at both ends", () => {
     render(<WorkspacePanel />);
 
-    const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
+    const dialog = screen.getByRole("dialog", { name: /where to focus/i });
     const buttons = within(dialog).getAllByRole("button");
     const first = buttons[0];
     const last = buttons[buttons.length - 1];
