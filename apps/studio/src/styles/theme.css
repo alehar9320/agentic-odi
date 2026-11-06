@@ -6907,3 +6907,15 @@ details[open] summary {
   font-size: 0.8rem;
   color: var(--amber);
 }
+
+/* Selection and the caret carry the brand instead of the browser default. */
+::selection {
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
+  color: var(--text);
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: var(--accent);
+}

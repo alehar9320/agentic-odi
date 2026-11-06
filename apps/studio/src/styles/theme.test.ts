@@ -147,3 +147,12 @@ describe("composer focus ring", () => {
     );
   });
 });
+
+describe("selection and caret", () => {
+  it("carries the accent into selection and the caret", () => {
+    expect(themeCss).toMatch(
+      /::selection\s*\{[^}]*background:\s*color-mix\(in srgb,\s*var\(--accent\)/,
+    );
+    expect(themeCss).toMatch(/caret-color:\s*var\(--accent\)/);
+  });
+});
