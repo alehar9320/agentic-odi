@@ -193,7 +193,13 @@ def _load_json(name: str) -> Any:
 
 
 def _og_image(path: str) -> str:
-    """The absolute URL of a page's own social card."""
+    """The absolute URL of a page's own social card.
+
+    The landing page keeps the committed, hand-reviewed card at assets/og.png;
+    every other page gets the card generated from its own title and figure.
+    """
+    if path == "index.html":
+        return f"{PAGES_URL}assets/og.png"
     return f"{PAGES_URL}assets/og/{make_og.og_name(path)}"
 
 
@@ -218,6 +224,21 @@ def _flat_guides(nav: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, An
     return [(group, guide) for group in nav.get("groups", []) for guide in group.get("guides", [])]
 
 
+def _compact_markup(html: str) -> str:
+    """Drop whitespace between tags, leaving code blocks byte-identical.
+
+    The MCP reference is generated: one section per tool, one row per argument.
+    The template is already terse, but the blank lines and indentation between
+    block elements are still a kilobyte of bytes no reader sees. Preformatted
+    regions keep their exact whitespace, because there it is content.
+    """
+    parts = re.split(r"(<pre\b[\s\S]*?</pre>|<code\b[\s\S]*?</code>)", html)
+    return "".join(
+        part if index % 2 else re.sub(r">\s+<", "><", part).strip()
+        for index, part in enumerate(parts)
+    )
+
+
 def _guide_body(
     env: Environment,
     guide: dict[str, Any],
@@ -237,7 +258,7 @@ def _guide_body(
         return body, [], None
 
     if slug == "mcp":
-        body = env.get_template("_mcp_reference.html").render(**context)
+        body = _compact_markup(env.get_template("_mcp_reference.html").render(**context))
         return body, [], None
 
     source = guide.get("source")
@@ -357,7 +378,15 @@ def _render_pages(env: Environment) -> dict[str, str]:
         tool_signatures={tool["name"]: _signature(tool) for tool in tools},
         catalog_cards=cards,
         odi_schema=odi_schema,
-        odi_schema_json=json.dumps(odi_schema, separators=(",", ":"), sort_keys=True),
+        # Quotes need no escaping in HTML text, so only &, < and > are escaped here;
+        # the template marks the value safe. Escaping every quote cost ~9 KB of
+        # "&#34;" on the one page that already sits at the document-size budget.
+        odi_schema_json=(
+            json.dumps(odi_schema, separators=(",", ":"), sort_keys=True)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        ),
         works_today=_works_today(tools, cards, connectors),
         roadmap_pending=roadmap_pending,
         formula_base=formula_base,
