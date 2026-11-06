@@ -1,3 +1,5 @@
+import type { Outcome } from "../types";
+
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -67,6 +69,14 @@ export function summarizeMemberScores(
     }
   }
   return { mean: scored === 0 ? null : total / scored, scored, unscored };
+}
+
+/**
+ * Average only the stored numeric opportunity scores. Unscored outcomes never
+ * become zeros; the mean is `null` when nothing is scored.
+ */
+export function scoredAverage(outcomes: Outcome[]): { mean: number | null; scored: number; unscored: number } {
+  return summarizeMemberScores(outcomes.map((o) => o.opportunity_score));
 }
 
 /**
