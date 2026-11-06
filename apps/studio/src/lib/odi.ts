@@ -1,6 +1,29 @@
+import type { Outcome } from "../types";
+
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
+}
+
+export interface ScoredAverage {
+  mean: number | null;
+  scored: number;
+  unscored: number;
+}
+
+export function scoredAverage(outcomes: ReadonlyArray<Outcome>): ScoredAverage {
+  let total = 0;
+  let scored = 0;
+  let unscored = 0;
+  for (const o of outcomes) {
+    if (typeof o.opportunity_score === "number" && Number.isFinite(o.opportunity_score)) {
+      total += o.opportunity_score;
+      scored += 1;
+    } else {
+      unscored += 1;
+    }
+  }
+  return { mean: scored === 0 ? null : total / scored, scored, unscored };
 }
 
 /** The line between "served" and "underserved". `packages/core` keeps its own
