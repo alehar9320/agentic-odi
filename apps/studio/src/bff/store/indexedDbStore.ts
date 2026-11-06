@@ -10,6 +10,7 @@ import {
   type StudioDb,
 } from "./migrations";
 import {
+  MAX_CONVERSATION_TITLE,
   byCreated,
   bySeq,
   type DrainLease,
@@ -271,6 +272,27 @@ export class IndexedDbLocalStore implements LocalStore {
       ...conversation,
       head_id: headId,
       updated_at: now,
+    };
+    await this.db.put("conversations", next);
+    return next;
+  }
+
+  async renameConversation(
+    id: string,
+    title: string,
+  ): Promise<StoredConversation> {
+    const conversation = await this.db.get("conversations", id);
+    if (!conversation) {
+      throw new Error(`Conversation ${id} not found`);
+    }
+    const cleaned = title.trim();
+    if (!cleaned) {
+      throw new Error("A conversation needs a name.");
+    }
+    const next: StoredConversation = {
+      ...conversation,
+      title: cleaned.slice(0, MAX_CONVERSATION_TITLE),
+      updated_at: nowIso(),
     };
     await this.db.put("conversations", next);
     return next;

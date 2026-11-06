@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioApiError, fetchCanvas, fetchMemory, isTransportFailure, listConversations, streamChat } from "./studioApi";
+import { StudioApiError, fetchCanvas, fetchMemory, isTransportFailure, listConversations, renameConversation, streamChat } from "./studioApi";
 
 const bff = {
   data: { fetchCanvas: vi.fn() },
-  memory: { listObservations: vi.fn(), listConversations: vi.fn() },
+  memory: { listObservations: vi.fn(), listConversations: vi.fn(), renameConversation: vi.fn() },
   chat: { stream: vi.fn() },
 };
 
@@ -24,6 +24,7 @@ beforeEach(() => {
   vi.mocked(bff.data.fetchCanvas).mockReset();
   vi.mocked(bff.memory.listObservations).mockReset();
   vi.mocked(bff.memory.listConversations).mockReset();
+  vi.mocked(bff.memory.renameConversation).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
 });
 
@@ -132,5 +133,56 @@ describe("listConversations fallback", () => {
 
     expect(listed.map((item) => item.id)).toEqual(["c-2"]);
     expect(bff.memory.listConversations).not.toHaveBeenCalled();
+  });
+});
+
+describe("renameConversation", () => {
+  it("patches the trimmed title through the sidecar", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        conversation: {
+          id: "c-1",
+          title: "Retention work",
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-02T00:00:00Z",
+          head_id: "m-2",
+        },
+      }),
+    );
+
+    const renamed = await renameConversation("c-1", "  Retention work  ");
+
+    expect(renamed.title).toBe("Retention work");
+    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toContain("/api/conversations/c-1");
+    expect(init.method).toBe("PATCH");
+    // The branch is not in the body: a rename must not move the reader.
+    expect(JSON.parse(String(init.body))).toEqual({ title: "Retention work" });
+    expect(bff.memory.renameConversation).not.toHaveBeenCalled();
+  });
+
+  it("renames through the browser store when the sidecar is unreachable", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ detail: "Sidecar unreachable" }, 502),
+    );
+    vi.mocked(bff.memory.renameConversation).mockResolvedValueOnce({
+      id: "c-1",
+      title: "Retention work",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-02T00:00:00Z",
+      head_id: null,
+    });
+
+    const renamed = await renameConversation("c-1", "Retention work");
+
+    expect(renamed.title).toBe("Retention work");
+    expect(bff.memory.renameConversation).toHaveBeenCalledWith("c-1", "Retention work");
+  });
+
+  it("refuses a blank name before any request", async () => {
+    await expect(renameConversation("c-1", "   ")).rejects.toThrow(/name/i);
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(bff.memory.renameConversation).not.toHaveBeenCalled();
   });
 });

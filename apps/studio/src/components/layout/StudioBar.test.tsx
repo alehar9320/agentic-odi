@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -20,6 +20,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   llmHealth: { healthy: true, message: "ok" },
   messages: [],
   openConversation: vi.fn(),
+  renameConversation: vi.fn(),
   refreshConversations: vi.fn(),
   unreadSignalCount: 0,
   openPanel: vi.fn(),
@@ -361,6 +362,125 @@ describe("StudioBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
 
     expect(screen.getByRole("menuitem", { name: /new conversation/i })).toBeInTheDocument();
+  });
+
+  const twoThreads = [
+    {
+      id: "c-2",
+      title: "Current thread",
+      created_at: "2026-10-22T09:00:00Z",
+      updated_at: "2026-10-22T09:00:00Z",
+      head_id: null,
+      turn_count: 1,
+    },
+    {
+      id: "c-1",
+      title: "An older thread",
+      created_at: "2026-10-21T09:00:00Z",
+      updated_at: "2026-10-21T09:00:00Z",
+      head_id: null,
+      turn_count: 3,
+    },
+  ];
+
+  it("renames a thread from its row without opening it (#642)", async () => {
+    const renameConversation = vi.fn(async () => undefined);
+    const openConversation = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        renameConversation,
+        openConversation,
+        conversationId: "c-2",
+        conversations: twoThreads,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+
+    const input = screen.getByRole("textbox", { name: /name for an older thread/i });
+    expect(input).toHaveValue("An older thread");
+
+    fireEvent.change(input, { target: { value: "Churn pricing" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() =>
+      expect(renameConversation).toHaveBeenCalledWith("c-1", "Churn pricing"),
+    );
+    // A name is not a door: the thread on screen and the open list both stay.
+    expect(openConversation).not.toHaveBeenCalled();
+    expect(screen.getByRole("menu", { name: "Recent conversations" })).toBeInTheDocument();
+  });
+
+  it("cancels a rename on Escape and refuses a blank name in place", async () => {
+    const renameConversation = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        renameConversation,
+        conversationId: "c-2",
+        conversations: twoThreads,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+
+    const input = screen.getByRole("textbox", { name: /name for an older thread/i });
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    // A blank name never reaches the store, and the field says why.
+    expect(renameConversation).not.toHaveBeenCalled();
+    expect(input).toHaveAttribute("aria-invalid", "true");
+
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
+  });
+
+  it("commits a changed name when the field loses focus", async () => {
+    const renameConversation = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        renameConversation,
+        conversationId: "c-2",
+        conversations: twoThreads,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+
+    const input = screen.getByRole("textbox", { name: /name for an older thread/i });
+    fireEvent.change(input, { target: { value: "Churn pricing" } });
+    fireEvent.blur(input);
+
+    await waitFor(() =>
+      expect(renameConversation).toHaveBeenCalledWith("c-1", "Churn pricing"),
+    );
+  });
+
+  it("does not spend a request on a name that did not change", async () => {
+    const renameConversation = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        renameConversation,
+        conversationId: "c-2",
+        conversations: twoThreads,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+    fireEvent.blur(screen.getByRole("textbox", { name: /name for an older thread/i }));
+
+    expect(renameConversation).not.toHaveBeenCalled();
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
   });
 });
 
