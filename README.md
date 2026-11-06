@@ -159,7 +159,8 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its
-  sidecar-owned transcript, with attachments, tool traces, opt-in approvals for
+  sidecar-owned transcript, with attachments, tool traces under one foldable
+  work row per turn, opt-in approvals for
   chat writes and unknown tools, and branch-aware editing and regeneration.
   Settings → About also offers an opt-in, redacted local diagnostics preview; no
   report is uploaded. See
@@ -217,6 +218,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [Design Audit](DESIGN-AUDIT.md) | The target identity, the one scale per value, and the per-screen findings the current look came from |
 | [Design: Left Over](DESIGN-REMAINING.md) | What that pass deliberately did not change, and the reason for each |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
+| [The assistant-ui ledger](docs/assistant-ui-ledger.md) | Every assistant-ui capability and the one honest state it is in |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
@@ -249,7 +251,7 @@ drift from the workspace. The distributions are:
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) answers a navigation it cannot reach with `public/offline.html`, so an uncached deep link opened offline gets a themed page instead of the browser's error page. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
-| **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |
+| **`scripts/`** | — | Dev launcher, binary build, installer tests, the deterministic study-corpus generator (`gen_corpus.py`), and the shared structural audit every artifact HTML passes through (`artifact_a11y.py`, with its renderer inventory in `artifact_renderers.py`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
 
 Inside `packages/core` there are four groups, and the rules between them are
