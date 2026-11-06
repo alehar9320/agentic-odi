@@ -3232,6 +3232,18 @@ button.message__tag:hover {
   }
 }
 
+/* StudioContext holds this class for one theme change only, so the tokens
+   cross-fade for 120ms instead of snapping. Reduced motion never adds it, and
+   the global reduce rule shortens it if it runs anyway. */
+html.theme-fading,
+html.theme-fading *,
+html.theme-fading *::before,
+html.theme-fading *::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 120ms;
+  transition-timing-function: linear;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

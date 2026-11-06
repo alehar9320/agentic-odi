@@ -135,6 +135,14 @@ describe("theme tokens", () => {
   });
 });
 
+describe("theme change", () => {
+  it("cross-fades only through the fading class", () => {
+    expect(themeCss).toMatch(
+      /html\.theme-fading[^{]*\{[^}]*transition-duration:\s*120ms/,
+    );
+  });
+});
+
 describe("composer focus ring", () => {
   it("follows the capsule's shape instead of floating inside it", () => {
     expect(themeCss).toMatch(
