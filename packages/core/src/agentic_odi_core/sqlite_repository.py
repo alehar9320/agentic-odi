@@ -14,6 +14,8 @@ from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    Briefing,
+    BriefingItem,
     CustomerOutcome,
     Evidence,
     Job,
@@ -70,6 +72,7 @@ class SQLiteRepository(Repository):
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
         self.studies: dict[str, Study] = {}
+        self.briefings: dict[str, Briefing] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -226,6 +229,11 @@ class SQLiteRepository(Repository):
             self.studies[p["id"]] = Study.model_validate(p)
         elif et == "STUDY_UPDATED":
             self._merge_updates(self.studies, p, Study)
+        elif et == "BRIEFING_ADDED":
+            try:
+                self.briefings[p["id"]] = Briefing.model_validate(p)
+            except Exception:
+                pass
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -882,6 +890,32 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return new_strategy
+
+
+    def add_briefing(self, briefing: Briefing) -> Briefing:
+        with self._lock:
+            self._sync()
+            self.briefings[briefing.id] = briefing
+            self.store.append(
+                "BRIEFING_ADDED",
+                briefing.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return briefing
+
+    def get_briefing(self, briefing_id: str) -> Briefing | None:
+        with self._lock:
+            self._sync()
+            return self.briefings.get(briefing_id)
+
+    def get_latest_briefing(self) -> Briefing | None:
+        with self._lock:
+            self._sync()
+            if not self.briefings:
+                return None
+            return sorted(self.briefings.values(), key=lambda b: getattr(b, "created_at", ""), reverse=True)[0]
 
     def clear(self) -> None:
         with self._lock:

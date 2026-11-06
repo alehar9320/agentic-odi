@@ -26,6 +26,8 @@ from agentic_odi_core.mapping import (
     ProposalStrategy,
 )
 from agentic_odi_core.models import (
+    Briefing,
+    BriefingItem,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     BusinessValue,
@@ -1062,6 +1064,13 @@ class ODIService:
         updated = self.repo.update_scheduled_work(work_id, updates)
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
+        # Try to build a briefing if possible
+        try:
+            from agentic_odi_core.briefing import build_briefing
+            briefing = build_briefing(updated)
+            self.repo.add_briefing(briefing)
+        except Exception:
+            pass
         return updated
 
     # -- Stage 5: outcome-based segments -------------------------------------

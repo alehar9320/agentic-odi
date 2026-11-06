@@ -56,6 +56,8 @@ from agentic_odi_core.messages import (
     step_not_found,
 )
 from agentic_odi_core.models import (
+    Briefing,
+    BriefingItem,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     V2MOM,
@@ -139,6 +141,8 @@ __all__ = [
     "load_score_fixture",
     "ScheduledWorkStatus",
     "ScheduledWorkTriggerType",
+    "Briefing",
+    "BriefingItem",
     "Segment",
     "SegmentVerdict",
     "SegmentationStrategy",

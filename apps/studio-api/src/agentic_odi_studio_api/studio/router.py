@@ -69,6 +69,8 @@ from agentic_odi_studio_api.studio.probes import (
     probe_llm_health,
 )
 from agentic_odi_studio_api.studio.schemas import (
+    BriefingOut,
+    BriefingItemOut,
     AddConnectorRequest,
     AddCustomerOutcomeRequest,
     AddEvidenceRequest,
@@ -1689,4 +1691,35 @@ async def reject_proposal_api(
     return {
         "ok": True,
         "result": _proposal_out(proposal).model_dump(mode="json"),
+    }
+
+
+@router.get("/briefings/latest")
+async def get_latest_briefing(request: Request):
+    service = _service(request)
+    if hasattr(service, "get_latest_briefing"):
+        briefing = service.get_latest_briefing()
+    elif hasattr(service.repo, "get_latest_briefing"):
+        briefing = service.repo.get_latest_briefing()
+    else:
+        briefing = None
+    if briefing is None:
+        from fastapi import Response
+        return Response(status_code=204)
+    # Convert to response
+    items = []
+    for item in getattr(briefing, "items", []):
+        items.append({
+            "kind": getattr(item, "kind"),
+            "text": getattr(item, "text"),
+            "record_id": getattr(item, "record_id"),
+            "record_kind": getattr(item, "record_kind"),
+        })
+    created_at = getattr(briefing, "created_at")
+    if hasattr(created_at, "isoformat"):
+        created_at = created_at.isoformat()
+    return {
+        "run_id": getattr(briefing, "run_id"),
+        "created_at": created_at,
+        "items": items,
     }

@@ -479,3 +479,25 @@ class ScheduledWork(BaseModel):
     last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
     next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
     result_summary: str | None = Field(None, description="Execution outcome or error summary")
+
+
+class BriefingItem(BaseModel):
+    kind: str
+    text: str
+    record_id: str
+    record_kind: str
+
+    @model_validator(mode="after")
+    def _require_record(self) -> "BriefingItem":
+        if not self.record_id:
+            raise ValueError("record_id required")
+        if not self.record_kind:
+            raise ValueError("record_kind required")
+        return self
+
+
+class Briefing(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    run_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    items: list[BriefingItem] = Field(default_factory=list)
