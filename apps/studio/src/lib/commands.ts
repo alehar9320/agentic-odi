@@ -226,3 +226,7 @@ export function matchCommands(draft: string): StudioCommand[] {
   scored.sort((a, b) => a.score - b.score || a.index - b.index);
   return scored.map((entry) => entry.command);
 }
+
+/** The one sentence that asks the studio to walk the job (#698 D32). */
+export const WALK_THE_JOB_INTENT =
+  "Walk me through the job step by step, and show me where the work breaks down today.";
