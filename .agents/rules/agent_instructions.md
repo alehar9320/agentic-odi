@@ -246,7 +246,7 @@ approval prompts beside it.
 
 ### 6. Testing Strategy (FastMCP)
 - **First-Class Documentation**: Treat tests as living documentation that demonstrate how features work while protecting against regressions.
-- **Speed & Isolation**: Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
+- **Testing & Verification**: Follow the test tiers in `.agents/workflows/test.md` — run `uv run python scripts/verify.py --changed` as the bar for opening a PR; `--default` before asking for merge review; `--full` is CI's responsibility. Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
 - **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` -> `apps/mcp-server/tests/test_server_tools.py`, `packages/connectors/src/agentic_odi_connectors/mcp/connector.py` -> `packages/connectors/tests/test_mcp_connector.py`).
 - **Atomic Tests**: Each test must verify exactly one specific behavior with clear intent in test names and assertions. Avoid multi-behavior tests.
 - **In-Memory Testing (Preferred)**: Favor testing functionality deterministically by passing the `FastMCP` server directly into the `Client(server)` instance. This runs in-memory without network overhead for deterministic and lightning-fast execution.

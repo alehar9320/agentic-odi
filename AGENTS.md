@@ -208,4 +208,4 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
 - Keep `README.md` current in the same task whenever code, commands, dependencies, or capabilities change.
 - Architecture and data-flow details live in `docs/architecture/`; update them when the package graph or runtime boundaries change.
 - Superpowers artifacts belong under `docs/superpowers/`: designs in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, plans in `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.
-- Run `uv run pytest` from the root; see `.agents/workflows/test.md` and `docs/architecture/testing.md` for focused commands.
+- **Before opening a PR**, run the pre-PR tier: `uv run python scripts/verify.py --changed` (see `.agents/workflows/test.md`). CI owns `--full`. See `docs/architecture/testing.md` for details.

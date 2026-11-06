@@ -2,6 +2,31 @@
 description: how to run the test suite
 ---
 
+# Test tiers
+
+Pick the smallest tier that matches your time budget. CI owns the full matrix; agents must not be asked to run it all locally.
+
+| Tier | Command | When | Notes |
+|---|---|---|---|
+| `--changed` (fast gate) | `uv run python scripts/verify.py --changed` | **Bar for opening a PR.** Run before opening or updating a PR. Fits inside a 10–30 minute agent budget. | Ruff on touched paths, pytest for selected packages. Prints elapsed seconds per step and what was skipped. Fails loudly if a touched file maps to no test target. |
+| `--default` | `uv run python scripts/verify.py --default` | Before asking for merge review. | Adds `mypy` for touched packages and `vitest` for touched studio files. Still not a substitute for CI. |
+| `--full` | `uv run python scripts/verify.py --full` | **CI's job.** Do not run by default in agent runs. | Runs today's full matrix (Python, website pytest, studio vitest, `npm run build`, Playwright e2e). Per-job budgets are 5–20 minutes in CI. |
+
+## PR requirement (honest verification)
+
+A pull request **must** list the tiers it ran and the tiers it skipped in the PR body (in the repo's spirit of no-silent-fabrication). For example:
+
+```markdown
+**Verification**
+- Ran: `--changed`
+- Skipped: `--default` (reason), `--full` (CI)
+- Not verified: coverage, e2e, website, desktop (as applicable)
+```
+
+## Legacy notes (for reference)
+
+If you need to run things manually:
+
 1. Run all Python tests from the project root (workspace-aware):
 
 ```bash

@@ -1,6 +1,18 @@
 # Testing
 
-## Commands
+## Tiers (pre-PR)
+See [`.agents/workflows/test.md`](../../.agents/workflows/test.md): 
+- `--changed` — PR bar (fast gate on touched files)
+- `--default` — adds `mypy` and `vitest` for touched areas
+- `--full` — CI's responsibility (full matrix)
+
+```bash
+uv run python scripts/verify.py --changed
+uv run python scripts/verify.py --default
+uv run python scripts/verify.py --full
+```
+
+## Commands (reference)
 
 ```bash
 uv run pytest                       # all packages + root contract/launcher tests
@@ -13,7 +25,7 @@ uv run bandit -c pyproject.toml -r apps packages
 uv run bandit -c pyproject.toml -r website/
 ```
 
-The root `pyproject.toml` owns pytest, coverage, ruff, mypy, and bandit configuration. There is no per-package test configuration to keep in sync.
+The root `pyproject.toml` owns pytest, coverage, ruff, mypy, and bandit configuration. There is no per-package test configuration to keep in sync. Coverage floor is enforced in CI (`fail_under = 89`).
 
 ## Layout
 

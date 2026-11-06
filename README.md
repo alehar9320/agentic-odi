@@ -273,7 +273,7 @@ request:
 
 ```bash
 uv run ruff check . && uv run ruff format --check .
-uv run mypy apps packages && uv run pytest
+uv run python scripts/verify.py --changed  # PR bar; see .agents/workflows/test.md
 uv run python scripts/doc_check.py   # documented commands, paths, routes, env vars, and the assistant-ui ledger hold up
 ```
 
