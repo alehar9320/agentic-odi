@@ -309,6 +309,11 @@ function ComposerBody({
             if (files.length === 0) {
               return;
             }
+            const text = event.clipboardData?.getData("text/plain") ?? "";
+            if (text !== "") {
+              onFiles(files);
+              return;
+            }
             event.preventDefault();
             onFiles(files);
           }}
