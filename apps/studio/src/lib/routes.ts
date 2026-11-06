@@ -14,12 +14,13 @@
 import type { SignalSubjectKind, WorkspacePanelId } from "../types";
 
 export type Route =
-  | { name: "home" }
-  | { name: "thread"; threadId: string }
+  | { name: "home"; search?: string }
+  | { name: "thread"; threadId: string; search?: string }
   | {
       name: "threadPanel";
       threadId: string;
       panel: WorkspacePanelId;
+      search?: string;
     }
   | {
       name: "threadPanelSubject";
@@ -27,10 +28,11 @@ export type Route =
       panel: WorkspacePanelId;
       subjectKind: SignalSubjectKind;
       subjectId: string;
+      search?: string;
     }
-  | { name: "customize" }
-  | { name: "customizeListing"; listingId: string }
-  | { name: "search" };
+  | { name: "customize"; search?: string }
+  | { name: "customizeListing"; listingId: string; search?: string }
+  | { name: "search"; search?: string };
 
 const THREAD_RE = /^\/t\/([^/]+)$/;
 const THREAD_PANEL_RE = /^\/t\/([^/]+)\/([^/]+)$/;

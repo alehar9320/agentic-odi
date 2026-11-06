@@ -295,6 +295,8 @@ export interface StudioContextValue {
   /** The failure behind `canvasState.kind === "error"`, if any. */
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
+  /** Navigate to a route: updates the URL and derives studio state from it. */
+  navigateTo: (route: Route, replace?: boolean) => void;
   llmHealth: { healthy: boolean | null; message: string };
   /** Model ids the configured endpoint publishes. Empty means "type one". */
   models: string[];
@@ -617,7 +619,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    */
   const navigateTo = useCallback(
     (route: Route, replace = false) => {
-      const path = withSearch(routeToPath(route), route.search);
+      const path = withSearch(routeToPath(route), route.search ?? "");
       setCurrentRoute(route);
 
       const threadId =

@@ -682,8 +682,6 @@ class StudioMemory:
         importance: float = 5.0,
         satisfaction: float = 5.0,
     ) -> Thesis:
-        import json
-
         now = _now()
         # Look up the outcome to get its current score
         outcome_score = 5.0
@@ -729,9 +727,7 @@ class StudioMemory:
 
     def delete_thesis(self, thesis_id: str) -> None:
         with self._lock, self._connection:
-            cursor = self._connection.execute(
-                "DELETE FROM theses WHERE id = ?", (thesis_id,)
-            )
+            cursor = self._connection.execute("DELETE FROM theses WHERE id = ?", (thesis_id,))
             if cursor.rowcount == 0:
                 raise MemoryError(f"Thesis {thesis_id} not found")
 
@@ -835,6 +831,7 @@ class StudioMemory:
             updated_at=row["updated_at"],
         )
 
+    @staticmethod
     def _thesis_from_row(row: sqlite3.Row) -> Thesis:
         return Thesis(
             id=row["id"],

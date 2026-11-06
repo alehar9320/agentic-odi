@@ -45,7 +45,7 @@ class IntentStore:
                     f"SQLite store is damaged: {exc}",
                     path=db_path,
                     rows=[str(exc)],
-                )
+                ) from exc
             if row is None or row[0] != "ok":
                 cursor = ro_conn.execute("PRAGMA integrity_check")
                 rows = [str(r[0]) for r in cursor.fetchmany(20)]

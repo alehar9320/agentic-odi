@@ -10,10 +10,11 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from agentic_odi_core.errors import StoreCorrupt
+from agentic_odi_core.errors import StoreCorrupt, StoreError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.models import (
+    V2MOM,
     CustomerOutcome,
     Evidence,
     Job,
@@ -73,6 +74,23 @@ class SQLiteRepository(Repository):
         """Run PRAGMA wal_checkpoint(mode) to fold the WAL into the main file."""
         with self._lock:
             self.store.conn.execute(f"PRAGMA wal_checkpoint({mode})")
+
+    def _check_store_integrity(self) -> None:
+        """Raise ``StoreCorrupt`` when the live store fails ``PRAGMA quick_check``.
+
+        ``restore`` swaps the database file underneath an open repository, so it
+        re-verifies the replacement before loading any snapshot from it.
+        """
+        cursor = self.store.conn.execute("PRAGMA quick_check")
+        row = cursor.fetchone()
+        if row is None or row[0] != "ok":
+            integrity = self.store.conn.execute("PRAGMA integrity_check")
+            rows = [str(item[0]) for item in integrity.fetchmany(20)]
+            raise StoreCorrupt(
+                "Restored store failed quick_check",
+                path=self.store.db_path,
+                rows=rows,
+            )
 
     def _load_snapshot(self) -> None:
         self.jobs: dict[str, Job] = {}
@@ -229,7 +247,7 @@ class SQLiteRepository(Repository):
         elif et == "STRATEGY_UPDATED":
             self._merge_updates(self.strategies, p, Strategy)
         elif et == "V2MOM_SAVED":
-            self.v2mom[p["id"]] = V2MOM.model_validate(p)
+            self.v2mom["current"] = V2MOM.model_validate(p)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -843,8 +861,6 @@ class SQLiteRepository(Repository):
         replaces. Never overwrites a good copy with a failed one.
         """
         import os
-        import shutil
-        import tempfile
 
         tmp_path = backup_path + ".tmp"
         try:
@@ -919,7 +935,7 @@ class SQLiteRepository(Repository):
             except sqlite3.OperationalError:
                 raise StoreError(
                     f"Live database {self.store.db_path} is in use by another process"
-                )
+                ) from None
         finally:
             live_conn.close()
 

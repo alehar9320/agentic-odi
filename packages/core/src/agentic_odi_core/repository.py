@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.models import (
+    V2MOM,
     CustomerOutcome,
     Evidence,
     Job,
@@ -17,8 +18,6 @@ from agentic_odi_core.models import (
     Signal,
     Step,
     Strategy,
-    V2MOM,
-    compute_opportunity_score,
 )
 
 _Item = TypeVar("_Item")
@@ -569,7 +568,8 @@ class InMemoryRepository:
         return new_strategy
 
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
-        self.v2mom[v2mom.id] = v2mom
+        # A store holds one V2MOM per workspace; the model carries no id.
+        self.v2mom["current"] = v2mom
         return v2mom
 
     def get_v2mom(self) -> V2MOM | None:
