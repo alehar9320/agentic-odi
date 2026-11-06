@@ -685,8 +685,9 @@ any machine.
 ## Test Coverage
 
 The `test` job is the authoritative Python gate. Pytest runs on Python
-**3.10, 3.11, and 3.12** with `--cov-fail-under=89`, so it fails the job on its
-own — no token, and therefore no fork PR that skips the check. The current
+**3.10, 3.11, and 3.12** with coverage on, and pytest reads the floor from
+`[tool.coverage.report] fail_under` in `pyproject.toml`, so it fails the job on
+its own — no token, and therefore no fork PR that skips the check. The current
 measurement is **89.75%** (7,720 statements, 791 missed).
 
 The floor is a ratchet. On every pull request, `scripts/coverage_floor.py`
@@ -764,17 +765,6 @@ the code disagree, so do not edit it by hand — run
 <!-- coverage-map:start -->
 | Test file | Exercises |
 |---|---|
-| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, the onboarding funnel counters, and the per-segment cold-open budget |
-| `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
-| `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, step/outcome passthrough, and the funnel endpoints |
-| `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, the funnel report, connectors, and startup performance |
-| `packages/connectors/tests/` | Catalog presets, registry persistence, factory, MCP and REST connectors, evidence mapping, and sink |
-| `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
-| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift; the artifact structural rules and the renderer inventory gate |
-| `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
-| `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
-| `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, every built page through the artifact rule set, OG art reproducibility, and README sync |
 | `apps/cli/tests/test_backend.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
 | `apps/cli/tests/test_backend_edges.py` | `apps/cli/src/agentic_odi_cli/backend.py` |
 | `apps/cli/tests/test_backend_selection.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
@@ -947,12 +937,13 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | `apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/onboarding/storage.ts` |
 | `apps/studio/src/onboarding/machine.test.ts` | `apps/studio/src/onboarding/machine.ts`<br>`apps/studio/src/onboarding/storage.ts` |
 | `apps/studio/src/state/StudioContext.test.tsx` | `apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/lib/session.ts`<br>`apps/studio/src/state/StudioContext.tsx` |
+| `apps/studio/src/state/deviceStatus.test.ts` | `apps/studio/src/bff/capabilities/registry.ts`<br>`apps/studio/src/state/deviceStatus.ts` |
 | `apps/studio/src/styles/bootShell.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/brief.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/colors.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/print.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/theme.test.ts` | — no direct source pair |
-| `apps/studio/src/test/a11y.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/ChangelogModal.tsx`<br>`apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/components/canvas/JobMap.tsx`<br>`apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/components/chat/ChatStage.tsx`<br>`apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/components/notifications/CatchUpFeed.tsx`<br>`apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/test/axe.ts`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/test/a11y.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/ChangelogModal.tsx`<br>`apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/components/brief/BriefLens.tsx`<br>`apps/studio/src/components/canvas/JobMap.tsx`<br>`apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/components/chat/ChatStage.tsx`<br>`apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/components/notifications/CatchUpFeed.tsx`<br>`apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/test/axe.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/updater/types.ts` |
 | `apps/studio/src/test/contrast.test.ts` | `apps/studio/src/test/contrast.ts` |
 | `apps/studio/src/test/keyboard.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/lib/useFocusTrap.ts` |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | `apps/studio/src/ui/UiRenderer.tsx`<br>`apps/studio/src/ui/actions.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts`<br>`apps/studio/src/ui/registry.ts` |
@@ -968,6 +959,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio-api/tests/test_api.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
 | `apps/studio-api/tests/test_app_spa.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/main.py`<br>`packages/core/src/agentic_odi_core/messages.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
 | `apps/studio-api/tests/test_boot_integrity.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/intent_store.py` |
+| `apps/studio-api/tests/test_probe_cache.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/probes.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py` |
 | `apps/studio-api/tests/test_studio_api.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/chat.py` |
 | `apps/studio-api/tests/test_studio_approvals.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py` |
 | `apps/studio-api/tests/test_studio_brief.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
@@ -1057,6 +1049,8 @@ the code disagree, so do not edit it by hand — run
 | `tests/contract/test_cli_contract.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
 | `tests/contract/test_mcp_contract.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/services.py` |
 | `tests/contract/test_protected_files.py` | — no direct source pair |
+| `tests/scripts/test_artifact_a11y.py` | `scripts/artifact_a11y.py` |
+| `tests/scripts/test_artifact_inventory.py` | `scripts/artifact_renderers.py` |
 | `tests/scripts/test_assistant_ui_ledger.py` | `scripts/doc_check.py` |
 | `tests/scripts/test_ci_release.py` | `scripts/ci_release.py` |
 | `tests/scripts/test_cli_docs.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
@@ -1077,6 +1071,7 @@ the code disagree, so do not edit it by hand — run
 | `tests/scripts/test_release_instructions.py` | `scripts/release_instructions.py` |
 | `tests/scripts/test_release_version_gate.py` | — no direct source pair |
 | `tests/scripts/test_release_workflow.py` | — no direct source pair |
+| `tests/scripts/test_updater_proof_gate.py` | — no direct source pair |
 | `tests/scripts/test_vendor_policy.py` | `scripts/vendor_policy.py` |
 | `tests/scripts/test_version_sync.py` | `apps/cli/src/agentic_odi_cli/_build_info.py`<br>`scripts/check_version_parity.py` |
 | `tests/scripts/test_workflow_triggers.py` | — no direct source pair |
@@ -1092,11 +1087,11 @@ the code disagree, so do not edit it by hand — run
 | `website/tests/test_ci_required.py` | — no direct source pair |
 | `website/tests/test_content_sync.py` | `website/tools/build_sample.py`<br>`website/tools/extract.py` |
 | `website/tests/test_design_system.py` | `website/tools/extract.py` |
-| `website/tests/test_docs_render.py` | `website/tools/markdown_render.py` |
+| `website/tests/test_docs_render.py` | `scripts/artifact_a11y.py`<br>`website/tools/markdown_render.py` |
 | `website/tests/test_generated.py` | `website/tools/build_site.py`<br>`website/tools/extract.py` |
 | `website/tests/test_make_og.py` | `website/tools/make_og.py` |
 | `website/tests/test_pages_deploy.py` | — no direct source pair |
-| `website/tests/test_site.py` | `website/tools/extract.py` |
+| `website/tests/test_site.py` | `scripts/artifact_a11y.py`<br>`website/tools/extract.py` |
 | `website/tests/test_theme.py` | — no direct source pair |
 <!-- coverage-map:end -->
 

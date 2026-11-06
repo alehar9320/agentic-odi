@@ -139,8 +139,9 @@ Checks that span the workspace rather than one distribution:
 ## Coverage
 
 The authoritative Python gate is the `test` job, not Codecov. Pytest runs with
-`--cov-fail-under=89` on every run, which is token-free and therefore gates a
-fork PR the same way it gates `main`. The current measurement is **89.75%**
+coverage on, and the floor comes from `[tool.coverage.report] fail_under` in
+`pyproject.toml` — token-free, so it gates a fork PR the same way it gates
+`main`. The current measurement is **89.75%**
 (7,720 statements, 791 missed). On pull requests, `scripts/coverage_floor.py`
 refuses a `pyproject.toml` whose `fail_under` is lower than the base branch's,
 so the floor can only ratchet upward. The 3.12 job writes per-distribution
