@@ -571,7 +571,18 @@ disabled and says why: nothing to brief yet.
 Print is the brief's own contract. While the print dialog is open the body
 carries `brief-printing`, and the sheet's controls, the objection field, the
 thread and the chrome all disappear — the PDF is the document, not a screenshot
-of the app.
+of the app. What the print contract is not allowed to do is hide a paragraph:
+`src/styles/print.test.ts` reads the stylesheet's `display: none` list and fails
+if any of it reaches inside the document.
+
+The brief is an artifact, so it is held to the same six structural rules as
+every page the product emits — one title, no skipped heading level, named
+tables with scoped headers, labelled or deliberately hidden images, no id used
+twice. `src/test/a11y.test.tsx` runs axe over the rendered sheet, and
+`src/components/brief/BriefLens.test.tsx` checks the structure of the document
+itself, including that a quote containing `<script>` or `<h1>` prints as the
+characters the person said. The rules live in `scripts/artifact_a11y.py`; what
+passes them is a well-built document, not a certified one.
 
 ## Rich responses
 
