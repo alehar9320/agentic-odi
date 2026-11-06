@@ -100,6 +100,29 @@ describe("theme contrast", () => {
   }
 });
 
+describe("more contrast", () => {
+  it("promotes muted and faint past AAA and thickens hairlines", () => {
+    const start = themeCss.indexOf("@media (prefers-contrast: more)");
+    expect(start, "missing the more-contrast block").toBeGreaterThanOrEqual(0);
+    const block = themeCss.slice(start, start + 1400);
+    const promoted = {
+      dark: { muted: "#c6cad3", faint: "#adb2bf" },
+      light: { muted: "#3a4050", faint: "#454c5c" },
+    };
+    for (const [name, tokens] of [
+      ["dark", promoted.dark],
+      ["light", promoted.light],
+    ] as const) {
+      const background = name === "dark" ? dark.bg : light.bg;
+      for (const [token, value] of Object.entries(tokens)) {
+        expect(block, `${name} --${token} is not promoted`).toContain(`--${token}: ${value}`);
+        expect(contrast(value, background), `${name} --${token} on --bg`).toBeGreaterThanOrEqual(7);
+      }
+    }
+    expect(block).toContain("border-width: 1.5px");
+  });
+});
+
 describe("theme tokens", () => {
   it("defines every custom property the stylesheet references without a fallback", () => {
     const referenced = new Set(

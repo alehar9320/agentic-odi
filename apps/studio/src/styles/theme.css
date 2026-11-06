@@ -56,6 +56,35 @@ html.theme-light {
   --surface-hover: rgba(15, 23, 42, 0.07);
 }
 
+/* More contrast: muted text climbs one step, hairlines thicken, and the
+   accent keeps its 3:1 focus ring. Both themes are named inside the query so
+   the light values are not shadowed by their earlier declaration. */
+@media (prefers-contrast: more) {
+  :root {
+    --muted: #c6cad3;
+    --faint: #adb2bf;
+    --line: rgba(255, 255, 255, 0.16);
+    --line-strong: rgba(255, 255, 255, 0.3);
+  }
+
+  html.theme-light {
+    --muted: #3a4050;
+    --faint: #454c5c;
+    --line: rgba(15, 23, 42, 0.22);
+    --line-strong: rgba(15, 23, 42, 0.4);
+  }
+
+  .bar,
+  .banner,
+  .outcome-card,
+  .settings-drawer,
+  .changelog-modal,
+  .diagnostics-modal,
+  .studio-metric {
+    border-width: 1.5px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
