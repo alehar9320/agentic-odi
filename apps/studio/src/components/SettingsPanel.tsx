@@ -10,6 +10,36 @@ import { AboutSection } from "./settings/sections/AboutSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ModelSection } from "./settings/sections/ModelSection";
 import { UpdatesSection } from "./settings/sections/UpdatesSection";
+import { initInstall, isDismissed, isInstalled, offerInstall, dismissInstall } from "../install";
+
+function InstallSection() {
+  const canInstall = !isInstalled() && !isDismissed();
+  return (
+    <section className="settings__install" aria-labelledby="settings-install-heading">
+      <h3 className="settings__title" id="settings-install-heading">
+        Install
+      </h3>
+      <p className="muted">
+        Open the Studio in its own window. The site works offline and the window
+        keeps your place when you reopen it.
+      </p>
+      {canInstall ? (
+        <button
+          type="button"
+          className="button button--ghost"
+          onClick={() => {
+            const offered = offerInstall();
+            if (!offered) {
+              dismissInstall();
+            }
+          }}
+        >
+          Install app
+        </button>
+      ) : null}
+    </section>
+  );
+}
 
 const PRESET_AREAS: ConnectorPreset["area"][] = [
   "voice-of-customer",
@@ -78,6 +108,11 @@ export function SettingsPanel() {
     };
     // Once per open: typing a URL must not re-probe per keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Offer the app install prompt once; dismissal is remembered.
+  useEffect(() => {
+    initInstall();
   }, []);
 
   const modelHealthy = survey ? survey.llmHealthy : llmHealth.healthy;
@@ -299,6 +334,7 @@ export function SettingsPanel() {
       <UpdatesSection />
 
       <AboutSection settings={settings} capabilities={capabilities} />
+      <InstallSection />
     </div>
   );
 }
