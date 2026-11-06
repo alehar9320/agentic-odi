@@ -17,11 +17,11 @@ describe("computeOpportunityScore", () => {
 });
 
 describe("LocalDataService canvas", () => {
-  it("returns an empty canvas with source local", async () => {
+  it("returns an empty canvas whose source names the browser", async () => {
     const store = makeStore();
     const service = new LocalDataService(store);
     const canvas = await service.fetchCanvas();
-    expect(canvas.source).toBe("local");
+    expect(canvas.source).toBe("browser");
     expect(canvas.jobs).toEqual([]);
     expect(canvas.steps).toEqual([]);
     expect(canvas.outcomes).toEqual([]);

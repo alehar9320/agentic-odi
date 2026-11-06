@@ -188,6 +188,14 @@ Studio says so in one place and keeps going:
   in the browser: the conversation, the canvas, and memory are read and written
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
+<<<<<<< HEAD
+  all. While that board is the browser's — `canvas.source === "browser"`, the
+  one value `isBrowserCanvas` accepts, since the sidecar's own repository says
+  `local` and `provenance.kind` says *live* for both — the receipt for a job, a
+  step, an outcome, and the first-run context ends with **Saved in this
+  browser.** "Saved" alone would promise a server that is not there, and the
+  next machine would look like it lost their work.
+=======
   all.
 - The outbox is shared by every tab in the origin, so two tabs would otherwise
   drain it and send each record twice. `apps/studio/src/bff/outbox.ts` takes a
@@ -206,6 +214,7 @@ Studio says so in one place and keeps going:
   old connection and block the upgrade. `IndexedDbLocalStore` closes its
   connection on `versionchange` and sets `needsReload`, which the app can read
   to show "Reload to continue" rather than hanging.
+>>>>>>> origin/main
 - Where that work sits, and how much room it takes, is one call away:
   `bff/storageFacts.ts` reports the engine, the database name, the record count,
   the newest write the records carry, and whether the browser agreed to keep the

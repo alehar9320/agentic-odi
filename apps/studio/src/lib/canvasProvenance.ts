@@ -83,3 +83,17 @@ export function savedCopyCaption(
   const days = Math.round(elapsed / DAY);
   return `Saved ${days} day${days === 1 ? "" : "s"} ago`;
 }
+
+/**
+ * True when this board is the browser's own store and nobody else is keeping a
+ * copy. `source` is the storage signal, but `local` is not it: the sidecar
+ * answers `local` for its own SQLite repository, so a desktop board would claim
+ * the browser had kept it. The browser BFF says `browser`, and a board cached by
+ * an older build says neither — the clause stays off rather than lying.
+ */
+export function isBrowserCanvas(data: CanvasData | null | undefined): boolean {
+  return data?.source === "browser";
+}
+
+/** The one clause that names the store, so no receipt invents its own. */
+export const LOCAL_BOARD_NOTE = "Saved in this browser.";
