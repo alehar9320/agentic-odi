@@ -309,6 +309,52 @@ class Study(BaseModel):
         return self
 
 
+class NextStep(BaseModel):
+    """The one thing the user said they would do next, kept for the next visit.
+
+    A next step is an intention, not a measurement, and it is stored rather than
+    kept in the browser: a greeting about a step that vanished on a cache clear
+    would report something that no longer exists. Only the invariants this model
+    can check alone live here — a step needs a real line of text, and a
+    resolution never arrives without the moment it happened. One open step per
+    workspace and the supersede that enforces it need to see the other rows, so
+    they live in the service.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    text: str = Field(..., min_length=1, description="One line, in the user's own words")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    due_at: datetime | None = Field(None, description="When the user asked to be reminded")
+    resolved_at: datetime | None = Field(
+        None, description="Set once, when the user says it happened"
+    )
+    resolution: str | None = Field(
+        None, description="What happened, in one sentence — recorded as evidence too"
+    )
+    superseded_at: datetime | None = Field(
+        None, description="Set when a newer step replaced this one; the row survives as history"
+    )
+    outcome_id: str | None = Field(
+        None, description="Desired Outcome this step was taken about, if any"
+    )
+
+    @model_validator(mode="after")
+    def _clean_text_and_closure(self) -> NextStep:
+        self.text = self.text.strip()
+        if not self.text:
+            raise ValueError("A next step must say what the user intends to do")
+        if self.resolution is not None and self.resolved_at is None:
+            raise ValueError("A resolution must carry the moment the step was resolved")
+        if self.resolved_at is not None and self.resolution is None:
+            raise ValueError("A resolved step must record what happened")
+        return self
+
+    @property
+    def is_open(self) -> bool:
+        """Whether the step is still outstanding: neither answered nor replaced."""
+        return self.resolved_at is None and self.superseded_at is None
+
+
 class SegmentVerdict(str, Enum):
     """Stage 5's verdict on a group of people, computed from their outcomes."""
 

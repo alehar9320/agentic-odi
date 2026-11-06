@@ -87,6 +87,13 @@ per-platform archives with SHA-256 checksums for a manual download. See
   unverified instead of settling the matter. The bar's history list keeps
   the last twenty threads one click away, each named by its first question and
   marked when it is the one on screen.
+- **It remembers why you came back.** Say what you mean to do next and the
+  Studio asks about it on the next visit: the headline quotes your own words,
+  and the composer asks whether it happened. *It happened* is a sentence that
+  becomes an evidence record; *not yet* is a date to ask again, or silence.
+  Only what actually happened is written — nothing is recorded for an answer
+  with no words in it, and a dropped promise closes without inventing a result.
+  `agentic-odi next-step` does the same at the terminal.
 - **A document when the conversation needs one.** `/brief` writes the decision
   brief from the canvas — the ranked bets, the records behind each, what argues
   against them, and the next evidence to collect — as Markdown a review can read

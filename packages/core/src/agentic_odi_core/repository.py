@@ -12,6 +12,7 @@ from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
     Job,
+    NextStep,
     Outcome,
     ScheduledWork,
     Segment,
@@ -124,6 +125,7 @@ class Repository(Protocol):
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
     studies: dict[str, Study]
+    next_steps: dict[str, NextStep]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -202,6 +204,10 @@ class Repository(Protocol):
     def get_study(self, study_id: str) -> Study | None: ...
     def list_studies(self, job_id: str | None = None) -> list[Study]: ...
     def update_study(self, study_id: str, updates: dict) -> Study | None: ...
+    def add_next_step(self, step: NextStep) -> NextStep: ...
+    def get_next_step(self, step_id: str) -> NextStep | None: ...
+    def list_next_steps(self) -> list[NextStep]: ...
+    def update_next_step(self, step_id: str, updates: dict) -> NextStep | None: ...
     def add_strategy(self, strategy: Strategy) -> Strategy: ...
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
@@ -236,6 +242,7 @@ class InMemoryRepository:
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
         self.studies: dict[str, Study] = {}
+        self.next_steps: dict[str, NextStep] = {}
         self._last_event_id = 0
 
     def last_event_id(self) -> int:
@@ -649,6 +656,28 @@ class InMemoryRepository:
         new_study = study.model_validate(current)
         self.studies[study_id] = new_study
         return new_study
+
+    def add_next_step(self, step: NextStep) -> NextStep:
+        self._append_event()
+        self.next_steps[step.id] = step
+        return step
+
+    def get_next_step(self, step_id: str) -> NextStep | None:
+        return self.next_steps.get(step_id)
+
+    def list_next_steps(self) -> list[NextStep]:
+        return list(self.next_steps.values())
+
+    def update_next_step(self, step_id: str, updates: dict) -> NextStep | None:
+        step = self.next_steps.get(step_id)
+        if step is None:
+            return None
+        self._append_event()
+        current = step.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_step = step.model_validate(current)
+        self.next_steps[step_id] = new_step
+        return new_step
 
     def add_strategy(self, strategy: Strategy) -> Strategy:
         self._append_event()

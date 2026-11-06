@@ -589,6 +589,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/next-step": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Next Step
+         * @description The one thing left outstanding, or ``null`` when nothing was promised.
+         *
+         *     ``null`` and never an empty list: a greeting that reads this to decide
+         *     whether to ask about last time must not mistake "no step" for "a step with
+         *     blank text".
+         */
+        get: operations["get_next_step_api_next_step_get"];
+        put?: never;
+        /**
+         * Post Next Step
+         * @description Record what the person means to do next; the step it replaces stays as history.
+         */
+        post: operations["post_next_step_api_next_step_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/next-step/{step_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Next Step Resolve
+         * @description Answer the step with what happened, which is the one answer worth keeping.
+         *
+         *     The route is a verb rather than a field on the PATCH because it produces a
+         *     different record — an Evidence row — the way ``/evidence/{id}/promote``
+         *     produces a job or an outcome.
+         */
+        post: operations["post_next_step_resolve_api_next_step__step_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/next-step/{step_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Next Step
+         * @description Move the open step without claiming anything happened: reschedule or drop.
+         *
+         *     "Not yet" is deliberately absent — it changes nothing, so it has no write to
+         *     make, and a route that recorded it would pretend the product learned
+         *     something it did not.
+         */
+        patch: operations["patch_next_step_api_next_step__step_id__patch"];
+        trace?: never;
+    };
     "/api/customer-outcomes": {
         parameters: {
             query?: never;
@@ -1735,6 +1811,25 @@ export interface components {
             confidence?: number | null;
         };
         /**
+         * PatchNextStepRequest
+         * @description An answer that moves the row and records nothing.
+         *
+         *     ``action`` is a plain string, not a ``Literal``: an unknown step must still
+         *     read as a 404, and request validation would answer 422 before the route ever
+         *     looked the id up.
+         */
+        PatchNextStepRequest: {
+            /** Action */
+            action: string;
+            /** Due At */
+            due_at?: string | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
          * PromoteEvidenceRequest
          * @description Turn a captured record into a Job or a Desired Outcome.
          */
@@ -1800,6 +1895,19 @@ export interface components {
              */
             mcp_url: string;
         };
+        /**
+         * ResolveNextStepRequest
+         * @description What actually happened — the answer that becomes an evidence record.
+         */
+        ResolveNextStepRequest: {
+            /** Resolution */
+            resolution: string;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
         /** ScheduleWorkRequest */
         ScheduleWorkRequest: {
             /**
@@ -1827,6 +1935,24 @@ export interface components {
             };
             /** Job Id */
             job_id?: string | null;
+        };
+        /**
+         * SetNextStepRequest
+         * @description The one thing the person means to do when they come back (ALH-146).
+         *
+         *     An empty promise is refused by the service rather than by a length rule here,
+         *     so the terminal and the sidecar say it the same way.
+         */
+        SetNextStepRequest: {
+            /** Text */
+            text: string;
+            /** Outcome Id */
+            outcome_id?: string | null;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
         };
         /**
          * SignalActionRequest
@@ -3245,6 +3371,148 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProposeStrategyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_next_step_api_next_step_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    } | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_next_step_api_next_step_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetNextStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_next_step_resolve_api_next_step__step_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveNextStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_next_step_api_next_step__step_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchNextStepRequest"];
             };
         };
         responses: {

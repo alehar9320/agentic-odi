@@ -37,6 +37,7 @@ from agentic_odi_core.models import (
     EvidenceItemType,
     Job,
     JobStage,
+    NextStep,
     Outcome,
     ScheduledWork,
     ScheduledWorkStatus,
@@ -91,6 +92,14 @@ class StudyNotFoundError(NotFoundError):
     def __init__(self, study_id: str, hint: str | None = None) -> None:
         self.study_id = study_id
         super().__init__(study_id, "study", hint)
+
+
+class NextStepNotFoundError(NotFoundError):
+    """Raised when a next-step id does not resolve."""
+
+    def __init__(self, step_id: str, hint: str | None = None) -> None:
+        self.step_id = step_id
+        super().__init__(step_id, "next step", hint)
 
 
 class ScheduledWorkNotFoundError(NotFoundError, ValueError):
@@ -1063,6 +1072,133 @@ class ODIService:
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
         return updated
+
+    # -- The next step: the one thing the user meant to do next --------------
+
+    def set_next_step(self, text: str, outcome_id: str | None = None) -> NextStep:
+        """Record what the user intends to do before coming back.
+
+        A second step supersedes the first instead of overwriting it. The
+        earlier line is the record of what was meant at the time, and a
+        returning visit must read exactly one open step, so closing the old one
+        has to be part of what is written down rather than a detail of this
+        call.
+        """
+        cleaned = text.strip()
+        if not cleaned:
+            raise ValidationError("A next step must say what the user intends to do")
+        if outcome_id is not None and self.repo.get_outcome(outcome_id) is None:
+            raise OutcomeNotFoundError(outcome_id)
+        previous = self.open_next_step()
+        if previous is not None:
+            self.repo.update_next_step(
+                previous.id, {"superseded_at": datetime.now(timezone.utc).isoformat()}
+            )
+        return self.repo.add_next_step(NextStep(text=cleaned, outcome_id=outcome_id))
+
+    def list_next_steps(self) -> list[NextStep]:
+        return self.repo.list_next_steps()
+
+    def get_next_step(self, step_id: str) -> NextStep | None:
+        """The step with this id, open or not; None when the store never had it.
+
+        A route needs to tell "that id is not a step" apart from "that step is
+        closed" before it answers anything else about the row.
+        """
+        return self.repo.get_next_step(step_id)
+
+    def open_next_step(self) -> NextStep | None:
+        """The step a returning visit should ask about, or None if there is none.
+
+        The newest open step wins. If an older one was somehow never closed, the
+        user is more likely to still mean the thing they said most recently.
+        """
+        open_steps = [step for step in self.repo.list_next_steps() if step.is_open]
+        if not open_steps:
+            return None
+        return max(open_steps, key=lambda step: step.created_at)
+
+    def resolve_next_step(self, step_id: str, resolution: str) -> Evidence:
+        """Answer an open step, keeping what happened as evidence in its own right.
+
+        The answer is worth more than a tick: it is what the user learned by
+        doing the thing, so it joins the Evidence library where it can support
+        an outcome. The evidence is written before the step is stamped, so a
+        step never reads as answered with nothing to show for it. Answering
+        twice keeps the first answer rather than rewriting the record.
+        """
+        step = self.repo.get_next_step(step_id)
+        if step is None:
+            raise NextStepNotFoundError(step_id)
+        cleaned = resolution.strip()
+        if not cleaned:
+            raise ValidationError("An answer must say what happened")
+        answered = next(
+            (
+                evidence
+                for evidence in self.repo.list_evidence()
+                if evidence.raw.get("next_step_id") == step_id
+            ),
+            None,
+        )
+        if answered is not None:
+            return answered
+        if step.superseded_at is not None:
+            raise ValidationError(
+                "That step was replaced by a newer one; answer the current step instead."
+            )
+        record = self.add_evidence(
+            source_name="You (next step)",
+            source_kind="manual",
+            name=f"Next step — {step.text}",
+            content=cleaned,
+            raw={"next_step_id": step.id, "origin": "user"},
+            outcome_id=step.outcome_id,
+        )
+        updated = self.repo.update_next_step(
+            step_id,
+            {"resolved_at": datetime.now(timezone.utc).isoformat(), "resolution": cleaned},
+        )
+        if updated is None:
+            raise NextStepNotFoundError(step_id)
+        return record
+
+    def reschedule_next_step(self, step_id: str, due_at: str) -> NextStep:
+        """Keep the step, and say when to ask about it again."""
+        self._require_open_step(step_id)
+        try:
+            when = datetime.fromisoformat(due_at)
+        except ValueError:
+            raise ValidationError("A next step must say when to ask again") from None
+        if when.tzinfo is None:
+            raise ValidationError("A next step's reminder must name a timezone")
+        updated = self.repo.update_next_step(step_id, {"due_at": when.isoformat()})
+        if updated is None:
+            raise NextStepNotFoundError(step_id)
+        return updated
+
+    def drop_next_step(self, step_id: str) -> NextStep:
+        """Not doing it — close the step without claiming anything happened.
+
+        ``superseded_at`` is the field that means "no longer the plan", so the
+        row survives as history and no evidence is manufactured for a step that
+        was never done.
+        """
+        self._require_open_step(step_id)
+        updated = self.repo.update_next_step(
+            step_id, {"superseded_at": datetime.now(timezone.utc).isoformat()}
+        )
+        if updated is None:
+            raise NextStepNotFoundError(step_id)
+        return updated
+
+    def _require_open_step(self, step_id: str) -> NextStep:
+        step = self.repo.get_next_step(step_id)
+        if step is None:
+            raise NextStepNotFoundError(step_id)
+        if not step.is_open:
+            raise ValidationError("That step is already closed; set a new one instead.")
+        return step
 
     # -- Stage 5: outcome-based segments -------------------------------------
 

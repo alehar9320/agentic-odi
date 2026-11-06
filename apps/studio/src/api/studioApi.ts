@@ -15,12 +15,14 @@ import type {
   ConversationSummary,
   ConversationTree,
   CreateJobPayload,
+  Evidence,
   Job,
   LatestConversation,
   LlmHealth,
   MarketplaceSearch,
   McpHealth,
   ModelList,
+  NextStep,
   Observation,
   ObservationKind,
   ObservationStatus,
@@ -584,6 +586,49 @@ export async function proposeStrategy(mcpUrl: string, jobId?: string): Promise<S
   });
 }
 
+/** The step the last visit ended with, or `null` when nothing is outstanding. */
+export async function fetchNextStep(mcpUrl: string): Promise<NextStep | null> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  return getJson<NextStep | null>(`/api/next-step?${params.toString()}`);
+}
+
+export async function setNextStep(
+  mcpUrl: string,
+  text: string,
+  outcomeId?: string | null,
+): Promise<NextStep> {
+  return postJson<NextStep>("/api/next-step", {
+    text,
+    outcome_id: outcomeId ?? null,
+    mcp_url: mcpUrl,
+  });
+}
+
+/** Answer the step with what happened. The reply is the evidence record. */
+export async function resolveNextStep(
+  mcpUrl: string,
+  stepId: string,
+  resolution: string,
+): Promise<Evidence> {
+  return postJson<Evidence>(
+    `/api/next-step/${encodeURIComponent(stepId)}/resolve`,
+    { resolution, mcp_url: mcpUrl },
+  );
+}
+
+/** Move the step without claiming anything happened: a new date, or dropped. */
+export async function patchNextStep(
+  mcpUrl: string,
+  stepId: string,
+  action: "reschedule" | "drop",
+  dueAt?: string,
+): Promise<NextStep> {
+  return sendJson<NextStep>("PATCH", `/api/next-step/${encodeURIComponent(stepId)}`, {
+    action,
+    ...(dueAt ? { due_at: dueAt } : {}),
+    mcp_url: mcpUrl,
+  });
+}
 
 export async function fetchMemory(): Promise<Observation[]> {
   return withLocal(

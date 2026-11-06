@@ -1,3 +1,5 @@
+import type { NextStep } from "../types";
+
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -14,6 +16,17 @@ export function opportunityScore(importance: number, satisfaction: number): numb
 
 export function isUnderserved(score: number | null | undefined): boolean {
   return score != null && score > UNDERSERVED_THRESHOLD;
+}
+
+/**
+ * Whether the store still owes the user a question about this step.
+ *
+ * Openness is derived from the two closing stamps rather than carried as a
+ * field, so the browser, the terminal and `packages/core` cannot disagree about
+ * which step a greeting should ask about.
+ */
+export function isNextStepOpen(step: NextStep): boolean {
+  return step.resolved_at == null && step.superseded_at == null;
 }
 
 /** True only when the store actually holds a numeric score for this outcome.

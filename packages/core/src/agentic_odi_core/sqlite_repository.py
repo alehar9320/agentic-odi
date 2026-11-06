@@ -17,6 +17,7 @@ from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
     Job,
+    NextStep,
     Outcome,
     ScheduledWork,
     Segment,
@@ -70,6 +71,7 @@ class SQLiteRepository(Repository):
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
         self.studies: dict[str, Study] = {}
+        self.next_steps: dict[str, NextStep] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -226,6 +228,10 @@ class SQLiteRepository(Repository):
             self.studies[p["id"]] = Study.model_validate(p)
         elif et == "STUDY_UPDATED":
             self._merge_updates(self.studies, p, Study)
+        elif et == "NEXT_STEP_CREATED":
+            self.next_steps[p["id"]] = NextStep.model_validate(p)
+        elif et == "NEXT_STEP_UPDATED":
+            self._merge_updates(self.next_steps, p, NextStep)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -816,6 +822,48 @@ class SQLiteRepository(Repository):
             if job_id is not None:
                 items = [study for study in items if study.job_id == job_id]
             return items
+
+    def add_next_step(self, step: NextStep) -> NextStep:
+        with self._lock:
+            self.store.append(
+                "NEXT_STEP_CREATED",
+                step.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return step
+
+    def get_next_step(self, step_id: str) -> NextStep | None:
+        with self._lock:
+            self._sync()
+            return self.next_steps.get(step_id)
+
+    def list_next_steps(self) -> list[NextStep]:
+        with self._lock:
+            self._sync()
+            return list(self.next_steps.values())
+
+    def update_next_step(self, step_id: str, updates: dict[str, Any]) -> NextStep | None:
+        with self._lock:
+            self._sync()
+            step = self.next_steps.get(step_id)
+            if step is None:
+                return None
+            current = step.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_step = step.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "NEXT_STEP_UPDATED",
+                {"id": step_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_step
 
     def update_study(self, study_id: str, updates: dict[str, Any]) -> Study | None:
         with self._lock:

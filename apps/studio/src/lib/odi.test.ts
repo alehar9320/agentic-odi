@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { NextStep } from "../types";
 import {
   formatMemberMean,
   formatOpportunityScore,
   hasScore,
+  isNextStepOpen,
   isUnderserved,
   opportunityPill,
   opportunityScore,
@@ -130,5 +132,27 @@ describe("segmentBasisLine", () => {
 
   it("claims only that the people were named when they were", () => {
     expect(segmentBasisLine(false)).toBe("People named from your evidence.");
+  });
+});
+
+describe("isNextStepOpen", () => {
+  const step = (over: Partial<NextStep>): NextStep => ({
+    id: "ns-1",
+    text: "Talk to two support leads",
+    created_at: "2026-01-01T00:00:00+00:00",
+    ...over,
+  });
+
+  it("calls a step with no stamps outstanding", () => {
+    expect(isNextStepOpen(step({}))).toBe(true);
+  });
+
+  it("keeps a step outstanding when it only has a reminder date", () => {
+    expect(isNextStepOpen(step({ due_at: "2026-12-01T00:00:00+00:00" }))).toBe(true);
+  });
+
+  it("closes a step once it is answered or replaced", () => {
+    expect(isNextStepOpen(step({ resolved_at: "2026-01-05T00:00:00+00:00" }))).toBe(false);
+    expect(isNextStepOpen(step({ superseded_at: "2026-01-05T00:00:00+00:00" }))).toBe(false);
   });
 });

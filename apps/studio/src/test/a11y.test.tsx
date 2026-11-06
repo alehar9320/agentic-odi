@@ -109,6 +109,17 @@ const state = vi.hoisted(() => ({
   llmHealth: { healthy: true, message: "ok" },
   connectorSuggestions: [] as string[],
   dismissConnectorSuggestion: vi.fn(),
+  // The dock asks about the last visit's promise (ALH-146), so the sweep covers it.
+  openNextStep: {
+    id: "ns-1",
+    text: "talk to two support leads",
+    created_at: "2026-10-19T10:00:00+00:00",
+  } as unknown,
+  lastTurnProducedSurface: true,
+  nextStepDismissed: false,
+  setNextStep: vi.fn(async () => undefined),
+  answerNextStep: vi.fn(async () => undefined),
+  dismissNextStep: vi.fn(),
 }));
 
 vi.mock("../state/StudioContext", () => ({
@@ -280,6 +291,12 @@ describe("axe sweep", () => {
   });
 
   it("passes the chat stage", async () => {
+    // A thread with an answer in it: the empty stage has no dock, and the dock
+    // is where the next-step question lives (ALH-146).
+    state.messages = [
+      { id: "u-1", parentId: null, role: "user", content: "What is on the board?" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "Three outcomes, one bet." },
+    ];
     const { container } = renderWithUpdates(
       <Surface>
         <StudioRuntimeProvider>
@@ -287,6 +304,11 @@ describe("axe sweep", () => {
         </StudioRuntimeProvider>
       </Surface>,
     );
+
+    // The dock is asking about last visit's promise, so the sweep has to see it.
+    expect(
+      screen.getByRole("complementary", { name: /what you said you would do/i }),
+    ).toBeTruthy();
 
     await expectAccessible(container);
   });

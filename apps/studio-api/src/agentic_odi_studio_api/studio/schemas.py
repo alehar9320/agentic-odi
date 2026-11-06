@@ -455,6 +455,38 @@ class PromoteEvidenceRequest(BaseModel):
     mcp_url: str = ""
 
 
+class SetNextStepRequest(BaseModel):
+    """The one thing the person means to do when they come back (ALH-146).
+
+    An empty promise is refused by the service rather than by a length rule here,
+    so the terminal and the sidecar say it the same way.
+    """
+
+    text: str
+    outcome_id: str | None = None
+    mcp_url: str = ""
+
+
+class ResolveNextStepRequest(BaseModel):
+    """What actually happened — the answer that becomes an evidence record."""
+
+    resolution: str
+    mcp_url: str = ""
+
+
+class PatchNextStepRequest(BaseModel):
+    """An answer that moves the row and records nothing.
+
+    ``action`` is a plain string, not a ``Literal``: an unknown step must still
+    read as a 404, and request validation would answer 422 before the route ever
+    looked the id up.
+    """
+
+    action: str
+    due_at: str | None = None
+    mcp_url: str = ""
+
+
 class ProposeOutcomeRequest(BaseModel):
     """Propose a desired outcome from an evidence record."""
 

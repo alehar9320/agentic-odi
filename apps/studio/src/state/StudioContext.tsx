@@ -43,6 +43,7 @@ import {
   fetchMarketplace,
   fetchMemory,
   fetchModels,
+  fetchNextStep,
   fetchSegments,
   fetchSignals,
   fetchStrategy,
@@ -51,9 +52,12 @@ import {
   healthMcp,
   listConversations as apiListConversations,
   markSignalRead as apiMarkSignalRead,
+  patchNextStep as apiPatchNextStep,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
+  resolveNextStep as apiResolveNextStep,
   setConversationHead as apiSetConversationHead,
+  setNextStep as apiSetNextStep,
   streamChat,
   updateJob as apiUpdateJob,
   updateObservation as apiUpdateObservation,
@@ -69,6 +73,7 @@ import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
+import { readNextStepDismissed, writeNextStepDismissed } from "../lib/nextStep";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -89,6 +94,8 @@ import type {
   FocusSubject,
   MarketplaceListing,
   MarketplaceSearch,
+  NextStep,
+  NextStepAnswer,
   Observation,
   Segment,
   Signal,
@@ -107,6 +114,12 @@ import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
 import { resolveTheme } from "../lib/theme";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
+
+/** True when the newest answer put a surface, not just prose, on the screen. */
+function producedSurface(messages: ChatMessage[]): boolean {
+  const newest = messages.filter((message) => message.role === "assistant").at(-1);
+  return (newest?.parts ?? []).some((part) => part.kind === "ui");
+}
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -513,6 +526,17 @@ export interface StudioContextValue {
   strategy: Strategy | null;
   segmentsError: StudioError | null;
   refreshSegments: () => Promise<void>;
+  /** ALH-146: the one thing the last visit said it would do, or null. */
+  openNextStep: NextStep | null;
+  /** Remember a promise for the next visit; the store keeps only one open at a time. */
+  setNextStep: (text: string) => Promise<void>;
+  /** What happened, what happens later, or nothing. */
+  answerNextStep: (stepId: string, answer: NextStepAnswer) => Promise<void>;
+  /** True when the newest answer put a surface on the screen. */
+  lastTurnProducedSurface: boolean;
+  /** Held for this visit only, so the next one is asked again. */
+  nextStepDismissed: boolean;
+  dismissNextStep: () => void;
   /** The evidence record a citation chip asked the Evidence lens to show. */
   focusedEvidenceId: string | null;
   focusEvidence: (evidenceId: string) => void;
@@ -674,6 +698,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [strategy, setStrategy] = useState<Strategy | null>(null);
   const [segmentsError, setSegmentsError] = useState<StudioError | null>(null);
+  const [openNextStep, setOpenNextStep] = useState<NextStep | null>(null);
+  const [nextStepDismissed, setNextStepDismissed] = useState(readNextStepDismissed);
   const [focusedSubject, setFocusedSubject] = useState<FocusSubject | null>(loadFocusedSubject);
   const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
@@ -729,6 +755,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSegmentsError(null);
     } catch (error) {
       setSegmentsError(asStudioError(error));
+    }
+  }, [settings.mcp_url]);
+
+  /**
+   * The one thing the last visit said it would do.
+   *
+   * A step the studio cannot read is a step it does not mention: an answer that
+   * guesses at a promise is worse than the copy that says nothing about one.
+   */
+  const refreshNextStep = useCallback(async () => {
+    try {
+      setOpenNextStep(await fetchNextStep(settings.mcp_url));
+    } catch {
+      setOpenNextStep(null);
     }
   }, [settings.mcp_url]);
 
@@ -1246,6 +1286,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     // Segments and the strategy are the other things a turn can create, and the
     // rail counts them, so they are re-read on the same beat.
     void refreshSegments();
+    // The next step rides the same beat: the greeting reads it, and a turn can
+    // be the thing that answers it.
+    void refreshNextStep();
     setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
     try {
       const data = await fetchCanvas(settings.mcp_url);
@@ -1263,7 +1306,66 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const problem = asStudioError(error);
       setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
     }
-  }, [settings.mcp_url, refreshSignals, refreshSegments]);
+  }, [settings.mcp_url, refreshSignals, refreshSegments, refreshNextStep]);
+
+  /**
+   * Whether the newest answer put something on the screen.
+   *
+   * Derived from the parts the turn published rather than a flag set while it
+   * ran, so switching conversations cannot leave the offer pointing at a
+   * surface that is no longer there.
+   */
+  const lastTurnProducedSurface = useMemo(() => producedSurface(messages), [messages]);
+
+  /**
+   * Keep the one thing worth coming back for. The store holds a single open
+   * step, so naming a new promise replaces the old one instead of stacking
+   * a list nobody finishes.
+   */
+  const setNextStep = useCallback(
+    async (text: string) => {
+      try {
+        setOpenNextStep(await apiSetNextStep(settings.mcp_url, text));
+        pushToast("success", "The studio will ask about this next time.");
+      } catch (error) {
+        pushToast("error", `Could not save the next step: ${(error as Error).message}`);
+      }
+    },
+    [settings.mcp_url, pushToast],
+  );
+
+  /**
+   * Answer what the studio asked last time. Only what happened is written: a
+   * sentence becomes an evidence record, a date moves the ask, and "not yet"
+   * with no date is a thing that did not happen, so it writes nothing at all.
+   */
+  const answerNextStep = useCallback(
+    async (stepId: string, answer: NextStepAnswer) => {
+      const sentence = answer.sentence?.trim();
+      try {
+        if (answer.done && sentence) {
+          await apiResolveNextStep(settings.mcp_url, stepId, sentence);
+        } else if (answer.action === "reschedule") {
+          await apiPatchNextStep(settings.mcp_url, stepId, "reschedule", answer.dueAt);
+        } else if (answer.action === "drop") {
+          await apiPatchNextStep(settings.mcp_url, stepId, "drop");
+        } else {
+          return;
+        }
+      } catch (error) {
+        pushToast("error", `Could not answer the next step: ${(error as Error).message}`);
+        return;
+      }
+      await refreshNextStep();
+    },
+    [settings.mcp_url, pushToast, refreshNextStep],
+  );
+
+  /** Put the question away for this visit. The store still holds the promise. */
+  const dismissNextStep = useCallback(() => {
+    writeNextStepDismissed(true);
+    setNextStepDismissed(true);
+  }, []);
 
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
@@ -2540,6 +2642,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       strategy,
       segmentsError,
       refreshSegments,
+      openNextStep,
+      setNextStep,
+      answerNextStep,
+      lastTurnProducedSurface,
+      nextStepDismissed,
+      dismissNextStep,
       focusedEvidenceId,
       focusEvidence,
     }),
@@ -2663,6 +2771,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       strategy,
       segmentsError,
       refreshSegments,
+      openNextStep,
+      setNextStep,
+      answerNextStep,
+      lastTurnProducedSurface,
+      nextStepDismissed,
+      dismissNextStep,
       focusedEvidenceId,
       focusEvidence,
     ],

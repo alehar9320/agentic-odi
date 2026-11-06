@@ -21,6 +21,7 @@ from agentic_odi_core import (
     EvidenceNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
+    NextStepNotFoundError,
     NoStrategyEvidenceError,
     OdiError,
     ODIService,
@@ -98,12 +99,15 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationListResponse,
     ObservationResponse,
     ObservationUpdateRequest,
+    PatchNextStepRequest,
     PromoteEvidenceRequest,
     ProposalOut,
     ProposeOutcomeRequest,
     ProposeStrategyRequest,
     RejectProposalRequest,
+    ResolveNextStepRequest,
     ScheduleWorkRequest,
+    SetNextStepRequest,
     SignalActionRequest,
     TurnNode,
     UpdateConversationRequest,
@@ -912,6 +916,124 @@ async def post_strategy_propose(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return strategy.model_dump(mode="json")
+
+
+@router.get("/next-step", response_model=dict[str, Any] | None)
+async def get_next_step(
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any] | None:
+    """The one thing left outstanding, or ``null`` when nothing was promised.
+
+    ``null`` and never an empty list: a greeting that reads this to decide
+    whether to ask about last time must not mistake "no step" for "a step with
+    blank text".
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_NEXT_STEP.value, {}
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, dict) else None
+    step = _service(request).open_next_step()
+    return None if step is None else step.model_dump(mode="json")
+
+
+@router.post("/next-step", response_model=dict[str, Any])
+async def post_next_step(body: SetNextStepRequest, request: Request) -> dict[str, Any]:
+    """Record what the person means to do next; the step it replaces stays as history."""
+    arguments: dict[str, Any] = {"text": body.text}
+    if body.outcome_id is not None:
+        arguments["outcome_id"] = body.outcome_id
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.SET_NEXT_STEP.value, arguments
+        )
+        return _payload_from_text(result)
+    try:
+        step = _service(request).set_next_step(body.text, outcome_id=body.outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return step.model_dump(mode="json")
+
+
+@router.post("/next-step/{step_id}/resolve", response_model=dict[str, Any])
+async def post_next_step_resolve(
+    step_id: str,
+    body: ResolveNextStepRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """Answer the step with what happened, which is the one answer worth keeping.
+
+    The route is a verb rather than a field on the PATCH because it produces a
+    different record — an Evidence row — the way ``/evidence/{id}/promote``
+    produces a job or an outcome.
+    """
+    arguments: dict[str, Any] = {"step_id": step_id, "resolution": body.resolution}
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.RESOLVE_NEXT_STEP.value, arguments
+        )
+        return _payload_from_text(result)
+    try:
+        record = _service(request).resolve_next_step(step_id, body.resolution)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return record.model_dump(mode="json")
+
+
+@router.patch("/next-step/{step_id}", response_model=dict[str, Any])
+async def patch_next_step(
+    step_id: str,
+    body: PatchNextStepRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """Move the open step without claiming anything happened: reschedule or drop.
+
+    "Not yet" is deliberately absent — it changes nothing, so it has no write to
+    make, and a route that recorded it would pretend the product learned
+    something it did not.
+    """
+    if not _uses_mcp(request) and _service(request).get_next_step(step_id) is None:
+        # The id is checked before the action, so a step the store never had
+        # reads as a 404 whatever the body said.
+        raise _as_http_error(NextStepNotFoundError(step_id))
+    if body.action == "reschedule" and not body.due_at:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="Rescheduling a next step needs the date to ask again.",
+                field="due_at",
+            ),
+            status_code=400,
+        )
+    if body.action not in ("reschedule", "drop"):
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="A next step can be rescheduled or dropped; anything else is already done.",
+                field="action",
+            ),
+            status_code=400,
+        )
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {"step_id": step_id}
+        if body.action == "reschedule":
+            arguments["due_at"] = body.due_at
+            tool = ToolName.RESCHEDULE_NEXT_STEP
+        else:
+            tool = ToolName.DROP_NEXT_STEP
+        result = await call_mcp_tool(_require_mcp_url(body.mcp_url), tool.value, arguments)
+        return _payload_from_text(result)
+    service = _service(request)
+    try:
+        if body.action == "reschedule":
+            step = service.reschedule_next_step(step_id, str(body.due_at))
+        else:
+            step = service.drop_next_step(step_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return step.model_dump(mode="json")
 
 
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:

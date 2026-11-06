@@ -63,6 +63,12 @@ class ToolName(str, Enum):
     REJECT_PROPOSAL = "reject_proposal"
     OPEN_STUDY = "open_study"
     LIST_STUDIES = "list_studies"
+    SET_NEXT_STEP = "set_next_step"
+    GET_NEXT_STEP = "get_next_step"
+    LIST_NEXT_STEPS = "list_next_steps"
+    RESOLVE_NEXT_STEP = "resolve_next_step"
+    RESCHEDULE_NEXT_STEP = "reschedule_next_step"
+    DROP_NEXT_STEP = "drop_next_step"
 
 
 class ToolEffect(str, Enum):
@@ -557,6 +563,50 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         effect=_derive_effect("list_studies"),
         arguments=("job_id",),
         returns="A list of Studies. Empty until a study has been opened.",
+    ),
+    ToolName.SET_NEXT_STEP.value: ToolSpec(
+        name="set_next_step",
+        summary="Record the one thing the user intends to do before coming back.",
+        effect=_derive_effect("set_next_step"),
+        arguments=("text", "outcome_id"),
+        required=("text",),
+        returns="The created NextStep. An open step it replaces is superseded, not deleted.",
+    ),
+    ToolName.GET_NEXT_STEP.value: ToolSpec(
+        name="get_next_step",
+        summary="The next step still outstanding, which is what a returning session asks about.",
+        effect=_derive_effect("get_next_step"),
+        returns="The open NextStep, or null when nothing is outstanding.",
+    ),
+    ToolName.LIST_NEXT_STEPS.value: ToolSpec(
+        name="list_next_steps",
+        summary="List every next step recorded, outstanding and closed.",
+        effect=_derive_effect("list_next_steps"),
+        returns="A list of NextSteps, most recent last.",
+    ),
+    ToolName.RESOLVE_NEXT_STEP.value: ToolSpec(
+        name="resolve_next_step",
+        summary="Answer an open next step with what actually happened.",
+        effect=_derive_effect("resolve_next_step"),
+        arguments=("step_id", "resolution"),
+        required=("step_id", "resolution"),
+        returns="The Evidence row recording what happened.",
+    ),
+    ToolName.RESCHEDULE_NEXT_STEP.value: ToolSpec(
+        name="reschedule_next_step",
+        summary="Keep an open next step and say when to ask about it again.",
+        effect=_derive_effect("reschedule_next_step"),
+        arguments=("step_id", "due_at"),
+        required=("step_id", "due_at"),
+        returns="The step with its new due date. Nothing is recorded as having happened.",
+    ),
+    ToolName.DROP_NEXT_STEP.value: ToolSpec(
+        name="drop_next_step",
+        summary="Close a next step the user is not going to do, without claiming an answer.",
+        effect=_derive_effect("drop_next_step"),
+        arguments=("step_id",),
+        required=("step_id",),
+        returns="The step, superseded rather than deleted, and no evidence.",
     ),
 }
 
