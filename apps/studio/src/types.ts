@@ -283,6 +283,10 @@ export interface StudioError {
   suggestion?: string | null;
   retryable: boolean;
   request_id?: string | null;
+  //: Which outcome field the failure belongs to, so the form can render it
+  //: beside the statement or rating the person mistyped. Absent when the
+  //: failure cannot be attributed to a single field.
+  field?: "statement" | "importance" | "satisfaction" | null;
 }
 
 export type StudioTheme = "light" | "dark";

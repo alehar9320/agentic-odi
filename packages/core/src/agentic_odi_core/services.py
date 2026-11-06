@@ -19,6 +19,7 @@ from agentic_odi_core.evaluation import (
     n_advisory,
     require_outcome_statement,
 )
+from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
@@ -569,6 +570,7 @@ class ODIService:
             raise OutcomeNotFoundError(outcome_id)
         self._emit_outcome_updates(existing, res)
         self._record_score_snapshot(res, note)
+        self._count_outcome_milestones(res)
         return res
 
     def get_outcome_delta(self, outcome_id: str, since: str | None = None) -> OutcomeDelta:
@@ -853,6 +855,18 @@ class ODIService:
             "interval_computed_at": utc_now_iso(),
         }
 
+    def _count_outcome_milestones(self, outcome: Outcome) -> None:
+        """Tell the onboarding funnel how far this workspace has got.
+
+        Both milestones are first-ever-per-workspace, so offering them on every
+        outcome is cheaper and truer than trying to remember which one was first.
+        A score milestone needs both scores: an outcome with one is not yet a
+        ranked opportunity, and the funnel must not claim it is.
+        """
+        count_milestone(self.repo, FIRST_OUTCOME)
+        if outcome.importance is not None and outcome.satisfaction is not None:
+            count_milestone(self.repo, FIRST_SCORE)
+
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
         #: The write that produced these facts: two changes landing on the same
         #: score are two changes, one change reported twice is one signal.
@@ -1013,6 +1027,7 @@ class ODIService:
         )
         created = self.repo.add_outcome(outcome)
         self._record_score_snapshot(created, note)
+        self._count_outcome_milestones(created)
         return created
 
     def get_outcomes(

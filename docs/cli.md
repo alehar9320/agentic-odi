@@ -257,6 +257,11 @@ tests so it stays swappable.
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
 agentic-odi summary <job-id> --top 3 --json
+
+# Onboarding funnel: launch, first message, first outcome, first score, return
+agentic-odi stats
+agentic-odi stats --json
+agentic-odi stats --reset --yes
 ```
 
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
@@ -279,6 +284,16 @@ and the Studio API returns a 422 with the same message.
 `summary` shows how many of the eight job-map phases the Job covers, which are
 still missing, and the underserved outcomes (score above 10) in descending
 order. `--top` caps that list; `--json` returns the same data for a script.
+
+`stats` reports the onboarding funnel: how many times the sidecar was launched,
+and whether this store has seen a first message, a first outcome, a first score,
+and a return session. Counts come from the same local event log as the records
+do, so nothing is uploaded anywhere and a counter that has not happened reads as
+zero rather than a guess. Each event carries a session id drawn fresh for the
+process, which is not the per-install device id. `--reset` appends a marker that
+puts the counters back to zero and leaves the underlying events in place; it asks
+first unless you pass `--yes`. With `--backend mcp` the command exits 1: that
+backend has no local log to count.
 
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows

@@ -54,9 +54,16 @@ While a turn has produced no text yet, an activity line names the phase (*Waking
 the model*, *Opening your studio tools*, *Thinking*) with a shimmer and an
 elapsed hint; the phase is announced once to assistive technology, and the reply
 is marked busy until it settles so a screen reader reads the answer, not every
-token. Reasoning sits above the answer in a disclosure that opens while it is
-being written and collapses to *Thought for Ns* afterwards, and every tool call
-is a trace chip with the source the turn actually read.
+token. A turn that used your tools folds what it did into one work row —
+*Working… · 3 calls* while it runs, *Worked for 12s · 3 calls* once it settles —
+open on the way, closed at rest, and reopening it shows the turn's own record
+rather than a summary the model wrote: reasoning in a disclosure that opens while
+it is being written and collapses to *Thought for Ns*, then each MCP call as a
+trace chip. A write still asking permission is never folded in: it stays unfolded
+beside the answer until you answer, because a question is not history. Prose,
+sources, and generated surfaces sit outside the row, and a turn that only thought
+needs no row at all. A conversation reopened from the store counts its calls
+without a duration — only the browser that watched the run owns the clock.
 
 ### Slash commands
 
@@ -338,11 +345,12 @@ without giving up the message model the sidecar already understands.
 | **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
 | **Silence** | A run that stops producing tokens for eight seconds shows *Still working · no new output for Ns* under the reply, while the Stop button keeps its meaning. The signal comes from assistant-ui's stall detection over text, reasoning, tool arguments, and tool results — never from a timer watching the DOM — so a long tool call reads as work, not a freeze. A dropped stream never shows it: that path ends in the failure panel. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
+| **Work** | What a turn did folds into one row: *Working… · 3 calls* while it runs, then *Worked for 12s · 3 calls*, closed and reopenable. Opening it is the turn's own record, not a paraphrase — the same reasoning disclosure and trace chips, in the order they arrived. A turn the browser did not watch from the start shows its calls with no duration. |
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
-| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. |
+| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. The ask is never folded into the work row — a question is not history. |
 | **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
 | **Claims** | Each declarative sentence ends with an evidence marker, and the reply arrives with a validated claim list. A chip names the source and the record (`Gong · Call with Acme`), never the tool; `Hypothesis` tags an ungrounded guess; an unmarked sentence keeps its place with a dotted underline and the accessible name *Uncited claim*. A chip opens that row in the Evidence lens, and Escape returns focus to the chip. Claims are stored with the turn, so they survive a reload; a record deleted later keeps its snapshot label and stops being a link. A seeded demo reply labels its chips **Sample** and does not count as cited. |
-| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter — capped at 20,000 characters with the truncation announced in the extracted text, and sent with the turn. Nothing is stored server-side. |
+| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. A turn carries at most five attachments, counting text and images together; a sixth is refused, naming the file and the limit, before the turn is sent. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter — capped at 20,000 characters with the truncation announced in the extracted text, and sent with the turn. Nothing is stored server-side. |
 | **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
@@ -376,11 +384,13 @@ cites the issue or PR that landed it.
 | runtime `suggestions` | Adopted | Starter suggestions computed from canvas state. | #238 |
 | `queue` adapter | Adopted | The follow-up lane: a send while a reply runs joins the queue instead of the wall. | #410 |
 | `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works; the dedicated adapter is unused, branches are inferred from parent ids. | — |
+| `groupPartByType` / `GroupedParts` | Partial | The work row groups through `GroupedParts` with our own `workGrouping`; the helper, which keys by part type alone, is unused. | — |
 | `ThreadPrimitive.Root` | Adopted | The transcript's shell. | #238 |
 | `ThreadPrimitive.Viewport` | Adopted | Scrolling; the jump-to-latest affordance reads its `isAtBottom`. | #238 |
 | `ThreadPrimitive.Messages` | Adopted | The message map. | #238 |
 | `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data is adopted; the pills are hand-rolled because they carry the artifact-preview copy. | — |
 | `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
+| `MessagePrimitive.GroupedParts` | Adopted | One collapsed row holds what a turn did — its reasoning and tool calls — and never hides a write that is still asking. | #392 |
 | `MessagePrimitive.Attachments` | Adopted | User turns show what was sent. | #238 |
 | `MessagePrimitive.Root` | Partial | The wrapper is a hand-written article carrying `aria-busy` and the avatar. | — |
 | `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
@@ -411,7 +421,7 @@ cites the issue or PR that landed it.
 | `unstable_useComposerInputHistory` | Adopted | Up-arrow recalls what you sent last. | #430 |
 | `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count is ours (`arrivalCount.ts`). | #245 |
 | Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
-| Tool result rendering | Adopted | Each MCP call is a trace chip. | #238 |
+| Tool result rendering | Adopted | Each MCP call is a trace chip, gathered under the turn's work row. | #238 |
 | `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
 | ODI surfaces as `data` parts | Adopted | A validated `UiNode` rides the transcript and renders through `UiRenderer`. | #55 |
 
@@ -424,7 +434,9 @@ cites the issue or PR that landed it.
 | `apps/studio/src/assistant/attachments.ts` | The attachment adapter and the browser-side text/image extraction. |
 | `apps/studio/src/assistant/parts.tsx` | One renderer per part: text, reasoning, tool (with its approval), source, file, generated surface, claims. |
 | `apps/studio/src/assistant/claims.ts` | Hides claim markers (including one split across streamed chunks), cuts the reply so every chip lands after its own sentence, and counts citations without a seeded demo. The Markdown export reads a claim-bearing reply through this same parser, so the file cannot say something other than what the transcript showed. |
-| `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.Parts`, the branch picker, the action bar, and the in-place edit composer. |
+| `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.GroupedParts` with the turn's work grouped, the branch picker, the action bar, and the in-place edit composer. |
+| `apps/studio/src/components/chat/WorkBlock.tsx` | The work row itself: one line that counts the calls it holds, times only a run this browser watched, and opens on the turn's own record. |
+| `apps/studio/src/components/chat/workGrouping.ts` | Which parts of a reply are one run of work — the thinking and the answered calls together, a pending approval never folded in. Pure over the runtime's parts, so it needs no browser to test. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
 | `apps/studio/src/components/settings/SavedField.tsx` | A field that saves when it is left, states **Saved** in its section, and refuses an unusable value beside itself with the reason. |
@@ -571,7 +583,18 @@ disabled and says why: nothing to brief yet.
 Print is the brief's own contract. While the print dialog is open the body
 carries `brief-printing`, and the sheet's controls, the objection field, the
 thread and the chrome all disappear — the PDF is the document, not a screenshot
-of the app.
+of the app. What the print contract is not allowed to do is hide a paragraph:
+`src/styles/print.test.ts` reads the stylesheet's `display: none` list and fails
+if any of it reaches inside the document.
+
+The brief is an artifact, so it is held to the same six structural rules as
+every page the product emits — one title, no skipped heading level, named
+tables with scoped headers, labelled or deliberately hidden images, no id used
+twice. `src/test/a11y.test.tsx` runs axe over the rendered sheet, and
+`src/components/brief/BriefLens.test.tsx` checks the structure of the document
+itself, including that a quote containing `<script>` or `<h1>` prints as the
+characters the person said. The rules live in `scripts/artifact_a11y.py`; what
+passes them is a well-built document, not a certified one.
 
 ## Rich responses
 
@@ -832,8 +855,9 @@ Each row below names a state to reach and what is worth your own eyes.
 | Activity line | A turn whose first token is slow: a cold model, or a long prompt | The label moves *Waking the model* → *Opening your studio tools* → *Thinking*, the dots animate, an elapsed count appears after 3 s, and the reply does not jump the layout when it arrives |
 | Streaming prose | Any turn | The caret trails the last word, the send button is a stop button, and scrolling away offers **Jump to latest** with a count of what arrived, without fighting the follow |
 | Reasoning | A backend that streams `reasoning_content` or `reasoning` | The disclosure opens while it is written, settles to *Thought for Ns*, reopens on click, and never repeats the answer |
+| Work row | A model that emits real `tool_calls`, then a page reload | The row reads *Working… · N calls* while the turn runs and *Worked for Ns · N calls* at rest; opening it lists the calls in the order they arrived without shifting the answer; the same turn reopened from the store counts its calls and invents no duration |
 | Tool trace and sources | A model that emits real `tool_calls` | The dot pulses while the tool runs, the chip previews what came back, and the source names the tool the turn actually read |
-| Approval | The same, asking it to write ("add a step to …") | The turn pauses for **Allow**/**Decline**, a decline reads as a tool result and not an error, and a double click runs the tool once |
+| Approval | The same, asking it to write ("add a step to …") | The turn pauses for **Allow**/**Decline**, the ask is never folded into the work row, a decline reads as a tool result and not an error, and a double click runs the tool once |
 | Model picker | **Model** in the hint row; open it twice; narrow the window first | The list matches the backend, the configured id stays selectable, arrows/Home/End/Enter/Escape work, an offline backend explains itself and its Settings button is reachable from the keyboard, and it probes once per backend |
 | Attachments | Paperclip, drag a file onto the composer, paste a screenshot, then drop a `.exe` | Thumbnail, name, size, and remove on the chip; the unreadable file is refused with its reason; the sent turn shows the same; the paperclip has a visible focus ring |
 | Branches | Edit your own turn, then regenerate a reply | **Alternative N of M** with `‹`/`›`, and a reload reopens the branch you were reading |
