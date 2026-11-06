@@ -321,6 +321,34 @@ describe("SettingsPanel about section", () => {
     expect(within(about).getByText(/macOS|Windows|Linux|Desktop/)).toBeInTheDocument();
     expect(within(about).getByText(aboutService.statusLine())).toBeInTheDocument();
   });
+
+  it("shows the package version when the updater is unsupported (browser case)", async () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    const browserService = createUpdateService({
+      transport: {
+        supported: () => false,
+        currentVersion: async () => "",
+        check: async () => null,
+        relaunch: async () => undefined,
+      },
+      storage: null,
+      document: null,
+    });
+    render(
+      <UpdateProvider service={browserService}>
+        <OnboardingProvider enabled={false}>
+          <SettingsPanel />
+        </OnboardingProvider>
+      </UpdateProvider>,
+    );
+
+    const about = screen.getByRole("region", { name: "About" });
+    await waitFor(() => expect(browserService.getSnapshot().phase).not.toBe("checking"));
+
+    expect(within(about).getByText(`v${__STUDIO_VERSION__}`)).toBeInTheDocument();
+    expect(within(about).queryByText("—")).not.toBeInTheDocument();
+  });
 });
 
 describe("SettingsPanel connection survey", () => {

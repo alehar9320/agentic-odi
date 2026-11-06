@@ -322,7 +322,14 @@ npm --prefix apps/studio run typecheck   # tsc --noEmit
 npm --prefix apps/studio test -- --run   # Vitest on jsdom (run once)
 npm --prefix apps/studio run test:visual # Vitest Browser Mode → Chromatic archives
 npm --prefix apps/studio run build       # production build → apps/studio/dist
-cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
+```
+
+`__STUDIO_VERSION__` is the only build-version source, baked into `vite.config.ts`
+from `apps/studio/package.json` and exposed through `apps/studio/src/lib/version.ts`.
+`src/lib/version.test.ts` asserts it matches both `package.json` and the release
+manifest; removing the vite define must fail that test.
+```
+ cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
 ### Visual tests
