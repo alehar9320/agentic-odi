@@ -750,9 +750,7 @@ class LocalBackend(Backend):
         from agentic_odi_core import OdiError
 
         try:
-            step = self.service.reschedule_next_step(
-                step_id=args["step_id"], due_at=args["due_at"]
-            )
+            step = self.service.reschedule_next_step(step_id=args["step_id"], due_at=args["due_at"])
         except OdiError as exc:
             raise BackendError(str(exc)) from None
         return step.model_dump(mode="json")
