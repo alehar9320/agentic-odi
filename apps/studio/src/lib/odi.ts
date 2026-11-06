@@ -1,3 +1,4 @@
+import type { Outcome } from "../types";
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -22,11 +23,16 @@ export function hasScore(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+
 export function formatOpportunityScore(score: number | null | undefined): string {
   if (score == null) {
     return "N/A";
   }
   return score.toFixed(1);
+}
+
+export function scoredAverage(outcomes: Outcome[]): { mean: number | null; scored: number; unscored: number } {
+  return summarizeMemberScores(outcomes.map((o) => o.opportunity_score));
 }
 
 export function opportunityPill(score: number | null | undefined): PillDescriptor {
