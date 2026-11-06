@@ -199,6 +199,51 @@ describe("ThreadComposer attachments", () => {
 
     expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
   });
+
+  it("keeps five mixed attachments and refuses the rest, naming the file and the limit", async () => {
+    const pushToast = vi.fn();
+    const { container } = await renderThreadComposer({ pushToast });
+    const root = container.querySelector(".composer") as HTMLElement;
+    const files = [1, 2, 3, 4, 5, 6].map(
+      (n) => new File(["x"], `notes-${n}.txt`, { type: "text/plain" }),
+    );
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files } });
+
+    await screen.findByText("notes-1.txt");
+    await screen.findByText("notes-5.txt");
+    expect(screen.queryByText("notes-6.txt")).toBeNull();
+    expect(await screen.findAllByRole("listitem")).toHaveLength(5);
+
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("notes-6.txt"));
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("5-file"));
+
+    const refusal = screen.getByText(/exceeds the 5-file attachment limit/);
+    expect(refusal).toHaveTextContent(/exceeds the 5-file attachment limit/);
+    expect(refusal).toHaveTextContent(/notes-6.txt/);
+  });
+
+  it("shows the attachment counter as files are added and removed", async () => {
+    const pushToast = vi.fn();
+    const { container } = await renderThreadComposer({ pushToast });
+    const root = container.querySelector(".composer") as HTMLElement;
+    const file = (n: number) => new File(["x"], `notes-${n}.txt`, { type: "text/plain" });
+
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file(1)] } });
+    await screen.findByText("1 of 5 files");
+
+    fireEvent.drop(root, {
+      dataTransfer: { types: ["Files"], files: [file(2), file(3), file(4), file(5)] },
+    });
+    await screen.findByText("5 of 5 files");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove notes-1.txt" }));
+    await screen.findByText("4 of 5 files");
+
+    // Making room admits one more and refuses the next.
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file(6), file(7)] } });
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("notes-7.txt"));
+    await screen.findByText("5 of 5 files");
+  });
 });
 
 describe("Composer keyboard focus", () => {
