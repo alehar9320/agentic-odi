@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import type { NextStep } from "../types";
+
+import { describe, expect, it, vi } from "vitest";
 
 import {
   greetingCandidates,
@@ -106,5 +108,49 @@ describe("nextGreeting", () => {
 
   it("returns null for an empty rotation", () => {
     expect(nextGreeting([], "greeting")).toBeNull();
+  });
+});
+
+describe("the next step candidate", () => {
+  const step = (over: Partial<NextStep> = {}): NextStep => ({
+    id: "ns-1",
+    text: "talk to two support leads",
+    created_at: "2026-10-17T09:30:00Z",
+    ...over,
+  });
+
+  it("wins the rotation whenever a step is outstanding", () => {
+    const [first] = greetingCandidates(context({ nextStep: step() }));
+
+    expect(first.id).toBe("next-step");
+    expect(first.kind).toBe("insight");
+  });
+
+  it("leaves today's copy untouched when there is no step", () => {
+    expect(greetingCandidates(context())).toEqual(greetingCandidates(context({ nextStep: null })));
+  });
+
+  it("says when the promise was made, so the question is about a real visit", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-20T09:30:00Z"));
+    try {
+      const [first] = greetingCandidates(context({ nextStep: step() }));
+
+      expect(first.text).toBe(
+        "Last time you said you would talk to two support leads (3d ago). Did it happen?",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never greets about a step with nothing in it", () => {
+    const blank = greetingCandidates(context({ nextStep: step({ text: "   " }) }));
+    const closed = greetingCandidates(
+      context({ nextStep: step({ resolved_at: "2026-10-18T09:30:00Z", resolution: "Did it" }) }),
+    );
+
+    expect(blank.some((candidate) => candidate.id === "next-step")).toBe(false);
+    expect(closed.some((candidate) => candidate.id === "next-step")).toBe(false);
   });
 });

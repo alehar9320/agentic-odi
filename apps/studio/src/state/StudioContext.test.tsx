@@ -71,6 +71,11 @@ let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 let conversationCreates = 0;
 
+// ALH-146: the sidecar keeps at most one open step, so the stub is that single
+// row or null, plus a log of what the studio asked it to write.
+let nextStepOpen: Record<string, unknown> | null = null;
+let nextStepCalls: { method: string; url: string; body: Record<string, unknown> }[] = [];
+
 // The follow-up queue (#410) needs a turn that stays in flight so later sends
 // actually line up behind it: /api/chat then returns a stream the test closes
 // (respond) or breaks (abort — the same way aborting the fetch signal would).
@@ -306,6 +311,34 @@ function route(
         },
       ],
     });
+  }
+  if (url === "/api/next-step" || url.startsWith("/api/next-step?")) {
+    if (init?.method === "POST") {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      nextStepCalls.push({ method: "POST", url, body });
+      nextStepOpen = {
+        id: "ns-1",
+        text: body.text,
+        created_at: "2026-10-22T10:00:00+00:00",
+        ...(body.outcome_id ? { outcome_id: body.outcome_id } : {}),
+      };
+    }
+    return json(nextStepOpen);
+  }
+  if (url.startsWith("/api/next-step/")) {
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    nextStepCalls.push({ method: String(init?.method ?? "POST"), url, body });
+    if (url.endsWith("/resolve")) {
+      // Answering the step writes an evidence row and leaves nothing open.
+      nextStepOpen = null;
+      return json({ id: "EV-9", item_type: "manual", content: body.resolution });
+    }
+    if (body.action === "drop") {
+      nextStepOpen = null;
+    } else if (body.action === "reschedule" && nextStepOpen) {
+      nextStepOpen = { ...nextStepOpen, due_at: body.due_at };
+    }
+    return json(nextStepOpen);
   }
   if (url === "/api/health/mcp") {
     return json({ reachable: true });
@@ -1782,5 +1815,191 @@ describe("StudioContext agent focus", () => {
     // but the composer has no words to claim, so no chip may appear.
     expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "deleted-yesterday" });
     expect(result.current.focusedSubjectLabel).toBeNull();
+  });
+});
+
+describe("StudioContext next step", () => {
+  // A turn that put a surface on screen is the one worth asking a promise about.
+  const SURFACE_CHAT_STREAM =
+    'event: conversation\ndata: {"id":"c-3","title":"hello"}\n\n' +
+    'event: delta\ndata: {"text":"Here is the board."}\n\n' +
+    'event: ui\ndata: {"id":"ui-1","spec":{"type":"divider"}}\n\n' +
+    'event: message\ndata: {"content":"Here is the board."}\n\n';
+
+  const OPEN_STEP = {
+    id: "ns-1",
+    text: "Talk to two support leads",
+    created_at: "2026-10-19T10:00:00+00:00",
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    bootCorrupt = false;
+    chatAborts = false;
+    canvasFails = false;
+    canvasRecords = {};
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    nextStepOpen = null;
+    nextStepCalls = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function booted() {
+    const view = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(view.result.current.conversationId).toBe("c-1"));
+    return view;
+  }
+
+  it("reads the step the last visit left open", async () => {
+    nextStepOpen = OPEN_STEP;
+
+    const { result } = await booted();
+
+    await waitFor(() => expect(result.current.openNextStep?.text).toBe("Talk to two support leads"));
+  });
+
+  it("holds no step when the store has none", async () => {
+    const { result } = await booted();
+
+    // Null, never an empty row: a greeting must not read "no step" as
+    // "a step with blank text".
+    expect(result.current.openNextStep).toBeNull();
+  });
+
+  it("keeps the promise the person makes after a turn", async () => {
+    const { result } = await booted();
+
+    await act(async () => {
+      await result.current.setNextStep("Talk to two support leads");
+    });
+
+    const write = nextStepCalls.find((call) => call.method === "POST" && call.url === "/api/next-step");
+    expect(write?.body).toMatchObject({ text: "Talk to two support leads" });
+    expect(result.current.openNextStep?.text).toBe("Talk to two support leads");
+  });
+
+  it("answers the step with what happened and leaves nothing open", async () => {
+    nextStepOpen = OPEN_STEP;
+    const { result } = await booted();
+    await waitFor(() => expect(result.current.openNextStep?.id).toBe("ns-1"));
+
+    await act(async () => {
+      await result.current.answerNextStep("ns-1", {
+        done: true,
+        sentence: "Both said the queue is manual today",
+      });
+    });
+
+    const resolve = nextStepCalls.find((call) => call.url.endsWith("/resolve"));
+    expect(resolve?.body).toMatchObject({ resolution: "Both said the queue is manual today" });
+    expect(result.current.openNextStep).toBeNull();
+  });
+
+  it("writes nothing for an answer with no words in it", async () => {
+    nextStepOpen = OPEN_STEP;
+    const { result } = await booted();
+    await waitFor(() => expect(result.current.openNextStep?.id).toBe("ns-1"));
+
+    // "Not yet" and an empty sentence are the same silence. Asking the sidecar
+    // anyway would trade a 400 for a promise it cannot keep.
+    await act(async () => {
+      await result.current.answerNextStep("ns-1", {});
+    });
+    await act(async () => {
+      await result.current.answerNextStep("ns-1", { done: true, sentence: "  " });
+    });
+
+    expect(nextStepCalls).toEqual([]);
+    expect(result.current.openNextStep?.id).toBe("ns-1");
+  });
+
+  it("moves the when for a step postponed, without recording an answer", async () => {
+    nextStepOpen = OPEN_STEP;
+    const { result } = await booted();
+    await waitFor(() => expect(result.current.openNextStep?.id).toBe("ns-1"));
+
+    await act(async () => {
+      await result.current.answerNextStep("ns-1", {
+        action: "reschedule",
+        dueAt: "2026-12-01T00:00:00+00:00",
+      });
+    });
+
+    const patch = nextStepCalls.find((call) => call.method === "PATCH");
+    expect(patch?.url).toBe("/api/next-step/ns-1");
+    expect(patch?.body).toMatchObject({ action: "reschedule", due_at: "2026-12-01T00:00:00+00:00" });
+    expect(result.current.openNextStep?.id).toBe("ns-1");
+  });
+
+  it("stops asking when the person drops the step", async () => {
+    nextStepOpen = OPEN_STEP;
+    const { result } = await booted();
+    await waitFor(() => expect(result.current.openNextStep?.id).toBe("ns-1"));
+
+    await act(async () => {
+      await result.current.answerNextStep("ns-1", { action: "drop" });
+    });
+
+    expect(nextStepCalls.find((call) => call.method === "PATCH")?.body).toMatchObject({
+      action: "drop",
+    });
+    expect(result.current.openNextStep).toBeNull();
+  });
+
+  it("counts a turn that showed something as worth asking about", async () => {
+    chatStream = SURFACE_CHAT_STREAM;
+    const { result } = await booted();
+
+    expect(result.current.lastTurnProducedSurface).toBe(false);
+
+    await act(async () => {
+      await result.current.sendMessage("show me the board");
+    });
+
+    expect(result.current.lastTurnProducedSurface).toBe(true);
+  });
+
+  it("counts a plain prose answer as no surface", async () => {
+    const { result } = await booted();
+
+    await act(async () => {
+      await result.current.sendMessage("what would have to be true?");
+    });
+
+    expect(result.current.lastTurnProducedSurface).toBe(false);
+  });
+
+  it("holds the dismissal for this visit only", async () => {
+    nextStepOpen = OPEN_STEP;
+    const { result } = await booted();
+    await waitFor(() => expect(result.current.openNextStep?.id).toBe("ns-1"));
+
+    act(() => {
+      result.current.dismissNextStep();
+    });
+
+    expect(result.current.nextStepDismissed).toBe(true);
+    // Session-scoped, unlike the guidance hint's permanent localStorage key.
+    expect(sessionStorage.getItem("studio.nextStepDismissed")).toBe("1");
+
+    sessionStorage.clear();
+    const again = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    expect(again.result.current.nextStepDismissed).toBe(false);
   });
 });

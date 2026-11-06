@@ -7,6 +7,10 @@
  * The lines rotate so the surface feels alive rather than static.
  */
 
+import type { NextStep } from "../types";
+import { isNextStepOpen } from "./odi";
+import { formatRelativeTime } from "./relativeTime";
+
 export interface GreetingContext {
   now: Date;
   displayName?: string | null;
@@ -16,6 +20,8 @@ export interface GreetingContext {
   llmHealthy?: boolean | null;
   productName?: string | null;
   jobStatement?: string | null;
+  /** The step the last visit ended with, read from the store. `null` asks nothing. */
+  nextStep?: NextStep | null;
 }
 
 export type GreetingKind = "greeting" | "insight" | "capability" | "status";
@@ -121,6 +127,20 @@ export function greetingCandidates(context: GreetingContext): Greeting[] {
       id: "status-offline",
       text: "No model right now — the studio still works by hand.",
       kind: "status",
+    });
+  }
+
+  const promise = context.nextStep;
+  const said = promise?.text.trim();
+  if (promise && said && isNextStepOpen(promise)) {
+    // The reason they came back, said back to them. It leads because every other
+    // line is an invitation to start something, and this one finishes a visit
+    // already started. A step the studio cannot name — blank, or already
+    // answered or replaced — leaves today's copy exactly as it was.
+    candidates.unshift({
+      id: "next-step",
+      text: `Last time you said you would ${said} (${formatRelativeTime(promise.created_at)}). Did it happen?`,
+      kind: "insight",
     });
   }
 

@@ -623,6 +623,48 @@ a {
   opacity: 1;
 }
 
+/* The next-step aside is the same quiet line with one control in it (ALH-146). */
+.guidance--step {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.guidance__row {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.guidance__label {
+  flex: none;
+  color: var(--muted);
+  font-size: inherit;
+}
+
+.guidance__input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font: inherit;
+  font-size: inherit;
+}
+
+.guidance__input:hover {
+  border-color: var(--line-strong);
+}
+
+.guidance__input:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
+}
+
 .suggestion {
   display: inline-flex;
   align-items: center;

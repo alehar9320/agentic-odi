@@ -156,6 +156,24 @@ export interface NextStep {
   outcome_id?: string | null;
 }
 
+/**
+ * What the person said about the step they were asked about.
+ *
+ * Every field is optional because the honest answer is sometimes none of them:
+ * "not yet" with no new date is not a thing that happened, and the studio writes
+ * nothing for it.
+ */
+export interface NextStepAnswer {
+  /** True when the thing did happen — with a `sentence`, that becomes evidence. */
+  done?: boolean;
+  /** What actually happened, in the person's own words. */
+  sentence?: string;
+  /** Ask again later, or stop asking. Neither records anything happening. */
+  action?: "reschedule" | "drop";
+  /** Only meaningful with `action: "reschedule"`. */
+  dueAt?: string;
+}
+
 export type CanvasProvenanceKind = "live" | "seed" | "empty";
 
 /**
