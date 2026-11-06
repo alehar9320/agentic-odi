@@ -407,7 +407,7 @@ the pure count arithmetic:
 | `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
 | `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
 | `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface with zero violations; contrast is scoped to the token audit and documented there |
+| `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface, the decision brief included, with zero violations; contrast is scoped to the token audit and documented there |
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
 | `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
@@ -573,6 +573,39 @@ The MCP server contract test compares the live FastMCP registry with
 both places. The CLI local-backend contract test keeps `_LOCAL_HANDLERS` aligned
 with the same tool names.
 
+### Artifact structure
+
+An artifact is HTML a person reads without the app: a built website page, the
+sample workspace, the offline shell, the decision brief. All of them are judged
+by one rule set, `scripts/artifact_a11y.py`, which reports six structural defects:
+
+- `single-h1` — the document holds exactly one `<h1>`; none and two are both defects.
+- `heading-order` — a heading never skips a level.
+- `table-caption` — a data table is named, by a `<caption>` or by an
+  `aria-labelledby` that resolves to an `id` the document actually contains.
+- `table-header-scope` — every `<th>` declares `scope` of row, col, rowgroup or colgroup.
+- `image-label` — an `<img>` carries `alt`, and an `<svg>` is either decoration
+  (`aria-hidden="true"`) or a chart with a label a reader can be told.
+- `duplicate-id` — no `id` is used twice, so a link or a label cannot point at the
+  wrong element.
+
+```bash
+uv run pytest tests/scripts/test_artifact_a11y.py           # the rules, on fixtures
+uv run pytest website/tests/test_site.py -k artifact_audit   # every built page against them
+```
+
+`scripts/artifact_renderers.py` is the inventory: one row per renderer, plus the
+artifacts that have none. `tests/scripts/test_artifact_inventory.py` scans the
+artifact roots for the markup that gives a renderer away, so a new file writing
+`<h1>` or `<table>` under one of those roots fails the suite by name until it is
+registered as a `Renderer(...)` row.
+
+Zero violations is a structural check. It is not WCAG conformance and it is not
+a screen-reader certification — nobody has read these artifacts with an actual
+reader, which is ALH-252's work. The memo, the one-pager and the shared page are
+recorded in the inventory as having no renderer at all, so there is nothing here
+to audit for them yet.
+
 ### End-to-end testing
 
 The browser-level suite lives in `apps/studio/e2e/` and runs with
@@ -710,11 +743,11 @@ uv run pytest \
 | `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, the funnel report, connectors, and startup performance |
 | `packages/connectors/tests/` | Catalog presets, registry persistence, factory, MCP and REST connectors, evidence mapping, and sink |
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
-| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift |
+| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift; the artifact structural rules and the renderer inventory gate |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, OG art reproducibility, and README sync |
+| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, every built page through the artifact rule set, OG art reproducibility, and README sync |
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the
