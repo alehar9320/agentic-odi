@@ -5,8 +5,9 @@ import { expect, test, type Page } from "@playwright/test";
  *
  * A cold load must never be the browser's white canvas, and it must be the
  * right colour the first time. These tests cut the module bundle off at the
- * network so only the document — its inline style and its inline theme script —
- * can paint, then read what the browser actually resolved.
+ * network so only the document and its own bootstrap files can paint —
+ * `boot.css` for the colours and `boot-theme.js` for the theme class — then
+ * read what the browser actually resolved.
  *
  * The shell is a fixed, full-viewport layer, so its resolved background is the
  * first paint. The colours are the `--bg` token in `src/styles/theme.css`,
@@ -15,6 +16,16 @@ import { expect, test, type Page } from "@playwright/test";
 
 const DARK_BG = "rgb(10, 11, 14)"; // #0a0b0e
 const LIGHT_BG = "rgb(245, 246, 248)"; // #f5f6f8
+
+/**
+ * The React bundle: Vite's hashed entry under `/assets`, and nothing else.
+ *
+ * Aborting it leaves the document and its own bootstraps running while React
+ * never mounts, which is the frame these tests measure. The bootstraps are
+ * separate same-origin files (the strict CSP refuses inline script and style),
+ * so they are deliberately not part of this pattern.
+ */
+const REACT_BUNDLE = "**/assets/*.js";
 
 /** The colour the window shows first: the covering shell layer. */
 async function shellBackground(page: Page): Promise<string> {
@@ -71,8 +82,8 @@ test.describe("the theme is resolved before React", () => {
     await page.addInitScript(() => {
       window.localStorage.setItem("studio.settings", JSON.stringify({ theme: "light" }));
     });
-    // Cut the module bundle off: nothing but the document can have run.
-    await page.route("**/*.js", (route) => route.abort());
+    // Cut the React bundle off: nothing but the document and its bootstraps ran.
+    await page.route(REACT_BUNDLE, (route) => route.abort());
     await page.emulateMedia({ colorScheme: "dark" });
     await page.goto("/");
 
@@ -85,7 +96,7 @@ test.describe("the theme is resolved before React", () => {
     await page.addInitScript(() => {
       window.localStorage.setItem("studio.settings", JSON.stringify({ theme: "dark" }));
     });
-    await page.route("**/*.js", (route) => route.abort());
+    await page.route(REACT_BUNDLE, (route) => route.abort());
     await page.emulateMedia({ colorScheme: "light" });
     await page.goto("/");
 
@@ -94,7 +105,7 @@ test.describe("the theme is resolved before React", () => {
   });
 
   test("nothing stored follows the system, without the bundle", async ({ page }) => {
-    await page.route("**/*.js", (route) => route.abort());
+    await page.route(REACT_BUNDLE, (route) => route.abort());
     await page.emulateMedia({ colorScheme: "light" });
     await page.goto("/");
 
