@@ -7,7 +7,7 @@
  * added in exactly two files.
  */
 
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActionBarPrimitive,
@@ -165,12 +165,39 @@ function AssistantMessage() {
 
 function UserMessage() {
   const copied = useAuiState((state) => state.message.isCopied);
+  // A pasted document is a message, not the screen. The bubble starts clamped at
+  // eight lines; when the text fits, the clamp and its control disappear. Copy
+  // still reads the turn, so the whole message is what gets copied (#696).
+  const [clamped, setClamped] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const bubble = bubbleRef.current;
+    if (!bubble) {
+      return;
+    }
+    setClamped(bubble.scrollHeight > bubble.clientHeight + 1);
+  }, []);
 
   return (
     <article className="message message--user">
-      <div className="message__bubble">
+      <div
+        ref={bubbleRef}
+        className={`message__bubble${clamped && !expanded ? " is-clamped" : ""}`}
+      >
         <MessagePrimitive.Parts components={{ Text: TextPart }} />
       </div>
+      {clamped && (
+        <button
+          type="button"
+          className="quiet-action message__more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
       <MessagePrimitive.Attachments>
         {({ attachment }) => {
           // The turn owns the id; the prepared copy (if this session still has
