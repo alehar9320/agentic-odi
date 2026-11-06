@@ -197,7 +197,7 @@ beforeEach(() => {
 });
 
 describe("axe sweep", () => {
-  it("passes the opportunity landscape in all three views", async () => {
+  it("passes the where to play landscape in all three views", async () => {
     const { container } = renderWithUpdates(
       <Surface>
         <OpportunityLandscape />

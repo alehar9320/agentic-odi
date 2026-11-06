@@ -147,7 +147,7 @@ describe("studio shell", () => {
       screen.getByRole("button", { name: /turn 40 interview notes into one bet/i }),
     ).toBeInTheDocument();
     // The classic UI is secondary: no workspace surface until you ask for one.
-    expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /where to play/i })).toBeNull();
   });
 
   it("sends the runtime prompt when a contextual starter card is selected", async () => {
@@ -183,7 +183,7 @@ describe("studio shell", () => {
     fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
 
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to play/i }),
     ).toBeInTheDocument();
     // The conversation keeps the stage: the composer never leaves.
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
@@ -191,7 +191,7 @@ describe("studio shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /close workspace view/i }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /where to play/i })).toBeNull();
     });
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
   });
@@ -207,7 +207,7 @@ describe("studio shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
 
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to play/i }),
     ).toBeInTheDocument();
     // The lens makes room; it never hides what the user was reading.
     expect(screen.getByText("Where do I start?")).toBeInTheDocument();
@@ -255,7 +255,7 @@ describe("studio shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to play/i }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /go to home/i }));
@@ -263,7 +263,7 @@ describe("studio shell", () => {
     // Home closes what is open; the transcript is the other control's to
     // discard, and only after asking what is being lost.
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /where to play/i })).toBeNull();
     });
     expect(screen.getByText("Where do I start?")).toBeInTheDocument();
   });
@@ -401,7 +401,7 @@ describe("studio shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to play/i }),
     ).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Escape" });
@@ -409,12 +409,12 @@ describe("studio shell", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
     });
-    expect(screen.getByRole("heading", { name: /opportunity landscape/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /where to play/i })).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Escape" });
 
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /where to play/i })).toBeNull();
     });
   });
 
@@ -497,7 +497,7 @@ describe("first-run tour", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(
-      await screen.findByText("A quick look at your instruments."),
+      await screen.findByText("Your setup."),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     fireEvent.click(screen.getByRole("button", { name: "Make it real" }));
@@ -518,7 +518,7 @@ describe("first-run tour", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
     fireEvent.click(screen.getByRole("button", { name: /Help me find the next one/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await screen.findByText("A quick look at your instruments.");
+    await screen.findByText("Your setup.");
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     fireEvent.click(screen.getByRole("button", { name: "Find my next opportunity" }));
 
@@ -635,7 +635,7 @@ describe("first run", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to play/i }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /close workspace view/i }));
@@ -708,7 +708,7 @@ describe("first run", () => {
       await screen.findByText(/Here is what I will hold/i, { selector: "p" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /change product/i }));
+    fireEvent.click(screen.getByRole("button", { name: /change what are you building/i }));
     const composer = screen.getByRole("textbox", { name: /message the studio/i });
     fireEvent.change(composer, { target: { value: "Ambient Two" } });
     fireEvent.keyDown(composer, { key: "Enter" });

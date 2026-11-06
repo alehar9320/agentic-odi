@@ -29,28 +29,28 @@ export interface SetupQuestion {
 export const SETUP_QUESTIONS: SetupQuestion[] = [
   {
     field: "product_name",
-    label: "Product",
+    label: "What are you building?",
     ask: "What are you building?",
     hint: "A product, a service, a team — whatever the work is.",
     placeholder: "Ambient — a deployment tool",
   },
   {
     field: "target_user",
-    label: "Customer",
+    label: "Who feels the problem?",
     ask: "Who feels the problem most?",
     hint: "The people whose job you are trying to make easier.",
     placeholder: "Platform engineers shipping services",
   },
   {
     field: "job_statement",
-    label: "Job",
+    label: "What job are they trying to get done?",
     ask: "What job are they trying to get done?",
     hint: "The progress they want, not a feature.",
     placeholder: "Get a service from commit to production without hand-copying config",
   },
   {
     field: "core_problem",
-    label: "Friction",
+    label: "Where does it hurt?",
     ask: "Where does it hurt most?",
     hint: "One frustration is enough.",
     placeholder: "A missed config key costs hours on deploy day",
@@ -63,7 +63,7 @@ export const SETUP_QUESTIONS: SetupQuestion[] = [
   },
   {
     field: "vision",
-    label: "Vision",
+    label: "Where are you headed?",
     ask: "What is your vision for this domain?",
     hint: "What you want to achieve or create long-term.",
     placeholder: "Empower developers to ship securely without friction",
@@ -129,7 +129,7 @@ export function questionContent(
     return reviewContent(draft);
   }
   const current = draft[question.field].trim();
-  return [lead, `**${question.ask}**`, `_${question.hint}_`, current ? `You said: “${current}”.` : ""]
+  return [lead, `**${question.ask}**`, `_${question.hint}_`, current ? `You said: "${current}."` : ""]
     .filter(Boolean)
     .join("\n\n");
 }

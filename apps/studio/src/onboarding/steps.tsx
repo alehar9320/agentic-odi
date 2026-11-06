@@ -104,7 +104,7 @@ export function GoalStep({
       </div>
       <p className="wizard-hint">
         {goal
-          ? "Continue when you are ready. Everything stays one message away."
+          ? "Ready when you are. One message is enough."
           : "Pick one to start."}
       </p>
     </>
@@ -137,7 +137,7 @@ function StatusRow({
   value: boolean | null;
 }) {
   const state = value === true ? "ok" : value === false ? "warn" : "pending";
-  const text = value === true ? "Connected" : value === false ? "Not reachable" : "Checking";
+  const text = value === true ? "Connected" : value === false ? "Not ready" : "Checking";
 
   return (
     <div className={`wizard-check wizard-check--${state}`}>
@@ -178,17 +178,17 @@ export function ReadinessStep({
       <div className="wizard-checks">
         <StatusRow
           label="Studio service"
-          detail="The local sidecar serving this window."
+          detail="The local helper running this window."
           value={status.sidecar}
         />
         <StatusRow
-          label="MCP server"
-          detail="Your jobs, outcomes, and evidence."
+          label="Data bridge"
+          detail="Your jobs, steps, and insights."
           value={status.mcp}
         />
         <StatusRow
-          label="Copilot model"
-          detail="The OpenAI-compatible model behind the chat."
+          label="AI assistant"
+          detail="The model helping with conversation."
           value={status.model}
         />
       </div>
@@ -196,8 +196,7 @@ export function ReadinessStep({
       {modelDown ? (
         <div className="wizard-config">
           <p className="wizard-config__hint">
-            The studio still opens and works by hand. Point it at a model now, or connect
-            one later in Settings.
+            The studio works on its own. An AI assistant makes conversation richer — but you can add that later in Settings.
           </p>
           {modelMessage ? <p className="wizard-config__message">{modelMessage}</p> : null}
 
