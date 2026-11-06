@@ -18,6 +18,7 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    V2MOM,
     EvidenceNotFoundError,
     JobNotFoundError,
     NoStrategyEvidenceError,
@@ -96,7 +97,6 @@ from agentic_odi_studio_api.studio.schemas import (
     ScheduleWorkRequest,
     SignalActionRequest,
     ThesisRequest,
-    ThesisResponse,
     TurnNode,
     UpdateConversationRequest,
     UpdateCustomerOutcomeRequest,
@@ -104,7 +104,6 @@ from agentic_odi_studio_api.studio.schemas import (
     UpdateOutcomeRequest,
     UpdateStepRequest,
     V2MOMRequest,
-    V2MOMResponse,
 )
 
 router = APIRouter(prefix="/api")
@@ -1510,11 +1509,10 @@ def put_vision(body: V2MOMRequest, request: Request) -> dict:
 def list_theses(request: Request) -> dict:
     if _uses_mcp(request):
         return {"ok": True, "result": []}
-    service = _service(request)
-    theses = service.repo.list_theses()
+    theses = _memory(request).list_theses()
     return {
         "ok": True,
-        "result": [thesis.model_dump(mode="json") for thesis in theses],
+        "result": [thesis.to_dict() for thesis in theses],
     }
 
 
@@ -1526,14 +1524,13 @@ def create_thesis(body: ThesisRequest, request: Request) -> dict:
     # Verify the outcome exists
     outcome = service.repo.get_outcome(body.outcome_id)
     if outcome is None:
-        raise _as_http_error(
+        raise StudioHTTPError(
             StudioError(
                 code=StudioErrorCode.NOT_FOUND,
                 message=f"Outcome {body.outcome_id} not found",
-            ),
-            status_code=404,
+            )
         )
-    thesis = service.repo.add_thesis(
+    thesis = _memory(request).add_thesis(
         outcome_id=body.outcome_id,
         job_id=body.job_id,
         statement=body.statement,
@@ -1541,19 +1538,17 @@ def create_thesis(body: ThesisRequest, request: Request) -> dict:
         importance=body.importance,
         satisfaction=body.satisfaction,
     )
-    return {"ok": True, "result": thesis.model_dump(mode="json")}
+    return {"ok": True, "result": thesis.to_dict()}
 
 
 @router.delete("/api/theses/{thesis_id}")
 def delete_thesis(thesis_id: str, request: Request) -> dict:
     if _uses_mcp(request):
         return {"ok": True}
-    service = _service(request)
     try:
-        service.repo.delete_thesis(thesis_id)
+        _memory(request).delete_thesis(thesis_id)
     except MemoryError as exc:
-        raise _as_http_error(
-            StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)),
-            status_code=404,
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc))
         ) from exc
     return {"ok": True}

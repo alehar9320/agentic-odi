@@ -18,6 +18,7 @@ from agentic_odi_core.evaluation import (
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    V2MOM,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,

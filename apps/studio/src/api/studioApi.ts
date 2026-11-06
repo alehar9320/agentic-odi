@@ -196,7 +196,11 @@ async function getJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
+async function sendJson<T>(
+  method: "POST" | "PATCH" | "PUT",
+  path: string,
+  body: unknown
+): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method,
     headers: { "Content-Type": "application/json", Accept: "application/json" },

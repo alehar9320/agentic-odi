@@ -9,7 +9,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import typer
 
@@ -212,7 +212,6 @@ def doctor_cmd(
     backup: bool = typer.Option(False, "--backup", help="Take a fresh backup of the ODI store."),
 ) -> None:
     """Check store integrity: quick_check, WAL size, entity counts, schema version, backups."""
-    from agentic_odi_core.errors import StoreCorrupt
     from agentic_odi_core.sqlite_repository import SQLiteRepository
 
     db_path_str = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
@@ -245,7 +244,7 @@ def doctor_cmd(
                 "outcomes": len(repo.outcomes),
                 "evidence": len(repo.evidence),
                 "signals": len(repo.signals),
-                "proposals": len(repo.proposals),
+                "scheduled_work": len(repo.scheduled_work),
             }
             results["odi"] = {
                 "status": "ok" if quick_check == "ok" else "corrupt",
@@ -267,11 +266,7 @@ def doctor_cmd(
         repo = SQLiteRepository(db_path=db_path_str)
         backup_dir = os.path.join(os.path.dirname(db_path_str), "backups")
         os.makedirs(backup_dir, exist_ok=True)
-        repo.backup(
-            os.path.join(
-                backup_dir, f"odi-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.db"
-            )
-        )
+        repo.backup(os.path.join(backup_dir, f"odi-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.db"))
         repo.close()
 
     if json_output:
@@ -299,7 +294,7 @@ def doctor_cmd(
 
 @app.command(name="restore")
 def restore_cmd(
-    backup_file: Path = typer.Argument(..., help="Path to the backup file to restore from."),
+    backup_file: Annotated[Path, typer.Argument(help="Path to the backup file to restore from.")],
     yes: bool = typer.Option(False, "--yes", help="Skip confirmation and restore immediately."),
 ) -> None:
     """Restore the ODI store from a backup file."""
@@ -322,7 +317,7 @@ def restore_cmd(
         repo.restore(str(backup_file))
     except (StoreCorrupt, Exception) as exc:  # noqa: BLE001
         typer.echo(f"Restore failed: {exc}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
     finally:
         repo.close()
 
