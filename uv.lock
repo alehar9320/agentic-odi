@@ -128,7 +128,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "agentic-odi-core", editable = "packages/core" },
-    { name = "fastmcp" },
+    { name = "fastmcp", specifier = ">=4.1,<5" },
     { name = "pydantic" },
 ]
 
