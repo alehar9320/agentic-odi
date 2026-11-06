@@ -277,6 +277,12 @@ them: `chromium` for the local backend (the product default) and
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none.
 
+`next-step.spec.ts` answers the question the browser cannot ask on its own: what
+the repository holds after the person replied. It seeds a promise through the
+API, answers it in the dock, and reads the evidence record, the closed step, and
+the reminder date back through the sidecar — the last of which the store only
+accepts with a timezone in it, so the instant is compared rather than the string.
+
 `first-paint.spec.ts` is the exception to "drives the real sidecar": it aborts
 the module bundle so it can read the pre-JavaScript shell in `index.html`, then
 compares the colour it painted against the `--bg` token for each theme.

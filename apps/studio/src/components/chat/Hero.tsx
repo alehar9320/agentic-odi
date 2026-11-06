@@ -12,7 +12,8 @@ import { useStudio } from "../../state/StudioContext";
  * live in the composer, where they stay reachable once the thread starts.
  */
 export function Hero() {
-  const { displayName, canvas, llmHealth, brief, openSetup, openNextStep } = useStudio();
+  const { displayName, canvas, llmHealth, brief, openSetup, openNextStep, nextStepDismissed } =
+    useStudio();
   const { enabled: tourEnabled, openTour } = useOnboarding();
 
   const jobs = canvas?.jobs.length ?? 0;
@@ -32,7 +33,8 @@ export function Hero() {
         llmHealthy: llmHealth.healthy,
         productName: brief?.product_name,
         jobStatement: brief?.job_statement,
-        nextStep: openNextStep,
+        // "Don't ask again this visit" has to cover both screens that ask.
+        nextStep: nextStepDismissed ? null : openNextStep,
       }),
     [
       displayName,
@@ -43,6 +45,7 @@ export function Hero() {
       brief?.product_name,
       brief?.job_statement,
       openNextStep,
+      nextStepDismissed,
     ],
   );
 

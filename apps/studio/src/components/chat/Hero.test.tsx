@@ -12,6 +12,7 @@ const harness = vi.hoisted(() => ({
     brief: null,
     openSetup: vi.fn(),
     openNextStep: null as NextStep | null,
+    nextStepDismissed: false as boolean,
   },
   tour: { enabled: false, openTour: vi.fn() },
 }));
@@ -32,6 +33,7 @@ describe("Hero", () => {
   beforeEach(() => {
     vi.useFakeTimers({ now: new Date("2026-10-22T10:00:00+00:00") });
     harness.state.openNextStep = null;
+    harness.state.nextStepDismissed = false;
     harness.state.brief = null;
   });
 
@@ -77,6 +79,22 @@ describe("Hero", () => {
       resolved_at: "2026-10-20T10:00:00+00:00",
       resolution: "Both said the queue is manual today",
     };
+
+    render(<Hero />);
+
+    expect(headline()).toBe("What do you want to win?");
+  });
+
+  it("asks nothing on either screen once the person said not to ask this visit", () => {
+    // The ✕ in the dock promises "quiet for this visit". A reload keeps the
+    // thread empty and the promise open, so the greeting is the second place
+    // that ask could come back — and it must not.
+    harness.state.openNextStep = {
+      id: "ns-1",
+      text: "talk to two support leads",
+      created_at: "2026-10-19T10:00:00+00:00",
+    };
+    harness.state.nextStepDismissed = true;
 
     render(<Hero />);
 

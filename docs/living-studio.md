@@ -164,6 +164,32 @@ are permanent (`localStorage["studio.guidance"]`), and with nothing useful to sa
 the line does not render at all — a hint system that keeps finding things to say
 becomes the modal it replaced.
 
+### Coming back
+
+The other thing the studio remembers is not its own to say. After a turn that put
+a surface on the screen, the dock asks what you will come back for; one line
+saved there is a `NextStep` in the ODI repository, and the next visit reads it
+back — the home headline says *Last time you said you would … did it happen?*,
+and the dock asks the same question beside the composer.
+
+| Route | What an answer does |
+|---|---|
+| `GET /api/next-step` | The one step still open, or `null` — never an empty list |
+| `POST /api/next-step` | Promise the next thing; the step it replaces stays as history |
+| `POST /api/next-step/{id}/resolve` | Say it happened, in a sentence that becomes an evidence record |
+| `PATCH /api/next-step/{id}` | `reschedule` to a date, or `drop` — moves the row and records nothing |
+
+Only the first answer writes anything. "Not yet" with no date is not a thing that
+happened, so the studio sends no request at all rather than recording a silence as
+a result; "drop it" closes the row without manufacturing one. A step the store
+cannot name — blank text, or a row already answered — leaves today's greeting
+exactly as it was.
+
+Quiet is scoped to the visit, not the record: the ✕ writes
+`sessionStorage["studio.nextStepDismissed"]`, so a reload — which resumes the same
+thread — keeps both the headline and the dock silent, and the next visit asks
+again. Nothing about the promise is deleted.
+
 ### Without a model
 
 A browser with no model configured is the design working, not a failure. The
@@ -503,6 +529,10 @@ Storage is a separate SQLite file from the ODI repository:
 
 **Forget everything** is a two-step confirmation and also clears the visible
 thread, because the server deletes the conversations behind it.
+
+One remembered thing is not stored here: the open next step is an event in the
+ODI repository, not a row in `studio.db`, because what you said you would do
+belongs with the records it was said about. See **Coming back**.
 
 ### The thread comes back
 

@@ -636,6 +636,9 @@ a {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  /* The row is the only item that claims a line, so it takes the second one and
+     the quiet ✕ stays at the end of the question. */
+  order: 1;
 }
 
 .guidance__label {
