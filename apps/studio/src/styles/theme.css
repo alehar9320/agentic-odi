@@ -6714,6 +6714,21 @@ details[open] summary {
   cursor: pointer;
 }
 
+.update-settings__log {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.update-settings__log-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+}
+
 .update-settings__toggle input {
   accent-color: var(--accent);
 }
