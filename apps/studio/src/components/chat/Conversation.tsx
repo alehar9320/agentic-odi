@@ -39,6 +39,8 @@ import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon } from "../icons";
 import { Markdown } from "./Markdown";
 import { StallNotice } from "./StallNotice";
+import { WorkBlock } from "./WorkBlock";
+import { workGrouping } from "./workGrouping";
 
 const PHASE_LABEL: Record<string, string> = {
   health_check: "Waking the model",
@@ -58,9 +60,11 @@ function AssistantMessage() {
   const id = useAuiState((state) => state.message.id);
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
+  const parts = useAuiState((state) => state.message.parts);
   const hasText = useAuiState((state) =>
     state.message.content.some((part) => part.type === "text" && part.text.trim().length > 0),
   );
+  const groupBy = useMemo(() => workGrouping(parts), [parts]);
   const error = useAuiState(
     (state) => state.message.metadata.custom?.error as StudioError | undefined,
   );
@@ -86,16 +90,43 @@ function AssistantMessage() {
           </button>
         ) : null}
 
-        <MessagePrimitive.Parts
-          components={{
-            Text: TextPart,
-            Reasoning: ReasoningPart,
-            Source: SourcePart,
-            File: FilePart,
-            data: { by_name: { [SURFACE_PART]: SurfacePart, [CLAIMS_PART]: ClaimsPart } },
-            tools: { Fallback: ToolPart },
+        {/* One row for the work a turn did, and the answer on its own. The
+            grouping is ours rather than `ChainOfThoughtPrimitive` because that
+            primitive gathers every adjacent tool call into the group, including
+            a write that is still asking — and a question is not history. */}
+        <MessagePrimitive.GroupedParts groupBy={groupBy} indicator="never">
+          {({ part, children }) => {
+            switch (part.type) {
+              case "group-work":
+                return (
+                  <WorkBlock
+                    calls={part.indices.filter((index) => parts[index]?.type === "tool-call").length}
+                    running={running}
+                  >
+                    {children}
+                  </WorkBlock>
+                );
+              case "text":
+                return <TextPart />;
+              case "reasoning":
+                return <ReasoningPart />;
+              case "source":
+                return <SourcePart />;
+              case "file":
+                return <FilePart />;
+              case "data":
+                return part.name === SURFACE_PART ? (
+                  <SurfacePart />
+                ) : part.name === CLAIMS_PART ? (
+                  <ClaimsPart />
+                ) : null;
+              case "tool-call":
+                return <ToolPart {...part} />;
+              default:
+                return null;
+            }
           }}
-        />
+        </MessagePrimitive.GroupedParts>
 
         {running && !hasText ? <TypingPart label={phaseLabel(thinkingPhase)} /> : null}
         {running && hasText ? <span className="caret" aria-hidden="true" /> : null}

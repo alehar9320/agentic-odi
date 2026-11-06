@@ -292,6 +292,29 @@ describe("axe sweep", () => {
   });
 
   it("passes the chat stage", async () => {
+    // A settled run row (folded), the same row opened, and a write still
+    // asking — the three states the transcript can show at once.
+    state.messages = [
+      {
+        id: "a-1",
+        parentId: null,
+        role: "assistant",
+        content: "Two jobs, one bet.",
+        parts: [
+          { kind: "reasoning", text: "Weighing the scored outcomes." },
+          { kind: "tool", id: "c-1", name: "list_jobs", status: "ok" },
+          { kind: "tool", id: "c-2", name: "get_outcomes", status: "ok" },
+          { kind: "text", text: "Two jobs, one bet." },
+          {
+            kind: "tool",
+            id: "c-3",
+            name: "add_job",
+            status: "running",
+            approval: { id: "ap-1", prompt: "Add the retention job?" },
+          },
+        ],
+      },
+    ];
     const { container } = renderWithUpdates(
       <Surface>
         <StudioRuntimeProvider>
@@ -301,6 +324,11 @@ describe("axe sweep", () => {
     );
 
     await expectAccessible(container);
+
+    fireEvent.click(container.querySelector(".work-block__trigger") as HTMLElement);
+    await expectAccessible(container);
+
+    state.messages = [];
   });
 
   it("passes the changelog dialog", async () => {
