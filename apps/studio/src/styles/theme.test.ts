@@ -50,6 +50,31 @@ function contrast(foreground: string, background: string): number {
 const TEXT_TOKENS = ["text", "muted", "faint", "accent", "green", "amber"];
 const SURFACES = ["bg", "bg-raised"];
 
+describe("reduced transparency", () => {
+  it("drops every blur and goes opaque", () => {
+    const start = themeCss.indexOf("@media (prefers-reduced-transparency: reduce)");
+    expect(start, "missing the reduced-transparency block").toBeGreaterThanOrEqual(0);
+    const block = themeCss.slice(start, start + 1400);
+    for (const selector of [
+      ".scrim",
+      ".bar",
+      ".outcome-card",
+      ".settings-drawer",
+      ".banner",
+      ".changelog-modal",
+      ".changelog-overlay",
+      ".diagnostics-overlay",
+      ".suggestion-modal",
+      ".catchup-summary",
+      ".studio-metric",
+    ]) {
+      expect(block, `${selector} keeps its blur`).toContain(selector);
+    }
+    expect(block).toContain("backdrop-filter: none");
+    expect(block).toContain("background-color: var(--bg-raised)");
+  });
+});
+
 describe("theme contrast", () => {
   for (const [name, tokens] of [
     ["dark", dark],

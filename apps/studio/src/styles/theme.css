@@ -4500,6 +4500,48 @@ button.message__tag:hover {
   -webkit-backdrop-filter: blur(12px) saturate(160%);
 }
 
+/* ------------------------------------------------------------------ */
+/* Preferences owned by the operating system                           */
+/* ------------------------------------------------------------------ */
+
+/* Reduced transparency: the glass becomes a surface. Every blur is removed
+   and the overlay scrims go opaque, so text never sits on moving wallpaper. */
+@media (prefers-reduced-transparency: reduce) {
+  .scrim,
+  .bar,
+  .outcome-card,
+  .settings-drawer,
+  .banner,
+  .changelog-modal,
+  .changelog-overlay,
+  .diagnostics-overlay,
+  .suggestion-modal,
+  .catchup-summary,
+  .studio-metric {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .bar,
+  .outcome-card,
+  .settings-drawer,
+  .banner,
+  .changelog-modal,
+  .catchup-summary,
+  .studio-metric {
+    background-color: var(--bg-raised);
+  }
+
+  .changelog-overlay,
+  .diagnostics-overlay,
+  .suggestion-modal,
+  .scrim {
+    background-color: var(--bg);
+  }
+}
+
+
+
 /* 2. Apple-style range slider dynamics */
 input[type="range"] {
   -webkit-appearance: none;
