@@ -24,6 +24,7 @@ ASSET_NAMES = (
     "odi-mascot-512.png",
     "odi-mascot-1024.png",
     "odi-icon-1024.png",
+    "odi-icon-maskable-512.png",
     "favicon.svg",
     "favicon.ico",
     "apple-touch-icon.png",
@@ -131,7 +132,32 @@ def test_png_assets_have_the_expected_dimensions():
     assert png_size((ASSETS / "odi-mascot-512.png").read_bytes()) == (512, 512)
     assert png_size((ASSETS / "odi-mascot-1024.png").read_bytes()) == (1024, 1024)
     assert png_size((ASSETS / "odi-icon-1024.png").read_bytes()) == (1024, 1024)
+    assert png_size((ASSETS / "odi-icon-maskable-512.png").read_bytes()) == (512, 512)
     assert png_size((ASSETS / "apple-touch-icon.png").read_bytes()) == (180, 180)
+
+
+def test_maskable_head_stays_inside_the_safe_zone():
+    """A maskable icon may be cropped to a circle; the character must survive it.
+
+    The safe zone is the inner 80% of the tile, so every pixel of the character
+    has to sit within 0.4 * GRID of the centre. The tile itself fills the grid
+    and is expected to be cropped, so only the character's pixels are measured.
+    """
+    raster = odi_mascot.maskable_raster()
+    centre = odi_mascot.GRID / 2
+    safe_radius = 0.4 * odi_mascot.GRID
+
+    for y in range(raster.grid):
+        for x in range(raster.grid):
+            color = raster.get(x, y)
+            if color is None or color == "tile":
+                continue
+            distance = ((x + 0.5 - centre) ** 2 + (y + 0.5 - centre) ** 2) ** 0.5
+            assert distance <= safe_radius, f"pixel ({x}, {y}) is outside the safe zone"
+
+    # The tile still fills the grid, so the mask has a solid colour to crop.
+    assert raster.get(0, 0) == "tile"
+    assert raster.get(odi_mascot.GRID - 1, odi_mascot.GRID - 1) == "tile"
 
 
 def test_ico_contains_the_expected_sizes():

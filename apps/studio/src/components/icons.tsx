@@ -157,6 +157,15 @@ export function ArrowDownIcon(props: IconProps) {
   );
 }
 
+export function DownloadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3v12M7 10l5 5 5-5" />
+      <path d="M4 20h16" />
+    </Icon>
+  );
+}
+
 export function StopIcon(props: IconProps) {
   return (
     <Icon {...props}>

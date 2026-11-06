@@ -9,6 +9,13 @@ vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 
+// The bar hosts the install pill, which needs its own provider. It has its own
+// test file (InstallPill.test.tsx); here it is kept out of the way so these
+// tests stay about the bar's own controls.
+vi.mock("./InstallPill", () => ({
+  InstallPill: () => null,
+}));
+
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import type { UpdateSnapshot } from "../../updater/types";

@@ -22,6 +22,7 @@ import odi_mascot  # noqa: E402
 
 ASSETS = ROOT / "brand" / "assets"
 STUDIO_PUBLIC = ROOT / "apps" / "studio" / "public"
+STUDIO_ICONS = STUDIO_PUBLIC / "icons"
 STUDIO_COMPONENT = ROOT / "apps" / "studio" / "src" / "components" / "OdiMascot.tsx"
 CLI_MODULE = ROOT / "apps" / "cli" / "src" / "agentic_odi_cli" / "mascot.py"
 
@@ -120,6 +121,7 @@ def artifacts() -> dict[Path, bytes]:
     """Return every generated artifact, keyed by its path in the repository."""
     mark = odi_mascot.mark_raster()
     bust = odi_mascot.bust_raster()
+    maskable = odi_mascot.maskable_raster()
     favicon_svg = odi_mascot.render_svg_rle(mark).encode()
     return {
         ASSETS / "odi-mascot.svg": odi_mascot.render_svg(bust, guides=True, rle=True).encode(),
@@ -128,6 +130,7 @@ def artifacts() -> dict[Path, bytes]:
         ASSETS / "odi-mascot-512.png": odi_mascot.render_png(bust, 512),
         ASSETS / "odi-mascot-1024.png": odi_mascot.render_png(bust, 1024),
         ASSETS / "odi-icon-1024.png": odi_mascot.render_png(mark, 1024),
+        ASSETS / "odi-icon-maskable-512.png": odi_mascot.render_png(maskable, 512),
         ASSETS / "favicon.svg": favicon_svg,
         ASSETS / "favicon.ico": odi_mascot.render_ico(),
         ASSETS / "apple-touch-icon.png": odi_mascot.render_png(mark, 180),
@@ -135,6 +138,9 @@ def artifacts() -> dict[Path, bytes]:
         STUDIO_PUBLIC / "favicon.svg": favicon_svg,
         STUDIO_PUBLIC / "favicon.ico": odi_mascot.render_ico(),
         STUDIO_PUBLIC / "apple-touch-icon.png": odi_mascot.render_png(mark, 180),
+        STUDIO_ICONS / "icon-192.png": odi_mascot.render_png(mark, 192),
+        STUDIO_ICONS / "icon-512.png": odi_mascot.render_png(mark, 512),
+        STUDIO_ICONS / "maskable-512.png": odi_mascot.render_png(maskable, 512),
         STUDIO_COMPONENT: _studio_component(),
         CLI_MODULE: _cli_module(),
     }

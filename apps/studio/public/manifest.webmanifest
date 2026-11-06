@@ -1,28 +1,28 @@
 {
   "name": "Living Studio",
-  "short_name": "ODI Studio",
+  "short_name": "Studio",
+  "description": "An opportunity canvas that starts from customer evidence.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
-  "theme_color": "#0a0b0e",
   "background_color": "#0a0b0e",
-  "description": "Opportunity Discovery Interface studio",
+  "theme_color": "#0a0b0e",
   "icons": [
     {
-      "src": "/odi-mark.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/odi-mascot-256.png",
-      "sizes": "256x256",
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/odi-mascot-512.png",
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

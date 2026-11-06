@@ -20,6 +20,7 @@ import {
 } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 import { StatusDot } from "../status/StatusDot";
+import { InstallPill } from "./InstallPill";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -242,6 +243,8 @@ export function StudioBar({
         >
           ✨ What's New
         </button>
+
+        <InstallPill />
 
         <div className="bar__new-wrap" ref={askRef} onKeyDown={onAskKeyDown}>
           <button
