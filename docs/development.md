@@ -103,7 +103,7 @@ by the presence of one handler.
 | `useRemoteThreadListRuntime`, `useCloudThreadListAdapter`, `AssistantCloud` | Rejected | — | — | Local-first: no account, no cloud, no outbound thread sync. |
 | Prebuilt `ExternalThread`, `SingleThreadList`, `InMemoryThreadList`, `RemoteThreadList` | Rejected | — | — | A prebuilt thread cannot carry the ODI part renderers; adopting it would can the three-file part bridge. |
 | `createThreadRowsSelector` / `ThreadRow` | Decision | — | — | Group the conversation list by day once #408 lands. Decide from real list lengths, not now. |
-| `groupPartByType` / `GroupedParts` | Planned | — | #392 | Fallback if `ChainOfThoughtPrimitive` cannot exclude a pending approval. |
+| `groupPartByType` / `GroupedParts` | Partial | `apps/studio/src/components/chat/workGrouping.ts` | — | The fallback fired: the turn's work groups through `GroupedParts` (see the message table), but with our own `workGrouping`. `groupPartByType` keys by part type or tool name alone, so a pending approval — a `tool-call` part — would be folded into the row. |
 | `getExternalStoreMessages` / `bindExternalStoreMessage` | Rejected | — | — | One store. These exist to reconcile foreign messages, which we do not accept. |
 
 ### Thread
@@ -133,7 +133,7 @@ by the presence of one handler.
 | `MessagePrimitive.Quote` | Adopted | `apps/studio/src/assistant/quote.ts` | #435 | Renders the quoted passage on a sent turn. |
 | `MessagePrimitive.Error` / `ErrorPrimitive` | Rejected | — | — | `FailurePanel` already renders the structured error, the retry copy, and the Try again action from `metadata.custom.error`. Swapping adds nothing and loses the ODI failure language. |
 | `GenerativeUIRender` / `MessagePrimitive.GenerativeUI` | Decision | — | — | Would let a model emit UI we did not validate. The ODI catalog is schema-validated; revisit only if validation moves server-side. |
-| `MessagePrimitive.GroupedParts` | Planned | — | #392 | See the runtime table. |
+| `MessagePrimitive.GroupedParts` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #392 | The reasoning and tool calls of one run fold into a single disclosure; `indicator="never"` keeps the activity line and caret where the `components` map put them. |
 | `MessagePrimitive.PartByIndex` / `Content` | Rejected | — | — | `Parts` is the one path; aliases would be a second. |
 | `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | `apps/studio/src/assistant/parts.tsx` | — | Rendered through the `components` map (custom `TextPart`, `FilePart`) rather than the bare primitives, which cannot show claim chips or extraction state. |
 | `MessagePartPrimitive.InProgress` | Decision | — | — | Our `TypingPart` shows a phase ("checking the sidecar"). The primitive would flatten that to a generic indicator. |
@@ -211,9 +211,9 @@ only the surface is missing.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Planned | — | #392 | One disclosure per settled turn. |
+| `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Rejected | — | — | Checked against the installed 0.15.31 rather than the docs: `groupMessageParts` starts a run at any adjacent `tool-call` or `reasoning` part, so its one disclosure would gather a write that is still asking. `GroupedParts` with `workGrouping` ends a run at an unanswered approval. |
 | Pending approvals inside a group | Rejected | — | — | A pending write is a question, not history. It stays ungrouped and visible, always. |
-| `useToolCallElapsed` | Planned | — | #392 | "Worked for Ns · N tools". |
+| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. |
 | `useMessageTiming` | Decision | — | — | Tokens/second is engineering telemetry. Useful to us, not to the PM; expose it only behind a diagnostics toggle if at all. |
 
 ### Selection and quote
@@ -300,11 +300,11 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 44 |
-| Partial | 8 |
-| Planned | 18 |
+| Adopted | 45 |
+| Partial | 9 |
+| Planned | 14 |
 | Decision | 26 |
-| Rejected | 33 |
+| Rejected | 35 |
 | Total | 129 |
 
 Read it as: **52** of the library's 129 relevant capabilities already deliver
@@ -682,6 +682,46 @@ within a month. The deterministic guard is
 `test_perf_canvas_assembly_does_not_rescan_the_whole_log`: it counts rows read
 rather than seconds, and a return to the full rescan (206,010 rows) fails it on
 any machine.
+
+## Render budget
+
+The cold-open number above is one screen appearing. The second cost is a screen
+that re-renders while you use it, and that is what the Studio's state splits
+(#503, #504, #505) are for. Their precondition is a number, so
+`apps/studio/src/test/renderCounts.tsx` counts renders and
+`src/state/StudioContext.test.tsx` pins them.
+
+Four surfaces are instrumented — the composer, the opportunity landscape, the
+workbench rail, and the banner area — mounted inside the real provider stack.
+A counter rendered *beside* a context consumer cannot see that consumer re-render
+(React bails out below a provider whose children element is stable), so each
+surface is wrapped in a `Profiler` and the number is commits that included it.
+
+| Scenario | composer | landscape | rail | banners |
+|---|---|---|---|---|
+| Forty streamed deltas | 5 | 2 | 2 | 2 |
+| Twenty keystrokes in the composer | 40 | 0 | 0 | 0 |
+| One health poll turning unhealthy | 1 | 1 | 1 | 5 |
+
+Baseline recorded on 2026-11-05 at commit `c403ba17`.
+
+```bash
+npm --prefix apps/studio test -- --run src/state/StudioContext.test.tsx   # the budget
+npm --prefix apps/studio test -- --run src/test/renderCounts.test.tsx     # the harness
+```
+
+Two things make these numbers usable. They are **exact, not ceilings**: the split
+issues may only lower a row, and a rise — or a drop — fails with the surface
+named, so it has to be argued with and re-recorded in the same pull request. And
+the scenario starts only once the boot has gone quiet: the harness waits for the
+fetches the boot left in flight, because a health answer landing mid-typing
+otherwise measures the race instead of the interaction.
+
+The harness is imported by tests alone, and the shipped bundle is byte-identical
+to the baseline it was taken against (`index-BLu6eXb1.js`, 1,321.24 kB / 392.52 kB
+gzip; `index-BXj2fr1g.css`, 106.89 kB / 20.56 kB gzip). A wall-clock render
+budget is deliberately not asserted: it would fail on a busy runner for reasons
+unrelated to the code under review.
 
 ## Test Coverage
 
