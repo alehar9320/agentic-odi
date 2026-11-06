@@ -15,8 +15,10 @@ import { useStudio } from "../state/StudioContext";
 import type { ConnectionReport } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
+import { StatusDot } from "./status/StatusDot";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ModelSection } from "./settings/sections/ModelSection";
+import { initInstall, isDismissed, isInstalled, offerInstall, dismissInstall } from "../install";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
 import { detectPlatform } from "../updater/platform";
 
@@ -119,6 +121,35 @@ function AboutSection({
   );
 }
 
+function InstallSection() {
+  const canInstall = !isInstalled() && !isDismissed();
+  return (
+    <section className="settings__install" aria-labelledby="settings-install-heading">
+      <h3 className="settings__title" id="settings-install-heading">
+        Install
+      </h3>
+      <p className="muted">
+        Open the Studio in its own window. The site works offline and the window
+        keeps your place when you reopen it.
+      </p>
+      {canInstall ? (
+        <button
+          type="button"
+          className="button button--ghost"
+          onClick={() => {
+            const offered = offerInstall();
+            if (!offered) {
+              dismissInstall();
+            }
+          }}
+        >
+          Install app
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
 const PRESET_AREAS: ConnectorPreset["area"][] = [
   "voice-of-customer",
   "quantitative-data",
@@ -193,6 +224,11 @@ export function SettingsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Offer the app install prompt once; dismissal is remembered.
+  useEffect(() => {
+    initInstall();
+  }, []);
+
   const modelHealthy = survey ? survey.llmHealthy : llmHealth.healthy;
   const sidecarKnown = survey ? survey.sidecarReachable : sidecarReachable;
   const mcpKnown = survey ? survey.mcpReachable : mcpReachable;
@@ -261,11 +297,7 @@ export function SettingsPanel() {
         <ul className="connection-list">
           {capabilities.map((capability) => (
             <li key={capability.id}>
-              <span
-                className={`status-dot${
-                  capability.status === "available" ? "" : " is-warn"
-                }`}
-              />
+              <StatusDot tone={capability.status === "available" ? "ok" : "warn"} />
               <span>{capability.label}</span>
               <span className="connection-list__value">
                 {capability.status === "available" ? "available" : "unavailable"}
@@ -395,6 +427,8 @@ export function SettingsPanel() {
       <UpdateSettings />
 
       <AboutSection settings={settings} capabilities={capabilities} />
+
+      <InstallSection />
 
       <details className="disclosure">
         <summary>How the studio works</summary>

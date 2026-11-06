@@ -699,6 +699,26 @@ class LocalBackend(Backend):
         segments = self.service.list_segments(job_id=args.get("job_id"))
         return [segment.model_dump(mode="json") for segment in segments]
 
+    def _open_study(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, OdiError, job_not_found
+
+        try:
+            study = self.service.open_study(
+                job_id=args["job_id"],
+                name=args["name"],
+                wave=int(args["wave"]),
+                method_notes=args.get("method_notes"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id") or "")) from None
+        except OdiError as exc:
+            raise BackendError(str(exc)) from None
+        return study.model_dump(mode="json")
+
+    def _list_studies(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        studies = self.service.list_studies(job_id=args.get("job_id"))
+        return [study.model_dump(mode="json") for study in studies]
+
     def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
         strategy = self.service.get_strategy()
         return None if strategy is None else strategy.model_dump(mode="json")
@@ -760,6 +780,8 @@ _LOCAL_HANDLERS = {
     "dismiss_signal": LocalBackend._dismiss_signal,
     "segment_market": LocalBackend._segment_market,
     "get_segments": LocalBackend._get_segments,
+    "open_study": LocalBackend._open_study,
+    "list_studies": LocalBackend._list_studies,
     "get_strategy": LocalBackend._get_strategy,
     "propose_strategy": LocalBackend._propose_strategy,
     "get_health": LocalBackend._get_health,

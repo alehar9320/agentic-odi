@@ -17,6 +17,7 @@ import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 import { UpdateBanner, UpdateProvider } from "./updater";
+import { initInstall } from "./install";
 
 /**
  * One room, one intelligence.
@@ -29,10 +30,10 @@ import { UpdateBanner, UpdateProvider } from "./updater";
 function StudioShell() {
   const {
     closePanel,
-    clearChat,
     closeSetup,
     customizeOpen,
     closeCustomize,
+    startNewThread,
     streaming,
     stopStreaming,
     bootError,
@@ -43,14 +44,15 @@ function StudioShell() {
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
-    clearChat();
+    // Home closes what is open and leaves the thread alone. Discarding it is
+    // the other control's job, and only after asking what is being lost.
     closePanel();
     closeSetup();
     closeCustomize();
   }
 
-  function newConversation() {
-    clearChat();
+  function newThread(options?: { stop?: boolean }) {
+    startNewThread(options);
     closePanel();
     closeSetup();
     closeCustomize();
@@ -69,6 +71,12 @@ function StudioShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closePanel, streaming, stopStreaming]);
+
+  // Capture the install prompt as early as possible so the browser's
+  // beforeinstallprompt event is not missed before Settings is opened.
+  useEffect(() => {
+    initInstall();
+  }, []);
 
   // A damaged database is not a broken screen: the file is intact on disk and
   // the only honest thing to show is that failure, not a zeroed-out studio.
@@ -93,7 +101,7 @@ function StudioShell() {
       />
       <StudioBar
         onHome={goHome}
-        onNew={newConversation}
+        onNew={newThread}
         onChangelog={() => setShowChangelog(true)}
       />
       <UpdateBanner />

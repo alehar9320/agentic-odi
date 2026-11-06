@@ -14,6 +14,7 @@ from agentic_odi_core import (
     InMemoryRepository,
     JobStage,
     ODIService,
+    Signal,
     SignalBudget,
     SignalKind,
     SignalNotFoundError,
@@ -131,6 +132,65 @@ def test_a_score_change_repeats_only_when_the_scores_really_change() -> None:
     service.update_outcome(outcome.id, {"importance": 8.0, "satisfaction": 4.0})
     service.update_outcome(outcome.id, {"importance": 8.0, "satisfaction": 4.0})
     assert _kinds(service).count("outcome_scored") == 1
+
+
+def _rescored(service: ODIService, source_event_id: int | None = None) -> Signal:
+    return service.record_signal(
+        SignalKind.OUTCOME_SCORED,
+        'Outcome re-scored: "Min x"',
+        subject_kind="outcome",
+        subject_id="o1",
+        discriminator="importance=8.0,satisfaction=4.0",
+        source_event_id=source_event_id,
+    )
+
+
+def test_the_same_value_from_two_changes_is_two_signals() -> None:
+    """A score the feed has seen before can still be news: it moved again."""
+    service = _service()
+
+    first = _rescored(service, source_event_id=4)
+    second = _rescored(service, source_event_id=7)
+
+    assert second.id != first.id
+    assert len(service.list_signals()) == 2
+
+
+def test_replaying_one_change_stores_one_signal() -> None:
+    """The source id is the change, not the call that reported it."""
+    service = _service()
+
+    first = _rescored(service, source_event_id=7)
+    again = _rescored(service, source_event_id=7)
+
+    assert again.id == first.id
+    assert len(service.list_signals()) == 1
+
+
+def test_a_signal_without_a_source_event_keeps_the_fingerprint_it_had() -> None:
+    service = _service()
+
+    signal = _rescored(service)
+
+    expected = hashlib.sha256(
+        b"outcome_scored|outcome|o1|importance=8.0,satisfaction=4.0"
+    ).hexdigest()
+    assert signal.fingerprint == expected
+
+
+def test_a_score_that_moves_away_and_back_signals_every_move() -> None:
+    service = _service()
+    job_id = _job(service)
+    outcome = service.add_outcome(job_id, STATEMENT, importance=5.0, satisfaction=5.0)
+    _clear(service)
+
+    for score in (8.0, 5.0, 8.0, 5.0):
+        service.update_outcome(outcome.id, {"importance": score, "satisfaction": score})
+
+    assert _kinds(service).count("outcome_scored") == 4
+
+    service.update_outcome(outcome.id, {"importance": 5.0, "satisfaction": 5.0})
+    assert _kinds(service).count("outcome_scored") == 4
 
 
 def test_evidence_ingest_and_promotion_each_emit_their_own_signal() -> None:

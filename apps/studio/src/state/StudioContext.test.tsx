@@ -5,6 +5,7 @@ import "fake-indexeddb/auto";
 
 import { LOCAL_BOARD_NOTE } from "../lib/canvasProvenance";
 import { SESSION_KEY } from "../lib/session";
+import { queuedUserMessage } from "../assistant/queue";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -51,9 +52,13 @@ const DEFAULT_CHAT_STREAM =
 
 let chatStream: string | null = null;
 let canvasFails = false;
+/** Extra records the canvas route serves; empty keeps every other test as-is. */
+let canvasRecords: Record<string, unknown> = {};
 let bootCorrupt = false;
 let chatAborts = false;
 let chatFailure: Error | null = null;
+let chatHangs = false;
+let releaseChat: (() => void) | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
 let llmUnhealthy = false;
@@ -65,6 +70,51 @@ let featuredFetches = 0;
 let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+let conversationCreates = 0;
+
+// The follow-up queue (#410) needs a turn that stays in flight so later sends
+// actually line up behind it: /api/chat then returns a stream the test closes
+// (respond) or breaks (abort — the same way aborting the fetch signal would).
+type GatedTurn = {
+  body: Record<string, unknown>;
+  aborted: boolean;
+  respond: (events: string) => void;
+  abort: () => void;
+};
+let gateChats = false;
+let gatedTurns: GatedTurn[] = [];
+
+function gatedChatResponse(
+  body: Record<string, unknown>,
+  signal?: AbortSignal | null,
+): Response {
+  const encoder = new TextEncoder();
+  let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const turn: GatedTurn = {
+    body,
+    aborted: false,
+    respond: (events) => {
+      streamController?.enqueue(encoder.encode(events));
+      streamController?.close();
+    },
+    abort: () => {
+      turn.aborted = true;
+      const error = new Error("The user aborted a request.");
+      error.name = "AbortError";
+      streamController?.error(error);
+    },
+  };
+  signal?.addEventListener("abort", turn.abort, { once: true });
+  gatedTurns.push(turn);
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller;
+      },
+    }),
+    { status: 200, headers: { "Content-Type": "text/event-stream" } },
+  );
+}
 
 function route(
   input: RequestInfo | URL,
@@ -83,6 +133,22 @@ function route(
     }
     if (chatFailure) {
       throw chatFailure;
+    }
+    if (chatHangs) {
+      // A reply still in the air. A browser's fetch rejects on abort, so the
+      // studio's own cancel path can be exercised against this stub.
+      const signal = init?.signal;
+      return new Promise<Response>((resolve, reject) => {
+        releaseChat = () => resolve(sse(chatStream ?? DEFAULT_CHAT_STREAM));
+        signal?.addEventListener("abort", () => {
+          const error = new Error("The user aborted a request.");
+          error.name = "AbortError";
+          reject(error);
+        });
+      });
+    }
+    if (gateChats) {
+      return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
@@ -131,7 +197,7 @@ function route(
         headers: { "Content-Type": "application/json" },
       });
     }
-    return json({ jobs: [], steps: [], outcomes: [], source: "mcp" });
+    return json({ jobs: [], steps: [], outcomes: [], source: "mcp", ...canvasRecords });
   }
   if (url === "/api/connectors/catalog") {
     catalogFetches += 1;
@@ -210,13 +276,36 @@ function route(
     });
   }
   if (url === "/api/conversations") {
+    if (init?.method === "POST") {
+      conversationCreates += 1;
+      return json({
+        conversation: {
+          id: "c-new",
+          title: "",
+          created_at: "2026-10-22T10:00:00+00:00",
+          updated_at: "2026-10-22T10:00:00+00:00",
+        },
+      });
+    }
     return json({
-      conversation: {
-        id: "c-new",
-        title: "",
-        created_at: "2026-10-22T10:00:00+00:00",
-        updated_at: "2026-10-22T10:00:00+00:00",
-      },
+      conversations: [
+        {
+          id: "c-1",
+          title: "I own activation.",
+          created_at: "2026-10-22T10:00:00+00:00",
+          updated_at: "2026-10-22T10:00:00+00:00",
+          head_id: "t-2",
+          turn_count: 2,
+        },
+        {
+          id: "c-old",
+          title: "Price the churn spike",
+          created_at: "2026-10-20T10:00:00+00:00",
+          updated_at: "2026-10-20T10:00:00+00:00",
+          head_id: null,
+          turn_count: 1,
+        },
+      ],
     });
   }
   if (url === "/api/health/mcp") {
@@ -385,6 +474,32 @@ describe("StudioContext memory and resume", () => {
     ]);
     expect(result.current.memory.map((item) => item.text)).toEqual([
       "Accountable for activation.",
+    ]);
+  });
+
+  it("loads the history list on boot, newest first", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.conversations).toHaveLength(2));
+    expect(result.current.conversations.map((conversation) => conversation.id)).toEqual([
+      "c-1",
+      "c-old",
+    ]);
+    expect(result.current.conversations[0].title).toBe("I own activation.");
+  });
+
+  it("opens a past conversation by loading its turns", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.openConversation("c-1");
+    });
+
+    expect(result.current.conversationId).toBe("c-1");
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Tell me more.",
     ]);
   });
 
@@ -644,6 +759,12 @@ describe("StudioContext first run in a browser with no server", () => {
 
     await act(async () => {
       await result.current.sendMessage("what should I work on first?");
+    });
+
+    // sendMessage settles when the send enters the queue (#410), not when the
+    // turn answers, so the offline reply is awaited where it actually lands.
+    await waitFor(() => {
+      expect((result.current.messages.at(-1)?.content ?? "").trim().length).toBeGreaterThan(0);
     });
 
     const last = result.current.messages.at(-1);
@@ -1195,5 +1316,527 @@ describe("StudioContext boot failure", () => {
 
     expect(result.current.bootError).toBeNull();
     expect(result.current.sidecarReachable).toBe(true);
+  });
+});
+
+describe("StudioContext startNewThread (#319)", () => {
+  // A turn that leaves a tool call, an offline flag, and its own conversation
+  // id behind — everything the Undo snapshot has to carry back.
+  const RICH_STREAM =
+    'event: conversation\ndata: {"id":"c-9","title":"thread"}\n\n' +
+    'event: status\ndata: {"phase":"offline"}\n\n' +
+    'event: tool\ndata: {"name":"list_jobs","status":"ok","preview":"3 jobs"}\n\n' +
+    'event: delta\ndata: {"text":"Three jobs."}\n\n' +
+    'event: message\ndata: {"content":"Three jobs."}\n\n';
+
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = RICH_STREAM;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    chatHangs = false;
+    releaseChat = null;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    conversationCreates = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    chatStream = null;
+    chatHangs = false;
+    releaseChat = null;
+    document.body.innerHTML = "";
+  });
+
+  async function booted() {
+    const harness = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(harness.result.current.conversationId).toBe("c-1"));
+    return harness;
+  }
+
+  async function threadWithOneTurn() {
+    const harness = await booted();
+    await act(async () => {
+      await harness.result.current.sendMessage("How many jobs?");
+    });
+    expect(harness.result.current.messages.length).toBeGreaterThan(1);
+    expect(harness.result.current.conversationId).toBe("c-9");
+    return harness;
+  }
+
+  it("refuses to start a new thread while a reply is still coming", async () => {
+    const harness = await booted();
+    chatHangs = true;
+    await act(async () => {
+      void harness.result.current.sendMessage("How many jobs?");
+    });
+    expect(harness.result.current.streaming).toBe(true);
+    const before = harness.result.current.messages;
+
+    const handle = harness.result.current.startNewThread();
+
+    expect(handle).toBeNull();
+    expect(harness.result.current.messages).toEqual(before);
+    expect(harness.result.current.streaming).toBe(true);
+
+    await act(async () => {
+      releaseChat?.();
+    });
+  });
+
+  it("aborts the reply when told to stop it", async () => {
+    const harness = await booted();
+    chatHangs = true;
+    await act(async () => {
+      void harness.result.current.sendMessage("How many jobs?");
+    });
+
+    await act(async () => {
+      harness.result.current.startNewThread({ stop: true });
+      releaseChat?.();
+    });
+
+    expect(harness.result.current.streaming).toBe(false);
+    expect(harness.result.current.messages).toEqual([]);
+  });
+
+  it("creates no conversation until the first message", async () => {
+    const harness = await threadWithOneTurn();
+    expect(conversationCreates).toBe(0);
+
+    await act(async () => {
+      harness.result.current.startNewThread();
+    });
+
+    expect(conversationCreates).toBe(0);
+    expect(harness.result.current.conversationId).toBeNull();
+    expect(harness.result.current.messages).toEqual([]);
+
+    chatStream = null;
+    await act(async () => {
+      await harness.result.current.sendMessage("A new question.");
+    });
+
+    expect(harness.result.current.conversationId).toBe("c-2");
+    expect(chatBody?.conversation_id).toBeNull();
+  });
+
+  it("restores the thread exactly when Undo runs inside the ten seconds", async () => {
+    const viewport = document.createElement("div");
+    viewport.className = "chat__scroll";
+    Object.defineProperty(viewport, "scrollTop", {
+      configurable: true,
+      writable: true,
+      value: 812,
+    });
+    document.body.append(viewport);
+
+    const harness = await threadWithOneTurn();
+    const before = harness.result.current.messages;
+    const beforeToolActivity = harness.result.current.toolActivity;
+    const beforeOfflineReply = harness.result.current.offlineReplyFor;
+    // The undo has to bring something back, not compare two empties.
+    expect(beforeToolActivity.length).toBeGreaterThan(0);
+
+    let handle!: ReturnType<typeof harness.result.current.startNewThread>;
+    await act(async () => {
+      handle = harness.result.current.startNewThread();
+    });
+    expect(handle).not.toBeNull();
+
+    viewport.scrollTop = 0;
+    await act(async () => {
+      handle?.undo();
+    });
+
+    expect(harness.result.current.messages).toEqual(before);
+    expect(harness.result.current.messages.map((message) => message.id)).toEqual(
+      before.map((message) => message.id),
+    );
+    expect(harness.result.current.messages.map((message) => message.parentId)).toEqual(
+      before.map((message) => message.parentId),
+    );
+    expect(harness.result.current.conversationId).toBe("c-9");
+    expect(harness.result.current.toolActivity).toEqual(beforeToolActivity);
+    expect(harness.result.current.offlineReplyFor).toBe(beforeOfflineReply);
+    expect(viewport.scrollTop).toBe(812);
+  });
+
+  it("offers a ten-second Undo and stops offering it once a message is sent", async () => {
+    const harness = await threadWithOneTurn();
+
+    let handle!: ReturnType<typeof harness.result.current.startNewThread>;
+    await act(async () => {
+      handle = harness.result.current.startNewThread();
+    });
+
+    const undoToast = harness.result.current.toasts.at(-1);
+    expect(undoToast?.message).toBe("New thread. Your last one is still saved.");
+    expect(undoToast?.action?.label).toBe("Undo");
+    expect(undoToast?.durationMs).toBe(10_000);
+
+    chatStream = null;
+    await act(async () => {
+      await harness.result.current.sendMessage("A new question.");
+    });
+
+    expect(harness.result.current.toasts.some((toast) => toast.action?.label === "Undo")).toBe(false);
+    expect(harness.result.current.toasts.at(-1)?.message).toBe("New thread started.");
+
+    const messagesAfter = harness.result.current.messages;
+    await act(async () => {
+      handle?.undo();
+    });
+    expect(harness.result.current.messages).toBe(messagesAfter);
+    expect(harness.result.current.conversationId).toBe("c-2");
+  });
+
+  it("leaves the canvas, brief, memory, and connectors where they were", async () => {
+    const harness = await threadWithOneTurn();
+    await waitFor(() => expect(harness.result.current.connectors.length).toBeGreaterThanOrEqual(0));
+    const before = JSON.stringify({
+      canvas: harness.result.current.canvas,
+      brief: harness.result.current.brief,
+      memory: harness.result.current.memory,
+      connectors: harness.result.current.connectors,
+      settings: harness.result.current.settings,
+    });
+
+    await act(async () => {
+      harness.result.current.startNewThread();
+    });
+
+    const after = JSON.stringify({
+      canvas: harness.result.current.canvas,
+      brief: harness.result.current.brief,
+      memory: harness.result.current.memory,
+      connectors: harness.result.current.connectors,
+      settings: harness.result.current.settings,
+    });
+    expect(after).toBe(before);
+  });
+});
+
+describe("StudioContext follow-up queue (#410)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatAttempts = 0;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    gateChats = true;
+    gatedTurns = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    gateChats = false;
+    vi.unstubAllGlobals();
+  });
+
+  async function openStudio() {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    await waitFor(() => expect(result.current.queue).not.toBeNull());
+    return result;
+  }
+
+  /** The question the sidecar was actually asked on one gated turn. */
+  function turnText(turn: GatedTurn): string {
+    const history = (turn.body.messages ?? []) as { content: string }[];
+    return history[history.length - 1]?.content ?? "";
+  }
+
+  function laneTexts(items: readonly { parts: readonly { type: string; text?: string }[] }[]): string[] {
+    return items.map((item) =>
+      item.parts.flatMap((part) => (part.type === "text" ? [part.text ?? ""] : [])).join(" "),
+    );
+  }
+
+  // The adapter mounts on the first effect, so it is present once openStudio
+  // resolves; this narrows the nullable context field for the assertions below.
+  type StudioResult = Awaited<ReturnType<typeof openStudio>>;
+  function lane(
+    result: StudioResult,
+  ): NonNullable<StudioResult["current"]["queue"]> {
+    const queue = result.current.queue;
+    if (!queue) {
+      throw new Error("queue adapter missing");
+    }
+    return queue;
+  }
+
+  it("holds follow-ups typed during an answer and sends them in order", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("first question?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+    expect(result.current.streaming).toBe(true);
+
+    await act(async () => {
+      await result.current.sendMessage("second question?");
+      await result.current.sendMessage("third question?");
+    });
+
+    // Never two streams for one conversation: the follow-ups wait in the lane.
+    expect(gatedTurns).toHaveLength(1);
+    expect(laneTexts(lane(result).items)).toEqual([
+      "second question?",
+      "third question?",
+    ]);
+
+    await act(async () => {
+      gatedTurns[0].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(2));
+    await act(async () => {
+      gatedTurns[1].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(3));
+    await act(async () => {
+      gatedTurns[2].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+
+    expect(gatedTurns.map(turnText)).toEqual([
+      "first question?",
+      "second question?",
+      "third question?",
+    ]);
+  });
+
+  it("a steered follow-up cuts in, cancelling the live answer exactly once", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("long question?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      lane(result).steer(queuedUserMessage("urgent correction"));
+    });
+
+    // The live stream aborts and the steer is dispatched at once — a cut-in,
+    // not a second stream: exactly one new request was made.
+    await waitFor(() => expect(gatedTurns).toHaveLength(2));
+    await waitFor(() => expect(gatedTurns[0].aborted).toBe(true));
+    expect(gatedTurns[1].aborted).toBe(false);
+    expect(chatAttempts).toBe(2);
+
+    await act(async () => {
+      gatedTurns[1].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+    expect(turnText(gatedTurns[1])).toBe("urgent correction");
+    // The interrupted question stays in the transcript; only its empty
+    // answer is dropped.
+    expect(result.current.messages.some((message) => message.content === "long question?")).toBe(true);
+  });
+
+  it("a follow-up removed from the lane is never fetched", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("running question?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+    await act(async () => {
+      await result.current.sendMessage("withdrawn question?");
+    });
+    const [item] = lane(result).items;
+    await act(async () => {
+      lane(result).remove(item.id);
+    });
+    expect(lane(result).items).toHaveLength(0);
+
+    await act(async () => {
+      gatedTurns[0].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+    expect(gatedTurns).toHaveLength(1);
+    expect(
+      result.current.messages.some((message) => message.content === "withdrawn question?"),
+    ).toBe(false);
+  });
+
+  it("stopping the answer keeps the lane waiting for the next send", async () => {
+    const result = await openStudio();
+
+    await act(async () => {
+      await result.current.sendMessage("first?");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+    await act(async () => {
+      await result.current.sendMessage("second?");
+    });
+
+    await act(async () => {
+      result.current.stopStreaming();
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+    // Stop takes down the turn, not the person's follow-ups (#410): the lane
+    // keeps "second?" and waits — nothing fires off behind the stop.
+    expect(gatedTurns).toHaveLength(1);
+    expect(laneTexts(lane(result).items)).toEqual(["second?"]);
+
+    await act(async () => {
+      await result.current.sendMessage("third?");
+    });
+    // The next send re-arms the lane, and the older follow-up answers first.
+    await waitFor(() => expect(gatedTurns).toHaveLength(2));
+    expect(turnText(gatedTurns[1])).toBe("second?");
+    await act(async () => {
+      gatedTurns[1].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(3));
+    expect(turnText(gatedTurns[2])).toBe("third?");
+    await act(async () => {
+      gatedTurns[2].respond(DEFAULT_CHAT_STREAM);
+    });
+    await waitFor(() => expect(result.current.streaming).toBe(false));
+  });
+});
+
+describe("StudioContext agent focus", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    bootCorrupt = false;
+    chatAborts = false;
+    canvasFails = false;
+    canvasRecords = {};
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends the selected record as a pointer the sidecar can verify", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("outcome", "O-9");
+    });
+    await act(async () => {
+      await result.current.sendMessage("what would have to be true?");
+    });
+
+    expect(chatBody?.focus).toEqual({ kind: "outcome", id: "O-9" });
+  });
+
+  it("sends no focus when the screen has nothing selected", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("what would have to be true?");
+    });
+
+    expect(chatBody?.focus ?? null).toBeNull();
+  });
+
+  it("does not point at a record the sidecar cannot read", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("strategy", "S-1");
+    });
+    await act(async () => {
+      await result.current.sendMessage("what would have to be true?");
+    });
+
+    expect(chatBody?.focus ?? null).toBeNull();
+  });
+
+  it("stops pointing at the screen once the person clears the focus", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("outcome", "O-9");
+    });
+    expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-9" });
+    // Focusing a record is remembered for the next visit, so clearing must undo it.
+    expect(localStorage.getItem("studio.session")).toContain("O-9");
+
+    act(() => {
+      result.current.clearFocus();
+    });
+
+    expect(result.current.focusedSubject).toBeNull();
+    expect(localStorage.getItem("studio.session")).toBeNull();
+
+    await act(async () => {
+      await result.current.sendMessage("what would have to be true?");
+    });
+
+    expect(chatBody?.focus ?? null).toBeNull();
+  });
+
+  it("names the focused record with the words the snapshot holds", async () => {
+    canvasRecords = {
+      outcomes: [{ id: "O-9", statement: "Reduce the time to reconcile a failed payment" }],
+    };
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("outcome", "O-9");
+    });
+
+    await waitFor(() =>
+      expect(result.current.focusedSubjectLabel).toBe(
+        "Reduce the time to reconcile a failed payment",
+      ),
+    );
+  });
+
+  it("names nothing for a selection this snapshot does not hold", async () => {
+    canvasRecords = {
+      outcomes: [{ id: "O-9", statement: "An outcome that is still on the board" }],
+    };
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.focusSubject("outcome", "deleted-yesterday");
+    });
+
+    // The pointer still travels — the sidecar answers nothing it cannot read —
+    // but the composer has no words to claim, so no chip may appear.
+    expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "deleted-yesterday" });
+    expect(result.current.focusedSubjectLabel).toBeNull();
   });
 });

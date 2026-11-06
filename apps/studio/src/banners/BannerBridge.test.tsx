@@ -1,5 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BannerBridge, useBannerActionDispatcher } from "./BannerBridge";
 import { BannerProvider, useBanner } from "./BannerProvider";
@@ -15,6 +15,28 @@ const studio = vi.hoisted(() => ({
   openPanel: vi.fn(),
   ask: vi.fn(),
 }));
+
+const originalOnLine = Object.getOwnPropertyDescriptor(window.navigator, "onLine");
+
+/** jsdom reports `onLine: true`; the offline path needs to flip it and dispatch
+ * the event the bridge subscribes to. */
+function setOnLine(value: boolean) {
+  Object.defineProperty(window.navigator, "onLine", { value, configurable: true });
+}
+
+function goOffline() {
+  setOnLine(false);
+  act(() => {
+    window.dispatchEvent(new Event("offline"));
+  });
+}
+
+function goOnline() {
+  setOnLine(true);
+  act(() => {
+    window.dispatchEvent(new Event("online"));
+  });
+}
 
 vi.mock("../state/StudioContext", () => ({
   useStudio: () => studio,
@@ -49,6 +71,14 @@ describe("BannerBridge", () => {
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: true, message: "" };
     studio.dismissedSidecarNotice = false;
+    setOnLine(true);
+  });
+
+  afterEach(() => {
+    setOnLine(true);
+    if (originalOnLine) {
+      Object.defineProperty(window.navigator, "onLine", originalOnLine);
+    }
   });
 
   it("raises nothing while the sidecar is reachable and the model is healthy", () => {
@@ -157,5 +187,71 @@ describe("BannerBridge", () => {
     });
 
     expect(studio.dismissSidecarNotice).toHaveBeenCalledTimes(1);
+  });
+
+  it("says one line naming what still works when the browser goes offline", () => {
+    renderShell();
+    expect(screen.queryByText(/you're offline/i)).not.toBeInTheDocument();
+
+    goOffline();
+
+    expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
+    expect(screen.getByText(/on this device/i)).toBeInTheDocument();
+  });
+
+  it("does not repeat the offline line when the connection flaps", () => {
+    renderShell();
+    goOffline();
+    goOnline();
+    goOffline();
+
+    expect(screen.getAllByText(/you're offline/i)).toHaveLength(1);
+  });
+
+  it("clears the offline line when the connection comes back", () => {
+    renderShell();
+    goOffline();
+    expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
+
+    goOnline();
+
+    expect(screen.queryByText(/you're offline/i)).not.toBeInTheDocument();
+  });
+
+  it("says offline rather than working-by-hand while the browser has no network", () => {
+    // One condition, one line: the offline strip already names what still works,
+    // so the model strip would only repeat it.
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    goOffline();
+
+    expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+  });
+
+  it("brings back the working-by-hand line once the browser is back online", () => {
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+    goOffline();
+    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+
+    goOnline();
+
+    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
+  });
+
+  it("keeps the offline line alone while the browser has no network", () => {
+    // The sidecar strip's Recheck and Start actions could not succeed offline,
+    // so it waits until the connection is back.
+    studio.sidecarReachable = false;
+    renderShell();
+    goOffline();
+
+    expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
+    expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
+
+    goOnline();
+
+    expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
   });
 });

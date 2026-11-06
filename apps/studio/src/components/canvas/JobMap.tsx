@@ -275,7 +275,6 @@ export function JobMap() {
                 <span
                   className="studio-pill"
                   style={{
-                    fontSize: "0.68rem",
                     padding: "2px 6px",
                     background: hasSteps ? "rgba(129, 140, 248, 0.15)" : "transparent",
                     color: hasSteps ? "var(--studio-indigo)" : "rgba(255,255,255,0.2)",
