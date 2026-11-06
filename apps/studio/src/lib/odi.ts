@@ -12,6 +12,10 @@ export function opportunityScore(importance: number, satisfaction: number): numb
   return importance + Math.max(importance - satisfaction, 0);
 }
 
+export function hasScore(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 export function isUnderserved(score: number | null | undefined): boolean {
   return score != null && score > UNDERSERVED_THRESHOLD;
 }

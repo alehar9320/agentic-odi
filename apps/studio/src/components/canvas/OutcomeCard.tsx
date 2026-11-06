@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import {
   formatOpportunityScore,
+  hasScore,
   isUnderserved,
   opportunityPill,
   opportunityScore,
@@ -28,14 +29,19 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
   const outcomeId = outcome.id ?? "O";
-  const underserved = isUnderserved(opp);
-  const pill = opportunityPill(opp);
+  const scored = hasScore(opp);
+  const underserved = scored ? isUnderserved(opp) : false;
+  const pill = scored ? opportunityPill(opp) : null;
 
   return (
     <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>
       <header className="card__head">
         <span className="card__id">{outcomeId}</span>
-        <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
+        {scored && pill ? (
+          <span className={`badge badge--`}>{pill.label}</span>
+        ) : (
+          <span className="badge badge--neutral" aria-label="Not scored — no ratings recorded">Not scored</span>
+        )}
         {sample ? (
           <span
             className="badge badge--amber"
@@ -53,7 +59,7 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
         <span aria-hidden="true"> · </span>
         Satisfaction <b>{outcome.satisfaction ?? "—"}</b>
         <span aria-hidden="true"> · </span>
-        Opportunity <b>{formatOpportunityScore(opp)}</b>
+        Opportunity <b>{scored ? formatOpportunityScore(opp) : "—"}</b>
       </p>
 
       {showEvidence &&

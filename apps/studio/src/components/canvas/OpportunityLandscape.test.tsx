@@ -396,6 +396,6 @@ describe("OpportunityLandscape score rendering", () => {
     fireEvent.click(screen.getByText("📋 Table View"));
 
     const row = screen.getByRole("row", { name: /minimize unanswered support tickets/i });
-    expect(within(row).getByText("N/A")).toBeInTheDocument();
+    expect(within(row).getByText("—")).toBeInTheDocument();
   });
 });
