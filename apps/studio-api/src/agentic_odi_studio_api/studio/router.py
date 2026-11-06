@@ -36,6 +36,7 @@ from agentic_odi_core import (
     invalid_strategy_request,
     manual_claim_check,
 )
+from agentic_odi_core.funnel import count_reset, read_counts
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
@@ -62,10 +63,10 @@ from agentic_odi_studio_api.studio.memory import (
     StudioMemory,
 )
 from agentic_odi_studio_api.studio.probes import (
-    check_llm_health,
     defaults,
     is_endpoint_reachable,
     list_models,
+    probe_llm_health,
 )
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
@@ -88,6 +89,7 @@ from agentic_odi_studio_api.studio.schemas import (
     CreateJobRequest,
     LatestConversationResponse,
     LlmHealthRequest,
+    LlmHealthResponse,
     LlmProxyRequest,
     MarketplaceListingOut,
     MarketplaceSearchResponse,
@@ -155,6 +157,12 @@ def _first_validation_error(exc: ValidationError) -> str:
     return f"{location}: {message}" if location else message
 
 
+def _outcome_field(message: str) -> str | None:
+    """Return ``importance`` or ``satisfaction`` when a rating error names one."""
+    first = message.split(maxsplit=1)[0] if message.strip() else ""
+    return first if first in {"importance", "satisfaction"} else None
+
+
 def _as_http_error(exc: Exception) -> StudioHTTPError:
     """Translate domain errors into typed HTTP responses without leaking 500s."""
     if isinstance(exc, ValidationError):
@@ -164,7 +172,7 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         )
     if isinstance(exc, OutcomeStatementError):
         return StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field="statement"),
             status_code=422,
         )
     if isinstance(
@@ -189,7 +197,14 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             status_code=422,
         )
     if isinstance(exc, ValueOutOfRangeError):
-        return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))
+        return StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.OUT_OF_RANGE,
+                message=str(exc),
+                field=_outcome_field(str(exc)),
+            ),
+            status_code=422,
+        )
     if isinstance(exc, OdiError):
         status = error_status(exc)
         return StudioHTTPError(
@@ -283,6 +298,29 @@ def get_diagnostics(request: Request) -> dict[str, Any]:
     }
 
 
+@router.get("/stats")
+def get_stats(request: Request) -> dict[str, Any]:
+    """The onboarding funnel, counted from this machine's own event log.
+
+    Every counter is always named, and one that has not happened answers with a
+    zero and no timestamps rather than an invented history. Nothing leaves the
+    machine: these numbers come from the same store the records do.
+    """
+    return read_counts(_service(request))
+
+
+@router.post("/stats/reset")
+def reset_stats(request: Request) -> dict[str, Any]:
+    """Start the measurement over and return the counters as they now stand.
+
+    A reset appends a marker; the events it supersedes stay in the log. The
+    asking happens in whatever surface calls this — a click that erases a
+    measurement should not be the kind that fires straight away.
+    """
+    count_reset(_service(request))
+    return read_counts(_service(request))
+
+
 @router.get("/changelog")
 def get_changelog_route() -> dict:
     return get_changelog()
@@ -293,10 +331,20 @@ def post_mcp_health(body: McpHealthRequest) -> dict:
     return {"reachable": is_endpoint_reachable(body.mcp_url)}
 
 
-@router.post("/health/llm")
-async def post_llm_health(body: LlmHealthRequest) -> dict:
-    healthy, message = await check_llm_health(body.base_url, body.api_key, body.model)
-    return {"healthy": healthy, "message": message}
+@router.post("/health/llm", response_model=LlmHealthResponse)
+async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) -> dict:
+    """Probe the configured LLM endpoint, cached per (endpoint, model).
+
+    Concurrent tabs within the TTL cause a single upstream probe. ``?fresh=true``
+    bypasses the cache so a user-initiated "check now" is never stale.
+    """
+    result = await probe_llm_health(body.base_url, body.api_key, body.model, fresh=fresh)
+    return {
+        "healthy": result["healthy"],
+        "message": result["message"],
+        "checked_at": result["checked_at"],
+        "cached": result["cached"],
+    }
 
 
 @router.post("/models")

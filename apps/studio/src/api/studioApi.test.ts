@@ -26,6 +26,7 @@ import {
   healthMcp,
   streamChat,
   asStudioError,
+  StudioApiError,
 } from "./studioApi";
 
 afterEach(() => {
@@ -518,8 +519,62 @@ describe("typed failures", () => {
         satisfaction: 3,
       }),
     ).rejects.toMatchObject({ error: { code: "not_found" } });
-  });
-});
+   });
+
+   it("carries the optional field through from the server's error body", async () => {
+     mockFailure(422, {
+       error: {
+         code: "validation",
+         message: "Outcome statement does not match the ODI format.",
+         field: "statement",
+         suggestion: "Fix the input and try again.",
+         retryable: false,
+       },
+     });
+
+     let thrown: StudioApiError | null = null;
+     try {
+       await addOutcome({
+         mcp_url: "u",
+         job_id: "JOB-402",
+         statement: "fast",
+         importance: 8,
+         satisfaction: 3,
+       });
+     } catch (caught) {
+       thrown = caught as StudioApiError;
+     }
+     expect(thrown).not.toBeNull();
+     expect(thrown!.error.code).toBe("validation");
+     expect(thrown!.error.field).toBe("statement");
+   });
+
+   it("leaves field undefined when the server omits it", async () => {
+     mockFailure(422, {
+       error: {
+         code: "validation",
+         message: "Invalid input.",
+         suggestion: "Fix the input and try again.",
+         retryable: false,
+       },
+     });
+
+     let thrown: StudioApiError | null = null;
+     try {
+       await addOutcome({
+         mcp_url: "u",
+         job_id: "JOB-402",
+         statement: "fast",
+         importance: 8,
+         satisfaction: 3,
+       });
+     } catch (caught) {
+       thrown = caught as StudioApiError;
+     }
+     expect(thrown).not.toBeNull();
+     expect(thrown!.error.field).toBeUndefined();
+   });
+ });
 
 describe("signal inbox", () => {
   function mockStore(body: unknown): { url: string; method: string; body: string }[] {

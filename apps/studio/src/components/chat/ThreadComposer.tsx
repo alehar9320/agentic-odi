@@ -13,6 +13,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ATTACHMENT_ACCEPT,
   MAX_ATTACHMENT_CHARS,
+  MAX_ATTACHMENTS,
   MAX_IMAGE_BYTES,
   attachmentRejection,
   formatFileSize,
@@ -64,7 +65,11 @@ function AttachmentThumb({ file }: { file?: File }) {
   return <img className="attachment-chip__thumb" src={url} alt="" />;
 }
 
-function AttachmentRow() {
+function AttachmentRow({
+  onRemove,
+}: {
+  onRemove?: (index: number) => void;
+}) {
   const aui = useAui();
   const attachments = useAuiState((state) => state.composer.attachments);
 
@@ -74,6 +79,9 @@ function AttachmentRow() {
 
   return (
     <div className="composer__attachments" role="list" aria-label="Attachments">
+      <p className="attachment-count" aria-live="polite">
+        {attachments.length} of {MAX_ATTACHMENTS} files
+      </p>
       {attachments.map((attachment, index) => {
         const size = formatFileSize(attachment.file?.size ?? 0);
         return (
@@ -87,7 +95,10 @@ function AttachmentRow() {
               type="button"
               className="attachment-chip__remove"
               aria-label={`Remove ${attachment.name}`}
-              onClick={() => void aui.composer.attachment({ index }).remove()}
+              onClick={() => {
+                void aui.composer.attachment({ index }).remove();
+                onRemove?.(index);
+              }}
             >
               ✕
             </button>
@@ -104,12 +115,16 @@ function ComposerBody({
   onFiles,
   placeholder,
   autoFocus = false,
+  attachmentRefusal,
+  onClearAttachmentRefusal,
 }: {
   onCommand: (command: StudioCommand) => void;
   onSlashCommand?: (text: string) => boolean;
   onFiles: (files: File[]) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  attachmentRefusal: string | null;
+  onClearAttachmentRefusal: () => void;
 }) {
   const aui = useAui();
   const { llmHealth } = useStudio();
@@ -142,6 +157,9 @@ function ComposerBody({
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (open) {
+      if (event.nativeEvent.isComposing || event.keyCode === 229) {
+        return;
+      }
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         if (!matches.length) {
@@ -223,7 +241,12 @@ function ComposerBody({
       <ConnectorChips />
       <ContextChip />
       <QueueLane />
-      <AttachmentRow />
+      <AttachmentRow onRemove={onClearAttachmentRefusal} />
+      {attachmentRefusal && (
+        <p className="attachment-refusal" role="status" aria-live="polite">
+          {attachmentRefusal}
+        </p>
+      )}
       {/* The live transcript is recognition output, not a draft: it is marked
           as interim and the primitive replaces it with the final sentence. */}
       <AuiIf condition={(state) => state.composer.dictation != null}>
@@ -342,15 +365,28 @@ export function ThreadComposer(props: {
   // dragenter/dragleave fire for every child; count depth so moving over the
   // textarea does not flicker the drop state off and on.
   const dragDepth = useRef(0);
+  const attachments = useAuiState((state) => state.composer.attachments);
+  // A refusal names the refused file and the limit and stays on screen until the
+  // person makes room, so a screen reader can reach it (a toast alone expires).
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   function attachFiles(files: File[]) {
+    let accepted = 0;
     for (const file of files) {
       const rejection = attachmentRejection(file);
       if (rejection) {
         pushToast("error", rejection);
         continue;
       }
+      if (attachments.length + accepted >= MAX_ATTACHMENTS) {
+        const message = `${file.name} exceeds the ${MAX_ATTACHMENTS}-file attachment limit.`;
+        pushToast("error", message);
+        setRefusal(message);
+        continue;
+      }
       void aui.composer.addAttachment(file);
+      accepted += 1;
+      setRefusal(null);
     }
   }
 
@@ -391,7 +427,12 @@ export function ThreadComposer(props: {
       }}
     >
       {dragging ? <p className="composer__drop-hint">Drop to attach</p> : null}
-      <ComposerBody {...props} onFiles={attachFiles} />
+      <ComposerBody
+        {...props}
+        onFiles={attachFiles}
+        attachmentRefusal={refusal}
+        onClearAttachmentRefusal={() => setRefusal(null)}
+      />
     </ComposerPrimitive.Root>
   );
 }
