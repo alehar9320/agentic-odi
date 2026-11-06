@@ -31,6 +31,13 @@ class LlmHealthRequest(BaseModel):
     model: str = ""
 
 
+class LlmHealthResponse(BaseModel):
+    healthy: bool
+    message: str
+    checked_at: str  # ISO 8601 UTC when the probe last ran
+    cached: bool  # whether the answer was served from the TTL cache
+
+
 class ModelListRequest(BaseModel):
     """Which backend to ask for its model ids. The key travels in the body, not
     the query string, so it never lands in a URL or an access log."""

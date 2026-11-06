@@ -63,10 +63,10 @@ from agentic_odi_studio_api.studio.memory import (
     StudioMemory,
 )
 from agentic_odi_studio_api.studio.probes import (
-    check_llm_health,
     defaults,
     is_endpoint_reachable,
     list_models,
+    probe_llm_health,
 )
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
@@ -89,6 +89,7 @@ from agentic_odi_studio_api.studio.schemas import (
     CreateJobRequest,
     LatestConversationResponse,
     LlmHealthRequest,
+    LlmHealthResponse,
     LlmProxyRequest,
     MarketplaceListingOut,
     MarketplaceSearchResponse,
@@ -330,10 +331,20 @@ def post_mcp_health(body: McpHealthRequest) -> dict:
     return {"reachable": is_endpoint_reachable(body.mcp_url)}
 
 
-@router.post("/health/llm")
-async def post_llm_health(body: LlmHealthRequest) -> dict:
-    healthy, message = await check_llm_health(body.base_url, body.api_key, body.model)
-    return {"healthy": healthy, "message": message}
+@router.post("/health/llm", response_model=LlmHealthResponse)
+async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) -> dict:
+    """Probe the configured LLM endpoint, cached per (endpoint, model).
+
+    Concurrent tabs within the TTL cause a single upstream probe. ``?fresh=true``
+    bypasses the cache so a user-initiated "check now" is never stale.
+    """
+    result = await probe_llm_health(body.base_url, body.api_key, body.model, fresh=fresh)
+    return {
+        "healthy": result["healthy"],
+        "message": result["message"],
+        "checked_at": result["checked_at"],
+        "cached": result["cached"],
+    }
 
 
 @router.post("/models")
