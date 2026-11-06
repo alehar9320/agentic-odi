@@ -327,7 +327,9 @@ MCP tool result (text)
   When the sidecar never answers at all — a network failure in the browser — the
   SPA classifies the failure client-side (`TypeError` → `mcp_unreachable`) and
   surfaces the same `sidecar-down` banner strip plus a non-retryable in-thread
-  notice, instead of a generic "something went wrong".
+  notice, instead of a generic "something went wrong". The strip is reserved for
+  the loss of a sidecar this session was using; a studio that never had one
+  announces nothing.
 - **CLI hints.** `BackendError(message, suggestion)` is rendered as `Error: …` on
   stderr with a trailing `Hint: …` line, so a `BackendError("could not reach MCP
   server …")` tells the user exactly what to start.
