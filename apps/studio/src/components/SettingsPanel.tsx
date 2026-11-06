@@ -17,6 +17,7 @@ import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
 import { StatusDot } from "./status/StatusDot";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
+import { DataSection } from "./settings/sections/DataSection";
 import { ModelSection } from "./settings/sections/ModelSection";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
 import { detectPlatform } from "../updater/platform";
@@ -410,6 +411,8 @@ export function SettingsPanel() {
       ) : null}
 
       <UpdateSettings />
+
+      <DataSection />
 
       <AboutSection settings={settings} capabilities={capabilities} />
 
