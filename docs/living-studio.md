@@ -524,6 +524,12 @@ sentence carries the distinction the transcript drew beside it — *Hypothesis*,
 never print outside code, and the labels state what the turn read when it was
 written rather than promising that the record is still there.
 
+**The records lens exports itself.** Its **Export CSV** button writes `records.csv`
+with the same sections, labels, and column order the lens shows on screen, so the
+store opens in a spreadsheet instead of a screenshot. A record with no score exports
+the word `unscored`, exactly as the lens prints it, and the button is disabled while
+the store is empty. Export only — nothing here reads a file back in.
+
 **Diagnostics are separate from conversation export.** Settings → About →
 Diagnostics builds a local, opt-in bundle, then shows the exact pretty-printed
 JSON, byte count, and Included / Never included lists before Copy or Save. Capture
@@ -538,7 +544,9 @@ It still exports while the sidecar is stopped; nothing is uploaded.
 Printing (`Cmd`/`Ctrl`+`P`) lays the open conversation out for A4: the bar,
 rail, composer, and floating chrome are hidden, the palette switches to paper,
 and cards stay whole instead of splitting across sheets. An open lens prints
-below the thread instead of being clipped off-screen.
+below the thread instead of being clipped off-screen. The records lens prints as
+tables: section headings and column headers repeat on every sheet, a row is never
+split across one, and **Export CSV** and the "showing first 200" notice are dropped.
 
 ### The decision brief
 

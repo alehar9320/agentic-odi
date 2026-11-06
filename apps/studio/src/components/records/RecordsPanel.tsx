@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
-import { buildRecords } from "../../lib/records";
+import { downloadFile } from "../../lib/export";
+import { buildRecords, toCsv } from "../../lib/records";
 import { useStudio } from "../../state/StudioContext";
 import { RecordDetail } from "./RecordDetail";
 import { RecordsTable } from "./RecordsTable";
@@ -43,6 +44,10 @@ export function RecordsPanel() {
     origin?.focus();
   }
 
+  function exportCsv() {
+    downloadFile(toCsv(rows), "records.csv", "text/csv;charset=utf-8");
+  }
+
   return (
     <div className="records">
       {status ? (
@@ -50,6 +55,15 @@ export function RecordsPanel() {
           {status.label}
         </p>
       ) : null}
+      <button
+        type="button"
+        className="quiet-action records__export"
+        disabled={rows.length === 0}
+        title="Download every record the lens shows, as CSV"
+        onClick={exportCsv}
+      >
+        Export CSV
+      </button>
       {filter ? (
         <p className="records__filter">
           Filtered: <code className="records__id">{filter}</code>
