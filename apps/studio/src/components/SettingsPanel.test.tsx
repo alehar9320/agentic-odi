@@ -287,11 +287,11 @@ describe("SettingsPanel capabilities", () => {
 });
 
 describe("SettingsPanel about section", () => {
-  it("reports the running version, build date, platform, and update status", async () => {
+  it("reports the running version, commit, build date, platform, and the product essay", async () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
 
-    // A supported transport: the unsupported file-level stub never syncs
-    // currentVersion, and About must show real facts, not placeholders.
+    // A supported transport: About reads the updater's running version when
+    // available, matching the release/build-info source of truth.
     const aboutService = createUpdateService({
       transport: {
         supported: () => true,
@@ -314,12 +314,13 @@ describe("SettingsPanel about section", () => {
     await waitFor(() =>
       expect(aboutService.getSnapshot().currentVersion).toBe("0.11.0"),
     );
-    await waitFor(() => expect(aboutService.getSnapshot().phase).not.toBe("checking"));
 
     expect(within(about).getByText("v0.11.0")).toBeInTheDocument();
+    expect(within(about).getByText("dev")).toBeInTheDocument();
     expect(within(about).getByText(__STUDIO_BUILD_DATE__)).toBeInTheDocument();
     expect(within(about).getByText(/macOS|Windows|Linux|Desktop/)).toBeInTheDocument();
-    expect(within(about).getByText(aboutService.statusLine())).toBeInTheDocument();
+    expect(within(about).getByText(/canvas of human intent/i)).toBeInTheDocument();
+    expect(within(about).queryByText("Updates")).not.toBeInTheDocument();
   });
 });
 
