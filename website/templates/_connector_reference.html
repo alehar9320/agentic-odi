@@ -7,19 +7,19 @@
   cannot drift from the route the sidecar exposes.
 #}
 <section class="tool-doc" id="preset-reference">
-  <h2 class="tool-doc__name">Preset reference</h2>
+  <h2 class="tool-doc__name" id="preset-reference-title">Preset reference</h2>
   <p class="tool-doc__purpose">
     Every built-in preset, read from the catalog at build time. Register one
     with <code>connectors add mcp --preset &lt;id&gt;</code>, then check it with
     the health endpoint shown for that preset.
   </p>
-  <table class="tool-doc__args">
+  <table class="tool-doc__args" aria-labelledby="preset-reference-title">
     <thead>
       <tr>
-        <th>Provider</th>
-        <th>Kind</th>
-        <th>Auth</th>
-        <th>Health endpoint</th>
+        <th scope="col">Provider</th>
+        <th scope="col">Kind</th>
+        <th scope="col">Auth</th>
+        <th scope="col">Health endpoint</th>
       </tr>
     </thead>
     <tbody>

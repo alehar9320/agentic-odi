@@ -79,6 +79,38 @@ describe("Composer connector suggestions", () => {
   });
 });
 
+describe("Composer keycap labels", () => {
+  const baseProps = {
+    value: "",
+    onChange: () => {},
+    onSubmit: () => {},
+    onCommand: () => {},
+    streaming: false,
+    onStop: () => {},
+    inputRef: createRef<HTMLTextAreaElement>(),
+  };
+
+  it.each([
+    ["Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15", "⌘K", "↵"],
+    ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Ctrl K", "Enter"],
+    ["Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36", "Ctrl K", "Enter"],
+  ])("draws the keys this machine actually has (%s)", (userAgent, focus, send) => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));
+    const original = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", { value: userAgent, configurable: true });
+    try {
+      render(<Composer {...baseProps} />);
+
+      const hint = document.querySelector(".composer__hint") as HTMLElement;
+      const caps = Array.from(hint.querySelectorAll("kbd")).map((cap) => cap.textContent);
+      expect(caps).toContain(focus);
+      expect(caps).toContain(send);
+    } finally {
+      Object.defineProperty(navigator, "userAgent", { value: original, configurable: true });
+    }
+  });
+});
+
 describe("ThreadComposer attachment guidance", () => {
   it("describes supported files and the extraction limits on the attachment control", async () => {
     const { StudioRuntimeProvider } = await import("../../assistant/StudioRuntime");
@@ -198,6 +230,51 @@ describe("ThreadComposer attachments", () => {
     });
 
     expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
+  });
+
+  it("keeps five mixed attachments and refuses the rest, naming the file and the limit", async () => {
+    const pushToast = vi.fn();
+    const { container } = await renderThreadComposer({ pushToast });
+    const root = container.querySelector(".composer") as HTMLElement;
+    const files = [1, 2, 3, 4, 5, 6].map(
+      (n) => new File(["x"], `notes-${n}.txt`, { type: "text/plain" }),
+    );
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files } });
+
+    await screen.findByText("notes-1.txt");
+    await screen.findByText("notes-5.txt");
+    expect(screen.queryByText("notes-6.txt")).toBeNull();
+    expect(await screen.findAllByRole("listitem")).toHaveLength(5);
+
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("notes-6.txt"));
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("5-file"));
+
+    const refusal = screen.getByText(/exceeds the 5-file attachment limit/);
+    expect(refusal).toHaveTextContent(/exceeds the 5-file attachment limit/);
+    expect(refusal).toHaveTextContent(/notes-6.txt/);
+  });
+
+  it("shows the attachment counter as files are added and removed", async () => {
+    const pushToast = vi.fn();
+    const { container } = await renderThreadComposer({ pushToast });
+    const root = container.querySelector(".composer") as HTMLElement;
+    const file = (n: number) => new File(["x"], `notes-${n}.txt`, { type: "text/plain" });
+
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file(1)] } });
+    await screen.findByText("1 of 5 files");
+
+    fireEvent.drop(root, {
+      dataTransfer: { types: ["Files"], files: [file(2), file(3), file(4), file(5)] },
+    });
+    await screen.findByText("5 of 5 files");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove notes-1.txt" }));
+    await screen.findByText("4 of 5 files");
+
+    // Making room admits one more and refuses the next.
+    fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file(6), file(7)] } });
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("notes-7.txt"));
+    await screen.findByText("5 of 5 files");
   });
 });
 
