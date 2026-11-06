@@ -1234,6 +1234,24 @@ def patch_conversation(
     return ConversationResponse(conversation=conversation.to_dict())
 
 
+@router.delete("/conversations/{conversation_id}", status_code=204)
+def delete_conversation(conversation_id: str, request: Request) -> None:
+    """Delete one thread for good: it, its turns, and their citations.
+
+    A client asking twice gets a 404 the second time rather than a second success:
+    "already gone" and "I deleted it" are different answers.
+    """
+    try:
+        _memory(request).delete_conversation(conversation_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+            )
+        ) from exc
+
+
 @router.post("/approvals/{approval_id}", response_model=ApprovalDecisionResponse)
 async def resolve_approval(
     approval_id: str, body: ApprovalDecisionRequest, request: Request

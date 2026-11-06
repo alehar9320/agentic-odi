@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioApiError, fetchCanvas, fetchMemory, isTransportFailure, listConversations, streamChat } from "./studioApi";
+import { StudioApiError, deleteConversation, fetchCanvas, fetchMemory, isTransportFailure, listConversations, streamChat } from "./studioApi";
 
 const bff = {
   data: { fetchCanvas: vi.fn() },
-  memory: { listObservations: vi.fn(), listConversations: vi.fn() },
+  memory: {
+    listObservations: vi.fn(),
+    listConversations: vi.fn(),
+    deleteConversation: vi.fn(),
+  },
   chat: { stream: vi.fn() },
 };
 
@@ -24,6 +28,7 @@ beforeEach(() => {
   vi.mocked(bff.data.fetchCanvas).mockReset();
   vi.mocked(bff.memory.listObservations).mockReset();
   vi.mocked(bff.memory.listConversations).mockReset();
+  vi.mocked(bff.memory.deleteConversation).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
 });
 
@@ -132,5 +137,39 @@ describe("listConversations fallback", () => {
 
     expect(listed.map((item) => item.id)).toEqual(["c-2"]);
     expect(bff.memory.listConversations).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteConversation", () => {
+  it("deletes through the sidecar and accepts the 204 it answers with", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    await expect(deleteConversation("c-1")).resolves.toBeUndefined();
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toContain("/api/conversations/c-1");
+    expect(init.method).toBe("DELETE");
+    expect(bff.memory.deleteConversation).not.toHaveBeenCalled();
+  });
+
+  it("deletes through the browser store when the sidecar is unreachable", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ detail: "Sidecar unreachable" }, 502),
+    );
+    vi.mocked(bff.memory.deleteConversation).mockResolvedValueOnce({ ok: true });
+
+    await deleteConversation("c-1");
+
+    expect(bff.memory.deleteConversation).toHaveBeenCalledWith("c-1");
+  });
+
+  it("does not fall back when the sidecar says the thread is gone", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ error: { code: "not_found", message: "gone" } }, 404),
+    );
+
+    await expect(deleteConversation("c-1")).rejects.toThrow();
+
+    expect(bff.memory.deleteConversation).not.toHaveBeenCalled();
   });
 });

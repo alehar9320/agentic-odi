@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 
+import pytest
+
 from agentic_odi_core import InMemoryRepository
 from agentic_odi_studio_api.app import create_app
 from agentic_odi_studio_api.studio.claims import (
@@ -11,7 +13,11 @@ from agentic_odi_studio_api.studio.claims import (
     EvidenceSnapshot,
     split_claims,
 )
-from agentic_odi_studio_api.studio.memory import MAX_CONVERSATIONS, StudioMemory
+from agentic_odi_studio_api.studio.memory import (
+    MAX_CONVERSATIONS,
+    ConversationNotFoundError,
+    StudioMemory,
+)
 from fastapi.testclient import TestClient
 
 
@@ -369,3 +375,43 @@ def test_the_tree_endpoint_restores_claims_with_their_labels() -> None:
     claims = body["messages"][0]["claims"]
     assert [claim["status"] for claim in claims] == ["cited", "hypothesis"]
     assert claims[0]["evidence"] == [{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}]
+
+
+def test_deleting_a_thread_takes_its_turns_and_citations(tmp_path) -> None:
+    path = tmp_path / "studio.db"
+    memory = StudioMemory(path)
+    kept = memory.create_conversation("Activation model")
+    doomed = memory.create_conversation("Old interview")
+    memory.append_turn(kept.id, "user", "still here", "m-1", None)
+    doomed_turn = memory.append_turn(doomed.id, "user", CONTENT, "m-2", None)
+    memory.add_citations(doomed_turn, split_claims(CONTENT, _evidence_index()))
+
+    memory.delete_conversation(doomed.id)
+    memory.close()
+
+    connection = sqlite3.connect(path)
+    try:
+        orphan_turns = connection.execute(
+            "SELECT COUNT(*) FROM turns WHERE conversation_id = ?", (doomed.id,)
+        ).fetchone()[0]
+        # A citation whose turn is gone is a record nobody can read.
+        orphan_citations = connection.execute(
+            "SELECT COUNT(*) FROM turn_citations "
+            "WHERE turn_id NOT IN (SELECT id FROM turns)"
+        ).fetchone()[0]
+        kept_turns = connection.execute(
+            "SELECT COUNT(*) FROM turns WHERE conversation_id = ?", (kept.id,)
+        ).fetchone()[0]
+    finally:
+        connection.close()
+
+    assert orphan_turns == 0
+    assert orphan_citations == 0
+    assert kept_turns == 1
+
+
+def test_deleting_a_missing_thread_is_a_not_found() -> None:
+    memory = _memory()
+
+    with pytest.raises(ConversationNotFoundError):
+        memory.delete_conversation("does-not-exist")

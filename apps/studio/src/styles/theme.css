@@ -375,6 +375,77 @@ a {
   font-size: 0.72rem;
 }
 
+/* One row is a thread plus the actions about the thread itself. */
+.bar__history-row {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.bar__history-row .bar__history-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.bar__history-delete {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 0.86rem;
+}
+
+.bar__history-delete:hover,
+.bar__history-delete:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.bar__history-confirm {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.bar__history-confirm-text {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.bar__history-confirm-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.bar__history-keep,
+.bar__history-destroy {
+  border: 1px solid var(--border, var(--faint));
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.bar__history-destroy {
+  border-color: var(--danger, #c0392b);
+  color: var(--danger, #c0392b);
+}
+
+.bar__history-destroy:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 /* ------------------------------------------------------------------ */
 /* Conversation                                                       */
 /* ------------------------------------------------------------------ */

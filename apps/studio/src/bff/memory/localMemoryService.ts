@@ -158,6 +158,16 @@ export class LocalMemoryService {
     return { ok: true };
   }
 
+  /** Delete one thread with its turns; a missing id is a not-found, not a no-op. */
+  async deleteConversation(id: string): Promise<{ ok: boolean }> {
+    const existing = await this.store.getConversation(id);
+    if (!existing) {
+      throw notFound("Conversation", id);
+    }
+    await this.store.deleteConversation(id);
+    return { ok: true };
+  }
+
   async createConversation(title = ""): Promise<Conversation> {
     const now = nowIso();
     const conversation: StoredConversation = {

@@ -276,6 +276,23 @@ export class IndexedDbLocalStore implements LocalStore {
     return next;
   }
 
+  async deleteConversation(id: string): Promise<void> {
+    const conversation = await this.db.get("conversations", id);
+    if (!conversation) {
+      throw new Error(`Conversation ${id} not found`);
+    }
+    // One transaction over both stores: a thread without its turns, or turns
+    // without their thread, is a state the reader can never repair.
+    const tx = this.db.transaction(["conversations", "turns"], "readwrite");
+    const turnKeys = await tx
+      .objectStore("turns")
+      .index("by-conversation")
+      .getAllKeys(id);
+    tx.objectStore("conversations").delete(id);
+    await Promise.all(turnKeys.map((key) => tx.objectStore("turns").delete(key)));
+    await tx.done;
+  }
+
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.db.getAllFromIndex("turns", "by-conversation", conversationId);
   }

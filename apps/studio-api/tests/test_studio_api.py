@@ -589,6 +589,18 @@ def test_memory_observation_crud() -> None:
     assert client.delete(f"/api/memory/observations/{observation['id']}").status_code == 404
 
 
+def test_deleting_a_conversation_answers_204_then_404() -> None:
+    client = _client()
+    created = client.post("/api/conversations").json()["conversation"]
+
+    assert client.delete(f"/api/conversations/{created['id']}").status_code == 204
+    assert created["id"] not in [
+        item["id"] for item in client.get("/api/conversations").json()["conversations"]
+    ]
+    # "Already gone" and "I deleted it" are different answers.
+    assert client.delete(f"/api/conversations/{created['id']}").status_code == 404
+
+
 def test_memory_rejects_unknown_kind_and_blank_text() -> None:
     client = _client()
 

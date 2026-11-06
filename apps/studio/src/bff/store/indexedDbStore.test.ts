@@ -120,6 +120,13 @@ describe("IndexedDbLocalStore", () => {
     await store.setConversationHead("c-1", "m-1");
     const again = await store.conversationTree("c-1");
     expect(again.head_id).toBe("m-1");
+
+    // Deleting takes the thread and its turns in one transaction, and a second
+    // delete is a not-found rather than a second success.
+    await store.deleteConversation("c-1");
+    expect(await store.getConversation("c-1")).toBeUndefined();
+    expect(await store.listTurns("c-1")).toEqual([]);
+    await expect(store.deleteConversation("c-1")).rejects.toThrow(/not found/i);
     store.close();
   });
 

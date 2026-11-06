@@ -525,6 +525,14 @@ conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
 
+The history list is also where a thread can be removed. **Delete** on a row asks
+first, names the thread, and opens on **Keep it**, so a stray Enter keeps the
+thread rather than destroying it; accepting removes the conversation, every turn
+in it, and the citations those turns carried, and returns to the empty stage only
+when that thread was the one on screen. It does not touch the ODI records those
+turns created — the jobs, steps, outcomes, and evidence stay. A delete that fails
+leaves the row and the transcript exactly as they were.
+
 ### Printing and export
 
 The bar's overflow menu has **Export → Markdown**. The file labels every

@@ -54,6 +54,7 @@ import {
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
+  deleteConversation as apiDeleteConversation,
   streamChat,
   updateJob as apiUpdateJob,
   updateObservation as apiUpdateObservation,
@@ -397,6 +398,11 @@ export interface StudioContextValue {
   refreshConversations: () => Promise<void>;
   /** Open a past thread by loading its turns; never a conversation without them. */
   openConversation: (conversationId: string) => Promise<void>;
+  /**
+   * Delete a thread for good. The stage goes home only when the deleted thread
+   * was the open one; every other thread on screen is left alone.
+   */
+  deleteConversation: (conversationId: string) => Promise<void>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -2250,6 +2256,38 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined);
   }, []);
 
+  /**
+   * Delete a thread for good.
+   *
+   * Deleting the open thread is a privacy action, not a navigation one: the reply
+   * is stopped first, so it cannot append a turn to a conversation that is about
+   * to be gone, and the stage goes home only after the server says it is gone. A
+   * failure leaves the transcript, the list, and the stored data as they were.
+   */
+  const deleteConversation = useCallback(
+    async (targetId: string) => {
+      const wasOpen = conversationId === targetId;
+      if (wasOpen) {
+        abortRef.current?.abort();
+        abortRef.current = null;
+        turnQueueRef.current?.clear();
+        setStreaming(false);
+        setThinkingPhase(null);
+        setOfflineReplyFor(null);
+      }
+      await apiDeleteConversation(targetId);
+      setConversations((current) =>
+        current.filter((conversation) => conversation.id !== targetId),
+      );
+      if (wasOpen) {
+        setMessages([]);
+        setToolActivity([]);
+        setConversationId(null);
+      }
+    },
+    [conversationId],
+  );
+
   // First paint shows the person's own work; nothing that nobody asked for gets
   // to declare the studio broken. Boot order, and why nothing on the first
   // screen waits on the network:
@@ -2477,6 +2515,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      deleteConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2601,6 +2640,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      deleteConversation,
       memory,
       memoryLoading,
       refreshMemory,

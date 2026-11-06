@@ -230,6 +230,10 @@ async function deleteJson<T>(path: string): Promise<T> {
     recordStudioError(error.error, path);
     throw error;
   }
+  // A 204 says "gone" in the status line, not in a body.
+  if (response.status === 204) {
+    return undefined as T;
+  }
   return (await response.json()) as T;
 }
 
@@ -707,6 +711,20 @@ export async function setConversationHead(
         { head_id: headId },
       ).then((body) => body.conversation),
     async (bff) => bff.memory.setConversationHead(conversationId, headId),
+  );
+}
+
+/**
+ * Delete one thread for good: the conversation, its turns, and the citations
+ * those turns carried. A missing id is a failure, not a quiet success — "already
+ * gone" and "I deleted it" are different answers.
+ */
+export async function deleteConversation(conversationId: string): Promise<void> {
+  await withLocal(
+    () => deleteJson<unknown>(`/api/conversations/${encodeURIComponent(conversationId)}`),
+    async (bff) => {
+      await bff.memory.deleteConversation(conversationId);
+    },
   );
 }
 
