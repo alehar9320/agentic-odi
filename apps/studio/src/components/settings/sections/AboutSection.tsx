@@ -11,7 +11,7 @@ import { DiagnosticsModal } from "../../../diagnostics/DiagnosticsModal";
 import { PRODUCT_NAME } from "../../../lib/brand";
 import { resolveTheme } from "../../../lib/theme";
 import type { StudioConfig } from "../../../types";
-import { useUpdateService, useUpdateSnapshot } from "../../../updater";
+import { useUpdateSnapshot } from "../../../updater";
 import { detectPlatform } from "../../../updater/platform";
 
 const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
@@ -37,7 +37,6 @@ export function AboutSection({
   settings: StudioConfig;
   capabilities: unknown[];
 }) {
-  const service = useUpdateService();
   const snapshot = useUpdateSnapshot();
   const platform = detectPlatform();
   const [diagnosticsJson, setDiagnosticsJson] = useState<string | null>(null);
