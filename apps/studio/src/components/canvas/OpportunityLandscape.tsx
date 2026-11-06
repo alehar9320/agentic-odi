@@ -5,6 +5,7 @@ import {
   formatOpportunityScore,
   hasScore,
   isUnderserved,
+  scoredAverage,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
@@ -80,10 +81,7 @@ export function OpportunityLandscape() {
     return ids.size;
   }, [evidence]);
 
-  const avgOpportunity = useMemo(() => {
-    const total = outcomes.reduce((acc, o) => acc + (o.opportunity_score ?? 0), 0);
-    return formatOpportunityScore(outcomes.length ? total / outcomes.length : null);
-  }, [outcomes]);
+  const avgOpportunity = useMemo(() => scoredAverage(outcomes), [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
     return outcomes.filter((outcome) => {
@@ -242,7 +240,10 @@ export function OpportunityLandscape() {
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Avg Opportunity Score</div>
-            <div className="studio-metric__value">{avgOpportunity}</div>
+            <div className="studio-metric__value">{avgOpportunity.mean == null ? "Not scored" : formatOpportunityScore(avgOpportunity.mean)}</div>
+            {avgOpportunity.mean != null ? (
+              <div className="studio-metric__delta">{avgOpportunity.scored} scored · {avgOpportunity.unscored} not scored</div>
+            ) : null}
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Unique Customer Quotes</div>

@@ -1,3 +1,5 @@
+import type { Outcome } from "../types";
+
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -70,7 +72,25 @@ export function summarizeMemberScores(
 }
 
 /**
- * The one sentence a segment board shows for its member scores. `Not scored`
+ * Average only the stored numeric opportunity scores. An unscored outcome is
+ * never counted as a zero — it is excluded from both the sum and the count.
+ */
+export function scoredAverage(outcomes: Outcome[]): { mean: number | null; scored: number; unscored: number } {
+  let total = 0;
+  let scored = 0;
+  let unscored = 0;
+  for (const o of outcomes) {
+    if (typeof o.opportunity_score === "number") {
+      total += o.opportunity_score;
+      scored += 1;
+    } else {
+      unscored += 1;
+    }
+  }
+  return { mean: scored === 0 ? null : total / scored, scored, unscored };
+}
+
+/**\n * The one sentence a segment board shows for its member scores. `Not scored`
  * replaces the mean when nothing is scored — never `0`, `NaN`, or a dash that
  * reads as a number.
  */
