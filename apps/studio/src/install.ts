@@ -77,7 +77,7 @@ function readDismissed(storage: PreferenceStorage | null): boolean {
  * Chrome reports this through the `standalone` display mode; iOS Safari, which
  * has no `beforeinstallprompt`, reports it on `navigator.standalone`.
  */
-export function isInstalled(targetWindow: Window | null): boolean {
+export function isInstalled(targetWindow: Window | null = defaultWindow()): boolean {
   if (!targetWindow) {
     return false;
   }
@@ -182,4 +182,43 @@ export function createInstallController(
       listeners.clear();
     },
   };
+}
+
+/*
+ * The flat, module-level surface the Settings panel and App use (landed in
+ * main as #782). It is a thin layer over the one shared controller, so both
+ * entry points read the same window listeners and the same dismissal key.
+ */
+
+/** The single controller the module-level helpers share, created on first use. */
+let sharedController: InstallController | null = null;
+
+function shared(): InstallController {
+  sharedController ??= createInstallController();
+  return sharedController;
+}
+
+/** Wire the install prompt listener. Safe to call more than once. */
+export function initInstall(): void {
+  shared();
+}
+
+/** True when the person has dismissed the install prompt. */
+export function isDismissed(): boolean {
+  return readDismissed(defaultStorage());
+}
+
+/** Mark the install prompt as dismissed so it is not offered again. */
+export function dismissInstall(): void {
+  shared().dismiss();
+}
+
+/** Offer the install prompt. Returns false when there is nothing to offer. */
+export function offerInstall(): boolean {
+  const controller = shared();
+  if (!controller.getSnapshot().canInstall) {
+    return false;
+  }
+  void controller.prompt();
+  return true;
 }

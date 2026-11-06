@@ -18,6 +18,7 @@ import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 import { UpdateBanner, UpdateProvider } from "./updater";
+import { initInstall } from "./install";
 
 /**
  * One room, one intelligence.
@@ -71,6 +72,12 @@ function StudioShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closePanel, streaming, stopStreaming]);
+
+  // Capture the install prompt as early as possible so the browser's
+  // beforeinstallprompt event is not missed before Settings is opened.
+  useEffect(() => {
+    initInstall();
+  }, []);
 
   // A damaged database is not a broken screen: the file is intact on disk and
   // the only honest thing to show is that failure, not a zeroed-out studio.
