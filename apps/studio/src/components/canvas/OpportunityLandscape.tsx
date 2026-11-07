@@ -7,6 +7,7 @@ import {
   isUnderserved,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -430,6 +431,8 @@ function OpportunityMatrixView({
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
+  // The pulse is decoration; with reduce-motion the ring stays still.
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   const plotted: PlottedOutcome[] = outcomes.map((outcome) => {
     const importance = Math.min(Math.max(outcome.importance ?? 5, 0), 10);
@@ -626,18 +629,22 @@ function OpportunityMatrixView({
                       strokeWidth="1.5"
                       opacity="0.4"
                     >
-                      <animate
-                        attributeName="r"
-                        values={isSelected ? "12;18;12" : "8;14;8"}
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
-                      <animate
-                        attributeName="opacity"
-                        values="0.6;0.1;0.6"
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
+                      {!reducedMotion && (
+                        <>
+                          <animate
+                            attributeName="r"
+                            values={isSelected ? "12;18;12" : "8;14;8"}
+                            dur="3s"
+                            repeatCount="indefinite"
+                          />
+                          <animate
+                            attributeName="opacity"
+                            values="0.6;0.1;0.6"
+                            dur="3s"
+                            repeatCount="indefinite"
+                          />
+                        </>
+                      )}
                     </circle>
                   )}
 

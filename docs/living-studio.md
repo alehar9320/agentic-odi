@@ -838,7 +838,9 @@ Each row below names a state to reach and what is worth your own eyes.
 | Model picker | **Model** in the hint row; open it twice; narrow the window first | The list matches the backend, the configured id stays selectable, arrows/Home/End/Enter/Escape work, an offline backend explains itself and its Settings button is reachable from the keyboard, and it probes once per backend |
 | Attachments | Paperclip, drag a file onto the composer, paste a screenshot, then drop a `.exe` | Thumbnail, name, size, and remove on the chip; the unreadable file is refused with its reason; the sent turn shows the same; the paperclip has a visible focus ring |
 | Branches | Edit your own turn, then regenerate a reply | **Alternative N of M** with `‹`/`›`, and a reload reopens the branch you were reading |
-| Reduced motion, narrow window | Turn on OS reduce-motion; then drag the window narrow | Shimmer, dots, and cycling stop; the lens becomes a sheet, the composer stays usable, and menus stay on screen |
+| Reduced motion, narrow window | Turn on OS reduce-motion; then drag the window narrow | Shimmer, dots, cycling, and the landscape's underserved pulse stop; the ring stays drawn and the nodes do not move; the lens becomes a sheet, the composer stays usable, and menus stay on screen |
+| Reduced transparency, more contrast | Turn on OS reduce-transparency, then more contrast | Every blurred panel becomes an opaque surface instead of glass; muted and faint text step up, hairlines thicken, and nothing overlaps or clips |
+| Theme change | Toggle Appearance in Settings while watching the bar | The window cross-fades in about 120 ms with no white flash; with reduce-motion on it swaps instantly; selected text and the caret carry the accent |
 
 Two things surprise people on a local model:
 
