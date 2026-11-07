@@ -75,11 +75,17 @@ function stubContext(): StudioContextValue {
 describe("DiagnosticsModal", () => {
   beforeEach(() => {
     modalProps.onClose.mockClear();
+    window.localStorage.clear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
+
+  /** Diagnostics live in About; the index is the only door to it. */
+  function openAbout() {
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
+  }
 
   it("shows the exact bytes, size, and inclusion boundaries before export", () => {
     render(<DiagnosticsModal {...modalProps} />);
@@ -137,6 +143,7 @@ describe("DiagnosticsModal", () => {
         </OnboardingProvider>
       </UpdateProvider>,
     );
+    openAbout();
 
     fireEvent.click(screen.getByRole("button", { name: "Create diagnostics bundle" }));
 
@@ -176,6 +183,7 @@ describe("DiagnosticsModal", () => {
     );
 
     expect(calls).toEqual([]);
+    openAbout();
     fireEvent.click(screen.getByRole("button", { name: "Create diagnostics bundle" }));
 
     expect(await screen.findByRole("dialog", { name: "Review diagnostics" })).toBeInTheDocument();

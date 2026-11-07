@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { fetchDiagnostics } from "../api/studioApi";
 import type { SidecarDiagnostics } from "../api/studioApi";
@@ -14,11 +14,16 @@ import { versionLabel } from "../lib/version";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { ConnectionReport } from "../state/StudioContext";
-import type { ConnectorPreset, StudioConfig } from "../types";
+import type { ConnectorPreset, StudioBrief, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
 import { StatusDot } from "./status/StatusDot";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ModelSection } from "./settings/sections/ModelSection";
+import {
+  SETTINGS_SECTIONS,
+  readSettingsSection,
+  rememberSettingsSection,
+} from "./settings/sections";
 import { initInstall, isDismissed, isInstalled, offerInstall, dismissInstall } from "../install";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
 import { detectPlatform } from "../updater/platform";
@@ -167,6 +172,124 @@ const AREA_LABELS: Record<ConnectorPreset["area"], string> = {
   "knowledge-output": "Strategy & knowledge management output",
 };
 
+/**
+ * Your context, your name, and the actions that start fresh — the blocks that
+ * are all local, so this section has nothing to load and nothing to fail on.
+ */
+function DataSection({
+  brief,
+  openSetup,
+  displayName,
+  setDisplayName,
+  closeSetup,
+  clearChat,
+  refreshCanvas,
+}: {
+  brief: StudioBrief | null;
+  openSetup: () => void;
+  displayName: string;
+  setDisplayName: (name: string) => void;
+  closeSetup: () => void;
+  clearChat: () => void;
+  refreshCanvas: () => Promise<void>;
+}) {
+  return (
+    <>
+      <div className="settings__context">
+        <div>
+          <p className="settings__context-label">Your context</p>
+          <p className="settings__context-value">
+            {brief?.job_statement
+              ? `${brief.product_name || "Your product"} — ${brief.job_statement}`
+              : "Not set yet. The studio starts every reply from this."}
+          </p>
+          {brief?.v2mom?.vision && (
+            <p className="settings__context-value">
+              <strong>Vision:</strong> {brief.v2mom.vision}
+            </p>
+          )}
+        </div>
+        <button type="button" className="button button--ghost" onClick={openSetup}>
+          {brief ? "Edit context" : "Set up context"}
+        </button>
+      </div>
+
+      <div className="field">
+        <label htmlFor="display-name">
+          Your name <span className="field__hint">optional — used in the greeting</span>
+        </label>
+        <input
+          id="display-name"
+          className="input"
+          value={displayName}
+          placeholder="Ada"
+          autoComplete="given-name"
+          onChange={(event) => setDisplayName(event.target.value)}
+        />
+      </div>
+
+      <div className="settings__actions">
+        <button
+          type="button"
+          className="button"
+          onClick={() => {
+            closeSetup();
+            clearChat();
+          }}
+        >
+          Start a new conversation
+        </button>
+        <button type="button" className="button button--ghost" onClick={() => void refreshCanvas()}>
+          Sync canvas
+        </button>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Software update, the tour, the install prompt, and the essay about how the
+ * studio works. The updater owns its own provider-backed state, so a failure
+ * to check for an update never reaches the sections beside it.
+ */
+function UpdatesSection({
+  tourEnabled,
+  restartTour,
+}: {
+  tourEnabled: boolean;
+  restartTour: () => void;
+}) {
+  return (
+    <>
+      {tourEnabled ? (
+        <div className="settings__tour">
+          <h3 className="settings__title">Getting started</h3>
+          <p className="muted">
+            A four-step product tour, when you want one. It never opens by itself.
+          </p>
+          <button type="button" className="button button--ghost" onClick={restartTour}>
+            Replay the tour
+          </button>
+        </div>
+      ) : null}
+
+      <UpdateSettings />
+
+      <InstallSection />
+    </>
+  );
+}
+
+/**
+ * Settings is five named sections behind a left-hand index, not one scroll.
+ *
+ * The sections are declared in `settings/sections.ts`; this panel renders the
+ * open one and marks it in the index, so "where do I change the model?" is one
+ * click rather than a scroll. The open section is remembered per browser, and
+ * an id that is no longer a section falls back to Model.
+ *
+ * The blocks themselves are unchanged — each one lives in exactly one section.
+ */
 export function SettingsPanel() {
   const {
     settings,
@@ -198,6 +321,18 @@ export function SettingsPanel() {
     surveyConnections,
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
+
+  const [section, setSection] = useState(() => readSettingsSection());
+  const paneRef = useRef<HTMLDivElement>(null);
+  // Focus follows a deliberate jump, never the initial render — the lens header
+  // already takes focus when Settings opens.
+  const jumped = useRef(false);
+
+  useEffect(() => {
+    if (jumped.current) {
+      paneRef.current?.focus();
+    }
+  }, [section]);
 
   // Opening Settings is the person asking what is connected, which is the first moment
   // a probe is owed to them. The answer is kept here, in the panel that asked: a passive
@@ -235,230 +370,220 @@ export function SettingsPanel() {
     presets: presets.filter((preset) => preset.area === area),
   })).filter((group) => group.presets.length > 0);
 
+  function openSection(id: string) {
+    jumped.current = true;
+    setSection(id);
+    rememberSettingsSection(id);
+  }
+
+  const active =
+    SETTINGS_SECTIONS.find((candidate) => candidate.id === section) ?? SETTINGS_SECTIONS[0];
+
   return (
     <div className="settings">
-      <div className="settings__context">
-        <div>
-          <p className="settings__context-label">Your context</p>
-          <p className="settings__context-value">
-            {brief?.job_statement
-              ? `${brief.product_name || "Your product"} — ${brief.job_statement}`
-              : "Not set yet. The studio starts every reply from this."}
-          </p>
-          {brief?.v2mom?.vision && (
-            <p className="settings__context-value">
-              <strong>Vision:</strong> {brief.v2mom.vision}
-            </p>
-          )}
-        </div>
-        <button type="button" className="button button--ghost" onClick={openSetup}>
-          {brief ? "Edit context" : "Set up context"}
-        </button>
-      </div>
-
-      <div className="field">
-        <label htmlFor="display-name">
-          Your name <span className="field__hint">optional — used in the greeting</span>
-        </label>
-        <input
-          id="display-name"
-          className="input"
-          value={displayName}
-          placeholder="Ada"
-          autoComplete="given-name"
-          onChange={(event) => setDisplayName(event.target.value)}
-        />
-      </div>
-
-      <ModelSection
-        settings={settings}
-        saveSettings={saveSettings}
-        models={models}
-        modelsLoading={modelsLoading}
-        modelsMessage={modelsMessage}
-        refreshModels={refreshModels}
-      />
-
-      <ConnectionsSection settings={settings} saveSettings={saveSettings}>
-        <ul className="connection-list">
-          <li>
-            <StatusDot
-              tone={modelHealthy === false ? "warn" : modelHealthy === null ? "unknown" : "ok"}
-            />
-            <span>Model</span>
-            <span className="connection-list__value">
-              {modelHealthy === false
-                ? "offline"
-                : modelHealthy === null
-                  ? "not checked"
-                  : "reachable"}
-            </span>
-          </li>
-          <li>
-            <StatusDot
-              tone={sidecarKnown === false ? "warn" : sidecarKnown === null ? "unknown" : "ok"}
-            />
-            <span>Sidecar</span>
-            <span className="connection-list__value">
-              {sidecarKnown === false ? "unavailable" : sidecarKnown === null ? "unknown" : "reachable"}
-            </span>
-          </li>
-          <li>
-            <StatusDot tone={mcpKnown ? "ok" : "unknown"} />
-            <span>Local FastMCP server</span>
-            <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
-          </li>
-        </ul>
-        <p className="muted">
-          Only the model and MCP server above are live. No data source is connected yet — add one
-          from the presets below.
-        </p>
-
-        <h3 className="settings__title">Capabilities</h3>
-        <ul className="connection-list">
-          {capabilities.map((capability) => (
-            <li key={capability.id}>
-              <StatusDot tone={capability.status === "available" ? "ok" : "warn"} />
-              <span>{capability.label}</span>
-              <span className="connection-list__value">
-                {capability.status === "available" ? "available" : "unavailable"}
-                {capability.reason ? ` — ${capability.reason}` : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        {sidecarKnown === false ? (
-          <p className="muted">
-            Connectors require the local sidecar. Data and conversation still work
-            without it; connect a sidecar to add MCP or REST data sources.
-          </p>
-        ) : (
-          <>
-            <h3 className="settings__title">Connectors</h3>
-            <button
-              type="button"
-              className="button settings__manage"
-              onClick={() => openCustomize()}
-            >
-              Manage connectors
-            </button>
-            {connectorsError ? (
-              <FailurePanel
-                error={connectorsError}
-                retryText="reload"
-                onRetry={() => void refreshConnectors()}
-              />
-            ) : connectors.length === 0 ? (
-              <p className="muted">No connectors registered. Pick a preset to add one.</p>
-            ) : (
-              <ul className="connection-list">
-                {connectors.map((connector) => (
-                  <li key={connector.name}>
-                    <span className="connection-list__value">
-                      {connector.name} · {connector.kind}
-                      {connector.enabled ? "" : " (disabled)"}
-                    </span>
-                    <button
-                      type="button"
-                      className="button button--ghost"
-                      aria-label={`Remove ${connector.name}`}
-                      onClick={() => void deleteConnector(connector.name)}
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <h4 className="settings__title">Add a data source</h4>
-            {presetError ? (
-              <FailurePanel
-                error={presetError}
-                retryText="reload"
-                onRetry={() => void refreshPresets()}
-              />
-            ) : presetGroups.length === 0 ? (
-              <p className="muted">No presets available.</p>
-            ) : (
-              <div className="settings__presets">
-                {presetGroups.map((group) => (
-                  <section
-                    key={group.area}
-                    className="settings__preset-group"
-                    aria-label={group.label}
-                  >
-                    <h5 className="settings__preset-title">{group.label}</h5>
-                    <ul className="connection-list">
-                      {group.presets.map((preset) => (
-                        <li key={preset.id}>
-                          <span className="connection-list__value">
-                            {preset.label}{" "}
-                            <code className="settings__preset-id">{preset.id}</code>
-                            {" · "}
-                            {preset.auth === "oauth" ? "OAuth" : "No auth"}
-                          </span>
-                          <button
-                            type="button"
-                            className="button button--ghost"
-                            aria-label={`Connect ${preset.label}`}
-                            onClick={() => void addConnector({ preset: preset.id })}
-                          >
-                            Connect
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                ))}
-              </div>
-            )}
-            </>
-          )}
-      </ConnectionsSection>
-
-      <div className="settings__actions">
-        <button
-          type="button"
-          className="button"
-          onClick={() => {
-            closeSetup();
-            clearChat();
-          }}
-        >
-          Start a new conversation
-        </button>
-        <button type="button" className="button button--ghost" onClick={() => void refreshCanvas()}>
-          Sync canvas
-        </button>
-      </div>
-
-      {tourEnabled ? (
-        <div className="settings__tour">
-          <h3 className="settings__title">Getting started</h3>
-          <p className="muted">
-            A four-step product tour, when you want one. It never opens by itself.
-          </p>
-          <button type="button" className="button button--ghost" onClick={restartTour}>
-            Replay the tour
+      <nav className="settings__index" aria-label="Settings sections">
+        {SETTINGS_SECTIONS.map((candidate) => (
+          <button
+            key={candidate.id}
+            type="button"
+            className={`settings__index-link${candidate.id === active.id ? " is-active" : ""}`}
+            aria-current={candidate.id === active.id ? "true" : undefined}
+            title={candidate.blurb}
+            onClick={() => openSection(candidate.id)}
+          >
+            {candidate.label}
           </button>
-        </div>
-      ) : null}
+        ))}
+      </nav>
 
-      <UpdateSettings />
+      <div className="settings__pane" data-section={active.id} ref={paneRef} tabIndex={-1}>
+        <p className="settings__blurb">{active.blurb}</p>
 
-      <AboutSection settings={settings} capabilities={capabilities} />
+        {active.id === "settings-model" ? (
+          <ModelSection
+            settings={settings}
+            saveSettings={saveSettings}
+            models={models}
+            modelsLoading={modelsLoading}
+            modelsMessage={modelsMessage}
+            refreshModels={refreshModels}
+          />
+        ) : null}
 
-      <InstallSection />
+        {active.id === "settings-connections" ? (
+          <ConnectionsSection settings={settings} saveSettings={saveSettings}>
+            <ul className="connection-list">
+              <li>
+                <StatusDot
+                  tone={modelHealthy === false ? "warn" : modelHealthy === null ? "unknown" : "ok"}
+                />
+                <span>Model</span>
+                <span className="connection-list__value">
+                  {modelHealthy === false
+                    ? "offline"
+                    : modelHealthy === null
+                      ? "not checked"
+                      : "reachable"}
+                </span>
+              </li>
+              <li>
+                <StatusDot
+                  tone={sidecarKnown === false ? "warn" : sidecarKnown === null ? "unknown" : "ok"}
+                />
+                <span>Sidecar</span>
+                <span className="connection-list__value">
+                  {sidecarKnown === false
+                    ? "unavailable"
+                    : sidecarKnown === null
+                      ? "unknown"
+                      : "reachable"}
+                </span>
+              </li>
+              <li>
+                <StatusDot tone={mcpKnown ? "ok" : "unknown"} />
+                <span>Local FastMCP server</span>
+                <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
+              </li>
+            </ul>
+            <p className="muted">
+              Only the model and MCP server above are live. No data source is connected yet — add one
+              from the presets below.
+            </p>
 
-      <details className="disclosure">
-        <summary>How the studio works</summary>
-        <p>
-          Backlogs and ticket accounting give way to a canvas of human intent. Point at an outcome,
-          then talk about it: every bet traces back to evidence, and impact is simulated before code
-          gets written.
-        </p>
-      </details>
+            <h3 className="settings__title">Capabilities</h3>
+            <ul className="connection-list">
+              {capabilities.map((capability) => (
+                <li key={capability.id}>
+                  <StatusDot tone={capability.status === "available" ? "ok" : "warn"} />
+                  <span>{capability.label}</span>
+                  <span className="connection-list__value">
+                    {capability.status === "available" ? "available" : "unavailable"}
+                    {capability.reason ? ` — ${capability.reason}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {sidecarKnown === false ? (
+              <p className="muted">
+                Connectors require the local sidecar. Data and conversation still work
+                without it; connect a sidecar to add MCP or REST data sources.
+              </p>
+            ) : (
+              <>
+                <h3 className="settings__title">Connectors</h3>
+                <button
+                  type="button"
+                  className="button settings__manage"
+                  onClick={() => openCustomize()}
+                >
+                  Manage connectors
+                </button>
+                {connectorsError ? (
+                  <FailurePanel
+                    error={connectorsError}
+                    retryText="reload"
+                    onRetry={() => void refreshConnectors()}
+                  />
+                ) : connectors.length === 0 ? (
+                  <p className="muted">No connectors registered. Pick a preset to add one.</p>
+                ) : (
+                  <ul className="connection-list">
+                    {connectors.map((connector) => (
+                      <li key={connector.name}>
+                        <span className="connection-list__value">
+                          {connector.name} · {connector.kind}
+                          {connector.enabled ? "" : " (disabled)"}
+                        </span>
+                        <button
+                          type="button"
+                          className="button button--ghost"
+                          aria-label={`Remove ${connector.name}`}
+                          onClick={() => void deleteConnector(connector.name)}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <h4 className="settings__title">Add a data source</h4>
+                {presetError ? (
+                  <FailurePanel
+                    error={presetError}
+                    retryText="reload"
+                    onRetry={() => void refreshPresets()}
+                  />
+                ) : presetGroups.length === 0 ? (
+                  <p className="muted">No presets available.</p>
+                ) : (
+                  <div className="settings__presets">
+                    {presetGroups.map((group) => (
+                      <section
+                        key={group.area}
+                        className="settings__preset-group"
+                        aria-label={group.label}
+                      >
+                        <h5 className="settings__preset-title">{group.label}</h5>
+                        <ul className="connection-list">
+                          {group.presets.map((preset) => (
+                            <li key={preset.id}>
+                              <span className="connection-list__value">
+                                {preset.label}{" "}
+                                <code className="settings__preset-id">{preset.id}</code>
+                                {" · "}
+                                {preset.auth === "oauth" ? "OAuth" : "No auth"}
+                              </span>
+                              <button
+                                type="button"
+                                className="button button--ghost"
+                                aria-label={`Connect ${preset.label}`}
+                                onClick={() => void addConnector({ preset: preset.id })}
+                              >
+                                Connect
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </ConnectionsSection>
+        ) : null}
+
+        {active.id === "settings-data" ? (
+          <DataSection
+            brief={brief}
+            openSetup={openSetup}
+            displayName={displayName}
+            setDisplayName={setDisplayName}
+            closeSetup={closeSetup}
+            clearChat={clearChat}
+            refreshCanvas={refreshCanvas}
+          />
+        ) : null}
+
+        {active.id === "settings-updates" ? (
+          <UpdatesSection tourEnabled={tourEnabled} restartTour={restartTour} />
+        ) : null}
+
+        {active.id === "settings-about" ? (
+          <>
+            <AboutSection settings={settings} capabilities={capabilities} />
+            <details className="disclosure">
+              <summary>How the studio works</summary>
+              <p>
+                Backlogs and ticket accounting give way to a canvas of human intent. Point at an outcome,
+                then talk about it: every bet traces back to evidence, and impact is simulated before code
+                gets written.
+              </p>
+            </details>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }

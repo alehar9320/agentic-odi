@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
 import { UpdateProvider, createUpdateService } from "../updater";
@@ -86,6 +86,70 @@ function renderPanel() {
   );
 }
 
+/** The index is the only door to a section; Model opens first. */
+function openSection(name: string) {
+  fireEvent.click(screen.getByRole("button", { name }));
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+describe("SettingsPanel sections", () => {
+  it("offers five named sections in order and opens Model first", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    const index = screen.getByRole("navigation", { name: "Settings sections" });
+    expect(
+      within(index)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Model", "Connections", "Data", "Updates", "About"]);
+    expect(within(index).getByRole("button", { name: "Model" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(screen.getByLabelText(/^model/i)).toBeInTheDocument();
+  });
+
+  it("renders one section at a time", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    // Model is open; Connections is not until it is asked for.
+    expect(screen.queryByLabelText("MCP server URL")).toBeNull();
+    openSection("Connections");
+    expect(screen.getByLabelText("MCP server URL")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^model/i)).toBeNull();
+  });
+
+  it("remembers the open section and falls back to Model for an unknown id", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    const first = renderPanel();
+    openSection("About");
+    expect(window.localStorage.getItem("studio.settings.section")).toBe("settings-about");
+    first.unmount();
+
+    renderPanel();
+    expect(screen.getByRole("button", { name: "About" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
+  });
+
+  it("falls back to Model when the stored section is no longer one", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+    window.localStorage.setItem("studio.settings.section", "settings-appearance");
+
+    renderPanel();
+
+    expect(screen.getByRole("button", { name: "Model" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByLabelText(/^model/i)).toBeInTheDocument();
+  });
+});
+
 describe("SettingsPanel model catalog", () => {
   it("offers the endpoint's models as suggestions and keeps typing free", () => {
     vi.mocked(useStudio).mockReturnValue(
@@ -122,6 +186,7 @@ describe("SettingsPanel connectors", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ deleteConnector: del }));
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.getAllByText(/notion/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: /remove notion/i }));
@@ -132,6 +197,7 @@ describe("SettingsPanel connectors", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
 
     renderPanel();
+    openSection("Connections");
 
     expect(
       screen.getByRole("region", { name: /voice of customer/i }),
@@ -148,6 +214,7 @@ describe("SettingsPanel connectors", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     fireEvent.click(screen.getByRole("button", { name: /connect notion/i }));
     expect(add).toHaveBeenCalledWith({ preset: "notion" });
@@ -157,6 +224,7 @@ describe("SettingsPanel connectors", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.queryByText(/gong transcripts/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/slack friction stream/i)).not.toBeInTheDocument();
@@ -183,6 +251,7 @@ describe("SettingsPanel connectors", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.getByText(/no connectors registered/i)).toBeInTheDocument();
   });
@@ -205,6 +274,7 @@ describe("SettingsPanel connector catalog failures", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.getByRole("alert").textContent).toContain(
       "The connector catalog is unreachable.",
@@ -227,6 +297,7 @@ describe("SettingsPanel connector catalog failures", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.queryByRole("button", { name: /^connect /i })).toBeNull();
   });
@@ -247,6 +318,7 @@ describe("SettingsPanel connector list failures", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
     expect(screen.queryByText(/no connectors registered/i)).toBeNull();
@@ -276,6 +348,7 @@ describe("SettingsPanel capabilities", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     const dataRow = screen.getByText(/local canvas data/i).closest("li");
     expect(dataRow).toBeInTheDocument();
@@ -310,6 +383,7 @@ describe("SettingsPanel about section", () => {
         </OnboardingProvider>
       </UpdateProvider>,
     );
+    openSection("About");
 
     const about = screen.getByRole("region", { name: "About" });
     await waitFor(() =>
@@ -347,6 +421,7 @@ describe("SettingsPanel about section", () => {
       </UpdateProvider>,
     );
 
+    openSection("About");
     const about = screen.getByRole("region", { name: "About" });
     await waitFor(() => expect(browserService.getSnapshot().phase).not.toBe("checking"));
 
@@ -377,6 +452,7 @@ describe("SettingsPanel connection survey", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     expect(await screen.findByText("unavailable")).toBeInTheDocument();
     expect(surveyConnections).toHaveBeenCalledOnce();

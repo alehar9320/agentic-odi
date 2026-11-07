@@ -2385,6 +2385,54 @@ input[type="range"] {
   gap: 12px;
 }
 
+/* The index across the top: five named sections, the open one marked. */
+.settings__index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings__index-link {
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.settings__index-link:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.settings__index-link.is-active {
+  border-color: rgba(139, 140, 248, 0.4);
+  background: rgba(99, 102, 241, 0.16);
+  color: var(--text);
+}
+
+.settings__pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings__pane:focus {
+  outline: none;
+}
+
+.settings__blurb {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .settings__title {
   margin: 8px 0 0;
   color: var(--faint);

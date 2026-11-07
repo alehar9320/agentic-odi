@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../../onboarding/OnboardingProvider";
 import { UpdateProvider, createUpdateService } from "../../updater";
@@ -73,6 +73,15 @@ function renderPanel() {
   );
 }
 
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+/** The index is the only door to a section; Model opens first. */
+function openSection(name: string) {
+  fireEvent.click(screen.getByRole("button", { name }));
+}
+
 describe("Settings saves per field", () => {
   it("saves a changed model when the field is left and says so once", () => {
     const saveSettings = vi.fn();
@@ -131,6 +140,7 @@ describe("Settings saves per field", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
 
     renderPanel();
+    openSection("Connections");
 
     const mcpUrl = screen.getByLabelText("MCP server URL");
     fireEvent.change(mcpUrl, { target: { value: "ftp://nope" } });
@@ -145,6 +155,7 @@ describe("Settings saves per field", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
 
     renderPanel();
+    openSection("Connections");
 
     const mcpUrl = screen.getByLabelText("MCP server URL");
     fireEvent.change(mcpUrl, { target: { value: "http://localhost:9000/mcp" } });
