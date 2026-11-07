@@ -17,7 +17,7 @@ import type { WorkspacePanelId } from "../../types";
 import { IntroConversation } from "../setup/IntroConversation";
 import { SetupConversation } from "../setup/SetupConversation";
 import { Conversation } from "./Conversation";
-import { GuidanceHint } from "./GuidanceHint";
+import { NextMoveCard } from "./NextMoveCard";
 import { Hero } from "./Hero";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { ThreadComposer } from "./ThreadComposer";
@@ -223,7 +223,7 @@ export function ChatStage() {
         <LatestMessageButton messageCount={messages.length} />
       </div>
       <div className="chat__dock">
-        <GuidanceHint />
+        <NextMoveCard />
         <ThreadComposer
           onCommand={(command) => runCommand(command)}
           onSlashCommand={submitCommand}

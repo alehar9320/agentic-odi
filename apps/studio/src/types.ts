@@ -12,6 +12,8 @@ export interface Step {
   job_id?: string;
   name?: string;
   order?: number;
+  /** The Universal Job Map stage id, when the step has one. */
+  stage?: string | null;
 }
 
 /** A question put to the person that they did not answer, and why not. */
