@@ -25,7 +25,7 @@ interface QuickPill {
   label: string;
   icon: ReactNode;
   run: () => void;
-  conversational?: boolean;
+  preview?: string;
 }
 
 /**
@@ -39,15 +39,7 @@ export function SuggestionPills() {
 
   const jobs = canvas?.jobs.length ?? 0;
 
-  const pills: QuickPill[] = suggestions.map((suggestion, index) => ({
-    id: `suggestion-${index}`,
-    label: suggestion.title ?? suggestion.prompt,
-    icon: PILL_ICONS[index % PILL_ICONS.length],
-    run: () => void sendMessage(suggestion.prompt),
-    conversational: true,
-  }));
-
-  pills.push(
+  const landscape =
     jobs > 0 && llmHealth.healthy === false
       ? {
           id: "capture",
@@ -60,24 +52,41 @@ export function SuggestionPills() {
           label: "Opportunity landscape",
           icon: <CompassIcon size={15} />,
           run: () => openPanel("landscape"),
-        },
-  );
+        };
+
+  const cards: QuickPill[] = suggestions.map((suggestion, index) => ({
+    id: `suggestion-${index}`,
+    label: suggestion.title ?? suggestion.prompt,
+    icon: PILL_ICONS[index % PILL_ICONS.length],
+    run: () => void sendMessage(suggestion.prompt),
+    preview: (suggestion as { artifact?: string }).artifact,
+  }));
 
   return (
-    <div className="composer__pills" aria-label="Suggested next steps">
-      {pills.map((pill) => (
-        <button
-          key={pill.id}
-          type="button"
-          className="suggestion"
-          disabled={Boolean(pill.conversational && streaming)}
-          onClick={pill.run}
-        >
-          {pill.icon}
-          {pill.label}
-        </button>
-      ))}
-    </div>
+    <>
+      <ul className="composer__starters" role="list" aria-label="Suggested next steps">
+        {cards.map((card) => (
+          <li key={card.id}>
+            <button
+              type="button"
+              className="suggestion suggestion--card"
+              disabled={streaming}
+              aria-label={card.label}
+              onClick={card.run}
+            >
+              {card.icon}
+              <div className="suggestion__copy">
+                <div className="suggestion__title">{card.label}</div>
+                {card.preview && <div className="suggestion__description">{card.preview}</div>}
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="composer__starter--link" aria-label={landscape.label} onClick={landscape.run}>
+        {landscape.icon} {landscape.label}
+      </button>
+    </>
   );
 }
 
