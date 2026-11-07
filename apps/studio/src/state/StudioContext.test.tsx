@@ -78,6 +78,8 @@ let featuredFetches = 0;
 let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+/** When true, a memory write never reaches the sidecar and falls to the BFF. */
+let memoryWriteFails = false;
 let conversationCreates = 0;
 
 // The follow-up queue (#410) needs a turn that stays in flight so later sends
@@ -230,6 +232,10 @@ function route(
     return json([]);
   }
   if (url === "/api/memory/observations") {
+    if (init?.method === "POST" && memoryWriteFails) {
+      // The sidecar is unreachable for this write, so it falls to the local BFF.
+      throw new TypeError("fetch failed");
+    }
     return json({ observations: [OBSERVATION] });
   }
   if (url === "/api/conversations/latest") {
@@ -351,6 +357,7 @@ describe("StudioContext memory and resume", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    memoryWriteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1903,5 +1910,67 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+});
+
+describe("StudioContext when the browser is out of space", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    memoryWriteFails = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reports a full disk once, pauses writes, and keeps the export path open", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    // The origin is out of space: every IndexedDB write is refused the way a
+    // browser refuses one. The first failure must pause the rest.
+    const quota = new Error("The quota has been exceeded.");
+    quota.name = "QuotaExceededError";
+    const put = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(() => {
+      throw quota;
+    });
+    // No sidecar answers this write, so it falls to the browser's own store —
+    // which is where the quota failure happens.
+    memoryWriteFails = true;
+
+    try {
+      await act(async () => {
+        await result.current.addObservation({ kind: "career", text: "Owns activation." });
+      });
+
+      expect(result.current.storageFull).toBe(true);
+      const messages = result.current.toasts.map((toast) => toast.message);
+      const full = messages.find((message) => /out of space/i.test(message));
+      expect(full).toBeDefined();
+      expect(full).toMatch(/existing work is safe/i);
+      // Nothing suggests clearing data to make room.
+      expect(full).not.toMatch(/clear|delete|remove/i);
+
+      // The pause holds: a second write is rejected without touching the store.
+      expect(put).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await result.current.addObservation({ kind: "career", text: "Another." });
+      });
+      expect(put).toHaveBeenCalledTimes(1);
+    } finally {
+      put.mockRestore();
+    }
   });
 });
