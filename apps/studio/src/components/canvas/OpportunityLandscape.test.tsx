@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isUnderserved, opportunityScore, UNDERSERVED_THRESHOLD } from "../../lib/odi";
 import type { CanvasState } from "../../types";
@@ -480,6 +480,62 @@ describe("OpportunityLandscape stored versus displayed score", () => {
 
     const tile = screen.getByText("Avg Opportunity Score").parentElement;
     expect(tile?.textContent).toContain("13.0");
+  });
+});
+
+describe("OpportunityLandscape motion preference", () => {
+  function stubMotion(reduced: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: reduced && query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+  }
+
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("pulses the underserved ring when motion is allowed", () => {
+    stubMotion(false);
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.querySelectorAll("animate").length).toBeGreaterThan(0);
+  });
+
+  it("keeps a still ring and no animation when motion is reduced", () => {
+    stubMotion(true);
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.querySelectorAll("animate")).toHaveLength(0);
+    expect(container.querySelectorAll('circle[opacity="0.4"]').length).toBeGreaterThan(0);
+  });
+
+  it("does not move the nodes when the pulse is removed", () => {
+    stubMotion(false);
+    const moving = render(<OpportunityLandscape />);
+    const positions = Array.from(moving.container.querySelectorAll("circle"), (circle) =>
+      `${circle.getAttribute("cx")},${circle.getAttribute("cy")}`,
+    );
+    moving.unmount();
+
+    stubMotion(true);
+    const still = render(<OpportunityLandscape />);
+    const stillPositions = Array.from(still.container.querySelectorAll("circle"), (circle) =>
+      `${circle.getAttribute("cx")},${circle.getAttribute("cy")}`,
+    );
+
+    expect(stillPositions).toEqual(positions);
   });
 });
 
