@@ -362,7 +362,7 @@ without giving up the message model the sidecar already understands.
 #### What the runtime gives us, and what we did not take
 
 The full coverage ledger — every assistant-ui capability and its one honest
-state — is authored in [Development](development.md),
+state — is authored in [The assistant-ui ledger](assistant-ui-ledger.md),
 and `scripts/doc_check.py` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
 narrower than the library offers (Partial). A row is Adopted only when a test
 proves a person can use it, the named file exists, and the Delivered column
