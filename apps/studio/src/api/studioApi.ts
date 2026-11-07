@@ -153,6 +153,22 @@ export function asStudioError(error: unknown): StudioError {
   };
 }
 
+/** The per-install sidecar token, shared with the sidecar and the MCP server. */
+const STUDIO_TOKEN_KEY = "studio.token";
+
+export function getStudioToken(): string | null {
+  if (typeof localStorage === "undefined") {
+    return null;
+  }
+  return localStorage.getItem(STUDIO_TOKEN_KEY);
+}
+
+/** Headers attaching the bearer token to every sidecar call. */
+export function authHeaders(): HeadersInit {
+  const token = getStudioToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function studioError(response: Response): Promise<StudioApiError> {
   let body: { error?: StudioError; detail?: string };
   try {
@@ -191,7 +207,7 @@ async function studioError(response: Response): Promise<StudioApiError> {
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(apiUrl(path), {
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...authHeaders() },
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) {
@@ -205,7 +221,7 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method,
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -223,7 +239,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 async function deleteJson<T>(path: string): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method: "DELETE",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...authHeaders() },
   });
   if (!response.ok) {
     const error = await studioError(response);
@@ -432,7 +448,7 @@ export function addConnector(payload: AddConnectorPayload): Promise<ConnectorOpe
 export async function deleteConnector(name: string): Promise<ConnectorOperationResponse> {
   const response = await fetch(apiUrl(`/api/connectors/${encodeURIComponent(name)}`), {
     method: "DELETE",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...authHeaders() },
   });
   if (!response.ok) {
     const error = await studioError(response);
@@ -455,7 +471,11 @@ export async function streamChat(
   try {
     const response = await fetch(apiUrl("/api/chat"), {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        ...authHeaders(),
+      },
       body: JSON.stringify({
         ...request,
         messages: request.messages.reduce<{
