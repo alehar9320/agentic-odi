@@ -231,9 +231,9 @@ class SQLiteRepository(Repository):
             message = Message.model_validate(p)
             self.messages[message.id] = message
         elif et == "MESSAGE_CLAIMS_SET":
-            message = self.messages.get(p["id"])
-            if message is not None:
-                self.messages[message.id] = message.model_copy(
+            existing = self.messages.get(p["id"])
+            if existing is not None:
+                self.messages[existing.id] = existing.model_copy(
                     update={"claims": list(p.get("claims") or [])}
                 )
         elif et == "OBSERVATION_CREATED":

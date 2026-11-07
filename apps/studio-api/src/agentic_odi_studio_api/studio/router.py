@@ -21,7 +21,6 @@ from agentic_odi_core import (
     EvidenceNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
-    Message,
     NoStrategyEvidenceError,
     OdiError,
     ODIService,
@@ -1147,9 +1146,7 @@ def list_observations(
     if status:
         # Filter on what the client will read, not the stored spelling.
         observations = [item for item in observations if item.to_dict()["status"] == status]
-    return ObservationListResponse(
-        observations=[item.to_dict() for item in observations]
-    )
+    return ObservationListResponse(observations=[item.to_dict() for item in observations])
 
 
 @router.post("/observations", response_model=ObservationResponse)
@@ -1254,9 +1251,7 @@ def list_conversations(
 ) -> ConversationListResponse:
     """Newest first, archived included: the switcher decides what to show."""
     conversations = _memory(request).list_conversations(limit=limit)
-    return ConversationListResponse(
-        conversations=[item.to_dict() for item in conversations]
-    )
+    return ConversationListResponse(conversations=[item.to_dict() for item in conversations])
 
 
 @router.post("/conversations", response_model=ConversationResponse)
@@ -1318,10 +1313,7 @@ def append_message(
     if body.id and body.id in already:
         return MessageResponse(
             message=_turn_model(
-                next(
-                    t for t in memory.list_turns(conversation_id)
-                    if t.message_id == body.id
-                ),
+                next(t for t in memory.list_turns(conversation_id) if t.message_id == body.id),
                 memory,
             )
         )
@@ -1338,7 +1330,8 @@ def append_message(
         raise StudioHTTPError(
             StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
         ) from exc
-    return MessageResponse(message=_turn_model(message, memory))
+    stored = next(turn for turn in memory.list_turns(conversation_id) if turn.id == message)
+    return MessageResponse(message=_turn_model(stored, memory))
 
 
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)

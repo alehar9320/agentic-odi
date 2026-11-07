@@ -248,6 +248,7 @@ class Repository(Protocol):
     def set_message_claims(self, message_id: str, claims: list[dict[str, Any]]) -> Message | None:
         """Attach evidence claims to an already-appended turn."""
         ...
+
     def add_observation(self, observation: Observation) -> Observation: ...
     def get_observation(self, observation_id: str) -> Observation | None: ...
     def list_observations(
@@ -657,6 +658,7 @@ class InMemoryRepository:
 
     def get_brief(self) -> Brief | None:
         return self.brief
+
     def get_evidence_by_fingerprint(
         self,
         source_kind: str,

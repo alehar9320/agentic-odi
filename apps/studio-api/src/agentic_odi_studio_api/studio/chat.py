@@ -47,7 +47,7 @@ from agentic_odi_studio_api.studio.claims import (
 )
 from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.memory import MAX_TEXT as MAX_OBSERVATION_TEXT
-from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
+from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory, Turn
 from agentic_odi_studio_api.studio.observability import log_turn
 from agentic_odi_studio_api.studio.probes import check_llm_health, is_endpoint_reachable
 from agentic_odi_studio_api.studio.schemas import (
@@ -451,9 +451,7 @@ def _persist_turn(
             if claims:
                 memory.add_citations(turns[-1], claims)
             return turns[-1]
-        turn_id = memory.append_turn(
-            conversation_id, role, content, message_id, parent_id, parts
-        )
+        turn_id = memory.append_turn(conversation_id, role, content, message_id, parent_id, parts)
         stored = next(
             (turn for turn in memory.list_turns(conversation_id) if turn.id == turn_id), None
         )
@@ -540,6 +538,8 @@ def _record_tool_part(
     if preview:
         part["preview"] = preview
     parts.append(part)
+
+
 def _local_evidence_resolver(
     service: ODIService | None,
 ) -> Any:

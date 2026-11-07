@@ -118,6 +118,8 @@ class Conversation:
     updated_at: str
     #: The visible leaf of the branch tree. ``None`` until a turn is persisted.
     head_id: str | None = None
+    #: Archived threads stay readable but leave the rail.
+    archived: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -126,6 +128,7 @@ class Conversation:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "head_id": self.head_id,
+            "archived": self.archived,
         }
 
 
@@ -273,7 +276,8 @@ CREATE TABLE IF NOT EXISTS conversations (
     title TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    head_id TEXT
+    head_id TEXT,
+    archived INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS turns (
@@ -341,6 +345,7 @@ CREATE INDEX IF NOT EXISTS shares_by_hash ON shares(token_hash);
 #: is upgraded in place: nothing is dropped and no data is rewritten.
 _MIGRATIONS: tuple[tuple[str, str, str], ...] = (
     ("conversations", "head_id", "TEXT"),
+    ("conversations", "archived", "INTEGER NOT NULL DEFAULT 0"),
     ("turns", "message_id", "TEXT"),
     ("turns", "parent_id", "TEXT"),
     ("turns", "parts", "TEXT"),
@@ -404,9 +409,7 @@ def _validate_data(data: dict[str, Any] | None) -> dict[str, Any]:
 class StudioMemory:
     """A small SQLite store for conversations, turns, and observations."""
 
-    def __init__(
-        self, path: str | Path | None = None, *, import_legacy: bool = False
-    ) -> None:
+    def __init__(self, path: str | Path | None = None, *, import_legacy: bool = False) -> None:
         resolved = default_db_path() if path is None else path
         self._memory = str(resolved) == ":memory:"
         self.db_path = Path(":memory:") if self._memory else Path(resolved)
@@ -516,6 +519,7 @@ class StudioMemory:
                        (SELECT COUNT(*) FROM turns
                          WHERE turns.conversation_id = conversations.id) AS turn_count
                   FROM conversations
+                 WHERE conversations.archived = 0
                  ORDER BY conversations.updated_at DESC, conversations.created_at DESC
                  LIMIT ?
                 """,
@@ -698,6 +702,42 @@ class StudioMemory:
                 (title.strip()[:200], now, conversation_id),
             )
         return self._updated_conversation(conversation_id)
+
+    def set_archived(self, conversation_id: str, archived: bool) -> Conversation:
+        """Take a thread out of the rail without destroying it."""
+        now = _now()
+        with self._lock, self._connection:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
+            self._connection.execute(
+                "UPDATE conversations SET archived = ?, updated_at = ? WHERE id = ?",
+                (1 if archived else 0, now, conversation_id),
+            )
+        return self._updated_conversation(conversation_id)
+
+    def delete_conversation(self, conversation_id: str) -> None:
+        """Forget one thread and everything hanging off it."""
+        with self._lock, self._connection:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
+            self._connection.execute(
+                "DELETE FROM turn_citations WHERE turn_id IN "
+                "(SELECT id FROM turns WHERE conversation_id = ?)",
+                (conversation_id,),
+            )
+            self._connection.execute(
+                "DELETE FROM turns WHERE conversation_id = ?", (conversation_id,)
+            )
+            self._connection.execute(
+                "DELETE FROM observations WHERE conversation_id = ?", (conversation_id,)
+            )
+            self._connection.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
 
     def _updated_conversation(self, conversation_id: str) -> Conversation:
         """Read back a row this instance just wrote.
@@ -981,6 +1021,7 @@ class StudioMemory:
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             head_id=row["head_id"] if "head_id" in keys else None,
+            archived=bool(row["archived"]) if "archived" in keys else False,
         )
 
     @staticmethod
@@ -1116,8 +1157,7 @@ def _import_legacy(connection: sqlite3.Connection, live: str, path: Path) -> Non
                 continue
             placeholders = ", ".join("?" for _ in usable)
             statement = (
-                f"INSERT OR IGNORE INTO {table} ({', '.join(usable)}) "
-                f"VALUES ({placeholders})"
+                f"INSERT OR IGNORE INTO {table} ({', '.join(usable)}) VALUES ({placeholders})"
             )
             for row in legacy_rows:
                 row = dict(row)

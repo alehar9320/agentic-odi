@@ -362,6 +362,8 @@ class Observation(BaseModel):
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
     workspace_id: str = Field(DEFAULT_WORKSPACE, description="Workspace that owns this fact")
+
+
 class StudyStatus(str, Enum):
     """Where a study is in its own life: opened, collecting, or closed."""
 

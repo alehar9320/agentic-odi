@@ -109,6 +109,8 @@ class ProposeStrategyRequest(BaseModel):
 
     job_id: str | None = None
     mcp_url: str = ""
+
+
 class AddCustomerOutcomeRequest(BaseModel):
     mcp_url: str = ""
     job_id: str
@@ -372,10 +374,6 @@ class ClaimOut(BaseModel):
     status: str
     evidence: list[ClaimCitationOut] = Field(default_factory=list)
     reason: str | None = None
-
-
-class ConversationListResponse(BaseModel):
-    conversations: list[ConversationSummaryModel] = Field(default_factory=list)
 
 
 class TurnModel(BaseModel):
