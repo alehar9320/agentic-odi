@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 
 import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
@@ -18,6 +19,7 @@ export default defineConfig({
   // date is baked in at build time. Applies to vitest transforms too.
   define: {
     __STUDIO_BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+    __STUDIO_VERSION__: JSON.stringify(JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8")).version),
   },
   server: {
     port: 5173,
