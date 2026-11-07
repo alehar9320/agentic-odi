@@ -263,8 +263,6 @@ export class LocalMemoryService {
     content: string,
     messageId?: string | null,
     parentId?: string | null,
-    // Parts are the sidecar's richer transcript; the browser store keeps text.
-    _parts: unknown[] = [],
   ): Promise<ConversationTurn> {
     if (!TURN_ROLES.has(role)) {
       throw validation(`Unknown turn role: ${role}.`);

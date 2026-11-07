@@ -883,7 +883,6 @@ export async function appendMessage(
         message.content,
         message.id ?? null,
         message.parent_id ?? null,
-        message.parts ?? [],
       );
     },
   );
