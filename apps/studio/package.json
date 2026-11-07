@@ -11,6 +11,7 @@
     "test:visual": "vitest run --config vitest.visual.config.ts",
     "chromatic": "chromatic --vitest",
     "test:e2e": "playwright test",
+    "test:e2e:no-sidecar": "playwright test --config playwright.no-sidecar.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
