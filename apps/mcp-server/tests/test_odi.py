@@ -2,7 +2,6 @@ import json
 import re
 
 import pytest
-from agentic_odi_mcp_server import jobs_db, mcp
 from fastmcp import Client
 
 
@@ -12,7 +11,10 @@ def extract_id(result_str):
 
 
 @pytest.mark.asyncio
-async def test_odi_workflow():
+async def test_odi_workflow(
+    mcp,
+    repository,
+):
     """Test the full ODI workflow (Add Job -> Add Steps -> Add Outcome -> Get Data)."""
     # Use in-memory testing by passing the server instance directly to the client
     async with Client(mcp) as client:
@@ -24,7 +26,7 @@ async def test_odi_workflow():
         assert "Job created successfully" in job_text
 
         job_id = extract_id(job_text)
-        assert job_id in jobs_db
+        assert job_id in repository.jobs
 
         # 2. Add an Outcome first (steps require an outcome to exist)
         outcome_res = await client.call_tool(
@@ -76,7 +78,9 @@ async def test_odi_workflow():
 
 @pytest.mark.asyncio
 @pytest.mark.asyncio
-async def test_get_capabilities():
+async def test_get_capabilities(
+    mcp,
+):
     """Test that the get_capabilities tool returns the generated human-readable summary."""
     async with Client(mcp) as client:
         result = await client.call_tool("get_capabilities", {})
@@ -99,7 +103,9 @@ async def test_get_capabilities():
 
 
 @pytest.mark.asyncio
-async def test_get_capabilities_manifest_returns_json():
+async def test_get_capabilities_manifest_returns_json(
+    mcp,
+):
     """Test that get_capabilities_manifest returns the tool manifest as JSON."""
     import json
 

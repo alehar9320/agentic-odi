@@ -1,7 +1,6 @@
 import json
 
 import pytest
-from agentic_odi_mcp_server import mcp
 from fastmcp import Client
 from mcp_failures import failure, sentence
 
@@ -17,7 +16,9 @@ async def _new_job(client) -> str:
 
 
 @pytest.mark.asyncio
-async def test_step_and_outcome_get_update_delete():
+async def test_step_and_outcome_get_update_delete(
+    mcp,
+):
     async with Client(mcp) as client:
         job_id = await _new_job(client)
         await client.call_tool(
@@ -70,7 +71,9 @@ async def test_step_and_outcome_get_update_delete():
 
 
 @pytest.mark.asyncio
-async def test_update_customer_outcome_replaces_value_metrics():
+async def test_update_customer_outcome_replaces_value_metrics(
+    mcp,
+):
     async with Client(mcp) as client:
         job_id = await _new_job(client)
         cv = {
@@ -115,7 +118,9 @@ async def test_update_customer_outcome_replaces_value_metrics():
 
 
 @pytest.mark.asyncio
-async def test_update_outcome_out_of_range_returns_error_string():
+async def test_update_outcome_out_of_range_returns_error_string(
+    mcp,
+):
     async with Client(mcp) as client:
         job_id = await _new_job(client)
         out = await client.call_tool(
@@ -136,7 +141,9 @@ async def test_update_outcome_out_of_range_returns_error_string():
 
 
 @pytest.mark.asyncio
-async def test_evaluate_outcome_reports_a_missing_job_as_an_error_string():
+async def test_evaluate_outcome_reports_a_missing_job_as_an_error_string(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool(
             "evaluate_outcome",
@@ -159,7 +166,7 @@ async def test_evaluate_outcome_reports_a_missing_job_as_an_error_string():
         ("Make it better", False),
     ],
 )
-async def test_evaluate_outcome_round_trips_as_json(statement: str, expected_valid: bool):
+async def test_evaluate_outcome_round_trips_as_json(mcp, statement: str, expected_valid: bool):
     async with Client(mcp) as client:
         res = await client.call_tool("evaluate_outcome", {"statement": statement})
 
@@ -172,7 +179,9 @@ async def test_evaluate_outcome_round_trips_as_json(statement: str, expected_val
 
 
 @pytest.mark.asyncio
-async def test_promote_evidence_reports_a_missing_evidence_id():
+async def test_promote_evidence_reports_a_missing_evidence_id(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool(
             "promote_evidence", {"evidence_id": "EV-MISSING", "target": "job"}
@@ -186,7 +195,9 @@ async def test_promote_evidence_reports_a_missing_evidence_id():
 
 
 @pytest.mark.asyncio
-async def test_promote_evidence_rejects_an_unknown_target():
+async def test_promote_evidence_rejects_an_unknown_target(
+    mcp,
+):
     async with Client(mcp) as client:
         added = await client.call_tool(
             "add_evidence",

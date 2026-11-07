@@ -5,7 +5,7 @@ import re
 from uuid import uuid4
 
 import pytest
-from agentic_odi_mcp_server import mcp, mcp_server
+from agentic_odi_mcp_server import mcp_server
 from fastmcp import Client
 from mcp_failures import failure, sentence
 
@@ -24,7 +24,9 @@ def _claim_check() -> dict:
 
 
 @pytest.mark.asyncio
-async def test_get_jobs_lists_created_jobs():
+async def test_get_jobs_lists_created_jobs(
+    mcp,
+):
     async with Client(mcp) as client:
         # Create multiple jobs
         job_names = ["Job One", "Job Two"]
@@ -46,7 +48,9 @@ async def test_get_jobs_lists_created_jobs():
 
 
 @pytest.mark.asyncio
-async def test_get_job_success_returns_matching_job():
+async def test_get_job_success_returns_matching_job(
+    mcp,
+):
     async with Client(mcp) as client:
         create_res = await client.call_tool(
             "add_job",
@@ -66,7 +70,9 @@ async def test_get_job_success_returns_matching_job():
 
 
 @pytest.mark.asyncio
-async def test_get_job_not_found_returns_error_message():
+async def test_get_job_not_found_returns_error_message(
+    mcp,
+):
     async with Client(mcp) as client:
         random_id = str(uuid4())
         res = await client.call_tool("get_job", {"job_id": random_id})
@@ -76,7 +82,9 @@ async def test_get_job_not_found_returns_error_message():
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_job_not_found_returns_error():
+async def test_add_outcome_job_not_found_returns_error(
+    mcp,
+):
     async with Client(mcp) as client:
         random_id = str(uuid4())
         res = await client.call_tool(
@@ -94,7 +102,9 @@ async def test_add_outcome_job_not_found_returns_error():
 
 
 @pytest.mark.asyncio
-async def test_get_job_map_job_not_found_returns_error():
+async def test_get_job_map_job_not_found_returns_error(
+    mcp,
+):
     async with Client(mcp) as client:
         random_id = str(uuid4())
         res = await client.call_tool("get_job_map", {"job_id": random_id})
@@ -104,7 +114,9 @@ async def test_get_job_map_job_not_found_returns_error():
 
 
 @pytest.mark.asyncio
-async def test_get_outcomes_job_not_found_returns_error():
+async def test_get_outcomes_job_not_found_returns_error(
+    mcp,
+):
     async with Client(mcp) as client:
         random_id = str(uuid4())
         res = await client.call_tool("get_outcomes", {"job_id": random_id})
@@ -114,7 +126,9 @@ async def test_get_outcomes_job_not_found_returns_error():
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_requires_both_scores():
+async def test_add_outcome_requires_both_scores(
+    mcp,
+):
     async with Client(mcp) as client:
         # First create a job
         create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
@@ -143,7 +157,9 @@ async def test_add_outcome_requires_both_scores():
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_description_puts_three_questions_before_the_score():
+async def test_add_outcome_description_puts_three_questions_before_the_score(
+    mcp,
+):
     #: The docstring below the tool is what the model reads before it decides to
     #: call it, so the interview requirement has to be in it, not only in the gate.
     async with Client(mcp) as client:
@@ -154,7 +170,9 @@ async def test_add_outcome_description_puts_three_questions_before_the_score():
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_refuses_a_score_without_a_claim_check():
+async def test_add_outcome_refuses_a_score_without_a_claim_check(
+    mcp,
+):
     async with Client(mcp) as client:
         create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
         job_id = _extract_id(create_res.content[0].text)
@@ -181,7 +199,9 @@ async def test_add_outcome_refuses_a_score_without_a_claim_check():
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_accepts_an_unscored_outcome():
+async def test_add_outcome_accepts_an_unscored_outcome(
+    mcp,
+):
     async with Client(mcp) as client:
         create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
         job_id = _extract_id(create_res.content[0].text)
@@ -199,7 +219,9 @@ async def test_add_outcome_accepts_an_unscored_outcome():
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_rejects_a_vague_statement_with_the_fix():
+async def test_add_outcome_rejects_a_vague_statement_with_the_fix(
+    mcp,
+):
     async with Client(mcp) as client:
         create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
         job_id = _extract_id(create_res.content[0].text)
@@ -222,7 +244,9 @@ async def test_add_outcome_rejects_a_vague_statement_with_the_fix():
 
 
 @pytest.mark.asyncio
-async def test_get_odi_framework_guidelines_includes_expected_sections():
+async def test_get_odi_framework_guidelines_includes_expected_sections(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool("get_odi_framework_guidelines", {})
         text = res.content[0].text
@@ -237,7 +261,9 @@ async def test_get_odi_framework_guidelines_includes_expected_sections():
 
 
 @pytest.mark.asyncio
-async def test_add_step_accepts_the_eight_job_map_stages():
+async def test_add_step_accepts_the_eight_job_map_stages(
+    mcp,
+):
     async with Client(mcp) as client:
         created = await client.call_tool("add_job", {"name": "Deploy a service"})
         job_id = _extract_id(created.content[0].text)
@@ -275,7 +301,9 @@ async def test_add_step_accepts_the_eight_job_map_stages():
 
 
 @pytest.mark.asyncio
-async def test_add_step_rejects_an_order_outside_the_job_map():
+async def test_add_step_rejects_an_order_outside_the_job_map(
+    mcp,
+):
     async with Client(mcp) as client:
         created = await client.call_tool("add_job", {"name": "Deploy a service"})
         job_id = _extract_id(created.content[0].text)
@@ -308,7 +336,9 @@ def _failure_payload(text: str) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_reports_a_missing_job_with_a_code():
+async def test_add_outcome_reports_a_missing_job_with_a_code(
+    mcp,
+):
     async with Client(mcp) as client:
         random_id = str(uuid4())
         res = await client.call_tool(
@@ -322,7 +352,9 @@ async def test_add_outcome_reports_a_missing_job_with_a_code():
 
 
 @pytest.mark.asyncio
-async def test_a_refused_score_range_carries_the_range_code():
+async def test_a_refused_score_range_carries_the_range_code(
+    mcp,
+):
     async with Client(mcp) as client:
         created = await client.call_tool("add_job", {"name": "Deploy a service"})
         job_id = _extract_id(created.content[0].text)
@@ -347,7 +379,9 @@ async def test_a_refused_score_range_carries_the_range_code():
 
 
 @pytest.mark.asyncio
-async def test_a_successful_tool_returns_no_envelope():
+async def test_a_successful_tool_returns_no_envelope(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool(
             "add_job", {"name": "Music", "description": "Listen on the go"}

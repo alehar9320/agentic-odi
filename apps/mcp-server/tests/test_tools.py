@@ -1,10 +1,11 @@
 import pytest
-from agentic_odi_mcp_server import mcp
 from fastmcp import Client
 
 
 @pytest.mark.asyncio
-async def test_add_job_returns_content():
+async def test_add_job_returns_content(
+    mcp,
+):
     """Test that add_job returns a valid response with accessible content."""
     async with Client(mcp) as client:
         result = await client.call_tool("add_job", {"name": "Test", "description": "123"})

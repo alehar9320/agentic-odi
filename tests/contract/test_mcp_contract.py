@@ -19,13 +19,20 @@ from agentic_odi_core.errors import (
     ValidationError,
 )
 from agentic_odi_core.remote import StudioErrorCode, error_envelope, parse_tool_result
+from agentic_odi_core.repository import InMemoryRepository
 from agentic_odi_core.services import ValueOutOfRangeError
-from agentic_odi_mcp_server.mcp_server import mcp
-from fastmcp import Client
+from agentic_odi_mcp_server.mcp_server import create_server
+from fastmcp import Client, FastMCP
+
+
+@pytest.fixture
+def mcp() -> FastMCP:
+    """The surface the factory serves, over a store this module owns."""
+    return create_server(repository=InMemoryRepository())
 
 
 @pytest.mark.asyncio
-async def test_mcp_exposes_exactly_the_contract_tools() -> None:
+async def test_mcp_exposes_exactly_the_contract_tools(mcp: FastMCP) -> None:
     async with Client(mcp) as client:
         tools = await client.list_tools()
 
@@ -33,7 +40,7 @@ async def test_mcp_exposes_exactly_the_contract_tools() -> None:
 
 
 @pytest.mark.asyncio
-async def test_mcp_argument_names_match_the_contract() -> None:
+async def test_mcp_argument_names_match_the_contract(mcp: FastMCP) -> None:
     async with Client(mcp) as client:
         tools = {tool.name: tool for tool in await client.list_tools()}
 
@@ -77,7 +84,7 @@ def test_each_failure_kind_arrives_with_a_code_of_its_own(
 
 
 @pytest.mark.asyncio
-async def test_a_missing_job_crosses_the_wire_as_not_found() -> None:
+async def test_a_missing_job_crosses_the_wire_as_not_found(mcp: FastMCP) -> None:
     """One live call proves the envelope survives the transport, not just the function."""
     async with Client(mcp) as client:
         text = (await client.call_tool("get_job", {"job_id": "nope"})).content[0].text

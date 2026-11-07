@@ -10,27 +10,27 @@ from agentic_odi_core.contract import TOOL_SPECS
 from agentic_odi_mcp_server import mcp_server
 
 
-def _live_tools():
-    return asyncio.run(mcp_server.mcp.list_tools())
+def _live_tools(mcp):
+    return asyncio.run(mcp.list_tools())
 
 
-def test_live_registry_matches_the_contract():
-    assert mcp_server.validate_tool_specs(tools=_live_tools()) == []
+def test_live_registry_matches_the_contract(mcp):
+    assert mcp_server.validate_tool_specs(tools=_live_tools(mcp)) == []
 
 
-def test_a_missing_handler_is_reported():
-    tools = [tool for tool in _live_tools() if tool.name != "add_job"]
+def test_a_missing_handler_is_reported(mcp):
+    tools = [tool for tool in _live_tools(mcp) if tool.name != "add_job"]
 
     errors = mcp_server.validate_tool_specs(tools=tools)
 
     assert any("add_job" in error and "handler" in error for error in errors)
 
 
-def test_an_argument_mismatch_is_reported():
+def test_an_argument_mismatch_is_reported(mcp):
     specs = dict(TOOL_SPECS)
     specs["add_job"] = replace(TOOL_SPECS["add_job"], arguments=("name",), required=("name",))
 
-    errors = mcp_server.validate_tool_specs(specs=specs, tools=_live_tools())
+    errors = mcp_server.validate_tool_specs(specs=specs, tools=_live_tools(mcp))
 
     assert any("add_job" in error and "arguments" in error for error in errors)
 
@@ -43,37 +43,43 @@ def test_a_missing_enum_spec_is_reported():
     assert any("add_job" in error and "ToolName" in error for error in errors)
 
 
-def test_a_duplicate_handler_is_reported():
-    tools = _live_tools()
+def test_a_duplicate_handler_is_reported(mcp):
+    tools = _live_tools(mcp)
 
     errors = mcp_server.validate_tool_specs(tools=[*tools, tools[0]])
 
     assert any("duplicate" in error.lower() for error in errors)
 
 
-def test_startup_exits_when_validation_fails(monkeypatch, capsys):
+def test_startup_exits_when_validation_fails(mcp, monkeypatch, capsys):
     monkeypatch.setattr(mcp_server, "validate_tool_specs", lambda **_: ["add_job: broken"])
 
     with pytest.raises(SystemExit) as exc:
-        mcp_server.validate_at_startup()
+        mcp_server.validate_at_startup(mcp)
 
     assert exc.value.code == 1
     assert "add_job: broken" in capsys.readouterr().err
 
 
-def test_startup_is_silent_when_valid(monkeypatch, capsys):
+def test_startup_is_silent_when_valid(mcp, monkeypatch, capsys):
     monkeypatch.setattr(mcp_server, "validate_tool_specs", lambda **_: [])
 
-    mcp_server.validate_at_startup()
+    mcp_server.validate_at_startup(mcp)
 
     assert capsys.readouterr().err == ""
 
 
-def test_main_validates_before_serving(monkeypatch):
+def test_main_validates_before_serving(mcp, monkeypatch):
     calls: list[object] = []
-    monkeypatch.setattr(mcp_server, "validate_at_startup", lambda: calls.append("validate"))
-    monkeypatch.setattr(mcp_server.mcp, "run", lambda **kwargs: calls.append("run"))
+
+    def fake_create_server():
+        calls.append("create")
+        return mcp
+
+    monkeypatch.setattr(mcp_server, "create_server", fake_create_server)
+    monkeypatch.setattr(mcp_server, "validate_at_startup", lambda _server: calls.append("validate"))
+    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append("run"))
 
     mcp_server.main([])
 
-    assert calls == ["validate", "run"]
+    assert calls == ["create", "validate", "run"]
