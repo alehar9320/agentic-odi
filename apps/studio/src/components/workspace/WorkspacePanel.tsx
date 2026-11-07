@@ -1,12 +1,13 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
+import { buildRecords } from "../../lib/records";
 import { useFocusTrap } from "../../lib/useFocusTrap";
-import { useStudio } from "../../state/StudioContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useStudio } from "../../state/StudioContext";
 import { CloseIcon } from "../icons";
 import { PanelBoundary } from "./PanelBoundary";
 import type { WorkspacePanelId } from "../../types";
-import { findPanel, type PanelDefinition } from "./panels";
+import { findPanel, WORKSPACE_PANELS, type PanelDefinition } from "./panels";
 
 const MOBILE_QUERY = "(max-width: 1023px)";
 
@@ -28,7 +29,17 @@ function PanelBody({ panel }: { panel: PanelDefinition }) {
  * closes it, and focus returns to whatever opened it.
  */
 export function WorkspacePanel() {
-  const { activePanel, closePanel, sendMessage } = useStudio();
+  const {
+    activePanel,
+    closePanel,
+    openPanel,
+    sendMessage,
+    canvas,
+    conversations,
+    conversationId,
+    memory,
+    segments,
+  } = useStudio();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const panel = activePanel ? findPanel(activePanel) : null;
   const panelId = panel?.id ?? null;
@@ -39,6 +50,27 @@ export function WorkspacePanel() {
   // has to outlive the DOM to come back with it — per panel, never global (#696).
   const scrollByPanel = useRef(new Map<WorkspacePanelId, number>());
   const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  const conversationTitle = useMemo(() => {
+    const current = conversations.find((item) => item.id === conversationId);
+    const title = current?.title?.trim();
+    return title || "This conversation";
+  }, [conversations, conversationId]);
+
+  const siblingCounts = useMemo(() => {
+    const outcomes = canvas?.outcomes ?? [];
+    const steps = canvas?.steps ?? [];
+    const evidence = outcomes.filter((outcome) => outcome.evidence?.trim()).length;
+    const records = buildRecords(canvas);
+    return {
+      records: records.length,
+      landscape: outcomes.length,
+      jobmap: steps.length,
+      segments: segments.length,
+      evidence,
+      memory: memory.length,
+    } as Partial<Record<WorkspacePanelId, number>>;
+  }, [canvas, memory, segments]);
 
   useFocusTrap(panelRef, isMobile && Boolean(panel));
 
@@ -90,10 +122,10 @@ export function WorkspacePanel() {
     };
   }, [isMobile, activePanel, panel?.id]);
 
-  // Capture so the escape never reaches the app-level handler, which would
-  // stop a running reply instead of closing the sheet the person is looking at.
+  // Escape closes the open lens and returns focus to its opener. Captured so it
+  // never reaches the app-level handler, which would stop a running reply.
   useEffect(() => {
-    if (!isMobile || !activePanel) {
+    if (!activePanel) {
       return;
     }
     function onKeyDown(event: KeyboardEvent) {
@@ -105,7 +137,7 @@ export function WorkspacePanel() {
     }
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [isMobile, activePanel, closePanel]);
+  }, [activePanel, closePanel]);
 
   // A lens opens where it was left; a different lens starts at its top.
   useLayoutEffect(() => {
@@ -160,15 +192,29 @@ export function WorkspacePanel() {
       >
         <header className="lens__head">
           <div className="lens__heading">
-            <span className="lens__icon" aria-hidden="true">
-              {panel.icon}
-            </span>
-            <div>
-              <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
-                {panel.title}
-              </h2>
-              <p className="lens__blurb">{panel.blurb}</p>
-            </div>
+            <p className="lens__where" aria-label={`In ${conversationTitle}`}>
+              {conversationTitle}
+            </p>
+            <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
+              {panel.title}
+            </h2>
+            <nav className="lens__siblings" aria-label="Other views">
+              {WORKSPACE_PANELS.filter((item) => item.id !== panel.id).map((item) => {
+                const count = siblingCounts[item.id];
+                const label = typeof count === "number" ? `${item.label} (${count})` : item.label;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="lens__sibling"
+                    aria-current={item.id === panel.id ? "true" : undefined}
+                    onClick={() => openPanel(item.id)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
           <button
             type="button"

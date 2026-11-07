@@ -6,7 +6,12 @@ const brokenPanel = vi.hoisted(() => ({ renders: 0, fail: true }));
 const studio = vi.hoisted(() => ({
   activePanel: "landscape" as string | null,
   closePanel: vi.fn(),
+  openPanel: vi.fn(),
   sendMessage: vi.fn(async () => undefined),
+  conversationId: "c1",
+  conversations: [{ id: "c1", title: "Launch thread", turn_count: 2 }],
+  memory: [],
+  segments: [],
   canvas: {
     jobs: [],
     steps: [],
@@ -64,7 +69,12 @@ describe("WorkspacePanel", () => {
     brokenPanel.renders = 0;
     studio.activePanel = "landscape";
     studio.closePanel.mockClear();
+    studio.openPanel.mockClear();
     studio.sendMessage.mockClear();
+    studio.conversationId = "c1";
+    studio.conversations = [{ id: "c1", title: "Launch thread", turn_count: 2 }];
+    studio.memory = [];
+    studio.segments = [];
     studio.canvasState = {
       kind: "ready",
       data: {
@@ -90,6 +100,7 @@ describe("WorkspacePanel", () => {
     expect(
       screen.getByRole("complementary", { name: /opportunity landscape/i }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Launch thread")).toBeInTheDocument();
     expect(
       screen.getByText(/a lens on the conversation, not a separate place/i),
     ).toBeInTheDocument();
@@ -113,6 +124,51 @@ describe("WorkspacePanel", () => {
 
     expect(studio.closePanel).toHaveBeenCalled();
     expect(studio.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("names the conversation and switches a sibling while keeping the lens open (#324)", () => {
+    const { rerender } = render(<WorkspacePanel />);
+
+    expect(screen.getByText("Launch thread")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /opportunity landscape/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /job map/i }));
+
+    expect(studio.openPanel).toHaveBeenCalledWith("jobmap");
+    expect(studio.closePanel).not.toHaveBeenCalled();
+
+    studio.activePanel = "jobmap";
+    rerender(<WorkspacePanel />);
+
+    expect(screen.getByRole("complementary", { name: /universal job map/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /universal job map/i })).toBeInTheDocument();
+  });
+
+  it("closes on Escape and returns focus to the opener (#324)", () => {
+    const chip = document.createElement("button");
+    chip.textContent = "Landscape";
+    document.body.append(chip);
+    chip.focus();
+
+    const { rerender } = render(<WorkspacePanel />);
+
+    const event = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(event);
+
+    expect(studio.closePanel).toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+
+    studio.activePanel = null;
+    rerender(<WorkspacePanel />);
+
+    expect(chip).toHaveFocus();
+    chip.remove();
   });
 
   it("moves focus into the lens and gives it back to the chip when it closes (#696)", () => {

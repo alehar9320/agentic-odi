@@ -3129,6 +3129,10 @@ button.message__tag:hover {
     padding: 18px 16px 32px;
   }
 
+  .lens__siblings {
+    max-width: 100%;
+  }
+
   .rail {
     padding-inline: 18px;
   }
@@ -6802,6 +6806,41 @@ details[open] summary {
 
 /* Segments lens: the verdict board and the bet it implies */
 .segments-board {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.segments-board__list,
+.segments-board__empty,
+.segments-board__strategy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.segments-board__strategy {
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.segments-board__unclustered ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.segments-board__refusal {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--amber);
+}
+
   display: flex;
   flex-direction: column;
   gap: 14px;
