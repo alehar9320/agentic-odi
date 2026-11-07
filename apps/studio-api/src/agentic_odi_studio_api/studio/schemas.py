@@ -278,13 +278,21 @@ MAX_OBSERVATION_TEXT = 300
 
 
 class ObservationModel(BaseModel):
+    """One remembered fact.
+
+    ``kind`` is what the store records; ``category`` is the same value under the
+    name this screen has always shown, so both clients read what they expect.
+    """
+
     id: str
     conversation_id: str | None = None
     text: str
+    kind: str
     category: str
     status: str
     data: dict[str, Any] = Field(default_factory=dict)
     confidence: float
+    source_turn: int | None = None
     source_message_id: str | None = None
     created_at: str
     updated_at: str
@@ -299,12 +307,18 @@ class ObservationResponse(BaseModel):
 
 
 class ObservationCreateRequest(BaseModel):
-    category: ObservationCategory = "other"
+    """A note to remember, named either way, with text the caller stands behind."""
+
+    kind: str | None = None
+    category: ObservationCategory | None = None
     text: str = Field(min_length=1, max_length=MAX_OBSERVATION_TEXT)
     data: dict[str, Any] | None = None
     confidence: float = Field(default=0.6, ge=0, le=1)
     confirmed: bool = False
     conversation_id: str | None = None
+
+    def resolved_kind(self) -> str:
+        return self.kind or self.category or "other"
 
 
 class ObservationUpdateRequest(BaseModel):
@@ -577,3 +591,29 @@ class ProposalOut(BaseModel):
     source_name: str
     status: str
     created_at: str
+
+
+class MintShareRequest(BaseModel):
+    """Mint one scoped, expiring, read-only link for one artifact."""
+
+    artifact_kind: Literal["outcome", "segment", "strategy"]
+    artifact_id: str = Field(min_length=1)
+    #: Days until the link expires. Omitted means 7; the range is 1–30.
+    ttl_days: int | None = Field(default=None, ge=1, le=30)
+
+
+class ShareMintResponse(BaseModel):
+    """The one time the raw token is shown. Only its hash is stored."""
+
+    id: str
+    token: str
+    url: str
+    expires_at: str
+
+
+class SharedArtifactResponse(BaseModel):
+    """Exactly the named artifact and its own evidence. Nothing else."""
+
+    artifact_kind: str
+    artifact: dict[str, Any]
+    evidence: list[dict[str, Any]] = Field(default_factory=list)

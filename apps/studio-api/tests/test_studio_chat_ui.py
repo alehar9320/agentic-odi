@@ -329,10 +329,13 @@ def test_an_agent_cannot_confirm_its_own_memory(monkeypatch) -> None:
 
     asyncio.run(_run())
 
-    assert memory.memory_context() == ""
+    # The agent's own note lands unconfirmed and is carried as a guess, never as
+    # a fact the person has stood behind.
     observation = memory.list_observations()[0]
+    assert observation.status == "suggested"
+    assert "(suggested)" in memory.memory_context()
     memory.update_observation(observation.id, status="confirmed")
-    assert "Owns activation." in memory.memory_context()
+    assert "(confirmed)" in memory.memory_context()
     memory.close()
 
 

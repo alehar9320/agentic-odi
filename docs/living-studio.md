@@ -68,8 +68,10 @@ without a duration — only the browser that watched the run owns the clock.
 ### Slash commands
 
 Type `/` to open the palette. `Up`/`Down` move, `Enter` or `Tab` runs the
-selected command, `Esc` closes it. Commands are handled in the SPA and never call
-the model, so they work when it is offline.
+selected command, `Esc` closes it. While an input method is composing — Japanese,
+Chinese, Korean, or any other — its keys are never interpreted: `Enter` and the
+arrows choose a candidate, they do not run, move, dismiss, or send. Commands are
+handled in the SPA and never call the model, so they work when it is offline.
 
 | Command | Effect |
 |---|---|
@@ -358,11 +360,12 @@ without giving up the message model the sidecar already understands.
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 | **Queue** | A follow-up sent while an answer still streams does not hit a wall: it joins a quiet lane above the composer and runs in the order it was sent once the live turn settles. Each row offers **Run now** — it jumps ahead of the other waiting follow-ups — and a remove that drops only that message. Stop stops the live turn and the lane waits for the next send; it never clears the queue. The lane is in-memory and dies with the page, and the sidecar still sees exactly one SSE turn at a time — the queue sequences, it never parallelises. |
+| **Read aloud** | A settled reply with prose offers **Read aloud** beside Copy, and becomes **Stop reading** while it speaks. Starting another reply stops the first; **Stop reading**, Escape inside the thread, and leaving the conversation end it. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken. A streaming reply is never spoken, and speech is never persisted. |
 
 #### What the runtime gives us, and what we did not take
 
 The full coverage ledger — every assistant-ui capability and its one honest
-state — is authored in [Development](development.md),
+state — is authored in [The assistant-ui ledger](assistant-ui-ledger.md),
 and `scripts/doc_check.py` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
 narrower than the library offers (Partial). A row is Adopted only when a test
 proves a person can use it, the named file exists, and the Delivered column
@@ -484,19 +487,17 @@ change the next answer.
 | `opportunity` | The opportunity or bet currently in play |
 | `business` | Goals, metrics, and commercial constraints |
 | `customer` | Who the customer is and what they are trying to get done |
-| `constraint` | Time, budget, policy, or technical limits |
 | `decision` | A call the PM made and stands behind |
 | `stakeholder` | Who else matters and what they care about |
+| `constraint` | Time, budget, policy, or technical limits |
 | `evidence` | What has actually been heard or measured |
 | `preference` | How the PM likes to work and be spoken to |
 | `other` | Anything worth keeping that fits none of the above |
 
-Each note is `proposed`, `confirmed`, or `dismissed`. Proposed notes appear first
-under **What I know** with **Yes, that's right**, **That's not it**, and **Edit**;
+Each note is `suggested` or `confirmed`. Suggested notes appear first under
+**What I know** with **Yes, that's right**, **That's not it**, and **Edit**;
 confirmed notes can be edited or forgotten. The PM can also add a note by hand.
-Nothing is silently promoted: the agent may propose, but the person decides, and
-only `confirmed` notes are carried into the next prompt — a dismissed one never
-comes back, in this session or the next.
+Nothing is silently promoted: the agent may propose, but the person decides.
 
 The agent writes notes through a `remember` tool during a normal reply. The
 sidecar applies it, emits a `memory` SSE event, and the panel updates without a
@@ -505,15 +506,12 @@ answer into an error. A turn can therefore finish without being remembered; when
 that happens the sidecar logs one warning carrying the request id, the role, and
 the exception class — never the words of the turn — instead of failing the reply.
 
-Notes are stored in the same event-sourced database as the canvas, not in a file
-the sidecar keeps to itself, so `agentic-odi` on the command line and any agent
-speaking MCP read the same memory the Studio wrote. The API is small, and
-`/api/observations` answers as `GET`, `POST`, `PATCH` and `DELETE` with the same
-shapes:
+Storage is a separate SQLite file from the ODI repository:
+`~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`
+(`:memory:` is supported and is what the tests use). The API is small:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/observations` | Filter by `status`; dismissed rows only when asked |
 | `GET` | `/api/memory/observations` | Everything the agent believes |
 | `POST` | `/api/memory/observations` | Add a note by hand |
 | `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |
@@ -526,37 +524,12 @@ thread, because the server deletes the conversations behind it.
 
 ### The thread comes back
 
-Conversations and notes live in the same store, so closing the laptop costs
-nothing. On launch the SPA reopens the thread it was left on — `localStorage`
-remembers the id, and with nothing remembered it asks `GET
-/api/conversations/latest` — and restores it exactly: the same turn ids, the same
-parents, and the same ordered parts, which means the cards it showed you come
-back as cards rather than as prose. A stored
-surface the current catalog no longer understands degrades to the unsupported
-placeholder instead of breaking the reload, and a turn that was still mid-flight
-when the tab died is restored as declined, never as pending. **New conversation**
-archives the thread you were on rather than erasing it; the bar's conversation
-list reopens any stored thread and deletes one only when you ask for it by name.
-**Forget everything** is the explicit path that removes history, and it is a
-two-step confirmation. The composer stays usable while the restore is in flight,
-and a restore failure simply leaves the room empty.
-
-Each thread is stamped with the workspace (`AGENTIC_ODI_WORKSPACE`, default
-`local`) and a device id created once at `~/.agentic-odi/device_id` (`0600`), so
-the history is portable in format even though sync is deliberately not
-implemented yet — two installs are no longer indistinguishable.
-
-The brief is a stored entity behind `GET`/`PUT /api/brief`, appended to the same
-event log as the canvas; `localStorage` keeps a copy so the room is not empty
-while the sidecar warms up. The CLI and the MCP server read that same store,
-though neither exposes a brief command yet.
-
-The provider key is the one setting that never enters the browser's durable
-storage. `POST /api/settings` writes it to `~/.agentic-odi/studio.json` with mode
-`0600`, `GET /api/settings` returns only `has_api_key` and a mask like
-`sk-…4f2a`, and a chat turn sent without a key gets the stored one substituted
-server-side. A key typed into this tab is held in `sessionStorage` for the tab
-alone; `localStorage` holds only the base URL, model, MCP URL, and theme.
+Conversations are stored beside the memory. On launch the SPA asks
+`GET /api/conversations/latest`, restores that thread's user and assistant
+turns, and continues with the same `conversation_id` on the next message. **New
+conversation** starts a fresh one without touching the memory; **Forget
+everything** removes both. The composer stays usable while the restore is in
+flight, and a restore failure simply leaves the room empty.
 
 ### Printing and export
 
@@ -585,6 +558,29 @@ rail, composer, and floating chrome are hidden, the palette switches to paper,
 and cards stay whole instead of splitting across sheets. An open lens prints
 below the thread instead of being clipped off-screen.
 
+### Sharing one artifact
+
+Sometimes the work has to leave the room without the room going with it. The
+sidecar mints a **scoped, expiring, read-only share token** for exactly one
+record — an outcome, a segment, or a strategy. `POST /api/share` returns the raw
+token once; `DELETE /api/share/{id}` revokes it, effective immediately; and
+`GET /api/share/{token}` returns the named artifact and its own evidence and
+nothing else. `GET /api/share` lists the owner's links without their tokens.
+
+The token is `odi_sh_` plus 32 random bytes, and only its SHA-256 hash is
+stored, so a copy of the database is not a copy of the link. Expiry defaults to
+7 days and never exceeds 30. A read never returns the workspace: not the canvas,
+not a list, not the memory, not a conversation, and not a connector secret — an
+evidence record travels without its raw payload. An unknown, expired, revoked,
+or malformed token is the same `404`, so a probe learns nothing, and a read
+records only `last_read_at` for the owner, never who read it. Nothing about a
+link is writable: a non-`GET` on the shared path is `405`.
+
+The link points at `AGENTIC_ODI_PUBLIC_BASE_URL` when it is set, and at
+`http://127.0.0.1:8100` otherwise. It works only while this sidecar is running
+and reachable by the reader; the read-only page that renders it is #550. No
+accounts, no session, and no public write path exist here — the token is the
+whole capability.
 ### The decision brief
 
 A conversation is hard to hand to a review, so the Studio writes the document
@@ -822,13 +818,12 @@ drive the agent. For a fully local setup, see
 ## Reviewing the conversation by hand
 
 Timing, focus rings, drop targets, and menu placement are not things a test can
-judge. Start the stack against a local model, with a store and a settings file of
-its own — a second checkout sharing `~/.agentic-odi` can otherwise leave this one
-with a schema it cannot open, and the conversation now lives in that same store:
+judge. Start the stack against a local model and a database of its own — a second
+checkout sharing `~/.agentic-odi` can otherwise leave this one with a schema it
+cannot open:
 
 ```bash
-AGENTIC_ODI_DB=~/.agentic-odi/review-odi.db \
-AGENTIC_ODI_STUDIO_SETTINGS=~/.agentic-odi/review-studio.json \
+AGENTIC_ODI_STUDIO_DB=~/.agentic-odi/studio-review.db \
 AGENTIC_ODI_BASE_URL=http://127.0.0.1:11434/v1 \
 AGENTIC_ODI_MODEL=qwen2.5-coder:14b \
 npm --prefix apps/studio run dev:full          # http://localhost:5173
@@ -847,7 +842,9 @@ Each row below names a state to reach and what is worth your own eyes.
 | Model picker | **Model** in the hint row; open it twice; narrow the window first | The list matches the backend, the configured id stays selectable, arrows/Home/End/Enter/Escape work, an offline backend explains itself and its Settings button is reachable from the keyboard, and it probes once per backend |
 | Attachments | Paperclip, drag a file onto the composer, paste a screenshot, then drop a `.exe` | Thumbnail, name, size, and remove on the chip; the unreadable file is refused with its reason; the sent turn shows the same; the paperclip has a visible focus ring |
 | Branches | Edit your own turn, then regenerate a reply | **Alternative N of M** with `‹`/`›`, and a reload reopens the branch you were reading |
-| Reduced motion, narrow window | Turn on OS reduce-motion; then drag the window narrow | Shimmer, dots, and cycling stop; the lens becomes a sheet, the composer stays usable, and menus stay on screen |
+| Reduced motion, narrow window | Turn on OS reduce-motion; then drag the window narrow | Shimmer, dots, cycling, and the landscape's underserved pulse stop; the ring stays drawn and the nodes do not move; the lens becomes a sheet, the composer stays usable, and menus stay on screen |
+| Reduced transparency, more contrast | Turn on OS reduce-transparency, then more contrast | Every blurred panel becomes an opaque surface instead of glass; muted and faint text step up, hairlines thicken, and nothing overlaps or clips |
+| Theme change | Toggle Appearance in Settings while watching the bar | The window cross-fades in about 120 ms with no white flash; with reduce-motion on it swaps instantly; selected text and the caret carry the accent |
 
 Two things surprise people on a local model:
 

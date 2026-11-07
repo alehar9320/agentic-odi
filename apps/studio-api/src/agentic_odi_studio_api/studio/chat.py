@@ -47,7 +47,7 @@ from agentic_odi_studio_api.studio.claims import (
 )
 from agentic_odi_studio_api.studio.connectors import ConnectorService
 from agentic_odi_studio_api.studio.memory import MAX_TEXT as MAX_OBSERVATION_TEXT
-from agentic_odi_studio_api.studio.memory import OBSERVATION_CATEGORIES, StudioMemory
+from agentic_odi_studio_api.studio.memory import OBSERVATION_KINDS, StudioMemory
 from agentic_odi_studio_api.studio.observability import log_turn
 from agentic_odi_studio_api.studio.probes import check_llm_health, is_endpoint_reachable
 from agentic_odi_studio_api.studio.schemas import (
@@ -293,7 +293,7 @@ REMEMBER_TOOL: dict[str, Any] = {
             "properties": {
                 "category": {
                     "type": "string",
-                    "enum": sorted(OBSERVATION_CATEGORIES),
+                    "enum": sorted(OBSERVATION_KINDS),
                     "description": "The area of context this observation belongs to.",
                 },
                 "text": {
@@ -352,7 +352,7 @@ def _apply_remember(
     if not category:
         # Guessing ``other`` here would quietly file the fact under a category
         # nobody asked for, so send the model back to the tool instead.
-        return "remember needs a category: " + ", ".join(sorted(OBSERVATION_CATEGORIES)), None
+        return "remember needs a category: " + ", ".join(sorted(OBSERVATION_KINDS)), None
     text = str(arguments.get("text", ""))
     data = arguments.get("data")
     try:
@@ -362,7 +362,7 @@ def _apply_remember(
 
     try:
         observation = memory.add_observation(
-            category=category,
+            kind=category,
             text=text,
             data=data if isinstance(data, dict) else None,
             confidence=confidence,
@@ -373,7 +373,7 @@ def _apply_remember(
         return f"Could not remember that: {exc}", None
     return (
         "Proposed for the user to confirm. It is not durable context until they do.",
-        {"observation": observation.model_dump(mode="json")},
+        {"observation": observation.to_dict()},
     )
 
 
@@ -430,7 +430,7 @@ def _persist_turn(
     parts: list[dict[str, Any]] | None = None,
     claims: list[Claim] | None = None,
     request_id: str = "",
-) -> Message | None:
+) -> Turn | None:
     """Record a turn and its claims, tolerating a duplicate retry.
 
     A retry that reuses a message id rewrites the same claims instead of
@@ -442,7 +442,7 @@ def _persist_turn(
     try:
         turns = memory.list_turns(conversation_id)
         if message_id:
-            existing = next((turn for turn in turns if turn.id == message_id), None)
+            existing = next((turn for turn in turns if turn.message_id == message_id), None)
             if existing is not None:
                 if claims:
                     memory.add_citations(existing, claims)
@@ -451,9 +451,17 @@ def _persist_turn(
             if claims:
                 memory.add_citations(turns[-1], claims)
             return turns[-1]
-        stored = memory.append_turn(conversation_id, role, content, message_id, parent_id, parts)
+        turn_id = memory.append_turn(
+            conversation_id, role, content, message_id, parent_id, parts
+        )
+        stored = next(
+            (turn for turn in memory.list_turns(conversation_id) if turn.id == turn_id), None
+        )
+        if stored is None:
+            return None
         if claims:
             memory.add_citations(stored, claims)
+        stored.claims = list(claims or [])
         return stored
     except Exception as exc:  # noqa: BLE001
         # Deliberate degradation: the person keeps the reply they already read,

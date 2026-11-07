@@ -62,6 +62,7 @@ from agentic_odi_studio_api.studio.memory import (
     ConversationNotFoundError,
     ObservationNotFoundError,
     StudioMemory,
+    Turn,
 )
 from agentic_odi_studio_api.studio.probes import (
     defaults,
@@ -101,6 +102,7 @@ from agentic_odi_studio_api.studio.schemas import (
     McpHealthRequest,
     MessageListResponse,
     MessageResponse,
+    MintShareRequest,
     ModelListRequest,
     ObservationCreateRequest,
     ObservationListResponse,
@@ -114,6 +116,8 @@ from agentic_odi_studio_api.studio.schemas import (
     ScheduleWorkRequest,
     SettingsResponse,
     SettingsUpdateRequest,
+    SharedArtifactResponse,
+    ShareMintResponse,
     SignalActionRequest,
     TurnModel,
     TurnNode,
@@ -124,6 +128,12 @@ from agentic_odi_studio_api.studio.schemas import (
     UpdateStepRequest,
 )
 from agentic_odi_studio_api.studio.settings import StudioSettings
+from agentic_odi_studio_api.studio.sharing import (
+    ShareError,
+    ShareNotFoundError,
+    ShareService,
+    UnknownArtifactError,
+)
 
 router = APIRouter(prefix="/api")
 
@@ -261,31 +271,29 @@ def _not_found(message: str) -> StudioHTTPError:
     )
 
 
-def _turn_node(message: Message, memory: Any) -> TurnNode:
+def _turn_node(turn: Turn, memory: Any) -> TurnNode:
     """One turn as the branch tree needs it, parts and all."""
-    data = message.model_dump(mode="json")
     return TurnNode(
-        id=data["id"],
-        parent_id=data["parent_id"],
-        role=data["role"],
-        content=data["content"],
-        created_at=data["created_at"],
-        parts=data["parts"],
-        claims=[ClaimOut(**claim.to_dict()) for claim in memory.claims_for_turn(message)],
+        id=turn.message_id or f"turn-{turn.id}",
+        parent_id=turn.parent_id,
+        role=turn.role,
+        content=turn.content,
+        created_at=turn.created_at,
+        parts=list(turn.parts),
+        claims=[ClaimOut(**claim.to_dict()) for claim in memory.claims_for_turn(turn)],
     )
 
 
-def _turn_model(message: Message, memory: Any) -> TurnModel:
-    data = message.model_dump(mode="json")
+def _turn_model(turn: Turn, memory: Any) -> TurnModel:
     return TurnModel(
-        id=data["id"],
-        conversation_id=data["conversation_id"],
-        role=data["role"],
-        content=data["content"],
-        created_at=data["created_at"],
-        parent_id=data["parent_id"],
-        parts=data["parts"],
-        claims=[ClaimOut(**claim.to_dict()) for claim in memory.claims_for_turn(message)],
+        id=turn.message_id or f"turn-{turn.id}",
+        conversation_id=turn.conversation_id,
+        role=turn.role,
+        content=turn.content,
+        created_at=turn.created_at,
+        parent_id=turn.parent_id,
+        parts=list(turn.parts),
+        claims=[ClaimOut(**claim.to_dict()) for claim in memory.claims_for_turn(turn)],
     )
 
 
@@ -1137,9 +1145,10 @@ def list_observations(
     """Newest first. A dismissed observation is only listed when asked for."""
     observations = _memory(request).list_observations(include_dismissed=status == "dismissed")
     if status:
-        observations = [item for item in observations if item.status == status]
+        # Filter on what the client will read, not the stored spelling.
+        observations = [item for item in observations if item.to_dict()["status"] == status]
     return ObservationListResponse(
-        observations=[item.model_dump(mode="json") for item in observations]
+        observations=[item.to_dict() for item in observations]
     )
 
 
@@ -1149,10 +1158,10 @@ def create_observation(body: ObservationCreateRequest, request: Request) -> Obse
     """A person-confirmed note arrives confirmed; the agent can only propose."""
     try:
         observation = _memory(request).add_observation(
-            category=body.category,
+            kind=body.resolved_kind(),
             text=body.text,
             data=body.data,
-            status="confirmed" if body.confirmed else "proposed",
+            status="confirmed" if body.confirmed else "suggested",
             confidence=body.confidence,
             conversation_id=body.conversation_id,
         )
@@ -1160,7 +1169,7 @@ def create_observation(body: ObservationCreateRequest, request: Request) -> Obse
         raise StudioHTTPError(
             StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
         ) from exc
-    return ObservationResponse(observation=observation.model_dump(mode="json"))
+    return ObservationResponse(observation=observation.to_dict())
 
 
 @router.patch("/observations/{observation_id}", response_model=ObservationResponse)
@@ -1182,7 +1191,7 @@ def update_observation(
         raise StudioHTTPError(
             StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
         ) from exc
-    return ObservationResponse(observation=observation.model_dump(mode="json"))
+    return ObservationResponse(observation=observation.to_dict())
 
 
 @router.delete("/observations/{observation_id}")
@@ -1234,7 +1243,7 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
         return LatestConversationResponse(conversation=None, turns=[])
     turns = memory.list_turns(conversation.id)
     return LatestConversationResponse(
-        conversation=conversation.model_dump(mode="json"),
+        conversation=conversation.to_dict(),
         turns=[_turn_model(turn, memory) for turn in turns],
     )
 
@@ -1253,7 +1262,7 @@ def list_conversations(
 @router.post("/conversations", response_model=ConversationResponse)
 def create_conversation(request: Request) -> ConversationResponse:
     conversation = _memory(request).create_conversation()
-    return ConversationResponse(conversation=conversation.model_dump(mode="json"))
+    return ConversationResponse(conversation=conversation.to_dict())
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationMessagesResponse)
@@ -1263,7 +1272,7 @@ def get_conversation(conversation_id: str, request: Request) -> ConversationMess
     if conversation is None:
         raise _not_found(f"Conversation {conversation_id} not found")
     return ConversationMessagesResponse(
-        conversation=conversation.model_dump(mode="json"),
+        conversation=conversation.to_dict(),
         messages=[_turn_node(turn, memory) for turn in memory.list_turns(conversation_id)],
     )
 
@@ -1277,7 +1286,7 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
         raise _not_found(f"Conversation {conversation_id} not found")
     turns = memory.conversation_tree(conversation_id)
     return ConversationTreeResponse(
-        conversation=conversation.model_dump(mode="json"),
+        conversation=conversation.to_dict(),
         messages=[_turn_node(turn, memory) for turn in turns if turn.role in {"user", "assistant"}],
         head_id=conversation.head_id or (turns[-1].id if turns else None),
     )
@@ -1305,11 +1314,15 @@ def append_message(
     memory = _memory(request)
     if memory.get_conversation(conversation_id) is None:
         raise _not_found(f"Conversation {conversation_id} not found")
-    already = [turn.id for turn in memory.list_turns(conversation_id)]
+    already = [turn.message_id for turn in memory.list_turns(conversation_id)]
     if body.id and body.id in already:
         return MessageResponse(
             message=_turn_model(
-                next(t for t in memory.list_turns(conversation_id) if t.id == body.id), memory
+                next(
+                    t for t in memory.list_turns(conversation_id)
+                    if t.message_id == body.id
+                ),
+                memory,
             )
         )
     try:
@@ -1348,7 +1361,7 @@ def patch_conversation(
         raise _not_found(str(exc)) from exc
     if conversation is None:
         raise _not_found(f"Conversation {conversation_id} not found")
-    return ConversationResponse(conversation=conversation.model_dump(mode="json"))
+    return ConversationResponse(conversation=conversation.to_dict())
 
 
 @router.delete("/conversations/{conversation_id}")
@@ -1820,3 +1833,73 @@ async def reject_proposal_api(
         "ok": True,
         "result": _proposal_out(proposal).model_dump(mode="json"),
     }
+
+
+# -- sharing (issue #549) ------------------------------------------------------
+
+
+def _sharing(request: Request) -> ShareService:
+    return request.app.state.sharing
+
+
+def _share_not_found() -> StudioHTTPError:
+    """One body for every dead token, so a probe cannot tell them apart."""
+    return StudioHTTPError(
+        StudioError(
+            code=StudioErrorCode.NOT_FOUND,
+            message="This link is not available. It may have expired or been revoked.",
+        ),
+        status_code=404,
+    )
+
+
+@router.post("/share", response_model=ShareMintResponse)
+def mint_share(body: MintShareRequest, request: Request) -> ShareMintResponse:
+    """Mint a scoped, expiring, read-only link for one artifact.
+
+    The raw token is returned exactly once; only its hash is stored. Creation
+    happens through this route only, so the token is never minted by a page.
+    """
+    try:
+        minted = _sharing(request).mint(body.artifact_kind, body.artifact_id, body.ttl_days)
+    except UnknownArtifactError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)),
+            status_code=404,
+        ) from exc
+    except ShareError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            status_code=422,
+        ) from exc
+    return ShareMintResponse(**minted.to_dict())
+
+
+@router.get("/share", response_model=list[dict[str, Any]])
+def list_shares(request: Request) -> list[dict[str, Any]]:
+    """The owner's links, without tokens: id, artifact, and the key dates."""
+    return [share.to_dict() for share in _sharing(request).list_shares()]
+
+
+@router.delete("/share/{share_id}")
+def revoke_share(share_id: str, request: Request) -> dict[str, bool]:
+    """Revoke a link. Effective immediately, and idempotent."""
+    try:
+        _sharing(request).revoke(share_id)
+    except ShareNotFoundError as exc:
+        raise _share_not_found() from exc
+    return {"ok": True}
+
+
+@router.get("/share/{token}", response_model=SharedArtifactResponse)
+def read_shared(token: str, request: Request) -> SharedArtifactResponse:
+    """Read exactly the one artifact a token names, and its own evidence.
+
+    A malformed, unknown, expired, or revoked token is the same ``404``; the
+    response never says which. There is no list and no canvas here.
+    """
+    try:
+        payload = _sharing(request).read(token)
+    except ShareNotFoundError as exc:
+        raise _share_not_found() from exc
+    return SharedArtifactResponse(**payload)

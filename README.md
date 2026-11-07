@@ -74,20 +74,25 @@ per-platform archives with SHA-256 checksums for a manual download. See
   recommends the one innovation path those segments support, with every path it
   rejected and why.
 - **A conversation, not a form.** The Living Studio opens on one question —
-  **What do you want to win?** — with the composer focused. Its optional
-  four-step tour stays out of the way, and in-place guidance appears only after
-  the first exchange. It turns "a customer still reconciles invoices by hand"
-  into a scored outcome, a job map, and a ranked opportunity board — inline in
-  the thread. Every claim in a reply names the record behind it, or says it is a
-  hypothesis. A score names the questions that produced it, and a number with no
-  customer answer behind it reads as unverified instead of settling the matter.
-- **The thread survives you.** Conversations, the cards they showed, and what
-  the agent learned are appended to the same event log as the canvas, so a
-  reload restores the exact thread. The bar's history list keeps the last twenty
-  threads one click away, each named by its first question and marked when it is
-  the one on screen, and `list_conversations`, `get_conversation`,
-  `list_observations`, `confirm_observation`, and `dismiss_observation` are MCP
-  tools any agent can call.
+  **What do you want to win?** — with the composer focused. When you ask for
+  context, the agent speaks first: who you are and your team, who feels the
+  problem, what they are trying to win, where it breaks, and what you already
+  have. The answers come back as a brief you can edit line by line, not a
+  settings dialog. Its optional four-step tour stays out of the way, and
+  in-place guidance appears only after the first exchange. It turns "a customer
+  still reconciles invoices by hand" into a scored outcome, a job map, and a
+  ranked opportunity board — inline in the thread. Every claim in a reply names
+  the record behind it, or says it is a hypothesis. A score names the questions
+  that produced it, and a number with no customer answer behind it reads as
+  unverified instead of settling the matter. The bar's history list keeps
+  the last twenty threads one click away, each named by its first question and
+  marked when it is the one on screen.
+- **A document when the conversation needs one.** `/brief` writes the decision
+  brief from the canvas — the ranked bets, the records behind each, what argues
+  against them, and the next evidence to collect — as Markdown a review can read
+  with or without the Studio. Provenance travels with it: demo rows are excluded
+  from every count and labelled, and every number counts records instead of
+  generating prose.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **Evidence becomes outcomes.** An ingested record is mined into a scored,
@@ -211,6 +216,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [Reuse First](docs/architecture/reuse.md) | The ladder agents walk before writing code: reuse what exists, adopt what is declared, copy with provenance, then build |
 | [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
+| [The assistant-ui ledger](docs/assistant-ui-ledger.md) | Every assistant-ui capability and the one honest state it is in |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
@@ -235,10 +241,10 @@ drift from the workspace. The distributions are:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models including the conversation, message, observation, and brief entities, the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, conversations, observations, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, PM memory, and scoped read-only share tokens for one artifact. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) answers a navigation it cannot reach with `public/offline.html`, so an uncached deep link opened offline gets a themed page instead of the browser's error page. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |

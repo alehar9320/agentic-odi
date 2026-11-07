@@ -654,6 +654,43 @@ describe("StudioContext theme", () => {
     expect(JSON.parse(localStorage.getItem("studio.settings") ?? "{}").theme).toBe("light");
   });
 
+  it("cross-fades a theme change and clears the class when it ends", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+
+    expect(document.documentElement.classList.contains("theme-fading")).toBe(true);
+    await waitFor(() =>
+      expect(document.documentElement.classList.contains("theme-fading")).toBe(false),
+    );
+  });
+
+  it("swaps the theme instantly when reduced motion is requested", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(document.documentElement.classList.contains("theme-fading")).toBe(false);
+  });
+
   it("keeps the chosen theme across a remount", async () => {
     localStorage.setItem("studio.settings", JSON.stringify({ theme: "light" }));
     const { unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });

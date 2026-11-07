@@ -1,16 +1,12 @@
-"""The Studio's memory is the core store, not a file of its own.
+"""Local, inspectable memory for the Living Studio.
 
-The sidecar used to keep its conversations and observations in a private
-SQLite database nothing else could read: the CLI saw no thread, the MCP server
-saw no memory, and two installs of the same product disagreed about the same
-person. Both backends now write through the event-sourced repository the
-canvas already uses, so one append-only log holds jobs, outcomes, the thread,
-and what the agent learned.
+The Studio remembers the product manager across sessions: what was said, and
+what the agent believes about the person and their opportunity. Observations
+are proposed by the agent and confirmed, edited, or dismissed by the PM. Only
+confirmed observations are treated as durable truth in the prompt.
 
-Citations come from the same place. A turn's claims are stored on the message
-itself, so the evidence a reply stood behind survives a reload, a branch, and a
-second client — and the citation reader below keeps the vocabulary the routes
-and the tests were written against.
+The store is deliberately small and boring: stdlib ``sqlite3``, one file under
+``~/.agentic-odi`` (overridable with ``AGENTIC_ODI_STUDIO_DB``), no network.
 """
 
 from __future__ import annotations
@@ -18,38 +14,44 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import threading
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast, get_args
+from typing import Any
 
-from agentic_odi_core import (
-    V2MOM,
-    Brief,
-    Conversation,
-    ConversationNotFoundError,
-    InMemoryRepository,
-    Message,
-    Observation,
-    ObservationNotFoundError,
-    ODIService,
-    Repository,
-)
-from agentic_odi_core.errors import ValidationError
+from agentic_odi_core import Brief
+from agentic_odi_core.errors import StoreCorrupt
 from agentic_odi_core.integrity import ensure_intact
-from agentic_odi_core.models import MessageRole, ObservationCategory, ObservationStatus
-from agentic_odi_core.sqlite_repository import SQLiteRepository
 
-from agentic_odi_studio_api.studio.claims import Claim, EvidenceSnapshot, split_claims
+from agentic_odi_studio_api.studio.claims import (
+    Claim,
+    EvidenceSnapshot,
+    split_claims,
+)
 
-OBSERVATION_CATEGORIES: frozenset[str] = frozenset(get_args(ObservationCategory))
-OBSERVATION_STATUSES: frozenset[str] = frozenset(get_args(ObservationStatus))
+OBSERVATION_KINDS: frozenset[str] = frozenset(
+    {
+        "career",
+        "opportunity",
+        "business",
+        "customer",
+        "constraint",
+        "decision",
+        "stakeholder",
+        "evidence",
+        "preference",
+        "other",
+    }
+)
+#: The same set under the name the memory screen uses, kept so a caller written
+#: against the older spelling keeps working.
+OBSERVATION_CATEGORIES: frozenset[str] = OBSERVATION_KINDS
+OBSERVATION_STATUSES: frozenset[str] = frozenset({"suggested", "confirmed", "dismissed"})
 TURN_ROLES: frozenset[str] = frozenset({"user", "assistant", "system", "tool"})
 
-#: The word the pre-core store used for an unconfirmed observation. It maps to
-#: the core's ``proposed``; nothing else is renamed.
-_LEGACY_PROPOSED = "suggested"
-
-MAX_TEXT = 300
+MAX_TEXT = 2_000
 MAX_CONTEXT_TEXT = 500
 MAX_CONTEXT_CHARS = 4_000
 MAX_SUGGESTED_IN_CONTEXT = 10
@@ -58,33 +60,73 @@ MAX_SUGGESTED_IN_CONTEXT = 10
 #: owns paging; this slice shows the recent ones and stops.
 MAX_CONVERSATIONS = 20
 
-BRIEF_FIELDS = ("product_name", "product_url", "target_user", "job_statement", "core_problem")
-
-#: The categories a pre-core ``kind`` could name. Anything else is imported as
-#: ``other`` rather than dropped.
-_LEGACY_KINDS = frozenset(
-    {
-        "career",
-        "opportunity",
-        "business",
-        "stakeholder",
-        "constraint",
-        "evidence",
-        "preference",
-    }
-)
-
 
 class MemoryError(ValueError):
     """Base class for recoverable memory errors."""
 
 
+class ObservationNotFoundError(MemoryError):
+    pass
+
+
+class ConversationNotFoundError(MemoryError):
+    pass
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _json_parts(raw: Any) -> list[dict[str, Any]]:
+    """Parts as stored, one JSON array per row; a bad row reads as none."""
+    if not raw:
+        return []
+    try:
+        loaded = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(loaded, list):
+        return []
+    return [part for part in loaded if isinstance(part, dict)]
+
+
+def _json_values(raw: Any) -> list[str]:
+    """Read a snapshot column: a JSON array, or a single plain value."""
+    if not isinstance(raw, str):
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return [raw] if raw else []
+    if isinstance(parsed, list):
+        return [value for value in parsed if isinstance(value, str)]
+    return [parsed] if isinstance(parsed, str) else []
+
+
 def default_db_path() -> Path:
-    """Where the pre-core Studio database lived, before it was imported here."""
     configured = os.environ.get("AGENTIC_ODI_STUDIO_DB")
     if configured:
         return Path(configured)
     return Path.home() / ".agentic-odi" / "studio.db"
+
+
+@dataclass
+class Conversation:
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+    #: The visible leaf of the branch tree. ``None`` until a turn is persisted.
+    head_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "head_id": self.head_id,
+        }
 
 
 @dataclass
@@ -110,179 +152,386 @@ class ConversationSummary:
 
 
 @dataclass
-class TurnCitation:
-    """One stored claim: its status, and the records it cited."""
+class Turn:
+    id: int
+    conversation_id: str
+    role: str
+    content: str
+    created_at: str
+    #: Stable client-facing id, so a branch can be rebuilt without guessing.
+    message_id: str | None = None
+    parent_id: str | None = None
+    #: The ordered surfaces the client renders, so a reload is not a plainer
+    #: version of the thread it replaced.
+    parts: list[dict[str, Any]] = field(default_factory=list)
+    #: What each sentence of this turn stands behind, when it was recorded.
+    claims: list[Claim] = field(default_factory=list)
 
-    turn_id: str
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "conversation_id": self.conversation_id,
+            "role": self.role,
+            "content": self.content,
+            "created_at": self.created_at,
+            "message_id": self.message_id,
+            "parent_id": self.parent_id,
+            "parts": [dict(part) for part in self.parts],
+            "claims": [claim.to_dict() for claim in self.claims],
+        }
+
+
+@dataclass
+class TurnCitation:
+    """One stored claim: its status, and the record labels it carried.
+
+    A claim may cite up to three records, and the primary key is the claim, so
+    the three snapshot columns hold JSON arrays. Reading tolerates a plain
+    string, which keeps an older row readable.
+    """
+
+    turn_id: int
     claim_index: int
     status: str
     evidence: list[EvidenceSnapshot] = field(default_factory=list)
     reason: str | None = None
 
 
-def _claim_dict(claim: Claim) -> dict[str, Any]:
-    """A claim as the event log stores it: plain JSON, one record per citation."""
-    return {
-        "index": claim.index,
-        "text": claim.text,
-        "status": claim.status,
-        "evidence": [
-            {
-                "id": snapshot.id,
-                "name": snapshot.name,
-                "source_name": snapshot.source_name,
-            }
-            for snapshot in claim.evidence
-        ],
-        "reason": claim.reason,
-    }
+@dataclass
+class Observation:
+    id: str
+    kind: str
+    text: str
+    data: dict[str, Any] = field(default_factory=dict)
+    status: str = "suggested"
+    confidence: float = 0.5
+    source_turn: int | None = None
+    #: The conversation and message a remembered fact came from, so a person can
+    #: see where the agent picked it up.
+    conversation_id: str | None = None
+    source_message_id: str | None = None
+    created_at: str = ""
+    updated_at: str = ""
+
+    @property
+    def category(self) -> str:
+        """The kind under the name the memory screen has always shown."""
+        return self.kind
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "kind": self.kind,
+            #: The same value under the name the memory screen shows.
+            "category": self.kind,
+            "conversation_id": self.conversation_id,
+            "source_message_id": self.source_message_id,
+            "text": self.text,
+            "data": self.data,
+            # Stored as ``suggested``; the screen calls an unconfirmed fact
+            # ``proposed``, and that is what a client acts on.
+            "status": "proposed" if self.status == "suggested" else self.status,
+            "confidence": self.confidence,
+            "source_turn": self.source_turn,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
 
 
-def _claim_from_dict(raw: Any) -> Claim:
-    if isinstance(raw, Claim):
-        return raw
-    return Claim(
-        index=int(raw.get("index", 0)),
-        text=str(raw.get("text", "")),
-        status=cast(Any, raw.get("status", "uncited")),
-        evidence=tuple(EvidenceSnapshot(**item) for item in raw.get("evidence") or []),
-        reason=raw.get("reason"),
+@dataclass
+class Share:
+    """One scoped, expiring, read-only capability.
+
+    The raw token is never here: only its SHA-256 hash is stored, so a reader of
+    the database cannot reconstruct the link.
+    """
+
+    id: str
+    token_hash: str
+    artifact_kind: str
+    artifact_id: str
+    created_at: str
+    expires_at: str
+    revoked_at: str | None = None
+    last_read_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "artifact_kind": self.artifact_kind,
+            "artifact_id": self.artifact_id,
+            "created_at": self.created_at,
+            "expires_at": self.expires_at,
+            "revoked_at": self.revoked_at,
+            "last_read_at": self.last_read_at,
+        }
+
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    head_id TEXT
+);
+
+CREATE TABLE IF NOT EXISTS turns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    message_id TEXT,
+    parent_id TEXT,
+    parts TEXT
+);
+
+CREATE INDEX IF NOT EXISTS turns_by_conversation ON turns(conversation_id);
+
+CREATE TABLE IF NOT EXISTS turn_citations (
+    turn_id INTEGER NOT NULL REFERENCES turns(id) ON DELETE CASCADE,
+    claim_index INTEGER NOT NULL,
+    evidence_id TEXT NOT NULL DEFAULT '[]',
+    evidence_name TEXT NOT NULL DEFAULT '[]',
+    source_name TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL,
+    reason TEXT,
+    PRIMARY KEY (turn_id, claim_index)
+);
+
+CREATE TABLE IF NOT EXISTS observations (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    data TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'suggested',
+    confidence REAL NOT NULL DEFAULT 0.5,
+    source_turn INTEGER,
+    conversation_id TEXT,
+    source_message_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS observations_by_status ON observations(status);
+
+CREATE TABLE IF NOT EXISTS brief (
+    id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS shares (
+    id TEXT PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
+    artifact_kind TEXT NOT NULL,
+    artifact_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT,
+    last_read_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS shares_by_hash ON shares(token_hash);
+"""
+
+
+#: Columns added after the first release. A database created by an older build
+#: is upgraded in place: nothing is dropped and no data is rewritten.
+_MIGRATIONS: tuple[tuple[str, str, str], ...] = (
+    ("conversations", "head_id", "TEXT"),
+    ("turns", "message_id", "TEXT"),
+    ("turns", "parent_id", "TEXT"),
+    ("turns", "parts", "TEXT"),
+    ("observations", "conversation_id", "TEXT"),
+    ("observations", "source_message_id", "TEXT"),
+)
+
+
+def _migrate(connection: sqlite3.Connection) -> None:
+    for table, column, kind in _MIGRATIONS:
+        columns = {
+            row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column not in columns:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS turns_by_message ON turns(conversation_id, message_id)"
     )
 
 
-def _build_service(target: Any) -> ODIService:
-    """Accept whatever a caller or a test hands over and return a service over it."""
-    if target is None:
-        # The conversation history has its own file; defaulting to the intent
-        # store's path would leave a second live connection on that database.
-        return ODIService(SQLiteRepository(str(default_db_path())))
-    if isinstance(target, ODIService):
-        return target
-    if isinstance(target, (str, Path)):
-        if str(target) == ":memory:":
-            return ODIService(InMemoryRepository())
-        return ODIService(SQLiteRepository(str(target)))
-    # ``Repository`` is a static Protocol, so it cannot be isinstance-checked:
-    # anything that can store a conversation is treated as one.
-    if hasattr(target, "add_conversation"):
-        return ODIService(cast(Repository, target))
-    raise ValidationError(f"unsupported memory store: {type(target).__name__}")
+def _validate_text(text: str) -> str:
+    cleaned = text.strip()
+    if not cleaned:
+        raise MemoryError("observation text cannot be empty")
+    if len(cleaned) > MAX_TEXT:
+        raise MemoryError(f"observation text cannot exceed {MAX_TEXT} characters")
+    return cleaned
 
 
-def _is_file_store(target: Any) -> bool:
-    """Whether this target ends up on disk, unlike an in-memory test double."""
-    if isinstance(target, Path):
-        return True
-    if isinstance(target, str):
-        return target != ":memory:"
-    return target is None
+def _validate_kind(kind: str) -> str:
+    if kind not in OBSERVATION_KINDS:
+        raise MemoryError(f"unknown observation kind: {kind}")
+    return kind
 
 
-def _iso(value: Any) -> str:
-    if value is None:
-        return ""
-    if hasattr(value, "isoformat"):
-        return str(value.isoformat())
-    return str(value)
+def _validate_status(status: str) -> str:
+    # The screen's word for an unconfirmed fact is ``proposed``; one status is
+    # stored for it however it was asked for.
+    if status == "proposed":
+        status = "suggested"
+    if status not in OBSERVATION_STATUSES:
+        raise MemoryError(f"unknown observation status: {status}")
+    return status
+
+
+def _validate_confidence(confidence: float) -> float:
+    value = float(confidence)
+    if not 0.0 <= value <= 1.0:
+        raise MemoryError("confidence must be between 0 and 1")
+    return value
+
+
+def _validate_data(data: dict[str, Any] | None) -> dict[str, Any]:
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise MemoryError("observation data must be an object")
+    return data
 
 
 class StudioMemory:
-    """Conversations, turns, claims, and observations, stored as events."""
+    """A small SQLite store for conversations, turns, and observations."""
 
-    def __init__(self, target: Any = None, *, import_legacy: bool = False) -> None:
+    def __init__(
+        self, path: str | Path | None = None, *, import_legacy: bool = False
+    ) -> None:
+        resolved = default_db_path() if path is None else path
+        self._memory = str(resolved) == ":memory:"
+        self.db_path = Path(":memory:") if self._memory else Path(resolved)
+        if not self._memory:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        self._lock = threading.RLock()
         self._closed = False
-        if _is_file_store(target):
-            # The default store is a file too, and a damaged one must fail here,
-            # by name, before the app serves.
-            path = default_db_path() if target is None else Path(str(target))
-            if path.is_file():
-                # A damaged file must fail here, by name, before the app serves.
-                connection = sqlite3.connect(path)
-                try:
-                    ensure_intact(connection, str(path), label="Your Studio memory")
-                finally:
-                    connection.close()
-        self._owns_store = target is None or isinstance(target, (str, Path))
-        self.service = _build_service(target)
-        if import_legacy or _is_file_store(target):
-            _import_legacy(self.service, default_db_path())
+        self._connection = sqlite3.connect(
+            ":memory:" if self._memory else str(self.db_path),
+            check_same_thread=False,
+        )
+        self._connection.row_factory = sqlite3.Row
+        try:
+            if not self._memory:
+                # Same gate as the ODI store, but a distinct label: losing the
+                # conversation history is recoverable in a way the canvas is
+                # not, and the message should say so.
+                ensure_intact(self._connection, str(self.db_path), label="Your Studio memory")
+            self._connection.execute("PRAGMA foreign_keys = ON")
+            if not self._memory:
+                self._connection.execute("PRAGMA journal_mode = WAL")
+                # Another process may be mid-write; wait for it briefly rather
+                # than failing the turn with "database is locked".
+                self._connection.execute("PRAGMA busy_timeout = 5000")
+            with self._connection:
+                self._connection.executescript(_SCHEMA)
+                _migrate(self._connection)
+            if not self._memory and (import_legacy or path is not None):
+                # A pre-core ``studio.db`` is moved in once, then renamed. The
+                # store opened on that very file never imports it: that would
+                # empty a live conversation log.
+                _import_legacy(self._connection, str(self.db_path), default_db_path())
+        except sqlite3.DatabaseError as exc:
+            self._connection.close()
+            raise StoreCorrupt(str(self.db_path), [str(exc)], label="Your Studio memory") from exc
+        except BaseException:
+            self._connection.close()
+            raise
 
     def close(self) -> None:
-        """Fold the log back into the file and mark the store closed.
-
-        A store this object opened owns its write-ahead log; folding it back on
-        close is what leaves one file behind for the next launch, and it is also
-        what makes a damaged file detectable on the next boot instead of hidden
-        behind the log.
-        """
-        if self._owns_store:
-            self.checkpoint("TRUNCATE")
-        self._closed = True
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            if not self._memory:
+                # Fold the write-ahead log back so a clean stop leaves no
+                # sidecar for the next process to recover.
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            self._connection.close()
 
     def checkpoint(self, mode: str = "TRUNCATE") -> None:
-        """Kept for callers that checkpointed the private store."""
-        repository = self.service.repo
-        checkpoint = getattr(repository, "checkpoint", None)
-        if callable(checkpoint):
-            checkpoint(mode)
+        """Fold the write-ahead log back into the database file."""
+        with self._lock:
+            if self._memory or self._closed:
+                return
+            self._connection.execute(f"PRAGMA wal_checkpoint({mode})")
 
     # -- conversations -----------------------------------------------------
 
-    def create_conversation(self, title: str | None = None) -> Conversation:
-        return self.service.start_conversation(title=title or None)
+    def create_conversation(self, title: str = "") -> Conversation:
+        conversation = Conversation(
+            id=uuid.uuid4().hex,
+            title=title.strip(),
+            created_at=_now(),
+            updated_at=_now(),
+        )
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (
+                    conversation.id,
+                    conversation.title,
+                    conversation.created_at,
+                    conversation.updated_at,
+                ),
+            )
+        return conversation
 
     def get_conversation(self, conversation_id: str) -> Conversation | None:
-        return self.service.repo.get_conversation(conversation_id)
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+        return None if row is None else self._conversation_from_row(row)
 
     def latest_conversation(self) -> Conversation | None:
-        conversations = self.service.repo.list_conversations(limit=1)
-        return conversations[0] if conversations else None
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM conversations ORDER BY updated_at DESC, created_at DESC LIMIT 1"
+            ).fetchone()
+        return None if row is None else self._conversation_from_row(row)
 
-    def list_conversations(self, limit: int | None = MAX_CONVERSATIONS) -> list[ConversationSummary]:
-        """Newest first, capped, each with the number of turns it holds.
+    def list_conversations(self, limit: int = MAX_CONVERSATIONS) -> list[ConversationSummary]:
+        """The recent conversations, most recently touched first, with turn counts.
 
-        Archived threads stay listed: history is never hidden, it is filtered by
-        the client that has a reason to filter it.
+        The title is whatever the first question set; a thread nobody has spoken
+        in yet carries an empty one. No turn bodies are read: the list is metadata
+        and a count, so a history strip never pays for the prose behind it.
         """
-        conversations = self.service.repo.list_conversations(limit=None)
-        ordered = sorted(conversations, key=lambda item: _iso(item.updated_at), reverse=True)
-        if limit is not None:
-            ordered = ordered[:limit]
-        summaries: list[ConversationSummary] = []
-        for conversation in ordered:
-            turns = self.service.repo.list_messages(conversation.id)
-            summaries.append(
-                ConversationSummary(
-                    id=conversation.id,
-                    title=conversation.title or "",
-                    created_at=conversation.created_at,
-                    updated_at=conversation.updated_at,
-                    head_id=conversation.head_id,
-                    turn_count=len(turns),
-                )
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT conversations.id, conversations.title,
+                       conversations.created_at, conversations.updated_at,
+                       conversations.head_id,
+                       (SELECT COUNT(*) FROM turns
+                         WHERE turns.conversation_id = conversations.id) AS turn_count
+                  FROM conversations
+                 ORDER BY conversations.updated_at DESC, conversations.created_at DESC
+                 LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            ConversationSummary(
+                id=row["id"],
+                title=row["title"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                head_id=row["head_id"],
+                turn_count=row["turn_count"],
             )
-        return summaries
-
-    def set_head(self, conversation_id: str, head_id: str | None) -> Conversation:
-        """Record which branch is visible, so a reload opens the same one."""
-        return self._update_conversation(conversation_id, {"head_id": head_id})
-
-    def update_title(self, conversation_id: str, title: str) -> Conversation:
-        return self._update_conversation(conversation_id, {"title": title.strip()[:200]})
-
-    def set_archived(self, conversation_id: str, archived: bool) -> Conversation:
-        """Archive is reversible; only an explicit delete loses the transcript."""
-        return self._update_conversation(conversation_id, {"archived": archived})
-
-    def delete_conversation(self, conversation_id: str) -> None:
-        self.service.delete_conversation(conversation_id)
-
-    def _update_conversation(self, conversation_id: str, updates: dict[str, Any]) -> Conversation:
-        if self.get_conversation(conversation_id) is None:
-            raise ConversationNotFoundError(conversation_id)
-        return self.service.update_conversation(conversation_id, updates)
-
-    # -- turns -------------------------------------------------------------
+            for row in rows
+        ]
 
     def append_turn(
         self,
@@ -292,114 +541,276 @@ class StudioMemory:
         message_id: str | None = None,
         parent_id: str | None = None,
         parts: list[dict[str, Any]] | None = None,
-    ) -> Message:
-        """Record a turn and return the stored message, so citations can attach.
-
-        The returned handle is the message itself: its id is the client-facing
-        id, so ``add_citations`` and ``citations_for_turn`` take the same value
-        the branch tree exposes.
-        """
+    ) -> int:
+        """Record a turn and return its row id, so citations can be attached."""
         if role not in TURN_ROLES:
             raise MemoryError(f"unknown turn role: {role}")
-        if self.get_conversation(conversation_id) is None:
-            raise ConversationNotFoundError(conversation_id)
-        return self.service.append_message(
-            conversation_id=conversation_id,
-            role=cast(MessageRole, role),
-            content=content,
-            parts=parts,
-            message_id=message_id,
-            parent_id=parent_id,
-        )
 
-    def list_turns(self, conversation_id: str) -> list[Message]:
-        if self.get_conversation(conversation_id) is None:
-            raise ConversationNotFoundError(conversation_id)
-        return self.service.conversation_thread(conversation_id)
+        now = _now()
+        with self._lock, self._connection:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
 
-    def conversation_tree(self, conversation_id: str) -> list[Message]:
-        """Every branch, oldest first.
+            cursor = self._connection.execute(
+                "INSERT INTO turns "
+                "(conversation_id, role, content, created_at, message_id, parent_id, parts) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    conversation_id,
+                    role,
+                    content,
+                    now,
+                    message_id,
+                    parent_id,
+                    json.dumps(list(parts or [])),
+                ),
+            )
+            if message_id:
+                self._connection.execute(
+                    "UPDATE conversations SET head_id = ? WHERE id = ?",
+                    (message_id, conversation_id),
+                )
 
-        A turn carries its ``parent_id``, so a second answer to the same
-        question is a sibling rather than a rewrite of the thread.
-        """
-        turns = self.list_turns(conversation_id)
-        restored: list[Message] = []
-        for turn in turns:
-            claims = self.claims_for_turn(turn)
-            if claims and len(claims) != len(split_claims(turn.content)):
-                # Content and citations disagree; attach none rather than the
-                # wrong sentence's evidence.
-                claims = []
-            restored.append(turn.model_copy(update={"claims": claims}))
-        return restored
+            title = ""
+            if role == "user" and content.strip():
+                title = content.strip()[:80]
+            if title:
+                self._connection.execute(
+                    "UPDATE conversations SET title = ?, updated_at = ? "
+                    "WHERE id = ? AND title = ''",
+                    (title, now, conversation_id),
+                )
+            self._connection.execute(
+                "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                (now, conversation_id),
+            )
+        return int(cursor.lastrowid or 0)
 
     # -- citations ---------------------------------------------------------
 
-    def add_citations(self, turn: Message | str, claims: list[Claim]) -> None:
-        """Store one claim per row, idempotently, on the turn itself.
+    def add_citations(self, turn: int | Turn, claims: list[Claim]) -> None:
+        """Store one row per claim, idempotently.
 
-        A duplicate retry rewrites the same claims instead of stacking new ones.
+        A duplicate retry rewrites the same rows instead of stacking new ones.
+        The turn itself is accepted as well as its row id, because a caller
+        that just stored one holds the object and not the number.
         """
-        message_id = turn if isinstance(turn, str) else turn.id
-        self.service.repo.set_message_claims(message_id, [_claim_dict(claim) for claim in claims])
+        turn_id = turn if isinstance(turn, int) else turn.id
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM turn_citations WHERE turn_id = ?", (turn_id,))
+            for claim in claims:
+                ids = [snapshot.id for snapshot in claim.evidence]
+                names = [snapshot.name for snapshot in claim.evidence]
+                sources = [snapshot.source_name for snapshot in claim.evidence]
+                self._connection.execute(
+                    "INSERT OR REPLACE INTO turn_citations "
+                    "(turn_id, claim_index, evidence_id, evidence_name, source_name, status, reason) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        turn_id,
+                        claim.index,
+                        json.dumps(ids),
+                        json.dumps(names),
+                        json.dumps(sources),
+                        claim.status,
+                        claim.reason,
+                    ),
+                )
 
-    def claims_for_turn(self, turn: Message | str) -> list[Claim]:
-        """The claims this turn stands behind, in sentence order."""
-        message_id = turn if isinstance(turn, str) else turn.id
-        message = self.service.repo.get_message(message_id)
-        if message is None:
+    def citations_for_turn(self, turn_id: int) -> list[TurnCitation]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM turn_citations WHERE turn_id = ? ORDER BY claim_index ASC",
+                (turn_id,),
+            ).fetchall()
+        return [self._citation_from_row(row) for row in rows]
+
+    def claims_for_turn(self, turn: Turn) -> list[Claim]:
+        """Attach stored citations to a turn by splitting its content again.
+
+        A mismatch in counts means the content and its citations disagree; the
+        citations are dropped rather than attached to the wrong sentence.
+        """
+        rows = self.citations_for_turn(turn.id)
+        if not rows:
             return []
-        return [_claim_from_dict(raw) for raw in message.claims]
-
-    def citations_for_turn(self, turn: Message | str) -> list[TurnCitation]:
-        message_id = turn if isinstance(turn, str) else turn.id
-        return [
-            TurnCitation(
-                turn_id=message_id,
-                claim_index=claim.index,
-                status=claim.status,
-                evidence=list(claim.evidence),
-                reason=claim.reason,
+        claims = split_claims(turn.content)
+        if len(rows) != len(claims):
+            return []
+        by_index = {row.claim_index: row for row in rows}
+        attached: list[Claim] = []
+        for claim in claims:
+            row = by_index.get(claim.index)
+            if row is None:
+                return []
+            attached.append(
+                Claim(
+                    index=claim.index,
+                    text=claim.text,
+                    status=row.status,  # type: ignore[arg-type]
+                    evidence=tuple(row.evidence),
+                    reason=row.reason,
+                )
             )
-            for claim in self.claims_for_turn(turn)
-        ]
+        return attached
+
+    def list_turns(self, conversation_id: str) -> list[Turn]:
+        with self._lock:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
+            rows = self._connection.execute(
+                "SELECT * FROM turns WHERE conversation_id = ? ORDER BY id ASC",
+                (conversation_id,),
+            ).fetchall()
+        return [self._turn_from_row(row) for row in rows]
+
+    def set_head(self, conversation_id: str, head_id: str | None) -> Conversation:
+        """Record which branch is visible, so a reload opens the same one."""
+        now = _now()
+        with self._lock, self._connection:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
+            self._connection.execute(
+                "UPDATE conversations SET head_id = ?, updated_at = ? WHERE id = ?",
+                (head_id, now, conversation_id),
+            )
+        return self._updated_conversation(conversation_id)
+
+    def update_title(self, conversation_id: str, title: str) -> Conversation:
+        now = _now()
+        with self._lock, self._connection:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
+            self._connection.execute(
+                "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
+                (title.strip()[:200], now, conversation_id),
+            )
+        return self._updated_conversation(conversation_id)
+
+    def _updated_conversation(self, conversation_id: str) -> Conversation:
+        """Read back a row this instance just wrote.
+
+        A missing row here means the store was mutated underneath us after the
+        existence check, which is a not-found, not an assertion.
+        """
+        conversation = self.get_conversation(conversation_id)
+        if conversation is None:
+            raise ConversationNotFoundError(conversation_id)
+        return conversation
+
+    def conversation_tree(self, conversation_id: str) -> list[Turn]:
+        """Turns in insertion order, with a linear chain synthesized for old rows.
+
+        Rows written before message ids existed have no ``message_id``; they are
+        given a stable one derived from their row id and chained to the previous
+        row, so an old conversation opens exactly as it did.
+        """
+        turns = self.list_turns(conversation_id)
+        previous: str | None = None
+        for turn in turns:
+            if turn.message_id is None:
+                turn.message_id = f"turn-{turn.id}"
+                turn.parent_id = previous
+            previous = turn.message_id
+            turn.claims = self.claims_for_turn(turn)
+        return turns
+
+    # -- brief -------------------------------------------------------------
+
+    def get_brief(self) -> Brief | None:
+        """The standing context, or None before anything was saved."""
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT data FROM brief WHERE id = ?", ("brief",)
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            return Brief.model_validate_json(row["data"])
+        except ValueError:
+            return None
+
+    def save_brief(self, values: dict[str, Any]) -> Brief:
+        """Replace the standing context; the client sends the whole block."""
+        brief = Brief(**values)
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT OR REPLACE INTO brief (id, data, updated_at) VALUES (?, ?, ?)",
+                ("brief", brief.model_dump_json(), _now()),
+            )
+        return brief
 
     # -- observations ------------------------------------------------------
 
     def list_observations(self, include_dismissed: bool = False) -> list[Observation]:
-        items = self.service.list_observations()
-        if include_dismissed:
-            return items
-        return [item for item in items if item.status != "dismissed"]
+        query = "SELECT * FROM observations"
+        params: tuple[Any, ...] = ()
+        if not include_dismissed:
+            query += " WHERE status != ?"
+            params = ("dismissed",)
+        query += " ORDER BY created_at ASC, rowid ASC"
+        with self._lock:
+            rows = self._connection.execute(query, params).fetchall()
+        return [self._observation_from_row(row) for row in rows]
 
     def add_observation(
         self,
-        category: str,
+        kind: str,
         text: str,
         data: dict[str, Any] | None = None,
-        status: str = "proposed",
+        status: str = "suggested",
         confidence: float = 0.5,
+        source_turn: int | None = None,
         conversation_id: str | None = None,
         source_message_id: str | None = None,
     ) -> Observation:
-        if category not in OBSERVATION_CATEGORIES:
-            raise ValidationError(f"unknown observation category: {category}")
-        if status == _LEGACY_PROPOSED:
-            status = "proposed"
-        if status not in OBSERVATION_STATUSES:
-            raise ValidationError(f"unknown observation status: {status}")
-        observation = self.service.remember(
-            text=text.strip()[:MAX_TEXT],
-            category=cast(ObservationCategory, category),
+        now = _now()
+        observation = Observation(
+            id=uuid.uuid4().hex,
+            kind=_validate_kind(kind),
+            text=_validate_text(text),
+            data=_validate_data(data),
+            status=_validate_status(status),
+            confidence=_validate_confidence(confidence),
+            source_turn=source_turn,
             conversation_id=conversation_id,
             source_message_id=source_message_id,
-            data=data,
-            confidence=confidence,
+            created_at=now,
+            updated_at=now,
         )
-        if status == "proposed":
-            return observation
-        return self.service.update_observation(observation.id, {"status": status})
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT INTO observations "
+                "(id, kind, text, data, status, confidence, source_turn, "
+                "conversation_id, source_message_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    observation.id,
+                    observation.kind,
+                    observation.text,
+                    json.dumps(observation.data),
+                    observation.status,
+                    observation.confidence,
+                    observation.source_turn,
+                    observation.conversation_id,
+                    observation.source_message_id,
+                    observation.created_at,
+                    observation.updated_at,
+                ),
+            )
+        return observation
 
     def update_observation(
         self,
@@ -412,101 +823,245 @@ class StudioMemory:
     ) -> Observation:
         updates: dict[str, Any] = {}
         if text is not None:
-            updates["text"] = text.strip()[:MAX_TEXT]
+            updates["text"] = _validate_text(text)
         if status is not None:
-            if status == _LEGACY_PROPOSED:
-                status = "proposed"
-            if status not in OBSERVATION_STATUSES:
-                raise ValidationError(f"unknown observation status: {status}")
-            updates["status"] = status
+            updates["status"] = _validate_status(status)
         if data is not None:
-            updates["data"] = data
+            updates["data"] = json.dumps(_validate_data(data))
         if confidence is not None:
-            updates["confidence"] = confidence
-        if not updates:
-            current = self.service.get_observation(observation_id)
-            if current is None:
+            updates["confidence"] = _validate_confidence(confidence)
+
+        with self._lock, self._connection:
+            row = self._connection.execute(
+                "SELECT * FROM observations WHERE id = ?", (observation_id,)
+            ).fetchone()
+            if row is None:
                 raise ObservationNotFoundError(observation_id)
-            return current
-        return self.service.update_observation(observation_id, updates)
+
+            if updates:
+                updates["updated_at"] = _now()
+                assignments = ", ".join(f"{column} = ?" for column in updates)
+                self._connection.execute(
+                    # Column names come from the fixed keys above, not user input.
+                    f"UPDATE observations SET {assignments} WHERE id = ?",  # nosec B608
+                    (*updates.values(), observation_id),
+                )
+            row = self._connection.execute(
+                "SELECT * FROM observations WHERE id = ?", (observation_id,)
+            ).fetchone()
+        return self._observation_from_row(row)
 
     def delete_observation(self, observation_id: str) -> None:
-        self.service.delete_observation(observation_id)
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM observations WHERE id = ?", (observation_id,)
+            )
+            if cursor.rowcount == 0:
+                raise ObservationNotFoundError(observation_id)
 
-    # -- brief -------------------------------------------------------------
+    def clear_memory(self) -> None:
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM turn_citations")
+            self._connection.execute("DELETE FROM turns")
+            self._connection.execute("DELETE FROM observations")
+            self._connection.execute("DELETE FROM conversations")
 
-    def get_brief(self) -> Brief | None:
-        return self.service.get_brief()
+    # -- shares ------------------------------------------------------------
 
-    def save_brief(self, values: dict[str, Any]) -> Brief:
-        fields = {key: str(values.get(key, "") or "") for key in BRIEF_FIELDS}
-        vision = values.get("v2mom")
-        return self.service.save_brief(
-            **fields,
-            v2mom=None if vision is None else V2MOM.model_validate(vision),
+    def create_share(
+        self,
+        *,
+        token_hash: str,
+        artifact_kind: str,
+        artifact_id: str,
+        expires_at: str,
+    ) -> Share:
+        share = Share(
+            id=f"shr_{uuid.uuid4().hex[:12]}",
+            token_hash=token_hash,
+            artifact_kind=artifact_kind,
+            artifact_id=artifact_id,
+            created_at=_now(),
+            expires_at=expires_at,
         )
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT INTO shares "
+                "(id, token_hash, artifact_kind, artifact_id, created_at, expires_at, "
+                " revoked_at, last_read_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)",
+                (
+                    share.id,
+                    share.token_hash,
+                    share.artifact_kind,
+                    share.artifact_id,
+                    share.created_at,
+                    share.expires_at,
+                ),
+            )
+        return share
+
+    def get_share(self, share_id: str) -> Share | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM shares WHERE id = ?", (share_id,)
+            ).fetchone()
+        return None if row is None else self._share_from_row(row)
+
+    def get_share_by_token_hash(self, token_hash: str) -> Share | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM shares WHERE token_hash = ?", (token_hash,)
+            ).fetchone()
+        return None if row is None else self._share_from_row(row)
+
+    def list_shares(self) -> list[Share]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM shares ORDER BY created_at DESC, rowid DESC"
+            ).fetchall()
+        return [self._share_from_row(row) for row in rows]
+
+    def revoke_share(self, share_id: str) -> bool:
+        """Set ``revoked_at`` once. Idempotent: a second call changes nothing."""
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "UPDATE shares SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+                (_now(), share_id),
+            )
+            if cursor.rowcount:
+                return True
+            exists = self._connection.execute(
+                "SELECT 1 FROM shares WHERE id = ?", (share_id,)
+            ).fetchone()
+        return exists is not None
+
+    def record_share_read(self, share_id: str) -> None:
+        """Record that the owner's link was read. No reader identity is stored."""
+        with self._lock, self._connection:
+            self._connection.execute(
+                "UPDATE shares SET last_read_at = ? WHERE id = ?",
+                (_now(), share_id),
+            )
 
     # -- prompt context ----------------------------------------------------
 
     def memory_context(self) -> str:
-        """A bounded block of *confirmed* memory for the system prompt.
+        """A bounded block of remembered context for the system prompt."""
+        observations = self.list_observations(include_dismissed=False)
+        confirmed = [item for item in observations if item.status == "confirmed"]
+        suggested = [item for item in observations if item.status == "suggested"][
+            :MAX_SUGGESTED_IN_CONTEXT
+        ]
 
-        A proposed observation is the agent's own guess and stays out: only what
-        the person confirmed is carried forward, and a dismissed one is never
-        injected again, in this session or the next.
-        """
-        confirmed = self.service.confirmed_observations()
-        if not confirmed:
+        lines: list[str] = []
+        for item in [*confirmed, *suggested]:
+            text = item.text[:MAX_CONTEXT_TEXT]
+            lines.append(f"- ({item.status}) [{item.kind}] {text}")
+
+        if not lines:
             return ""
-        lines = [f"- [{item.category}] {item.text[:MAX_CONTEXT_TEXT]}" for item in confirmed]
+
         block = (
-            "What this product manager confirmed about themself, their product, and "
-            "their customers. Treat it as durable context and use it naturally; do "
-            "not recite it back or mention that you have a memory store.\n" + "\n".join(lines)
+            "What you already know about this product manager, from earlier "
+            "conversations. Use it naturally; do not recite it back or mention "
+            "that you have a memory store. Confirmed items are durable context. "
+            "Suggested items are your working guesses and may be wrong.\n" + "\n".join(lines)
         )
         return block[:MAX_CONTEXT_CHARS]
 
-    def clear_memory(self) -> None:
-        for conversation in self.service.list_conversations():
-            self.service.delete_conversation(conversation.id)
-        for observation in self.service.list_observations():
-            self.service.delete_observation(observation.id)
+    # -- row mapping -------------------------------------------------------
 
+    @staticmethod
+    def _conversation_from_row(row: sqlite3.Row) -> Conversation:
+        keys = row.keys()
+        return Conversation(
+            id=row["id"],
+            title=row["title"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            head_id=row["head_id"] if "head_id" in keys else None,
+        )
 
-def _import_legacy(service: ODIService, path: Path) -> None:
-    """Move a pre-core ``studio.db`` into the event log, once.
+    @staticmethod
+    def _turn_from_row(row: sqlite3.Row) -> Turn:
+        keys = row.keys()
+        return Turn(
+            id=row["id"],
+            conversation_id=row["conversation_id"],
+            role=row["role"],
+            content=row["content"],
+            created_at=row["created_at"],
+            message_id=row["message_id"] if "message_id" in keys else None,
+            parent_id=row["parent_id"] if "parent_id" in keys else None,
+            parts=_json_parts(row["parts"]) if "parts" in keys else [],
+        )
 
-    The file is renamed, not deleted, so a person who wants to undo the import
-    still has what the sidecar used to keep.
-    """
-    if not path.is_file():
-        return
-    # A store opened on the legacy path itself must never import (and rename)
-    # the very file it is reading: that empties a live conversation log.
-    live = getattr(service.repo, "db_path", None)
-    if live is not None:
+    @staticmethod
+    def _citation_from_row(row: sqlite3.Row) -> TurnCitation:
+        ids = _json_values(row["evidence_id"])
+        names = _json_values(row["evidence_name"])
+        sources = _json_values(row["source_name"])
+        evidence: list[EvidenceSnapshot] = []
+        for position, evidence_id in enumerate(ids):
+            evidence.append(
+                EvidenceSnapshot(
+                    id=evidence_id,
+                    name=names[position] if position < len(names) else evidence_id,
+                    source_name=sources[position] if position < len(sources) else "",
+                )
+            )
+        return TurnCitation(
+            turn_id=row["turn_id"],
+            claim_index=row["claim_index"],
+            status=row["status"],
+            evidence=evidence,
+            reason=row["reason"],
+        )
+
+    @staticmethod
+    def _share_from_row(row: sqlite3.Row) -> Share:
+        keys = row.keys()
+        return Share(
+            id=row["id"],
+            token_hash=row["token_hash"],
+            artifact_kind=row["artifact_kind"],
+            artifact_id=row["artifact_id"],
+            created_at=row["created_at"],
+            expires_at=row["expires_at"],
+            revoked_at=row["revoked_at"] if "revoked_at" in keys else None,
+            last_read_at=row["last_read_at"] if "last_read_at" in keys else None,
+        )
+
+    @staticmethod
+    def _observation_from_row(row: sqlite3.Row) -> Observation:
         try:
-            if Path(str(live)).resolve() == path.resolve():
-                return
-        except OSError:
-            return
-    imported = path.with_suffix(path.suffix + ".imported")
-    if imported.exists():
-        return
-    try:
-        _write_legacy(service, _read_legacy(path))
-    except (sqlite3.Error, KeyError, TypeError, ValueError):
-        return
-    path.rename(imported)
+            data = json.loads(row["data"])
+        except (TypeError, json.JSONDecodeError):
+            data = {}
+        return Observation(
+            id=row["id"],
+            kind=row["kind"],
+            text=row["text"],
+            data=data if isinstance(data, dict) else {},
+            status=row["status"],
+            confidence=row["confidence"],
+            source_turn=row["source_turn"],
+            conversation_id=row["conversation_id"] if "conversation_id" in row.keys() else None,
+            source_message_id=(
+                row["source_message_id"] if "source_message_id" in row.keys() else None
+            ),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
 
 
-#: The pre-core Studio tables, named literally so nothing here builds SQL from a
-#: value.
-_LEGACY_QUERIES = {
-    "conversations": "SELECT * FROM conversations ORDER BY rowid",
-    "turns": "SELECT * FROM turns ORDER BY rowid",
-    "observations": "SELECT * FROM observations ORDER BY rowid",
-}
+#: The pre-core Studio tables, named literally so no SQL is built from a value.
+_LEGACY_QUERIES = (
+    ("conversations", "SELECT * FROM conversations ORDER BY rowid"),
+    ("turns", "SELECT * FROM turns ORDER BY rowid"),
+    ("observations", "SELECT * FROM observations ORDER BY rowid"),
+)
 
 
 def _read_legacy(path: Path) -> dict[str, list[dict[str, Any]]]:
@@ -519,79 +1074,79 @@ def _read_legacy(path: Path) -> dict[str, list[dict[str, Any]]]:
         }
         return {
             name: [dict(row) for row in connection.execute(sql)]
-            for name, sql in _LEGACY_QUERIES.items()
+            for name, sql in _LEGACY_QUERIES
             if name in tables
         }
     finally:
         connection.close()
 
 
-def _write_legacy(service: ODIService, rows: dict[str, list[dict[str, Any]]]) -> None:
-    turns = rows.get("turns", [])
-    for conversation in rows.get("conversations", []):
-        stored = service.repo.add_conversation(
-            Conversation(
-                id=str(conversation["id"]),
-                title=conversation.get("title") or None,
-            )
-        )
-        previous: str | None = None
-        for index, turn in enumerate(row for row in turns if row["conversation_id"] == stored.id):
-            message_id = str(turn.get("message_id") or f"{stored.id}-turn-{index + 1}")
-            service.append_message(
-                conversation_id=stored.id,
-                role=cast(MessageRole, turn["role"]),
-                content=str(turn["content"]),
-                message_id=message_id,
-                # The pre-core store had no branching: turns chained in row order.
-                parent_id=turn.get("parent_id") or previous,
-            )
-            previous = message_id
-        head = conversation.get("head_id")
-        if head:
-            service.repo.update_conversation(stored.id, {"head_id": str(head)})
-    for observation in rows.get("observations", []):
-        kind = str(observation.get("kind") or "other")
-        status = str(observation.get("status") or "proposed")
-        if status == _LEGACY_PROPOSED:
-            status = "proposed"
-        service.repo.add_observation(
-            Observation(
-                id=str(observation["id"]),
-                text=str(observation["text"])[:MAX_TEXT],
-                category=cast(ObservationCategory, kind if kind in _LEGACY_KINDS else "other"),
-                status=cast(ObservationStatus, status),
-                data=_legacy_json(observation.get("data")),
-                confidence=float(observation.get("confidence") or 0.5),
-            )
-        )
+def _import_legacy(connection: sqlite3.Connection, live: str, path: Path) -> None:
+    """Move a pre-core ``studio.db`` into this store, once.
 
-
-def _legacy_json(raw: Any) -> dict[str, Any]:
-    if isinstance(raw, dict):
-        return raw
-    if not raw:
-        return {}
+    The file is renamed, not deleted, so a person who wants to undo the import
+    still has what the sidecar used to keep.
+    """
+    if live != ":memory:":
+        try:
+            if Path(live).resolve() == path.resolve():
+                return
+        except OSError:
+            return
+    if not path.is_file():
+        return
+    imported = path.with_suffix(path.suffix + ".imported")
+    if imported.exists():
+        return
     try:
-        parsed = json.loads(str(raw))
-    except (TypeError, ValueError):
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
+        rows = _read_legacy(path)
+    except (sqlite3.Error, KeyError, TypeError, ValueError):
+        return
+    with connection:
+        for table, _sql in _LEGACY_QUERIES:
+            legacy_rows = rows.get(table) or []
+            if not legacy_rows:
+                continue
+            columns = [
+                str(row["name"])
+                for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+            ]
+            usable = [column for column in columns if column in legacy_rows[0]]
+            if not usable:
+                continue
+            placeholders = ", ".join("?" for _ in usable)
+            statement = (
+                f"INSERT OR IGNORE INTO {table} ({', '.join(usable)}) "
+                f"VALUES ({placeholders})"
+            )
+            for row in legacy_rows:
+                row = dict(row)
+                if table == "observations":
+                    if row.get("kind") not in OBSERVATION_KINDS:
+                        row["kind"] = "other"
+                    status = row.get("status")
+                    row["status"] = "suggested" if status == "proposed" else status
+                connection.execute(statement, tuple(row[column] for column in usable))
+    try:
+        path.rename(imported)
+    except OSError:
+        return
 
 
 __all__ = [
-    "BRIEF_FIELDS",
     "MAX_CONTEXT_CHARS",
     "MAX_CONVERSATIONS",
     "MAX_SUGGESTED_IN_CONTEXT",
-    "OBSERVATION_CATEGORIES",
+    "OBSERVATION_KINDS",
     "OBSERVATION_STATUSES",
-    "TURN_ROLES",
+    "Conversation",
     "ConversationNotFoundError",
-    "ConversationSummary",
     "MemoryError",
+    "Observation",
     "ObservationNotFoundError",
+    "Share",
     "StudioMemory",
+    "Turn",
     "TurnCitation",
     "default_db_path",
 ]

@@ -1,4 +1,5 @@
 import { apiUrl } from "../bridge/desktopBridge";
+import { authHeaders } from "../api/studioApi";
 import { nowIso } from "./id";
 import type { CanvasData, ChangelogData, Observation } from "../types";
 import type { LocalStore } from "./store/types";
@@ -83,10 +84,12 @@ export class StudioBff {
 
     const canvas = (await fetch(
       apiUrl(`/api/canvas?mcp_url=${encodeURIComponent(mcpUrl)}`),
+      { headers: authHeaders() },
     ).then((response) => response.json())) as CanvasData;
 
     const observationPage = (await fetch(
       apiUrl("/api/memory/observations"),
+      { headers: authHeaders() },
     ).then((response) => response.json())) as {
       observations: Observation[];
     };

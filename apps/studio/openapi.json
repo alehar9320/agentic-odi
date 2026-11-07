@@ -1103,14 +1103,10 @@
         "type": "object"
       },
       "ConversationSummaryModel": {
-        "description": "A conversation in the history list: its metadata plus how much is in it.",
+        "description": "Metadata plus a count: the switcher never needs a turn body.",
         "properties": {
-          "archived": {
-            "default": false,
-            "title": "Archived",
-            "type": "boolean"
-          },
           "created_at": {
+            "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
@@ -1130,15 +1126,9 @@
             "type": "string"
           },
           "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
+            "default": "",
+            "title": "Title",
+            "type": "string"
           },
           "turn_count": {
             "default": 0,
@@ -1146,6 +1136,7 @@
             "type": "integer"
           },
           "updated_at": {
+            "format": "date-time",
             "title": "Updated At",
             "type": "string"
           }
@@ -1727,6 +1718,44 @@
         "title": "MessageResponse",
         "type": "object"
       },
+      "MintShareRequest": {
+        "description": "Mint one scoped, expiring, read-only link for one artifact.",
+        "properties": {
+          "artifact_id": {
+            "minLength": 1,
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "artifact_kind": {
+            "enum": [
+              "outcome",
+              "segment",
+              "strategy"
+            ],
+            "title": "Artifact Kind",
+            "type": "string"
+          },
+          "ttl_days": {
+            "anyOf": [
+              {
+                "maximum": 30.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Days"
+          }
+        },
+        "required": [
+          "artifact_kind",
+          "artifact_id"
+        ],
+        "title": "MintShareRequest",
+        "type": "object"
+      },
       "ModelListRequest": {
         "description": "Which backend to ask for its model ids. The key travels in the body, not\nthe query string, so it never lands in a URL or an access log.",
         "properties": {
@@ -1747,23 +1776,30 @@
         "type": "object"
       },
       "ObservationCreateRequest": {
+        "description": "A note to remember, named either way, with text the caller stands behind.",
         "properties": {
           "category": {
-            "default": "other",
-            "enum": [
-              "career",
-              "opportunity",
-              "business",
-              "customer",
-              "constraint",
-              "decision",
-              "stakeholder",
-              "evidence",
-              "preference",
-              "other"
+            "anyOf": [
+              {
+                "enum": [
+                  "career",
+                  "opportunity",
+                  "business",
+                  "customer",
+                  "constraint",
+                  "decision",
+                  "stakeholder",
+                  "evidence",
+                  "preference",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Category",
-            "type": "string"
+            "title": "Category"
           },
           "confidence": {
             "default": 0.6,
@@ -1800,6 +1836,17 @@
             ],
             "title": "Data"
           },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
           "text": {
             "maxLength": 300,
             "minLength": 1,
@@ -1830,6 +1877,7 @@
         "type": "object"
       },
       "ObservationModel": {
+        "description": "One remembered fact.\n\n``kind`` is what the store records; ``category`` is the same value under the\nname this screen has always shown, so both clients read what they expect.",
         "properties": {
           "category": {
             "title": "Category",
@@ -1863,6 +1911,10 @@
             "title": "Id",
             "type": "string"
           },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
           "source_message_id": {
             "anyOf": [
               {
@@ -1873,6 +1925,17 @@
               }
             ],
             "title": "Source Message Id"
+          },
+          "source_turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Turn"
           },
           "status": {
             "title": "Status",
@@ -1890,6 +1953,7 @@
         "required": [
           "id",
           "text",
+          "kind",
           "category",
           "status",
           "confidence",
@@ -2214,6 +2278,63 @@
           }
         },
         "title": "SettingsUpdateRequest",
+        "type": "object"
+      },
+      "ShareMintResponse": {
+        "description": "The one time the raw token is shown. Only its hash is stored.",
+        "properties": {
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "token",
+          "url",
+          "expires_at"
+        ],
+        "title": "ShareMintResponse",
+        "type": "object"
+      },
+      "SharedArtifactResponse": {
+        "description": "Exactly the named artifact and its own evidence. Nothing else.",
+        "properties": {
+          "artifact": {
+            "additionalProperties": true,
+            "title": "Artifact",
+            "type": "object"
+          },
+          "artifact_kind": {
+            "title": "Artifact Kind",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Evidence",
+            "type": "array"
+          }
+        },
+        "required": [
+          "artifact_kind",
+          "artifact"
+        ],
+        "title": "SharedArtifactResponse",
         "type": "object"
       },
       "SignalActionRequest": {
@@ -5724,6 +5845,151 @@
           }
         },
         "summary": "Put Settings"
+      }
+    },
+    "/api/share": {
+      "get": {
+        "description": "The owner's links, without tokens: id, artifact, and the key dates.",
+        "operationId": "list_shares_api_share_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Shares Api Share Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Shares"
+      },
+      "post": {
+        "description": "Mint a scoped, expiring, read-only link for one artifact.\n\nThe raw token is returned exactly once; only its hash is stored. Creation\nhappens through this route only, so the token is never minted by a page.",
+        "operationId": "mint_share_api_share_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MintShareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareMintResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mint Share"
+      }
+    },
+    "/api/share/{share_id}": {
+      "delete": {
+        "description": "Revoke a link. Effective immediately, and idempotent.",
+        "operationId": "revoke_share_api_share__share_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "share_id",
+            "required": true,
+            "schema": {
+              "title": "Share Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Revoke Share Api Share  Share Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Share"
+      }
+    },
+    "/api/share/{token}": {
+      "get": {
+        "description": "Read exactly the one artifact a token names, and its own evidence.\n\nA malformed, unknown, expired, or revoked token is the same ``404``; the\nresponse never says which. There is no list and no canvas here.",
+        "operationId": "read_shared_api_share__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedArtifactResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Shared"
       }
     },
     "/api/signals": {
