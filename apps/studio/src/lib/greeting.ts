@@ -71,8 +71,8 @@ export function greetingCandidates(context: GreetingContext): Greeting[] {
       id: "insight-outcomes",
       text:
         context.underservedCount > 0
-          ? `${plural(context.outcomeCount, "outcome")} mapped — ${context.underservedCount} underserved.`
-          : `${plural(context.outcomeCount, "outcome")} mapped. Nothing is starving for attention.`,
+          ? `${plural(context.outcomeCount, "gap")} worth chasing — attention needed.`
+          : `${plural(context.outcomeCount, "gap")} worth chasing. Nothing urgent here yet.`,
       kind: "insight",
     });
   }
@@ -82,8 +82,8 @@ export function greetingCandidates(context: GreetingContext): Greeting[] {
       id: "insight-jobs",
       text:
         context.jobCount === 1
-          ? "One job on the canvas. Want to break it into steps?"
-          : `${plural(context.jobCount, "job")} on the canvas. Want to break one into steps?`,
+          ? "One job to work on. Want to map out the steps?"
+          : `${plural(context.jobCount, "job")} to work on. Want to map one into steps?`,
       kind: "insight",
     });
   }
@@ -91,7 +91,7 @@ export function greetingCandidates(context: GreetingContext): Greeting[] {
   candidates.push(
     {
       id: "capability-opportunity",
-      text: "What opportunity is on your mind?",
+      text: "What gap should we focus on?",
       kind: "capability",
     },
     {

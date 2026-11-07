@@ -161,8 +161,8 @@ export function Composer({
           placeholder={
             placeholder ??
             (offline
-              ? "Model offline — type / for commands, or capture what you know…"
-              : "Start with what's on your mind…")
+              ? "Model offline — type / for shortcuts, or add what you know…"
+              : "What's on your mind?")
           }
           aria-haspopup="listbox"
           aria-controls={paletteOpen ? paletteId : undefined}

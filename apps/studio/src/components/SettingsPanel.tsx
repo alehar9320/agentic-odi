@@ -304,12 +304,12 @@ export function SettingsPanel() {
           </li>
           <li>
             <StatusDot tone={mcpKnown ? "ok" : "unknown"} />
-            <span>Local FastMCP server</span>
-            <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
+            <span>Data bridge</span>
+            <span className="connection-list__value">{mcpKnown ? "Connected" : "offline"}</span>
           </li>
         </ul>
         <p className="muted">
-          Only the model and MCP server above are live. No data source is connected yet — add one
+          Only the model and data bridge above are live. No data source is connected yet — add one
           from the presets below.
         </p>
 

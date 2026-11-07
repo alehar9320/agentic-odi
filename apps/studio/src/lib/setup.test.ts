@@ -50,9 +50,9 @@ describe("setup conversation model", () => {
       product_name: "Ambient",
       job_statement: "Ship a service",
     });
-    expect(content).toContain("**Product** — Ambient");
-    expect(content).toContain("**Customer** — —");
-    expect(content).toContain("**Job** — Ship a service");
+    expect(content).toContain("**What are you building?** — Ambient");
+    expect(content).toContain("**Who feels the problem?** — —");
+    expect(content).toContain("**What job are they trying to get done?** — Ship a service");
   });
 
   it("keeps the review honest when nothing was answered", () => {
@@ -91,6 +91,6 @@ describe("setup conversation model", () => {
       v2mom: { vision: "Zero downtime" },
     });
     expect(firstUnanswered(draft)).toBe(REVIEW_INDEX);
-    expect(questionContent(0, draft)).toContain("You said: “Ambient”");
+    expect(questionContent(0, draft)).toContain('You said: "Ambient."');
   });
 });

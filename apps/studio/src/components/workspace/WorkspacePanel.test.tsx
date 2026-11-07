@@ -88,7 +88,7 @@ describe("WorkspacePanel", () => {
     render(<WorkspacePanel />);
 
     expect(
-      screen.getByRole("complementary", { name: /opportunity landscape/i }),
+      screen.getByRole("complementary", { name: /where to play/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/a lens on the conversation, not a separate place/i),
@@ -98,7 +98,7 @@ describe("WorkspacePanel", () => {
   it("returns to the conversation through a question, not a menu", () => {
     render(<WorkspacePanel />);
 
-    fireEvent.click(screen.getByRole("button", { name: /ask which to chase/i }));
+    fireEvent.click(screen.getByRole("button", { name: /ask which gap to chase/i }));
 
     expect(studio.closePanel).toHaveBeenCalled();
     expect(studio.sendMessage).toHaveBeenCalledWith(
@@ -195,7 +195,7 @@ describe("WorkspacePanel as a mobile sheet", () => {
   it("opens as a modal dialog with focus inside it", () => {
     render(<WorkspacePanel />);
 
-    const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
+    const dialog = screen.getByRole("dialog", { name: /where to play/i });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
@@ -203,7 +203,7 @@ describe("WorkspacePanel as a mobile sheet", () => {
   it("keeps Tab inside the sheet and wraps at both ends", () => {
     render(<WorkspacePanel />);
 
-    const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
+    const dialog = screen.getByRole("dialog", { name: /where to play/i });
     const buttons = within(dialog).getAllByRole("button");
     const first = buttons[0];
     const last = buttons[buttons.length - 1];
