@@ -11,6 +11,7 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { ShareAction } from "../ShareAction";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
 
@@ -138,7 +139,7 @@ export function OpportunityLandscape() {
           </p>
         </div>
 
-        {/* The view switcher, and the one action that leaves the screen for a document. */}
+        {/* The view switcher, and the actions that leave the screen — for a document, or a read-only link. */}
         <div className="field__row">
           <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", padding: 3, borderRadius: 8, border: "1px solid var(--studio-border)" }}>
             <button
@@ -176,6 +177,7 @@ export function OpportunityLandscape() {
           >
             Export brief
           </button>
+          <ShareAction />
         </div>
       </div>
 
