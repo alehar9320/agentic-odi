@@ -503,19 +503,31 @@ def test_every_page_resolves_its_own_assets(page: str):
         )
 
 
+# The MCP reference is the long pole: every tool's argument table and the
+# whole ODI schema live on that one page, so it grows with each paginated
+# list tool and each entity we add. The V2MOM entity, the five scheduled-work
+# tools, and the three signal tools bring the page to ~78 KB; the four Stage 5
+# and 6 tools (segment_market, get_segments, get_strategy, propose_strategy)
+# bring it to ~80 KB; the four outcome-proposal tools (propose_outcome,
+# list_proposals, approve_proposal, reject_proposal) bring it to ~85 KB. The
+# assistant-ui ledger (issue #429) puts 129 rows on the Development page, which
+# now reaches ~93 KB and is the new long pole; it is a coverage record, not
+# decoration, so the ceiling moves.
+PAGE_WEIGHT_BUDGET = 100 * 1024
+
+# The development guide mirrors the generated coverage map, which grows with
+# the test tree, so it needs its own ceiling rather than a raised one for
+# every page. Every test file in the workspace is one row, and the row count
+# roughly doubled as the pillar work landed; the guides main added since push it
+# to ~168 KB, which is why its own ceiling is 172 KB while every other page stays
+# under the base budget.
+PAGE_WEIGHT_OVERRIDES = {
+    "docs/development/index.html": 172 * 1024,
+}
+
+
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference was the long pole: every tool's argument table and the
-    # whole ODI schema live on that one page, so it grows with each paginated
-    # list tool and each entity we add. The V2MOM entity, the five
-    # scheduled-work tools, and the three signal tools bring the page to ~78 KB;
-    # the four Stage 5 and 6 tools (segment_market, get_segments, get_strategy,
-    # propose_strategy) bring it to ~80 KB; the four outcome-proposal tools
-    # (propose_outcome, list_proposals, approve_proposal, reject_proposal)
-    # bring it to ~85 KB. The assistant-ui ledger (issue #429) puts 129 rows
-    # on the Development page, which now reaches ~93 KB and is the new long
-    # pole; it is a coverage record, not decoration, so the ceiling moves.
-    # The Study entity and its two tools (open_study, list_studies) add the
-    # last few KB to the MCP reference page.
-    assert size <= 100 * 1024, f"{page}: {size} bytes"
+    budget = PAGE_WEIGHT_OVERRIDES.get(page, PAGE_WEIGHT_BUDGET)
+    assert size <= budget, f"{page}: {size} bytes (budget {budget})"
