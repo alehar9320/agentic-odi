@@ -62,6 +62,7 @@ export function AboutSection({
     }
     const bundle = createDiagnosticsBundle({
       version,
+      versionSource: "build",
       build: `${__STUDIO_BUILD_DATE__} (${commit})`,
       platform: PLATFORM_LABELS[platform],
       theme: resolveTheme(settings.theme),

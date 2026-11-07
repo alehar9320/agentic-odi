@@ -36,6 +36,12 @@ function buildInfoVersion(): string {
     return "0.0.0";
   }
 }
+// The build version is the single source of truth: read from package.json here
+// and baked in as a define so no component can carry a second literal that
+// drifts from the release manifest.
+const studioPackage = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+) as { version: string };
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -59,6 +65,7 @@ export default defineConfig({
     __STUDIO_BUILD_COMMIT__: JSON.stringify(
       process.env.STUDIO_BUILD_COMMIT ?? process.env.GITHUB_SHA ?? "dev",
     ),
+    __STUDIO_VERSION__: JSON.stringify(studioPackage.version),
   },
   server: {
     port: 5173,

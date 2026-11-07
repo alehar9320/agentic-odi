@@ -1,3 +1,4 @@
+import { authHeaders } from "../../api/studioApi";
 import { apiUrl } from "../../bridge/desktopBridge";
 import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
@@ -99,6 +100,7 @@ function isBrowserModelAvailable(): boolean {
 async function probeSidecar(path: string, capabilityId?: CapabilityId): Promise<boolean> {
   try {
     const response = await fetch(apiUrl(path), {
+      headers: authHeaders(),
       signal: AbortSignal.timeout(2000),
     });
     if (!response.ok) {

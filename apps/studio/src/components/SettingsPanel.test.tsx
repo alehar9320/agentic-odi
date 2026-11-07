@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { FirstRunWizard, OnboardingProvider } from "../onboarding";
 import { UpdateProvider, createUpdateService } from "../updater";
 import type { UpdateTransport } from "../updater/types";
 import { SettingsPanel } from "./SettingsPanel";
+import { STUDIO_VERSION } from "../lib/version";
 
 vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
@@ -339,6 +340,37 @@ describe("SettingsPanel tour entry", () => {
 
     fireEvent.click(tourLinks[0]);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  // #799: in a browser or installed PWA the updater has no version to report,
+  // so About used to render "—". It must show the build version instead, and
+  // never a dash.
+  it("shows the build version when the updater transport is unsupported", async () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    const browserService = createUpdateService({
+      transport: {
+        supported: () => false,
+        currentVersion: async () => "0.11.0",
+        check: async () => null,
+        relaunch: async () => undefined,
+      },
+      storage: null,
+      document: null,
+    });
+    render(
+      <UpdateProvider service={browserService}>
+        <OnboardingProvider enabled={false}>
+          <SettingsPanel />
+        </OnboardingProvider>
+      </UpdateProvider>,
+    );
+
+    const about = screen.getByRole("region", { name: "About" });
+    await waitFor(() => expect(browserService.getSnapshot().phase).not.toBe("checking"));
+
+    expect(within(about).getByText(`v${STUDIO_VERSION}`)).toBeInTheDocument();
+    expect(within(about).queryByText("—")).not.toBeInTheDocument();
   });
 });
 

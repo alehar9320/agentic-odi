@@ -8,6 +8,8 @@ declare const __STUDIO_APP_VERSION__: string;
 
 /** Git commit sha injected at build time; "dev" in a source checkout. */
 declare const __STUDIO_BUILD_COMMIT__: string;
+/** Build version injected by vite.config.ts from apps/studio/package.json. */
+declare const __STUDIO_VERSION__: string;
 
 interface ImportMetaEnv {
   /** `on` / `off` override for the first-run wizard feature flag. */
