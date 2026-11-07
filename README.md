@@ -269,8 +269,12 @@ reason `contract.py` is not its own package yet, is in
 
 ## Contributing
 
-Contributions are welcome. Run the checks that CI runs before opening a pull
-request:
+Open a pull request against the **default** tier in
+[`.agents/workflows/test.md`](.agents/workflows/test.md) — that is the bar.
+The fast tier (pytest on the changed packages, `uv run ruff check .`) is a
+quick answer on the changed slice; the full tier (the studio build and the
+browser e2e suite) is CI's job and is not asked of anyone before they open a
+pull request.
 
 ```bash
 uv run ruff check . && uv run ruff format --check .
