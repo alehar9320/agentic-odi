@@ -421,6 +421,7 @@ describe("SettingsPanel about section", () => {
       </UpdateProvider>,
     );
 
+    openSection("About");
     const about = screen.getByRole("region", { name: "About" });
     await waitFor(() => expect(browserService.getSnapshot().phase).not.toBe("checking"));
 
