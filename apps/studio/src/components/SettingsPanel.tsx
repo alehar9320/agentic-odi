@@ -10,6 +10,7 @@ import {
 import { DiagnosticsModal } from "../diagnostics/DiagnosticsModal";
 import { PRODUCT_NAME } from "../lib/brand";
 import { resolveTheme } from "../lib/theme";
+import { versionLabel } from "../lib/version";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { ConnectionReport } from "../state/StudioContext";
@@ -21,8 +22,6 @@ import { ModelSection } from "./settings/sections/ModelSection";
 import { initInstall, isDismissed, isInstalled, offerInstall, dismissInstall } from "../install";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
 import { detectPlatform } from "../updater/platform";
-
-const STUDIO_VERSION = "0.14.0";
 
 const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
   macos: "macOS",
@@ -45,6 +44,7 @@ function AboutSection({
 }) {
   const service = useUpdateService();
   const snapshot = useUpdateSnapshot();
+  const label = versionLabel(snapshot.currentVersion);
   const platform = detectPlatform();
   const [diagnosticsJson, setDiagnosticsJson] = useState<string | null>(null);
 
@@ -60,7 +60,8 @@ function AboutSection({
       // Export remains available when the local sidecar is down.
     }
     const bundle = createDiagnosticsBundle({
-      version: snapshot.currentVersion ?? STUDIO_VERSION,
+      version: label.version,
+      versionSource: label.source,
       build: __STUDIO_BUILD_DATE__,
       platform: PLATFORM_LABELS[platform],
       theme: resolveTheme(settings.theme),
@@ -86,7 +87,7 @@ function AboutSection({
       <p className="muted">{PRODUCT_NAME} is a local-first workspace for outcome-driven work.</p>
       <dl>
         <dt>Version</dt>
-        <dd>{snapshot.currentVersion ? `v${snapshot.currentVersion}` : "—"}</dd>
+        <dd>v{label.version}</dd>
         <dt>Build</dt>
         <dd>{__STUDIO_BUILD_DATE__}</dd>
         <dt>Platform</dt>
