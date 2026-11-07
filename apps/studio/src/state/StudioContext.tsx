@@ -519,6 +519,13 @@ export interface StudioContextValue {
   /** The evidence record a citation chip asked the Evidence lens to show. */
   focusedEvidenceId: string | null;
   focusEvidence: (evidenceId: string) => void;
+  /** The observation the search box asked the memory lens to show. */
+  focusedObservationId: string | null;
+  focusObservation: (observationId: string) => void;
+  /** Whether the one search box is on screen. */
+  searchOpen: boolean;
+  openSearch: () => void;
+  closeSearch: () => void;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -680,6 +687,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [segmentsError, setSegmentsError] = useState<StudioError | null>(null);
   const [focusedSubject, setFocusedSubject] = useState<FocusSubject | null>(loadFocusedSubject);
   const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
+  const [focusedObservationId, setFocusedObservationId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [marketplace, setMarketplace] = useState<MarketplaceSearch | null>(null);
@@ -1484,6 +1493,22 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [openPanel],
   );
+
+  /**
+   * A search hit opens the record it names, focused in the lens that owns it.
+   * The Evidence lens scrolls to its row; memory gets the same one-shot focus so
+   * a hit is never just "opened" and left for the person to find again.
+   */
+  const focusObservation = useCallback(
+    (observationId: string) => {
+      setFocusedObservationId(observationId);
+      openPanel("memory");
+    },
+    [openPanel],
+  );
+
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
 
   /**
    * Where the chip's promise came from: open the lens holding the record the
@@ -2553,6 +2578,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      focusedObservationId,
+      focusObservation,
+      searchOpen,
+      openSearch,
+      closeSearch,
     }),
     [
       settings,
@@ -2677,6 +2707,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      focusedObservationId,
+      focusObservation,
+      searchOpen,
+      openSearch,
+      closeSearch,
     ],
   );
 

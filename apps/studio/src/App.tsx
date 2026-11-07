@@ -11,6 +11,7 @@ import { ConnectorSuggestionModal } from "./components/customize/ConnectorSugges
 import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
+import { SearchBox } from "./components/search/SearchBox";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { dialogOpen, focusComposer, startComposerCommand } from "./lib/composerFocus";
@@ -161,6 +162,7 @@ function StudioShell() {
       </main>
       <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
       <ConnectorSuggestionModal />
+      <SearchBox />
     </div>
   );
 }
