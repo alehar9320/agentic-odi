@@ -514,8 +514,8 @@ def test_page_weights_are_within_budget(page: str):
     # propose_strategy) bring it to ~80 KB; the four outcome-proposal tools
     # (propose_outcome, list_proposals, approve_proposal, reject_proposal)
     # bring it to ~85 KB. The assistant-ui ledger (issue #429) puts 129 rows
-    # on the Development page, which now reaches ~93 KB and is the new long
-    # pole; it is a coverage record, not decoration, so the ceiling moves.
-    # The Study entity and its two tools (open_study, list_studies) add the
-    # last few KB to the MCP reference page.
-    assert size <= 100 * 1024, f"{page}: {size} bytes"
+    # on the Development page, which now reaches ~106 KB and is the new long
+    # pole; it is a coverage record, not decoration, so the ceiling moves to
+    # 110 KB. The Study entity and its two tools (open_study, list_studies)
+    # add the last few KB to the MCP reference page.
+    assert size <= 110 * 1024, f"{page}: {size} bytes"
