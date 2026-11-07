@@ -1,14 +1,103 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import { nowIso } from "./id";
-import type { CanvasData, ChangelogData, Observation } from "../types";
-import type { LocalStore } from "./store/types";
-import type { WorkspaceSnapshot } from "./store/types";
+import type { CanvasData, ChangelogData, Evidence, Observation } from "../types";
+import type {
+  LocalStore,
+  StoredConversation,
+  StoredJob,
+  StoredOutcome,
+  StoredStep,
+  StoredTurn,
+  WorkspaceSnapshot,
+  WorkspaceSummary,
+} from "./store/types";
+import { WORKSPACE_SNAPSHOT_VERSION } from "./store/types";
 import { openLocalStore } from "./store/openStore";
 import { LocalDataService } from "./data/localDataService";
 import { LocalMemoryService } from "./memory/localMemoryService";
 import { ChatOrchestrator } from "./chat/orchestrator";
 import { CapabilityRegistry, capabilityRegistry } from "./capabilities/registry";
 import { BffError } from "./errors";
+
+const EXPORT_HINT =
+  "Export the workspace again and try importing the file unchanged.";
+
+/** The list fields a snapshot carries, read defensively. */
+function readList<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+/**
+ * Turn a version 1 payload into a version 2 snapshot.
+ *
+ * Version 1 had no `evidence`; every other list is carried across untouched, so
+ * an old file keeps every record it held.
+ */
+function migrateFromV1(raw: Record<string, unknown>): WorkspaceSnapshot {
+  return {
+    version: WORKSPACE_SNAPSHOT_VERSION,
+    jobs: readList<StoredJob>(raw.jobs),
+    steps: readList<StoredStep>(raw.steps),
+    outcomes: readList<StoredOutcome>(raw.outcomes),
+    observations: readList<Observation>(raw.observations),
+    evidence: [],
+    conversations: readList<StoredConversation>(raw.conversations),
+    turns: readList<StoredTurn>(raw.turns),
+  };
+}
+
+/**
+ * Read an exported workspace file into a snapshot this build can restore.
+ *
+ * Accepts the current version and migrates version 1 on the way in. Any other
+ * version is refused with the version it found, because silently ignoring the
+ * parts a newer file carries would be a backup that drops records.
+ */
+export function parseWorkspaceSnapshot(json: string): WorkspaceSnapshot {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    throw new BffError("validation", "The workspace file is not valid JSON.", {
+      suggestion: EXPORT_HINT,
+    });
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new BffError(
+      "validation",
+      "The workspace file is not a workspace snapshot.",
+      { suggestion: EXPORT_HINT },
+    );
+  }
+  const record = raw as Record<string, unknown>;
+  const version = record.version;
+  if (version === 1) {
+    return migrateFromV1(record);
+  }
+  if (version === WORKSPACE_SNAPSHOT_VERSION) {
+    return {
+      version: WORKSPACE_SNAPSHOT_VERSION,
+      jobs: readList<StoredJob>(record.jobs),
+      steps: readList<StoredStep>(record.steps),
+      outcomes: readList<StoredOutcome>(record.outcomes),
+      observations: readList<Observation>(record.observations),
+      evidence: readList<Evidence>(record.evidence),
+      conversations: readList<StoredConversation>(record.conversations),
+      turns: readList<StoredTurn>(record.turns),
+    };
+  }
+  const found = version === undefined ? "none" : String(version);
+  throw new BffError(
+    "validation",
+    `This workspace file is version ${found}, but this build reads up to version ${WORKSPACE_SNAPSHOT_VERSION}.`,
+    {
+      suggestion:
+        typeof version === "number" && version > WORKSPACE_SNAPSHOT_VERSION
+          ? "Update the studio, then import the file again."
+          : EXPORT_HINT,
+    },
+  );
+}
 
 export class StudioBff {
   readonly store: LocalStore;
@@ -42,31 +131,52 @@ export class StudioBff {
     return { releases: [] };
   }
 
-  /** Serialize the whole local workspace (canvas, memory, conversations) to JSON. */
+  /**
+   * Serialize the whole local workspace (canvas, memory, conversations) to a
+   * readable JSON snapshot at the current version.
+   *
+   * Queued-but-unsent intents are not portable, so they are excluded and their
+   * presence is recorded in the file rather than silently dropped.
+   */
   async exportWorkspace(): Promise<string> {
     const snapshot = await this.store.snapshot();
-    return JSON.stringify({ ...snapshot, exported_at: nowIso() }, null, 2);
+    const outbox = await this.store.listOutbox();
+    const pending = outbox.some(
+      (record) => record.state === "pending" || record.state === "sending",
+    );
+    return JSON.stringify(
+      { ...snapshot, exported_at: nowIso(), pending_writes_excluded: pending },
+      null,
+      2,
+    );
   }
 
-  /** Replace the whole local workspace with an imported JSON snapshot. */
+  /** What the workspace holds, so a caller can name it before replacing it. */
+  async workspaceSummary(): Promise<WorkspaceSummary> {
+    const snapshot = await this.store.snapshot();
+    const counts = {
+      jobs: snapshot.jobs.length,
+      steps: snapshot.steps.length,
+      outcomes: snapshot.outcomes.length,
+      observations: snapshot.observations.length,
+      evidence: snapshot.evidence.length,
+      conversations: snapshot.conversations.length,
+      turns: snapshot.turns.length,
+    };
+    const records = Object.values(counts).reduce((total, count) => total + count, 0);
+    return { records, counts, empty: records === 0 };
+  }
+
+  /**
+   * Replace the whole local workspace with an imported JSON snapshot.
+   *
+   * A version 1 file is migrated on the way in; a version this build cannot read
+   * is refused with the version it found, so the mismatch is explained rather
+   * than swallowed. Restoring is destructive by nature — the caller confirms
+   * first, and this method never asks.
+   */
   async importWorkspace(json: string): Promise<void> {
-    let snapshot: WorkspaceSnapshot;
-    try {
-      snapshot = JSON.parse(json) as WorkspaceSnapshot;
-    } catch {
-      throw new BffError(
-        "validation",
-        "The workspace file is not valid JSON.",
-        { suggestion: "Export the workspace again and try importing the file unchanged." },
-      );
-    }
-    if (!snapshot || snapshot.version !== 1) {
-      throw new BffError(
-        "validation",
-        `Unsupported workspace version ${snapshot?.version}.`,
-        { suggestion: "Export the workspace again and try importing the file unchanged." },
-      );
-    }
+    const snapshot = parseWorkspaceSnapshot(json);
     await this.store.restore(snapshot);
   }
 
