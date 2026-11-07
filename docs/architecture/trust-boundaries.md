@@ -61,6 +61,13 @@ LLM directly; the sidecar is its only backend.
 - **Signed updates.** The desktop updater verifies signatures before staging.
 - **Prompt-level consent.** Conversational writes pause for an approval card; see
   [Consent and approvals](consent.md).
+- **Scoped share tokens.** `POST /api/share` mints one `odi_sh_…` token for a
+  single artifact; only its SHA-256 hash is stored in `studio.db`, the read
+  compares it in constant time, and expiry (7 days by default, 30 at most) and
+  revocation are checked on every read. The token is a bearer capability for one
+  record and its own evidence — never the canvas, the memory, a conversation, or
+  a connector secret — and every dead token answers the same `404`. See
+  [Running the Living Studio](../living-studio.md#sharing-one-artifact).
 - **Focus is a pointer, never prose.** A chat turn may carry `focus: {kind, id}`
   for the record the person selected, and `FocusRef` rejects any extra key
   (`schemas.py`). The sidecar re-reads that id from its own store before the
