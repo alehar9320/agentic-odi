@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { useStudio } from "../../state/StudioContext";
 import { GhostMemory } from "../Skeletons";
@@ -35,6 +35,7 @@ export function MemoryPanel() {
     updateObservation,
     deleteObservation,
     clearMemory,
+    focusedObservationId,
   } = useStudio();
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -42,10 +43,37 @@ export function MemoryPanel() {
   const [adding, setAdding] = useState(false);
   const [addKind, setAddKind] = useState<ObservationKind>("constraint");
   const [addText, setAddText] = useState("");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
 
   const items = useMemo(() => [...memory].sort(byStatus), [memory]);
   const suggested = items.filter((item) => item.status === "suggested");
   const confirmed = items.filter((item) => item.status === "confirmed");
+
+  // The search box asked for this note: bring it into view, mark it briefly,
+  // and put the keyboard there so the next Tab continues from the record.
+  useEffect(() => {
+    if (!focusedObservationId) {
+      return;
+    }
+    const element = itemRefs.current.get(focusedObservationId);
+    if (!element) {
+      return;
+    }
+    element.scrollIntoView({ block: "center" });
+    element.focus({ preventScroll: true });
+    setHighlightedId(focusedObservationId);
+    const timer = window.setTimeout(() => setHighlightedId(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [focusedObservationId, items]);
+
+  function registerItem(id: string, element: HTMLLIElement | null) {
+    if (element) {
+      itemRefs.current.set(id, element);
+    } else {
+      itemRefs.current.delete(id);
+    }
+  }
 
   async function decide(observation: Observation, status: ObservationStatus) {
     setBusyId(observation.id);
@@ -133,7 +161,14 @@ export function MemoryPanel() {
           <h3 className="memory-group__title">Did I get this right?</h3>
           <ul className="memory-list">
             {suggested.map((observation) => (
-              <li key={observation.id} className="memory-item memory-item--suggested">
+              <li
+                key={observation.id}
+                ref={(element) => registerItem(observation.id, element)}
+                tabIndex={-1}
+                className={`memory-item memory-item--suggested${
+                  highlightedId === observation.id ? " is-focused" : ""
+                }`}
+              >
                 <p className="memory-item__kind">{KIND_LABELS[observation.kind]}</p>
                 {body(observation)}
                 <div className="memory-item__actions">
@@ -172,7 +207,12 @@ export function MemoryPanel() {
           <h3 className="memory-group__title">What I'm working from</h3>
           <ul className="memory-list">
             {confirmed.map((observation) => (
-              <li key={observation.id} className="memory-item">
+              <li
+                key={observation.id}
+                ref={(element) => registerItem(observation.id, element)}
+                tabIndex={-1}
+                className={`memory-item${highlightedId === observation.id ? " is-focused" : ""}`}
+              >
                 <div className="memory-item__head">
                   <p className="memory-item__kind">{KIND_LABELS[observation.kind]}</p>
                   <div className="memory-item__actions">

@@ -13,11 +13,13 @@ const mocks = vi.hoisted(() => ({
 
 let mockMemory: Observation[] = [];
 let mockMemoryLoading = false;
+let mockFocusedObservationId: string | null = null;
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({
     memory: mockMemory,
     memoryLoading: mockMemoryLoading,
+    focusedObservationId: mockFocusedObservationId,
     ...mocks,
   }),
 }));
@@ -41,6 +43,7 @@ describe("MemoryPanel", () => {
   beforeEach(() => {
     mockMemory = [];
     mockMemoryLoading = false;
+    mockFocusedObservationId = null;
     vi.clearAllMocks();
   });
 
@@ -128,5 +131,36 @@ describe("MemoryPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Forget everything" }));
     expect(mocks.clearMemory).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks the note the search box asked for and puts the keyboard on it", () => {
+    mockMemory = [
+      observation({ id: "o-1", status: "confirmed", text: "Owns activation." }),
+      observation({ id: "o-2", status: "confirmed", text: "Prefers short updates." }),
+    ];
+    mockFocusedObservationId = "o-2";
+    const scroll = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      const { container } = render(<MemoryPanel />);
+
+      const focused = container.querySelector(".memory-item.is-focused");
+      expect(focused).not.toBeNull();
+      expect(focused).toHaveTextContent("Prefers short updates.");
+      expect(focused).toHaveFocus();
+      expect(scroll).toHaveBeenCalledWith({ block: "center" });
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it("marks nothing when the search box has not asked for a note", () => {
+    mockMemory = [observation({ id: "o-1", status: "confirmed" })];
+    mockFocusedObservationId = null;
+
+    const { container } = render(<MemoryPanel />);
+
+    expect(container.querySelector(".memory-item.is-focused")).toBeNull();
   });
 });

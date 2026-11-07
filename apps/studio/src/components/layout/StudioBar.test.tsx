@@ -23,6 +23,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   refreshConversations: vi.fn(),
   unreadSignalCount: 0,
   openPanel: vi.fn(),
+  openSearch: vi.fn(),
   pushToast: vi.fn(),
   saveSettings: vi.fn(),
   settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "dark" },
@@ -56,6 +57,18 @@ describe("StudioBar", () => {
     const svg = container.querySelector(".brand__mark svg");
     expect(svg?.getAttribute("width")).toBe("32");
     expect(svg?.getAttribute("height")).toBe("32");
+  });
+
+  it("opens the one search box from the bar control", () => {
+    const openSearch = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(stubContext({ openSearch }) as never);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    const button = screen.getByRole("button", { name: "Search everything" });
+    expect(button).toHaveAttribute("aria-keyshortcuts", "Control+Shift+F Meta+Shift+F");
+
+    fireEvent.click(button);
+    expect(openSearch).toHaveBeenCalledTimes(1);
   });
 
   it("labels the model health control with its state and message", () => {
