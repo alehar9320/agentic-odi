@@ -283,10 +283,43 @@ python3 scripts/pr_labels.py --managed          # list every managed label
 echo '{"author":{"login":"x","type":"User"},"files":[]}' | python3 scripts/pr_labels.py
 ```
 
-The risk tier labels (`safe to merge`, `needs a look`, `danger zone`) and the
-merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
-workflows and are deliberately left alone. The workflow is silent: it updates
-labels only and never posts PR comments.
+The risk tier labels (`safe to merge`, `needs a look`, `danger zone`) are owned
+by the PR Risk Classification workflow and are deliberately left alone. The
+merge-state labels (`ci-pending`, `ready-for-merge`) are owned by the CI Label
+workflow below. The workflow is silent: it updates labels only and never posts
+PR comments.
+
+### CI Label
+
+The [CI Label](../.github/workflows/ci-label.yml) workflow keeps the two
+merge-state labels in sync on every pull-request event and every check-run
+completion:
+
+| Label | Meaning |
+|---|---|
+| `ci-pending` | CI checks are still running, but nothing is blocking — the PR is unblocked and ready for a human to review once CI turns green. |
+| `ready-for-merge` | CI is green, there are no merge conflicts, the PR is not a draft, and no review has requested changes — ready to merge. |
+
+A pull request moves between the labels as CI progresses:
+
+1. A new or revised PR starts with neither label while CI spins up.
+2. Once CI has at least one check run and nothing blocks it, `ci-pending` is applied.
+3. When every completed check is green and none is pending, `ci-pending` is replaced with `ready-for-merge`.
+4. If the PR is a draft, has merge conflicts, a failing/cancelled check, or a
+   `CHANGES_REQUESTED` review, both labels are removed until the blocker clears.
+
+The logic is deterministic and pure: `scripts/ci_label.py` computes the labels
+from the PR's facts, and the workflow only adds/removes them — it never posts
+comments. The set of labels it owns is defined once, in `scripts/ci_label.py`:
+
+```bash
+python3 scripts/ci_label.py --managed          # list every managed label
+echo '{"is_draft":false,"mergeable":"MERGEABLE","review_decision":"","reviews":[],"check_runs":[{"name":"lint","status":"COMPLETED","conclusion":"SUCCESS"}]}' | python3 scripts/ci_label.py
+```
+
+Labels are managed idempotently: each run removes both merge-state labels, then
+adds the ones the current state implies, so re-pushing a branch corrects the
+label instead of stacking a second one.
 
 ## Testing
 
