@@ -27,7 +27,7 @@ test.describe("the workspace", () => {
     await expect(landscape).toBeVisible();
 
     await landscape.click();
-    await expect(lens(page)).toHaveAttribute("aria-label", "Opportunity landscape");
+    await expect(lens(page)).toHaveAttribute("aria-label", "Where to focus");
   });
 
   test("marks the open view as current", async ({ page, request }) => {
