@@ -403,3 +403,51 @@ def test_fetch_local_canvas_marks_an_empty_store_as_empty() -> None:
     assert payload["source"] == "local"
     assert payload["provenance"]["kind"] == "empty"
     assert payload["provenance"]["reason"] == "local_store_empty"
+
+
+def _recorded_transports(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
+    """Swap in a client that records the transport it was built from."""
+    seen: list[Any] = []
+
+    class _RecordingClient(_FakeClient):
+        def __init__(self, target: Any) -> None:
+            seen.append(target)
+            super().__init__("http://mcp")
+
+    _FakeClient.calls = []
+    _FakeClient.error = None
+    _FakeClient.payloads = {"get_jobs": "[]"}
+    monkeypatch.setattr(mcp_data, "McpClient", _RecordingClient)
+    monkeypatch.setattr(mcp_data, "is_endpoint_reachable", lambda url, timeout: True)
+    return seen
+
+
+def test_call_mcp_tool_presents_the_sidecar_token_to_the_server(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen = _recorded_transports(monkeypatch)
+    monkeypatch.setattr(mcp_data, "load_token", lambda: "shared-token")
+
+    asyncio.run(mcp_data.call_mcp_tool("http://mcp", "get_jobs", {}))
+
+    assert seen[0].headers == {"Authorization": "Bearer shared-token"}
+
+
+def test_fetch_canvas_presents_the_sidecar_token_to_the_server(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen = _recorded_transports(monkeypatch)
+    monkeypatch.setattr(mcp_data, "load_token", lambda: "shared-token")
+
+    asyncio.run(mcp_data.fetch_canvas("http://mcp"))
+
+    assert seen[0].headers == {"Authorization": "Bearer shared-token"}
+
+
+def test_no_token_means_no_authorization_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = _recorded_transports(monkeypatch)
+    monkeypatch.setattr(mcp_data, "load_token", lambda: None)
+
+    asyncio.run(mcp_data.call_mcp_tool("http://mcp", "get_jobs", {}))
+
+    assert seen[0].headers == {}
