@@ -246,8 +246,106 @@ def test_an_approved_write_runs(monkeypatch) -> None:
     approval = next(data for name, data in events if name == "approval")
     assert approval["name"] == "add_job"
     assert approval["arguments"] == {"name": "Retention"}
-    assert approval["prompt"] == "Allow the assistant to add job?"
+    assert approval["prompt"] == 'Allow the assistant to Add Job "Retention"?'
+    assert approval["consequence"] == 'Add Job "Retention"'
     assert _Mcp.calls == [("add_job", {"name": "Retention"})]
+
+
+@pytest.mark.parametrize(
+    ("name", "arguments", "consequence"),
+    [
+        ("add_job", {"name": "Retention"}, 'Add Job "Retention"'),
+        ("delete_job", {"job_id": "JOB-1"}, 'Delete Job "JOB-1"'),
+        ("update_outcome", {"outcome_id": "O-2", "statement": "Reduce rework"}, 'Update Outcome "Reduce rework"'),
+        ("schedule_work", {"name": "Weekly scan"}, 'Schedule work "Weekly scan"'),
+        ("mark_signal_read", {"signal_id": "SIG-9"}, 'Mark signal "SIG-9"'),
+        ("cancel_scheduled_work", {"work_id": "W-3"}, 'Cancel scheduled work "W-3"'),
+        ("add_evidence", {"source_name": "Support tickets"}, 'Add evidence record "Support tickets"'),
+        ("add_step", {"job_id": "J-1"}, "Add a Step"),
+        ("add_connector", {}, "Add a connector"),
+        ("unknown_tool", {}, "Run unknown tool"),
+    ],
+)
+def test_the_prompt_names_the_artifact_and_its_value(monkeypatch, name, arguments, consequence) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call(json.dumps(arguments), name)])]),
+            _FakeStream([_chunk(content="Understood.")]),
+        ],
+    )
+    events = _parse(
+        _collect_answering(
+            _request(approvals=True), ApprovalRegistry(), ApprovalDecision(approved=False)
+        )
+    )
+    approval = next(data for name_, data in events if name_ == "approval")
+    assert approval["name"] == name
+    assert approval["consequence"] == consequence
+    assert approval["prompt"] == f"Allow the assistant to {consequence}?"
+
+
+def test_a_long_argument_is_truncated_in_the_prompt(monkeypatch) -> None:
+    statement = "Minimize the time " + "x" * 200
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call(json.dumps({"statement": statement}), "add_outcome")])]),
+            _FakeStream([_chunk(content="Understood.")]),
+        ],
+    )
+    events = _parse(
+        _collect_answering(
+            _request(approvals=True), ApprovalRegistry(), ApprovalDecision(approved=False)
+        )
+    )
+    consequence = next(data for name, data in events if name == "approval")["consequence"]
+    assert consequence.startswith("Add Outcome \"Minimize the time")
+    assert consequence.endswith("…\"")
+    assert len(consequence) < len(statement)
+
+
+def test_a_new_tool_gets_a_sentence_without_a_new_branch() -> None:
+    from agentic_odi_core.contract import TOOL_SPECS, ToolEffect, ToolSpec
+
+    write = ToolSpec(
+        name="add_widget", summary="Create a widget.", effect=ToolEffect.WRITE, arguments=("name",)
+    )
+    destructive = ToolSpec(
+        name="delete_widget",
+        summary="Delete a widget.",
+        effect=ToolEffect.DESTRUCTIVE,
+        arguments=("widget_id",),
+    )
+
+    assert chat._consequence_for("add_widget", {"name": "Alpha"}, write) == 'Add Widget "Alpha"'
+    assert (
+        chat._consequence_for("delete_widget", {"widget_id": "W-1"}, destructive)
+        == 'Delete Widget "W-1"'
+    )
+    # Unknown to TOOL_SPECS still names the tool rather than raising.
+    assert chat._consequence_for("future_tool", {}, TOOL_SPECS.get("future_tool")) == "Run future tool"
+
+
+def test_an_empty_or_absent_argument_names_the_kind_not_a_blank() -> None:
+    from agentic_odi_core.contract import TOOL_SPECS
+
+    assert chat._consequence_for("add_job", {"name": "   "}, TOOL_SPECS["add_job"]) == "Add a Job"
+    assert chat._consequence_for("delete_job", {}, TOOL_SPECS["delete_job"]) == "Delete a Job"
+    # add_connector is a local tool with no TOOL_SPECS entry; the override still
+    # names it rather than falling back to "Run add connector".
+    assert chat._consequence_for("add_connector", {}, TOOL_SPECS.get("add_connector")) == "Add a connector"
+
+
+def test_the_consequence_never_dumps_raw_arguments() -> None:
+    from agentic_odi_core.contract import TOOL_SPECS
+
+    consequence = chat._consequence_for(
+        "add_job", {"name": "Retention", "description": "{'secret': 1}"}, TOOL_SPECS["add_job"]
+    )
+
+    assert consequence == 'Add Job "Retention"'
+    assert "{" not in consequence and "}" not in consequence
 
 
 def test_a_declined_write_never_runs_and_the_turn_still_ends(monkeypatch) -> None:
