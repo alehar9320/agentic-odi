@@ -472,4 +472,74 @@ describe("ChatStage", () => {
 
     expect(harness.state.openPanel).toHaveBeenCalledWith("brief");
   });
+
+  it("shows the sample loop on the empty stage, above the composer", () => {
+    window.localStorage.clear();
+
+    const { container } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    const strip = screen.getByLabelText("Sample loop, not your data");
+    expect(strip).toBeInTheDocument();
+    // It sits inside the welcome block, so it scrolls with the hero and never
+    // covers the composer.
+    expect(container.querySelector(".chat__welcome-inner .sample-loop")).not.toBeNull();
+  });
+
+  it("hands the composer focus and a placeholder without sending anything", () => {
+    window.localStorage.clear();
+    harness.state.sendMessage.mockClear();
+
+    render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Start with my own" }));
+
+    const input = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(input).toHaveFocus();
+    expect(input.placeholder).toBe("Paste a customer quote to begin.");
+    expect(input.value).toBe("");
+    expect(harness.state.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("drops the sample loop once the thread has a message", () => {
+    window.localStorage.clear();
+    harness.state.messages = [
+      { id: "u-1", parentId: null, role: "user", content: "What should I chase?" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "Start with the job." },
+    ];
+
+    render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    expect(screen.queryByLabelText("Sample loop, not your data")).toBeNull();
+  });
+
+  it("stays out of the way while the introduction is open", () => {
+    window.localStorage.clear();
+    harness.state.setupOpen = true;
+
+    try {
+      render(
+        <StudioRuntimeProvider>
+          <ChatStage />
+        </StudioRuntimeProvider>,
+      );
+
+      // One first impression at a time: the introduction speaks first, and the
+      // sample waits for the stage to be otherwise empty.
+      expect(screen.queryByLabelText("Sample loop, not your data")).toBeNull();
+    } finally {
+      harness.state.setupOpen = false;
+    }
+  });
 });

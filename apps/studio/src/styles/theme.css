@@ -602,6 +602,178 @@ a {
   text-decoration-color: currentColor;
 }
 
+/* The empty stage's worked example: one finished loop, labelled a sample.
+   It is content, not chrome, so it reads as a quiet card rather than a banner. */
+.sample-loop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  /* Opaque on purpose: the strip must clear the contrast gate, and a
+     translucent fill over the shell's gradient would not. */
+  background: var(--bg-raised);
+  text-align: left;
+}
+
+.sample-loop__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.sample-loop__label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.sample-loop__chip {
+  padding: 1px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--faint);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.sample-loop__band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 14px;
+}
+
+.sample-loop__beat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sample-loop__quote {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.sample-loop__source {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.7rem;
+}
+
+.sample-loop__outcome {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.sample-loop__values {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.sample-loop__values b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* The score is the only accented number: it is the one thing worth looking at. */
+.sample-loop__values b.sample-loop__score {
+  color: var(--accent);
+}
+
+.sample-loop__segment {
+  margin: 0;
+  color: var(--amber);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sample-loop__gap-title {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sample-loop__gap {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.sample-loop__gap li {
+  position: relative;
+  padding-left: 12px;
+  line-height: 1.5;
+}
+
+.sample-loop__gap li::before {
+  content: "–";
+  position: absolute;
+  left: 0;
+  color: var(--faint);
+}
+
+.sample-loop__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sample-loop__start {
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg-raised);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sample-loop__start:hover {
+  background: var(--accent-strong);
+}
+
+.sample-loop__hide {
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.sample-loop__hide:hover {
+  color: var(--text);
+  text-decoration-color: currentColor;
+}
+
+/* Below 760px the three beats stack; the band is one column. */
+@media (max-width: 759px) {
+  .sample-loop__band {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
 /* One next thing, under the thread and above the composer. */
 .guidance {
   display: flex;
