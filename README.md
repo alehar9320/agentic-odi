@@ -93,6 +93,10 @@ per-platform archives with SHA-256 checksums for a manual download. See
   with or without the Studio. Provenance travels with it: demo rows are excluded
   from every count and labelled, and every number counts records instead of
   generating prose.
+- **One artifact you can hand over.** A read-only link opens a single artifact
+  and its evidence on its own page — no rail, no composer, no way into the rest
+  of the workspace — and states when the link expires. The link is a capability,
+  not a copy of the database.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
 - **Evidence becomes outcomes.** An ingested record is mined into a scored,
@@ -258,9 +262,9 @@ drift from the workspace. The distributions are:
 | **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, PM memory, and scoped read-only share tokens for one artifact. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) answers a navigation it cannot reach with `public/offline.html`, so an uncached deep link opened offline gets a themed page instead of the browser's error page. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) precaches the built shell so the app opens with no network, answers an uncached navigation with the cached shell or `public/offline.html`, and never caches `/api/**`. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
 | **`scripts/`** | — | Dev launcher, binary build, installer tests, the deterministic study-corpus generator (`gen_corpus.py`), and the shared structural audit every artifact HTML passes through (`artifact_a11y.py`, with its renderer inventory in `artifact_renderers.py`). |
@@ -283,8 +287,12 @@ reason `contract.py` is not its own package yet, is in
 
 ## Contributing
 
-Contributions are welcome. Run the checks that CI runs before opening a pull
-request:
+Open a pull request against the **default** tier in
+[`.agents/workflows/test.md`](.agents/workflows/test.md) — that is the bar.
+The fast tier (pytest on the changed packages, `uv run ruff check .`) is a
+quick answer on the changed slice; the full tier (the studio build and the
+browser e2e suite) is CI's job and is not asked of anyone before they open a
+pull request.
 
 ```bash
 uv run ruff check . && uv run ruff format --check .

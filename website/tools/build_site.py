@@ -487,6 +487,75 @@ def _robots() -> str:
     return f"User-agent: *\nAllow: /\n\nSitemap: {PAGES_URL}sitemap.xml\n"
 
 
+# Whitespace between two block-level tags is never rendered, and a guide with a
+# 154-row table spends kilobytes on indentation no reader sees. The build drops
+# that whitespace and leaves every byte a reader can see exactly where it was.
+_PROTECTED_BLOCKS = re.compile(
+    r"<(?P<tag>pre|textarea|script|style)\b[^>]*>.*?</(?P=tag)>", re.DOTALL | re.IGNORECASE
+)
+_BLOCK_TAGS = frozenset(
+    "address article aside blockquote body dd details div dl dt fieldset "
+    "figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hr html li "
+    "main nav ol p section summary table tbody td tfoot th thead tr ul".split()
+)
+_TAG_SPLIT = re.compile(r"(<[^>]*>)")
+_CLOSING_TAG = re.compile(r"</([a-zA-Z0-9]+)")
+_OPENING_TAG = re.compile(r"<([a-zA-Z0-9]+)")
+
+
+def _tag_name(markup: str) -> str | None:
+    """The element a tag opens or closes, lowercased."""
+    match = _CLOSING_TAG.match(markup) or _OPENING_TAG.match(markup)
+    return match.group(1).lower() if match else None
+
+
+def _collapse(segment: str) -> str:
+    """Drop whitespace between two block-level tags; keep inline spacing.
+
+    A run of whitespace between two block-level tags renders as nothing, so it
+    is removed outright. Any other run becomes one space when it spans a line,
+    which is what a browser would have shown anyway.
+    """
+    parts = _TAG_SPLIT.split(segment)
+    for index, part in enumerate(parts):
+        if not part or part.startswith("<") or not part.isspace():
+            continue
+        previous = parts[index - 1] if index else ""
+        following = parts[index + 1] if index + 1 < len(parts) else ""
+        before = _tag_name(previous) if previous.startswith("<") else None
+        after = _tag_name(following) if following.startswith("<") else None
+        if before in _BLOCK_TAGS and after in _BLOCK_TAGS:
+            # Between two block-level tags: nothing renders between them.
+            parts[index] = ""
+        elif before in _BLOCK_TAGS and not previous.startswith("</"):
+            # A block's first child: a browser drops whitespace at a line start.
+            parts[index] = ""
+        elif after in _BLOCK_TAGS and following.startswith("</"):
+            # A block's last child: and whitespace at a line end.
+            parts[index] = ""
+        elif "\n" in part:
+            parts[index] = " "
+    return "".join(parts)
+
+
+def compact_html(html: str) -> str:
+    """The page with the whitespace a reader never sees removed.
+
+    ``<pre>``, ``<textarea>``, ``<script>`` and ``<style>`` keep every byte: their
+    whitespace is content, and a code sample that lost its indentation would be
+    a lie. Elsewhere, whitespace between two block-level tags is dropped and any
+    other whitespace spanning a line becomes one space.
+    """
+    pieces: list[str] = []
+    cursor = 0
+    for match in _PROTECTED_BLOCKS.finditer(html):
+        pieces.append(_collapse(html[cursor : match.start()]).strip())
+        pieces.append(match.group(0))
+        cursor = match.end()
+    pieces.append(_collapse(html[cursor:]).strip())
+    return "".join(pieces).strip() + "\n"
+
+
 def _tree(root: Path) -> dict[str, bytes]:
     """Every file under a directory, keyed by its relative path."""
     if not root.is_dir():
@@ -508,7 +577,12 @@ def build(out_dir: Path, *, check: bool = False) -> int:
     env = environment()
     rendered = _render_pages(env)
 
-    files: dict[str, bytes] = {name: html.encode("utf-8") for name, html in rendered.items()}
+    # The committed sample page has a twin on disk that a test compares byte for
+    # byte, so it ships exactly as build_sample.py rendered it.
+    files: dict[str, bytes] = {
+        name: (html if name == SAMPLE_OUTPUT else compact_html(html)).encode("utf-8")
+        for name, html in rendered.items()
+    }
     # One card per published page. A page the build emits without a card is a
     # page whose shared link would show someone else's image, so this is a hard
     # failure rather than a warning. (404 is not published, so it has no card.)
@@ -520,7 +594,6 @@ def build(out_dir: Path, *, check: bool = False) -> int:
     if missing:
         raise SystemExit(f"no social card was generated for: {', '.join(missing)}")
     files.update(cards)
-
     urls = ["/"]
     for name in sorted(rendered):
         if name in {"index.html", "404.html"}:

@@ -257,3 +257,4 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
   CLI command is missing from `docs/cli.md`, so a new command cannot ship
   undocumented. A hidden group (`outcomes`, the alias of `customer-outcomes`) is
   exempt; everything else is not.
+- Before opening a pull request, run the **default** tier from `.agents/workflows/test.md` — that is the bar. See `.agents/workflows/test.md` for the fast, default, and full tiers, and `docs/architecture/testing.md` for focused commands.
