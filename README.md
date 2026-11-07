@@ -78,7 +78,8 @@ per-platform archives with SHA-256 checksums for a manual download. See
   context, the agent speaks first: who you are and your team, who feels the
   problem, what they are trying to win, where it breaks, and what you already
   have. The answers come back as a brief you can edit line by line, not a
-  settings dialog. Its optional four-step tour stays out of the way, and
+  settings dialog. Its optional three-scene tour rehearses the loop on a
+  labelled sample brief, and
   in-place guidance appears only after the first exchange. It turns "a customer
   still reconciles invoices by hand" into a scored outcome, a job map, and a
   ranked opportunity board — inline in the thread. Every claim in a reply names
