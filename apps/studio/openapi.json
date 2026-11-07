@@ -86,6 +86,48 @@
         }
       }
     },
+    "/api/stats": {
+      "get": {
+        "summary": "Get Stats",
+        "description": "The onboarding funnel, counted from this machine's own event log.\n\nEvery counter is always named, and one that has not happened answers with a\nzero and no timestamps rather than an invented history. Nothing leaves the\nmachine: these numbers come from the same store the records do.",
+        "operationId": "get_stats_api_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Stats Api Stats Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats/reset": {
+      "post": {
+        "summary": "Reset Stats",
+        "description": "Start the measurement over and return the counters as they now stand.\n\nA reset appends a marker; the events it supersedes stay in the log. The\nasking happens in whatever surface calls this — a click that erases a\nmeasurement should not be the kind that fires straight away.",
+        "operationId": "reset_stats_api_stats_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Reset Stats Api Stats Reset Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/changelog": {
       "get": {
         "summary": "Get Changelog Route",
@@ -4629,6 +4671,44 @@
         ],
         "title": "McpHealthRequest"
       },
+      "MintShareRequest": {
+        "properties": {
+          "artifact_kind": {
+            "type": "string",
+            "enum": [
+              "outcome",
+              "segment",
+              "strategy"
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Artifact Id"
+          },
+          "ttl_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 30.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_kind",
+          "artifact_id"
+        ],
+        "title": "MintShareRequest",
+        "description": "Mint one scoped, expiring, read-only link for one artifact."
+      },
       "ModelListRequest": {
         "properties": {
           "base_url": {
@@ -5028,6 +5108,63 @@
           "schedule_expression"
         ],
         "title": "ScheduleWorkRequest"
+      },
+      "ShareMintResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "token",
+          "url",
+          "expires_at"
+        ],
+        "title": "ShareMintResponse",
+        "description": "The one time the raw token is shown. Only its hash is stored."
+      },
+      "SharedArtifactResponse": {
+        "properties": {
+          "artifact_kind": {
+            "type": "string",
+            "title": "Artifact Kind"
+          },
+          "artifact": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Artifact"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_kind",
+          "artifact"
+        ],
+        "title": "SharedArtifactResponse",
+        "description": "Exactly the named artifact and its own evidence. Nothing else."
       },
       "SignalActionRequest": {
         "properties": {

@@ -23,6 +23,9 @@ import {
 /** How much of a text file the model sees. Shared with the document formats. */
 export const MAX_ATTACHMENT_CHARS = MAX_EXTRACTED_CHARS;
 
+/** How many attachments a turn may carry, counting text and images together. */
+export const MAX_ATTACHMENTS = 5;
+
 /** The largest document we will try to read, re-exported for the composer. */
 export { MAX_DOCUMENT_BYTES } from "./extract/common";
 

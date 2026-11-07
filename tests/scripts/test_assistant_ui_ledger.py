@@ -14,7 +14,7 @@ from pathlib import Path
 
 from doc_check import ROOT, delivered_references, ledger_errors
 
-LEDGER_HEAD = """## The assistant-ui ledger
+LEDGER_HEAD = """# The assistant-ui ledger
 
 Prose.
 
@@ -178,6 +178,6 @@ def test_delivered_references_ignores_merge_commits() -> None:
 
 def test_the_repository_ledger_is_honest() -> None:
     """The real table passes every structural rule with history-independent checks."""
-    source = (ROOT / "docs/development.md").read_text(encoding="utf-8")
+    source = (ROOT / "docs/assistant-ui-ledger.md").read_text(encoding="utf-8")
     projection = (ROOT / "docs/living-studio.md").read_text(encoding="utf-8")
     assert ledger_errors(source, projection, root=ROOT, delivered=None) == []
