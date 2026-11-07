@@ -319,6 +319,15 @@
         </div>
       </div>
 
+      <div class="run__downloads" data-reveal>
+        <h3 class="run__label">Download a prebuilt archive</h3>
+        <div class="run__download-list">
+          {% for download in landing.run.downloads %}
+          <a class="btn btn--primary" href="{{ download.url }}">{{ download.label }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
       <p class="run__note">
         Hosted credentials come from the maintainers &mdash;
         <a href="https://github.com/alehar9320/agentic-odi/issues">open an issue</a>.
