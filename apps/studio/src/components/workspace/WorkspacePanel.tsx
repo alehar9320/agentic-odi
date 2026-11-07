@@ -39,6 +39,10 @@ export function WorkspacePanel() {
   // has to outlive the DOM to come back with it — per panel, never global (#696).
   const scrollByPanel = useRef(new Map<WorkspacePanelId, number>());
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  // Which element had focus when the panel opened, so closing the lens can
+  // return focus there instead of stealing it for the composer (#696).
+  // Never capture a textbox as the return target — focus returning to a text
+  // input moves the caret, which is exactly what this guard prevents.
 
   useFocusTrap(panelRef, isMobile && Boolean(panel));
 
@@ -57,8 +61,11 @@ export function WorkspacePanel() {
     if (isMobile) {
       return;
     }
-    returnFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!returnFocusRef.current) {
+      const active = document.activeElement;
+      returnFocusRef.current =
+        active instanceof HTMLElement && active.tagName !== "TEXTAREA" ? active : null;
+    }
     headingRef.current?.focus();
   }, [panelId, isMobile]);
 
