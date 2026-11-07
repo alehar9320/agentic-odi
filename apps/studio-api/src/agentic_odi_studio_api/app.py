@@ -32,6 +32,7 @@ from agentic_odi_studio_api.studio.errors import (
 from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.router import router as studio_router
+from agentic_odi_studio_api.studio.sharing import ShareService
 
 CORS_ORIGINS = [
     "tauri://localhost",
@@ -95,6 +96,7 @@ def create_app(
     connectors: ConnectorService | None = None,
     memory: StudioMemory | None = None,
     marketplace: StudioMarketplace | None = None,
+    sharing: ShareService | None = None,
 ) -> FastAPI:
     # A damaged file must not reach the person as a traceback. The store is
     # gated on open; when it fails, the app still starts and answers with the
@@ -170,6 +172,7 @@ def create_app(
     app.state.marketplace = resolved_marketplace
     app.state.connectors = connectors or ConnectorService(marketplace=resolved_marketplace)
     app.state.memory = resolved_memory
+    app.state.sharing = sharing or ShareService(service, resolved_memory)
     app.state.approvals = approvals
     app.state.boot_error = _boot_failure_error(boot_error) if boot_error else None
     app.state.db_integrity = "corrupt" if boot_error else getattr(repo, "integrity", "unknown")
