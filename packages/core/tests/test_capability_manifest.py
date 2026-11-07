@@ -41,7 +41,7 @@ def test_every_tool_has_summary_effect_and_returns() -> None:
 
 def test_effect_derivation_matches_naming_rule() -> None:
     """Known pure calculations are reads; other unrecognized verbs default to writes."""
-    pure_calculations = {"evaluate_outcome", "compute_opportunity"}
+    pure_calculations = {"evaluate_outcome", "compute_opportunity", "explain_opportunity"}
     for name, spec in TOOL_SPECS.items():
         if name.startswith(("get_", "list_")) or name in pure_calculations:
             assert spec.effect == ToolEffect.READ, (

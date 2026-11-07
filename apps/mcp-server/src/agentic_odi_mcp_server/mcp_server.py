@@ -40,6 +40,7 @@ from agentic_odi_core import (
     compute_opportunity_score,
     error_envelope,
     evaluate_outcome_statement,
+    explain_opportunity_score,
     invalid_strategy_request,
     job_not_found,
     odi_schema,
@@ -450,6 +451,22 @@ def compute_opportunity(importance: float, satisfaction: float) -> str:
         )
     score = compute_opportunity_score(importance, satisfaction)
     return f"Opportunity score: {score:.2f}"
+
+
+@mcp.tool
+def explain_opportunity(importance: float, satisfaction: float) -> str:
+    """Explain the algebra behind an ODI opportunity score.
+
+    Returns the two inputs, their gap, the score, the 10 threshold, and whether
+    the result is underserved. It answers with arithmetic only: it does not
+    change the formula, and it stores nothing.
+    """
+    if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
+        return _fail(
+            ValueOutOfRangeError("importance and satisfaction must be between 1.0 and 10.0")
+        )
+    explanation = explain_opportunity_score(importance, satisfaction)
+    return json.dumps(explanation)
 
 
 @mcp.tool

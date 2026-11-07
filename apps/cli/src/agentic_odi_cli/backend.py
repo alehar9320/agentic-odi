@@ -658,6 +658,15 @@ class LocalBackend(Backend):
             raise BackendError(_VALUE_RANGE_ERROR)
         return compute_opportunity_score(importance, satisfaction)
 
+    def _explain_opportunity(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import explain_opportunity_score
+
+        importance = args["importance"]
+        satisfaction = args["satisfaction"]
+        if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
+            raise BackendError(_VALUE_RANGE_ERROR)
+        return explain_opportunity_score(importance, satisfaction)
+
     def _list_signals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         signals = self.service.list_signals(
             unread_only=bool(args.get("unread_only", False)),
@@ -771,6 +780,7 @@ _LOCAL_HANDLERS = {
     "trigger_scheduled_work": LocalBackend._trigger_scheduled_work,
     "get_odi_schema": LocalBackend._get_odi_schema,
     "compute_opportunity": LocalBackend._compute_opportunity,
+    "explain_opportunity": LocalBackend._explain_opportunity,
     "evaluate_outcome": LocalBackend._evaluate_outcome,
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,

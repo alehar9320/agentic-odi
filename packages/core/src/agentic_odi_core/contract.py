@@ -41,6 +41,7 @@ class ToolName(str, Enum):
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
     COMPUTE_OPPORTUNITY = "compute_opportunity"
+    EXPLAIN_OPPORTUNITY = "explain_opportunity"
     GET_FRAMEWORK_GUIDELINES = "get_odi_framework_guidelines"
     GET_CAPABILITIES = "get_capabilities"
     GET_CAPABILITIES_MANIFEST = "get_capabilities_manifest"
@@ -384,6 +385,15 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("importance", "satisfaction"),
         required=("importance", "satisfaction"),
         returns="The opportunity score as a float.",
+        stage="4",
+    ),
+    ToolName.EXPLAIN_OPPORTUNITY.value: ToolSpec(
+        name="explain_opportunity",
+        summary="Explain how an ODI opportunity score is computed.",
+        effect=ToolEffect.READ,
+        arguments=("importance", "satisfaction"),
+        required=("importance", "satisfaction"),
+        returns="Explanation dict.",
         stage="4",
     ),
     ToolName.GET_FRAMEWORK_GUIDELINES.value: ToolSpec(
