@@ -7074,6 +7074,8 @@ details[open] summary {
   font-size: 0.76rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
 /* Selection and the caret carry the brand instead of the browser default. */
 ::selection {
   background: color-mix(in srgb, var(--accent) 38%, transparent);
