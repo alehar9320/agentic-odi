@@ -2147,6 +2147,12 @@ a {
   line-height: 1.45;
 }
 
+.settings__workspace-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.7rem;
+}
+
 .input,
 .select {
   width: 100%;

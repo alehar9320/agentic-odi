@@ -555,6 +555,17 @@ rail, composer, and floating chrome are hidden, the palette switches to paper,
 and cards stay whole instead of splitting across sheets. An open lens prints
 below the thread instead of being clipped off-screen.
 
+**The whole workspace is also one file.** Settings → Your workspace → **Export my
+workspace** writes every stored record — jobs, steps, outcomes, observations,
+evidence, conversations, and their messages — to `agentic-odi-workspace.json`, a
+plain readable snapshot at the current schema version. **Import workspace** reads
+that file back. Importing into an empty workspace proceeds; importing into a
+non-empty one asks first, naming what will be replaced, and cancelling changes
+nothing. A file this build cannot read is refused with the version it found — a
+version 1 file is migrated on the way in, every record kept — instead of failing
+silently. The file never leaves the machine: export downloads it, nothing is
+uploaded, and the outbox is excluded because a queued write is not portable.
+
 ### Sharing one artifact
 
 Sometimes the work has to leave the room without the room going with it. The

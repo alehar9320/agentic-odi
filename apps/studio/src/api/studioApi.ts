@@ -1,5 +1,7 @@
 import { apiUrl } from "../bridge/desktopBridge";
-import { getStudioBff } from "../bff/index";
+import { BffError } from "../bff/errors";
+import { getStudioBff, parseWorkspaceSnapshot } from "../bff/index";
+import type { WorkspaceSnapshot, WorkspaceSummary } from "../bff/store/types";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -819,4 +821,47 @@ export function promoteEvidence(
     `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
     payload,
   );
+}
+
+/**
+ * The whole local workspace as one JSON file. This is the browser store, not the
+ * sidecar: the escape hatch has to work when nothing else is reachable.
+ */
+export async function exportWorkspace(): Promise<string> {
+  const bff = await getStudioBff();
+  return bff.exportWorkspace();
+}
+
+/** What the local workspace holds, for naming it before it is replaced. */
+export async function workspaceSummary(): Promise<WorkspaceSummary> {
+  const bff = await getStudioBff();
+  return bff.workspaceSummary();
+}
+
+/**
+ * Validate an imported file without restoring it, so a version mismatch is
+ * reported before the person is asked to replace anything.
+ */
+export async function readWorkspaceSnapshot(json: string): Promise<WorkspaceSnapshot> {
+  try {
+    return parseWorkspaceSnapshot(json);
+  } catch (error) {
+    if (error instanceof BffError) {
+      throw new StudioApiError(error.studioError);
+    }
+    throw error;
+  }
+}
+
+/** Replace the local workspace with an imported file. Callers confirm first. */
+export async function importWorkspace(json: string): Promise<void> {
+  const bff = await getStudioBff();
+  try {
+    await bff.importWorkspace(json);
+  } catch (error) {
+    if (error instanceof BffError) {
+      throw new StudioApiError(error.studioError);
+    }
+    throw error;
+  }
 }
