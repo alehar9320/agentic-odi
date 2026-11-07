@@ -622,6 +622,33 @@ itself, including that a quote containing `<script>` or `<h1>` prints as the
 characters the person said. The rules live in `scripts/artifact_a11y.py`; what
 passes them is a well-built document, not a certified one.
 
+### Sharing a read-only artifact
+
+A person can hand a teammate one artifact without handing over the workspace.
+The landscape header carries a **Share** control; choosing a duration (7, 14, or
+30 days) mints a link through the sidecar and shows it once, with a **Copy
+link** button. The link is a capability, not a copy of the database: it opens a
+read-only page that renders the landscape — or the vision — and its own
+evidence, and nothing else.
+
+The page lives at `/shared/:token`, and it is deliberately *not* the Studio with
+its controls hidden. The route is decided before any provider mounts, so no
+canvas fetch, rail, composer or sidecar configuration runs; the header names the
+artifact and its expiry, and the only action is the browser's own print. An
+expired, unknown or revoked token shows one sentence and no data; a guessed
+artifact id renders nothing, because only the token is scoped.
+
+The mint and read contract belongs to the sidecar's share store (#549): it mints
+a link for one artifact, returns the scoped payload for a token, and revokes by
+id. Until that store lands, a click reports the failure rather than promising a
+link it did not make, and the sheet says when a link cannot be revoked.
+
+| File | Role |
+|---|---|
+| `apps/studio/src/lib/share.ts` | The `/shared/:token` route reader and expiry wording. Pure and tested. |
+| `apps/studio/src/components/SharedArtifact.tsx` | The read-only page: one artifact, its evidence, the expiry. |
+| `apps/studio/src/components/Share{Action,Sheet}.tsx` | The landscape control and the dialog that mints a link, offers it to copy, and states revocability. |
+
 ## Rich responses
 
 
