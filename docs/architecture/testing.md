@@ -128,6 +128,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 Checks that span the workspace rather than one distribution:
 
 - `tests/contract/test_mcp_contract.py` — live FastMCP names, argument names, and required fields match `agentic_odi_core.contract.TOOL_SPECS`.
+- `tests/contract/test_contract_snapshot.py` — the same contract, pinned: the declared `TOOL_SPECS`, the input schemas the live registry serves, and `odi_schema()` for the entities.
 - `tests/contract/test_cli_contract.py` — the CLI local-handler keys are a subset of `TOOL_NAMES`.
 - `tests/test_architecture.py` — the package diagram in the [architecture index](README.md#dependency-direction), the `[project] dependencies` each member declares, and the imports the source actually contains must all agree. It also checks the four groups inside `packages/core`: persistence imports no methodology, and every core module belongs to exactly one group ([the layer table](README.md#inside-packagescore)).
 - `tests/test_worker_security_headers.py` — the Living Studio Worker sends its security headers.
@@ -144,6 +145,32 @@ Checks that span the workspace rather than one distribution:
 - `website/tests/` — static site integrity (`test_site.py`), docs rendering (`test_docs_render.py`), content sync with the repo (`test_content_sync.py`, `test_generated.py`), OG art reproducibility (`test_make_og.py`), the design system (`test_design_system.py`), the Pages deploy (`test_pages_deploy.py`), and the CI wiring that runs this suite (`test_ci_required.py`).
 
 `test_ci_required.py` is the contract that keeps the site from shipping on faith. It asserts the `website` job in `ci.yml` runs `uv run --directory website pytest tests/`, carries no `continue-on-error`, and is both a `needs:` entry and an enforced result in the `CI green` aggregate — the status check the `main-requires-ci-green` ruleset requires. It also asserts the Pages `deploy` job waits on the tested `build`. The wiring has regressed before: the site's checks once lived in a `feature/gh-pages`-only workflow that never ran for a pull request into `main` (402f0a5).
+
+## Pinned Data
+
+`tests/contract/test_contract_snapshot.py` pins the shape of the MCP contract with
+`inline-snapshot`, declared in the root `[dependency-groups] dev`. Three surfaces are
+pinned in one file, because they can drift apart three different ways: the declared
+`TOOL_SPECS`, the input schemas the live registry actually serves, and `odi_schema()`
+for the entities those tools move.
+
+The pins cover structure — argument names, which of them are required, the read/write
+effect, the ODI stage, and the JSON-schema shape of every entity field. They do not
+cover wording. A reworded tool summary or field description is not a contract change,
+and a gate that fails on one trains people to regenerate without reading.
+
+When the contract is meant to change, regenerate deliberately, read the diff, then
+prove the file matches the code:
+
+```bash
+uv run pytest tests/contract/test_contract_snapshot.py --inline-snapshot=create
+uv run pytest tests/contract -k snapshot
+```
+
+CI runs only the second form. The first rewrites a test file, which is the opposite of
+a gate, so it never appears in a workflow. `[tool.inline-snapshot] format-command` in
+the root `pyproject.toml` pipes the generated literals through `ruff format`, so a
+regenerated pin is already in the shape `uv run ruff format --check .` expects.
 
 ## Isolation Rules
 
