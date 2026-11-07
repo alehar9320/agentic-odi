@@ -48,7 +48,7 @@ describe("StudioBar", () => {
   beforeEach(() => {
     vi.mocked(useUpdateSnapshot).mockReturnValue(stubSnapshot() as never);
   });
-  it("shows the Odi mark at 32 pixels so the pixel art stays crisp", () => {
+  it("shows the Odi mark at 32 pixels as a scalable vector mark", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext() as never);
     const { container } = render(
       <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
@@ -56,6 +56,8 @@ describe("StudioBar", () => {
     const svg = container.querySelector(".brand__mark svg");
     expect(svg?.getAttribute("width")).toBe("32");
     expect(svg?.getAttribute("height")).toBe("32");
+    expect(svg?.getAttribute("viewBox")).toBe("0 0 32 32");
+    expect(svg?.getAttribute("shape-rendering")).toBeNull();
   });
 
   it("labels the model health control with its state and message", () => {
