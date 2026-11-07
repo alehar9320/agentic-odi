@@ -35,9 +35,9 @@ const OBSERVATION = {
   updated_at: "2026-10-22T10:00:00+00:00",
 };
 
-function json(body: unknown): Response {
+function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
-    status: 200,
+    status,
     headers: { "Content-Type": "application/json" },
   });
 }
@@ -258,8 +258,19 @@ function route(
     return json({ ok: true, id: url.split("/").pop() });
   }
   if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
-    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
-    return json({ conversation: CONVERSATION });
+    const patch = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    headPatches.push(patch);
+    // The rename tests need the server's answer to carry the name they sent, and
+    // one name they can make fail on purpose.
+    if (patch.title === "__fail__") {
+      return json({ error: { code: "internal", message: "boom" } }, 500);
+    }
+    return json({
+      conversation:
+        typeof patch.title === "string"
+          ? { ...CONVERSATION, title: patch.title }
+          : CONVERSATION,
+    });
   }
   if (url === "/api/conversations/c-1/tree") {
     return json({
@@ -1828,6 +1839,52 @@ describe("StudioContext agent focus", () => {
     // but the composer has no words to claim, so no chip may appear.
     expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "deleted-yesterday" });
     expect(result.current.focusedSubjectLabel).toBeNull();
+  });
+
+  // Inside the main fixture on purpose: renaming needs the stubbed sidecar route
+  // and the same freshly cleared IndexedDB every other conversation test uses.
+  describe("renaming a thread (#642)", () => {
+  it("shows the new name in the list without leaving the open thread", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversations.length).toBeGreaterThan(0));
+    const open = result.current.conversationId;
+
+    await act(async () => {
+      await result.current.renameConversation("c-1", "  Retention work  ");
+    });
+
+    const renamed = result.current.conversations.find((item) => item.id === "c-1");
+    expect(renamed?.title).toBe("Retention work");
+    // A name is not a door: the thread on screen is still the one that was open,
+    // and the request carried the name alone.
+    expect(result.current.conversationId).toBe(open);
+    expect(headPatches[headPatches.length - 1]).toEqual({ title: "Retention work" });
+  });
+
+  it("puts the old name back when the rename is refused", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversations.length).toBeGreaterThan(0));
+    const before = result.current.conversations.find((item) => item.id === "c-1")?.title;
+
+    await act(async () => {
+      await expect(result.current.renameConversation("c-1", "__fail__")).rejects.toThrow();
+    });
+
+    // The optimistic name is withdrawn rather than left standing as a lie.
+    expect(result.current.conversations.find((item) => item.id === "c-1")?.title).toBe(before);
+  });
+
+  it("refuses a blank name before touching the list", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversations.length).toBeGreaterThan(0));
+    const patches = headPatches.length;
+
+    await act(async () => {
+      await expect(result.current.renameConversation("c-1", "   ")).rejects.toThrow(/name/i);
+    });
+
+    expect(headPatches.length).toBe(patches);
+  });
   });
 });
 

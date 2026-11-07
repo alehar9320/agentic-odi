@@ -732,6 +732,33 @@ export async function setConversationHead(
   );
 }
 
+/**
+ * Give a thread a name of its own.
+ *
+ * The sidecar trims and caps the title at 200 characters and keeps the visible
+ * branch: a rename must not move the person off the reply they were reading. An
+ * empty name is refused here, before any request, because a nameless row is the
+ * problem this exists to solve.
+ */
+export async function renameConversation(
+  conversationId: string,
+  title: string,
+): Promise<Conversation> {
+  const cleaned = title.trim();
+  if (!cleaned) {
+    throw new Error("A conversation needs a name.");
+  }
+  return withLocal(
+    () =>
+      sendJson<{ conversation: Conversation }>(
+        "PATCH",
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+        { title: cleaned },
+      ).then((body) => body.conversation),
+    async (bff) => bff.memory.renameConversation(conversationId, cleaned),
+  );
+}
+
 /** Answer one paused write. The turn resumes on the stream it came from. */
 export async function resolveApproval(
   approvalId: string,

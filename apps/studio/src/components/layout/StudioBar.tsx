@@ -41,6 +41,7 @@ export function StudioBar({
     llmHealth,
     messages,
     openConversation,
+    renameConversation,
     refreshConversations,
     sidecarReachable,
     streaming,
@@ -65,6 +66,12 @@ export function StudioBar({
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
+  // Renaming is an edit of one row, never a second way to open it.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const renamingRef = useRef<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [titleInvalid, setTitleInvalid] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   // An empty transcript is only nothing to lose when nothing is on screen to
   // leave: the plus is the documented way out of the first-run setup, and a
   // disabled control there would strand the person in it.
@@ -153,6 +160,17 @@ export function StudioBar({
     };
   }, [historyOpen]);
 
+  // The editor takes focus and selects the whole name, so typing replaces it and
+  // Escape puts it back without a second decision.
+  useEffect(() => {
+    if (!renamingId) {
+      return;
+    }
+    const input = titleInputRef.current;
+    input?.focus();
+    input?.select();
+  }, [renamingId]);
+
   function toggleHistory() {
     setHistoryOpen((open) => {
       if (!open) {
@@ -169,6 +187,74 @@ export function StudioBar({
         pushToast("error", "I couldn't open that conversation."),
       );
     }
+  }
+
+  function beginRename(targetId: string, title: string) {
+    setRenamingId(targetId);
+    renamingRef.current = targetId;
+    setDraftTitle(title);
+    setTitleInvalid(false);
+  }
+
+  function cancelRename() {
+    renamingRef.current = null;
+    setRenamingId(null);
+    setDraftTitle("");
+    setTitleInvalid(false);
+  }
+
+  async function commitRename(targetId: string, previousTitle: string) {
+    // Enter, then the input's blur, would otherwise both commit one name.
+    if (renamingRef.current !== targetId) {
+      return;
+    }
+    const cleaned = draftTitle.trim();
+    if (!cleaned) {
+      // Refused in place, without a request: a nameless row is what this replaces.
+      setTitleInvalid(true);
+      titleInputRef.current?.focus();
+      return;
+    }
+    renamingRef.current = null;
+    setRenamingId(null);
+    setTitleInvalid(false);
+    setDraftTitle("");
+    // An unchanged name costs nothing — no request, no reordering.
+    if (cleaned === previousTitle.trim()) {
+      return;
+    }
+    try {
+      await renameConversation(targetId, cleaned);
+    } catch {
+      pushToast("error", "I couldn't rename that conversation.");
+    }
+  }
+
+  function onTitleKeyDown(
+    event: ReactKeyboardEvent<HTMLInputElement>,
+    targetId: string,
+    previousTitle: string,
+  ) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      // The row is inside a menu: Enter belongs to the name, not to the row.
+      event.stopPropagation();
+      void commitRename(targetId, previousTitle);
+      return;
+    }
+    if (event.key === "Escape") {
+      // Cancels the rename, not the whole history list.
+      event.stopPropagation();
+      cancelRename();
+    }
+  }
+
+  function onTitleBlur(targetId: string, previousTitle: string) {
+    if (draftTitle.trim() === previousTitle.trim()) {
+      cancelRename();
+      return;
+    }
+    void commitRename(targetId, previousTitle);
   }
 
   function exportConversation() {
@@ -312,22 +398,53 @@ export function StudioBar({
               ) : (
                 conversations.map((conversation) => {
                   const current = conversation.id === conversationId;
+                  const stored = conversation.title.trim();
+                  const name = stored || "New conversation";
                   return (
-                    <button
-                      key={conversation.id}
-                      type="button"
-                      role="menuitem"
-                      className="bar__menu-item bar__history-item"
-                      aria-current={current ? "true" : undefined}
-                      onClick={() => selectConversation(conversation.id)}
-                    >
-                      <span className="bar__history-title">
-                        {conversation.title.trim() || "New conversation"}
-                      </span>
-                      <span className="bar__history-meta">
-                        {formatRelativeTime(conversation.updated_at)}
-                      </span>
-                    </button>
+                    <div key={conversation.id} className="bar__history-row" role="none">
+                      {renamingId === conversation.id ? (
+                        <input
+                          ref={titleInputRef}
+                          className="bar__history-input"
+                          aria-label={`Name for ${name}`}
+                          placeholder="Name this thread"
+                          value={draftTitle}
+                          aria-invalid={titleInvalid || undefined}
+                          onChange={(event) => {
+                            setDraftTitle(event.target.value);
+                            setTitleInvalid(false);
+                          }}
+                          onKeyDown={(event) =>
+                            onTitleKeyDown(event, conversation.id, stored)
+                          }
+                          onBlur={() => onTitleBlur(conversation.id, stored)}
+                        />
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="bar__menu-item bar__history-item"
+                            aria-current={current ? "true" : undefined}
+                            onClick={() => selectConversation(conversation.id)}
+                          >
+                            <span className="bar__history-title">{name}</span>
+                            <span className="bar__history-meta">
+                              {formatRelativeTime(conversation.updated_at)}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            className="bar__history-rename"
+                            aria-label={`Rename ${name}`}
+                            title={`Rename ${name}`}
+                            onClick={() => beginRename(conversation.id, conversation.title)}
+                          >
+                            <span aria-hidden="true">✎</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
                   );
                 })
               )}

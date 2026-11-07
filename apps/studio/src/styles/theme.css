@@ -404,6 +404,53 @@ a {
   font-size: 0.72rem;
 }
 
+/* One row is a thread plus the single action about the thread itself. */
+.bar__history-row {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.bar__history-row .bar__history-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.bar__history-rename {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+
+.bar__history-rename:hover,
+.bar__history-rename:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.bar__history-input {
+  flex: 1;
+  min-width: 0;
+  margin: 2px 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border, var(--faint));
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.bar__history-input[aria-invalid="true"] {
+  border-color: var(--danger, #c0392b);
+}
+
 /* ------------------------------------------------------------------ */
 /* Conversation                                                       */
 /* ------------------------------------------------------------------ */
