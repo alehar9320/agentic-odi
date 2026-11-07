@@ -68,8 +68,10 @@ without a duration — only the browser that watched the run owns the clock.
 ### Slash commands
 
 Type `/` to open the palette. `Up`/`Down` move, `Enter` or `Tab` runs the
-selected command, `Esc` closes it. Commands are handled in the SPA and never call
-the model, so they work when it is offline.
+selected command, `Esc` closes it. While an input method is composing — Japanese,
+Chinese, Korean, or any other — its keys are never interpreted: `Enter` and the
+arrows choose a candidate, they do not run, move, dismiss, or send. Commands are
+handled in the SPA and never call the model, so they work when it is offline.
 
 | Command | Effect |
 |---|---|
@@ -364,11 +366,12 @@ without giving up the message model the sidecar already understands.
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 | **Queue** | A follow-up sent while an answer still streams does not hit a wall: it joins a quiet lane above the composer and runs in the order it was sent once the live turn settles. Each row offers **Run now** — it jumps ahead of the other waiting follow-ups — and a remove that drops only that message. Stop stops the live turn and the lane waits for the next send; it never clears the queue. The lane is in-memory and dies with the page, and the sidecar still sees exactly one SSE turn at a time — the queue sequences, it never parallelises. |
+| **Read aloud** | A settled reply with prose offers **Read aloud** beside Copy, and becomes **Stop reading** while it speaks. Starting another reply stops the first; **Stop reading**, Escape inside the thread, and leaving the conversation end it. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken. A streaming reply is never spoken, and speech is never persisted. |
 
 #### What the runtime gives us, and what we did not take
 
 The full coverage ledger — every assistant-ui capability and its one honest
-state — is authored in [Development](development.md),
+state — is authored in [The assistant-ui ledger](assistant-ui-ledger.md),
 and `scripts/doc_check.py` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
 narrower than the library offers (Partial). A row is Adopted only when a test
 proves a person can use it, the named file exists, and the Delivered column
@@ -558,6 +561,29 @@ rail, composer, and floating chrome are hidden, the palette switches to paper,
 and cards stay whole instead of splitting across sheets. An open lens prints
 below the thread instead of being clipped off-screen.
 
+### Sharing one artifact
+
+Sometimes the work has to leave the room without the room going with it. The
+sidecar mints a **scoped, expiring, read-only share token** for exactly one
+record — an outcome, a segment, or a strategy. `POST /api/share` returns the raw
+token once; `DELETE /api/share/{id}` revokes it, effective immediately; and
+`GET /api/share/{token}` returns the named artifact and its own evidence and
+nothing else. `GET /api/share` lists the owner's links without their tokens.
+
+The token is `odi_sh_` plus 32 random bytes, and only its SHA-256 hash is
+stored, so a copy of the database is not a copy of the link. Expiry defaults to
+7 days and never exceeds 30. A read never returns the workspace: not the canvas,
+not a list, not the memory, not a conversation, and not a connector secret — an
+evidence record travels without its raw payload. An unknown, expired, revoked,
+or malformed token is the same `404`, so a probe learns nothing, and a read
+records only `last_read_at` for the owner, never who read it. Nothing about a
+link is writable: a non-`GET` on the shared path is `405`.
+
+The link points at `AGENTIC_ODI_PUBLIC_BASE_URL` when it is set, and at
+`http://127.0.0.1:8100` otherwise. It works only while this sidecar is running
+and reachable by the reader; the read-only page that renders it is #550. No
+accounts, no session, and no public write path exist here — the token is the
+whole capability.
 ### The decision brief
 
 A conversation is hard to hand to a review, so the Studio writes the document
@@ -819,7 +845,9 @@ Each row below names a state to reach and what is worth your own eyes.
 | Model picker | **Model** in the hint row; open it twice; narrow the window first | The list matches the backend, the configured id stays selectable, arrows/Home/End/Enter/Escape work, an offline backend explains itself and its Settings button is reachable from the keyboard, and it probes once per backend |
 | Attachments | Paperclip, drag a file onto the composer, paste a screenshot, then drop a `.exe` | Thumbnail, name, size, and remove on the chip; the unreadable file is refused with its reason; the sent turn shows the same; the paperclip has a visible focus ring |
 | Branches | Edit your own turn, then regenerate a reply | **Alternative N of M** with `‹`/`›`, and a reload reopens the branch you were reading |
-| Reduced motion, narrow window | Turn on OS reduce-motion; then drag the window narrow | Shimmer, dots, and cycling stop; the lens becomes a sheet, the composer stays usable, and menus stay on screen |
+| Reduced motion, narrow window | Turn on OS reduce-motion; then drag the window narrow | Shimmer, dots, cycling, and the landscape's underserved pulse stop; the ring stays drawn and the nodes do not move; the lens becomes a sheet, the composer stays usable, and menus stay on screen |
+| Reduced transparency, more contrast | Turn on OS reduce-transparency, then more contrast | Every blurred panel becomes an opaque surface instead of glass; muted and faint text step up, hairlines thicken, and nothing overlaps or clips |
+| Theme change | Toggle Appearance in Settings while watching the bar | The window cross-fades in about 120 ms with no white flash; with reduce-motion on it swaps instantly; selected text and the caret carry the accent |
 
 Two things surprise people on a local model:
 

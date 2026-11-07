@@ -183,6 +183,50 @@ describe("CapabilityRegistry", () => {
     expect(byId["sidecar-import"].status).toBe("available");
   });
 
+  it("presents the bearer token when probing the sidecar", async () => {
+    localStorage.setItem("studio.token", "probe-token");
+    // The gated sidecar answers only the requests that carry the key, so a
+    // probe that forgets it reports the capability as missing.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = new Headers(init?.headers);
+        if (headers.get("Authorization") !== "Bearer probe-token") {
+          return new Response("", { status: 401 });
+        }
+        const url = String(input);
+        if (url.includes("/api/capabilities")) {
+          return new Response(
+            JSON.stringify({
+              capabilities: [
+                { id: "sidecar-llm", available: true },
+                { id: "sidecar-import", available: true },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (url.includes("/api/connectors") || url.includes("/api/health/mcp")) {
+          return new Response("", { status: 200 });
+        }
+        return new Response("", { status: 404 });
+      }),
+    );
+    const statuses = await capabilityRegistry.statuses({
+      base_url: "http://localhost:8001/v1",
+      api_key: "local",
+      model_name: "local-tools-model",
+      mcp_url: "http://localhost:8000/mcp",
+      theme: "dark",
+    });
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["sidecar-llm"].status).toBe("available");
+    expect(byId["sidecar-connectors"].status).toBe("available");
+    expect(byId["sidecar-mcp"].status).toBe("available");
+    expect(byId["sidecar-import"].status).toBe("available");
+    localStorage.removeItem("studio.token");
+  });
+
   it("returns all eight capability ids", async () => {
     const statuses = await capabilityRegistry.statuses({
       base_url: "http://localhost:8001/v1",

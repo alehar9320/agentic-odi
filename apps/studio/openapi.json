@@ -4671,6 +4671,44 @@
         ],
         "title": "McpHealthRequest"
       },
+      "MintShareRequest": {
+        "properties": {
+          "artifact_kind": {
+            "type": "string",
+            "enum": [
+              "outcome",
+              "segment",
+              "strategy"
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Artifact Id"
+          },
+          "ttl_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 30.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_kind",
+          "artifact_id"
+        ],
+        "title": "MintShareRequest",
+        "description": "Mint one scoped, expiring, read-only link for one artifact."
+      },
       "ModelListRequest": {
         "properties": {
           "base_url": {
@@ -5070,6 +5108,63 @@
           "schedule_expression"
         ],
         "title": "ScheduleWorkRequest"
+      },
+      "ShareMintResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "token",
+          "url",
+          "expires_at"
+        ],
+        "title": "ShareMintResponse",
+        "description": "The one time the raw token is shown. Only its hash is stored."
+      },
+      "SharedArtifactResponse": {
+        "properties": {
+          "artifact_kind": {
+            "type": "string",
+            "title": "Artifact Kind"
+          },
+          "artifact": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Artifact"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_kind",
+          "artifact"
+        ],
+        "title": "SharedArtifactResponse",
+        "description": "Exactly the named artifact and its own evidence. Nothing else."
       },
       "SignalActionRequest": {
         "properties": {
