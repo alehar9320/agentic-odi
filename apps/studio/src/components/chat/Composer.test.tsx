@@ -244,7 +244,9 @@ describe("ThreadComposer attachments", () => {
     await screen.findByText("notes-1.txt");
     await screen.findByText("notes-5.txt");
     expect(screen.queryByText("notes-6.txt")).toBeNull();
-    expect(await screen.findAllByRole("listitem")).toHaveLength(5);
+    const items = await screen.findAllByRole("listitem");
+    // The starter cards are list items too now (#600); count only the attachments.
+    expect(items.filter((item) => item.closest(".composer__attachments"))).toHaveLength(5);
 
     expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("notes-6.txt"));
     expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("5-file"));
