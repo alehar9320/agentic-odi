@@ -47,9 +47,8 @@ function StudioShell() {
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
-    // Home is the empty stage. The thread is put away rather than thrown away:
-    // it stays in the history, so nothing said is lost by going back.
-    startNewThread();
+    // Home closes what is open and leaves the thread alone. Discarding it is
+    // the other control's job, and only after asking what is being lost.
     closePanel();
     closeSetup();
     closeCustomize();

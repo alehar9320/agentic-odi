@@ -1,19 +1,17 @@
 import type {
-  ChatPart,
   Conversation,
   ConversationSummary,
   ConversationTurn,
   LatestConversation,
   Observation,
-  ObservationCategory,
+  ObservationKind,
   ObservationStatus,
 } from "../../types";
 import { notFound, validation } from "../errors";
 import { newId, nowIso } from "../id";
 import type { LocalStore, StoredConversation, StoredTurn } from "../store/types";
 
-/** Mirrors `agentic_odi_core.models.ObservationCategory`. */
-const OBSERVATION_CATEGORIES = new Set<ObservationCategory>([
+const OBSERVATION_KINDS = new Set<ObservationKind>([
   "career",
   "opportunity",
   "business",
@@ -26,7 +24,7 @@ const OBSERVATION_CATEGORIES = new Set<ObservationCategory>([
   "other",
 ]);
 const OBSERVATION_STATUSES = new Set<ObservationStatus>([
-  "proposed",
+  "suggested",
   "confirmed",
   "dismissed",
 ]);
@@ -36,10 +34,10 @@ const TURN_ROLES = new Set<ConversationTurn["role"]>([
   "system",
   "tool",
 ]);
-/** The core caps an observation at 300 characters; the fallback must agree. */
-const MAX_TEXT = 300;
-const MAX_CONTEXT_TEXT = 300;
+const MAX_TEXT = 2000;
+const MAX_CONTEXT_TEXT = 500;
 const MAX_CONTEXT_CHARS = 4000;
+const MAX_SUGGESTED_IN_CONTEXT = 10;
 /** How many threads the history list carries; the switcher UI (#408) owns paging. */
 const MAX_CONVERSATIONS = 20;
 
@@ -54,11 +52,11 @@ function cleanText(text: string): string {
   return cleaned;
 }
 
-function cleanCategory(category: string): ObservationCategory {
-  if (!OBSERVATION_CATEGORIES.has(category as ObservationCategory)) {
-    throw validation(`Unknown observation category: ${category}.`);
+function cleanKind(kind: string): ObservationKind {
+  if (!OBSERVATION_KINDS.has(kind as ObservationKind)) {
+    throw validation(`Unknown observation kind: ${kind}.`);
   }
-  return category as ObservationCategory;
+  return kind as ObservationKind;
 }
 
 function cleanStatus(status: string): ObservationStatus {
@@ -90,24 +88,22 @@ export class LocalMemoryService {
   }
 
   async addObservation(input: {
-    category?: string;
+    kind: string;
     text: string;
     data?: Record<string, unknown>;
     confidence?: number;
     confirmed?: boolean;
-    conversationId?: string | null;
-    sourceMessageId?: string | null;
   }): Promise<Observation> {
     const now = nowIso();
     const observation: Observation = {
       id: newId(),
-      category: cleanCategory(input.category ?? "other"),
+      kind: cleanKind(input.kind),
+      category: cleanKind(input.kind),
       text: cleanText(input.text),
       data: cleanData(input.data),
-      status: input.confirmed ? "confirmed" : "proposed",
+      status: input.confirmed ? "confirmed" : "suggested",
       confidence: cleanConfidence(input.confidence ?? 0.5),
-      conversation_id: input.conversationId ?? null,
-      source_message_id: input.sourceMessageId ?? null,
+      source_turn: null,
       created_at: now,
       updated_at: now,
     };
@@ -120,7 +116,6 @@ export class LocalMemoryService {
     input: {
       text?: string;
       status?: string;
-      category?: string;
       data?: Record<string, unknown>;
       confidence?: number;
     },
@@ -134,8 +129,6 @@ export class LocalMemoryService {
     const next: Observation = {
       ...existing,
       text: input.text === undefined ? existing.text : cleanText(input.text),
-      category:
-        input.category === undefined ? existing.category : cleanCategory(input.category),
       status:
         input.status === undefined ? existing.status : cleanStatus(input.status),
       data: input.data === undefined ? existing.data : cleanData(input.data),
@@ -169,15 +162,14 @@ export class LocalMemoryService {
     return { ok: true };
   }
 
-  async createConversation(title?: string | null): Promise<Conversation> {
+  async createConversation(title = ""): Promise<Conversation> {
     const now = nowIso();
     const conversation: StoredConversation = {
       id: newId(),
-      title: title && title.trim() ? title.trim().slice(0, 200) : null,
+      title: title.trim(),
       created_at: now,
       updated_at: now,
       head_id: null,
-      archived: false,
     };
     await this.store.putConversation(conversation);
     return conversation;
@@ -206,25 +198,38 @@ export class LocalMemoryService {
     return this.store.setConversationHead(id, headId);
   }
 
-  /** Archiving keeps the thread readable; only a delete would lose it. */
   async setConversationArchived(id: string, archived: boolean): Promise<Conversation> {
     const conversation = await this.store.getConversation(id);
     if (!conversation) {
       throw notFound("Conversation", id);
     }
-    const next: StoredConversation = { ...conversation, archived, updated_at: nowIso() };
+    const next: StoredConversation = {
+      ...conversation,
+      head_id: conversation.head_id ?? null,
+      archived,
+      updated_at: nowIso(),
+    };
     await this.store.putConversation(next);
     return next;
   }
 
-  async deleteConversation(id: string): Promise<{ ok: boolean }> {
-    const conversation = await this.store.getConversation(id);
-    if (!conversation) {
+  async deleteConversation(id: string): Promise<{ deleted: string }> {
+    if (!(await this.store.getConversation(id))) {
       throw notFound("Conversation", id);
     }
+    // The browser store keeps no tombstone: the thread is emptied and marked
+    // archived, which is the strongest goodbye it can express.
     await this.store.clearTurns(id);
-    await this.store.deleteConversation(id);
-    return { ok: true };
+    const conversation = await this.store.getConversation(id);
+    if (conversation) {
+      await this.store.putConversation({
+        ...conversation,
+        head_id: conversation.head_id ?? null,
+        archived: true,
+        updated_at: nowIso(),
+      });
+    }
+    return { deleted: id };
   }
 
   async latestConversation(): Promise<LatestConversation> {
@@ -258,7 +263,8 @@ export class LocalMemoryService {
     content: string,
     messageId?: string | null,
     parentId?: string | null,
-    parts?: ChatPart[],
+    // Parts are the sidecar's richer transcript; the browser store keeps text.
+    _parts: unknown[] = [],
   ): Promise<ConversationTurn> {
     if (!TURN_ROLES.has(role)) {
       throw validation(`Unknown turn role: ${role}.`);
@@ -272,29 +278,28 @@ export class LocalMemoryService {
       role,
       content,
       created_at: nowIso(),
-      ...(messageId ? { id: messageId } : {}),
+      message_id: messageId ?? null,
       parent_id: parentId ?? null,
-      parts: parts ?? [],
     });
+    const now = nowIso();
     await this.store.putConversation({
       ...conversation,
       title:
         role === "user" && content.trim() && !conversation.title
           ? content.trim().slice(0, 80)
           : conversation.title,
-      head_id: turn.id,
-      updated_at: nowIso(),
+      head_id: messageId ?? conversation.head_id,
+      updated_at: now,
     });
     return turn;
   }
 
-  /**
-   * Confirmed facts only: a proposed observation is the agent's guess, and a
-   * dismissed one must never come back.
-   */
   async memoryContext(): Promise<string> {
-    const confirmed = (await this.listObservations()).filter(
+    const observations = (await this.listObservations()).filter(
       (observation) => observation.status === "confirmed",
+    );
+    const suggested = (await this.listObservations()).filter(
+      (observation) => observation.status === "suggested",
     );
     const lines: string[] = [];
     let length = 0;
@@ -305,10 +310,16 @@ export class LocalMemoryService {
       lines.push(line);
       length += line.length + 1;
     };
-    if (confirmed.length) {
+    if (observations.length) {
       add("Confirmed context:");
-      for (const observation of confirmed) {
-        add(`- [${observation.category}] ${observation.text.slice(0, MAX_CONTEXT_TEXT)}`);
+      for (const observation of observations) {
+        add(`- [${observation.kind}] ${observation.text.slice(0, MAX_CONTEXT_TEXT)}`);
+      }
+    }
+    if (suggested.length) {
+      add("Suggested context (not yet confirmed):");
+      for (const observation of suggested.slice(0, MAX_SUGGESTED_IN_CONTEXT)) {
+        add(`- [${observation.kind}] ${observation.text.slice(0, MAX_CONTEXT_TEXT)}`);
       }
     }
     return lines.join("\n");

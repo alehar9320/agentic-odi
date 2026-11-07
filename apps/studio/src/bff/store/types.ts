@@ -44,8 +44,8 @@ export interface StoredConversation extends Conversation {
 }
 
 export interface StoredTurn extends ConversationTurn {
-  /** Insertion order, because a string id says nothing about when a turn came. */
-  seq: number;
+  message_id: string | null;
+  parent_id: string | null;
 }
 
 export type OutboxKind = "create" | "update" | "delete";
@@ -158,12 +158,10 @@ export interface LocalStore {
   getConversation(id: string): Promise<StoredConversation | undefined>;
   putConversation(conversation: StoredConversation): Promise<void>;
   setConversationHead(id: string, headId: string | null): Promise<StoredConversation>;
-  deleteConversation(id: string): Promise<void>;
   listTurns(conversationId: string): Promise<ConversationTurn[]>;
   /** How much a conversation holds, without reading every turn. */
   countTurns(conversationId: string): Promise<number>;
-  /** The client's own message id is kept when it supplies one, so branches match. */
-  appendTurn(turn: Omit<StoredTurn, "id" | "seq"> & { id?: string }): Promise<StoredTurn>;
+  appendTurn(turn: Omit<StoredTurn, "id"> & { id?: string }): Promise<StoredTurn>;
   clearTurns(conversationId: string): Promise<void>;
   conversationTree(conversationId: string): Promise<{
     conversation: StoredConversation;

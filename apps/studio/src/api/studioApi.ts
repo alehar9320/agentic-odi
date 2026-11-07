@@ -607,11 +607,12 @@ export async function proposeStrategy(mcpUrl: string, jobId?: string): Promise<S
 }
 
 
+
 export async function fetchMemory(status?: ObservationStatus): Promise<Observation[]> {
   return withLocal(
     () =>
       getJson<{ observations: Observation[] }>(
-        `/api/observations${status ? `?status=${status}` : ""}`,
+        `/api/memory/observations${status ? `?status=${status}` : ""}`,
       ).then((body) => body.observations ?? []),
     async (bff) => {
       const all = await bff.memory.listObservations(true);
@@ -634,18 +635,16 @@ export interface AddObservationPayload {
 export async function addObservation(payload: AddObservationPayload): Promise<Observation> {
   return withLocal(
     () =>
-      postJson<{ observation: Observation }>("/api/observations", payload).then(
+      postJson<{ observation: Observation }>("/api/memory/observations", payload).then(
         (body) => body.observation,
       ),
     (bff) =>
       bff.memory.addObservation({
-        category: payload.category,
+        kind: payload.category ?? "other",
         text: payload.text,
         data: payload.data,
         confidence: payload.confidence,
         confirmed: payload.confirmed,
-        conversationId: payload.conversation_id,
-        sourceMessageId: payload.source_message_id,
       }),
   );
 }
@@ -666,7 +665,7 @@ export async function updateObservation(
     () =>
       sendJson<{ observation: Observation }>(
         "PATCH",
-        `/api/observations/${encodeURIComponent(observationId)}`,
+        `/api/memory/observations/${encodeURIComponent(observationId)}`,
         payload,
       ).then((body) => body.observation),
     (bff) => bff.memory.updateObservation(observationId, payload),
@@ -675,7 +674,7 @@ export async function updateObservation(
 
 export function deleteObservation(observationId: string): Promise<{ ok: boolean }> {
   return withLocal(
-    () => deleteJson<{ ok: boolean }>(`/api/observations/${encodeURIComponent(observationId)}`),
+    () => deleteJson<{ ok: boolean }>(`/api/memory/observations/${encodeURIComponent(observationId)}`),
     async (bff) => bff.memory.deleteObservation(observationId),
   );
 }

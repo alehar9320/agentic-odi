@@ -499,11 +499,18 @@ export type ObservationCategory =
  * A proposed fact is not true yet: only a person can move it to `confirmed`,
  * and a dismissed one never reaches a prompt again.
  */
-export type ObservationStatus = "proposed" | "confirmed" | "dismissed";
+export type ObservationKind = ObservationCategory;
+export type ObservationStatus =
+  | "suggested"
+  | "proposed"
+  | "confirmed"
+  | "dismissed";
 
 /** One thing the agent believes about the PM, shown for correction. */
 export interface Observation {
   id: string;
+  /** The store's word for what a note is about; `category` is the screen's. */
+  kind?: ObservationKind;
   category: ObservationCategory;
   text: string;
   status: ObservationStatus;
@@ -513,6 +520,7 @@ export interface Observation {
   conversation_id?: string | null;
   /** The turn the person said it in. */
   source_message_id?: string | null;
+  source_turn?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -527,6 +535,11 @@ export interface Conversation {
   head_id?: string | null;
   /** An archived thread is still readable; only a delete loses it. */
   archived?: boolean;
+}
+
+/** A conversation as the history list shows it: enough to name it and size it. */
+export interface ConversationSummary extends Conversation {
+  turn_count: number;
 }
 
 /** A conversation as the history list shows it: enough to name it and size it. */

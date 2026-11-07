@@ -27,14 +27,12 @@ import {
   createConversation as apiCreateConversation,
   createJob as apiCreateJob,
   deleteConnector as apiDeleteConnector,
-  deleteConversation as apiDeleteConversation,
   deleteJob as apiDeleteJob,
   deleteObservation as apiDeleteObservation,
   deleteEvidence as apiDeleteEvidence,
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
   dismissSignal as apiDismissSignal,
-  fetchBrief as apiFetchBrief,
   fetchCanvas,
   fetchConfig,
   fetchConnectorCatalog,
@@ -46,7 +44,6 @@ import {
   fetchMemory,
   fetchModels,
   fetchSegments,
-  fetchSettings as apiFetchSettings,
   fetchSignals,
   fetchStrategy,
   fetchUnreadSignalCount,
@@ -56,9 +53,6 @@ import {
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
-  saveBrief as apiSaveBrief,
-  saveSettings as apiSaveSettings,
-  setConversationArchived as apiSetConversationArchived,
   setConversationHead as apiSetConversationHead,
   streamChat,
   updateJob as apiUpdateJob,
@@ -98,7 +92,6 @@ import type {
   MarketplaceSearch,
   Observation,
   Segment,
-  SettingsSummary,
   Signal,
   SignalSubjectKind,
   Strategy,
@@ -139,78 +132,6 @@ export function pathToHead(nodes: TurnNode[], headId: string | null): TurnNode[]
   return path.reverse();
 }
 
-/**
- * Stored parts, re-validated for render.
- *
- * The store keeps the spec exactly as it was sent, so a thread reloaded after a
- * catalog change shows the same cards — or names the one it can no longer draw,
- * instead of losing the transcript to a crash. A pending approval never comes
- * back: the request it waited on has long since expired.
- */
-function restoreParts(node: TurnNode): ChatPart[] {
-  const raw = node.parts;
-  if (!Array.isArray(raw) || raw.length === 0) {
-    return [];
-  }
-  const manifest = catalogManifest();
-  return raw.flatMap((part): ChatPart[] => {
-    if (!part || typeof part !== "object") {
-      return [];
-    }
-    const candidate = part as { kind?: unknown; id?: unknown };
-    switch (candidate.kind) {
-      case "text":
-      case "reasoning": {
-        const text = (part as { text?: unknown }).text;
-        return typeof text === "string" && text
-          ? [{ kind: candidate.kind, text }]
-          : [];
-      }
-      case "ui": {
-        const id = String(candidate.id ?? `ui-${node.id}`);
-        const spec = (part as { node?: unknown }).node;
-        const parsed = parseUiSpec(spec, manifest);
-        if (parsed.ok) {
-          return [{ kind: "ui", id, node: parsed.node }];
-        }
-        const type =
-          spec && typeof spec === "object" && typeof (spec as { type?: unknown }).type === "string"
-            ? (spec as { type: string }).type
-            : "spec";
-        return [{ kind: "ui", id, node: { type, props: {}, children: [], unsupported: true } }];
-      }
-      case "tool": {
-        const tool = part as Record<string, unknown>;
-        const status = tool.status;
-        return [
-          {
-            kind: "tool",
-            id: String(tool.id ?? `tool-${node.id}`),
-            name: String(tool.name ?? ""),
-            status:
-              status === "ok" || status === "error" || status === "declined" ? status : "declined",
-            ...(typeof tool.preview === "string" ? { preview: tool.preview } : {}),
-          },
-        ];
-      }
-      case "source": {
-        const source = part as Record<string, unknown>;
-        return [
-          {
-            kind: "source",
-            id: String(source.id ?? `src-${node.id}`),
-            title: String(source.title ?? ""),
-            mediaType: String(source.mediaType ?? "application/json"),
-            ...(typeof source.filename === "string" ? { filename: source.filename } : {}),
-          },
-        ];
-      }
-      default:
-        return [];
-    }
-  });
-}
-
 /** Persisted turns as the thread renders them. */
 export function turnsToMessages(
   nodes: TurnNode[],
@@ -221,7 +142,6 @@ export function turnsToMessages(
       return [];
     }
     const content = node.content ?? "";
-    const parts = restoreParts(node);
     const claims = node.claims ?? [];
     return [
       {
@@ -229,10 +149,11 @@ export function turnsToMessages(
         parentId: node.parent_id,
         role: node.role,
         content,
-        parts: [
-          ...(parts.length ? parts : content ? [{ kind: "text" as const, text: content }] : []),
-          ...(claims.length ? [{ kind: "claims" as const, content, claims }] : []),
-        ],
+        parts: claims.length
+          ? [{ kind: "claims" as const, content, claims }]
+          : content
+            ? [{ kind: "text" as const, text: content }]
+            : [],
       },
     ];
   });
@@ -309,9 +230,6 @@ function readStudioError(raw: unknown): StudioError {
 }
 
 const SETTINGS_KEY = "studio.settings";
-/** The provider key, held only for this tab: never a durable browser cache. */
-const SECRET_KEY = "studio.apiKey";
-const CONVERSATION_KEY = "studio.conversationId";
 const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
@@ -398,8 +316,6 @@ export interface ConnectionReport {
 export interface StudioContextValue {
   settings: StudioConfig;
   saveSettings: (config: StudioConfig) => void;
-  /** The sidecar's view of the endpoint: the key is a mask, never the secret. */
-  settingsSummary: SettingsSummary | null;
   displayName: string;
   setDisplayName: (name: string) => void;
   brief: StudioBrief | null;
@@ -477,9 +393,10 @@ export interface StudioContextValue {
   conversationId: string | null;
   /** The recent threads, newest first, as the history list shows them. */
   conversations: ConversationSummary[];
+  /** Re-read the history list; called when it opens and after a turn persists. */
   refreshConversations: () => Promise<void>;
+  /** Open a past thread by loading its turns; never a conversation without them. */
   openConversation: (conversationId: string) => Promise<void>;
-  deleteConversation: (conversationId: string) => Promise<void>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -496,7 +413,6 @@ export interface StudioContextValue {
    * the one answer it describes instead of every answer on screen.
    */
   offlineReplyFor: string | null;
-  offlineReply: boolean;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
   addOutcome: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
   createJob: (payload: { name: string; description?: string }) => Promise<string | null>;
@@ -607,48 +523,16 @@ export interface StudioContextValue {
 
 const StudioContext = createContext<StudioContextValue | null>(null);
 
-function readSessionKey(): string | null {
-  try {
-    return sessionStorage.getItem(SECRET_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeSessionKey(value: string): void {
-  try {
-    sessionStorage.setItem(SECRET_KEY, value);
-  } catch {
-    /* storage unavailable */
-  }
-}
-
 function loadSettings(): StudioConfig {
-  let cached: Partial<StudioConfig> = {};
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
-      cached = JSON.parse(raw) as Partial<StudioConfig>;
-      const { api_key: leaked, ...safe } = cached;
-      // A key written by an older build is scrubbed from the durable cache:
-      // localStorage travels with the profile and is readable by any script on
-      // the page. The session copy below dies with the tab, and the durable
-      // copy belongs to the sidecar's file.
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(safe));
-      cached = safe;
-      if (leaked && readSessionKey() === null) {
-        writeSessionKey(String(leaked));
-      }
+      return { ...EMPTY_CONFIG, ...(JSON.parse(raw) as Partial<StudioConfig>) };
     }
   } catch {
     /* ignore malformed cache */
   }
-  const sessionKey = readSessionKey();
-  return {
-    ...EMPTY_CONFIG,
-    ...cached,
-    api_key: sessionKey === null ? EMPTY_CONFIG.api_key : sessionKey,
-  };
+  return EMPTY_CONFIG;
 }
 
 function loadFocusedSubject(): FocusSubject | null {
@@ -731,14 +615,6 @@ function loadBrief(): StudioBrief | null {
   }
 }
 
-function loadConversationId(): string | null {
-  try {
-    return localStorage.getItem(CONVERSATION_KEY);
-  } catch {
-    return null;
-  }
-}
-
 function loadTheses(): Thesis[] {
   try {
     const raw = localStorage.getItem(THESES_KEY);
@@ -763,8 +639,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   // hint once the studio has answered something, from /start, or from Settings.
   const [setupOpen, setSetupOpen] = useState(false);
   const [offlineReplyFor, setOfflineReplyFor] = useState<string | null>(null);
-  // The stable boolean view of the reason string; consumers compare this.
-  const offlineReply = offlineReplyFor !== null;
   const [canvasState, setCanvasState] = useState<CanvasState>(() => {
     const cached = loadCanvasCache();
     return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
@@ -782,8 +656,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [bootError, setBootError] = useState<StudioError | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(loadConversationId);
-  const [settingsSummary, setSettingsSummary] = useState<SettingsSummary | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
@@ -819,8 +692,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
-  /** Observations this tab already announced, so a notice fires once. */
-  const seenMemoryIds = useRef(new Set<string>());
   /** The id of the newest turn on the wire; a steered cut-in takes it over (#410). */
   const liveTurnId = useRef<string | null>(null);
   /** The deferred connectivity probe, until the person speaks or the view unmounts. */
@@ -1233,45 +1104,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
   }, [theme]);
 
-  // Which thread was on screen is worth remembering: it is how a reload reopens
-  // the conversation you were in instead of the newest one.
-  useEffect(() => {
-    try {
-      if (conversationId) {
-        localStorage.setItem(CONVERSATION_KEY, conversationId);
-      } else {
-        localStorage.removeItem(CONVERSATION_KEY);
-      }
-    } catch {
-      /* storage unavailable */
-    }
-  }, [conversationId]);
-
   const saveSettings = useCallback((config: StudioConfig) => {
     setSettings(config);
-    const key = config.api_key.trim();
-    writeSessionKey(key);
     try {
-      const { base_url, model_name, mcp_url, theme } = config;
-      // Only the non-secret fields are cached: localStorage travels with the
-      // browser profile and is readable from any script on the page.
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ base_url, model_name, mcp_url, theme }));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
     } catch {
       /* storage unavailable */
     }
-    // Hand the secret to the sidecar, which is the only place it survives the
-    // tab. An empty field means "unchanged", not "forget it".
-    void apiSaveSettings({
-      base_url: config.base_url,
-      model: config.model_name,
-      mcp_url: config.mcp_url,
-      ...(key ? { api_key: key } : {}),
-    })
-      .then((summary) => {
-        setSettingsSummary(summary);
-        setSidecarReachable(true);
-      })
-      .catch(() => undefined);
   }, []);
 
   const setDisplayName = useCallback((name: string) => {
@@ -1291,21 +1130,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     } catch {
       /* storage unavailable */
     }
-    // The CLI and the MCP server read the same record, so the cache is not the
-    // source of truth: writing through is what makes the brief survive a
-    // different front door.
-    void apiSaveBrief(next)
-      .then((saved) => {
-        if (saved) {
-          setBrief(saved);
-          try {
-            localStorage.setItem(BRIEF_KEY, JSON.stringify(saved));
-          } catch {
-            /* storage unavailable */
-          }
-        }
-      })
-      .catch(() => undefined);
   }, []);
 
   const openSetup = useCallback(() => {
@@ -1776,13 +1600,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    */
   const refreshConversations = useCallback(async () => {
     try {
-      const listed = await apiListConversations();
-      // The store answers with the list itself; a proxy that wraps it in
-      // `{ conversations }` is the other shape the same call can take.
-      const list = Array.isArray(listed)
-        ? listed
-        : ((listed as unknown as { conversations?: ConversationSummary[] } | null)?.conversations ?? []);
-      setConversations(list);
+      setConversations(await apiListConversations());
     } catch {
       /* history is a convenience; the current thread keeps working without it */
     }
@@ -2075,20 +1893,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           case "memory": {
             const observation = event.data.observation as Observation | undefined;
             if (observation?.id) {
-              const isNew = !seenMemoryIds.current.has(observation.id);
-              seenMemoryIds.current.add(observation.id);
               setMemory((prev) =>
                 prev.some((item) => item.id === observation.id)
                   ? prev.map((item) => (item.id === observation.id ? observation : item))
                   : [...prev, observation],
               );
-              if (observation.status === "proposed" && isNew) {
-                // The agent wrote something down; only the person can make it
-                // fact, so the toast points at the panel where that happens.
-                // The Catch Up inbox stays what #79 made it: facts the store
-                // recorded, not ones the client merely observed.
-                pushToast("info", `Noted: ${observation.text} — confirm it in Memory`);
-              }
             }
             break;
           }
@@ -2200,12 +2009,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       focusedSubject,
       refreshCanvas,
       refreshConnectors,
+      refreshConversations,
       cancelScheduledProbes,
       commitNewThread,
-      pushNotice,
-      pushToast,
-      refreshConversations,
-      sidecarReachable,
     ],
   );
 
@@ -2428,7 +2234,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, [pushToast]);
 
-  const resetChat = useCallback(() => {
+  const openConversation = useCallback(
+    async (targetId: string) => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setStreaming(false);
+      setThinkingPhase(null);
+      setOfflineReplyFor(null);
+      setToolActivity([]);
+      // The tree, not the flat turn list: a thread with branches must open on
+      // the branch that was visible when it was left. A conversation is never
+      // opened without its turns.
+      const tree = await fetchConversationTree(targetId);
+      setConversationId(targetId);
+      setMessages(turnsToMessages(tree.messages, tree.head_id));
+      void refreshConversations();
+    },
+    [refreshConversations],
+  );
+
+  const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     // A fresh chat is also a fresh lane: follow-ups typed for the old
@@ -2439,69 +2264,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setStreaming(false);
     setThinkingPhase(null);
     setOfflineReplyFor(null);
-  }, []);
-
-  /** A blank thread. Opening one never touches the thread being left. */
-  const startThread = useCallback(() => {
-    resetChat();
     setConversationId(null);
     void apiCreateConversation()
       .then((conversation) =>
         setConversationId((current) => current ?? conversation.id),
       )
       .catch(() => undefined);
-  }, [resetChat]);
-
-  const openConversation = useCallback(
-    async (id: string) => {
-      if (id === conversationId) {
-        return;
-      }
-      abortRef.current?.abort();
-      abortRef.current = null;
-      setStreaming(false);
-      setThinkingPhase(null);
-      try {
-        // The tree, not the flat turn list: a conversation with branches must
-        // open on the branch that was visible when it was left.
-        const tree = await fetchConversationTree(id);
-        setConversationId(tree.conversation.id);
-        setMessages(turnsToMessages(tree.messages, tree.head_id));
-        setToolActivity([]);
-        setOfflineReplyFor(null);
-      } catch {
-        pushToast("error", "That conversation couldn't be opened.");
-      }
-    },
-    [conversationId, pushToast],
-  );
-
-  const deleteConversation = useCallback(
-    async (id: string) => {
-      try {
-        await apiDeleteConversation(id);
-      } catch {
-        pushToast("error", "I couldn't delete that conversation.");
-        return;
-      }
-      if (id === conversationId) {
-        startThread();
-      }
-      void refreshConversations();
-    },
-    [conversationId, pushToast, refreshConversations, startThread],
-  );
-
-  const clearChat = useCallback(() => {
-    const leaving = conversationId;
-    startThread();
-    if (leaving) {
-      // Archiving is the reversible goodbye. Nothing said here is deleted; the
-      // thread stays readable from the conversation list.
-      void apiSetConversationArchived(leaving, true).catch(() => undefined);
-    }
-    void refreshConversations();
-  }, [conversationId, refreshConversations, startThread]);
+  }, []);
 
   // First paint shows the person's own work; nothing that nobody asked for gets
   // to declare the studio broken. Boot order, and why nothing on the first
@@ -2525,20 +2294,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       void refreshCanvas();
       void refreshMemory();
       void refreshConversations();
-      // The thread that was open when the tab closed wins. Only when there is
-      // none does the newest transcript stand in for it, and that fallback
-      // lives with the probes so a remembered thread never asks for "newest".
-      const stored = loadConversationId();
-      if (!stored) {
+      const { conversation } = await fetchLatestConversation();
+      if (cancelled || !conversation) {
         return;
       }
+      setConversationId(conversation.id);
       // The tree, not the flat turn list: a conversation with branches
       // must open on the branch that was visible when it was left.
-      const tree = await fetchConversationTree(stored).catch(() => null);
-      if (cancelled || !tree) {
+      const tree = await fetchConversationTree(conversation.id);
+      if (cancelled) {
         return;
       }
-      setConversationId(stored);
       setMessages(turnsToMessages(tree.messages, tree.head_id));
     };
     void loadLocalData().catch(() => undefined);
@@ -2568,10 +2334,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         if (problem.code === "store_corrupt") {
           setBootError(problem);
           setSidecarReachable(true);
-        } else {
-          // A sidecar that answers with an error is not a sidecar that is up:
-          // the stage may not offer to send a turn that cannot land.
-          setSidecarReachable(false);
         }
       });
 
@@ -2587,80 +2349,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       void refreshConnectors();
       void refreshPresets();
       void refreshFeatured();
-      void refreshMemory();
-      void refreshConversations();
-      // The sidecar's copy wins where the two disagree: it is what the CLI and
-      // the MCP server read, and the browser cache only saves a round-trip.
-      void apiFetchSettings()
-        .then((summary) => {
-          if (cancelled) {
-            return;
-          }
-          setSettingsSummary(summary);
-          setSettings((current) => ({
-            ...current,
-            base_url: summary.base_url || current.base_url,
-            model_name: summary.model || current.model_name,
-            mcp_url: summary.mcp_url || current.mcp_url,
-          }));
-        })
-        .catch(() => undefined);
-      void apiFetchBrief()
-        .then((saved) => {
-          if (cancelled || !saved) {
-            return;
-          }
-          setBrief(saved);
-          try {
-            localStorage.setItem(BRIEF_KEY, JSON.stringify(saved));
-          } catch {
-            /* storage unavailable */
-          }
-        })
-        .catch(() => undefined);
-      const reopen = async (): Promise<void> => {
-        const stored = loadConversationId();
-        let tree = stored ? await fetchConversationTree(stored).catch(() => null) : null;
-        if (!tree) {
-          // Either nothing was remembered, or the remembered thread belongs to a
-          // store that is no longer there: fall back to the newest transcript.
-          const { conversation } = await fetchLatestConversation();
-          if (!conversation) {
-            return;
-          }
-          tree = await fetchConversationTree(conversation.id);
-        }
-        if (cancelled) {
-          return;
-        }
-        setConversationId(tree.conversation.id);
-        setMessages(turnsToMessages(tree.messages, tree.head_id));
-      };
-      void reopen().catch(() => undefined);
-      void healthMcp(settings.mcp_url)
-        .then((result) => {
-          if (!cancelled) {
-            setMcpReachable(result.reachable);
-          }
-        })
-        .catch(() => undefined);
-      void healthLlm({
-        base_url: settings.base_url,
-        api_key: settings.api_key,
-        model: settings.model_name,
-      })
-        .then((result) => {
-          if (!cancelled) {
-            setLlmHealth(result);
-          }
-        })
-        .catch(() => undefined);
     };
-    if (false) {
+    if (typeof window.requestIdleCallback === "function") {
       const handle = window.requestIdleCallback(probe, { timeout: PROBE_IDLE_TIMEOUT_MS });
       idleProbeRef.current = { cancel: () => window.cancelIdleCallback(handle) };
     } else {
-      const timer = window.setTimeout(probe, 0);
+      const timer = window.setTimeout(probe, PROBE_IDLE_TIMEOUT_MS);
       idleProbeRef.current = { cancel: () => window.clearTimeout(timer) };
     }
 
@@ -2761,7 +2455,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     () => ({
       settings,
       saveSettings,
-      settingsSummary,
       displayName,
       setDisplayName,
       brief,
@@ -2806,7 +2499,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
-      deleteConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2816,7 +2508,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
-      offlineReply,
       addStep,
       addOutcome,
       promoteEvidence,
@@ -2888,7 +2579,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [
       settings,
       saveSettings,
-      settingsSummary,
       displayName,
       setDisplayName,
       brief,
@@ -2933,7 +2623,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
-      deleteConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2943,7 +2632,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
-      offlineReply,
       addStep,
       addOutcome,
       promoteEvidence,

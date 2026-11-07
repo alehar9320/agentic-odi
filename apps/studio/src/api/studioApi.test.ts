@@ -329,7 +329,7 @@ describe("memory", () => {
   it("fetchMemory unwraps the observations array", async () => {
     mockJson({ observations: [observation] });
     await expect(fetchMemory()).resolves.toEqual([observation]);
-    expect(fetch).toHaveBeenCalledWith("/api/observations", expect.objectContaining({ headers: expect.any(Object) }));
+    expect(fetch).toHaveBeenCalledWith("/api/memory/observations", expect.objectContaining({ headers: expect.any(Object) }));
   });
 
   it("addObservation posts the observation", async () => {
@@ -338,7 +338,7 @@ describe("memory", () => {
       addObservation({ category: "career", text: "Owns activation.", confirmed: true }),
     ).resolves.toEqual(observation);
     expect(fetch).toHaveBeenCalledWith(
-      "/api/observations",
+      "/api/memory/observations",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ category: "career", text: "Owns activation.", confirmed: true }),
@@ -352,7 +352,7 @@ describe("memory", () => {
       status: "confirmed",
     });
     expect(fetch).toHaveBeenCalledWith(
-      "/api/observations/o-1",
+      "/api/memory/observations/o-1",
       expect.objectContaining({ method: "PATCH" }),
     );
   });
@@ -361,7 +361,7 @@ describe("memory", () => {
     mockJson({ observations: [] });
     await expect(fetchMemory("confirmed")).resolves.toEqual([]);
     expect(fetch).toHaveBeenCalledWith(
-      "/api/observations?status=confirmed",
+      "/api/memory/observations?status=confirmed",
       expect.objectContaining({ headers: expect.any(Object) }),
     );
   });
@@ -370,7 +370,7 @@ describe("memory", () => {
     mockJson({ observation: { ...observation, status: "dismissed" } });
     await updateObservation("o-1", { status: "dismissed" });
     expect(fetch).toHaveBeenCalledWith(
-      "/api/observations/o-1",
+      "/api/memory/observations/o-1",
       expect.objectContaining({
         method: "PATCH",
         body: JSON.stringify({ status: "dismissed" }),
@@ -382,7 +382,7 @@ describe("memory", () => {
     mockJson({ ok: true });
     await deleteObservation("o-1");
     expect(fetch).toHaveBeenCalledWith(
-      "/api/observations/o-1",
+      "/api/memory/observations/o-1",
       expect.objectContaining({ method: "DELETE" }),
     );
     await clearMemory();

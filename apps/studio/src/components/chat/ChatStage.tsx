@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { ThreadPrimitive, useThreadViewport } from "@assistant-ui/react";
 
+import { isFeatureEnabled } from "../../features/flags";
 import { arrivalAnnouncement, arrivalLabel, arrivedSince } from "./arrivalCount";
 import {
   HELP_TEXT,
@@ -13,6 +14,7 @@ import {
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
+import { IntroConversation } from "../setup/IntroConversation";
 import { SetupConversation } from "../setup/SetupConversation";
 import { Conversation } from "./Conversation";
 import { GuidanceHint } from "./GuidanceHint";
@@ -187,7 +189,7 @@ export function ChatStage() {
   }
 
   if (setupOpen) {
-    return <SetupConversation />;
+    return isFeatureEnabled("firstRunIntro") ? <IntroConversation /> : <SetupConversation />;
   }
 
   if (empty) {

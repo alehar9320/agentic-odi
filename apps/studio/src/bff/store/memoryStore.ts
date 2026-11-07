@@ -1,5 +1,5 @@
 import type { Observation } from "../../types";
-import { newId, nowIso } from "../id";
+import { nowIso } from "../id";
 import {
   byCreated,
   bySeq,
@@ -18,7 +18,7 @@ import {
 export class MemoryLocalStore implements LocalStore {
   readonly durable = false;
   private seq = 0;
-  private turnSeq = 0;
+  private turnId = 0;
   private readonly jobs = new Map<string, StoredJob>();
   private readonly steps = new Map<string, StoredStep>();
   private readonly outcomes = new Map<string, StoredOutcome>();
@@ -199,15 +199,10 @@ export class MemoryLocalStore implements LocalStore {
     return next;
   }
 
-  async deleteConversation(id: string): Promise<void> {
-    this.conversations.delete(id);
-    await this.clearTurns(id);
-  }
-
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.turns
       .filter((turn) => turn.conversation_id === conversationId)
-      .sort((left, right) => left.seq - right.seq);
+      .sort((left, right) => left.id.localeCompare(right.id));
   }
 
   async countTurns(conversationId: string): Promise<number> {
@@ -215,10 +210,10 @@ export class MemoryLocalStore implements LocalStore {
   }
 
   async appendTurn(
-    turn: Omit<StoredTurn, "id" | "seq"> & { id?: string },
+    turn: Omit<StoredTurn, "id"> & { id?: string },
   ): Promise<StoredTurn> {
-    this.turnSeq += 1;
-    const stored: StoredTurn = { ...turn, id: turn.id ?? newId(), seq: this.turnSeq };
+    this.turnId += 1;
+    const stored = { ...turn, id: turn.id ?? String(this.turnId) };
     this.turns.push(stored);
     return stored;
   }
@@ -232,19 +227,18 @@ export class MemoryLocalStore implements LocalStore {
     if (!conversation) {
       throw new Error(`Conversation ${conversationId} not found`);
     }
-    const turns = await this.listTurns(conversationId);
-    // A turn written without a parent answers the one before it: the local
-    // fallback has no branching until the client says otherwise.
     let previous: string | null = null;
-    const messages = turns.map((turn) => {
-      const node: StoredTurn = { ...turn, parent_id: turn.parent_id ?? previous };
-      previous = node.id;
-      return node;
+    const messages = (await this.listTurns(conversationId)).map((turn) => {
+      if (!turn.message_id) {
+        turn = { ...turn, message_id: `turn-${turn.id}`, parent_id: previous };
+      }
+      previous = turn.message_id;
+      return turn;
     });
     return {
       conversation,
       messages,
-      head_id: conversation.head_id ?? messages[messages.length - 1]?.id ?? null,
+      head_id: conversation.head_id ?? messages[messages.length - 1]?.message_id ?? null,
     };
   }
 
@@ -306,7 +300,7 @@ export class MemoryLocalStore implements LocalStore {
       ...snapshot.steps.map((step) => step.seq),
       ...snapshot.outcomes.map((outcome) => outcome.seq),
     );
-    this.turnSeq = Math.max(0, ...snapshot.turns.map((turn) => turn.seq));
+    this.turnId = Math.max(0, ...snapshot.turns.map((turn) => Number(turn.id) || 0));
   }
 
   async clearAll(): Promise<void> {
@@ -319,7 +313,7 @@ export class MemoryLocalStore implements LocalStore {
     this.outbox.clear();
     this.lease = null;
     this.seq = 0;
-    this.turnSeq = 0;
+    this.turnId = 0;
   }
 
   close(): void {

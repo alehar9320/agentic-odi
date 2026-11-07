@@ -1,7 +1,7 @@
 import { openDB, type IDBPDatabase } from "idb";
 
 import type { Observation } from "../../types";
-import { newId, nowIso } from "../id";
+import { nowIso } from "../id";
 import {
   DB_NAME,
   DB_VERSION,
@@ -23,7 +23,6 @@ import {
   type WorkspaceSnapshot,
 } from "./types";
 
-/** Re-exported for callers that name the browser cache. */
 export { DB_NAME };
 
 const DRAIN_LEASE_KEY = "drain_lease";
@@ -47,8 +46,8 @@ export class IndexedDbLocalStore implements LocalStore {
     const db = await openDB<StudioDb>(DB_NAME, DB_VERSION, {
       upgrade(database, oldVersion, newVersion) {
         // Run the registered ladder from the version the person has up to the
-        // one this build ships. A v1 database runs only the v2 step; a fresh one
-        // runs every step. `migrationSteps` throws by name if a version has no
+        // one this build ships. A v1 database runs only `MIGRATIONS[2]`; a fresh
+        // one runs 1 then 2. `migrationSteps` throws by name if a version has no
         // registered step, so a bump without a migration fails loudly here.
         for (const step of migrationSteps(oldVersion, newVersion ?? DB_VERSION)) {
           step(database);
@@ -277,14 +276,8 @@ export class IndexedDbLocalStore implements LocalStore {
     return next;
   }
 
-  async deleteConversation(id: string): Promise<void> {
-    await this.db.delete("conversations", id);
-    await this.clearTurns(id);
-  }
-
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
-    const turns = await this.db.getAllFromIndex("turns", "by-conversation", conversationId);
-    return turns.sort(bySeq);
+    return this.db.getAllFromIndex("turns", "by-conversation", conversationId);
   }
 
   async countTurns(conversationId: string): Promise<number> {
@@ -292,15 +285,10 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async appendTurn(
-    turn: Omit<StoredTurn, "id" | "seq"> & { id?: string },
+    turn: Omit<StoredTurn, "id"> & { id?: string },
   ): Promise<StoredTurn> {
-    const stored: StoredTurn = {
-      ...turn,
-      id: turn.id ?? newId(),
-      seq: await this.nextSeq(),
-    };
-    await this.db.put("turns", stored);
-    return stored;
+    const id = await this.db.add("turns", turn as StoredTurn);
+    return { ...turn, id: turn.id ?? String(id) };
   }
 
   async conversationTree(conversationId: string): Promise<{
@@ -313,18 +301,19 @@ export class IndexedDbLocalStore implements LocalStore {
       throw new Error(`Conversation ${conversationId} not found`);
     }
     const turns = await this.listTurns(conversationId);
-    // A turn written without a parent answers the one before it: the local
-    // fallback has no branching until the client says otherwise.
     let previous: string | null = null;
     const messages = turns.map((turn) => {
-      const node: StoredTurn = { ...turn, parent_id: turn.parent_id ?? previous };
-      previous = node.id;
-      return node;
+      if (!turn.message_id) {
+        turn = { ...turn, message_id: `turn-${turn.id}`, parent_id: previous };
+      }
+      previous = turn.message_id;
+      return turn;
     });
     return {
       conversation,
       messages,
-      head_id: conversation.head_id ?? messages[messages.length - 1]?.id ?? null,
+      head_id:
+        conversation.head_id ?? messages[messages.length - 1]?.message_id ?? null,
     };
   }
 

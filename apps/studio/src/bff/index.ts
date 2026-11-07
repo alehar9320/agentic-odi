@@ -146,7 +146,7 @@ export class StudioBff {
 
     for (const observation of observationPage.observations ?? []) {
       await this.memory.addObservation({
-        category: observation.category,
+        kind: observation.kind ?? observation.category ?? "other",
         text: observation.text,
         data: observation.data ?? {},
         confidence: observation.confidence ?? 0.5,

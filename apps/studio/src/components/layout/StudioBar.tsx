@@ -1,33 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
+import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
-import { PRODUCT_NAME } from "../../lib/brand";
+import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import { formatRelativeTime } from "../../lib/relativeTime";
+import { resolveTheme } from "../../lib/theme";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
-import type { Conversation } from "../../types";
 import {
   BellIcon,
+  HistoryIcon,
   MenuIcon,
   MoonIcon,
   PlugIcon,
   PlusIcon,
   SettingsIcon,
   SunIcon,
-  ThreadsIcon,
 } from "../icons";
 import { OdiMascot } from "../OdiMascot";
-
-/** A thread is named by the first thing said in it; until then, by when it was left. */
-function threadTitle(conversation: Conversation): string {
-  const title = conversation.title?.trim();
-  if (title) {
-    return title;
-  }
-  const when = new Date(conversation.updated_at);
-  return Number.isNaN(when.getTime())
-    ? "Untitled conversation"
-    : `Conversation, ${when.toLocaleString()}`;
-}
+import { StatusDot } from "../status/StatusDot";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -40,49 +32,57 @@ export function StudioBar({
   onChangelog,
 }: {
   onHome: () => void;
-  onNew: () => void;
+  onNew: (options?: { stop?: boolean }) => void;
   onChangelog: () => void;
 }) {
   const {
+    conversationId,
+    conversations,
     llmHealth,
     messages,
+    openConversation,
+    refreshConversations,
+    sidecarReachable,
+    streaming,
     unreadSignalCount,
     openPanel,
+    activePanel,
+    customizeOpen,
+    setupOpen,
     openCustomize,
     pushToast,
     saveSettings,
     settings,
-    conversations,
-    conversationId,
-    openConversation,
-    deleteConversation,
-    refreshConversations,
   } = useStudio();
   const update = useUpdateSnapshot();
-  const theme = settings.theme === "light" ? "light" : "dark";
+  const theme = resolveTheme(settings.theme);
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
-  const [threadsOpen, setThreadsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const threadsRef = useRef<HTMLDivElement>(null);
+  const wide = useMediaQuery("(min-width: 720px)");
+  const [askOpen, setAskOpen] = useState(false);
+  const askRef = useRef<HTMLDivElement>(null);
+  const keepWritingRef = useRef<HTMLButtonElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  // An empty transcript is only nothing to lose when nothing is on screen to
+  // leave: the plus is the documented way out of the first-run setup, and a
+  // disabled control there would strand the person in it.
+  const nothingToLeave =
+    messages.length === 0 && !streaming && !setupOpen && !customizeOpen && activePanel === null;
 
   useEffect(() => {
-    if (!menuOpen && !threadsOpen) {
+    if (!menuOpen) {
       return;
     }
     function onPointerDown(event: MouseEvent) {
-      const target = event.target as Node;
-      if (menuRef.current && !menuRef.current.contains(target)) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
-      }
-      if (threadsRef.current && !threadsRef.current.contains(target)) {
-        setThreadsOpen(false);
       }
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setMenuOpen(false);
-        setThreadsOpen(false);
       }
     }
     window.addEventListener("mousedown", onPointerDown);
@@ -91,7 +91,85 @@ export function StudioBar({
       window.removeEventListener("mousedown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [menuOpen, threadsOpen]);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!askOpen) {
+      return;
+    }
+    // The ask is an interruption, not a mode: focus lands on the choice that
+    // changes nothing, so an accidental Enter keeps the reply.
+    keepWritingRef.current?.focus();
+    function onPointerDown(event: MouseEvent) {
+      if (askRef.current && !askRef.current.contains(event.target as Node)) {
+        setAskOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [askOpen]);
+
+  function startThread() {
+    if (streaming) {
+      setAskOpen((open) => !open);
+      return;
+    }
+    onNew();
+  }
+
+  function onAskKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape" || !askOpen) {
+      return;
+    }
+    // Stop the keystroke before the shell's global Escape hears it: closing the
+    // ask is not the same as cancelling the reply still streaming behind it.
+    event.stopPropagation();
+    setAskOpen(false);
+  }
+
+  // The history list is read when it opens, not polled: a thread created by a
+  // turn is added to the list by the turn itself.
+  useEffect(() => {
+    if (!historyOpen) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (historyRef.current && !historyRef.current.contains(event.target as Node)) {
+        setHistoryOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setHistoryOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [historyOpen]);
+
+  function toggleHistory() {
+    setHistoryOpen((open) => {
+      if (!open) {
+        void refreshConversations();
+      }
+      return !open;
+    });
+  }
+
+  function selectConversation(id: string) {
+    setHistoryOpen(false);
+    if (id !== conversationId) {
+      void openConversation(id).catch(() =>
+        pushToast("error", "I couldn't open that conversation."),
+      );
+    }
+  }
 
   function exportConversation() {
     const exportedAt = new Date();
@@ -100,10 +178,28 @@ export function StudioBar({
     pushToast("success", "Conversation exported as Markdown.");
   }
 
+  // A measured answer outranks an inference from the settings. The shipped desktop
+  // default points at the sidecar's own proxy — a loopback address the browser cannot
+  // talk model-to — so guessing from the endpoint alone would read "no model connected"
+  // forever on a machine where the model is in fact answering. "Connecting" is for a
+  // connection somebody is trying to make and has not yet heard back from.
+  const endpointConfigured = isEndpointConfiguredForSettings({
+    base_url: settings.base_url,
+    api_key: settings.api_key,
+    model_name: settings.model_name,
+  });
   const status =
-    llmHealth.healthy === null ? "Connecting" : llmHealth.healthy ? "Live" : "Local mode";
+    llmHealth.healthy === true
+      ? "Live"
+      : llmHealth.healthy === false
+        ? "Local mode"
+        : endpointConfigured || sidecarReachable === true
+          ? "Connecting"
+          : "Local";
+  const statusDetail =
+    status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
   const updateReady = update.phase === "ready";
-  const versionLabel = updateReady
+  const versionText = updateReady
     ? "Update ready"
     : update.currentVersion
       ? `v${update.currentVersion}`
@@ -116,7 +212,7 @@ export function StudioBar({
           type="button"
           className="brand brand--home"
           onClick={onHome}
-          aria-label="Go to home"
+          aria-label={`${PRODUCT_NAME}, go to home`}
           title="Home"
         >
           <span className="brand__mark" aria-hidden="true">
@@ -147,77 +243,98 @@ export function StudioBar({
           ✨ What's New
         </button>
 
-        <div className="bar__menu" ref={threadsRef}>
+        <div className="bar__new-wrap" ref={askRef} onKeyDown={onAskKeyDown}>
+          <button
+            type="button"
+            className="bar__new"
+            onClick={startThread}
+            disabled={nothingToLeave}
+            aria-label="Start a new thread"
+            aria-describedby={nothingToLeave ? "bar-new-reason" : undefined}
+            aria-haspopup={streaming ? "dialog" : undefined}
+            aria-expanded={streaming ? askOpen : undefined}
+            title="New thread. Your jobs, outcomes, and evidence stay."
+          >
+            <PlusIcon size={17} />
+            {wide && <span>New thread</span>}
+          </button>
+
+          {nothingToLeave && (
+            <span id="bar-new-reason" className="sr-only">
+              This thread is already new.
+            </span>
+          )}
+
+          {askOpen && (
+            <div className="bar__new-ask" role="dialog" aria-label="Stop the reply and start a new thread?">
+              <p>A reply is still coming. Stop it and start a new thread?</p>
+              <button
+                type="button"
+                ref={keepWritingRef}
+                className="bar__new-choice"
+                onClick={() => setAskOpen(false)}
+              >
+                Keep writing
+              </button>
+              <button
+                type="button"
+                className="bar__new-choice bar__new-choice--stop"
+                onClick={() => {
+                  setAskOpen(false);
+                  onNew({ stop: true });
+                }}
+              >
+                Stop and start
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="bar__menu" ref={historyRef}>
           <button
             type="button"
             className="icon-button"
-            aria-label="Open stored conversations"
-            title="Stored conversations"
+            aria-label="Conversation history"
+            title="Conversation history"
             aria-haspopup="menu"
-            aria-expanded={threadsOpen}
-            onClick={() => {
-              setThreadsOpen((open) => !open);
-              void refreshConversations();
-            }}
+            aria-expanded={historyOpen}
+            onClick={toggleHistory}
           >
-            <ThreadsIcon size={17} />
+            <HistoryIcon size={17} />
           </button>
-          {threadsOpen && (
+          {historyOpen && (
             <div
-              className="bar__menu-list bar__threads"
+              className="bar__menu-list bar__history"
               role="menu"
-              aria-label="Stored conversations"
+              aria-label="Recent conversations"
             >
-              {conversations.length === 0 && (
-                <p className="bar__threads-empty">Nothing stored yet.</p>
+              {conversations.length === 0 ? (
+                <p className="bar__history-empty">No conversations yet.</p>
+              ) : (
+                conversations.map((conversation) => {
+                  const current = conversation.id === conversationId;
+                  return (
+                    <button
+                      key={conversation.id}
+                      type="button"
+                      role="menuitem"
+                      className="bar__menu-item bar__history-item"
+                      aria-current={current ? "true" : undefined}
+                      onClick={() => selectConversation(conversation.id)}
+                    >
+                      <span className="bar__history-title">
+                        {(conversation.title ?? "").trim() || "New conversation"}
+                      </span>
+                      <span className="bar__history-meta">
+                        {formatRelativeTime(conversation.updated_at)}
+                      </span>
+                    </button>
+                  );
+                })
               )}
-              {conversations.map((conversation) => (
-                <div
-                  key={conversation.id}
-                  className={`bar__thread${
-                    conversation.id === conversationId ? " is-current" : ""
-                  }`}
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="bar__menu-item bar__thread-open"
-                    onClick={() => {
-                      setThreadsOpen(false);
-                      void openConversation(conversation.id);
-                    }}
-                  >
-                    <span className="bar__thread-title">{threadTitle(conversation)}</span>
-                    {conversation.archived && (
-                      <span className="bar__thread-tag">archived</span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="bar__thread-delete"
-                    aria-label={`Delete ${threadTitle(conversation)}`}
-                    title="Delete this conversation"
-                    onClick={() => {
-                      void deleteConversation(conversation.id);
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
             </div>
           )}
         </div>
 
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="New conversation"
-          title="New conversation"
-          onClick={onNew}
-        >
-          <PlusIcon size={17} />
-        </button>
 
         <button
           type="button"
@@ -248,29 +365,27 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
-          aria-label={`Model status: ${status}. ${llmHealth.message}`}
-          title={llmHealth.message}
+          aria-label={`Model status: ${status}. ${statusDetail}`}
+          title={statusDetail}
         >
-          <span
-            className={`status-dot${llmHealth.healthy === false ? " is-warn" : ""}${
-              llmHealth.healthy === null ? " is-unknown" : ""
-            }`}
+          <StatusDot
+            tone={status === "Local mode" ? "warn" : status === "Connecting" ? "unknown" : "ok"}
           />
           {status}
         </button>
 
-        {versionLabel && (
+        {versionText && (
           <button
             type="button"
             className={`bar__version${updateReady ? " is-accent" : ""}`}
             onClick={() => openPanel("settings")}
             title={
               update.currentVersion
-                ? `${PRODUCT_NAME} ${update.currentVersion} — open software update settings`
+                ? `${versionLabel(update.currentVersion)}, open software update settings`
                 : "Open software update settings"
             }
           >
-            {versionLabel}
+            {versionText}
           </button>
         )}
 

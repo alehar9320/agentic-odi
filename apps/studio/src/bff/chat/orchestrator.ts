@@ -400,7 +400,7 @@ export class ChatOrchestrator {
         return;
       }
       const observation = await this.memory.addObservation({
-        category: "other",
+        kind: "other",
         text,
       });
       emit(toolEvent("remember", "running", text.slice(0, 60)), onEvent);
@@ -868,7 +868,7 @@ export class ChatOrchestrator {
           }
           case "remember": {
             observation = await this.memory.addObservation({
-              category:
+              kind:
                 (call.argumentsObj.category as ObservationCategory) ?? "other",
               text: String(call.argumentsObj.text ?? ""),
             });
