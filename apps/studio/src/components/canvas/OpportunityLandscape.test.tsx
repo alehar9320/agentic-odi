@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isUnderserved, opportunityScore, UNDERSERVED_THRESHOLD } from "../../lib/odi";
 import type { CanvasState } from "../../types";
-import { OpportunityLandscape, plotX, plotY } from "./OpportunityLandscape";
+import { OpportunityPlot, OpportunityLandscape, plotX, plotY } from "./OpportunityLandscape";
 
 // Mock StudioContext
 const mockCanvasData = {
@@ -629,5 +629,43 @@ describe("OpportunityLandscape underserved boundary", () => {
     const action = screen.getByRole("button", { name: "Export brief" });
     expect(action).toBeDisabled();
     expect(action).toHaveAttribute("title", "Nothing to brief yet");
+  });
+});
+
+describe("OpportunityPlot highlight", () => {
+  const outcomes = mockCanvasData.outcomes;
+
+  it("marks exactly the highlighted outcome and no other", () => {
+    const { container } = render(
+      <OpportunityPlot
+        outcomes={outcomes}
+        selectedOutcomeId={null}
+        highlightedOutcomeId="O-101"
+        onSelectOutcome={() => {}}
+        onHoverOutcome={() => {}}
+        activeOutcome={null}
+        compact
+      />,
+    );
+
+    const highlighted = container.querySelectorAll(".matrix-node--highlighted");
+    expect(highlighted).toHaveLength(1);
+    expect(highlighted[0]).toHaveAttribute("data-highlighted", "true");
+    expect(highlighted[0]).toHaveAccessibleName(/^O-101,/);
+  });
+
+  it("marks nothing when no outcome is highlighted", () => {
+    const { container } = render(
+      <OpportunityPlot
+        outcomes={outcomes}
+        selectedOutcomeId={null}
+        onSelectOutcome={() => {}}
+        onHoverOutcome={() => {}}
+        activeOutcome={null}
+        compact
+      />,
+    );
+
+    expect(container.querySelectorAll(".matrix-node--highlighted")).toHaveLength(0);
   });
 });

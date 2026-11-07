@@ -18,7 +18,7 @@ export type GoalDestination =
 
 export type GoalIconName = "spark" | "bolt" | "compass" | "signal";
 
-export type WizardStepId = "welcome" | "goal" | "readiness" | "launch";
+export type WizardStepId = "welcome" | "goal" | "readiness" | "land";
 
 export interface OnboardingGoal {
   id: GoalId;
@@ -65,10 +65,10 @@ export const STEPS: OnboardingStep[] = [
       "answer; everything else works by hand.",
   },
   {
-    id: "launch",
-    label: "First move",
-    title: "Your first move.",
-    lead: "One sentence is enough to start.",
+    id: "land",
+    label: "Where it lands",
+    title: "Where it lands.",
+    lead: "The outcome you scored, on the landscape beside two others. Keep the sample to poke at, or start your own job.",
   },
 ];
 

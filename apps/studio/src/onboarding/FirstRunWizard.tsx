@@ -4,9 +4,11 @@ import { useStudio } from "../state/StudioContext";
 import { useOnboarding } from "./context";
 import { STEPS, goalById, type GoalId } from "./content";
 import { LAST_STEP_INDEX, stepAt } from "./machine";
+import { removeSampleRecords, planSampleRemoval, sampleRecordsIn } from "./sampleCleanup";
+import { LandScene } from "./LandScene";
+import { sampleRecordsForTour } from "../lib/sampleLoop";
 import {
   GoalStep,
-  LaunchStep,
   ReadinessStep,
   WelcomeStep,
   type ConnectionDraft,
@@ -31,6 +33,11 @@ export function FirstRunWizard() {
     openSetup,
     closeSetup,
     sendMessage,
+    canvasState,
+    deleteEvidence,
+    deleteJob,
+    deleteOutcome,
+    deleteStep,
   } = useStudio();
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -49,6 +56,7 @@ export function FirstRunWizard() {
   };
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [busyExit, setBusyExit] = useState(false);
 
   const stepIndex = state.step;
   const stepId = stepAt(stepIndex);
@@ -191,11 +199,12 @@ export function FirstRunWizard() {
     }
   }
 
-  function launch() {
+  /** Send the person into the work they chose in scene one. */
+  function enterGoalDestination() {
     if (!activeGoal) {
+      openPanel("landscape");
       return;
     }
-    complete();
     if (activeGoal.destination.kind === "setup") {
       openSetup();
     } else if (activeGoal.destination.kind === "chat") {
@@ -206,6 +215,45 @@ export function FirstRunWizard() {
     } else {
       openPanel(activeGoal.destination.panel);
     }
+  }
+
+  /**
+   * "Start your own job" leaves the sample behind. Only the records the tour
+   * created are removed; a job a person made is never in the plan.
+   */
+  async function startOwn() {
+    if (busyExit) {
+      return;
+    }
+    setBusyExit(true);
+    try {
+      // Remove the records the tour made, whether they live only in the
+      // rendered sample or reached a canvas a build wrote them to.
+      const records = planSampleRemoval(
+        sampleRecordsForTour(),
+        sampleRecordsIn(canvasState.data),
+      );
+      if (records.length) {
+        await removeSampleRecords(records, {
+          deleteEvidence,
+          deleteOutcome,
+          deleteStep,
+          deleteJob,
+        });
+      }
+    } catch {
+      // The tour still ends; a failed cleanup must not trap the person.
+    } finally {
+      setBusyExit(false);
+    }
+    complete();
+    enterGoalDestination();
+  }
+
+  /** "Keep the sample to poke at" leaves the marked sample in place. */
+  function keepSample() {
+    complete();
+    openPanel("landscape");
   }
 
   if (!enabled || !open) {
@@ -278,7 +326,7 @@ export function FirstRunWizard() {
               message={message}
             />
           ) : null}
-          {stepId === "launch" && activeGoal ? <LaunchStep goal={activeGoal} /> : null}
+          {stepId === "land" ? <LandScene /> : null}
         </div>
 
         <footer className="wizard-footer">
@@ -295,7 +343,7 @@ export function FirstRunWizard() {
             ) : null}
           </div>
           <div className="wizard-footer__actions">
-            {stepIndex > 0 ? (
+            {stepIndex > 0 && stepId !== "land" ? (
               <button
                 type="button"
                 className="button button--ghost"
@@ -305,15 +353,25 @@ export function FirstRunWizard() {
               </button>
             ) : null}
 
-            {stepId === "launch" ? (
-              <button
-                type="button"
-                className="button wizard-button--primary"
-                onClick={launch}
-                disabled={!activeGoal}
-              >
-                {activeGoal?.cta ?? "Continue"}
-              </button>
+            {stepId === "land" ? (
+              <>
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={keepSample}
+                  disabled={busyExit}
+                >
+                  Keep the sample to poke at
+                </button>
+                <button
+                  type="button"
+                  className="button wizard-button--primary"
+                  onClick={() => void startOwn()}
+                  disabled={busyExit}
+                >
+                  Start your own job
+                </button>
+              </>
             ) : (
               <button
                 type="button"
