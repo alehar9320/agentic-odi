@@ -269,12 +269,14 @@ gate is proven to fail rather than assumed to.
 
 ## End-to-end
 
-The browser-level suite lives in `apps/studio/e2e/` and runs with
-[Playwright](https://playwright.dev). It drives the real Studio against the
-real sidecar and MCP server — no mocked network calls — so it covers the
-seams that neither pytest nor vitest can: the SPA's assumptions about the
-sidecar's response shapes, the sidecar's hydration of the canvas, and the
-first-run wizard's ordering relative to the rest of the app.
+The browser-level suites live in `apps/studio/e2e/` and run with
+[Playwright](https://playwright.dev). The sidecar-backed suite drives the real
+Studio against the real sidecar and MCP server — no mocked network calls — so
+it covers the seams that neither pytest nor vitest can: the SPA's assumptions
+about the sidecar's response shapes, the sidecar's hydration of the canvas, and
+the first-run wizard's ordering relative to the rest of the app. The
+no-sidecar suite uses one 503 stub for `/api/**`, deliberately, so the fallback
+path is deterministic rather than dependent on a static server's SPA answer.
 
 ```bash
 npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
@@ -286,6 +288,13 @@ a second sidecar on the MCP passthrough backend. Two projects run against
 them: `chromium` for the local backend (the product default) and
 `mcp-backend` for the passthrough.
 
+`playwright.no-sidecar.config.ts` is the second, required configuration. It
+serves the built SPA from `vite preview` with no sidecar or MCP process and
+routes `/api/**` to a 503 HTML answer, then proves the four things the product
+promises without one: the stage loads, the assistant answers, a capture lands in
+IndexedDB, and a reload still shows it. Run it with
+`npm --prefix apps/studio run test:e2e:no-sidecar`.
+
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none.
 
@@ -293,6 +302,9 @@ never to a `data-testid`, of which the application has none.
 the module bundle so it can read the pre-JavaScript shell in `index.html`, then
 compares the colour it painted against the `--bg` token for each theme.
 
-CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
-repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
-`continue-on-error` on the job keeps a failure from turning CI red.
+CI runs the sidecar-backed suite in the `e2e` job. It is deliberately
+non-blocking: set the repository variable `AGENTIC_ODI_E2E` to `false` to skip
+it, and the `continue-on-error` on the job keeps a failure from turning CI red.
+The no-sidecar suite runs in the `e2e-no-sidecar` job, which has no
+`continue-on-error` and is part of the `CI green` aggregate: if the browser
+fallback regresses, the required check fails.

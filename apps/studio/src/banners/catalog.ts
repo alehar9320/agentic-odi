@@ -17,7 +17,7 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     life: "persistent",
     dock: "top",
     title: "The studio sidecar isn't running.",
-    body: "The assistant is paused and live data is frozen until it comes back.",
+    body: "The assistant answers from this browser and everything you capture is saved here. Live MCP data waits for the sidecar.",
     dismissible: true,
     actions: [
       { label: "Recheck", action: "recheck-sidecar", tone: "ghost" },

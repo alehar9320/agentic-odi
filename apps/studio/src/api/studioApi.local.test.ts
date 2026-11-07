@@ -1,9 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioApiError, fetchCanvas, fetchMemory, isTransportFailure, listConversations, streamChat } from "./studioApi";
+import {
+  StudioApiError,
+  addOutcome,
+  createJob,
+  deleteOutcome,
+  fetchCanvas,
+  fetchMemory,
+  isTransportFailure,
+  listConversations,
+  streamChat,
+  updateJob,
+} from "./studioApi";
 
 const bff = {
-  data: { fetchCanvas: vi.fn() },
+  data: {
+    fetchCanvas: vi.fn(),
+    createJob: vi.fn(),
+    updateJob: vi.fn(),
+    deleteJob: vi.fn(),
+    addStep: vi.fn(),
+    updateStep: vi.fn(),
+    deleteStep: vi.fn(),
+    addOutcome: vi.fn(),
+    updateOutcome: vi.fn(),
+    deleteOutcome: vi.fn(),
+  },
   memory: { listObservations: vi.fn(), listConversations: vi.fn() },
   chat: { stream: vi.fn() },
 };
@@ -19,9 +41,19 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/** What a dead reverse proxy returns: a status the client trusts, and no JSON. */
+function htmlResponse(status = 503): Response {
+  return new Response("Service Unavailable", {
+    status,
+    headers: { "Content-Type": "text/html" },
+  });
+}
+
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
-  vi.mocked(bff.data.fetchCanvas).mockReset();
+  for (const method of Object.values(bff.data)) {
+    method.mockReset();
+  }
   vi.mocked(bff.memory.listObservations).mockReset();
   vi.mocked(bff.memory.listConversations).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
@@ -42,6 +74,18 @@ describe("isTransportFailure", () => {
     expect(
       isTransportFailure(new StudioApiError({ code: "mcp_unreachable", message: "down", retryable: true }, 502, true)),
     ).toBe(false);
+  });
+
+  it("treats the hosted Worker's sidecar_unavailable answer as transport", () => {
+    expect(
+      isTransportFailure(
+        new StudioApiError(
+          { code: "sidecar_unavailable", message: "No sidecar.", retryable: false },
+          502,
+          true,
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("treats network errors as transport", () => {
@@ -79,6 +123,100 @@ describe("fetchMemory fallback", () => {
 
     await fetchMemory();
     expect(bff.memory.listObservations).toHaveBeenCalled();
+  });
+});
+
+describe("canvas writes fall back to the browser store", () => {
+  it("creates the job locally and drops the sidecar's mcp_url", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
+    const job = { id: "job-1", name: "Get a service from commit to production", description: "" };
+    vi.mocked(bff.data.createJob).mockResolvedValueOnce(job);
+
+    await expect(
+      createJob({ name: "Get a service from commit to production", mcp_url: "http://mcp" }),
+    ).resolves.toEqual(job);
+    expect(bff.data.createJob).toHaveBeenCalledWith({
+      name: "Get a service from commit to production",
+    });
+  });
+
+  it("records the outcome locally when the proxy answers 503 HTML", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
+    const outcome = {
+      id: "out-1",
+      job_id: "job-1",
+      statement: "Minimize the time it takes to rotate secrets",
+      importance: 9,
+      satisfaction: 3,
+      opportunity_score: 15,
+    };
+    vi.mocked(bff.data.addOutcome).mockResolvedValueOnce(outcome);
+
+    await expect(
+      addOutcome({
+        job_id: "job-1",
+        statement: "Minimize the time it takes to rotate secrets",
+        importance: 9,
+        satisfaction: 3,
+        mcp_url: "http://mcp",
+      }),
+    ).resolves.toEqual(outcome);
+    expect(bff.data.addOutcome).toHaveBeenCalledWith({
+      job_id: "job-1",
+      statement: "Minimize the time it takes to rotate secrets",
+      importance: 9,
+      satisfaction: 3,
+    });
+  });
+
+  it("falls back when the hosted Worker says sidecar_unavailable", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(
+        { error: { code: "sidecar_unavailable", message: "No sidecar.", retryable: false } },
+        502,
+      ),
+    );
+    vi.mocked(bff.data.updateJob).mockResolvedValueOnce({ id: "job-1", name: "Renamed" });
+
+    await updateJob("job-1", { name: "Renamed", mcp_url: "http://mcp" });
+    expect(bff.data.updateJob).toHaveBeenCalledWith("job-1", { name: "Renamed" });
+  });
+
+  it("deletes the outcome locally", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
+    vi.mocked(bff.data.deleteOutcome).mockResolvedValueOnce({ deleted: "out-1" });
+
+    await expect(deleteOutcome("out-1", "http://mcp")).resolves.toEqual({ deleted: "out-1" });
+    expect(bff.data.deleteOutcome).toHaveBeenCalledWith("out-1");
+  });
+
+  it("does not save a write the live sidecar rejected as invalid", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ error: { code: "validation", message: "Job name cannot be empty." } }, 422),
+    );
+
+    await expect(createJob({ name: "   ", mcp_url: "http://mcp" })).rejects.toThrow();
+    expect(bff.data.createJob).not.toHaveBeenCalled();
+  });
+
+  it("does not save a write when the sidecar cannot reach its MCP server", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(
+        { error: { code: "mcp_unreachable", message: "The MCP server could not be reached.", retryable: true } },
+        502,
+      ),
+    );
+
+    await expect(
+      addOutcome({
+        job_id: "job-1",
+        statement: "Anything",
+        importance: 5,
+        satisfaction: 5,
+        mcp_url: "http://mcp",
+      }),
+    ).rejects.toThrow();
+    expect(bff.data.addOutcome).not.toHaveBeenCalled();
   });
 });
 
