@@ -302,14 +302,26 @@ function ComposerBody({
           aria-haspopup="listbox"
           aria-controls={open ? paletteId : undefined}
           onKeyDown={onKeyDown}
+          // This composer owns pasting: the library's built-in handler would
+          // preventDefault whenever the clipboard carries a file, which is the
+          // one case that must keep its text. Disabling it avoids a double
+          // attach and leaves the decision below.
+          addAttachmentOnPaste={false}
           onPaste={(event) => {
             // A screenshot on the clipboard is a file, not text: attach it
-            // rather than letting the browser paste a placeholder name.
+            // rather than letting the browser paste a placeholder name. But a
+            // clipboard can carry both — a screenshot and the paragraph that
+            // explains it — and swallowing the text is a silent loss. When text
+            // is present, attach the files and leave the paste unprevented so
+            // the browser inserts the text at the caret.
             const files = Array.from(event.clipboardData?.files ?? []);
             if (files.length === 0) {
               return;
             }
-            event.preventDefault();
+            const text = event.clipboardData?.getData("text/plain") ?? "";
+            if (text === "") {
+              event.preventDefault();
+            }
             onFiles(files);
           }}
         />

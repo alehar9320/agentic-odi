@@ -116,6 +116,106 @@ describe("ThreadComposer recall", () => {
   });
 });
 
+describe("ThreadComposer mixed clipboard paste", () => {
+  const draft = "first line\nsecond line";
+
+  /**
+   * jsdom performs no clipboard default action, so the test supplies the one a
+   * browser would: when the composer leaves the paste unprevented, the text is
+   * inserted at the caret and the input event the app listens for is fired.
+   */
+  function paste(
+    input: HTMLTextAreaElement,
+    { text, files }: { text?: string; files?: File[] },
+  ): boolean {
+    const clipboardData = {
+      files: files ?? [],
+      getData: (type: string) => (type === "text/plain" ? (text ?? "") : ""),
+    };
+    const notPrevented = fireEvent.paste(input, { clipboardData });
+    if (notPrevented && text) {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      const next = input.value.slice(0, start) + text + input.value.slice(end);
+      fireEvent.change(input, { target: { value: next } });
+    }
+    return notPrevented;
+  }
+
+  it("keeps the pasted text when the clipboard also carries an image", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = renderComposer({ sendMessage });
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+    const image = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    const notPrevented = paste(input, { text: "inserted", files: [image] });
+
+    expect(notPrevented).toBe(true);
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("inserts text-only paste once and attaches nothing", () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+
+    paste(input, { text: "inserted" });
+
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(screen.queryByRole("listitem")).toBeNull();
+  });
+
+  it("attaches an image-only paste and inserts no text", async () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+    const image = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    const notPrevented = paste(input, { files: [image] });
+
+    expect(notPrevented).toBe(false);
+    expect(input.value).toBe(draft);
+    expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
+  });
+
+  it("keeps the text and still names a refused file", () => {
+    const pushToast = vi.fn();
+    const input = renderComposer({ pushToast });
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+    const pdf = new File(["x"], "deck.pdf", { type: "application/pdf" });
+
+    paste(input, { text: "inserted", files: [pdf] });
+
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("deck.pdf"));
+    expect(screen.queryByText("deck.pdf")).toBeNull();
+  });
+
+  it("inserts multiline unicode text verbatim", () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: "α β" } });
+    input.setSelectionRange(3, 3);
+
+    paste(input, { text: "héllo\nwörld" });
+
+    expect(input.value).toBe("α βhéllo\nwörld");
+  });
+
+  it("never sends the turn from a paste", () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = renderComposer({ sendMessage });
+    const image = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    paste(input, { text: "inserted", files: [image] });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
+
 describe("ThreadComposer focus chip", () => {
   const statement = "Reduce the time to reconcile a failed payment";
   const focusedSubject = { kind: "outcome", id: "O-9" };
