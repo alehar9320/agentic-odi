@@ -190,6 +190,12 @@ Studio says so in one place and keeps going:
   color, `aria-hidden` when a word already states the state, named by `label`
   when it stands alone. A `.studio-pill` is a label, not an indicator, so it
   carries no dot of its own.
+- Settings answers the same question with three words, and only claims what a
+  probe established: **available**, **unavailable**, or **configured, not
+  checked**. A model endpoint you have typed into Settings reads the third — it
+  never reads available until a health answer says so — and the MCP row is read
+  by the `POST` its route accepts, so a healthy sidecar no longer reports MCP
+  missing (`apps/studio/src/bff/capabilities/registry.ts`).
 - A reply that no model produced carries one line, on that reply: **Local draft,
   no model connected**. It is a button, and it opens Settings. It never repeats
   on the replies around it, and nothing about it covers the thread.

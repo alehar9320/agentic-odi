@@ -76,6 +76,17 @@ describe("deriveDeviceStatus", () => {
     expect(status.sidecar).toBe("ready");
   });
 
+  it("reads a configured-but-unchecked model as unknown, not absent (#515)", () => {
+    const capabilities = probed([]).map((capability) =>
+      capability.id === "endpoint-model" ? { ...capability, status: "unknown" as const } : capability,
+    );
+
+    const status = deriveDeviceStatus(capabilities, CHECKED);
+
+    expect(status.model).toBe("unknown");
+    expect(status.sidecar).toBe("absent");
+  });
+
   it("reports all three ready", () => {
     const status = deriveDeviceStatus(probed([...LOCAL, ...MODEL, ...SIDECAR]), CHECKED);
     expect(status.local).toBe("ready");

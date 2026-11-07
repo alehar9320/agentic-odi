@@ -38,11 +38,16 @@ function presenceFor(
   // A group that has not been probed at all is unknown, not absent.
   if (present.length === 0) return "unknown";
   const available = present.filter((capability) => capability.status === "available");
+  // Configured-but-unchecked is not absent: it is the same wait as an unprobed
+  // group, and reporting it as missing is the lie #515 fixes.
+  const unproven = present.some((capability) => capability.status === "unknown");
   if (requireAll) {
     if (present.length < ids.length) return "unknown";
-    return available.length === ids.length ? "ready" : "absent";
+    if (available.length === ids.length) return "ready";
+    return unproven ? "unknown" : "absent";
   }
-  return available.length > 0 ? "ready" : "absent";
+  if (available.length > 0) return "ready";
+  return unproven ? "unknown" : "absent";
 }
 
 /** Derive one answer for what works here from the probed capability list. */

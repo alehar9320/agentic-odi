@@ -167,6 +167,13 @@ const AREA_LABELS: Record<ConnectorPreset["area"], string> = {
   "knowledge-output": "Strategy & knowledge management output",
 };
 
+/** The word for a capability's state. `unknown` means present but unproven. */
+function capabilityWord(status: "available" | "unavailable" | "unknown"): string {
+  if (status === "available") return "available";
+  if (status === "unknown") return "configured, not checked";
+  return "unavailable";
+}
+
 export function SettingsPanel() {
   const {
     settings,
@@ -318,10 +325,18 @@ export function SettingsPanel() {
         <ul className="connection-list">
           {capabilities.map((capability) => (
             <li key={capability.id}>
-              <StatusDot tone={capability.status === "available" ? "ok" : "warn"} />
+              <StatusDot
+                tone={
+                  capability.status === "available"
+                    ? "ok"
+                    : capability.status === "unknown"
+                      ? "unknown"
+                      : "warn"
+                }
+              />
               <span>{capability.label}</span>
               <span className="connection-list__value">
-                {capability.status === "available" ? "available" : "unavailable"}
+                {capabilityWord(capability.status)}
                 {capability.reason ? ` — ${capability.reason}` : ""}
               </span>
             </li>
