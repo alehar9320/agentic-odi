@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { UpdateProvider } from "./UpdateProvider";
 import { UpdateSettings } from "./UpdateSettings";
-import { AUTO_CHECK_KEY, SKIPPED_VERSION_KEY, createUpdateService } from "./service";
+import { AUTO_CHECK_KEY, createUpdateService } from "./service";
 import type { DownloadProgress, UpdateTransport, UpdaterHandle } from "./types";
 
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -79,7 +79,7 @@ describe("UpdateSettings", () => {
     expect(screen.queryByRole("button", { name: "Check now" })).toBeNull();
   });
 
-  it("shows the running version and an up-to-date status", async () => {
+  it("shows one state line and at most one action", async () => {
     const transport = makeTransport();
     const service = renderSettings(transport);
 
@@ -87,9 +87,14 @@ describe("UpdateSettings", () => {
       await service.check();
     });
 
-    expect(await screen.findByText("v0.11.0")).toBeInTheDocument();
-    expect(screen.getByText("You're up to date.")).toBeInTheDocument();
-    expect(screen.getByText(/checked just now/i)).toBeInTheDocument();
+    expect(await screen.findByText("You're up to date.")).toBeInTheDocument();
+    // The updater's detail (the running version, the last check, the release
+    // notes) lives in About or the banner, never in this row.
+    expect(screen.queryByText("v0.11.0")).toBeNull();
+    expect(screen.queryByText(/checked just now/i)).toBeNull();
+
+    const section = screen.getByRole("region", { name: "Updates" });
+    expect(within(section).getAllByRole("button")).toHaveLength(1);
   });
 
   it("checks on request", async () => {
@@ -115,33 +120,6 @@ describe("UpdateSettings", () => {
 
     expect(storage.data.get(AUTO_CHECK_KEY)).toBe("off");
     expect(toggle).not.toBeChecked();
-  });
-
-  it("offers release notes for the available version", async () => {
-    const transport = makeTransport({ check: vi.fn(async () => makeHandle()) });
-    const service = renderSettings(transport);
-
-    await act(async () => {
-      await service.check();
-    });
-
-    expect(screen.getByText("What's new in 0.12.0")).toBeInTheDocument();
-    expect(screen.getByText("The canvas now follows the conversation.")).toBeInTheDocument();
-  });
-
-  it("lets a person skip a release that cannot be installed", async () => {
-    const storage = memoryStorage();
-    const transport = makeTransport({ check: vi.fn(async () => makeHandle()) });
-    const service = renderSettings(transport, { platform: "windows", storage });
-
-    await act(async () => {
-      await service.check();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Skip this version" }));
-
-    expect(storage.data.get(SKIPPED_VERSION_KEY)).toBe("0.12.0");
-    expect(await screen.findByText(/is skipped/i)).toBeInTheDocument();
   });
 
   it("offers the restart once an update is ready", async () => {
