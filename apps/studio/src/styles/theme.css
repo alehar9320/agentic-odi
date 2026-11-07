@@ -56,6 +56,35 @@ html.theme-light {
   --surface-hover: rgba(15, 23, 42, 0.07);
 }
 
+/* More contrast: muted text climbs one step, hairlines thicken, and the
+   accent keeps its 3:1 focus ring. Both themes are named inside the query so
+   the light values are not shadowed by their earlier declaration. */
+@media (prefers-contrast: more) {
+  :root {
+    --muted: #c6cad3;
+    --faint: #adb2bf;
+    --line: rgba(255, 255, 255, 0.16);
+    --line-strong: rgba(255, 255, 255, 0.3);
+  }
+
+  html.theme-light {
+    --muted: #3a4050;
+    --faint: #454c5c;
+    --line: rgba(15, 23, 42, 0.22);
+    --line-strong: rgba(15, 23, 42, 0.4);
+  }
+
+  .bar,
+  .banner,
+  .outcome-card,
+  .settings-drawer,
+  .changelog-modal,
+  .diagnostics-modal,
+  .studio-metric {
+    border-width: 1.5px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -3209,6 +3238,18 @@ button.message__tag:hover {
   }
 }
 
+/* StudioContext holds this class for one theme change only, so the tokens
+   cross-fade for 120ms instead of snapping. Reduced motion never adds it, and
+   the global reduce rule shortens it if it runs anyway. */
+html.theme-fading,
+html.theme-fading *,
+html.theme-fading *::before,
+html.theme-fading *::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 120ms;
+  transition-timing-function: linear;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -4505,6 +4546,48 @@ button.message__tag:hover {
   backdrop-filter: blur(12px) saturate(160%);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
 }
+
+/* ------------------------------------------------------------------ */
+/* Preferences owned by the operating system                           */
+/* ------------------------------------------------------------------ */
+
+/* Reduced transparency: the glass becomes a surface. Every blur is removed
+   and the overlay scrims go opaque, so text never sits on moving wallpaper. */
+@media (prefers-reduced-transparency: reduce) {
+  .scrim,
+  .bar,
+  .outcome-card,
+  .settings-drawer,
+  .banner,
+  .changelog-modal,
+  .changelog-overlay,
+  .diagnostics-overlay,
+  .suggestion-modal,
+  .catchup-summary,
+  .studio-metric {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .bar,
+  .outcome-card,
+  .settings-drawer,
+  .banner,
+  .changelog-modal,
+  .catchup-summary,
+  .studio-metric {
+    background-color: var(--bg-raised);
+  }
+
+  .changelog-overlay,
+  .diagnostics-overlay,
+  .suggestion-modal,
+  .scrim {
+    background-color: var(--bg);
+  }
+}
+
+
 
 /* 2. Apple-style range slider dynamics */
 input[type="range"] {
@@ -6841,4 +6924,16 @@ details[open] summary {
   margin: 0;
   font-size: 0.8rem;
   color: var(--amber);
+}
+
+/* Selection and the caret carry the brand instead of the browser default. */
+::selection {
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
+  color: var(--text);
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: var(--accent);
 }
