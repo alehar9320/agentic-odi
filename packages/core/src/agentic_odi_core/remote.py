@@ -42,6 +42,10 @@ class StudioError(BaseModel):
     suggestion: str | None = None
     retryable: bool = False
     request_id: str | None = None
+    #: Which outcome field the failure belongs to, so the client can render it
+    #: beside the statement or rating the person actually mistyped. Absent when
+    #: the failure cannot be attributed to a single field.
+    field: str | None = None
 
 
 STATUS_FOR_CODE: dict[StudioErrorCode, int] = {

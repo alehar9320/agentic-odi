@@ -89,7 +89,7 @@ describe("ChatStage", () => {
     );
 
     const viewport = container.querySelector(".chat__scroll") as HTMLDivElement;
-    expect(screen.queryByRole("button", { name: /jump to latest/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /latest/i })).toBeNull();
     Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1200 });
     Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 400 });
     Object.defineProperty(viewport, "scrollTop", { configurable: true, value: 800, writable: true });
@@ -99,7 +99,7 @@ describe("ChatStage", () => {
     viewport.scrollTop = 200;
     fireEvent.scroll(viewport);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /jump to latest/i })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: /latest/i })).toBeInTheDocument(),
     );
 
     Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1500 });
@@ -116,7 +116,7 @@ describe("ChatStage", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /jump to latest/i })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: /latest/i })).toBeInTheDocument(),
     );
     expect(viewport.scrollTop).toBe(200);
   });
@@ -156,7 +156,7 @@ describe("ChatStage", () => {
       </StudioRuntimeProvider>,
     );
 
-    const pill = await screen.findByRole("button", { name: "2 new · Jump to latest" });
+    const pill = await screen.findByRole("button", { name: "2 new ↓" });
     expect(pill).toBeInTheDocument();
     // The polite region states the count once, in words.
     expect(screen.getByRole("status", { name: "New replies" })).toHaveTextContent("2 new messages");
@@ -195,7 +195,7 @@ describe("ChatStage", () => {
         <ChatStage />
       </StudioRuntimeProvider>,
     );
-    await screen.findByRole("button", { name: "1 new · Jump to latest" });
+    await screen.findByRole("button", { name: "1 new ↓" });
 
     harness.state.messages = [
       ...harness.state.messages,
@@ -217,7 +217,7 @@ describe("ChatStage", () => {
     );
 
     // The streamed turn is one arrival, not one per delta.
-    const pill = await screen.findByRole("button", { name: "2 new · Jump to latest" });
+    const pill = await screen.findByRole("button", { name: "2 new ↓" });
     expect(pill).toBeInTheDocument();
   });
 
@@ -253,14 +253,14 @@ describe("ChatStage", () => {
         <ChatStage />
       </StudioRuntimeProvider>,
     );
-    await screen.findByRole("button", { name: "1 new · Jump to latest" });
+    await screen.findByRole("button", { name: "1 new ↓" });
 
     // Scrolling back to the bottom hides the pill and empties the announcement.
     viewport.scrollTop = 800;
     fireEvent.scroll(viewport);
 
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /jump to latest/i })).toBeNull(),
+      expect(screen.queryByRole("button", { name: /latest/i })).toBeNull(),
     );
     expect(screen.getByRole("status", { name: "New replies" })).toHaveTextContent("");
   });
@@ -296,12 +296,12 @@ describe("ChatStage", () => {
     Object.defineProperty(viewport, "scrollTo", { configurable: true, value: scrollTo });
     viewport.scrollTop = 200;
     fireEvent.scroll(viewport);
-    const latestButton = await screen.findByRole("button", { name: /jump to latest/i });
+    const latestButton = await screen.findByRole("button", { name: /latest/i });
 
     fireEvent.click(latestButton);
     expect(scrollTo).toHaveBeenCalledWith({ top: 1200, behavior: "smooth" });
     await waitFor(() => expect(viewport.scrollTop).toBe(800));
-    expect(screen.queryByRole("button", { name: /jump to latest/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /latest/i })).toBeNull();
   });
 
   it("returns to the live end without animating when reduced motion is preferred", async () => {
@@ -343,7 +343,7 @@ describe("ChatStage", () => {
       viewport.scrollTop = 200;
       fireEvent.scroll(viewport);
 
-      const latestButton = await screen.findByRole("button", { name: /jump to latest/i });
+      const latestButton = await screen.findByRole("button", { name: /latest/i });
       fireEvent.click(latestButton);
 
       expect(scrollTo).toHaveBeenCalledWith({ top: 1200, behavior: "auto" });
@@ -386,7 +386,7 @@ describe("ChatStage", () => {
     viewport.scrollTop = 200;
     fireEvent.scroll(viewport);
 
-    const pill = await screen.findByRole("button", { name: /jump to latest/i });
+    const pill = await screen.findByRole("button", { name: /latest/i });
     // Mounting the pill never moves focus away from where the reader was.
     expect(pill).not.toHaveFocus();
     expect(textbox).toHaveFocus();

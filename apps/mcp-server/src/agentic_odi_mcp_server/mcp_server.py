@@ -2,14 +2,17 @@
 
 import argparse
 import asyncio
+import hmac
 import json
 import os
 import signal
 import sys
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
+import uvicorn
 from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
@@ -49,8 +52,69 @@ from agentic_odi_core import (
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
 )
+from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"  # nosec B105 - env var name, not a secret
+
+
+def _token_path() -> Path:
+    env = os.getenv(TOKEN_PATH_ENV)
+    if env:
+        return Path(env)
+    return Path.home() / ".config" / "agentic-odi" / "studio-token"
+
+
+def _configured_token() -> str:
+    """The token a studio has already minted, or "" when none has been.
+
+    ``_studio_token`` issues one; this only reports, so starting the server is
+    not itself the act of turning the gate on.
+    """
+    path = _token_path()
+    if path.is_file():
+        return path.read_text(encoding="utf-8").strip()
+    return ""
+
+
+def _studio_token() -> str:
+    """Issue (or return) the per-install sidecar token shared with the sidecar."""
+    path = _token_path()
+    if path.is_file():
+        existing = path.read_text(encoding="utf-8").strip()
+        if existing:
+            return existing
+    token = os.urandom(24).hex()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(token, encoding="utf-8")
+    return token
+
+
+class _AuthMiddleware:
+    """Require the per-install bearer token on the MCP HTTP endpoint."""
+
+    def __init__(self, app: ASGIApp, token: str) -> None:
+        self.app = app
+        self.token = token
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = dict(scope.get("headers", []))
+        auth = headers.get(b"authorization", b"").decode("latin-1")
+        expected = f"Bearer {self.token}"
+        if not auth or not hmac.compare_digest(auth, expected):
+            response = JSONResponse(
+                {"error": {"code": "unauthorized", "message": "Unauthorized"}},
+                status_code=401,
+            )
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
 
 _repo = build_repository()
 service = ODIService(_repo)
@@ -1206,7 +1270,13 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     validate_at_startup()
     setup_graceful_shutdown()
-    mcp.run(transport="http", port=resolve_port(args.port))
+    # Gate only a token a studio has already minted. Minting one here would 401
+    # every documented boot (smoke, `python -m agentic_odi_mcp_server`, the
+    # dev script) on a machine that has never paired a studio, which is the
+    # opposite of what those instructions promise.
+    token = _configured_token()
+    app = _AuthMiddleware(mcp.http_app(), token) if token else mcp.http_app()
+    uvicorn.run(app, host="127.0.0.1", port=resolve_port(args.port))
 
 
 def setup_graceful_shutdown() -> None:
