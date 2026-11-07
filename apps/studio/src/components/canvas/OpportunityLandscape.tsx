@@ -4,6 +4,7 @@ import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canv
 import {
   formatOpportunityScore,
   hasScore,
+  scoredAverage,
   isUnderserved,
   scoredAverage,
   UNDERSERVED_THRESHOLD,
@@ -89,7 +90,7 @@ export function OpportunityLandscape() {
     }
     return {
       value: formatOpportunityScore(summary.mean),
-      caption: `${summary.scored} scored · ${summary.unscored} not scored`,
+      caption: ` scored ·  not scored`,
     };
   }, [outcomes]);
 

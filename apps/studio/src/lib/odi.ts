@@ -89,6 +89,18 @@ export function formatMemberMean(summary: MemberScoreSummary): string {
 }
 
 /**
+ * Average only the stored numeric opportunity scores. An unscored outcome is
+ * never treated as a zero: it is counted separately and excluded from the mean.
+ */
+export function scoredAverage(outcomes: ReadonlyArray<Outcome>): {
+  mean: number | null;
+  scored: number;
+  unscored: number;
+} {
+  return summarizeMemberScores(outcomes.map((o) => o.opportunity_score));
+}
+
+/**
  * The one line a segment shows about where its people came from. An inferred
  * group is a candidate, not a researched market, and the board says so rather
  * than letting the two read alike.
