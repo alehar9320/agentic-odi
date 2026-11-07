@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { JOB_STAGES, type JobStage } from "../../domain/jobStages";
 import { canvasHasRecords, savedCopyCaption } from "../../lib/canvasProvenance";
+import { WALK_THE_JOB_INTENT } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { FailurePanel } from "../FailurePanel";
 import { GhostJobSteps } from "../Skeletons";
@@ -28,6 +29,7 @@ export function JobMap() {
     deleteJob,
     focusedJobId,
     focusSubject,
+    sendMessage,
   } = useStudio();
   const canvas = canvasState.data;
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -502,11 +504,24 @@ export function JobMap() {
           })}
         </div>
       ) : (
-        <p className="toast toast--info" role="status">
-          {selectedPhaseIndex === null
-            ? "No steps captured yet. Ask the studio to walk you through the job."
-            : "No steps land in this phase yet."}
-        </p>
+        <div className="toast toast--info" role="status">
+          <p>
+            {selectedPhaseIndex === null
+              ? "No steps captured yet."
+              : "No steps land in this phase yet."}
+          </p>
+          {/* An empty panel offers the action that fills it, and it asks for the
+              same walk the lens footer does (#698 D32). */}
+          {selectedPhaseIndex === null && (
+            <button
+              type="button"
+              className="button"
+              onClick={() => void sendMessage(WALK_THE_JOB_INTENT)}
+            >
+              Walk me through the job
+            </button>
+          )}
+        </div>
       )}
 
       {activeJobId && (

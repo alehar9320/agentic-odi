@@ -51,7 +51,7 @@ it("renders the warning strip with every way to keep working", async () => {
     </Frame>,
   );
 
-  await expect.element(screen.getByText(/Working by hand/i)).toBeVisible();
+  await expect.element(screen.getByText(/Local mode/i)).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Map the job" })).toBeVisible();
 });
 

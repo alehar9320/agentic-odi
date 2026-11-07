@@ -62,12 +62,37 @@ describe("Composer connector suggestions", () => {
 
     render(<Composer {...baseProps} />);
 
-    const chip = screen.getByRole("button", { name: /added gong, dismiss/i });
+    const chip = screen.getByRole("button", { name: /hide gong/i });
     expect(chip).toBeInTheDocument();
     expect(chip).toHaveTextContent("Added Gong");
     fireEvent.click(chip);
     expect(dismiss).toHaveBeenCalledWith("gong");
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("names a connection the store already holds as a state, not a toast (#698 D33)", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [{ name: "gong", kind: "voice-of-customer", enabled: true }],
+        connectorSuggestions: ["gong"],
+      }),
+    );
+
+    render(<Composer {...baseProps} />);
+
+    expect(screen.getByText("Connected to Gong")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /hide gong/i })).toBeInTheDocument();
+  });
+
+  it("uses the one phrase for local mode in the hint row (#698 D35)", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ llmHealth: { healthy: false, message: "no model" } }),
+    );
+
+    render(<Composer {...baseProps} />);
+
+    expect(screen.getByText("Local mode")).toBeInTheDocument();
+    expect(screen.queryByText(/local guidance/i)).toBeNull();
   });
 
   it("renders nothing when there are no suggestions", () => {

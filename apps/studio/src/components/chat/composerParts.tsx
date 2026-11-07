@@ -12,6 +12,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useAuiState } from "@assistant-ui/react";
 
+import { LOCAL_MODE_LABEL } from "../../lib/brand";
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
@@ -177,6 +178,7 @@ export function CommandPalette({
 export function ConnectorChips() {
   const {
     connectorSuggestions,
+    connectors,
     presets,
     dismissConnectorSuggestion,
     refreshConnectors,
@@ -190,18 +192,24 @@ export function ConnectorChips() {
     <div className="composer__suggestions" aria-label="Connector suggestions">
       {connectorSuggestions.map((id) => {
         const label = presets.find((preset) => preset.id === id)?.label ?? id;
+        // A connection the store already holds is a state; one that was just
+        // added is still a proposal (#698 D33).
+        const persisted = (connectors ?? []).some(
+          (connector) =>
+            connector.name === id || connector.name.toLowerCase() === label.toLowerCase(),
+        );
         return (
           <button
             key={id}
             type="button"
             className="composer__suggestion"
-            aria-label={`Added ${label}, dismiss`}
+            aria-label={`Hide ${label}`}
             onClick={() => {
               dismissConnectorSuggestion(id);
               void refreshConnectors();
             }}
           >
-            <span>Added {label}</span>
+            <span>{persisted ? `Connected to ${label}` : `Added ${label}`}</span>
             <span aria-hidden>✕</span>
           </button>
         );
@@ -261,7 +269,7 @@ export function ComposerHint({ trailing }: { trailing?: ReactNode } = {}) {
         {brief ? ` · ${brief.product_name || "your job"}` : ""}
       </span>
       <span className="composer__hint-end">
-        {offline ? <span className="composer__status is-offline">Local guidance</span> : null}
+        {offline ? <span className="composer__status is-offline">{LOCAL_MODE_LABEL}</span> : null}
         {trailing ??
           (offline ? null : <span className="composer__status">{settings.model_name}</span>)}
       </span>
