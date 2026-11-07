@@ -206,7 +206,15 @@ describe("CapabilityRegistry", () => {
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
         }
-        if (url.includes("/api/connectors") || url.includes("/api/health/mcp")) {
+        if (url.includes("/api/health/mcp")) {
+          // #515: the MCP probe reads the body's `reachable`; a bare 200 proves
+          // the sidecar answered, not that the MCP server did.
+          return new Response(JSON.stringify({ reachable: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (url.includes("/api/connectors")) {
           return new Response("", { status: 200 });
         }
         return new Response("", { status: 404 });
