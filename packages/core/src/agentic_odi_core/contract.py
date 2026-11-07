@@ -63,6 +63,12 @@ class ToolName(str, Enum):
     REJECT_PROPOSAL = "reject_proposal"
     OPEN_STUDY = "open_study"
     LIST_STUDIES = "list_studies"
+    ADD_THEME = "add_theme"
+    RENAME_THEME = "rename_theme"
+    DELETE_THEME = "delete_theme"
+    LIST_THEMES = "list_themes"
+    ASSIGN_THEME = "assign_theme"
+    UNASSIGN_THEME = "unassign_theme"
 
 
 class ToolEffect(str, Enum):
@@ -541,6 +547,59 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("proposal_id",),
         required=("proposal_id",),
         returns="The rejected OutcomeProposal.",
+        stage="2",
+    ),
+    ToolName.ADD_THEME.value: ToolSpec(
+        name="add_theme",
+        summary="Name a group of related desired outcomes, optionally under a parent theme.",
+        effect=_derive_effect("add_theme"),
+        arguments=("name", "job_id", "parent_id", "description", "ordinal"),
+        required=("name",),
+        returns="The created Theme.",
+        stage="2",
+    ),
+    ToolName.RENAME_THEME.value: ToolSpec(
+        name="rename_theme",
+        summary="Rename a theme, edit its description or ordinal, or move it under another parent.",
+        effect=_derive_effect("rename_theme"),
+        arguments=("theme_id", "name", "description", "ordinal", "parent_id"),
+        required=("theme_id",),
+        returns="The updated Theme.",
+        stage="2",
+    ),
+    ToolName.DELETE_THEME.value: ToolSpec(
+        name="delete_theme",
+        summary="Delete a theme; its children move up and outcomes keep their other memberships.",
+        effect=_derive_effect("delete_theme"),
+        arguments=("theme_id",),
+        required=("theme_id",),
+        returns="The deleted theme id, its name, and the children it reparented.",
+        stage="2",
+    ),
+    ToolName.LIST_THEMES.value: ToolSpec(
+        name="list_themes",
+        summary="List themes for a job, plus workspace themes that span jobs.",
+        effect=_derive_effect("list_themes"),
+        arguments=("job_id",),
+        returns="A list of Themes.",
+        stage="2",
+    ),
+    ToolName.ASSIGN_THEME.value: ToolSpec(
+        name="assign_theme",
+        summary="File outcomes under a theme; the whole call is refused if any outcome is unknown.",
+        effect=_derive_effect("assign_theme"),
+        arguments=("outcome_ids", "theme_id"),
+        required=("outcome_ids", "theme_id"),
+        returns="The updated Outcomes.",
+        stage="2",
+    ),
+    ToolName.UNASSIGN_THEME.value: ToolSpec(
+        name="unassign_theme",
+        summary="Remove a theme from outcomes; their other memberships stay.",
+        effect=_derive_effect("unassign_theme"),
+        arguments=("outcome_ids", "theme_id"),
+        required=("outcome_ids", "theme_id"),
+        returns="The updated Outcomes.",
         stage="2",
     ),
     ToolName.OPEN_STUDY.value: ToolSpec(

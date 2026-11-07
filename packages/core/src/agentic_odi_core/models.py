@@ -188,6 +188,10 @@ class Outcome(BaseModel):
         None,
         description="The Study wave this outcome was measured in, or None for a row that predates studies",
     )
+    theme_ids: list[str] = Field(
+        default_factory=list,
+        description="The themes this outcome is filed under; empty until one is assigned",
+    )
 
 
 class ValueMetric(BaseModel):
@@ -370,6 +374,39 @@ class Strategy(BaseModel):
         default_factory=list, description='[{"kind": "disruptive", "why": "..."}]'
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Theme(BaseModel):
+    """A named branch of the outcome library — one level of a shallow tree.
+
+    A theme groups outcomes by what they are about, so a library of 150 stays
+    navigable. The tree is two levels at most: a theme either stands alone or
+    hangs under one parent, and a child of a child is refused. The parent
+    itself lives in the store, so "same scope, one level deep" is the service's
+    check; the model owns the one cycle it can see from inside a single row — a
+    theme cannot be its own parent.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str | None = Field(
+        None,
+        description=(
+            "The Job this theme organizes, or None for a workspace-wide theme that outcomes "
+            "of any job may join"
+        ),
+    )
+    parent_id: str | None = Field(None, description="The theme one level above this one, if any")
+    name: str = Field(..., min_length=1, description="Short human label for the theme")
+    description: str | None = Field(
+        None, description="What belongs under this theme, in the researcher's words"
+    )
+    ordinal: int = Field(0, ge=0, description="Display order among its siblings")
+
+    @model_validator(mode="after")
+    def _is_not_its_own_parent(self) -> Theme:
+        if self.parent_id is not None and self.parent_id == self.id:
+            raise ValueError("A theme cannot be its own parent")
+        return self
 
 
 class SignalKind(str, Enum):

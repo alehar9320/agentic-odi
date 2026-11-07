@@ -49,6 +49,7 @@ from agentic_odi_core.models import (
     Strategy,
     Study,
     StudyStatus,
+    Theme,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
@@ -145,6 +146,14 @@ class StrategyNotFoundError(NotFoundError, ValueError):
     def __init__(self, strategy_id: str, hint: str | None = None) -> None:
         self.strategy_id = strategy_id
         super().__init__(strategy_id, "strategy", hint)
+
+
+class ThemeNotFoundError(NotFoundError, ValueError):
+    """Raised when a theme id does not resolve."""
+
+    def __init__(self, theme_id: str, hint: str | None = None) -> None:
+        self.theme_id = theme_id
+        super().__init__(theme_id, "theme", hint)
 
 
 class NoStrategyEvidenceError(ValidationError):
@@ -439,6 +448,17 @@ class ODIService:
         else:
             updates = dict(updates)
             updates["opportunity_score"] = None
+        theme_ids = updates.get("theme_ids")
+        if theme_ids is not None:
+            for theme_id in theme_ids:
+                theme = self.repo.get_theme(theme_id)
+                if theme is None:
+                    raise ThemeNotFoundError(theme_id)
+                if theme.job_id is not None and theme.job_id != existing.job_id:
+                    raise ValidationError(
+                        f"Theme {theme_id} organizes job {theme.job_id}, not the outcome's job "
+                        f"{existing.job_id}; an outcome may only join a theme in its scope."
+                    )
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
             raise OutcomeNotFoundError(outcome_id)
@@ -1129,6 +1149,159 @@ class ODIService:
             raise SegmentNotFoundError(segment.id)
         self._emit_segment_signal(saved, is_new=existing is None)
         return saved
+
+    # -- Themes: a shallow named tree over the outcome library ----------------
+
+    def add_theme(
+        self,
+        name: str,
+        job_id: str | None = None,
+        parent_id: str | None = None,
+        description: str | None = None,
+        ordinal: int = 0,
+    ) -> Theme:
+        """Add one theme, refusing a placement the two-level tree cannot hold.
+
+        Scope has exactly one meaning: a theme with a ``job_id`` organizes that
+        job's outcomes only, and a theme without one is workspace-wide — its
+        children must match its scope, so a job theme never hangs off a
+        workspace theme or the other way round.
+        """
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        if parent_id is not None:
+            self._validate_theme_placement(parent_id, job_id)
+        theme = Theme(
+            job_id=job_id, parent_id=parent_id, name=name, description=description, ordinal=ordinal
+        )
+        return self.repo.add_theme(theme)
+
+    def _validate_theme_placement(self, parent_id: str, job_id: str | None) -> Theme:
+        parent = self.repo.get_theme(parent_id)
+        if parent is None:
+            raise ValidationError(f"Theme parent {parent_id} does not exist; add it first.")
+        if parent.parent_id is not None:
+            raise ValidationError(
+                f"Theme {parent_id} is already a child of {parent.parent_id}; themes go two "
+                "levels deep at most, so nothing can go under it."
+            )
+        if parent.job_id != job_id:
+            raise ValidationError(
+                f"Theme parent has scope job_id={parent.job_id!r}, the child asks for "
+                f"job_id={job_id!r}; a theme and its parent must share a scope — "
+                "a workspace theme (job_id=None) organizes any job's outcomes, "
+                "a job theme only its own."
+            )
+        return parent
+
+    def get_theme(self, theme_id: str) -> Theme:
+        theme = self.repo.get_theme(theme_id)
+        if theme is None:
+            raise ThemeNotFoundError(theme_id, "add a theme first")
+        return theme
+
+    def list_themes(self, job_id: str | None = None) -> list[Theme]:
+        return self.repo.list_themes(job_id=job_id)
+
+    def rename_theme(
+        self,
+        theme_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        ordinal: int | None = None,
+        parent_id: str | None = None,
+    ) -> Theme:
+        """Rename a theme, or move it under a parent; omitted fields stay as they are."""
+        theme = self.get_theme(theme_id)
+        updates: dict[str, Any] = {}
+        if name is not None:
+            updates["name"] = name
+        if description is not None:
+            updates["description"] = description
+        if ordinal is not None:
+            updates["ordinal"] = ordinal
+        if parent_id is not None:
+            self._validate_theme_placement(parent_id, theme.job_id)
+            has_children = any(t.parent_id == theme_id for t in self.repo.themes.values())
+            if has_children:
+                raise ValidationError(
+                    f"Theme {theme_id} still has children; moving it down would make them a "
+                    "third level, and themes go two levels deep. Move the children first."
+                )
+            updates["parent_id"] = parent_id
+        if not updates:
+            return theme
+        renamed = self.repo.update_theme(theme_id, updates)
+        if renamed is None:
+            raise ThemeNotFoundError(theme_id)
+        return renamed
+
+    def delete_theme(self, theme_id: str) -> dict[str, Any]:
+        """Delete a theme; its children rise to its parent and no outcome is deleted.
+
+        Deleting an outcome through a theme would destroy research to tidy a
+        label, so the cascade stops at membership: outcomes lose this one
+        theme id and keep every other. The reparented ids ride the event, so a
+        reload reproduces the same tree.
+        """
+        theme = self.get_theme(theme_id)
+        reparented = [t.id for t in self.repo.themes.values() if t.parent_id == theme_id]
+        self.repo.delete_theme(theme_id)
+        return {
+            "theme_id": theme_id,
+            "name": theme.name,
+            "reparented_to": theme.parent_id,
+            "reparented": reparented,
+        }
+
+    def assign_theme(self, outcome_ids: list[str], theme_id: str) -> list[Outcome]:
+        """File outcomes under a theme; every one must exist and match its scope."""
+        theme = self.get_theme(theme_id)
+        self._check_membership_targets(outcome_ids, theme)
+        results = []
+        for outcome_id in outcome_ids:
+            updated = self.repo.change_theme_membership(outcome_id, added=[theme_id], removed=[])
+            if updated is None:
+                raise OutcomeNotFoundError(outcome_id)
+            results.append(updated)
+        return results
+
+    def unassign_theme(self, outcome_ids: list[str], theme_id: str) -> list[Outcome]:
+        """Take outcomes out of one theme; their other memberships stay."""
+        self.get_theme(theme_id)
+        missing = [oid for oid in outcome_ids if self.repo.get_outcome(oid) is None]
+        if missing:
+            raise OutcomeNotFoundError(missing[0])
+        results = []
+        for outcome_id in outcome_ids:
+            updated = self.repo.change_theme_membership(outcome_id, added=[], removed=[theme_id])
+            if updated is None:
+                raise OutcomeNotFoundError(outcome_id)
+            results.append(updated)
+        return results
+
+    def _check_membership_targets(self, outcome_ids: list[str], theme: Theme) -> None:
+        missing = [oid for oid in outcome_ids if self.repo.get_outcome(oid) is None]
+        if missing:
+            raise OutcomeNotFoundError(missing[0])
+        if theme.job_id is not None:
+            foreign = []
+            for oid in outcome_ids:
+                existing = self.repo.get_outcome(oid)
+                if existing is not None and existing.job_id != theme.job_id:
+                    foreign.append(oid)
+            if foreign:
+                raise ValidationError(
+                    f"Theme {theme.id} organizes job {theme.job_id}; outcomes "
+                    f"{', '.join(foreign)} belong to other jobs. A workspace theme "
+                    "(job_id=None) is the one that spans jobs."
+                )
+
+    def _validate_theme_membership(self, theme_ids: list[str]) -> None:
+        for theme_id in theme_ids:
+            theme = self.repo.get_theme(theme_id)
+            if theme is None:
+                raise ThemeNotFoundError(theme_id)
 
     def _emit_segment_signal(self, segment: Segment, *, is_new: bool) -> None:
         severity = "notice" if segment.verdict is SegmentVerdict.UNDERSERVED else "info"

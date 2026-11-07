@@ -466,6 +466,54 @@ def render_segment(segment: Any, *, as_json: bool) -> str:
     )
 
 
+def render_theme_list(themes: Any, *, as_json: bool) -> str:
+    """Render themes as a table: name, parent, and the job they organize."""
+    if not isinstance(themes, list):
+        return _json(themes) if as_json else str(themes)
+    if as_json:
+        return _json(themes)
+    return _table(
+        ("id", "name", "parent", "job_id", "ordinal"),
+        [
+            (
+                _cell(item, "id"),
+                _truncate(_cell(item, "name")),
+                _cell(item, "parent_id"),
+                _cell(item, "job_id"),
+                _cell(item, "ordinal"),
+            )
+            for item in themes
+        ],
+        empty="No themes yet — `odi themes add --name <name>` names your first group.",
+    )
+
+
+def render_theme(theme: Any, *, as_json: bool) -> str:
+    """Render one theme: its name and its place in the tree."""
+    if not isinstance(theme, dict):
+        return _json(theme) if as_json else str(theme)
+    if as_json:
+        return _json(theme)
+    return _block(
+        [
+            ("id", _cell(theme, "id")),
+            ("name", _cell(theme, "name")),
+            ("parent", _cell(theme, "parent_id")),
+            ("job", _cell(theme, "job_id")),
+            ("ordinal", _cell(theme, "ordinal")),
+            ("description", _cell(theme, "description")),
+        ]
+    )
+
+
+def render_theme_deleted(result: dict[str, Any], *, as_json: bool) -> str:
+    """Report a deletion and the children that moved up."""
+    if as_json:
+        return _json(result)
+    reparented = result.get("reparented") or []
+    return f"Deleted theme {result.get('name')!r}; moved {len(reparented)} child theme(s) up."
+
+
 def render_study_list(studies: Any, *, as_json: bool) -> str:
     """Render studies as a table: a wave is meaningless without its status."""
     if not isinstance(studies, list):
