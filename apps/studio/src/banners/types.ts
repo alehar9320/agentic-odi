@@ -24,6 +24,7 @@ export type BannerKind =
   | "update-available"
   | "update-ready"
   | "write-rejected"
+  | "storage-full"
   | "info"
   | "success"
   | "error";
@@ -35,7 +36,8 @@ export type BannerActionId =
   | "open-capture"
   | "open-jobmap"
   | "install-update"
-  | "restart";
+  | "restart"
+  | "export-workspace";
 
 export interface BannerAction {
   label: string;

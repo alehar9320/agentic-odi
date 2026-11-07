@@ -9,10 +9,12 @@ const studio = vi.hoisted(() => ({
   sidecarReachable: true as boolean | null,
   llmHealth: { healthy: true as boolean | null, message: "" },
   dismissedSidecarNotice: false,
+  storageFull: false,
   dismissSidecarNotice: vi.fn(),
   recheckConnections: vi.fn(),
   openSetup: vi.fn(),
   openPanel: vi.fn(),
+  exportWorkspace: vi.fn(),
   ask: vi.fn(),
 }));
 
@@ -71,6 +73,7 @@ describe("BannerBridge", () => {
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: true, message: "" };
     studio.dismissedSidecarNotice = false;
+    studio.storageFull = false;
     setOnLine(true);
   });
 
@@ -187,6 +190,42 @@ describe("BannerBridge", () => {
     });
 
     expect(studio.dismissSidecarNotice).toHaveBeenCalledTimes(1);
+  });
+
+  it("raises the storage-full strip with Export as its one action", () => {
+    studio.storageFull = true;
+    renderShell();
+
+    expect(screen.getByText(/out of space for this site/i)).toBeInTheDocument();
+    expect(screen.getByText(/existing work is safe/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
+  });
+
+  it("exports the workspace from the strip, and never clears anything", () => {
+    studio.storageFull = true;
+    studio.exportWorkspace.mockClear();
+    renderShell();
+
+    act(() => {
+      screen.getByRole("button", { name: "Export" }).click();
+    });
+
+    expect(studio.exportWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the storage-full strip once the pause lifts", () => {
+    studio.storageFull = true;
+    const { rerender } = renderShell();
+    expect(screen.getByText(/out of space for this site/i)).toBeInTheDocument();
+
+    studio.storageFull = false;
+    rerender(
+      <BannerProvider>
+        <BannerBridge />
+        <Shell />
+      </BannerProvider>,
+    );
+    expect(screen.queryByText(/out of space for this site/i)).not.toBeInTheDocument();
   });
 
   it("says one line naming what still works when the browser goes offline", () => {
