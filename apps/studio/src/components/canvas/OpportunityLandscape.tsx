@@ -5,6 +5,7 @@ import {
   formatOpportunityScore,
   hasScore,
   isUnderserved,
+  scoredAverage,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -83,8 +84,11 @@ export function OpportunityLandscape() {
   }, [evidence]);
 
   const avgOpportunity = useMemo(() => {
-    const total = outcomes.reduce((acc, o) => acc + (o.opportunity_score ?? 0), 0);
-    return formatOpportunityScore(outcomes.length ? total / outcomes.length : null);
+    const { mean, scored, unscored } = scoredAverage(outcomes);
+    return {
+      value: mean == null ? "Not scored" : formatOpportunityScore(mean),
+      caption: `${scored} scored · ${unscored} not scored`,
+    };
   }, [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
@@ -245,7 +249,8 @@ export function OpportunityLandscape() {
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Avg Opportunity Score</div>
-            <div className="studio-metric__value">{avgOpportunity}</div>
+            <div className="studio-metric__value">{avgOpportunity.value}</div>
+            <div className="studio-metric__delta">{avgOpportunity.caption}</div>
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Unique Customer Quotes</div>

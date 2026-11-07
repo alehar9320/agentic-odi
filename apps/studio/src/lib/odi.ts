@@ -1,3 +1,5 @@
+import type { Outcome } from "../types";
+
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -91,4 +93,12 @@ export function segmentBasisLine(peopleInferred: boolean): string {
   return peopleInferred
     ? "Candidate segment — grouped by the job it serves, not by researched people."
     : "People named from your evidence.";
+}
+
+/** Average of the scores the store actually holds. Outcomes that were never
+ * scored are counted, never treated as a zero. `mean` is `null` when nothing
+ * was scored — the caller decides what to show then. The math is
+ * `summarizeMemberScores`, so the board and a segment agree on what a mean is. */
+export function scoredAverage(outcomes: Outcome[]): MemberScoreSummary {
+  return summarizeMemberScores(outcomes.map((outcome) => outcome.opportunity_score));
 }
