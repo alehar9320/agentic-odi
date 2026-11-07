@@ -29,6 +29,11 @@ with:
 When running from a non-frozen source install, auto-update is suppressed
 automatically.
 
+The store records the schema version it was written with. A database newer than
+the installed build is refused on open — the message names the stored version,
+the version the build supports, and `odi update` as the way forward. Nothing is
+downgraded and no data is rewritten while a store is refused.
+
 ## Install layout
 
 ```text
