@@ -160,3 +160,32 @@ def test_the_mermaid_runtime_is_vendored_rather_than_fetched():
         if re.search(r"jsdelivr|unpkg|cdn\.js\.cloudflare", read_page(page))
     ]
     assert not fetched, f"pages reach a third-party CDN: {fetched}"
+
+
+# ---------------------------------------------------------------- page weight
+
+
+def test_whitespace_between_block_tags_is_removed():
+    from build_site import compact_html
+
+    html = '<div class="a">\n  <p>one</p>\n\n  <p>two</p>\n</div>\n'
+
+    assert compact_html(html).strip() == '<div class="a"><p>one</p><p>two</p></div>'
+
+
+def test_whitespace_between_inline_tags_still_separates_words():
+    from build_site import compact_html
+
+    html = "<p><span>a</span>\n<span>b</span> <em>c</em></p>\n"
+
+    assert compact_html(html).strip() == "<p><span>a</span> <span>b</span> <em>c</em></p>"
+
+
+def test_code_blocks_keep_every_byte():
+    from build_site import compact_html
+
+    html = '<pre class="highlight"><code>a\n  b\n</code></pre>\n<p>x</p>\n'
+
+    assert (
+        compact_html(html).strip() == '<pre class="highlight"><code>a\n  b\n</code></pre><p>x</p>'
+    )
