@@ -302,7 +302,8 @@ def readme_code_overview_paths(readme: str) -> list[str]:
 
 # --- assistant-ui ledger ------------------------------------------------------
 
-LEDGER_HEADING = "## The assistant-ui ledger"
+LEDGER_HEADING = "# The assistant-ui ledger"
+LEDGER_SOURCE = "docs/assistant-ui-ledger.md"
 LEDGER_PROJECTION_HEADING = "#### What the runtime gives us, and what we did not take"
 LEDGER_STATUSES = {"Adopted", "Partial", "Planned", "Decision", "Rejected"}
 LEDGER_CITATION = re.compile(r"#(\d+)")
@@ -348,7 +349,7 @@ def ledger_errors(
     root: Path = ROOT,
     delivered: set[str] | None = None,
 ) -> list[str]:
-    """Check the assistant-ui ledger in docs/development.md and its projection.
+    """Check the assistant-ui ledger page and its Living Studio projection.
 
     ``delivered`` is the set of issue/PR numbers this repository's history
     proves merged. It is only supplied by the command-line entry point, which
@@ -496,7 +497,7 @@ def collect_issues(root: Path = ROOT, delivered: set[str] | None = None) -> list
     issues += [
         f"assistant-ui ledger: {issue}"
         for issue in ledger_errors(
-            docs.get("docs/development.md", ""),
+            docs.get(LEDGER_SOURCE, ""),
             docs.get("docs/living-studio.md", ""),
             root=root,
             delivered=delivered,
