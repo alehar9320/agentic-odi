@@ -35,9 +35,9 @@ const OBSERVATION = {
   updated_at: "2026-10-22T10:00:00+00:00",
 };
 
-function json(body: unknown): Response {
+function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
-    status: 200,
+    status,
     headers: { "Content-Type": "application/json" },
   });
 }
@@ -79,6 +79,8 @@ let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 let conversationCreates = 0;
+let deletedConversations: string[] = [];
+let deleteFails = false;
 
 // The follow-up queue (#410) needs a turn that stays in flight so later sends
 // actually line up behind it: /api/chat then returns a stream the test closes
@@ -261,6 +263,13 @@ function route(
     headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
     return json({ conversation: CONVERSATION });
   }
+  if (init?.method === "DELETE" && url.startsWith("/api/conversations/")) {
+    deletedConversations.push(url.split("/").filter(Boolean).pop() ?? "");
+    if (deleteFails) {
+      return json({ error: { code: "internal", message: "boom" } }, 500);
+    }
+    return new Response(null, { status: 204 });
+  }
   if (url === "/api/conversations/c-1/tree") {
     return json({
       conversation: CONVERSATION,
@@ -351,6 +360,8 @@ describe("StudioContext memory and resume", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -612,6 +623,8 @@ describe("StudioContext failures", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1129,6 +1142,8 @@ describe("StudioContext canvas state", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1166,6 +1181,8 @@ describe("StudioContext stopped turns", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1201,6 +1218,8 @@ describe("StudioContext write approval and branches", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1334,6 +1353,8 @@ describe("StudioContext startNewThread (#319)", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     conversationCreates = 0;
     vi.stubGlobal(
       "fetch",
@@ -1721,6 +1742,8 @@ describe("StudioContext agent focus", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
@@ -1828,6 +1851,53 @@ describe("StudioContext agent focus", () => {
     // but the composer has no words to claim, so no chip may appear.
     expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "deleted-yesterday" });
     expect(result.current.focusedSubjectLabel).toBeNull();
+  });
+
+  // Inside the main fixture on purpose: deleting needs the stubbed sidecar route
+  // and the same freshly cleared IndexedDB every other conversation test uses.
+  describe("deleting a thread (#643)", () => {
+    it("returns to the empty stage when the open thread is deleted", async () => {
+      const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+      await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+      expect(result.current.messages.length).toBeGreaterThan(0);
+
+      await act(async () => {
+        await result.current.deleteConversation("c-1");
+      });
+
+      expect(deletedConversations).toEqual(["c-1"]);
+      expect(result.current.conversationId).toBeNull();
+      expect(result.current.messages).toEqual([]);
+      expect(result.current.conversations.map((item) => item.id)).not.toContain("c-1");
+    });
+
+    it("leaves the open thread alone when another one is deleted", async () => {
+      const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+      await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+      await act(async () => {
+        await result.current.deleteConversation("c-old");
+      });
+
+      expect(result.current.conversationId).toBe("c-1");
+      expect(result.current.messages.length).toBeGreaterThan(0);
+      expect(result.current.conversations.map((item) => item.id)).not.toContain("c-old");
+    });
+
+    it("keeps the history and the transcript when the delete fails", async () => {
+      deleteFails = true;
+      const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+      await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+      await act(async () => {
+        await expect(result.current.deleteConversation("c-1")).rejects.toThrow();
+      });
+
+      // Data intact is the whole point of the confirmation.
+      expect(result.current.conversationId).toBe("c-1");
+      expect(result.current.messages.length).toBeGreaterThan(0);
+      expect(result.current.conversations.map((item) => item.id)).toContain("c-1");
+    });
   });
 });
 

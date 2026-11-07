@@ -625,6 +625,31 @@ class StudioMemory:
             )
         return self._updated_conversation(conversation_id)
 
+    def delete_conversation(self, conversation_id: str) -> None:
+        """Remove one thread, its turns, and the citations those turns carried.
+
+        One transaction: a half-deleted thread would leave turns nobody can open,
+        and a citation pointing at a turn that no longer exists. A missing id is
+        a not-found, never a silent success.
+        """
+        with self._lock, self._connection:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
+            self._connection.execute(
+                "DELETE FROM turn_citations WHERE turn_id IN "
+                "(SELECT id FROM turns WHERE conversation_id = ?)",
+                (conversation_id,),
+            )
+            self._connection.execute(
+                "DELETE FROM turns WHERE conversation_id = ?", (conversation_id,)
+            )
+            self._connection.execute(
+                "DELETE FROM conversations WHERE id = ?", (conversation_id,)
+            )
+
     def _updated_conversation(self, conversation_id: str) -> Conversation:
         """Read back a row this instance just wrote.
 

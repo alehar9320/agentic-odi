@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -20,6 +20,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   llmHealth: { healthy: true, message: "ok" },
   messages: [],
   openConversation: vi.fn(),
+  deleteConversation: vi.fn(),
   refreshConversations: vi.fn(),
   unreadSignalCount: 0,
   openPanel: vi.fn(),
@@ -361,6 +362,118 @@ describe("StudioBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
 
     expect(screen.getByRole("menuitem", { name: /new conversation/i })).toBeInTheDocument();
+  });
+
+  const historyRows = [
+    {
+      id: "c-2",
+      title: "Current thread",
+      created_at: "2026-10-22T09:00:00Z",
+      updated_at: "2026-10-22T09:00:00Z",
+      head_id: null,
+      turn_count: 1,
+    },
+    {
+      id: "c-1",
+      title: "An older thread",
+      created_at: "2026-10-21T09:00:00Z",
+      updated_at: "2026-10-21T09:00:00Z",
+      head_id: null,
+      turn_count: 3,
+    },
+  ];
+
+  it("asks before deleting, and keeping the thread does nothing (#643)", () => {
+    const deleteConversation = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        deleteConversation,
+        conversationId: "c-2",
+        conversations: historyRows,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+
+    // The question names the thread, and nothing has been requested yet.
+    const question = screen.getByRole("group", { name: "Delete An older thread" });
+    expect(within(question).getByText(/its turns/i)).toBeInTheDocument();
+    expect(deleteConversation).not.toHaveBeenCalled();
+    // Focus lands on the choice that keeps the thread.
+    expect(screen.getByRole("button", { name: "Keep it" })).toHaveFocus();
+
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    expect(deleteConversation).not.toHaveBeenCalled();
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
+  });
+
+  it("deletes only after the confirmation is accepted", async () => {
+    const deleteConversation = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        deleteConversation,
+        conversationId: "c-2",
+        conversations: historyRows,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete thread" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-1"));
+  });
+
+  it("closes the question on Escape without deleting", () => {
+    const deleteConversation = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        deleteConversation,
+        conversationId: "c-2",
+        conversations: historyRows,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+    fireEvent.keyDown(screen.getByRole("group", { name: "Delete An older thread" }), {
+      key: "Escape",
+    });
+
+    expect(deleteConversation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("group", { name: "Delete An older thread" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
+  });
+
+  it("keeps the row and says so when the delete fails", async () => {
+    const deleteConversation = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    const pushToast = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        deleteConversation,
+        pushToast,
+        conversationId: "c-2",
+        conversations: historyRows,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete thread" }));
+
+    await waitFor(() =>
+      expect(pushToast).toHaveBeenCalledWith("error", expect.stringMatching(/delete/i)),
+    );
+    // A delete that failed must not look like one that worked.
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
   });
 });
 

@@ -88,6 +88,22 @@ describe("LocalMemoryService conversations", () => {
     expect(found?.id).toBe(conv.id);
   });
 
+  it("deletes a thread with its turns, and a missing one is a not-found", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const doomed = await memory.createConversation("Old interview");
+    const kept = await memory.createConversation("Activation model");
+    await memory.appendTurn(doomed.id, "user", "quote", "m-1", null);
+    await memory.appendTurn(kept.id, "user", "still here", "m-2", null);
+
+    await expect(memory.deleteConversation(doomed.id)).resolves.toEqual({ ok: true });
+
+    expect(await memory.getConversation(doomed.id)).toBeUndefined();
+    await expect(memory.listTurns(doomed.id)).rejects.toThrow(/not found/i);
+    expect((await memory.listConversations()).map((item) => item.id)).toEqual([kept.id]);
+    await expect(memory.deleteConversation("does-not-exist")).rejects.toThrow(/not found/i);
+  });
+
   it("appends user and assistant turns with ids and parents", async () => {
     const store = makeStore();
     const memory = new LocalMemoryService(store);
