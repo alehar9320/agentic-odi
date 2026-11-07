@@ -344,22 +344,22 @@ without giving up the message model the sidecar already understands.
 
 | Capability | What it means here |
 |---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
-| **Silence** | A run that stops producing tokens for eight seconds shows *Still working · no new output for Ns* under the reply, while the Stop button keeps its meaning. The signal comes from assistant-ui's stall detection over text, reasoning, tool arguments, and tool results — never from a timer watching the DOM — so a long tool call reads as work, not a freeze. A dropped stream never shows it: that path ends in the failure panel. |
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. Scrolling away during a reply adds a keyboard-accessible **Jump to latest** control naming the count (`3 new · Jump to latest`) that returns to the live end without interrupting follow behavior; a polite live region announces the count once per arrival, never per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
+| **Silence** | A run that stalls for eight seconds shows *Still working · no new output for Ns* under the reply, while Stop keeps its meaning. The signal is assistant-ui's stall detection over text, reasoning, tool arguments, and tool results — never a DOM timer — so a long tool call reads as work, not a freeze. A dropped stream never shows it: that path ends in the failure panel. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
-| **Work** | What a turn did folds into one row: *Working… · 3 calls* while it runs, then *Worked for 12s · 3 calls*, closed and reopenable. Opening it is the turn's own record, not a paraphrase — the same reasoning disclosure and trace chips, in the order they arrived. A turn the browser did not watch from the start shows its calls with no duration. |
+| **Work** | What a turn did folds into one row: *Working… · 3 calls* while it runs, then *Worked for 12s · 3 calls*, closed and reopenable. Opening it shows the turn's own record, not a paraphrase — the same reasoning disclosure and trace chips, in arrival order. A turn not watched from the start shows its calls with no duration. |
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
-| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. The ask is never folded into the work row — a question is not history. |
-| **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
-| **Claims** | Each declarative sentence ends with an evidence marker, and the reply arrives with a validated claim list. A chip names the source and the record (`Gong · Call with Acme`), never the tool; `Hypothesis` tags an ungrounded guess; an unmarked sentence keeps its place with a dotted underline and the accessible name *Uncited claim*. A chip opens that row in the Evidence lens, and Escape returns focus to the chip. Claims are stored with the turn, so they survive a reload; a record deleted later keeps its snapshot label and stops being a link. A seeded demo reply labels its chips **Sample** and does not count as cited. |
-| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. A turn carries at most five attachments, counting text and images together; a sixth is refused, naming the file and the limit, before the turn is sent. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter — capped at 20,000 characters with the truncation announced in the extracted text, and sent with the turn. Nothing is stored server-side. |
+| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn for **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. The ask is never folded into the work row — a question is not history. |
+| **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn read; a citation is never invented. |
+| **Claims** | Each declarative sentence ends with an evidence marker, and the reply arrives with a validated claim list. A chip names the source and the record (`Gong · Call with Acme`), never the tool; `Hypothesis` tags an ungrounded guess; an unmarked sentence keeps its place with a dotted underline and the accessible name *Uncited claim*. A chip opens that row in the Evidence lens; Escape returns focus. Claims are stored with the turn and survive a reload; a deleted record keeps its snapshot label and stops being a link. A seeded demo reply labels its chips **Sample** and is not cited. |
+| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer lists the accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), `.docx` (25 MB), and images (PNG/JPEG/WebP/GIF, 5 MB); anything else is refused with the reason, and a legacy `.doc` is refused with a hint to save it as `.docx` or `.txt`. A turn carries at most five attachments, text and images together; a sixth is refused by name before the turn is sent. Chips show a name, size, an image preview, and a remove control. Text is extracted in the browser — `.docx` via mammoth's raw-text reader, never its HTML converter — capped at 20,000 characters with the cut announced, and sent with the turn. Nothing is stored server-side. |
 | **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
 | **Focus** | Select a job, step, desired outcome, or evidence record and the turn carries *which* one — kind and id, never the words. The sidecar re-reads that record from its own store before the model hears a sentence about it, and adds nothing for an id it does not hold. The composer admits this with a quiet **Looking at: …** chip that opens the record when pressed and can be dismissed; it renders only when the canvas can name the selection, so it cannot claim a record that is not there. |
 | **Generative UI** | A validated `UiNode` travels as an assistant-ui **data part** (`data-odi-surface`) and renders through the same `UiRenderer`. The catalog stays ours and server-validated. |
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
-| **Queue** | A follow-up sent while an answer still streams does not hit a wall: it joins a quiet lane above the composer and runs in the order it was sent once the live turn settles. Each row offers **Run now** — it jumps ahead of the other waiting follow-ups — and a remove that drops only that message. Stop stops the live turn and the lane waits for the next send; it never clears the queue. The lane is in-memory and dies with the page, and the sidecar still sees exactly one SSE turn at a time — the queue sequences, it never parallelises. |
+| **Queue** | A follow-up sent while an answer streams joins a quiet lane above the composer and runs in send order once the live turn settles. Each row offers **Run now**, which jumps ahead of the other follow-ups, and a remove that drops only that message. Stop stops the live turn; the lane waits for the next send and is never cleared. The lane is in-memory and dies with the page; the sidecar still sees one SSE turn at a time — the queue sequences, it never parallelises. |
 | **Read aloud** | A settled reply with prose offers **Read aloud** beside Copy, and becomes **Stop reading** while it speaks. Starting another reply stops the first; **Stop reading**, Escape inside the thread, and leaving the conversation end it. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken. A streaming reply is never spoken, and speech is never persisted. |
 
 #### What the runtime gives us, and what we did not take
@@ -455,31 +455,30 @@ opt-in and additive: `reasoning`, `source`, and `approval` stream events;
 is offline. A client that sends none of these sees exactly the stream it saw
 before, which is what the CLI and older clients do.
 
-When a chat request enables approvals, the sidecar uses the MCP contract to
-prompt for writes and unknown tools, while reads run without a prompt. The local
-`remember` suggestion and `render_ui` remain ungated. This is not authentication
-and does not gate direct CLI or MCP calls. See [Consent and approvals](architecture/consent.md).
+When a chat request enables approvals, the sidecar prompts for writes and unknown
+tools through the MCP contract, while reads run without a prompt; the local
+`remember` suggestion and `render_ui` stay ungated. This is not authentication and
+does not gate direct CLI or MCP calls. See [Consent and approvals](architecture/consent.md).
 
-The approval gate is per-process and single-user by design. `ApprovalRegistry`
+The approval gate is per-process and single-user by design: `ApprovalRegistry`
 waits on an `asyncio` future, `POST /api/approvals/{id}` answers it, and a
-timeout (300 s) or a cancelled turn resolves as a declined write, so a turn can
-never hang and a double click can never run a tool twice. That is the right size
-for a loopback sidecar with one person at the keyboard; it is not a durable job
-queue, and it is not pretending to be one.
+timeout (300 s) or a cancelled turn resolves as a declined write, so a turn never
+hangs and a double click never runs a tool twice. That suits a loopback sidecar
+with one person at the keyboard; it is not a durable job queue.
 
 #### Extending the conversation
 
-A new kind of part is added in exactly two places — the mapping in `convert.ts`
-and the component in `parts.tsx` — and then registered in the `components` map
-in `Conversation.tsx`. Do not add a second message list, and never let an unknown
-part reach the screen as JSON: the converter drops what it does not understand on
-purpose, and `convert.test.ts` holds that line.
+A new kind of part is added in two places — the mapping in `convert.ts` and the
+component in `parts.tsx` — then registered in the `components` map in
+`Conversation.tsx`. Do not add a second message list, and never let an unknown
+part reach the screen as JSON: the converter drops what it does not understand,
+and `convert.test.ts` holds that line.
 
 ### What it remembers
 
-The studio keeps a small, local, editable model of the person it is helping. It
-is not a profile and not a transcript index; it is the handful of things that
-change the next answer.
+The studio keeps a small, local, editable model of the person it helps: not a
+profile or a transcript index, but the handful of things that change the next
+answer.
 
 | Kind | What it captures |
 |---|---|
@@ -493,19 +492,18 @@ change the next answer.
 
 Each note is `suggested` or `confirmed`. Suggested notes appear first under
 **What I know** with **Yes, that's right**, **That's not it**, and **Edit**;
-confirmed notes can be edited or forgotten. The PM can also add a note by hand.
+confirmed notes can be edited or forgotten, and the PM can add one by hand.
 Nothing is silently promoted: the agent may propose, but the person decides.
 
 The agent writes notes through a `remember` tool during a normal reply. The
 sidecar applies it, emits a `memory` SSE event, and the panel updates without a
-refresh. Memory writes are best-effort — a database failure never turns a good
-answer into an error. A turn can therefore finish without being remembered; when
-that happens the sidecar logs one warning carrying the request id, the role, and
-the exception class — never the words of the turn — instead of failing the reply.
+refresh. Memory writes are best-effort: a database failure never turns a good
+answer into an error. A turn can finish unremembered; the sidecar then logs one
+warning with the request id, the role, and the exception class — never the words
+of the turn — instead of failing the reply.
 
-Storage is a separate SQLite file from the ODI repository:
-`~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`
-(`:memory:` is supported and is what the tests use). The API is small:
+Storage is a separate SQLite file: `~/.agentic-odi/studio.db`, overridable with
+`AGENTIC_ODI_STUDIO_DB` (`:memory:` is what the tests use). The API is small:
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -514,30 +512,28 @@ Storage is a separate SQLite file from the ODI repository:
 | `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |
 | `DELETE` | `/api/memory/observations/{id}` | Forget one note |
 | `DELETE` | `/api/memory` | Forget all notes and conversations |
-| `GET` | `/api/diagnostics` | App/runtime and database metadata/counts only; never config, database paths, or row contents |
+| `GET` | `/api/diagnostics` | App/runtime and database metadata only; never config, paths, or row contents |
 
-**Forget everything** is a two-step confirmation and also clears the visible
-thread, because the server deletes the conversations behind it.
+**Forget everything** is a two-step confirmation that also clears the visible
+thread, since the server deletes its conversations.
 
 ### The thread comes back
 
 Conversations are stored beside the memory. On launch the SPA asks
-`GET /api/conversations/latest`, restores that thread's user and assistant
-turns, and continues with the same `conversation_id` on the next message. **New
-conversation** starts a fresh one without touching the memory; **Forget
-everything** removes both. The composer stays usable while the restore is in
-flight, and a restore failure simply leaves the room empty.
+`GET /api/conversations/latest`, restores that thread's turns, and continues
+with the same `conversation_id`. **New conversation** starts a fresh one without
+touching the memory; **Forget everything** removes both. The composer stays
+usable during the restore, and a restore failure leaves the room empty.
 
 ### Printing and export
 
 The bar's overflow menu has **Export → Markdown**. The file labels every
 speaker, keeps the prose as Markdown, and writes each agent-composed surface as
-a fenced JSON block, so a thread can be pasted into a doc or a ticket without
-the reader needing the Studio. A reply that arrived with claims keeps them: each
-sentence carries the distinction the transcript drew beside it — *Hypothesis*,
-*Uncited*, or `Source · record name, record id` — the claim markers themselves
-never print outside code, and the labels state what the turn read when it was
-written rather than promising that the record is still there.
+a fenced JSON block, so a thread pastes into a doc or ticket without the Studio.
+A reply with claims keeps them: each sentence carries the distinction the
+transcript drew — *Hypothesis*, *Uncited*, or `Source · record name, record id`
+— markers never print outside code, and labels state what the turn read then
+rather than promising the record is still there.
 
 **Diagnostics are separate from conversation export.** Settings → About →
 Diagnostics builds a local, opt-in bundle, then shows the exact pretty-printed

@@ -21,6 +21,7 @@ from typing import Any
 
 import build_sample
 import extract
+import make_og
 import markdown_render
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -191,6 +192,17 @@ def _load_json(name: str) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _og_image(path: str) -> str:
+    """The absolute URL of a page's own social card.
+
+    The landing page keeps the committed, hand-reviewed card at assets/og.png;
+    every other page gets the card generated from its own title and figure.
+    """
+    if path == "index.html":
+        return f"{PAGES_URL}assets/og.png"
+    return f"{PAGES_URL}assets/og/{make_og.og_name(path)}"
+
+
 def _page_context(**extra: Any) -> dict[str, Any]:
     """The context every page receives."""
     context: dict[str, Any] = {
@@ -199,6 +211,9 @@ def _page_context(**extra: Any) -> dict[str, Any]:
         "depth": 0,
         "prefix": "",
         "year": "2026",
+        # The generic card is the fallback; every real page overrides it with
+        # its own card, which the build generates from the page's content.
+        "og_image": f"{PAGES_URL}assets/og.png",
     }
     context.update(extra)
     return context
@@ -207,6 +222,21 @@ def _page_context(**extra: Any) -> dict[str, Any]:
 def _flat_guides(nav: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     """Every guide, in navigation order, with its group."""
     return [(group, guide) for group in nav.get("groups", []) for guide in group.get("guides", [])]
+
+
+def _compact_markup(html: str) -> str:
+    """Drop whitespace between tags, leaving code blocks byte-identical.
+
+    The MCP reference is generated: one section per tool, one row per argument.
+    The template is already terse, but the blank lines and indentation between
+    block elements are still a kilobyte of bytes no reader sees. Preformatted
+    regions keep their exact whitespace, because there it is content.
+    """
+    parts = re.split(r"(<pre\b[\s\S]*?</pre>|<code\b[\s\S]*?</code>)", html)
+    return "".join(
+        part if index % 2 else re.sub(r">\s+<", "><", part).strip()
+        for index, part in enumerate(parts)
+    )
 
 
 def _guide_body(
@@ -228,7 +258,7 @@ def _guide_body(
         return body, [], None
 
     if slug == "mcp":
-        body = env.get_template("_mcp_reference.html").render(**context)
+        body = _compact_markup(env.get_template("_mcp_reference.html").render(**context))
         return body, [], None
 
     source = guide.get("source")
@@ -287,6 +317,7 @@ def _render_docs(env: Environment, nav: dict[str, Any], context: dict[str, Any])
         page_context["page"]["has_diagram"] = 'class="mermaid"' in body
         page_context["page"]["toc"] = toc
         page_context["prefix"] = "../../"
+        page_context["og_image"] = _og_image(output)
         rendered[output] = env.get_template("doc.html").render(**page_context)
 
     return rendered
@@ -313,6 +344,7 @@ def _render_docs_index(env: Environment, nav: dict[str, Any], context: dict[str,
         "toc": [],
     }
     page_context["prefix"] = "../"
+    page_context["og_image"] = _og_image("docs/index.html")
     return env.get_template("docs_index.html").render(**page_context)
 
 
@@ -346,7 +378,15 @@ def _render_pages(env: Environment) -> dict[str, str]:
         tool_signatures={tool["name"]: _signature(tool) for tool in tools},
         catalog_cards=cards,
         odi_schema=odi_schema,
-        odi_schema_json=json.dumps(odi_schema, indent=1, sort_keys=True),
+        # Quotes need no escaping in HTML text, so only &, < and > are escaped here;
+        # the template marks the value safe. Escaping every quote cost ~9 KB of
+        # "&#34;" on the one page that already sits at the document-size budget.
+        odi_schema_json=(
+            json.dumps(odi_schema, separators=(",", ":"), sort_keys=True)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        ),
         works_today=_works_today(tools, cards, connectors),
         roadmap_pending=roadmap_pending,
         formula_base=formula_base,
@@ -365,6 +405,7 @@ def _render_pages(env: Environment) -> dict[str, str]:
         "path": "index.html",
         "depth": 0,
     }
+    landing_context["og_image"] = _og_image("index.html")
     rendered["index.html"] = env.get_template("landing.html").render(**landing_context)
 
     rendered["docs/index.html"] = _render_docs_index(env, nav, context)
@@ -386,6 +427,23 @@ def _page_url(name: str) -> str:
     if name == "index.html":
         return ""
     return name[: -len("index.html")]
+
+
+def _page_sections() -> dict[str, str]:
+    """Each page's section label, from the nav groups.
+
+    A card's chip names the section the page belongs to. The nav is the one
+    place that already groups the guides, so the label comes from there rather
+    than from a second list that would drift.
+    """
+    nav = _load_json("nav.json")
+    sections: dict[str, str] = {}
+    for group in nav.get("groups", []):
+        for guide in group.get("guides", []):
+            sections[f"docs/{guide['slug']}/index.html"] = group["title"]
+    sections["index.html"] = "Overview"
+    sections["docs/index.html"] = "Documentation"
+    return sections
 
 
 def _search_entry(name: str, page: str) -> dict[str, str]:
@@ -525,6 +583,17 @@ def build(out_dir: Path, *, check: bool = False) -> int:
         name: (html if name == SAMPLE_OUTPUT else compact_html(html)).encode("utf-8")
         for name, html in rendered.items()
     }
+    # One card per published page. A page the build emits without a card is a
+    # page whose shared link would show someone else's image, so this is a hard
+    # failure rather than a warning. (404 is not published, so it has no card.)
+    pages_for_cards = {name: html for name, html in rendered.items() if name != "404.html"}
+    cards = make_og.render_site(pages_for_cards, PAGES_URL, _page_sections())
+    missing = sorted(
+        name for name in pages_for_cards if f"assets/og/{make_og.og_name(name)}" not in cards
+    )
+    if missing:
+        raise SystemExit(f"no social card was generated for: {', '.join(missing)}")
+    files.update(cards)
     urls = ["/"]
     for name in sorted(rendered):
         if name in {"index.html", "404.html"}:
