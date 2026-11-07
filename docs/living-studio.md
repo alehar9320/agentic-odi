@@ -68,8 +68,10 @@ without a duration — only the browser that watched the run owns the clock.
 ### Slash commands
 
 Type `/` to open the palette. `Up`/`Down` move, `Enter` or `Tab` runs the
-selected command, `Esc` closes it. Commands are handled in the SPA and never call
-the model, so they work when it is offline.
+selected command, `Esc` closes it. While an input method is composing — Japanese,
+Chinese, Korean, or any other — its keys are never interpreted: `Enter` and the
+arrows choose a candidate, they do not run, move, dismiss, or send. Commands are
+handled in the SPA and never call the model, so they work when it is offline.
 
 | Command | Effect |
 |---|---|
@@ -362,7 +364,7 @@ without giving up the message model the sidecar already understands.
 #### What the runtime gives us, and what we did not take
 
 The full coverage ledger — every assistant-ui capability and its one honest
-state — is authored in [Development](development.md),
+state — is authored in [The assistant-ui ledger](assistant-ui-ledger.md),
 and `scripts/doc_check.py` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
 narrower than the library offers (Partial). A row is Adopted only when a test
 proves a person can use it, the named file exists, and the Delivered column
@@ -552,6 +554,29 @@ rail, composer, and floating chrome are hidden, the palette switches to paper,
 and cards stay whole instead of splitting across sheets. An open lens prints
 below the thread instead of being clipped off-screen.
 
+### Sharing one artifact
+
+Sometimes the work has to leave the room without the room going with it. The
+sidecar mints a **scoped, expiring, read-only share token** for exactly one
+record — an outcome, a segment, or a strategy. `POST /api/share` returns the raw
+token once; `DELETE /api/share/{id}` revokes it, effective immediately; and
+`GET /api/share/{token}` returns the named artifact and its own evidence and
+nothing else. `GET /api/share` lists the owner's links without their tokens.
+
+The token is `odi_sh_` plus 32 random bytes, and only its SHA-256 hash is
+stored, so a copy of the database is not a copy of the link. Expiry defaults to
+7 days and never exceeds 30. A read never returns the workspace: not the canvas,
+not a list, not the memory, not a conversation, and not a connector secret — an
+evidence record travels without its raw payload. An unknown, expired, revoked,
+or malformed token is the same `404`, so a probe learns nothing, and a read
+records only `last_read_at` for the owner, never who read it. Nothing about a
+link is writable: a non-`GET` on the shared path is `405`.
+
+The link points at `AGENTIC_ODI_PUBLIC_BASE_URL` when it is set, and at
+`http://127.0.0.1:8100` otherwise. It works only while this sidecar is running
+and reachable by the reader; the read-only page that renders it is #550. No
+accounts, no session, and no public write path exist here — the token is the
+whole capability.
 ### The decision brief
 
 A conversation is hard to hand to a review, so the Studio writes the document
