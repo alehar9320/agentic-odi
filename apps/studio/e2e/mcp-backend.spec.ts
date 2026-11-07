@@ -89,6 +89,8 @@ test.describe("the Studio on the MCP backend", () => {
   test("shows the seeded job in the job map lens", async ({ page }) => {
     await openStudio(page);
 
+    // The notice's by-hand route, not the rail's: a seeded job with no steps
+    // earns no rail chip, so this is the only way onto the map.
     await page.getByRole("button", { name: "Map the job" }).click();
     await expect(lens(page)).toHaveAttribute("aria-label", "Universal job map");
   });

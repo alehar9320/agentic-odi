@@ -180,16 +180,20 @@ describe("FirstRunWizard", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("skips one step without ending the tour", () => {
+  it("offers one way out of a step: continue, or go back", () => {
     renderWizard();
 
-    fireEvent.click(screen.getByRole("button", { name: "Skip this step" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "What's on your mind?",
     );
+    expect(screen.queryByRole("button", { name: "Skip this step" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(stored()).toMatchObject({ status: "active", step: 1 });
+    expect(stored()).toMatchObject({ status: "active", step: 0 });
   });
 
   it("skips with Escape", () => {

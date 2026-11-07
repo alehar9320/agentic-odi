@@ -158,6 +158,11 @@ const PRESET_AREAS: ConnectorPreset["area"][] = [
   "knowledge-output",
 ];
 
+/** A tri-state read as one calm word: yes, no, or not yet asked. */
+function word(known: boolean | null, yes: string, no: string, unknown: string): string {
+  return known === null ? unknown : known ? yes : no;
+}
+
 const AREA_LABELS: Record<ConnectorPreset["area"], string> = {
   "voice-of-customer": "Voice of customer & qualitative research",
   "quantitative-data": "Quantitative data & opportunity scoring",
@@ -279,38 +284,13 @@ export function SettingsPanel() {
       />
 
       <ConnectionsSection settings={settings} saveSettings={saveSettings}>
-        <ul className="connection-list">
-          <li>
-            <StatusDot
-              tone={modelHealthy === false ? "warn" : modelHealthy === null ? "unknown" : "ok"}
-            />
-            <span>Model</span>
-            <span className="connection-list__value">
-              {modelHealthy === false
-                ? "offline"
-                : modelHealthy === null
-                  ? "not checked"
-                  : "reachable"}
-            </span>
-          </li>
-          <li>
-            <StatusDot
-              tone={sidecarKnown === false ? "warn" : sidecarKnown === null ? "unknown" : "ok"}
-            />
-            <span>Sidecar</span>
-            <span className="connection-list__value">
-              {sidecarKnown === false ? "unavailable" : sidecarKnown === null ? "unknown" : "reachable"}
-            </span>
-          </li>
-          <li>
-            <StatusDot tone={mcpKnown ? "ok" : "unknown"} />
-            <span>Local FastMCP server</span>
-            <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
-          </li>
-        </ul>
+        {/* One health readout per view: the bar pill owns the always-visible
+            version, this sentence answers in as much detail as a settings page
+            needs. Three status rows here repeated the pill at half the size. */}
         <p className="muted">
-          Only the model and MCP server above are live. No data source is connected yet — add one
-          from the presets below.
+          Model {word(modelHealthy, "reachable", "offline", "not checked")} · Sidecar{" "}
+          {word(sidecarKnown, "reachable", "unavailable", "unknown")} · MCP server{" "}
+          {word(mcpKnown, "connected", "offline", "unknown")}.
         </p>
 
         <h3 className="settings__title">Capabilities</h3>

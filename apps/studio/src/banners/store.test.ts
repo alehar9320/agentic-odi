@@ -12,7 +12,7 @@ describe("raiseBanner", () => {
   it("adds a banner resolved from its kind", () => {
     const state = raiseBanner(EMPTY_BANNER_STATE, { kind: "sidecar-down" });
     expect(state.banners).toHaveLength(1);
-    expect(state.banners[0].severity).toBe("critical");
+    expect(state.banners[0].severity).toBe("warning");
     expect(state.banners[0].id).toBe("sidecar-down");
   });
 
@@ -58,7 +58,7 @@ describe("resolveBanner", () => {
 describe("selectBanners", () => {
   it("orders by severity, critical first", () => {
     let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "success" }, 1);
-    state = raiseBanner(state, { kind: "sidecar-down" }, 2);
+    state = raiseBanner(state, { kind: "write-rejected" }, 2);
     const { visible } = selectBanners(state);
     expect(visible[0].severity).toBe("critical");
   });

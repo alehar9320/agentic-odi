@@ -18,7 +18,7 @@ const FOCUSABLE =
   'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function FirstRunWizard() {
-  const { enabled, open, state, chooseGoal, advance, skipStep, back, complete, skip } =
+  const { enabled, open, state, chooseGoal, advance, back, complete, skip } =
     useOnboarding();
   const {
     settings,
@@ -284,14 +284,9 @@ export function FirstRunWizard() {
         <footer className="wizard-footer">
           <div className="wizard-footer__skips">
             {stepIndex < LAST_STEP_INDEX ? (
-              <>
-                <button type="button" className="wizard-text-button" onClick={skip}>
-                  Skip the tour
-                </button>
-                <button type="button" className="wizard-text-button" onClick={skipStep}>
-                  Skip this step
-                </button>
-              </>
+              <button type="button" className="wizard-text-button" onClick={skip}>
+                Skip the tour
+              </button>
             ) : null}
           </div>
           <div className="wizard-footer__actions">

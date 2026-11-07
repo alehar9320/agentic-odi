@@ -99,14 +99,6 @@ export const KNOWN_PAIRS: KnownPair[] = [
     note: "--accent on the blue badge (4.41:1)",
   },
   {
-    theme: "light",
-    foreground: "rgb(165, 180, 252)",
-    background: "rgb(213, 216, 247)",
-    required: 4.5,
-    issue: 542,
-    note: "The changelog pill keeps a dark-theme indigo in light mode (1.43:1)",
-  },
-  {
     theme: "dark",
     foreground: "rgb(255, 255, 255)",
     background: "rgb(139, 140, 248)",

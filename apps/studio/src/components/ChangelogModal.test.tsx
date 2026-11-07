@@ -79,7 +79,7 @@ describe("ChangelogModal", () => {
 
     expect(screen.queryByRole("status")).toBeNull();
     expect(screen.queryByText("New")).toBeNull();
-    expect(screen.getByRole("button", { name: "Mark all read" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Mark all read" })).toBeNull();
 
     unmount();
     render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
@@ -87,7 +87,7 @@ describe("ChangelogModal", () => {
     await screen.findByText("v0.9.0");
     expect(screen.queryByRole("status")).toBeNull();
     expect(screen.queryByText("New")).toBeNull();
-    expect(screen.getByRole("button", { name: "Mark all read" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Mark all read" })).toBeNull();
   });
 
   it("counts only the releases that were not acknowledged before", async () => {

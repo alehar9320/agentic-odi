@@ -30,9 +30,9 @@ describe("BANNER_CATALOG", () => {
     }
   });
 
-  it("treats the sidecar being down as a critical, persistent, top strip", () => {
+  it("treats the sidecar being down as a calm, persistent, top strip", () => {
     const entry = BANNER_CATALOG["sidecar-down"];
-    expect(entry.severity).toBe("critical");
+    expect(entry.severity).toBe("warning");
     expect(entry.life).toBe("persistent");
     expect(entry.dock).toBe("top");
     expect(entry.dismissible).toBe(true);
@@ -76,7 +76,7 @@ describe("severityWeight", () => {
 describe("resolveSpec", () => {
   it("fills the defaults from the kind", () => {
     const resolved = resolveSpec({ kind: "sidecar-down" });
-    expect(resolved.severity).toBe("critical");
+    expect(resolved.severity).toBe("warning");
     expect(resolved.life).toBe("persistent");
     expect(resolved.dock).toBe("top");
   });

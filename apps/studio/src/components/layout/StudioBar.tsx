@@ -10,6 +10,7 @@ import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import {
   BellIcon,
+  SparkIcon,
   HistoryIcon,
   MenuIcon,
   MoonIcon,
@@ -234,15 +235,6 @@ export function StudioBar({
           Customize
         </button>
 
-        <button
-          type="button"
-          className="studio-pill pill-changelog"
-          onClick={onChangelog}
-          aria-label="Open What's New changelog"
-        >
-          ✨ What's New
-        </button>
-
         <div className="bar__new-wrap" ref={askRef} onKeyDown={onAskKeyDown}>
           <button
             type="button"
@@ -399,6 +391,20 @@ export function StudioBar({
           <SettingsIcon size={17} />
         </button>
 
+        {/* Release news left the pill row so the bar carries status and
+            navigation, but the changelog still needs one control that is
+            reachable without opening a menu: a quiet icon, not a pill that
+            argues with the brand. */}
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Open What's New changelog"
+          title="What's New"
+          onClick={onChangelog}
+        >
+          <SparkIcon size={17} />
+        </button>
+
         <div className="bar__menu" ref={menuRef}>
           <button
             type="button"
@@ -421,6 +427,14 @@ export function StudioBar({
                 disabled={messages.length === 0}
               >
                 Export → Markdown
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="bar__menu-item"
+                onClick={onChangelog}
+              >
+                What's New
               </button>
             </div>
           )}

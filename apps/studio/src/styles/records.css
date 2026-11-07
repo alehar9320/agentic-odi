@@ -4,7 +4,7 @@
 .records {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--s-3);
 }
 
 .records__sections {
@@ -16,33 +16,33 @@
 .records__section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s-2);
   min-width: 0;
 }
 
 .records__heading {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--s-2);
   margin: 0;
   color: var(--text);
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: var(--t-sm);
+  font-weight: var(--w-strong);
 }
 
 .records__count {
   padding: 1px 7px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--faint);
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: var(--t-xs);
+  font-weight: var(--w-strong);
 }
 
 .records__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.78rem;
+  font-size: var(--t-sm);
 }
 
 .records__table th,
@@ -55,8 +55,8 @@
 
 .records__table th {
   color: var(--faint);
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: var(--t-xs);
+  font-weight: var(--w-strong);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -69,7 +69,7 @@
 .records__id {
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
 }
 
 .records__provenance {
@@ -78,9 +78,9 @@
   margin: 0;
   padding: 4px 10px;
   border: 1px solid var(--line-strong);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--faint);
-  font-size: 0.7rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.08em;
 }
 
@@ -88,7 +88,7 @@
 .records__empty {
   margin: 0;
   color: var(--faint);
-  font-size: 0.75rem;
+  font-size: var(--t-xs);
 }
 
 /* A row opens, so its first cell is a button rather than text. It keeps the table's

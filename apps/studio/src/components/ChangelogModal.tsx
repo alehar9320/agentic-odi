@@ -170,21 +170,19 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
         </div>
 
         <footer className="changelog-modal__footer">
-          <span className="changelog-modal__quote">
-            "Design is not just what it looks like and feels like. Design is how it works."
-          </span>
           <div className="changelog-modal__actions">
+            {unread.length > 0 ? (
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={markAllRead}
+              >
+                Mark all read
+              </button>
+            ) : null}
             <button
               type="button"
-              className="studio-button"
-              onClick={markAllRead}
-              disabled={unread.length === 0}
-            >
-              Mark all read
-            </button>
-            <button
-              type="button"
-              className="studio-button"
+              className="button"
               onClick={onClose}
             >
               Done

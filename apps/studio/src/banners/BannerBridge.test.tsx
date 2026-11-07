@@ -148,17 +148,17 @@ describe("BannerBridge", () => {
     expect(studio.recheckConnections).toHaveBeenCalledTimes(1);
   });
 
-  it("opens setup through the real dispatcher", () => {
-    studio.sidecarReachable = false;
-    studio.llmHealth = { healthy: true, message: "" };
-    studio.openSetup.mockClear();
+  it("opens the capture panel through the real dispatcher", () => {
+    studio.sidecarReachable = true;
+    studio.llmHealth = { healthy: false, message: "" };
+    studio.openPanel.mockClear();
     renderShell();
 
     act(() => {
-      screen.getByRole("button", { name: "Start the sidecar" }).click();
+      screen.getByRole("button", { name: "Capture an outcome" }).click();
     });
 
-    expect(studio.openSetup).toHaveBeenCalledTimes(1);
+    expect(studio.openPanel).toHaveBeenCalledWith("capture");
   });
 
   it("clears the strip from the store when the user dismisses it", () => {
