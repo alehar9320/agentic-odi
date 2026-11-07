@@ -7203,6 +7203,8 @@ details[open] summary {
   border-left: 3px solid var(--accent);
   font-size: 1.1rem;
   line-height: 1.6;
+}
+
 /* Selection and the caret carry the brand instead of the browser default. */
 ::selection {
   background: color-mix(in srgb, var(--accent) 38%, transparent);
