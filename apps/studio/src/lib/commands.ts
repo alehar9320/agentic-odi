@@ -103,6 +103,14 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     keywords: ["markets", "verdict", "strategy", "who is this for"],
   },
   {
+    id: "brief",
+    name: "/brief",
+    label: "Decision brief",
+    description: "The document a review reads, ready to download or print.",
+    category: "Act",
+    keywords: ["export", "document", "review", "print", "pdf"],
+  },
+  {
     id: "impact",
     name: "/impact",
     label: "Simulate a bet",
@@ -167,6 +175,26 @@ export function isCommandDraft(draft: string): boolean {
 
 export function isSlashCommand(text: string): boolean {
   return text.trim().startsWith("/");
+}
+
+/**
+ * Whether a keystroke belongs to the field it was typed in.
+ *
+ * A shortcut that turns `/` into "open the palette" must never eat a slash the
+ * person meant to type, so the shell asks this before it acts.
+ */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  if (!element || typeof element.tagName !== "string") {
+    return false;
+  }
+  const tag = element.tagName.toLowerCase();
+  return (
+    tag === "input" ||
+    tag === "textarea" ||
+    tag === "select" ||
+    element.isContentEditable === true
+  );
 }
 
 /**

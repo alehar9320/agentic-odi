@@ -34,13 +34,23 @@ LLM directly; the sidecar is its only backend.
   `mcp/connector.py:78-89`). The app stores names, not values.
 - **OAuth tokens.** FastMCP's client cache is in memory for the life of one CLI
   process, so an OAuth connector may ask for consent again on the next command.
+- **The per-install sidecar token.** 32 random URL-safe bytes at
+  `~/.config/agentic-odi/studio-token` (override with
+  `AGENTIC_ODI_STUDIO_TOKEN`, which names the file, not the value), issued
+  lazily by whichever local process starts first and reused by the rest
+  (`apps/studio-api/src/agentic_odi_studio_api/studio/paths.py`). It is a
+  shared local secret, not an identity: every holder of the file has the same
+  rights.
 - **MCP URL.** A request argument or `AGENTIC_ODI_MCP_URL`; not a secret.
 
 ## What crosses each wire
 
-- **SPA → sidecar:** JSON over HTTP and server-sent events on `/api/*`. The one
-  exception to "no secrets in the browser" is the LLM key described above.
-- **Sidecar → MCP:** JSON-RPC tool calls.
+- **SPA → sidecar:** JSON over HTTP and server-sent events on `/api/*`. The SPA
+  attaches the sidecar token from the `studio.token` key in `localStorage`
+  (`apps/studio/src/api/studioApi.ts`); how that key gets into a real browser is
+  still open — see "What this does not do". The one exception to "no secrets in
+  the browser" is the LLM key described above.
+- **Sidecar → MCP:** JSON-RPC tool calls, carrying the same token.
 - **Sidecar → LLM:** OpenAI-compatible HTTP chat completions.
 - **Worker → sidecar:** the worker forwards `/api/*`, including the client's
   `Authorization` header, to `SIDECAR_URL` (`infra/cloudflare/worker.ts:190-232`).
@@ -53,21 +63,42 @@ LLM directly; the sidecar is its only backend.
 
 - **Loopback binding.** The sidecar listens on `127.0.0.1:8100`. FastMCP's HTTP
   server defaults to loopback as well. Neither is meant to be exposed directly.
+- **Per-install bearer token.** Every `/api` route on the sidecar and the MCP
+  HTTP endpoint answer `401` unless the request carries
+  `Authorization: Bearer <token>` with the issued key. `/health` and the static
+  shell stay open, because the deployment's readiness probe and the browser's
+  first request need them. The comparison is constant-time, and the token is
+  never read from a URL or a query string.
 - **CORS allow-list.** The sidecar accepts `tauri://localhost`,
   `localhost:5173`, `127.0.0.1:5173`, `localhost:8100`, and `127.0.0.1:8100`,
-  without credentials (`app.py:32-39`, `:88-94`).
+  without credentials (`app.py:38-45`, `:211-213`).
 - **Hosted topology.** The Cloudflare setup tunnels the sidecar, not MCP; the
   MCP port stays local.
 - **Signed updates.** The desktop updater verifies signatures before staging.
 - **Prompt-level consent.** Conversational writes pause for an approval card; see
   [Consent and approvals](consent.md).
+- **Scoped share tokens.** `POST /api/share` mints one `odi_sh_…` token for a
+  single artifact; only its SHA-256 hash is stored in `studio.db`, the read
+  compares it in constant time, and expiry (7 days by default, 30 at most) and
+  revocation are checked on every read. The token is a bearer capability for one
+  record and its own evidence — never the canvas, the memory, a conversation, or
+  a connector secret — and every dead token answers the same `404`. See
+  [Running the Living Studio](../living-studio.md#sharing-one-artifact).
+- **Focus is a pointer, never prose.** A chat turn may carry `focus: {kind, id}`
+  for the record the person selected, and `FocusRef` rejects any extra key
+  (`schemas.py`). The sidecar re-reads that id from its own store before the
+  model sees a word of it, and adds nothing for an id it does not hold
+  (`chat.py:_focus_context`). The browser therefore cannot author the sentence
+  the model reads about a record, and the fallback tiers, which never receive
+  this context, cannot be fed client text through it.
 
 ## What the alternatives were
 
-- **A sidecar bearer token.** Would stop another local process from calling
-  `127.0.0.1:8100`. Rejected so far because the sidecar serves one person on
-  loopback and the setup cost lands on every local run; it becomes necessary the
-  moment the sidecar is reachable off-host.
+- **No token at all.** The position this document held until
+  [#575](https://github.com/alehar9320/agentic-odi/issues/575): the sidecar
+  serves one person on loopback, so the setup cost lands on every local run for
+  little gain. It stops being true the moment the sidecar is reachable
+  off-host, which the Cloudflare tunnel already does.
 - **Keep the LLM key server-side.** The SPA only needs to display and change it;
   the sidecar could own the value and never return it. This is the gap
   [#90](https://github.com/alehar9320/agentic-odi/issues/90) tracks.
@@ -76,8 +107,13 @@ LLM directly; the sidecar is its only backend.
 
 ## What this does not do
 
-- It does not authenticate the sidecar or MCP. Anyone who can reach the port can
-  call it.
+- It does not say *who* holds the sidecar token. Any process that can read the
+  profile directory has the same rights as the Studio.
+- It does not yet put the key where every client can find one. The browser
+  reads `studio.token` from `localStorage` and nothing in the shipped app
+  writes it, so a launcher or the desktop shell must seed it; the CLI's own MCP
+  clients (`apps/cli/src/agentic_odi_cli/backend.py`, `chat.py`) connect
+  without the header and are refused by a gated server.
 - It does not encrypt data at rest. The SQLite databases and the LLM profile are
   plaintext files in the user's home directory.
 - It does not sandbox connector code or the LLM's network egress beyond the

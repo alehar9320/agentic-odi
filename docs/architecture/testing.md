@@ -156,6 +156,24 @@ download, and install), `transport.test.ts` (Tauri boundary), and the
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
+The outbox drain guard in `apps/studio/src/bff/outbox.ts` is covered by
+`outbox.test.ts`, which races two drains twice: once with a `navigator.locks`
+stub and once with `navigator.locks` deleted so the lease row runs. Both assert
+exactly one send per record, and the lease path also proves a crashed holder's
+lease is reclaimed only after it expires and that a running drain renews it.
+
+The IndexedDB schema and its migrations are covered by two files under
+`apps/studio/src/bff/store/`. `migrations.test.ts` asserts the registry has a
+step for every version up to `DB_VERSION` and that a gap fails with a message
+naming the missing version, so raising the version without a migration fails the
+suite instead of throwing `ConstraintError` on an existing database.
+`indexedDbStore.test.ts` seeds a v1 database with a row in all seven stores,
+opens it with the current code, and asserts every row is unchanged and the
+migrated schema equals a fresh database's (store names, key paths,
+auto-increment flags, and index names). The same file opens a second connection
+at a higher version and asserts the first closes and sets `needsReload` instead
+of blocking the upgrade.
+
 Copied UI is guarded structurally: `src/vendor/boundary.test.ts` reads every
 `.ts` and `.tsx` file under `apps/studio/src/vendor/` and fails on a specifier
 that resolves into a product slice (`state`, `api`, `assistant`, `bff`). It is
@@ -165,13 +183,12 @@ the rule. See [Vendor alley](vendor.md).
 
 ## Accessibility
 
-Accessibility is tested, not asserted. Three kinds of checks run with the normal
-frontend suite (`npm --prefix apps/studio test`), so a regression turns the
-build red without a separate command:
+Accessibility is tested, not asserted. Four kinds of checks run with the normal
+test suites, so a regression turns the build red without a separate command:
 
 - **axe sweep** — `src/test/a11y.test.tsx` renders every shipping surface
   (matrix, job map, catch-up feed, settings, first-run wizard, command palette,
-  chat stage, changelog dialog) inside a real `<main>` and runs
+  chat stage, changelog dialog, decision brief) inside a real `<main>` and runs
   [axe-core](https://github.com/dequelabs/axe-core) through `vitest-axe`, with
   zero WCAG 2.1 A/AA violations allowed. The helper lives in `src/test/axe.ts`.
   `vitest-axe@0.1.0` ships an empty `extend-expect` module, so the helper
@@ -197,6 +214,19 @@ build red without a separate command:
   roving tabindex and arrow keys on the opportunity matrix, `aria-activedescendant`
   in the command palette, focus trapping and focus restore in the mobile lens
   and changelog dialog, and a single polite live region per transcript.
+
+- **artifact structure** — `scripts/artifact_a11y.py` is the one owner of the
+  rules an artifact's markup has to satisfy: one `<h1>`, no skipped heading
+  level, a named table with scoped headers, a labelled or deliberately hidden
+  image, and no id used twice. `tests/scripts/test_artifact_a11y.py` proves each
+  rule with a fixture that breaks exactly one of them, `website/tests/test_site.py`
+  runs the rule set over every built page, and
+  `tests/scripts/test_artifact_inventory.py` scans the artifact roots so a
+  renderer nobody registered fails the build by path. The brief is rendered in
+  the browser, where Python cannot follow, so `src/components/brief/BriefLens.test.tsx`
+  asserts the same four rules against its DOM. Passing these checks is a
+  structural statement, not WCAG conformance and not a screen-reader
+  certification — that evidence is ALH-252's to collect.
 
 Reduced motion is honoured globally in `theme.css` (`@media
 (prefers-reduced-motion: reduce)` collapses animations, transitions, and
