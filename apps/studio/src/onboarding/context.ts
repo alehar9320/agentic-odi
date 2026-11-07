@@ -5,7 +5,7 @@ import type { OnboardingState } from "./machine";
 
 /**
  * The wizard's public surface. Components outside the onboarding module only
- * ever need `enabled` (to show a replay entry) and `restart`.
+ * ever need `enabled` (to decide whether to show a tour entry) and `openTour`.
  */
 export interface OnboardingController {
   enabled: boolean;

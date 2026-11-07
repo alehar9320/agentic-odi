@@ -6758,20 +6758,6 @@ details[open] summary {
   border-top: 1px solid var(--line);
 }
 
-.update-settings__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.update-settings__version {
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
-}
-
 .update-settings__status {
   display: flex;
   align-items: center;
@@ -6780,12 +6766,6 @@ details[open] summary {
   color: var(--muted);
   font-size: 0.79rem;
   line-height: 1.4;
-}
-
-.update-settings__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
 }
 
 .update-settings__toggle {
@@ -6799,14 +6779,6 @@ details[open] summary {
 
 .update-settings__toggle input {
   accent-color: var(--accent);
-}
-
-.update-settings__notes-body {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
 }
 
 .status-dot.is-busy {
