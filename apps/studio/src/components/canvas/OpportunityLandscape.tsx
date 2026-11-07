@@ -6,7 +6,6 @@ import {
   hasScore,
   scoredAverage,
   isUnderserved,
-  scoredAverage,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
 import { useMediaQuery } from "../../lib/useMediaQuery";

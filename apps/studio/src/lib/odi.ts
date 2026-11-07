@@ -31,9 +31,6 @@ export function formatOpportunityScore(score: number | null | undefined): string
   return score.toFixed(1);
 }
 
-export function scoredAverage(outcomes: Outcome[]): { mean: number | null; scored: number; unscored: number } {
-  return summarizeMemberScores(outcomes.map((o) => o.opportunity_score));
-}
 
 export function opportunityPill(score: number | null | undefined): PillDescriptor {
   const formatted = formatOpportunityScore(score);
