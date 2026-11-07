@@ -14,8 +14,7 @@ import { resolveTheme } from "../../../lib/theme";
 import type { StudioConfig } from "../../../types";
 import { useUpdateService, useUpdateSnapshot } from "../../../updater";
 import { detectPlatform } from "../../../updater/platform";
-
-const STUDIO_VERSION = "0.14.0";
+import { versionLabel } from "../../../lib/version";
 
 const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
   macos: "macOS",
@@ -38,6 +37,7 @@ export function AboutSection({ settings, capabilities }: AboutSectionProps) {
   const service = useUpdateService();
   const snapshot = useUpdateSnapshot();
   const platform = detectPlatform();
+  const label = versionLabel(snapshot.currentVersion);
   const [diagnosticsJson, setDiagnosticsJson] = useState<string | null>(null);
 
   async function prepareDiagnostics() {
@@ -52,7 +52,7 @@ export function AboutSection({ settings, capabilities }: AboutSectionProps) {
       // Export remains available when the local sidecar is down.
     }
     const bundle = createDiagnosticsBundle({
-      version: snapshot.currentVersion ?? STUDIO_VERSION,
+      version: label.version,
       build: __STUDIO_BUILD_DATE__,
       platform: PLATFORM_LABELS[platform],
       theme: resolveTheme(settings.theme),
@@ -78,7 +78,7 @@ export function AboutSection({ settings, capabilities }: AboutSectionProps) {
       <p className="muted">{PRODUCT_NAME} is a local-first workspace for outcome-driven work.</p>
       <dl>
         <dt>Version</dt>
-        <dd>{snapshot.currentVersion ? `v${snapshot.currentVersion}` : "—"}</dd>
+        <dd>v{label.version}</dd>
         <dt>Build</dt>
         <dd>{__STUDIO_BUILD_DATE__}</dd>
         <dt>Platform</dt>

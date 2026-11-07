@@ -43,12 +43,30 @@ export function WorkspacePanel() {
   // return focus there instead of stealing it for the composer (#696).
   // Never capture a textbox as the return target — focus returning to a text
   // input moves the caret, which is exactly what this guard prevents.
+  // A lens opens from the rail, a canvas card, a banner, or a slash command,
+  // and the composer is autofocused: "whatever held focus" is the composer, not
+  // the control the person used. Remember that control instead (#692).
+  const openerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    function rememberOpener(event: MouseEvent) {
+      const target = event.target;
+      const control =
+        target instanceof Element ? target.closest("button, a[href], [role=button]") : null;
+      openerRef.current = control instanceof HTMLElement ? control : null;
+    }
+    document.addEventListener("click", rememberOpener, true);
+    return () => document.removeEventListener("click", rememberOpener, true);
+  }, []);
 
   useFocusTrap(panelRef, isMobile && Boolean(panel));
 
   // On a wide screen the lens opens under the keyboard, so focus goes to the
-  // heading and comes back to the chip that opened it. The mobile sheet keeps
-  // its trap and its own return path; this effect stays out of its way (#696).
+  // heading and comes back to the control that opened it. The composer is
+  // autofocused, so recording "whatever held focus" would pull the caret out
+  // of the lens and into the thread on Escape; only a lens with no distinct
+  // opener falls back to the previously focused element. The mobile sheet
+  // keeps its trap and its own return path; this stays out of its way (#696).
   useEffect(() => {
     if (!panelId) {
       const target = returnFocusRef.current;
@@ -62,9 +80,15 @@ export function WorkspacePanel() {
       return;
     }
     if (!returnFocusRef.current) {
+      const opener = openerRef.current;
+      openerRef.current = null;
       const active = document.activeElement;
       returnFocusRef.current =
-        active instanceof HTMLElement && active.tagName !== "TEXTAREA" ? active : null;
+        opener?.isConnected && opener !== headingRef.current
+          ? opener
+          : active instanceof HTMLElement && active.tagName !== "TEXTAREA"
+          ? active
+          : null;
     }
     headingRef.current?.focus();
   }, [panelId, isMobile]);
