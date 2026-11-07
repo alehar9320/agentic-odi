@@ -1,3 +1,4 @@
+import type { Outcome } from "../types";
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -91,4 +92,26 @@ export function segmentBasisLine(peopleInferred: boolean): string {
   return peopleInferred
     ? "Candidate segment — grouped by the job it serves, not by researched people."
     : "People named from your evidence.";
+}
+
+export interface ScoredAverage {
+  mean: number | null;
+  scored: number;
+  unscored: number;
+}
+
+export function scoredAverage(outcomes: Outcome[]): ScoredAverage {
+  let total = 0;
+  let scored = 0;
+  let unscored = 0;
+  for (const o of outcomes) {
+    const v = o.opportunity_score;
+    if (typeof v === "number" && Number.isFinite(v)) {
+      total += v;
+      scored += 1;
+    } else {
+      unscored += 1;
+    }
+  }
+  return { mean: scored === 0 ? null : total / scored, scored, unscored };
 }
