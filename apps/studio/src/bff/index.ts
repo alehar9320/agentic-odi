@@ -2,6 +2,7 @@ import { apiUrl } from "../bridge/desktopBridge";
 import { newId, nowIso } from "./id";
 import type { CanvasData, ChangelogData, Job, Observation, Outcome, Step } from "../types";
 import type { LocalStore, OutboxEntity, OutboxKind, OutboxRecord } from "./store/types";
+import { authHeaders } from "../api/studioApi";
 import type { WorkspaceSnapshot } from "./store/types";
 import { openLocalStore } from "./store/openStore";
 import { LocalDataService } from "./data/localDataService";
@@ -219,10 +220,12 @@ export class StudioBff {
 
     const canvas = (await fetch(
       apiUrl(`/api/canvas?mcp_url=${encodeURIComponent(mcpUrl)}`),
+      { headers: authHeaders() },
     ).then((response) => response.json())) as CanvasData;
 
     const observationPage = (await fetch(
       apiUrl("/api/memory/observations"),
+      { headers: authHeaders() },
     ).then((response) => response.json())) as {
       observations: Observation[];
     };
