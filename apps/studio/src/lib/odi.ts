@@ -1,3 +1,4 @@
+import type { Outcome } from "../types";
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -22,12 +23,14 @@ export function hasScore(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+
 export function formatOpportunityScore(score: number | null | undefined): string {
   if (score == null) {
     return "N/A";
   }
   return score.toFixed(1);
 }
+
 
 export function opportunityPill(score: number | null | undefined): PillDescriptor {
   const formatted = formatOpportunityScore(score);
@@ -80,6 +83,18 @@ export function formatMemberMean(summary: MemberScoreSummary): string {
   }
   const base = `Mean opportunity ${summary.mean.toFixed(1)} across ${summary.scored} scored`;
   return summary.unscored > 0 ? `${base} · ${summary.unscored} not scored` : base;
+}
+
+/**
+ * Average only the stored numeric opportunity scores. An unscored outcome is
+ * never treated as a zero: it is counted separately and excluded from the mean.
+ */
+export function scoredAverage(outcomes: ReadonlyArray<Outcome>): {
+  mean: number | null;
+  scored: number;
+  unscored: number;
+} {
+  return summarizeMemberScores(outcomes.map((o) => o.opportunity_score));
 }
 
 /**
