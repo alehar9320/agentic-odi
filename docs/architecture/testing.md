@@ -1,5 +1,20 @@
 # Testing
 
+## Tiers
+
+There are three tiers of verification, named in
+[`.agents/workflows/test.md`](../.agents/workflows/test.md):
+
+| Tier | What it runs | Who runs it |
+|---|---|---|
+| **Fast** | pytest on the changed packages, ruff on the changed files | anyone who wants a quick answer |
+| **Default** | the fast tier, plus type checking, plus the studio units | **the bar for opening a PR** |
+| **Full** | the default tier, plus the studio build, plus the browser e2e suite | CI |
+
+The full tier is CI's responsibility and is not asked of anyone before they
+open a pull request. The commands below are the default tier; the fast tier
+is pytest on the changed packages plus `uv run ruff check .`.
+
 ## Commands
 
 ```bash
