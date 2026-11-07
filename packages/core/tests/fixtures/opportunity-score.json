@@ -9,6 +9,9 @@
     {"id": "satisfaction-above", "importance": 10.0, "satisfaction": 20.0, "score": 10.0},
     {"id": "underserved-gap", "importance": 8.0, "satisfaction": 4.0, "score": 12.0},
     {"id": "fractional-gap", "importance": 7.5, "satisfaction": 2.5, "score": 12.5},
-    {"id": "unscored", "importance": null, "satisfaction": null, "score": null}
+    {"id": "unscored", "importance": null, "satisfaction": null, "score": null},
+    {"id": "importance-below-satisfaction", "importance": 3.0, "satisfaction": 9.0, "score": 3.0},
+    {"id": "top-of-scale-gap", "importance": 20.0, "satisfaction": 1.0, "score": 39.0},
+    {"id": "clamped-below-satisfaction", "importance": 4.0, "satisfaction": 9.0, "score": 4.0}
   ]
 }
