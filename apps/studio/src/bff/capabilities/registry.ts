@@ -137,7 +137,7 @@ async function probeMcp(mcpUrl: string): Promise<boolean> {
   try {
     const response = await fetch(apiUrl("/api/health/mcp"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ mcp_url: mcpUrl }),
       signal: AbortSignal.timeout(2000),
     });
