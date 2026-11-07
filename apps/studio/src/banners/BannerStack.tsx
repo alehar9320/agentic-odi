@@ -72,21 +72,29 @@ export function BannerStack(props: BannerStackProps) {
   const onAction = props.onAction ?? (() => {});
   const onIntent = props.onIntent ?? (() => {});
 
+  const topBanners = banners.filter((banner) => banner.dock === "top");
+  const cornerBanners = banners.filter((banner) => banner.dock === "corner");
+
   return (
     <>
-      <Dock
-        dock="top"
-        label="Studio notices"
-        banners={banners.filter((banner) => banner.dock === "top")}
-        overflow={overflow}
-        onDismiss={onDismiss}
-        onAction={onAction}
-        onIntent={onIntent}
-      />
+      {/* The top dock is sticky and carries its own padding, so an empty one
+          is a strip of layout paid for by nothing. Overflow belongs to this
+          dock, so it counts as something to show. */}
+      {(topBanners.length > 0 || overflow > 0) && (
+        <Dock
+          dock="top"
+          label="Studio notices"
+          banners={topBanners}
+          overflow={overflow}
+          onDismiss={onDismiss}
+          onAction={onAction}
+          onIntent={onIntent}
+        />
+      )}
       <Dock
         dock="corner"
         label="Studio notifications"
-        banners={banners.filter((banner) => banner.dock === "corner")}
+        banners={cornerBanners}
         onDismiss={onDismiss}
         onAction={onAction}
         onIntent={onIntent}
