@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from agentic_odi_studio_api.studio import chat
 from agentic_odi_studio_api.studio.approvals import (
     ApprovalDecision,
     ApprovalRegistry,
 )
+from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.schemas import AttachmentRef, ChatMessage, ChatRequest
 
 
@@ -296,14 +299,51 @@ def test_an_expired_gate_tells_the_model_nothing_changed(monkeypatch) -> None:
     assert [name for name, _ in events if name in {"message", "error"}] == ["message"]
 
 
-def test_mutating_tools_are_named_by_prefix() -> None:
-    assert chat.is_mutating_tool("add_job")
-    assert chat.is_mutating_tool("delete_outcome")
-    assert chat.is_mutating_tool("ingest_notion")
-    assert chat.is_mutating_tool("promote_evidence")
+@pytest.mark.parametrize(
+    "name",
+    [
+        "schedule_work",
+        "trigger_scheduled_work",
+        "cancel_scheduled_work",
+        "mark_signal_read",
+        "dismiss_signal",
+        "unknown_tool",
+    ],
+)
+def test_declining_a_contract_write_or_unknown_tool_prevents_execution(monkeypatch, name) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call("{}", name)])]),
+            _FakeStream([_chunk(content="Nothing changed.")]),
+        ],
+    )
+    events = _parse(
+        _collect_answering(
+            _request(approvals=True), ApprovalRegistry(), ApprovalDecision(approved=False)
+        )
+    )
+    assert [data["name"] for event, data in events if event == "approval"] == [name]
+    assert _Mcp.calls == []
+
+
+def test_approval_classification_preserves_reads_and_local_surfaces(monkeypatch) -> None:
+    from agentic_odi_core.contract import TOOL_SPECS, ToolEffect, ToolSpec
+
     assert not chat.is_mutating_tool("get_jobs")
+    assert not chat.is_mutating_tool("compute_opportunity")
+    assert not chat.is_mutating_tool("evaluate_outcome")
     assert not chat.is_mutating_tool("remember")
     assert not chat.is_mutating_tool("render_ui")
+    assert chat.is_mutating_tool("add_connector")
+    assert chat.is_mutating_tool("open_study")
+    assert not chat.is_mutating_tool("list_studies")
+    monkeypatch.setitem(
+        TOOL_SPECS,
+        "get_future_write",
+        ToolSpec(name="get_future_write", summary="writes", effect=ToolEffect.WRITE),
+    )
+    assert chat.is_mutating_tool("get_future_write")
 
 
 def test_model_receives_visible_turn_history_in_order() -> None:
@@ -384,3 +424,188 @@ def test_attachment_text_is_truncated(monkeypatch) -> None:
 
     assert len(block) < 50_000
     assert chat.MAX_ATTACHMENT_TEXT < 50_000
+
+
+def test_a_cited_sentence_names_the_record_not_the_tool(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call("{}", "list_evidence")])]),
+            _FakeStream([_chunk(content="Three accounts stalled. [[ev:E-1]]")]),
+        ],
+    )
+    _Mcp.tool_result = '[{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}]'
+
+    events = _parse(_collect(_request()))
+
+    message = next(data for name, data in events if name == "message")
+    assert message["content"] == "Three accounts stalled. [[ev:E-1]]"
+    assert message["claims"] == [
+        {
+            "index": 0,
+            "text": "Three accounts stalled.",
+            "status": "cited",
+            "evidence": [{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}],
+            "reason": None,
+        }
+    ]
+
+
+def test_an_id_the_turn_never_received_is_downgraded(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call("{}", "list_evidence")])]),
+            _FakeStream([_chunk(content="They churned. [[ev:E-9]]")]),
+        ],
+    )
+    _Mcp.tool_result = "[]"
+
+    events = _parse(_collect(_request()))
+
+    claim = next(data for name, data in events if name == "message")["claims"][0]
+    assert claim["status"] == "uncited"
+    assert claim["reason"] == "unknown_evidence_id"
+    assert claim["evidence"] == []
+
+
+def test_a_hypothesis_and_an_unmarked_sentence_still_reach_the_reader(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [_FakeStream([_chunk(content="Nobody said why. [[hypothesis]] It is a guess.")])],
+    )
+
+    events = _parse(_collect(_request()))
+
+    claims = next(data for name, data in events if name == "message")["claims"]
+    assert [claim["status"] for claim in claims] == ["hypothesis", "uncited"]
+    assert [name for name, _ in events if name in {"message", "error"}] == ["message"]
+
+
+def test_an_offline_reply_carries_no_claims(monkeypatch) -> None:
+    async def _unhealthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+        return False, "down"
+
+    monkeypatch.setattr(chat, "check_llm_health", _unhealthy)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
+
+    events = _parse(_collect(_request()))
+
+    message = next(data for name, data in events if name == "message")
+    assert "claims" not in message
+
+
+def test_claims_are_persisted_with_the_turn(monkeypatch) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call("{}", "list_evidence")])]),
+            _FakeStream([_chunk(content="Three accounts stalled. [[ev:E-1]]")]),
+        ],
+    )
+    _Mcp.tool_result = '[{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}]'
+    memory = StudioMemory(":memory:")
+
+    async def _run() -> list[str]:
+        return [frame async for frame in chat.stream_chat(_request(), memory=memory)]
+
+    asyncio.run(_run())
+
+    conversation = memory.latest_conversation()
+    assert conversation is not None
+    assistant = memory.conversation_tree(conversation.id)[-1]
+    assert assistant.claims[0].status == "cited"
+    assert assistant.claims[0].evidence[0].name == "Call with Acme"
+
+
+def _offline(monkeypatch) -> None:
+    """Force the deterministic tier: no MCP, no model, one short reply."""
+
+    async def _unhealthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+        return False, "down"
+
+    monkeypatch.setattr(chat, "check_llm_health", _unhealthy)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
+
+
+def _memory_that_forgets_replies(monkeypatch) -> StudioMemory:
+    """A store that keeps what the person typed and fails on every reply."""
+    memory = StudioMemory(":memory:")
+    real_append = memory.append_turn
+
+    def _append(*args: Any, **kwargs: Any) -> int:
+        role = kwargs.get("role", args[1] if len(args) > 1 else "")
+        if role == "assistant":
+            raise RuntimeError("the store is closed")
+        return real_append(*args, **kwargs)
+
+    monkeypatch.setattr(memory, "append_turn", _append)
+    return memory
+
+
+def _ask_and_answer(memory: StudioMemory) -> list[str]:
+    async def _run() -> list[str]:
+        return [
+            frame
+            async for frame in chat.stream_chat(_request(), memory=memory, request_id="req-466")
+        ]
+
+    return asyncio.run(_run())
+
+
+def _warnings(caplog) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+
+
+def test_a_reply_that_is_not_stored_still_finishes(monkeypatch) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+
+    frames = _ask_and_answer(memory)
+
+    message = next(data for name, data in _parse(frames) if name == "message")
+    assert message["content"]
+
+
+def test_a_reply_that_is_not_stored_logs_a_warning(monkeypatch, caplog) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger="agentic_odi_studio_api.studio.chat"):
+        _ask_and_answer(memory)
+
+    assert len(_warnings(caplog)) == 1
+
+
+def test_the_persistence_warning_names_the_request_and_the_error(monkeypatch, caplog) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger="agentic_odi_studio_api.studio.chat"):
+        _ask_and_answer(memory)
+
+    warning = _warnings(caplog)[0]
+    assert "req-466" in warning
+    assert "RuntimeError" in warning
+    assert "assistant" in warning
+
+
+def test_the_persistence_warning_quotes_nothing_anyone_said(monkeypatch, caplog) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+    secret_words = "Propagate the quarterly hiring freeze"
+    request = _request(
+        api_key="sk-supersecret",
+        messages=[ChatMessage(role="user", content=secret_words, id="m-1")],
+    )
+
+    async def _run() -> None:
+        async for _frame in chat.stream_chat(request, memory=memory, request_id="req-466"):
+            pass
+
+    with caplog.at_level(logging.WARNING, logger="agentic_odi_studio_api.studio.chat"):
+        asyncio.run(_run())
+    logged = "\n".join(_warnings(caplog))
+    assert logged
+    assert secret_words not in logged
+    assert "sk-supersecret" not in logged

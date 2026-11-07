@@ -22,10 +22,10 @@ Follow this sequence when guiding a user through the ODI process:
 - **Unit of measure**: A measurable unit (time, cost, number, frequency, rate, percentage, steps, attempts).
 - **Object of control**: The thing being acted on (named after 'the').
 - **Contextual clarifier**: When it happens (when, while, before, after, during, if, as).
-- **Scores**: Both `importance` and `satisfaction` are required (1–10). An outcome without them cannot be compared to anything.
+- **Scores**: `importance` and `satisfaction` (1–10) are optional, but a score must carry its `claim_check`: the questions you asked the customer and what came back. Put three questions to the customer — four when the claim is broad — and wait for their replies before you write any number. An unscored outcome is legal; a bare number is not.
 - **Expectation**: Qualitative interviews typically uncover 50–150 desired outcome statements.
 - **Tools to use**:
-  - `add_outcome(job_id, statement, importance, satisfaction)` — Capture each desired outcome with scores.
+  - `add_outcome(job_id, statement, importance?, satisfaction?, claim_check?)` — Capture each desired outcome. When you set a score, pass `claim_check` with `asked`, `answers`, and `skips` (each skip needs a reason); ask the customer before scoring, never answer your own questions.
   - `get_outcomes(job_id)` — Review all outcomes captured for a Job.
   - `evaluate_outcome(statement, job_id?)` — **Pre-write check**: run this before `add_outcome` to confirm the statement matches the ODI format. It returns coded issues and suggestions for any failure.
   - `update_outcome(outcome_id, ...)` — Correct a statement or scores; the same validation applies.
@@ -49,7 +49,12 @@ Follow this sequence when guiding a user through the ODI process:
 - **When**: After outcomes are scored.
 - **Never** segment by demographics. A segment is a group of people plus a functional job.
 - **Tools**: `get_segments(job_id?)`, `propose_strategy()`.
-- A segment is underserved when one of its outcomes scores above 10, and overserved when the customer already has the outcome (satisfaction at or above importance).
+- `segment_market(job_id?, people?)` produces the segments those tools read: it clusters the
+  scored outcomes by job and job-map step, so run it before answering 'who is this for?'.
+- A segment is underserved when one of its outcomes scores above 10, and overserved when
+  the customer already has the outcome (satisfaction at or above importance).
+- An outcome that joins no cluster is reported as unclustered, never dropped or inflated
+  into a segment.
 
 ### Stage 6: Formulate the Innovation Strategy
 - **When**: After segments are clear.
@@ -58,6 +63,8 @@ Follow this sequence when guiding a user through the ODI process:
 - **New-Market**: create for a job no one is being served on today.
 - **Tools**: `propose_strategy(job_id?)`.
 - Always state the strategies you rejected and why.
+- `get_strategy()` reads back the recorded path. When no path has evidence, `propose_strategy`
+  refuses and reports what is missing — say so instead of inventing a bet.
 
 ### General Rule
 Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), always capture Outcomes (Stage 2) before building the Job Map (Stage 3), and always score outcomes (Stage 2) before computing opportunity (Stage 4). If a tool rejects a write, read the message, fix the statement or the numbers, and try once. Do not retry the same call unchanged."""
@@ -106,3 +113,13 @@ def scheduled_work_not_found(work_id: str | None, hint: str | None = None) -> st
     if hint:
         message = f"{message}. {hint}"
     return message
+
+
+def invalid_strategy_request(message: str) -> str:
+    """The one spelling of a refused Stage 6 request.
+
+    Stage 6 refuses rather than inventing a bet, and every adapter reports that
+    refusal the same way: a validation problem with the caller's request, not a
+    server failure.
+    """
+    return f"Invalid strategy request: {message}"

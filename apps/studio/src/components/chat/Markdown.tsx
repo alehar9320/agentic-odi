@@ -66,6 +66,11 @@ function Block({ block }: { block: MdBlock }) {
 }
 
 export function Markdown({ source }: { source: string }) {
+  // An empty part is not a paragraph. Rendering one leaves an empty paragraph
+  // in the transcript, which reads as a blank reply.
+  if (!source.trim()) {
+    return null;
+  }
   const blocks = parseMarkdown(source);
   return (
     <div className="md">

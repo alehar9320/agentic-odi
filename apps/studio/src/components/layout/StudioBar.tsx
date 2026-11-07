@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
+import { PRODUCT_NAME } from "../../lib/brand";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import type { Conversation } from "../../types";
@@ -121,7 +122,7 @@ export function StudioBar({
           <span className="brand__mark" aria-hidden="true">
             <OdiMascot size={32} />
           </span>
-          <span className="brand__wordmark">Living Studio</span>
+          <span className="brand__wordmark">{PRODUCT_NAME}</span>
         </button>
       </div>
 
@@ -265,7 +266,7 @@ export function StudioBar({
             onClick={() => openPanel("settings")}
             title={
               update.currentVersion
-                ? `Living Studio ${update.currentVersion} — open software update settings`
+                ? `${PRODUCT_NAME} ${update.currentVersion} — open software update settings`
                 : "Open software update settings"
             }
           >

@@ -5,6 +5,7 @@ description = "External system connectors for Agentic ODI, including an MCP clie
 requires-python = ">=3.10"
 dependencies = [
     "fastmcp",
+    "httpx",
     "pydantic",
 ]
 

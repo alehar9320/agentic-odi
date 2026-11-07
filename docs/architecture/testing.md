@@ -23,6 +23,9 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 
 - `test_models.py` — domain models and their validation rules.
 - `test_job_validation.py` — Job name and description constraints and `create_job()`.
+- `test_opportunity_score.py` — the ODI opportunity formula, its clamp, and its monotonicity.
+- `test_evaluation.py` — the outcome-statement format guard, and the harness that judges a service's scored outcomes by the shared fixture.
+- `test_evaluation_harness.py` — a service is judged by `packages/core/tests/fixtures/opportunity-score.json`: a wrong score fails with the id and both values; an unscored outcome stays allowed.
 - `test_service.py` — `ODIService` CRUD, Opportunity Score, and thesis rendering.
 - `test_repository.py` — `InMemoryRepository` behavior.
 - `test_sqlite_repository.py` — SQLite persistence and round-trips.
@@ -31,6 +34,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_schema.py` — schema creation and migration.
 - `test_events.py` — event-store schema and legacy-database backfill.
 - `test_intent_store.py` — append-only Intent Store ordering.
+- `test_sqlite_integrity.py` — the boot integrity gate, the bounded check, and the clean-shutdown checkpoint.
 - `test_pagination.py` — list pagination across both repositories and the service.
 - `test_errors.py` — the ODI error hierarchy and its messages.
 - `test_evidence_not_found.py` — actionable evidence-not-found errors.
@@ -70,6 +74,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_studio_ui_spec.py` — catalog-driven UI validation.
 - `test_studio_router.py` — passthrough responses from the Studio router.
 - `test_app_spa.py` — static SPA fallback and the local server entrypoint.
+- `test_boot_integrity.py` — the boot failure page, the idle checkpoint, and the clean shutdown that closes both stores.
 - `conftest.py` — shared `InMemoryRepository` fixtures.
 
 ### `apps/cli/tests/`
@@ -85,6 +90,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_update.py`, `test_update_command.py`, `test_update_edges.py`, `test_update_check.py` — update checks and installation.
 - `test_profile.py`, `test_paths.py` — config/data directories and `--profile`.
 - `test_persistence.py` — every entity survives a fresh repository.
+- `test_data_export.py` — `data-export` writes a restorable JSON snapshot.
 - `test_render.py` — table and JSON rendering.
 - `test_mascot.py` — the CLI banner.
 - `test_build_info.py` — the version string matches build metadata.
@@ -98,18 +104,21 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_config_path.py` — `AGENTIC_ODI_CONNECTORS_CONFIG` and the default path.
 - `test_mcp_connector.py`, `test_rest_connector.py` — MCP and REST ingest.
 - `test_mapping.py` — connector records mapped to evidence drafts.
-- `test_sink.py` — the in-process ingest sink.
+- `test_http_client.py` — the shared HTTP client reads its pool, timeout, and retry settings from the environment.
+- `test_rate_limit.py` — token-bucket ingest limits and environment configuration.
+- `test_sink.py` — the in-process ingest sink and its rate gate.
 
 ### Root `tests/`
 
-Cross-package checks only:
+Checks that span the workspace rather than one distribution:
 
 - `tests/contract/test_mcp_contract.py` — live FastMCP names, argument names, and required fields match `agentic_odi_core.contract.TOOL_SPECS`.
 - `tests/contract/test_cli_contract.py` — the CLI local-handler keys are a subset of `TOOL_NAMES`.
+- `tests/test_architecture.py` — the package diagram in the [architecture index](README.md#dependency-direction), the `[project] dependencies` each member declares, and the imports the source actually contains must all agree. It also checks the four groups inside `packages/core`: persistence imports no methodology, and every core module belongs to exactly one group ([the layer table](README.md#inside-packagescore)).
 - `tests/test_worker_security_headers.py` — the Living Studio Worker sends its security headers.
 - `tests/scripts/test_dev.py`, `test_dev_main.py` — `scripts/dev.py` startup, ports, signals, and shutdown.
 - `tests/scripts/test_doc_check.py` — documentation drift: commands, paths, routes, env vars, and README layout.
-- `tests/scripts/test_roadmap_check.py` — the roadmap gate for new capabilities.
+- `tests/scripts/test_assistant_ui_ledger.py` — the assistant-ui ledger (issue #429): adopted rows cite a merged delivery and name an existing file, counts and the Living Studio projection match the rows.
 - `tests/scripts/test_pr_body_gate.py` — CI refuses a branch without a described pull request.
 - `tests/scripts/test_release_instructions.py` — release-note section generation.
 - `tests/scripts/test_version_sync.py` — the declared version matches the release.
@@ -117,7 +126,9 @@ Cross-package checks only:
 ### `brand/tests/` and `website/tests/`
 
 - `brand/tests/test_brand_assets.py`, `test_generated_sources.py` — mascot art and generated brand sources.
-- `website/tests/` — static site integrity (`test_site.py`), docs rendering (`test_docs_render.py`), content sync with the repo (`test_content_sync.py`, `test_generated.py`), OG art reproducibility (`test_make_og.py`), the design system (`test_design_system.py`), and the Pages deploy (`test_pages_deploy.py`).
+- `website/tests/` — static site integrity (`test_site.py`), docs rendering (`test_docs_render.py`), content sync with the repo (`test_content_sync.py`, `test_generated.py`), OG art reproducibility (`test_make_og.py`), the design system (`test_design_system.py`), the Pages deploy (`test_pages_deploy.py`), and the CI wiring that runs this suite (`test_ci_required.py`).
+
+`test_ci_required.py` is the contract that keeps the site from shipping on faith. It asserts the `website` job in `ci.yml` runs `uv run --directory website pytest tests/`, carries no `continue-on-error`, and is both a `needs:` entry and an enforced result in the `CI green` aggregate — the status check the `main-requires-ci-green` ruleset requires. It also asserts the Pages `deploy` job waits on the tested `build`. The wiring has regressed before: the site's checks once lived in a `feature/gh-pages`-only workflow that never ran for a pull request into `main` (402f0a5).
 
 ## Isolation Rules
 
@@ -145,15 +156,39 @@ download, and install), `transport.test.ts` (Tauri boundary), and the
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
+The outbox drain guard in `apps/studio/src/bff/outbox.ts` is covered by
+`outbox.test.ts`, which races two drains twice: once with a `navigator.locks`
+stub and once with `navigator.locks` deleted so the lease row runs. Both assert
+exactly one send per record, and the lease path also proves a crashed holder's
+lease is reclaimed only after it expires and that a running drain renews it.
+
+The IndexedDB schema and its migrations are covered by two files under
+`apps/studio/src/bff/store/`. `migrations.test.ts` asserts the registry has a
+step for every version up to `DB_VERSION` and that a gap fails with a message
+naming the missing version, so raising the version without a migration fails the
+suite instead of throwing `ConstraintError` on an existing database.
+`indexedDbStore.test.ts` seeds a v1 database with a row in all seven stores,
+opens it with the current code, and asserts every row is unchanged and the
+migrated schema equals a fresh database's (store names, key paths,
+auto-increment flags, and index names). The same file opens a second connection
+at a higher version and asserts the first closes and sets `needsReload` instead
+of blocking the upgrade.
+
+Copied UI is guarded structurally: `src/vendor/boundary.test.ts` reads every
+`.ts` and `.tsx` file under `apps/studio/src/vendor/` and fails on a specifier
+that resolves into a product slice (`state`, `api`, `assistant`, `bff`). It is
+the second pair of eyes behind the ESLint rule in
+`apps/studio/eslint.config.js`, because widening a lint glob silently deletes
+the rule. See [Vendor alley](vendor.md).
+
 ## Accessibility
 
-Accessibility is tested, not asserted. Three kinds of checks run with the normal
-frontend suite (`npm --prefix apps/studio test`), so a regression turns the
-build red without a separate command:
+Accessibility is tested, not asserted. Four kinds of checks run with the normal
+test suites, so a regression turns the build red without a separate command:
 
 - **axe sweep** — `src/test/a11y.test.tsx` renders every shipping surface
   (matrix, job map, catch-up feed, settings, first-run wizard, command palette,
-  chat stage, changelog dialog) inside a real `<main>` and runs
+  chat stage, changelog dialog, decision brief) inside a real `<main>` and runs
   [axe-core](https://github.com/dequelabs/axe-core) through `vitest-axe`, with
   zero WCAG 2.1 A/AA violations allowed. The helper lives in `src/test/axe.ts`.
   `vitest-axe@0.1.0` ships an empty `extend-expect` module, so the helper
@@ -180,14 +215,57 @@ build red without a separate command:
   in the command palette, focus trapping and focus restore in the mobile lens
   and changelog dialog, and a single polite live region per transcript.
 
+- **artifact structure** — `scripts/artifact_a11y.py` is the one owner of the
+  rules an artifact's markup has to satisfy: one `<h1>`, no skipped heading
+  level, a named table with scoped headers, a labelled or deliberately hidden
+  image, and no id used twice. `tests/scripts/test_artifact_a11y.py` proves each
+  rule with a fixture that breaks exactly one of them, `website/tests/test_site.py`
+  runs the rule set over every built page, and
+  `tests/scripts/test_artifact_inventory.py` scans the artifact roots so a
+  renderer nobody registered fails the build by path. The brief is rendered in
+  the browser, where Python cannot follow, so `src/components/brief/BriefLens.test.tsx`
+  asserts the same four rules against its DOM. Passing these checks is a
+  structural statement, not WCAG conformance and not a screen-reader
+  certification — that evidence is ALH-252's to collect.
+
 Reduced motion is honoured globally in `theme.css` (`@media
 (prefers-reduced-motion: reduce)` collapses animations, transitions, and
 `scroll-behavior`), so new components inherit it without opting in.
 
-Contrast is never faked in jsdom: it is computed from the palette tokens above,
-and a real-browser axe pass over the matrix, palette, and mobile lens remains a
-candidate for the Playwright suite described below, which today covers the
-end-to-end seams rather than accessibility.
+### Contrast as a build gate
+
+The jsdom sweep above cannot measure contrast, so the browser carries that
+half of the gate (issue #543, parent #331). `e2e/a11y.spec.ts` renders the five
+core screens — home, the opportunity landscape, the records lens, catch-up, and
+settings — in both themes and fails when a screen paints a pair that is not on
+the known list, naming the screen, the selector, both colours, and the ratio.
+The job is required: `.github/workflows/ci.yml` runs it as `Contrast gate` and
+`ci-green` depends on it.
+
+- **the walker** — `src/test/contrast.ts` resolves the effective background by
+  walking the ancestors and folding each `background-color` and each gradient
+  stop together. axe skips any element over a gradient and returns it as
+  `incomplete`, which is exactly the shell, the hero, and the charts, so the
+  walker measures them itself and reports a pair it still cannot resolve (an
+  image, a filter) as `indeterminate` rather than skipping it. It is
+  self-contained: the spec serialises it into the page with
+  `Function.prototype.toString`, and `src/test/contrast.test.ts` runs the same
+  source in jsdom.
+- **the raw-colour gate** — `src/styles/colors.test.ts` fails on a hex or
+  `rgb()` literal outside `theme.css`, naming the file and line, so a component
+  cannot inline a colour the theme does not own. A handful of files whose
+  colours are structural (generated artwork, print media, SVG chart fills) are
+  named in `ALLOWED_FILES` with a reason and an issue; the list is capped and
+  fails on a stale entry, so it can only shrink.
+- **the known pairs** — `e2e/a11y/knownPairs.ts` records the token-level
+  failures the walker finds today, each owned by #542 ("fix the tokens that
+  fail AA", not yet merged) or #335. It is a ratchet: an unlisted pair fails
+  immediately, and an entry that stops failing fails too, so the list can only
+  shrink. When #542 lands, the gate reports the stale entries and they are
+  deleted.
+
+A deliberately low-contrast pair is injected in the spec's last test, so the
+gate is proven to fail rather than assumed to.
 
 ## End-to-end
 
@@ -210,6 +288,10 @@ them: `chromium` for the local backend (the product default) and
 
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none.
+
+`first-paint.spec.ts` is the exception to "drives the real sidecar": it aborts
+the module bundle so it can read the pre-JavaScript shell in `index.html`, then
+compares the colour it painted against the `--bg` token for each theme.
 
 CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
 repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the

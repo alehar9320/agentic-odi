@@ -12,6 +12,8 @@ from agentic_odi_core.models import (
     Evidence,
     Job,
     Outcome,
+    Signal,
+    SignalKind,
     Step,
 )
 from agentic_odi_core.repository import InMemoryRepository
@@ -237,22 +239,29 @@ def test_evidence_crud_and_filters():
     assert repo.get_evidence("e1") is None
 
 
-def test_delete_job_cascades_evidence():
+def test_delete_job_unlinks_evidence():
     repo = _repo_with_graph()
     repo.add_evidence(_evidence("e1", job_id="j1", step_id="s1", outcome_id="o1"))
     repo.add_evidence(_evidence("e2", job_id="j1"))
     repo.add_evidence(_evidence("e3", job_id="other"))
     assert repo.delete_job("j1") is True
-    assert repo.get_evidence("e1") is None
-    assert repo.get_evidence("e2") is None
+    #: Research evidence survives: references to the removed job, step, and
+    #: outcome are nulled rather than the rows being destroyed.
+    e1 = repo.get_evidence("e1")
+    assert e1 is not None
+    assert (e1.job_id, e1.step_id, e1.outcome_id) == (None, None, None)
+    e2 = repo.get_evidence("e2")
+    assert e2 is not None and e2.job_id is None
     assert repo.get_evidence("e3") is not None
 
 
-def test_delete_outcome_cascades_evidence():
+def test_delete_outcome_unlinks_evidence():
     repo = _repo_with_graph()
     repo.add_evidence(_evidence("e1", job_id="j1", outcome_id="o1"))
     assert repo.delete_outcome("o1") is True
-    assert repo.get_evidence("e1") is None
+    e1 = repo.get_evidence("e1")
+    assert e1 is not None
+    assert e1.outcome_id is None
 
 
 def test_reload_empties_in_memory_state() -> None:
@@ -271,3 +280,56 @@ def test_reload_is_safe_on_an_empty_repository() -> None:
     repo.reload()
     repo.reload()
     assert repo.list_jobs() == []
+
+
+def test_last_event_id_is_zero_before_any_write() -> None:
+    assert InMemoryRepository().last_event_id() == 0
+
+
+def test_each_write_is_given_its_own_event_id_in_append_order() -> None:
+    repo = InMemoryRepository()
+
+    ids: list[int] = []
+    repo.add_job(Job(id="j1", name="Job"))
+    ids.append(repo.last_event_id())
+    repo.add_step(Step(id="s1", job_id="j1", name="Step", order=1))
+    ids.append(repo.last_event_id())
+    repo.update_step("s1", {"name": "Prepare"})
+    ids.append(repo.last_event_id())
+    repo.add_evidence(_evidence("e1", job_id="j1"))
+    ids.append(repo.last_event_id())
+    repo.delete_evidence("e1")
+    ids.append(repo.last_event_id())
+
+    assert ids == [1, 2, 3, 4, 5]
+
+
+def test_a_write_that_changes_nothing_does_not_spend_an_event_id() -> None:
+    repo = _repo_with_graph()
+    before = repo.last_event_id()
+
+    assert repo.update_job("missing", {"name": "x"}) is None
+    assert repo.delete_step("missing") is False
+    assert repo.mark_signal_read("missing") is None
+
+    assert repo.last_event_id() == before
+
+
+def test_stamping_the_same_signal_twice_spends_one_event_id() -> None:
+    repo = _repo_with_graph()
+    repo.add_signal(
+        Signal(
+            id="sig-1",
+            kind=SignalKind.OUTCOME_SCORED,
+            title="Outcome re-scored",
+            fingerprint="fp",
+        )
+    )
+    after_add = repo.last_event_id()
+
+    assert repo.mark_signal_read("sig-1") is not None
+    assert repo.last_event_id() == after_add + 1
+
+    #: The second read changes nothing, so no event is appended and no id spent.
+    assert repo.mark_signal_read("sig-1") is not None
+    assert repo.last_event_id() == after_add + 1

@@ -1,23 +1,29 @@
 import type { ReactNode } from "react";
 
 import type { WorkspacePanelId } from "../../types";
+import { BriefLens } from "../brief/BriefLens";
 import { DirectCapture } from "../canvas/DirectCapture";
 import { EvidenceStream } from "../canvas/EvidenceStream";
 import { JobMap } from "../canvas/JobMap";
 import { MemoryPanel } from "../canvas/MemoryPanel";
 import { OpportunityLandscape } from "../canvas/OpportunityLandscape";
 import { SchedulePanel } from "../canvas/SchedulePanel";
+import { SegmentBoard } from "../canvas/SegmentBoard";
 import { CatchUpFeed } from "../notifications/CatchUpFeed";
+import { RecordsPanel } from "../records/RecordsPanel";
 import { SettingsPanel } from "../SettingsPanel";
 import {
   BellIcon,
   BoltIcon,
   CaptureIcon,
+  ClusterIcon,
   CompassIcon,
+  FileIcon,
   RouteIcon,
   SettingsIcon,
   SignalIcon,
   SparkIcon,
+  TableIcon,
 } from "../icons";
 
 export interface PanelTalk {
@@ -44,6 +50,19 @@ export interface PanelDefinition {
  */
 export const WORKSPACE_PANELS: PanelDefinition[] = [
   {
+    id: "records",
+    label: "Records",
+    title: "Records",
+    blurb: "Everything the store holds, with the ids and the values it returned.",
+    icon: <TableIcon />,
+    render: () => <RecordsPanel />,
+    talk: {
+      label: "Ask what's missing here",
+      intent:
+        "Here are the records I have stored. What is missing, duplicated, or inconsistent? Ask me before you change anything.",
+    },
+  },
+  {
     id: "catchup",
     label: "Catch up",
     title: "Catch up",
@@ -68,6 +87,14 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
     },
   },
   {
+    id: "brief",
+    label: "Decision brief",
+    title: "Decision brief",
+    blurb: "The document a review reads: the vision, the ranked bets, their evidence, the dissent.",
+    icon: <FileIcon />,
+    render: () => <BriefLens />,
+  },
+  {
     id: "jobmap",
     label: "Job map",
     title: "Universal job map",
@@ -78,6 +105,19 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
       label: "Walk me through the job",
       intent:
         "Walk me through the job step by step, and show me where the work breaks down today.",
+    },
+  },
+  {
+    id: "segments",
+    label: "Segments",
+    title: "Segments and the bet",
+    blurb: "Who the scored outcomes point at, and the strategy that follows from it.",
+    icon: <ClusterIcon />,
+    render: () => <SegmentBoard />,
+    talk: {
+      label: "Ask who this is for",
+      intent:
+        "Who is this for, according to the outcomes I have scored? Then tell me what to do about it, and name the paths you rejected.",
     },
   },
   {

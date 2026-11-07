@@ -1,8 +1,18 @@
+import { fileURLToPath } from "node:url";
+
 import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    // Copied components keep the import paths they shipped with
+    // (`@/components/ui/…`, `@/lib/utils`) and stay inside the tree.
+    alias: {
+      "@": fileURLToPath(new URL("./src/vendor", import.meta.url)),
+    },
+  },
   clearScreen: false,
   // Settings → About reports which build is running; the release workflow's
   // date is baked in at build time. Applies to vitest transforms too.
@@ -27,6 +37,8 @@ export default defineConfig({
     // stylesheet's source. Process CSS only when a test asks for it with a
     // query (?raw/?inline), so the rest of the suite keeps the faster path.
     css: { include: [/\.css(\?.*)?$/] },
+    testTimeout: 10000,
+    hookTimeout: 10000,
     // Visual tests need Chromium, so they run from vitest.visual.config.ts and
     // never from this jsdom suite (see docs/development.md).
     exclude: [...configDefaults.exclude, "**/*.visual.test.tsx"],

@@ -15,10 +15,21 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from datetime import datetime, timezone
+
 from agentic_odi_core import InMemoryRepository
 from agentic_odi_studio_api.app import create_app
 from agentic_odi_studio_api.studio import chat
-from agentic_odi_studio_api.studio.memory import ConversationNotFoundError, StudioMemory
+from agentic_odi_studio_api.studio.claims import (
+    EvidenceIndex,
+    EvidenceSnapshot,
+    split_claims,
+)
+from agentic_odi_studio_api.studio.memory import (
+    MAX_CONVERSATIONS,
+    ConversationNotFoundError,
+    StudioMemory,
+)
 from fastapi.testclient import TestClient
 
 BACKENDS = ("local", "mcp")
@@ -80,6 +91,134 @@ def test_rename_keeps_the_tree() -> None:
 
     assert renamed.title == "Retention work"
     assert renamed.head_id is None
+
+
+def test_the_conversation_list_is_ordered_by_the_last_touch(tmp_path) -> None:
+    path = tmp_path / "studio.db"
+    memory = StudioMemory(path)
+    # Created in one order, touched in the other: the list follows recency.
+    revisited = memory.create_conversation("Quarterly review")
+    untouched = memory.create_conversation("Activation model")
+    memory.close()
+
+    repo = memory.service.repo
+    repo.update_conversation(
+        revisited.id,
+        {
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-02-09T00:00:00+00:00",
+        },
+    )
+    repo.update_conversation(
+        untouched.id,
+        {
+            "created_at": "2026-02-05T00:00:00+00:00",
+            "updated_at": "2026-02-05T00:00:00+00:00",
+        },
+    )
+
+    listed = StudioMemory(path).list_conversations()
+
+    assert [item.id for item in listed] == [revisited.id, untouched.id]
+
+
+def test_the_conversation_list_counts_the_turns_of_each_conversation() -> None:
+    memory = _memory()
+    talked = memory.create_conversation()
+    quiet = memory.create_conversation()
+    memory.append_turn(talked.id, "user", "How do I score this?", "m-1", None)
+    memory.append_turn(talked.id, "assistant", "By importance and satisfaction.", "m-2", "m-1")
+
+    counts = {item.id: item.turn_count for item in memory.list_conversations()}
+
+    assert counts == {talked.id: 2, quiet.id: 0}
+
+
+def test_the_conversation_list_keeps_the_fields_a_switcher_needs() -> None:
+    memory = _memory()
+    blank = memory.create_conversation()
+    branch = memory.create_conversation("Activation model")
+    memory.append_turn(branch.id, "user", "list jobs", "m-1", None)
+    memory.append_turn(branch.id, "assistant", "first", "m-2", "m-1")
+    memory.append_turn(branch.id, "assistant", "second", "m-3", "m-1")
+    memory.set_head(branch.id, "m-3")
+
+    listed = {item.id: item for item in memory.list_conversations()}
+
+    assert listed[blank.id].to_dict() == {
+        "id": blank.id,
+        "title": "",
+        "created_at": blank.created_at,
+        "updated_at": blank.updated_at,
+        "head_id": None,
+        "turn_count": 0,
+    }
+    assert listed[branch.id].head_id == "m-3"
+
+
+def test_the_conversation_list_returns_the_recent_threads_newest_first(tmp_path) -> None:
+    path = tmp_path / "studio.db"
+    memory = StudioMemory(path)
+    older = memory.create_conversation("First question")
+    newer = memory.create_conversation("Second question")
+    memory.close()
+
+    repo = memory.service.repo
+    repo.update_conversation(older.id, {"updated_at": "2026-02-01T00:00:00+00:00"})
+    repo.update_conversation(newer.id, {"updated_at": "2026-02-09T00:00:00+00:00"})
+
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=StudioMemory(path)))
+    listed = client.get("/api/conversations").json()["conversations"]
+
+    assert [item["id"] for item in listed] == [newer.id, older.id]
+    # The title is derived from the first question; nothing here carries prose.
+    assert listed[0]["title"] == "Second question"
+
+
+def test_the_conversation_list_caps_at_twenty_and_keeps_the_newest(tmp_path) -> None:
+    path = tmp_path / "studio.db"
+    memory = StudioMemory(path)
+    ids = [memory.create_conversation(f"Thread {index}").id for index in range(25)]
+    memory.close()
+
+    repo = memory.service.repo
+    for index, conversation_id in enumerate(ids):
+        # Ascending timestamps, so the newest thread is unambiguous.
+        repo.update_conversation(
+            conversation_id, {"updated_at": f"2026-02-{index + 1:02d}T00:00:00+00:00"}
+        )
+
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=StudioMemory(path)))
+    listed = client.get("/api/conversations").json()["conversations"]
+
+    assert len(listed) == MAX_CONVERSATIONS
+    # Newest first: the most recently touched is kept, the oldest five are not.
+    assert [item["id"] for item in listed] == list(reversed(ids))[:MAX_CONVERSATIONS]
+
+
+def test_the_conversation_list_carries_no_turn_bodies() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    memory.append_turn(conversation.id, "user", "First question.", "m-1", None)
+    memory.append_turn(conversation.id, "assistant", "An answer nobody should see.", "m-2", "m-1")
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=memory))
+
+    body = client.get("/api/conversations").json()
+    item = body["conversations"][0]
+
+    # The summary is metadata and a count; the prose stays behind the tree route.
+    assert set(item) == {
+        "id",
+        "title",
+        "created_at",
+        "updated_at",
+        "head_id",
+        "turn_count",
+    }
+    # No turn bodies ride along: only the title, derived from the first question.
+    assert "content" not in item
+    assert "turns" not in item
+    assert "nobody should see" not in client.get("/api/conversations").text
 
 
 def test_the_tree_endpoint_returns_messages_and_the_head() -> None:
@@ -560,3 +699,62 @@ def test_the_conversation_id_survives_a_second_request() -> None:
 
     assert second_id == first_id
     assert len(client.get("/api/conversations").json()["conversations"]) == 1
+def _evidence_index() -> EvidenceIndex:
+    index = EvidenceIndex()
+    index.remember(EvidenceSnapshot("E-1", "Call with Acme", "Gong"))
+    return index
+
+
+CONTENT = "Three accounts stalled. [[ev:E-1]] Nobody said why. [[hypothesis]]"
+
+
+def test_claims_are_stored_beside_the_turn_and_restored_by_index() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+
+    turn_id = memory.append_turn(conversation.id, "assistant", CONTENT, "m-1", None)
+    memory.add_citations(turn_id, split_claims(CONTENT, _evidence_index()))
+
+    restored = memory.conversation_tree(conversation.id)[0].claims
+
+    assert [claim.status for claim in restored] == ["cited", "hypothesis"]
+    assert restored[0].text == "Three accounts stalled."
+    assert [snapshot.to_dict() for snapshot in restored[0].evidence] == [
+        {"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}
+    ]
+
+
+def test_a_duplicate_retry_does_not_duplicate_rows() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    claims = split_claims(CONTENT, _evidence_index())
+
+    turn_id = memory.append_turn(conversation.id, "assistant", CONTENT, "m-1", None)
+    memory.add_citations(turn_id, claims)
+    memory.add_citations(turn_id, claims)
+
+    assert len(memory.citations_for_turn(turn_id)) == len(claims)
+
+
+def test_a_count_mismatch_drops_the_citations_instead_of_mis_attaching_them() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+
+    turn_id = memory.append_turn(conversation.id, "assistant", "Only one sentence.", "m-1", None)
+    memory.add_citations(turn_id, split_claims("First. Second.", _evidence_index()))
+
+    assert memory.conversation_tree(conversation.id)[0].claims == []
+
+
+def test_the_tree_endpoint_restores_claims_with_their_labels() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    turn_id = memory.append_turn(conversation.id, "assistant", CONTENT, "m-1", None)
+    memory.add_citations(turn_id, split_claims(CONTENT, _evidence_index()))
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=memory))
+
+    body = client.get(f"/api/conversations/{conversation.id}/tree").json()
+
+    claims = body["messages"][0]["claims"]
+    assert [claim["status"] for claim in claims] == ["cited", "hypothesis"]
+    assert claims[0]["evidence"] == [{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}]

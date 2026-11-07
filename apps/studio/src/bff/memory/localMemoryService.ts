@@ -1,6 +1,7 @@
 import type {
   ChatPart,
   Conversation,
+  ConversationSummary,
   ConversationTurn,
   LatestConversation,
   Observation,
@@ -39,6 +40,8 @@ const TURN_ROLES = new Set<ConversationTurn["role"]>([
 const MAX_TEXT = 300;
 const MAX_CONTEXT_TEXT = 300;
 const MAX_CONTEXT_CHARS = 4000;
+/** How many threads the history list carries; the switcher UI (#408) owns paging. */
+const MAX_CONVERSATIONS = 20;
 
 function cleanText(text: string): string {
   const cleaned = text.trim();
@@ -184,8 +187,16 @@ export class LocalMemoryService {
     return this.store.getConversation(id);
   }
 
-  async listConversations(): Promise<StoredConversation[]> {
-    return this.store.listConversations();
+  /** The recent threads, most recent touch first, with their size. */
+  async listConversations(): Promise<ConversationSummary[]> {
+    const conversations = await this.store.listConversations();
+    const recent = conversations.slice(0, MAX_CONVERSATIONS);
+    return Promise.all(
+      recent.map(async (conversation) => ({
+        ...conversation,
+        turn_count: await this.store.countTurns(conversation.id),
+      })),
+    );
   }
 
   async setConversationHead(

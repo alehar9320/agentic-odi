@@ -1,9 +1,13 @@
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { asStudioError } from "../../api/studioApi";
+import { focusLastClaimChip } from "../../assistant/claims";
+import { savedCopyCaption } from "../../lib/canvasProvenance";
+import { formatOpportunityScore, opportunityPill } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Evidence, StudioError } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { GhostOpportunityCards } from "../Skeletons";
 import { SignalIcon } from "../icons";
 
 const ORDER_KEY = "agentic-odi.evidence-order";
@@ -26,11 +30,21 @@ function writeStoredOrder(ids: string[]) {
 }
 
 export function EvidenceStream() {
-  const { canvasState, openPanel, promoteEvidence } = useStudio();
+  const {
+    canvasCached,
+    canvasState,
+    closePanel,
+    focusedEvidenceId,
+    openPanel,
+    promoteEvidence,
+    refreshCanvas,
+  } = useStudio();
   const evidence = useMemo(() => canvasState.data?.evidence ?? [], [canvasState.data]);
   const jobs = useMemo(() => canvasState.data?.jobs ?? [], [canvasState.data]);
   const [storedOrder, setStoredOrder] = useState<string[]>(readStoredOrder);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
 
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [jobId, setJobId] = useState("");
@@ -51,6 +65,34 @@ export function EvidenceStream() {
     () => new Map(jobs.map((job) => [job.id, job.name || job.id])),
     [jobs],
   );
+
+  // Rows reached this far, so they are on the screen: during a reload or after a
+  // failed one they are the previous copy, and the caption says so rather than
+  // letting them read as freshly confirmed.
+  const savedCaption = canvasCached ? savedCopyCaption(canvasState.data) : null;
+
+  const outcomes = useMemo(() => canvasState.data?.outcomes ?? [], [canvasState.data]);
+  const outcomeMap = useMemo(
+    () => new Map(outcomes.map((o) => [o.id, o])),
+    [outcomes],
+  );
+
+  // A citation chip asked for this row: bring it into view, mark it briefly,
+  // and put the keyboard there so the next Tab continues from the record.
+  useEffect(() => {
+    if (!focusedEvidenceId) {
+      return;
+    }
+    const element = itemRefs.current.get(focusedEvidenceId);
+    if (!element) {
+      return;
+    }
+    element.scrollIntoView({ block: "center" });
+    element.focus({ preventScroll: true });
+    setHighlightedId(focusedEvidenceId);
+    const timer = window.setTimeout(() => setHighlightedId(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [focusedEvidenceId, ordered]);
 
   const commit = (next: Evidence[]) => {
     const ids = next.map((item) => item.id);
@@ -87,6 +129,11 @@ export function EvidenceStream() {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLLIElement>, id: string) => {
+    // Only the row's own arrow keys reorder it. A control inside the row — the job
+    // select, the statement input, a rating slider — keeps its native arrow behavior.
+    if (event.target !== event.currentTarget) {
+      return;
+    }
     if (event.key === "ArrowUp") {
       event.preventDefault();
       move(id, -1);
@@ -130,6 +177,30 @@ export function EvidenceStream() {
   };
 
   if (ordered.length === 0) {
+    // A canvas that failed to answer is not a workspace with nothing in it, and
+    // one still in flight has not answered yet. Both must say so instead of
+    // claiming no evidence exists.
+    if (canvasState.kind === "error") {
+      return (
+        <section className="stack" aria-label="Customer evidence">
+          <FailurePanel
+            error={canvasState.error}
+            onRetry={() => void refreshCanvas()}
+            retryText="reload"
+          />
+        </section>
+      );
+    }
+    if (canvasState.kind === "loading") {
+      return (
+        <section className="stack" aria-label="Customer evidence">
+          <p className="caption" role="status">
+            Loading evidence…
+          </p>
+          <GhostOpportunityCards />
+        </section>
+      );
+    }
     return (
       <section className="stack" aria-label="Customer evidence">
         <div className="evidence-empty">
@@ -157,6 +228,19 @@ export function EvidenceStream() {
     <section className="stack" aria-label="Customer evidence">
       <p className="notice">Drag a record to reorder it, or focus one and press ↑ / ↓.</p>
 
+      {canvasState.kind === "error" ? (
+        <FailurePanel
+          error={canvasState.error}
+          onRetry={() => void refreshCanvas()}
+          retryText="reload"
+        />
+      ) : null}
+      {savedCaption ? (
+        <p className="canvas-saved" role="status">
+          {savedCaption}
+        </p>
+      ) : null}
+
       <ol className="stack" style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {ordered.map((item, index) => {
           const label = item.name || item.source_name || "Untitled evidence";
@@ -164,12 +248,27 @@ export function EvidenceStream() {
           return (
             <li
               key={item.id}
-              className="evidence"
+              ref={(element) => {
+                if (element) {
+                  itemRefs.current.set(item.id, element);
+                } else {
+                  itemRefs.current.delete(item.id);
+                }
+              }}
+              className={`evidence${highlightedId === item.id ? " is-focused" : ""}`}
               draggable
               tabIndex={0}
               aria-label={`${label} (${index + 1} of ${ordered.length})`}
               aria-roledescription="sortable evidence record"
-              onKeyDown={(event) => onKeyDown(event, item.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  // Close the lens and hand focus back to the chip that asked.
+                  closePanel();
+                  focusLastClaimChip();
+                  return;
+                }
+                onKeyDown(event, item.id);
+              }}
               onDragStart={() => setDraggingId(item.id)}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
@@ -201,6 +300,26 @@ export function EvidenceStream() {
                 {linkedJob ? `Linked to ${linkedJob}` : "Not linked to a job"}
                 {item.source_name ? ` · ${item.source_name}` : ""}
                 {item.item_type ? ` · ${item.item_type}` : ""}
+                {item.outcome_id ? (
+                  <>
+                    {" · "}
+                    Supports <b>{item.outcome_id}</b>
+                    {outcomeMap.has(item.outcome_id) ? (
+                      <>
+                        {" "}
+                        <span
+                          className={`badge badge--${opportunityPill(
+                            outcomeMap.get(item.outcome_id)?.opportunity_score,
+                          ).variant}`}
+                        >
+                          {formatOpportunityScore(
+                            outcomeMap.get(item.outcome_id)?.opportunity_score,
+                          )}
+                        </span>
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
               </span>
 
               {promotingId === item.id ? (

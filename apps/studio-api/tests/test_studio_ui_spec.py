@@ -130,6 +130,39 @@ DEMO_CATALOG: dict[str, Any] = {
             },
         },
         {
+            # Mirrors the shipped `strategy-card`: a recommendation without the
+            # paths it beat is a conclusion, so the schema requires them.
+            "type": "strategy-card",
+            "kind": "leaf",
+            "description": "The one innovation path the segments support, with every path it beat and why.",
+            "acceptsChildren": False,
+            "props": {
+                "type": "object",
+                "required": ["kind", "thesis", "rejected"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "kind": {"enum": ["differentiated", "disruptive", "new_market"]},
+                    "segmentId": {"type": "string"},
+                    "thesis": {"type": "string"},
+                    "bets": {"type": "array", "maxItems": 6, "items": {"type": "string"}},
+                    "rejected": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {
+                            "type": "object",
+                            "required": ["kind", "why"],
+                            "properties": {
+                                "kind": {"enum": ["differentiated", "disruptive", "new_market"]},
+                                "why": {"type": "string"},
+                            },
+                        },
+                    },
+                    "actions": ACTIONS,
+                },
+            },
+        },
+        {
             "type": "evidence-quote",
             "kind": "leaf",
             "description": "A verbatim customer signal with its lineage.",
@@ -380,3 +413,67 @@ def test_an_impact_simulation_accepts_a_simulated_label() -> None:
 def test_an_impact_simulation_rejects_a_measured_or_live_label() -> None:
     assert _catalog().validate(_simulation(provenance="live")) is not None
     assert _catalog().validate(_simulation(provenance="measured")) is not None
+
+
+def _strategy(**overrides: Any) -> dict[str, Any]:
+    props: dict[str, Any] = {
+        "kind": "differentiated",
+        "thesis": "Finance leads are underserved on matching each line.",
+        "rejected": [
+            {"kind": "disruptive", "why": "no segment is overserved"},
+            {"kind": "new_market", "why": "every outcome maps to a known job"},
+        ],
+    }
+    props.update(overrides)
+    return {"type": "strategy-card", "props": props}
+
+
+def test_a_strategy_card_must_record_the_paths_it_rejected() -> None:
+    # A recommendation without its alternatives is a conclusion. The sidecar
+    # enforces that too, so a model cannot stream one past the client.
+    spec = _strategy()
+    del spec["props"]["rejected"]
+
+    problem = _catalog().validate(spec)
+
+    assert problem == "`strategy-card.props.rejected` is required"
+
+
+def test_a_strategy_card_needs_both_rejected_paths() -> None:
+    problem = _catalog().validate(
+        _strategy(rejected=[{"kind": "disruptive", "why": "no segment is overserved"}])
+    )
+
+    assert problem == "`strategy-card.props.rejected` needs at least 2 items"
+
+
+def test_a_strategy_card_cannot_reject_more_than_the_other_two_paths() -> None:
+    problem = _catalog().validate(
+        _strategy(
+            rejected=[
+                {"kind": "disruptive", "why": "no segment is overserved"},
+                {"kind": "new_market", "why": "every outcome maps to a known job"},
+                {"kind": "differentiated", "why": "the path it recommends"},
+            ]
+        )
+    )
+
+    assert problem == "`strategy-card.props.rejected` allows at most 2 items"
+
+
+def test_a_strategy_card_with_both_rejections_is_valid() -> None:
+    assert _catalog().validate(_strategy()) is None
+
+
+def test_a_rejected_path_names_a_known_kind_and_a_reason() -> None:
+    problem = _catalog().validate(
+        _strategy(
+            rejected=[
+                {"kind": "disruptive", "why": "no segment is overserved"},
+                {"kind": "vibes", "why": "the evidence did not point here"},
+            ]
+        )
+    )
+
+    assert problem is not None
+    assert "strategy-card.props.rejected[1].kind" in problem

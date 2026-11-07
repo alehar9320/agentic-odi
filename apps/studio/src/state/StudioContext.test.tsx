@@ -191,6 +191,11 @@ function route(
     deletedConversations.push(url.split("/").pop() as string);
     return json({ deleted: url.split("/").pop() });
   }
+  if (url === "/api/conversations" && init?.method !== "POST") {
+    // The sidecar lists threads on the bare path; the query form is the same
+    // call, so both answer with the list.
+    return json({ conversations: [CONVERSATION] });
+  }
   if (url === "/api/conversations") {
     return json({
       conversation: {
@@ -532,7 +537,8 @@ describe("StudioContext sidecar down", () => {
     vi.unstubAllGlobals();
   });
 
-  it("does not hit /api/chat when the sidecar is known to be down", async () => {
+  it("reports a failed send when the sidecar is known to be down", async () => {
+    chatFailure = new TypeError("fetch failed");
     const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.sidecarReachable).toBe(false));
@@ -541,9 +547,14 @@ describe("StudioContext sidecar down", () => {
       await result.current.sendMessage("list the jobs");
     });
 
-    expect(chatAttempts).toBe(0);
+    // The probe is not a gate: sending is the only evidence that matters, so
+    // the turn is tried once and the failure is reported where it is read
+    // instead of the studio refusing to answer after a single bad survey.
+    expect(chatAttempts).toBe(1);
     expect(result.current.streaming).toBe(false);
-    expect(result.current.messages.some((message) => message.role === "notice")).toBe(true);
+    // The failure lands on the answer it belongs to, so the retry control sits
+    // on the turn that failed instead of in a detached toast.
+    expect(result.current.messages.at(-1)?.error?.message).toBeTruthy();
   });
 });
 

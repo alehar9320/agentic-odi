@@ -35,6 +35,7 @@ import {
   healthMcp,
   streamChat,
   asStudioError,
+  StudioApiError,
 } from "./studioApi";
 
 afterEach(() => {
@@ -64,6 +65,33 @@ describe("fetchConfig", () => {
       base_url: "http://llm",
       model_name: "m",
     });
+  });
+
+  it("gives up on a request that never answers instead of hanging forever", async () => {
+    // A proxy that accepts the connection and never replies. Boot cannot wait on
+    // that; the request is bounded so the caller can fall back to its defaults.
+    let aborted = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_input: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              aborted = true;
+              const error = new Error("The operation was aborted.");
+              error.name = "AbortError";
+              reject(error);
+            });
+          }),
+      ),
+    );
+    vi.useFakeTimers();
+    const pending = fetchConfig();
+    const assertion = expect(pending).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(1_200);
+    await assertion;
+    expect(aborted).toBe(true);
+    vi.useRealTimers();
   });
 });
 
@@ -488,8 +516,8 @@ describe("typed failures", () => {
 
     expect(problem.code).toBe("mcp_unreachable");
     expect(problem.retryable).toBe(true);
-    expect(problem.suggestion).toMatch(/sidecar/i);
-    expect(problem.message).toMatch(/reachable|not running|unreachable/i);
+    expect(problem.suggestion).toContain("uv run python scripts/dev.py");
+    expect(problem.message).toMatch(/local Studio service isn.t responding/);
   });
 
   it("classifies an empty 502 response as mcp_unreachable", async () => {
@@ -504,7 +532,7 @@ describe("typed failures", () => {
         satisfaction: 3,
       }),
      ).rejects.toMatchObject({
-       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("sidecar") },
+       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
      });
    });
 
@@ -520,8 +548,62 @@ describe("typed failures", () => {
         satisfaction: 3,
       }),
     ).rejects.toMatchObject({ error: { code: "not_found" } });
-  });
-});
+   });
+
+   it("carries the optional field through from the server's error body", async () => {
+     mockFailure(422, {
+       error: {
+         code: "validation",
+         message: "Outcome statement does not match the ODI format.",
+         field: "statement",
+         suggestion: "Fix the input and try again.",
+         retryable: false,
+       },
+     });
+
+     let thrown: StudioApiError | null = null;
+     try {
+       await addOutcome({
+         mcp_url: "u",
+         job_id: "JOB-402",
+         statement: "fast",
+         importance: 8,
+         satisfaction: 3,
+       });
+     } catch (caught) {
+       thrown = caught as StudioApiError;
+     }
+     expect(thrown).not.toBeNull();
+     expect(thrown!.error.code).toBe("validation");
+     expect(thrown!.error.field).toBe("statement");
+   });
+
+   it("leaves field undefined when the server omits it", async () => {
+     mockFailure(422, {
+       error: {
+         code: "validation",
+         message: "Invalid input.",
+         suggestion: "Fix the input and try again.",
+         retryable: false,
+       },
+     });
+
+     let thrown: StudioApiError | null = null;
+     try {
+       await addOutcome({
+         mcp_url: "u",
+         job_id: "JOB-402",
+         statement: "fast",
+         importance: 8,
+         satisfaction: 3,
+       });
+     } catch (caught) {
+       thrown = caught as StudioApiError;
+     }
+     expect(thrown).not.toBeNull();
+     expect(thrown!.error.field).toBeUndefined();
+   });
+ });
 
 describe("settings, brief, and threads", () => {
   it("fetchSettings hands back a mask, never the key", async () => {

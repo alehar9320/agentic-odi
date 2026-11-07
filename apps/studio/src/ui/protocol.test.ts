@@ -11,7 +11,10 @@ const DOMAIN_CARDS = [
   "impact-simulation",
   "evidence-quote",
   "job-map",
+  "opportunity-thesis",
   "decision-record",
+  "segment-card",
+  "strategy-card",
 ];
 
 function expectOk(spec: unknown) {
@@ -183,6 +186,56 @@ describe("parseUiSpec", () => {
         props: { outcomes: [{ id: "O-1", statement: "Minimize time", importance: "nine" }] },
       }),
     ).toContain("opportunity-board");
+  });
+
+  it("rejects a strategy card that records no rejected path", () => {
+    // A recommendation without its alternatives is a conclusion. The catalog
+    // enforces that at the protocol boundary, so the model cannot stream one.
+    const reason = expectReason({
+      type: "strategy-card",
+      props: {
+        kind: "differentiated",
+        thesis: "Finance leads are underserved on matching each line.",
+      },
+    });
+    expect(reason).toContain("strategy-card");
+    expect(reason).toContain("rejected");
+  });
+
+  it("accepts a strategy card with both rejected paths", () => {
+    const node = expectOk({
+      type: "strategy-card",
+      props: {
+        kind: "differentiated",
+        thesis: "Finance leads are underserved on matching each line.",
+        rejected: [
+          { kind: "disruptive", why: "no segment is overserved" },
+          { kind: "new_market", why: "every outcome maps to a known job" },
+        ],
+      },
+    });
+    expect(node.props.rejected).toHaveLength(2);
+  });
+
+  it("drops a segment's evidence list when it rests on a single outcome", () => {
+    // Two is the floor: one outcome is a hypothesis, not a market. The list is
+    // optional, so the protocol drops it rather than letting a one-outcome
+    // "segment" through with its evidence intact.
+    const node = expectOk({
+      type: "segment-card",
+      props: {
+        id: "SEG-1",
+        name: "Finance leads, match each line",
+        people: "Finance leads",
+        jobStatement: "Reconcile invoices without manual effort",
+        verdict: "underserved",
+        confidence: 0.8,
+        outcomeIds: ["O-14"],
+        rationale: "One outcome scores above 10.",
+      },
+    });
+    expect(node.props).not.toHaveProperty("outcomeIds");
+    expect(node.props.id).toBe("SEG-1");
   });
 });
 

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import re
+
 import markdown_render
+from artifact_a11y import audit_html
+from site_support import _built_root, all_pages, read_page
 
 
 def test_markdown_features_render():
@@ -13,11 +17,29 @@ def test_markdown_features_render():
         "```python\nprint('hi')\n```\n",
         source_path="docs/example.md",
     )
-    assert "<table>" in html
+    assert "<table" in html
     assert "<ul>" in html
     assert "nested" in html
     assert "<pre" in html and "print" in html
     assert 'class="highlight"' in html
+
+
+def test_a_guide_table_is_named_for_a_reader_who_cannot_see_it():
+    """Columns are scoped, and the table takes the name of its heading.
+
+    Markdown has no caption syntax, and rewriting a maintainer's guide to add
+    one would be the worse trade. The renderer already mints a stable anchor for
+    every heading, so the table points at the heading a sighted reader uses to
+    find it — which is the same piece of information, given to the reader who
+    cannot see the layout.
+    """
+    html = markdown_render.render(
+        "## The eight stages\n\n| stage | output |\n|---|---|\n| Listen | quotes |\n",
+        source_path="docs/example.md",
+    )
+    assert '<th scope="col">' in html
+    assert '<table aria-labelledby="the-eight-stages">' in html
+    assert audit_html(f"<main><h1>Guide</h1>{html}</main>") == []
 
 
 def test_markdown_does_not_pass_through_raw_html():
@@ -106,3 +128,35 @@ def test_unpublished_guides_link_back_to_the_repository():
     assert (
         "https://github.com/alehar9320/agentic-odi/blob/main/docs/architecture/data-flow.md" in html
     )
+
+
+def test_a_mermaid_fence_is_a_diagram_not_highlighted_code():
+    html = markdown_render.render('```mermaid\ngraph BT\n    a["core"] --> b["cli"]\n```\n')
+    assert '<pre class="mermaid">' in html
+    assert 'class="highlight"' not in html
+
+
+def test_diagram_source_is_escaped_until_the_renderer_draws_it():
+    html = markdown_render.render(
+        '```mermaid\nflowchart LR\n    A["<img src=x onerror=alert(1)>"] --> B\n```\n'
+    )
+    assert "&lt;img" in html
+    assert "<img" not in html
+
+
+def test_the_renderer_loads_exactly_where_a_diagram_is_drawn():
+    drawn = sorted(page for page in all_pages() if '<pre class="mermaid">' in read_page(page))
+    asking = sorted(page for page in all_pages() if "assets/diagrams.js" in read_page(page))
+    assert drawn == asking, "a page paid for the runtime without a diagram, or lost its picture"
+    assert drawn, "no guide renders a diagram any more"
+
+
+def test_the_mermaid_runtime_is_vendored_rather_than_fetched():
+    assert _built_root("assets/mermaid/mermaid.min.js").is_file()
+    assert _built_root("assets/mermaid/LICENSE").is_file()
+    fetched = [
+        page
+        for page in all_pages()
+        if re.search(r"jsdelivr|unpkg|cdn\.js\.cloudflare", read_page(page))
+    ]
+    assert not fetched, f"pages reach a third-party CDN: {fetched}"

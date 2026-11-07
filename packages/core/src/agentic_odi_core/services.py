@@ -9,11 +9,21 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from pydantic import ValidationError as PydanticValidationError
+
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
+    classify_opportunity,
     evaluate_outcome_statement,
     require_outcome_statement,
+)
+from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
+from agentic_odi_core.mapping import (
+    HeuristicProposalStrategy,
+    OutcomeProposal,
+    ProposalStatus,
+    ProposalStrategy,
 )
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
@@ -21,6 +31,8 @@ from agentic_odi_core.models import (
     V2MOM,
     Brief,
     BusinessValue,
+    ClaimCheck,
+    ClaimSkip,
     Conversation,
     CustomerOutcome,
     CustomerValue,
@@ -37,12 +49,24 @@ from agentic_odi_core.models import (
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
+    Segment,
+    SegmentVerdict,
     Signal,
     SignalKind,
     Step,
+    Strategy,
+    Study,
+    StudyStatus,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.segmentation import (
+    MIN_OUTCOMES_PER_SEGMENT,
+    OutcomeClusterStrategy,
+    SegmentationStrategy,
+    unclustered_outcomes,
+)
+from agentic_odi_core.strategy import propose_strategy as build_strategy
 
 
 class JobNotFoundError(NotFoundError):
@@ -67,6 +91,14 @@ class CustomerOutcomeNotFoundError(NotFoundError):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
         super().__init__(outcome_id, "customer_outcome")
+
+
+class StudyNotFoundError(NotFoundError):
+    """Raised when a study id does not resolve."""
+
+    def __init__(self, study_id: str, hint: str | None = None) -> None:
+        self.study_id = study_id
+        super().__init__(study_id, "study", hint)
 
 
 class ScheduledWorkNotFoundError(NotFoundError, ValueError):
@@ -115,6 +147,34 @@ class SignalNotFoundError(NotFoundError):
         super().__init__(signal_id, "signal")
 
 
+class SegmentNotFoundError(NotFoundError, ValueError):
+    """Raised when a segment id does not resolve.
+
+    Also a :class:`ValueError`, because the caller supplied an id that does not
+    resolve — an invalid argument value.
+    """
+
+    def __init__(self, segment_id: str, hint: str | None = None) -> None:
+        self.segment_id = segment_id
+        super().__init__(segment_id, "segment", hint)
+
+
+class StrategyNotFoundError(NotFoundError, ValueError):
+    """Raised when a strategy id does not resolve."""
+
+    def __init__(self, strategy_id: str, hint: str | None = None) -> None:
+        self.strategy_id = strategy_id
+        super().__init__(strategy_id, "strategy", hint)
+
+
+class NoStrategyEvidenceError(ValidationError):
+    """No strategic path has evidence behind it.
+
+    Raised instead of returning a strategy built on nothing: a bet the data does
+    not support is the fabrication Stage 6 exists to avoid.
+    """
+
+
 DEFAULT_SIGNAL_DAILY_CAP = 20
 
 _SEVERITY_RANK: dict[str, int] = {"info": 0, "notice": 1, "urgent": 2}
@@ -160,6 +220,69 @@ class InvalidOutcomeStatementError(OutcomeStatementError):
         super().__init__(verdict)
 
 
+class ClaimCheckError(ValidationError):
+    """A claim check does not record the questions behind a score.
+
+    Raised when a check is empty, an answer has no question behind it, or a
+    skip carries no reason. Each message names the fix so the agent can ask
+    again instead of writing the score anyway.
+    """
+
+
+def require_claim_check(check: ClaimCheck | dict[str, Any] | None) -> ClaimCheck | None:
+    """Validate a claim check, or pass ``None`` through unchanged.
+
+    ``None`` is legal: an outcome may be captured unscored or without a
+    recorded interrogation. A check that *is* supplied must be honest — it
+    names at least one question, every answer rests on a question that was
+    asked, and every skip carries a reason. A malformed check is reported as a
+    :class:`ClaimCheckError` naming the fix, not as a raw model error.
+    """
+    if check is None:
+        return None
+    if not isinstance(check, ClaimCheck):
+        try:
+            check = ClaimCheck.model_validate(check)
+        except PydanticValidationError as exc:
+            raise ClaimCheckError(
+                "claim_check is malformed; pass asked/answers/skips with each skip "
+                f"carrying a reason. {exc}"
+            ) from exc
+    if not check.asked and not check.answers and not check.skips:
+        raise ClaimCheckError(
+            "A claim check must record at least one question; ask the customer before scoring."
+        )
+    if len(check.answers) > len(check.asked):
+        raise ClaimCheckError(
+            "Every answer must answer a question that was asked; "
+            "do not invent answers to satisfy the check."
+        )
+    for answer in check.answers:
+        if not answer.strip():
+            raise ClaimCheckError("An answer cannot be blank.")
+    for skip in check.skips:
+        if not skip.reason.strip():
+            raise ClaimCheckError(
+                f"A skip needs a reason: the question {skip.question!r} was skipped with none."
+            )
+    return check
+
+
+def manual_claim_check(
+    reason: str = "Score entered by hand; no customer questions were asked.",
+) -> ClaimCheck:
+    """The provenance of a by-hand score: a skip with its reason.
+
+    A person typing two numbers into a form is not an interview. Recording
+    that honestly keeps a manual score from borrowing the confidence of an
+    interrogated one: nothing was ``asked``, the verification is skipped, and
+    the reason says why.
+    """
+    return ClaimCheck(
+        skips=[ClaimSkip(question="Was this score produced by asking the customer?", reason=reason)]
+    )
+
+
 def _first_line(text: str) -> str:
     for line in text.splitlines():
         stripped = line.strip()
@@ -177,26 +300,36 @@ def _now_iso() -> str:
 
 
 def _opportunity_crossing(before: float | None, after: float | None) -> tuple[str, str] | None:
-    """Did the opportunity score cross 10, and in which direction?
+    """Did the opportunity score enter or leave the underserved bucket?
 
-    Crossing up is urgent — a big unserved opportunity just surfaced;
-    crossing down is a notice.
+    The line is ``classify_opportunity``'s, not a second threshold: underserved
+    is strictly above 10, so a score that climbs onto exactly 10 has crossed
+    nothing and one that moves from 10 to 11 has. Entering is urgent — a real
+    unserved opportunity just surfaced; leaving is a notice.
     """
-    if before is None or after is None:
-        return None
-    if before < 10.0 <= after:
+    was = classify_opportunity(before)
+    now = classify_opportunity(after)
+    if was != "underserved" and now == "underserved":
         return ("up", "urgent")
-    if before >= 10.0 > after:
+    if was == "underserved" and now != "underserved":
         return ("down", "notice")
     return None
 
 
 class ODIService:
-    def __init__(self, repo: Repository, budget: SignalBudget | None = None) -> None:
+    def __init__(
+        self,
+        repo: Repository,
+        budget: SignalBudget | None = None,
+        segmentation: SegmentationStrategy | None = None,
+    ) -> None:
         self.repo = repo
         #: ``None`` re-reads ``AGENTIC_ODI_SIGNAL_BUDGET`` per signal so a
         #: long-running sidecar picks up a changed cap without a restart.
         self.budget = budget
+        #: ``None`` uses the deterministic outcome-cluster strategy, rebuilt per
+        #: call so it sees the job map as it stands at that moment.
+        self.segmentation = segmentation
 
     def record_signal(
         self,
@@ -207,19 +340,22 @@ class ODIService:
         severity: str = "info",
         detail: str | None = None,
         discriminator: str = "",
+        source_event_id: int | None = None,
     ) -> Signal:
         """Record one fact. A signal with the same fingerprint already exists.
 
-        ``discriminator`` is the thing that changed (a new score, a record id);
-        the fingerprint is sha256 over ``kind|subject_kind|subject_id|
-        discriminator``, so re-recording the same fact returns the first signal
-        instead of spamming the feed.
+        ``discriminator`` is the thing that changed (a new score, a record id) and
+        ``source_event_id`` the store event that carried the change. The fingerprint
+        is sha256 over ``kind|subject_kind|subject_id|discriminator``, with the source
+        id appended when one is given. Naming the change and not only the value it
+        landed on is what lets a second move to the same score be its own signal,
+        while a retry of one change stays one signal. Without a source id the
+        fingerprint is exactly what it was before, so stored signals still dedupe.
         """
-        fingerprint = hashlib.sha256(
-            "|".join([kind.value, subject_kind or "", subject_id or "", discriminator]).encode(
-                "utf-8"
-            )
-        ).hexdigest()
+        fact = [kind.value, subject_kind or "", subject_id or "", discriminator]
+        if source_event_id is not None:
+            fact.append(str(source_event_id))
+        fingerprint = hashlib.sha256("|".join(fact).encode("utf-8")).hexdigest()
         for existing in self.repo.signals.values():
             if existing.fingerprint == fingerprint:
                 return existing
@@ -314,6 +450,9 @@ class ODIService:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
             raise OutcomeNotFoundError(outcome_id)
+        study_id = updates.get("study_id")
+        if study_id is not None:
+            self._validate_study_scope(existing, study_id)
         statement = updates.get("statement", existing.statement)
         importance = updates.get("importance", existing.importance)
         satisfaction = updates.get("satisfaction", existing.satisfaction)
@@ -332,9 +471,25 @@ class ODIService:
         if not res:
             raise OutcomeNotFoundError(outcome_id)
         self._emit_outcome_updates(existing, res)
+        self._count_outcome_milestones(res)
         return res
 
+    def _count_outcome_milestones(self, outcome: Outcome) -> None:
+        """Tell the onboarding funnel how far this workspace has got.
+
+        Both milestones are first-ever-per-workspace, so offering them on every
+        outcome is cheaper and truer than trying to remember which one was first.
+        A score milestone needs both scores: an outcome with one is not yet a
+        ranked opportunity, and the funnel must not claim it is.
+        """
+        count_milestone(self.repo, FIRST_OUTCOME)
+        if outcome.importance is not None and outcome.satisfaction is not None:
+            count_milestone(self.repo, FIRST_SCORE)
+
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
+        #: The write that produced these facts: two changes landing on the same
+        #: score are two changes, one change reported twice is one signal.
+        source_event_id = self.repo.last_event_id()
         if before.importance != after.importance or before.satisfaction != after.satisfaction:
             self.record_signal(
                 SignalKind.OUTCOME_SCORED,
@@ -346,18 +501,21 @@ class ODIService:
                     f"satisfaction {before.satisfaction} -> {after.satisfaction}"
                 ),
                 discriminator=f"importance={after.importance},satisfaction={after.satisfaction}",
+                source_event_id=source_event_id,
             )
         crossing = _opportunity_crossing(before.opportunity_score, after.opportunity_score)
         if crossing is not None:
             direction, severity = crossing
             self.record_signal(
                 SignalKind.OPPORTUNITY_CROSSED,
-                f'Opportunity score crossed 10 ({direction}): "{after.statement[:60]}"',
+                f"Opportunity score {before.opportunity_score} -> {after.opportunity_score} "
+                f'({direction}): "{after.statement[:60]}"',
                 subject_kind="outcome",
                 subject_id=after.id,
                 severity=severity,
                 detail=f"{before.opportunity_score} -> {after.opportunity_score}",
                 discriminator=f"{direction}:{after.opportunity_score}",
+                source_event_id=source_event_id,
             )
 
     def _emit_job_map_completed(self, job_id: str) -> None:
@@ -427,24 +585,31 @@ class ODIService:
         self,
         job_id: str,
         statement: str,
-        importance: float,
-        satisfaction: float,
+        importance: float | None = None,
+        satisfaction: float | None = None,
         step_id: str | None = None,
         validate_statement: bool = True,
+        claim_check: ClaimCheck | dict[str, Any] | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
         if step_id is not None and self.repo.get_step(step_id) is None:
             raise StepNotFoundError(step_id)
-        if not (1.0 <= importance <= 10.0):
+        if importance is not None and not (1.0 <= importance <= 10.0):
             raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
-        if not (1.0 <= satisfaction <= 10.0):
+        if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
         if validate_statement:
             verdict = evaluate_outcome_statement(statement)
             if not verdict["valid"]:
                 raise InvalidOutcomeStatementError(verdict)
-        opportunity_score = compute_opportunity_score(importance, satisfaction)
+        check = require_claim_check(claim_check)
+        #: Unscored outcomes stay legal: a score is optional, and an outcome
+        #: without one carries no opportunity_score to stand behind.
+        if importance is not None and satisfaction is not None:
+            opportunity_score: float | None = compute_opportunity_score(importance, satisfaction)
+        else:
+            opportunity_score = None
         outcome = Outcome(
             id=str(uuid.uuid4()),
             job_id=job_id,
@@ -453,8 +618,11 @@ class ODIService:
             importance=importance,
             satisfaction=satisfaction,
             opportunity_score=opportunity_score,
+            claim_check=check,
         )
-        return self.repo.add_outcome(outcome)
+        created = self.repo.add_outcome(outcome)
+        self._count_outcome_milestones(created)
+        return created
 
     def get_outcomes(
         self,
@@ -466,12 +634,79 @@ class ODIService:
     ) -> list[Outcome]:
         return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset, sort=sort)
 
+    # -- Studies: one named pass over a Job, and the wave inside it ----------
+
+    def open_study(
+        self, job_id: str, name: str, wave: int, method_notes: str | None = None
+    ) -> Study:
+        """Open a study — one named pass over a Job, at a given wave number.
+
+        A study opens ``planned``; ``fielding`` and ``closed`` are later
+        transitions and nothing here moves to them automatically. The same
+        ``(job_id, name)`` may not repeat a wave, so an accidental re-run of a
+        pass is refused while a deliberate later wave is expressible.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        clash = next(
+            (
+                study
+                for study in self.repo.list_studies(job_id)
+                if study.name == name and study.wave == wave
+            ),
+            None,
+        )
+        if clash is not None:
+            raise ValidationError(
+                f"Study '{name}' already has wave {wave} for this job; open wave {wave + 1} instead."
+            )
+        study = Study(job_id=job_id, name=name, wave=wave, method_notes=method_notes)
+        return self.repo.add_study(study)
+
+    def close_study(self, study_id: str) -> Study:
+        """Close a study once. A second close keeps the first ``closed_at``."""
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id)
+        if study.status is StudyStatus.CLOSED:
+            return study
+        closed = self.repo.update_study(
+            study_id,
+            {
+                "status": StudyStatus.CLOSED.value,
+                "closed_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        if closed is None:
+            raise StudyNotFoundError(study_id)
+        return closed
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        return self.repo.list_studies(job_id=job_id)
+
+    def get_study(self, study_id: str) -> Study:
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id, "open a study first")
+        return study
+
+    def _validate_study_scope(self, outcome: Outcome, study_id: str) -> None:
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id)
+        if study.job_id != outcome.job_id:
+            raise ValidationError(
+                f"Study {study_id} belongs to job {study.job_id}, not the outcome's job "
+                f"{outcome.job_id}; an outcome may only join a study of its own job."
+            )
+
     def add_customer_outcome(
         self,
         job_id: str,
         customer_value: CustomerValue | dict[str, Any],
         business_value: BusinessValue | dict[str, Any],
         step_id: str | None = None,
+        quote_id: str | None = None,
     ) -> CustomerOutcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -489,6 +724,7 @@ class ODIService:
             id=str(uuid.uuid4()),
             job_id=job_id,
             step_id=step_id,
+            quote_id=quote_id,
             customer_value=cv,
             business_value=bv,
         )
@@ -566,6 +802,18 @@ class ODIService:
             step_id=step_id,
             outcome_id=outcome_id,
         )
+        #: Dedupe: the same quote imported twice must not become two evidence
+        #: records. Return the existing record instead of appending.
+        duplicate = self.repo.get_evidence_by_fingerprint(
+            evidence.source_kind,
+            evidence.source_name,
+            evidence.name,
+            evidence.content,
+            evidence.url,
+            evidence.raw,
+        )
+        if duplicate is not None:
+            return duplicate
         evidence = self.repo.add_evidence(evidence)
         self.record_signal(
             SignalKind.EVIDENCE_INGESTED,
@@ -620,6 +868,12 @@ class ODIService:
             )
             return self.add_job(label, description=evidence.content or None)
         if target == "outcome":
+            #: Idempotent promotion: if this evidence was already promoted to an
+            #: outcome, return the existing outcome instead of creating a copy.
+            if evidence.outcome_id is not None:
+                existing = self.repo.get_outcome(evidence.outcome_id)
+                if existing is not None:
+                    return existing
             target_job_id = job_id or evidence.job_id
             if target_job_id is None:
                 raise ValidationError("job_id is required to promote evidence to an outcome")
@@ -640,6 +894,8 @@ class ODIService:
                 satisfaction=satisfaction,
                 step_id=evidence.step_id,
             )
+            #: Record the bidirectional link: evidence → outcome.
+            self.repo.update_evidence(evidence.id, {"outcome_id": outcome.id})
             self.record_signal(
                 SignalKind.EVIDENCE_PROMOTED,
                 f'Evidence promoted to an outcome: "{outcome.statement[:60]}"',
@@ -650,6 +906,120 @@ class ODIService:
             )
             return outcome
         raise ValidationError(f"Unknown promotion target: {target}")
+
+    def propose_outcome_from_evidence(self, evidence_id: str) -> OutcomeProposal:
+        """Propose a desired outcome from one evidence record.
+
+        Uses the default heuristic strategy (deterministic, offline, no LLM).
+        Returns the proposal; nothing is written to the ODI store until the
+        proposal is approved.
+        """
+        strategy: ProposalStrategy = HeuristicProposalStrategy()
+        evidence = self.repo.get_evidence(evidence_id)
+        if evidence is None:
+            raise EvidenceNotFoundError(
+                evidence_id,
+                "List the stored records with list_evidence() to find a valid id.",
+            )
+        jobs = self.repo.list_jobs()
+        steps = self.repo.list_steps()
+        proposal = strategy.propose(evidence, jobs, steps)
+        if proposal is None:
+            raise ValidationError(
+                f"No candidate outcome could be extracted from evidence {evidence_id}. "
+                "The record does not contain a recognizable customer problem."
+            )
+        # Persist the proposal so it can be approved/rejected later.
+        return self.repo.add_proposal(proposal)
+
+    def propose_outcomes_from_batch(self, evidence_ids: list[str]) -> list[OutcomeProposal]:
+        """Propose desired outcomes from a batch of evidence records.
+
+        Each record is proposed independently. Records that yield no candidate
+        outcome are skipped (not raised) so a batch can contain mixed content.
+        """
+        proposals: list[OutcomeProposal] = []
+        strategy: ProposalStrategy = HeuristicProposalStrategy()
+        jobs = self.repo.list_jobs()
+        steps = self.repo.list_steps()
+        for evidence_id in evidence_ids:
+            evidence = self.repo.get_evidence(evidence_id)
+            if evidence is None:
+                continue
+            proposal = strategy.propose(evidence, jobs, steps)
+            if proposal is not None:
+                proposals.append(self.repo.add_proposal(proposal))
+        return proposals
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
+        """List all proposals, optionally filtered by status."""
+        return self.repo.list_proposals(status=status)
+
+    def approve_proposal(
+        self,
+        proposal_id: str,
+        statement: str | None = None,
+        importance: float | None = None,
+        satisfaction: float | None = None,
+    ) -> Outcome:
+        """Approve a proposal and write it as an Outcome through add_outcome.
+
+        If ``statement`` is provided, the edited statement is validated before
+        writing. Importance/satisfaction defaults come from the proposal.
+        """
+        proposal = self.repo.get_proposal(proposal_id)
+        if proposal is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        if proposal.status != ProposalStatus.PROPOSED:
+            raise ValidationError(
+                f"Proposal {proposal_id} is already {proposal.status.value}; "
+                "cannot approve a non-proposed proposal."
+            )
+
+        final_statement = statement or proposal.statement
+        # Validate the (possibly edited) statement through the same path as any
+        # other outcome write.
+        verdict = evaluate_outcome_statement(final_statement)
+        if not verdict["valid"]:
+            raise InvalidOutcomeStatementError(verdict)
+
+        final_importance = proposal.importance if importance is None else importance
+        final_satisfaction = proposal.satisfaction if satisfaction is None else satisfaction
+        if final_importance is None or final_satisfaction is None:
+            raise ValidationError(
+                f"Proposal {proposal_id} has no scored importance or satisfaction; "
+                "approve it with explicit importance and satisfaction values."
+            )
+
+        if proposal.job_id is None:
+            raise ValidationError(f"Proposal {proposal_id} has no routed job; cannot approve.")
+
+        outcome = self.add_outcome(
+            proposal.job_id,
+            final_statement,
+            importance=final_importance,
+            satisfaction=final_satisfaction,
+            step_id=proposal.step_id,
+        )
+        # Mark the proposal as approved (or edited if statement changed).
+        new_status = ProposalStatus.EDITED if statement is not None else ProposalStatus.APPROVED
+        self.repo.update_proposal(proposal_id, {"status": new_status, "outcome_id": outcome.id})
+        return outcome
+
+    def reject_proposal(self, proposal_id: str) -> OutcomeProposal:
+        """Reject a proposal. Nothing is written to the ODI store."""
+        proposal = self.repo.get_proposal(proposal_id)
+        if proposal is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        if proposal.status != ProposalStatus.PROPOSED:
+            raise ValidationError(
+                f"Proposal {proposal_id} is already {proposal.status.value}; "
+                "cannot reject a non-proposed proposal."
+            )
+        rejected = self.repo.update_proposal(proposal_id, {"status": ProposalStatus.REJECTED})
+        if rejected is None:
+            raise ValidationError(f"Proposal {proposal_id} not found.")
+        return rejected
 
     def compute_opportunity(self, importance: float, satisfaction: float) -> float:
         return compute_opportunity_score(importance, satisfaction)
@@ -867,3 +1237,153 @@ class ODIService:
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
         return updated
+
+    # -- Stage 5: outcome-based segments -------------------------------------
+
+    def segment_market(self, job_id: str | None = None, people: str | None = None) -> list[Segment]:
+        """Cluster the outcomes into segments and persist what the clustering found.
+
+        ``people`` is the group described in the customer's own words when the
+        caller has them; a group derived from the outcomes is labelled inferred.
+        Re-running is safe: a cluster keeps the same id, so the stored segment is
+        updated with the new evidence instead of a second copy appearing.
+        """
+        jobs = [job for job in self.repo.list_jobs() if job_id is None or job.id == job_id]
+        if job_id is not None and not jobs:
+            raise JobNotFoundError(job_id)
+        outcomes = list(self.repo.outcomes.values())
+        strategy = self.segmentation or OutcomeClusterStrategy(
+            steps=list(self.repo.steps.values()), people=people
+        )
+        return [self.save_segment(item) for item in strategy.segment(jobs, outcomes)]
+
+    def list_segments(self, job_id: str | None = None) -> list[Segment]:
+        return self.repo.list_segments(job_id=job_id)
+
+    def get_segment(self, segment_id: str) -> Segment:
+        segment = self.repo.get_segment(segment_id)
+        if segment is None:
+            raise SegmentNotFoundError(segment_id, "run segment_market to produce segments")
+        return segment
+
+    def save_segment(self, segment: Segment) -> Segment:
+        """Persist one segment, rejecting one the store cannot vouch for."""
+        if segment.job_id is not None and self.repo.get_job(segment.job_id) is None:
+            raise JobNotFoundError(segment.job_id)
+        missing = [oid for oid in segment.outcome_ids if self.repo.get_outcome(oid) is None]
+        if missing:
+            raise ValidationError(f"Segment cites outcomes that do not exist: {', '.join(missing)}")
+        if len(segment.outcome_ids) < MIN_OUTCOMES_PER_SEGMENT:
+            raise ValidationError(
+                f"A segment needs at least {MIN_OUTCOMES_PER_SEGMENT} outcomes; "
+                f"{segment.name} has {len(segment.outcome_ids)}. "
+                "It is a hypothesis, and belongs in the unclustered group."
+            )
+        existing = self.repo.get_segment(segment.id)
+        saved = (
+            self.repo.update_segment(
+                segment.id, segment.model_dump(mode="json", exclude={"id", "created_at"})
+            )
+            if existing is not None
+            else self.repo.add_segment(segment)
+        )
+        if saved is None:
+            raise SegmentNotFoundError(segment.id)
+        self._emit_segment_signal(saved, is_new=existing is None)
+        return saved
+
+    def _emit_segment_signal(self, segment: Segment, *, is_new: bool) -> None:
+        severity = "notice" if segment.verdict is SegmentVerdict.UNDERSERVED else "info"
+        self.record_signal(
+            SignalKind.SEGMENT_IDENTIFIED,
+            f'{"Segment identified" if is_new else "Segment re-scored"}: "{segment.name}"',
+            subject_kind="segment",
+            subject_id=segment.id,
+            severity=severity,
+            detail=segment.rationale[:500],
+            discriminator=f"verdict={segment.verdict},confidence={segment.confidence}",
+            source_event_id=self.repo.last_event_id(),
+        )
+
+    def unclustered_outcomes(self, job_id: str | None = None) -> list[Outcome]:
+        """Outcomes that joined no segment — reported, never dropped."""
+        outcomes = list(self.repo.outcomes.values())
+        if job_id is not None:
+            outcomes = [outcome for outcome in outcomes if outcome.job_id == job_id]
+        return unclustered_outcomes(self.repo.list_segments(), outcomes)
+
+    # -- Stage 6: the strategy they imply ------------------------------------
+
+    def propose_strategy(
+        self, segment_ids: list[str] | None = None, job_id: str | None = None
+    ) -> Strategy:
+        """Recommend the one path the evidence supports, and persist it.
+
+        ``job_id`` narrows the scope to that job's segments. Raises
+        :class:`NoStrategyEvidenceError` when no path has evidence: a bet built
+        on nothing is the fabrication this stage exists to avoid.
+        """
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        segments = self._segments_in_scope(segment_ids, job_id)
+        jobs = self.repo.list_jobs()
+        outcomes = list(self.repo.outcomes.values())
+        strategy = build_strategy(segments, jobs, outcomes)
+        if strategy is None:
+            underserved = sum(1 for item in segments if item.verdict is SegmentVerdict.UNDERSERVED)
+            overserved = sum(1 for item in segments if item.verdict is SegmentVerdict.OVERSERVED)
+            known = {job.id for job in jobs}
+            orphans = [item for item in outcomes if item.job_id not in known]
+            leftover = len(unclustered_outcomes(segments, outcomes))
+            raise NoStrategyEvidenceError(
+                f"No path is supported yet: {len(segments)} segment(s) in scope, "
+                f"{underserved} underserved, {overserved} overserved, "
+                f"{len(orphans)} outcome(s) outside a stored job, {leftover} unclustered. "
+                "Score outcomes against a job map before asking for a strategy."
+            )
+        return self.save_strategy(strategy)
+
+    def _segments_in_scope(
+        self, segment_ids: list[str] | None, job_id: str | None = None
+    ) -> list[Segment]:
+        if segment_ids is None:
+            return self.repo.list_segments(job_id=job_id)
+        return [self.get_segment(segment_id) for segment_id in segment_ids]
+
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
+        return self.repo.list_strategies(segment_id=segment_id)
+
+    def get_strategy(self) -> Strategy | None:
+        """The most recently recorded strategy, or ``None``."""
+        strategies = self.repo.list_strategies()
+        return strategies[-1] if strategies else None
+
+    def save_strategy(self, strategy: Strategy) -> Strategy:
+        """Persist a strategy, requiring the alternatives it beat."""
+        if not strategy.rejected:
+            raise ValidationError(
+                "A strategy without its rejected alternatives is a conclusion, "
+                "not a recommendation."
+            )
+        if strategy.segment_id is not None and self.repo.get_segment(strategy.segment_id) is None:
+            raise SegmentNotFoundError(strategy.segment_id, "propose_strategy from stored segments")
+        existing = self.repo.get_strategy(strategy.id)
+        saved = (
+            self.repo.update_strategy(
+                strategy.id, strategy.model_dump(mode="json", exclude={"id", "created_at"})
+            )
+            if existing is not None
+            else self.repo.add_strategy(strategy)
+        )
+        if saved is None:
+            raise StrategyNotFoundError(strategy.id)
+        self.record_signal(
+            SignalKind.STRATEGY_PROPOSED,
+            f"Strategy proposed: {saved.kind.value}",
+            subject_kind="strategy",
+            subject_id=saved.id,
+            severity="notice",
+            detail=saved.thesis[:500],
+            discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
+        )
+        return saved

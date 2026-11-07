@@ -7,6 +7,7 @@ import sys
 import tempfile
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +23,14 @@ from agentic_odi_cli.jobs import jobs_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
-from agentic_odi_cli.render import render_job_summary
+from agentic_odi_cli.render import render_funnel_summary, render_job_summary
 from agentic_odi_cli.schedule import schedule_app
+from agentic_odi_cli.segments import segments_app
 from agentic_odi_cli.settings import settings_app
 from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
+from agentic_odi_cli.strategy import strategy_app
+from agentic_odi_cli.studies import studies_app
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -47,6 +51,21 @@ app.add_typer(
     signals_app,
     name="signals",
     help="Read the signal inbox — real changes worth attention.",
+)
+app.add_typer(
+    segments_app,
+    name="segments",
+    help="Stage 5: segments derived from scored outcomes, never from demographics.",
+)
+app.add_typer(
+    studies_app,
+    name="studies",
+    help="A study is one named pass over a job; opening it again is a new wave.",
+)
+app.add_typer(
+    strategy_app,
+    name="strategy",
+    help="Stage 6: the innovation path the segments support, with the paths it beat.",
 )
 app.add_typer(
     customer_outcomes_app,
@@ -193,6 +212,50 @@ def health_cmd(
         raise typer.Exit(code=1)
 
 
+def _export_payload(job_id: str | None) -> dict[str, Any]:
+    if job_id is None:
+        jobs = run_tool("get_jobs", {})
+    else:
+        jobs = [run_tool("get_job", {"job_id": job_id})]
+    steps: list[Any] = []
+    outcomes: list[Any] = []
+    for job in jobs:
+        steps.extend(run_tool("get_job_map", {"job_id": job["id"]}))
+        outcomes.extend(run_tool("get_outcomes", {"job_id": job["id"]}))
+    scope: dict[str, Any] = {"job_id": job_id} if job_id is not None else {}
+    return {
+        "format": "agentic-odi-export",
+        "version": 1,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "job_id": job_id,
+        "jobs": jobs,
+        "steps": steps,
+        "outcomes": outcomes,
+        "customer_outcomes": run_tool("list_customer_outcomes", scope),
+        "evidence": run_tool("list_evidence", scope),
+    }
+
+
+@app.command(name="data-export")
+def data_export_cmd(
+    job_id: str | None = typer.Option(  # noqa: B008
+        None, "--job-id", help="Export only this job and the records beneath it."
+    ),
+    output: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--output",
+        "-o",
+        help="Destination file (default: ./odi-export-<timestamp>.json).",
+    ),
+) -> None:
+    """Write ODI jobs, steps, outcomes, and evidence to a JSON file."""
+    payload = _export_payload(job_id)
+    path = output or Path(f"odi-export-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    typer.echo(f"Exported {len(payload['jobs'])} job(s) to {path}")
+
+
 @app.command(name="evaluate")
 def evaluate_cmd(
     statement: str = typer.Argument(..., help="Outcome statement to check"),
@@ -218,6 +281,7 @@ def evaluate_cmd(
 def guidelines_cmd() -> None:
     """Print the ODI framework guidelines."""
     typer.echo(run_tool("get_odi_framework_guidelines", {}))
+    typer.echo("\nThe same method as a practitioner works it, stage by stage: docs/method.md.")
 
 
 capabilities_app = typer.Typer(name="capabilities", help="Inspect the assistant's tool surface.")
@@ -273,6 +337,44 @@ def summary(
             as_json=json_output,
         )
     )
+
+
+@app.command(name="stats")
+def stats_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    reset: bool = typer.Option(False, "--reset", help="Start the measurement over."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Answer the confirmation yes."),
+) -> None:
+    """Print the onboarding funnel this machine counted, and the step between each pair.
+
+    Five counters — launch, first message, first outcome, first score, return —
+    read from the same event log as the records. Nothing here reaches the
+    network. The reset appends a marker; the events it supersedes stay in the log.
+    """
+    from agentic_odi_core.funnel import adjacent_conversions, count_reset, read_counts
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    if context.selected_backend() == "mcp":
+        typer.echo(
+            "The funnel is counted in the local event log, which the mcp backend does not have. "
+            "Run this with --backend local (or --backend auto)."
+        )
+        raise typer.Exit(code=1)
+
+    if reset and not yes:
+        typer.confirm(
+            "Restart the funnel measurement? The counters go to zero and the events stay.",
+            abort=True,
+        )
+
+    repository = SQLiteRepository(db_path=context.config().db_path)
+    try:
+        if reset:
+            count_reset(repository)
+        counts = read_counts(repository)
+        typer.echo(render_funnel_summary(counts, adjacent_conversions(counts), as_json=json_output))
+    finally:
+        repository.close()
 
 
 @app.command(name="version")

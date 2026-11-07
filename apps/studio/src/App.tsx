@@ -4,6 +4,7 @@ import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge"
 import { BannerProvider, useBanner } from "./banners/BannerProvider";
 import { BannerStack } from "./banners/BannerStack";
 import { BannerToasts } from "./banners/BannerToasts";
+import { BootFailurePage } from "./components/BootFailurePage";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
 import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
@@ -12,10 +13,13 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
+import { dialogOpen, focusComposer, startComposerCommand } from "./lib/composerFocus";
+import { isEditableTarget } from "./lib/commands";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 import { UpdateBanner, UpdateProvider } from "./updater";
+import { initInstall } from "./install";
 
 /**
  * One room, one intelligence.
@@ -27,45 +31,101 @@ import { UpdateBanner, UpdateProvider } from "./updater";
  */
 function StudioShell() {
   const {
+    activePanel,
     closePanel,
-    clearChat,
     closeSetup,
     customizeOpen,
     closeCustomize,
+    startNewThread,
     streaming,
     stopStreaming,
+    bootError,
+    recheckBoot,
   } = useStudio();
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
 
   function goHome() {
-    clearChat();
+    // Home is the empty stage. The thread is put away rather than thrown away:
+    // it stays in the history, so nothing said is lost by going back.
+    startNewThread();
     closePanel();
     closeSetup();
     closeCustomize();
   }
 
-  function newConversation() {
-    clearChat();
+  function newThread(options?: { stop?: boolean }) {
+    startNewThread(options);
     closePanel();
     closeSetup();
     closeCustomize();
   }
 
+  // One listener for the keys the whole room shares. The composer registers
+  // how to take the caret (lib/composerFocus), so this is installed once for
+  // the shell instead of once per composer.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      const modifier = event.metaKey || event.ctrlKey;
+
+      if (modifier && !event.altKey && event.key.toLowerCase() === "k") {
+        if (dialogOpen()) {
+          return;
+        }
+        if (focusComposer()) {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      // `/` is a command only where it cannot be a character: inside a field
+      // the slash belongs to what the person is typing.
+      if (event.key === "/" && !modifier && !event.altKey) {
+        if (dialogOpen() || isEditableTarget(event.target)) {
+          return;
+        }
+        if (startComposerCommand()) {
+          event.preventDefault();
+        }
+        return;
+      }
+
       if (event.key === "Escape") {
+        // A dialog owns its Escape. Closing it must not also stop the reply
+        // behind it or move the caret out from under the person.
+        if (dialogOpen()) {
+          return;
+        }
         if (streaming) {
           stopStreaming();
           return;
         }
-        closePanel();
+        if (activePanel) {
+          closePanel();
+          return;
+        }
+        // Nothing is open, so Escape does the one thing it can: it takes you
+        // back to the place where you can type.
+        focusComposer();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePanel, streaming, stopStreaming]);
+  }, [activePanel, closePanel, streaming, stopStreaming]);
+
+  // Capture the install prompt as early as possible so the browser's
+  // beforeinstallprompt event is not missed before Settings is opened.
+  useEffect(() => {
+    initInstall();
+  }, []);
+
+  // A damaged database is not a broken screen: the file is intact on disk and
+  // the only honest thing to show is that failure, not a zeroed-out studio.
+  // This return sits after every hook so the hook order never changes.
+  if (bootError) {
+    return <BootFailurePage error={bootError} onRecheck={() => void recheckBoot()} />;
+  }
 
   return (
     <div className="studio-app">
@@ -83,7 +143,7 @@ function StudioShell() {
       />
       <StudioBar
         onHome={goHome}
-        onNew={newConversation}
+        onNew={newThread}
         onChangelog={() => setShowChangelog(true)}
       />
       <UpdateBanner />

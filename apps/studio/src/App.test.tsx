@@ -167,7 +167,9 @@ describe("studio shell", () => {
       await screen.findByRole("heading", { name: "What do you want to win?" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sharpen an opportunity/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /sharpen an opportunity/i }),
+    ).toBeInTheDocument();
     // The classic UI is secondary: no workspace surface until you ask for one.
     expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
   });

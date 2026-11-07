@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -15,17 +19,25 @@ from agentic_odi_connectors.registry import (
 )
 from agentic_odi_core import (
     EvidenceNotFoundError,
+    InvalidOutcomeStatementError,
     JobNotFoundError,
     Message,
+    NoStrategyEvidenceError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
+    OutcomeProposal,
     OutcomeStatementError,
+    ProposalStatus,
+    SegmentNotFoundError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
     error_status,
+    invalid_strategy_request,
+    manual_claim_check,
 )
+from agentic_odi_core.funnel import count_reset, read_counts
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
@@ -52,10 +64,10 @@ from agentic_odi_studio_api.studio.memory import (
     StudioMemory,
 )
 from agentic_odi_studio_api.studio.probes import (
-    check_llm_health,
     defaults,
     is_endpoint_reachable,
     list_models,
+    probe_llm_health,
 )
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
@@ -66,11 +78,13 @@ from agentic_odi_studio_api.studio.schemas import (
     AppendMessageRequest,
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
+    ApproveProposalRequest,
     BriefResponse,
     BriefUpdateRequest,
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
+    ClaimOut,
     ConnectorListItem,
     ConnectorOperationResponse,
     ConversationListResponse,
@@ -80,6 +94,7 @@ from agentic_odi_studio_api.studio.schemas import (
     CreateJobRequest,
     LatestConversationResponse,
     LlmHealthRequest,
+    LlmHealthResponse,
     LlmProxyRequest,
     MarketplaceListingOut,
     MarketplaceSearchResponse,
@@ -92,6 +107,10 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationResponse,
     ObservationUpdateRequest,
     PromoteEvidenceRequest,
+    ProposalOut,
+    ProposeOutcomeRequest,
+    ProposeStrategyRequest,
+    RejectProposalRequest,
     ScheduleWorkRequest,
     SettingsResponse,
     SettingsUpdateRequest,
@@ -149,6 +168,12 @@ def _first_validation_error(exc: ValidationError) -> str:
     return f"{location}: {message}" if location else message
 
 
+def _outcome_field(message: str) -> str | None:
+    """Return ``importance`` or ``satisfaction`` when a rating error names one."""
+    first = message.split(maxsplit=1)[0] if message.strip() else ""
+    return first if first in {"importance", "satisfaction"} else None
+
+
 def _as_http_error(exc: Exception) -> StudioHTTPError:
     """Translate domain errors into typed HTTP responses without leaking 500s."""
     if isinstance(exc, ValidationError):
@@ -158,16 +183,39 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         )
     if isinstance(exc, OutcomeStatementError):
         return StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field="statement"),
             status_code=422,
         )
     if isinstance(
         exc,
-        (JobNotFoundError, StepNotFoundError, OutcomeNotFoundError, EvidenceNotFoundError),
+        (
+            JobNotFoundError,
+            StepNotFoundError,
+            OutcomeNotFoundError,
+            EvidenceNotFoundError,
+            SegmentNotFoundError,
+        ),
     ):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
+    if isinstance(exc, NoStrategyEvidenceError):
+        # Stage 6 refusing to invent a bet is a problem with the request, and the
+        # MCP backend reports it with this same spelling, so both say it alike.
+        return StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message=invalid_strategy_request(str(exc)),
+            ),
+            status_code=422,
+        )
     if isinstance(exc, ValueOutOfRangeError):
-        return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))
+        return StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.OUT_OF_RANGE,
+                message=str(exc),
+                field=_outcome_field(str(exc)),
+            ),
+            status_code=422,
+        )
     if isinstance(exc, OdiError):
         status = error_status(exc)
         return StudioHTTPError(
@@ -213,7 +261,7 @@ def _not_found(message: str) -> StudioHTTPError:
     )
 
 
-def _turn_node(message: Message) -> TurnNode:
+def _turn_node(message: Message, memory: Any) -> TurnNode:
     """One turn as the branch tree needs it, parts and all."""
     data = message.model_dump(mode="json")
     return TurnNode(
@@ -223,10 +271,11 @@ def _turn_node(message: Message) -> TurnNode:
         content=data["content"],
         created_at=data["created_at"],
         parts=data["parts"],
+        claims=[ClaimOut(**claim.to_dict()) for claim in memory.claims_for_turn(message)],
     )
 
 
-def _turn_model(message: Message) -> TurnModel:
+def _turn_model(message: Message, memory: Any) -> TurnModel:
     data = message.model_dump(mode="json")
     return TurnModel(
         id=data["id"],
@@ -236,6 +285,7 @@ def _turn_model(message: Message) -> TurnModel:
         created_at=data["created_at"],
         parent_id=data["parent_id"],
         parts=data["parts"],
+        claims=[ClaimOut(**claim.to_dict()) for claim in memory.claims_for_turn(message)],
     )
 
 
@@ -253,6 +303,82 @@ def get_config() -> dict:
     return {"defaults": {**defaults(), "api_key": ""}}
 
 
+@router.get("/diagnostics")
+def get_diagnostics(request: Request) -> dict[str, Any]:
+    """Return diagnostic metadata only; never return database paths or records."""
+    service = _service(request)
+    repository = service.repo
+    connection = getattr(getattr(repository, "store", None), "conn", None)
+    db_name = "odi.db"
+    size_bytes = 0
+    if connection is not None:
+        try:
+            database = next(
+                (row for row in connection.execute("PRAGMA database_list") if row[1] == "main"),
+                None,
+            )
+            filename = str(database[2]) if database else ""
+            if filename:
+                db_name = Path(filename).name
+                try:
+                    size_bytes = Path(filename).stat().st_size
+                except OSError:
+                    size_bytes = 0
+            else:
+                db_name = ":memory:"
+        except Exception:  # noqa: BLE001
+            # A missing/closed local store must not make diagnostics unavailable.
+            db_name = "odi.db"
+
+    try:
+        studio_version = package_version("agentic-odi-studio-api")
+    except PackageNotFoundError:
+        studio_version = "unknown"
+
+    counts = {
+        "jobs": len(getattr(repository, "jobs", {})),
+        "outcomes": len(getattr(repository, "outcomes", {})),
+        "evidence": len(getattr(repository, "evidence", {})),
+        "observations": len(_memory(request).list_observations(include_dismissed=True)),
+    }
+    capabilities = get_capabilities(request).capabilities
+    return {
+        "version": studio_version,
+        "python": sys.version.split()[0],
+        "db": {
+            "name": db_name,
+            "size_bytes": size_bytes,
+            "integrity": getattr(request.app.state, "db_integrity", "unknown"),
+            "counts": counts,
+        },
+        "migrations": {"events": "current"},
+        "capabilities": [capability.model_dump(mode="json") for capability in capabilities],
+    }
+
+
+@router.get("/stats")
+def get_stats(request: Request) -> dict[str, Any]:
+    """The onboarding funnel, counted from this machine's own event log.
+
+    Every counter is always named, and one that has not happened answers with a
+    zero and no timestamps rather than an invented history. Nothing leaves the
+    machine: these numbers come from the same store the records do.
+    """
+    return read_counts(_service(request))
+
+
+@router.post("/stats/reset")
+def reset_stats(request: Request) -> dict[str, Any]:
+    """Start the measurement over and return the counters as they now stand.
+
+    A reset appends a marker; the events it supersedes stay in the log. The
+    asking happens in whatever surface calls this — a click that erases a
+    measurement should not be the kind that fires straight away.
+    """
+    count_reset(_service(request))
+    return read_counts(_service(request))
+
+
 @router.get("/changelog")
 def get_changelog_route() -> dict:
     return get_changelog()
@@ -263,12 +389,20 @@ def post_mcp_health(body: McpHealthRequest) -> dict:
     return {"reachable": is_endpoint_reachable(body.mcp_url)}
 
 
-@router.post("/health/llm")
-async def post_llm_health(body: LlmHealthRequest, request: Request) -> dict:
-    healthy, message = await check_llm_health(
-        body.base_url, _settings(request).resolve_api_key(body.api_key), body.model
-    )
-    return {"healthy": healthy, "message": message}
+@router.post("/health/llm", response_model=LlmHealthResponse)
+async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) -> dict:
+    """Probe the configured LLM endpoint, cached per (endpoint, model).
+
+    Concurrent tabs within the TTL cause a single upstream probe. ``?fresh=true``
+    bypasses the cache so a user-initiated "check now" is never stale.
+    """
+    result = await probe_llm_health(body.base_url, body.api_key, body.model, fresh=fresh)
+    return {
+        "healthy": result["healthy"],
+        "message": result["message"],
+        "checked_at": result["checked_at"],
+        "cached": result["cached"],
+    }
 
 
 @router.post("/models")
@@ -613,16 +747,28 @@ async def delete_step(step_id: str, request: Request, mcp_url: str | None = Quer
 
 @router.post("/outcomes")
 async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
+    #: This endpoint is the by-hand capture path. A person typing two numbers is
+    #: not an interview, so a score with no supplied check is recorded as an
+    #: unverified one that says so — never as an interrogated score. The agent's
+    #: own writes go through the MCP tool directly and are gated there.
+    claim_check = body.claim_check
+    if claim_check is None and (body.importance is not None or body.satisfaction is not None):
+        claim_check = manual_claim_check()
+    arguments: dict[str, Any] = {
+        "job_id": body.job_id,
+        "statement": body.statement,
+    }
+    if body.importance is not None:
+        arguments["importance"] = body.importance
+    if body.satisfaction is not None:
+        arguments["satisfaction"] = body.satisfaction
+    if claim_check is not None:
+        arguments["claim_check"] = claim_check.model_dump(mode="json")
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.ADD_OUTCOME.value,
-            {
-                "job_id": body.job_id,
-                "statement": body.statement,
-                "importance": body.importance,
-                "satisfaction": body.satisfaction,
-            },
+            arguments,
         )
         return _payload_from_text(result)
     try:
@@ -631,6 +777,7 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             statement=body.statement,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            claim_check=claim_check,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
@@ -744,6 +891,98 @@ async def post_signal_dismiss(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return signal.model_dump(mode="json")
+
+
+@router.get("/segments", response_model=list[dict[str, Any]])
+async def get_segments(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """Stage 5's segments, same records under both backends.
+
+    Empty until the agent has run ``segment_market``: a segment is derived from
+    scored outcomes, never typed in.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_SEGMENTS.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [
+        segment.model_dump(mode="json")
+        for segment in _service(request).list_segments(job_id=job_id)
+    ]
+
+
+@router.get("/studies", response_model=list[dict[str, Any]])
+async def get_studies(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The opened studies, same records under both backends.
+
+    Empty until the agent has run ``open_study``: a study is opened as a named
+    pass over a job, never typed into the canvas.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_STUDIES.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [
+        study.model_dump(mode="json") for study in _service(request).list_studies(job_id=job_id)
+    ]
+
+
+@router.get("/strategy", response_model=dict[str, Any] | None)
+async def get_strategy(
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any] | None:
+    """The recorded strategy and the paths it beat, or ``null`` before Stage 6."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_STRATEGY.value, {}
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, dict) else None
+    strategy = _service(request).get_strategy()
+    return None if strategy is None else strategy.model_dump(mode="json")
+
+
+@router.post("/strategy/propose", response_model=dict[str, Any])
+async def post_strategy_propose(
+    body: ProposeStrategyRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """Ask which innovation path the evidence supports.
+
+    A 422 with the missing evidence spelled out is the honest answer when no
+    path has support: the tool refuses rather than inventing a bet.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if body.job_id:
+            arguments["job_id"] = body.job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.PROPOSE_STRATEGY.value, arguments
+        )
+        return _payload_from_text(result)
+    try:
+        strategy = _service(request).propose_strategy(job_id=body.job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return strategy.model_dump(mode="json")
 
 
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:
@@ -993,9 +1232,10 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
     conversation = memory.latest_conversation()
     if conversation is None:
         return LatestConversationResponse(conversation=None, turns=[])
+    turns = memory.list_turns(conversation.id)
     return LatestConversationResponse(
         conversation=conversation.model_dump(mode="json"),
-        turns=[_turn_model(turn) for turn in memory.list_turns(conversation.id)],
+        turns=[_turn_model(turn, memory) for turn in turns],
     )
 
 
@@ -1006,7 +1246,7 @@ def list_conversations(
     """Newest first, archived included: the switcher decides what to show."""
     conversations = _memory(request).list_conversations(limit=limit)
     return ConversationListResponse(
-        conversations=[item.model_dump(mode="json") for item in conversations]
+        conversations=[item.to_dict() for item in conversations]
     )
 
 
@@ -1024,7 +1264,7 @@ def get_conversation(conversation_id: str, request: Request) -> ConversationMess
         raise _not_found(f"Conversation {conversation_id} not found")
     return ConversationMessagesResponse(
         conversation=conversation.model_dump(mode="json"),
-        messages=[_turn_node(turn) for turn in memory.list_turns(conversation_id)],
+        messages=[_turn_node(turn, memory) for turn in memory.list_turns(conversation_id)],
     )
 
 
@@ -1038,7 +1278,7 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
     turns = memory.conversation_tree(conversation_id)
     return ConversationTreeResponse(
         conversation=conversation.model_dump(mode="json"),
-        messages=[_turn_node(turn) for turn in turns if turn.role in {"user", "assistant"}],
+        messages=[_turn_node(turn, memory) for turn in turns if turn.role in {"user", "assistant"}],
         head_id=conversation.head_id or (turns[-1].id if turns else None),
     )
 
@@ -1053,7 +1293,7 @@ def conversation_messages(
     if memory.get_conversation(conversation_id) is None:
         raise _not_found(f"Conversation {conversation_id} not found")
     return MessageListResponse(
-        messages=[_turn_node(turn) for turn in memory.list_turns(conversation_id)[:limit]]
+        messages=[_turn_node(turn, memory) for turn in memory.list_turns(conversation_id)[:limit]]
     )
 
 
@@ -1069,7 +1309,7 @@ def append_message(
     if body.id and body.id in already:
         return MessageResponse(
             message=_turn_model(
-                next(t for t in memory.list_turns(conversation_id) if t.id == body.id)
+                next(t for t in memory.list_turns(conversation_id) if t.id == body.id), memory
             )
         )
     try:
@@ -1085,7 +1325,7 @@ def append_message(
         raise StudioHTTPError(
             StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
         ) from exc
-    return MessageResponse(message=_turn_model(message))
+    return MessageResponse(message=_turn_model(message, memory))
 
 
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
@@ -1157,6 +1397,7 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
             memory=request.app.state.memory,
             request_id=request_id,
             approvals=request.app.state.approvals,
+            local_service=request.app.state.service,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
@@ -1451,3 +1692,131 @@ async def promote_evidence(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True, "result": artifact.model_dump(mode="json")}
+
+
+def _proposal_out(proposal: OutcomeProposal) -> ProposalOut:
+    """Serialize one proposal for the Studio."""
+    return ProposalOut(
+        id=proposal.id,
+        evidence_id=proposal.evidence_id,
+        job_id=proposal.job_id,
+        step_id=proposal.step_id,
+        statement=proposal.statement,
+        direction=proposal.direction.value,
+        unit_of_measure=proposal.unit_of_measure,
+        object_of_control=proposal.object_of_control,
+        contextual_clarifier=proposal.contextual_clarifier,
+        importance=proposal.importance,
+        satisfaction=proposal.satisfaction,
+        confidence=proposal.confidence,
+        rationale=proposal.rationale,
+        quote=proposal.quote,
+        source_name=proposal.source_name,
+        status=proposal.status.value,
+        created_at=proposal.created_at.isoformat(),
+    )
+
+
+@router.post("/proposals")
+async def propose_outcome_api(body: ProposeOutcomeRequest, request: Request) -> dict:
+    """Mine one evidence record into a scored, approvable outcome proposal."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.PROPOSE_OUTCOME.value,
+            {"evidence_id": body.evidence_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposal = _service(request).propose_outcome_from_evidence(body.evidence_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": _proposal_out(proposal).model_dump(mode="json")}
+
+
+@router.get("/proposals")
+async def list_proposals_api(request: Request, status: str | None = Query(None)) -> dict:
+    """List outcome proposals, optionally filtered by status."""
+    try:
+        proposal_status = ProposalStatus(status) if status is not None else None
+    except ValueError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message=f"invalid status '{status}'. Use proposed, approved, rejected, or edited.",
+            ),
+            status_code=422,
+        ) from exc
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(request.query_params.get("mcp_url", "")),
+            ToolName.LIST_PROPOSALS.value,
+            {"status": status} if status else {},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposals = _service(request).list_proposals(status=proposal_status)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": [_proposal_out(p) for p in proposals],
+    }
+
+
+@router.post("/proposals/{proposal_id}/approve")
+async def approve_proposal_api(
+    proposal_id: str, body: ApproveProposalRequest, request: Request
+) -> dict:
+    """Approve a proposal and write it as an Outcome."""
+    if _uses_mcp(request):
+        args: dict[str, Any] = {"proposal_id": proposal_id}
+        if body.statement is not None:
+            args["statement"] = body.statement
+        if body.importance is not None:
+            args["importance"] = body.importance
+        if body.satisfaction is not None:
+            args["satisfaction"] = body.satisfaction
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.APPROVE_PROPOSAL.value,
+            args,
+        )
+        return {"ok": True, "result": result}
+    try:
+        outcome = _service(request).approve_proposal(
+            proposal_id,
+            statement=body.statement,
+            importance=body.importance,
+            satisfaction=body.satisfaction,
+        )
+    except InvalidOutcomeStatementError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            status_code=422,
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": outcome.model_dump(mode="json")}
+
+
+@router.post("/proposals/{proposal_id}/reject")
+async def reject_proposal_api(
+    proposal_id: str, body: RejectProposalRequest, request: Request
+) -> dict:
+    """Reject a proposal. Nothing is written to the ODI store."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.REJECT_PROPOSAL.value,
+            {"proposal_id": proposal_id},
+        )
+        return {"ok": True, "result": result}
+    try:
+        proposal = _service(request).reject_proposal(proposal_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": _proposal_out(proposal).model_dump(mode="json"),
+    }
