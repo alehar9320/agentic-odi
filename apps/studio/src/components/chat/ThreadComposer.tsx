@@ -317,7 +317,7 @@ function ComposerBody({
             if (files.length === 0) {
               return;
             }
-            const text = event.clipboardData?.getData("text/plain") ?? "";
+            const text = event.clipboardData?.getData?.("text/plain") ?? "";
             if (text !== "") {
               // Mixed payload: let the browser insert the text at the caret,
               // and attach the files alongside it.
