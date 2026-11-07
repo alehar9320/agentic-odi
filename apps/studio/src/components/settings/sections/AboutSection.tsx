@@ -53,6 +53,7 @@ export function AboutSection({ settings, capabilities }: AboutSectionProps) {
     }
     const bundle = createDiagnosticsBundle({
       version: label.version,
+      versionSource: label.source,
       build: __STUDIO_BUILD_DATE__,
       platform: PLATFORM_LABELS[platform],
       theme: resolveTheme(settings.theme),
