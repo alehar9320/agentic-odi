@@ -15,6 +15,7 @@ recorded by the caller; a scheduled full check is a later slice.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from dataclasses import dataclass, field
 
@@ -109,4 +110,22 @@ def ensure_intact(
     if result.status == "corrupt":
         problems = deep_check(connection) or result.problems
         raise StoreCorrupt(path, problems, label=label)
+    if result.status == "ok":
+        # A quick check only reads the pages the header claims. Bytes past the
+        # last page are not part of any page, so they are never inspected — yet
+        # they are exactly what a damaged or truncated-then-extended file looks
+        # like. Treat them as damage rather than serving a store with rubble in it.
+        try:
+            pages = connection.execute("PRAGMA page_count").fetchone()[0]
+            page_size = connection.execute("PRAGMA page_size").fetchone()[0]
+            size = os.path.getsize(path)
+        except (sqlite3.Error, OSError, TypeError):
+            pass
+        else:
+            if pages and page_size and size > pages * page_size:
+                raise StoreCorrupt(
+                    path,
+                    [f"the file is {size} bytes but its {pages} pages end sooner"],
+                    label=label,
+                )
     return result

@@ -22,7 +22,7 @@
     <code>{{ tool.name }}</code>
     <span class="pill">{{ tool.params | length }} argument{{ '' if tool.params | length == 1 else 's' }}</span>
   </h2>
-  <p class="tool-doc__purpose">{{ tool.purpose }}</p>
+  {% if tool.purpose %}<p class="tool-doc__purpose">{{ tool.purpose }}</p>{% endif %}
   <div class="codeblock">
     <button class="copy-btn" type="button" data-copy>Copy</button>
     <code>{{ tool_signatures[tool.name] }}</code>
@@ -34,13 +34,7 @@
       <tr><th scope="col">Argument</th><th scope="col">Type</th><th scope="col">Required</th></tr>
     </thead>
     <tbody>
-      {% for param in tool.params %}
-      <tr>
-        <td><code>{{ param.name }}</code></td>
-        <td><code>{{ param.annotation or "—" }}</code></td>
-        <td>{{ "yes" if param.required else "no" }}</td>
-      </tr>
-      {% endfor %}
+      {% for param in tool.params %}<tr><td><code>{{ param.name }}</code></td><td><code>{{ param.annotation or "—" }}</code></td><td>{{ "yes" if param.required else "no" }}</td></tr>{% endfor %}
     </tbody>
   </table>
   {% endif %}

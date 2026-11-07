@@ -322,7 +322,7 @@ export function StudioBar({
                       onClick={() => selectConversation(conversation.id)}
                     >
                       <span className="bar__history-title">
-                        {conversation.title.trim() || "New conversation"}
+                        {(conversation.title ?? "").trim() || "New conversation"}
                       </span>
                       <span className="bar__history-meta">
                         {formatRelativeTime(conversation.updated_at)}

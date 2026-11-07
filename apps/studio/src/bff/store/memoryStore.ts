@@ -202,16 +202,18 @@ export class MemoryLocalStore implements LocalStore {
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.turns
       .filter((turn) => turn.conversation_id === conversationId)
-      .sort((left, right) => left.id - right.id);
+      .sort((left, right) => left.id.localeCompare(right.id));
   }
 
   async countTurns(conversationId: string): Promise<number> {
     return this.turns.filter((turn) => turn.conversation_id === conversationId).length;
   }
 
-  async appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn> {
+  async appendTurn(
+    turn: Omit<StoredTurn, "id"> & { id?: string },
+  ): Promise<StoredTurn> {
     this.turnId += 1;
-    const stored = { ...turn, id: this.turnId };
+    const stored = { ...turn, id: turn.id ?? String(this.turnId) };
     this.turns.push(stored);
     return stored;
   }
@@ -298,7 +300,7 @@ export class MemoryLocalStore implements LocalStore {
       ...snapshot.steps.map((step) => step.seq),
       ...snapshot.outcomes.map((outcome) => outcome.seq),
     );
-    this.turnId = Math.max(0, ...snapshot.turns.map((turn) => turn.id ?? 0));
+    this.turnId = Math.max(0, ...snapshot.turns.map((turn) => Number(turn.id) || 0));
   }
 
   async clearAll(): Promise<void> {

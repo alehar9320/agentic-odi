@@ -52,9 +52,9 @@ The detail is below; this is the shape the rest of the document explains.
 
 | Layer | Owns | Persists |
 |---|---|---|
-| `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `Signal`, `ODIService`, repository protocol | SQLite event log + snapshots |
+| `packages/core` | `Job`, `Step`, `Outcome`, `CustomerOutcome`, `Signal`, `Conversation`, `Message`, `Observation`, `Brief`, `ODIService`, repository protocol | SQLite event log + snapshots |
 | `apps/mcp-server` | MCP tool adapters over `ODIService` | `build_repository()` selects SQLite in production and in-memory for `AGENTIC_ODI_DB=:memory:` |
-| `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | Via the same repository when the local backend is active; conversations and memory in `~/.agentic-odi/studio.db` |
+| `apps/studio-api` | Studio API, canvas projection, chat tool loop, conversation history, PM memory | The same repository: jobs, the thread, and what the agent learned are appended to one event log; the provider key lives in `~/.agentic-odi/studio.json` (`0600`) |
 | `packages/connectors` | Connector protocol, presets, record mapping | Shared `connectors.json` registry; ingested batches land in an in-process sink |
 | `apps/studio` | Presentation state, the visible conversation path, optimistic canvas updates; the conversation runtime is assistant-ui | IndexedDB (`agentic-odi-studio`) plus named `localStorage` keys — see Storage facts below |
 | `apps/cli` | Terminal rendering, local/remote backend selection | SQLite directly for `local`, no local writes for `mcp` |
@@ -110,6 +110,12 @@ MCP client / Studio MCP mode / CLI --backend mcp
 
 `apps/mcp-server` builds its repository once at import time with `build_repository()`. Production uses SQLite; tests set `AGENTIC_ODI_DB=:memory:` (the root test suite does this in `tests/conftest.py`).
 
+The thread and the memory are on that contract too — `list_conversations`,
+`get_conversation`, `list_observations`, `confirm_observation`,
+`dismiss_observation` — so any agent speaking MCP reads the same conversation
+and the same confirmed facts as the Studio, rather than the Studio holding a
+private version of the person.
+
 ### Studio API
 
 ```text
@@ -130,6 +136,15 @@ apps/studio SPA
 apps/studio SPA
   -> POST /api/models
   -> probes.list_models -> OpenAI-compatible LLM (model ids)
+
+apps/studio SPA
+  -> /api/conversations*, /api/observations*, /api/brief
+  -> StudioMemory -> ODIService -> Repository (append-only event log)
+     (the thread is always the sidecar's own store, in `local` and `mcp` alike)
+
+apps/studio SPA
+  -> POST /api/settings {api_key}
+  -> StudioSettings -> ~/.agentic-odi/studio.json (0600)   (no LLM, no repository)
 ```
 
 `/api/models` is read-only discovery for the composer's picker. It answers the
@@ -138,8 +153,18 @@ the sidecar's host and is not necessarily CORS-open. A refused connection is
 returned as `error` beside an empty list, not as a 5xx: an unreachable model
 server is a normal state the picker explains.
 
-The studio memory is a separate SQLite file, not an ODI repository. It never
-feeds the canvas; it only supplies bounded context to the next chat turn.
+The thread and the memory are no longer a private studio database: they are
+appended to the same event log as the canvas, so the CLI and the MCP server read
+the conversation the Studio had and the observations the agent wrote. The first
+time the sidecar opens a file-backed store it imports any pre-core
+`studio.db` into that log, once, and renames the file to `studio.db.imported`
+rather than deleting it. Storing or restoring a turn never touches the LLM.
+
+Settings are the exception: the provider key is written to `~/.agentic-odi/studio.json`
+instead of the event log, because a secret has no place in an append-only stream
+that other readers can open. `GET /api/settings` answers with `has_api_key` and a
+mask (`sk-…4f2a`), never the value, and a chat turn left without a key gets the
+stored one substituted server-side.
 
 ### Store open and close
 
@@ -219,13 +244,39 @@ The SPA owns the visible path; the sidecar owns the record. Turns persist with
 ```text
 GET   /api/conversations                       -> every thread, last touch first
 GET   /api/conversations/latest                -> thread + turns (resume)
+GET   /api/conversations?limit=20              -> newest first, archived included
+POST  /api/conversations                       -> start a thread
+GET   /api/conversations/{id}/messages         -> ordered turns
 GET   /api/conversations/{id}/tree             -> branch tree + head
-PATCH /api/conversations/{id} {"head_id"}      -> record the visible branch
+POST  /api/conversations/{id}/messages         -> append one turn
+PATCH /api/conversations/{id}                  -> title, archived, or head_id
+DELETE /api/conversations/{id}                 -> explicit, confirmed forget
 ```
+
+`CONVERSATION_CREATED`, `CONVERSATION_UPDATED`, `MESSAGE_APPENDED`,
+`OBSERVATION_CREATED` and `OBSERVATION_UPDATED` are appended beside the ODI
+events, so a reload restores the exact thread: the same ids, the same parents,
+and the same ordered `parts`, including every `ui` spec that was rendered. The
+SPA re-validates a stored spec on read and degrades an unknown one to the
+`unsupported` card instead of crashing. **New conversation** archives the thread
+it was left on rather than erasing it, and a branch that was still running when
+the tab died is restored as declined, not pending.
 
 A conversation written before ids existed has none, so the tree endpoint
 synthesises a linear chain and old threads still open. `apps/studio` never
 invents a branch the sidecar cannot reproduce.
+
+### What the agent learned
+
+`Observation` is the memory primitive: `text` (≤ 300 chars), a `category`, and a
+`status` of `proposed`, `confirmed`, or `dismissed`, with provenance back to the
+conversation and the message it came from. The `remember` tool can only write a
+proposal — the agent never confirms its own memory — and a `memory` SSE frame
+carries the whole observation so the panel updates without a refresh.
+
+Only `confirmed_observations()` feeds the system prompt, so a dismissed fact is
+gone from context in this session and the next, while still being readable in
+the log for the person who wants to see what was thrown away.
 
 ## Read Paths
 
@@ -245,6 +296,8 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | Variable | Used by | Default |
 |---|---|---|
 | `AGENTIC_ODI_DB` | core SQLite repository | `~/.agentic-odi/odi.db` |
+| `AGENTIC_ODI_WORKSPACE` | core SQLite repository — stamps every conversation, turn, observation, and brief | `local` |
+| `AGENTIC_ODI_DEVICE_ID` | core SQLite repository — otherwise the id created once at `~/.agentic-odi/device_id` (`0600`) | that generated id |
 | `AGENTIC_ODI_BACKEND` | CLI, Studio API | `local` |
 | `AGENTIC_ODI_MCP_URL` | CLI, Studio defaults | `http://localhost:8000/mcp` |
 | `AGENTIC_ODI_MCP_TIMEOUT` | CLI MCP client calls | `30` seconds |

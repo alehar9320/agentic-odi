@@ -31,7 +31,9 @@ export interface KeyFacts {
 export const APP_STORAGE_KEYS: readonly string[] = [
   "agentic-odi.changelog.read",
   "agentic-odi.evidence-order",
+  "studio.apiKey",
   "studio.brief",
+  "studio.conversationId",
   "studio.canvas",
   "studio.displayName",
   "studio.guidance",

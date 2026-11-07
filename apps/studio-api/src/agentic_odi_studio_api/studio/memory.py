@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agentic_odi_core import Brief
 from agentic_odi_core.errors import StoreCorrupt
 from agentic_odi_core.integrity import ensure_intact
 
@@ -35,12 +36,18 @@ OBSERVATION_KINDS: frozenset[str] = frozenset(
         "career",
         "opportunity",
         "business",
-        "stakeholder",
+        "customer",
         "constraint",
+        "decision",
+        "stakeholder",
         "evidence",
         "preference",
+        "other",
     }
 )
+#: The same set under the name the memory screen uses, kept so a caller written
+#: against the older spelling keeps working.
+OBSERVATION_CATEGORIES: frozenset[str] = OBSERVATION_KINDS
 OBSERVATION_STATUSES: frozenset[str] = frozenset({"suggested", "confirmed", "dismissed"})
 TURN_ROLES: frozenset[str] = frozenset({"user", "assistant", "system", "tool"})
 
@@ -68,6 +75,19 @@ class ConversationNotFoundError(MemoryError):
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _json_parts(raw: Any) -> list[dict[str, Any]]:
+    """Parts as stored, one JSON array per row; a bad row reads as none."""
+    if not raw:
+        return []
+    try:
+        loaded = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(loaded, list):
+        return []
+    return [part for part in loaded if isinstance(part, dict)]
 
 
 def _json_values(raw: Any) -> list[str]:
@@ -98,6 +118,8 @@ class Conversation:
     updated_at: str
     #: The visible leaf of the branch tree. ``None`` until a turn is persisted.
     head_id: str | None = None
+    #: Archived threads stay readable but leave the rail.
+    archived: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -106,6 +128,7 @@ class Conversation:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "head_id": self.head_id,
+            "archived": self.archived,
         }
 
 
@@ -141,6 +164,9 @@ class Turn:
     #: Stable client-facing id, so a branch can be rebuilt without guessing.
     message_id: str | None = None
     parent_id: str | None = None
+    #: The ordered surfaces the client renders, so a reload is not a plainer
+    #: version of the thread it replaced.
+    parts: list[dict[str, Any]] = field(default_factory=list)
     #: What each sentence of this turn stands behind, when it was recorded.
     claims: list[Claim] = field(default_factory=list)
 
@@ -153,6 +179,7 @@ class Turn:
             "created_at": self.created_at,
             "message_id": self.message_id,
             "parent_id": self.parent_id,
+            "parts": [dict(part) for part in self.parts],
             "claims": [claim.to_dict() for claim in self.claims],
         }
 
@@ -182,16 +209,31 @@ class Observation:
     status: str = "suggested"
     confidence: float = 0.5
     source_turn: int | None = None
+    #: The conversation and message a remembered fact came from, so a person can
+    #: see where the agent picked it up.
+    conversation_id: str | None = None
+    source_message_id: str | None = None
     created_at: str = ""
     updated_at: str = ""
+
+    @property
+    def category(self) -> str:
+        """The kind under the name the memory screen has always shown."""
+        return self.kind
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "kind": self.kind,
+            #: The same value under the name the memory screen shows.
+            "category": self.kind,
+            "conversation_id": self.conversation_id,
+            "source_message_id": self.source_message_id,
             "text": self.text,
             "data": self.data,
-            "status": self.status,
+            # Stored as ``suggested``; the screen calls an unconfirmed fact
+            # ``proposed``, and that is what a client acts on.
+            "status": "proposed" if self.status == "suggested" else self.status,
             "confidence": self.confidence,
             "source_turn": self.source_turn,
             "created_at": self.created_at,
@@ -234,7 +276,8 @@ CREATE TABLE IF NOT EXISTS conversations (
     title TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    head_id TEXT
+    head_id TEXT,
+    archived INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS turns (
@@ -244,7 +287,8 @@ CREATE TABLE IF NOT EXISTS turns (
     content TEXT NOT NULL,
     created_at TEXT NOT NULL,
     message_id TEXT,
-    parent_id TEXT
+    parent_id TEXT,
+    parts TEXT
 );
 
 CREATE INDEX IF NOT EXISTS turns_by_conversation ON turns(conversation_id);
@@ -268,11 +312,19 @@ CREATE TABLE IF NOT EXISTS observations (
     status TEXT NOT NULL DEFAULT 'suggested',
     confidence REAL NOT NULL DEFAULT 0.5,
     source_turn INTEGER,
+    conversation_id TEXT,
+    source_message_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS observations_by_status ON observations(status);
+
+CREATE TABLE IF NOT EXISTS brief (
+    id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS shares (
     id TEXT PRIMARY KEY,
@@ -293,8 +345,12 @@ CREATE INDEX IF NOT EXISTS shares_by_hash ON shares(token_hash);
 #: is upgraded in place: nothing is dropped and no data is rewritten.
 _MIGRATIONS: tuple[tuple[str, str, str], ...] = (
     ("conversations", "head_id", "TEXT"),
+    ("conversations", "archived", "INTEGER NOT NULL DEFAULT 0"),
     ("turns", "message_id", "TEXT"),
     ("turns", "parent_id", "TEXT"),
+    ("turns", "parts", "TEXT"),
+    ("observations", "conversation_id", "TEXT"),
+    ("observations", "source_message_id", "TEXT"),
 )
 
 
@@ -326,6 +382,10 @@ def _validate_kind(kind: str) -> str:
 
 
 def _validate_status(status: str) -> str:
+    # The screen's word for an unconfirmed fact is ``proposed``; one status is
+    # stored for it however it was asked for.
+    if status == "proposed":
+        status = "suggested"
     if status not in OBSERVATION_STATUSES:
         raise MemoryError(f"unknown observation status: {status}")
     return status
@@ -349,7 +409,7 @@ def _validate_data(data: dict[str, Any] | None) -> dict[str, Any]:
 class StudioMemory:
     """A small SQLite store for conversations, turns, and observations."""
 
-    def __init__(self, path: str | Path | None = None) -> None:
+    def __init__(self, path: str | Path | None = None, *, import_legacy: bool = False) -> None:
         resolved = default_db_path() if path is None else path
         self._memory = str(resolved) == ":memory:"
         self.db_path = Path(":memory:") if self._memory else Path(resolved)
@@ -378,6 +438,11 @@ class StudioMemory:
             with self._connection:
                 self._connection.executescript(_SCHEMA)
                 _migrate(self._connection)
+            if not self._memory and (import_legacy or path is not None):
+                # A pre-core ``studio.db`` is moved in once, then renamed. The
+                # store opened on that very file never imports it: that would
+                # empty a live conversation log.
+                _import_legacy(self._connection, str(self.db_path), default_db_path())
         except sqlite3.DatabaseError as exc:
             self._connection.close()
             raise StoreCorrupt(str(self.db_path), [str(exc)], label="Your Studio memory") from exc
@@ -454,6 +519,7 @@ class StudioMemory:
                        (SELECT COUNT(*) FROM turns
                          WHERE turns.conversation_id = conversations.id) AS turn_count
                   FROM conversations
+                 WHERE conversations.archived = 0
                  ORDER BY conversations.updated_at DESC, conversations.created_at DESC
                  LIMIT ?
                 """,
@@ -478,6 +544,7 @@ class StudioMemory:
         content: str,
         message_id: str | None = None,
         parent_id: str | None = None,
+        parts: list[dict[str, Any]] | None = None,
     ) -> int:
         """Record a turn and return its row id, so citations can be attached."""
         if role not in TURN_ROLES:
@@ -493,9 +560,17 @@ class StudioMemory:
 
             cursor = self._connection.execute(
                 "INSERT INTO turns "
-                "(conversation_id, role, content, created_at, message_id, parent_id) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (conversation_id, role, content, now, message_id, parent_id),
+                "(conversation_id, role, content, created_at, message_id, parent_id, parts) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    conversation_id,
+                    role,
+                    content,
+                    now,
+                    message_id,
+                    parent_id,
+                    json.dumps(list(parts or [])),
+                ),
             )
             if message_id:
                 self._connection.execute(
@@ -520,11 +595,14 @@ class StudioMemory:
 
     # -- citations ---------------------------------------------------------
 
-    def add_citations(self, turn_id: int, claims: list[Claim]) -> None:
+    def add_citations(self, turn: int | Turn, claims: list[Claim]) -> None:
         """Store one row per claim, idempotently.
 
         A duplicate retry rewrites the same rows instead of stacking new ones.
+        The turn itself is accepted as well as its row id, because a caller
+        that just stored one holds the object and not the number.
         """
+        turn_id = turn if isinstance(turn, int) else turn.id
         with self._lock, self._connection:
             self._connection.execute("DELETE FROM turn_citations WHERE turn_id = ?", (turn_id,))
             for claim in claims:
@@ -625,6 +703,42 @@ class StudioMemory:
             )
         return self._updated_conversation(conversation_id)
 
+    def set_archived(self, conversation_id: str, archived: bool) -> Conversation:
+        """Take a thread out of the rail without destroying it."""
+        now = _now()
+        with self._lock, self._connection:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
+            self._connection.execute(
+                "UPDATE conversations SET archived = ?, updated_at = ? WHERE id = ?",
+                (1 if archived else 0, now, conversation_id),
+            )
+        return self._updated_conversation(conversation_id)
+
+    def delete_conversation(self, conversation_id: str) -> None:
+        """Forget one thread and everything hanging off it."""
+        with self._lock, self._connection:
+            exists = self._connection.execute(
+                "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if exists is None:
+                raise ConversationNotFoundError(conversation_id)
+            self._connection.execute(
+                "DELETE FROM turn_citations WHERE turn_id IN "
+                "(SELECT id FROM turns WHERE conversation_id = ?)",
+                (conversation_id,),
+            )
+            self._connection.execute(
+                "DELETE FROM turns WHERE conversation_id = ?", (conversation_id,)
+            )
+            self._connection.execute(
+                "DELETE FROM observations WHERE conversation_id = ?", (conversation_id,)
+            )
+            self._connection.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+
     def _updated_conversation(self, conversation_id: str) -> Conversation:
         """Read back a row this instance just wrote.
 
@@ -653,6 +767,31 @@ class StudioMemory:
             turn.claims = self.claims_for_turn(turn)
         return turns
 
+    # -- brief -------------------------------------------------------------
+
+    def get_brief(self) -> Brief | None:
+        """The standing context, or None before anything was saved."""
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT data FROM brief WHERE id = ?", ("brief",)
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            return Brief.model_validate_json(row["data"])
+        except ValueError:
+            return None
+
+    def save_brief(self, values: dict[str, Any]) -> Brief:
+        """Replace the standing context; the client sends the whole block."""
+        brief = Brief(**values)
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT OR REPLACE INTO brief (id, data, updated_at) VALUES (?, ?, ?)",
+                ("brief", brief.model_dump_json(), _now()),
+            )
+        return brief
+
     # -- observations ------------------------------------------------------
 
     def list_observations(self, include_dismissed: bool = False) -> list[Observation]:
@@ -674,6 +813,8 @@ class StudioMemory:
         status: str = "suggested",
         confidence: float = 0.5,
         source_turn: int | None = None,
+        conversation_id: str | None = None,
+        source_message_id: str | None = None,
     ) -> Observation:
         now = _now()
         observation = Observation(
@@ -684,14 +825,17 @@ class StudioMemory:
             status=_validate_status(status),
             confidence=_validate_confidence(confidence),
             source_turn=source_turn,
+            conversation_id=conversation_id,
+            source_message_id=source_message_id,
             created_at=now,
             updated_at=now,
         )
         with self._lock, self._connection:
             self._connection.execute(
                 "INSERT INTO observations "
-                "(id, kind, text, data, status, confidence, source_turn, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "(id, kind, text, data, status, confidence, source_turn, "
+                "conversation_id, source_message_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     observation.id,
                     observation.kind,
@@ -700,6 +844,8 @@ class StudioMemory:
                     observation.status,
                     observation.confidence,
                     observation.source_turn,
+                    observation.conversation_id,
+                    observation.source_message_id,
                     observation.created_at,
                     observation.updated_at,
                 ),
@@ -875,6 +1021,7 @@ class StudioMemory:
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             head_id=row["head_id"] if "head_id" in keys else None,
+            archived=bool(row["archived"]) if "archived" in keys else False,
         )
 
     @staticmethod
@@ -888,6 +1035,7 @@ class StudioMemory:
             created_at=row["created_at"],
             message_id=row["message_id"] if "message_id" in keys else None,
             parent_id=row["parent_id"] if "parent_id" in keys else None,
+            parts=_json_parts(row["parts"]) if "parts" in keys else [],
         )
 
     @staticmethod
@@ -940,9 +1088,89 @@ class StudioMemory:
             status=row["status"],
             confidence=row["confidence"],
             source_turn=row["source_turn"],
+            conversation_id=row["conversation_id"] if "conversation_id" in row.keys() else None,
+            source_message_id=(
+                row["source_message_id"] if "source_message_id" in row.keys() else None
+            ),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
+
+
+#: The pre-core Studio tables, named literally so no SQL is built from a value.
+_LEGACY_QUERIES = (
+    ("conversations", "SELECT * FROM conversations ORDER BY rowid"),
+    ("turns", "SELECT * FROM turns ORDER BY rowid"),
+    ("observations", "SELECT * FROM observations ORDER BY rowid"),
+)
+
+
+def _read_legacy(path: Path) -> dict[str, list[dict[str, Any]]]:
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    connection.row_factory = sqlite3.Row
+    try:
+        tables = {
+            str(row["name"])
+            for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        return {
+            name: [dict(row) for row in connection.execute(sql)]
+            for name, sql in _LEGACY_QUERIES
+            if name in tables
+        }
+    finally:
+        connection.close()
+
+
+def _import_legacy(connection: sqlite3.Connection, live: str, path: Path) -> None:
+    """Move a pre-core ``studio.db`` into this store, once.
+
+    The file is renamed, not deleted, so a person who wants to undo the import
+    still has what the sidecar used to keep.
+    """
+    if live != ":memory:":
+        try:
+            if Path(live).resolve() == path.resolve():
+                return
+        except OSError:
+            return
+    if not path.is_file():
+        return
+    imported = path.with_suffix(path.suffix + ".imported")
+    if imported.exists():
+        return
+    try:
+        rows = _read_legacy(path)
+    except (sqlite3.Error, KeyError, TypeError, ValueError):
+        return
+    with connection:
+        for table, _sql in _LEGACY_QUERIES:
+            legacy_rows = rows.get(table) or []
+            if not legacy_rows:
+                continue
+            columns = [
+                str(row["name"])
+                for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+            ]
+            usable = [column for column in columns if column in legacy_rows[0]]
+            if not usable:
+                continue
+            placeholders = ", ".join("?" for _ in usable)
+            statement = (
+                f"INSERT OR IGNORE INTO {table} ({', '.join(usable)}) VALUES ({placeholders})"
+            )
+            for row in legacy_rows:
+                row = dict(row)
+                if table == "observations":
+                    if row.get("kind") not in OBSERVATION_KINDS:
+                        row["kind"] = "other"
+                    status = row.get("status")
+                    row["status"] = "suggested" if status == "proposed" else status
+                connection.execute(statement, tuple(row[column] for column in usable))
+    try:
+        path.rename(imported)
+    except OSError:
+        return
 
 
 __all__ = [

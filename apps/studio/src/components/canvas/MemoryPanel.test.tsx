@@ -13,11 +13,13 @@ const mocks = vi.hoisted(() => ({
 
 let mockMemory: Observation[] = [];
 let mockMemoryLoading = false;
+let mockMessages: { id: string; role: string; content: string }[] = [];
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({
     memory: mockMemory,
     memoryLoading: mockMemoryLoading,
+    messages: mockMessages,
     ...mocks,
   }),
 }));
@@ -25,12 +27,11 @@ vi.mock("../../state/StudioContext", () => ({
 function observation(overrides: Partial<Observation>): Observation {
   return {
     id: "o-1",
-    kind: "career",
+    category: "career",
     text: "Accountable for activation.",
     data: {},
     status: "confirmed",
     confidence: 0.9,
-    source_turn: 1,
     created_at: "2026-10-22T10:00:00+00:00",
     updated_at: "2026-10-22T10:00:00+00:00",
     ...overrides,
@@ -41,6 +42,7 @@ describe("MemoryPanel", () => {
   beforeEach(() => {
     mockMemory = [];
     mockMemoryLoading = false;
+    mockMessages = [];
     vi.clearAllMocks();
   });
 
@@ -58,7 +60,7 @@ describe("MemoryPanel", () => {
   });
 
   it("asks about a guess and confirms it", () => {
-    mockMemory = [observation({ status: "suggested", text: "You own activation." })];
+    mockMemory = [observation({ status: "proposed", text: "You own activation." })];
     render(<MemoryPanel />);
 
     expect(screen.getByText("Did I get this right?")).toBeInTheDocument();
@@ -69,7 +71,7 @@ describe("MemoryPanel", () => {
   });
 
   it("dismisses a wrong guess", () => {
-    mockMemory = [observation({ status: "suggested" })];
+    mockMemory = [observation({ status: "proposed" })];
     render(<MemoryPanel />);
 
     fireEvent.click(screen.getByRole("button", { name: "That's not it" }));
@@ -113,10 +115,26 @@ describe("MemoryPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(mocks.addObservation).toHaveBeenCalledWith({
-      kind: "constraint",
+      category: "constraint",
       text: "We can't change pricing this quarter.",
       confirmed: true,
     });
+  });
+
+  it("shows the line a guess came from, so it can be judged", () => {
+    mockMessages = [{ id: "m-1", role: "user", content: "We always plan on Mondays." }];
+    mockMemory = [
+      observation({
+        status: "proposed",
+        category: "preference",
+        text: "Plans on Mondays.",
+        source_message_id: "m-1",
+      }),
+    ];
+    render(<MemoryPanel />);
+
+    expect(screen.getByText("You said: We always plan on Mondays.")).toBeInTheDocument();
+    expect(screen.getByText("How you work")).toBeInTheDocument();
   });
 
   it("clears everything only after a second confirmation", () => {

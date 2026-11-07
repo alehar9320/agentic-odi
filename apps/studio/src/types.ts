@@ -383,6 +383,16 @@ export interface StudioBrief {
 }
 
 /**
+ * The stored form: one brief per workspace, with a stable id, so the CLI, the
+ * MCP server, and the Studio all read the same context instead of each keeping
+ * a copy. `localStorage` is only this object's cache.
+ */
+export interface StoredBrief extends StudioBrief {
+  id: string;
+  updated_at: string;
+}
+
+/**
  * Lenses reachable from the rail and the bar. Chat is always the primary
  * stage; a lens makes room for itself and never replaces the thread.
  */
@@ -486,6 +496,11 @@ export interface TurnNode {
   role: string;
   content: string;
   created_at: string;
+  /**
+   * The ordered parts the agent produced. Stored raw: a reloaded thread
+   * re-validates each `ui` spec so an older card degrades instead of crashing.
+   */
+  parts?: ChatPart[];
   /** What each sentence stands behind, restored from the turn's citations. */
   claims?: Claim[];
 }
@@ -496,37 +511,64 @@ export interface ConversationTree {
   head_id: string | null;
 }
 
-export type ObservationKind =
+/** What an observation can be about. Mirrors `agentic_odi_core` categories. */
+export type ObservationCategory =
   | "career"
   | "opportunity"
   | "business"
-  | "stakeholder"
+  | "customer"
   | "constraint"
+  | "decision"
+  | "stakeholder"
   | "evidence"
-  | "preference";
+  | "preference"
+  | "other";
 
-export type ObservationStatus = "suggested" | "confirmed" | "dismissed";
+/**
+ * A proposed fact is not true yet: only a person can move it to `confirmed`,
+ * and a dismissed one never reaches a prompt again.
+ */
+export type ObservationKind = ObservationCategory;
+export type ObservationStatus =
+  | "suggested"
+  | "proposed"
+  | "confirmed"
+  | "dismissed";
 
 /** One thing the agent believes about the PM, shown for correction. */
 export interface Observation {
   id: string;
-  kind: ObservationKind;
+  /** The store's word for what a note is about; `category` is the screen's. */
+  kind?: ObservationKind;
+  category: ObservationCategory;
   text: string;
-  data: Record<string, unknown>;
   status: ObservationStatus;
+  data: Record<string, unknown>;
   confidence: number;
-  source_turn: number | null;
+  /** The thread that produced the fact, so a panel can say where it came from. */
+  conversation_id?: string | null;
+  /** The turn the person said it in. */
+  source_message_id?: string | null;
+  source_turn?: number | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface Conversation {
   id: string;
-  title: string;
+  /** Derived from the first user turn, so an empty thread has no name yet. */
+  title: string | null;
   created_at: string;
   updated_at: string;
   /** The visible branch head turn, when the conversation has branches. */
   head_id?: string | null;
+  /** An archived thread is still readable; only a delete loses it. */
+  archived?: boolean;
+}
+
+/** A conversation as the history list shows it: enough to name it and size it. */
+export interface ConversationSummary extends Conversation {
+  turn_count: number;
 }
 
 /** A conversation as the history list shows it: enough to name it and size it. */
@@ -535,15 +577,16 @@ export interface ConversationSummary extends Conversation {
 }
 
 export interface ConversationTurn {
-  id: number;
+  id: string;
   conversation_id: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   created_at: string;
-  /** Stable client message id, when the turn was authored with one. */
+  /** The client's message id, so a restored branch matches the wire. */
   message_id?: string | null;
   /** The id of the turn this one answers, when it is a branch or edit. */
   parent_id?: string | null;
+  parts?: ChatPart[];
   /** Persisted claim citations, reattached to the stored prose on restore. */
   claims?: Claim[];
 }
@@ -551,6 +594,16 @@ export interface ConversationTurn {
 export interface LatestConversation {
   conversation: Conversation | null;
   turns: ConversationTurn[];
+}
+
+/** What the sidecar will tell the browser about the stored provider key. */
+export interface SettingsSummary {
+  base_url: string;
+  model: string;
+  mcp_url: string;
+  has_api_key: boolean;
+  /** A form safe to render: enough to recognise the key, none of the key. */
+  masked: string;
 }
 
 export interface CreateJobPayload {

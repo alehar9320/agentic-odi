@@ -15,10 +15,13 @@ const OBSERVATION_KINDS = new Set<ObservationKind>([
   "career",
   "opportunity",
   "business",
-  "stakeholder",
+  "customer",
   "constraint",
+  "decision",
+  "stakeholder",
   "evidence",
   "preference",
+  "other",
 ]);
 const OBSERVATION_STATUSES = new Set<ObservationStatus>([
   "suggested",
@@ -95,6 +98,7 @@ export class LocalMemoryService {
     const observation: Observation = {
       id: newId(),
       kind: cleanKind(input.kind),
+      category: cleanKind(input.kind),
       text: cleanText(input.text),
       data: cleanData(input.data),
       status: input.confirmed ? "confirmed" : "suggested",
@@ -192,6 +196,40 @@ export class LocalMemoryService {
     headId: string | null,
   ): Promise<Conversation> {
     return this.store.setConversationHead(id, headId);
+  }
+
+  async setConversationArchived(id: string, archived: boolean): Promise<Conversation> {
+    const conversation = await this.store.getConversation(id);
+    if (!conversation) {
+      throw notFound("Conversation", id);
+    }
+    const next: StoredConversation = {
+      ...conversation,
+      head_id: conversation.head_id ?? null,
+      archived,
+      updated_at: nowIso(),
+    };
+    await this.store.putConversation(next);
+    return next;
+  }
+
+  async deleteConversation(id: string): Promise<{ deleted: string }> {
+    if (!(await this.store.getConversation(id))) {
+      throw notFound("Conversation", id);
+    }
+    // The browser store keeps no tombstone: the thread is emptied and marked
+    // archived, which is the strongest goodbye it can express.
+    await this.store.clearTurns(id);
+    const conversation = await this.store.getConversation(id);
+    if (conversation) {
+      await this.store.putConversation({
+        ...conversation,
+        head_id: conversation.head_id ?? null,
+        archived: true,
+        updated_at: nowIso(),
+      });
+    }
+    return { deleted: id };
   }
 
   async latestConversation(): Promise<LatestConversation> {

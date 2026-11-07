@@ -1,0 +1,21 @@
+# Approved exceptions to the deletion budget in ``config.yml``. The default is
+# deny: a pull request that deletes more than ``max_deletions`` lines fails, and
+# only the branch named here gets the larger ceiling, and only up to the ceiling
+# written next to it. Every entry names the issue that requires the removal and
+# why the removal is the work, not collateral damage. An entry is ignored - and
+# the strict default applies - if any of its four fields is missing.
+#
+# - issue: "<issue-number>"
+#   branch: "<head-branch-name>"
+#   max_deletions: 1500
+#   reason: "<why this change must remove shipped code>"
+- issue: 81
+  branch: issue-81-sessions
+  max_deletions: 1500
+  reason: >-
+    #81 requires the sidecar to stop keeping conversations, turns, and
+    observations in its own SQLite tables and to write them through the
+    event-sourced repository instead, so that the CLI and the MCP server see the
+    same thread. The replaced store is the work item, not incidental churn: every
+    removed behaviour is re-covered by the tests in
+    apps/studio-api/tests/test_studio_conversations.py and test_studio_memory.py.
