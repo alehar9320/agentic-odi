@@ -346,7 +346,7 @@ def _render_pages(env: Environment) -> dict[str, str]:
         tool_signatures={tool["name"]: _signature(tool) for tool in tools},
         catalog_cards=cards,
         odi_schema=odi_schema,
-        odi_schema_json=json.dumps(odi_schema, indent=1, sort_keys=True),
+        odi_schema_json=json.dumps(odi_schema, separators=(",", ":"), sort_keys=True),
         works_today=_works_today(tools, cards, connectors),
         roadmap_pending=roadmap_pending,
         formula_base=formula_base,
