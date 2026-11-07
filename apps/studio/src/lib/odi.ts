@@ -1,3 +1,4 @@
+import type { Outcome } from "../types";
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -91,4 +92,8 @@ export function segmentBasisLine(peopleInferred: boolean): string {
   return peopleInferred
     ? "Candidate segment — grouped by the job it serves, not by researched people."
     : "People named from your evidence.";
+}
+
+export function scoredAverage(outcomes: ReadonlyArray<Outcome>): { mean: number | null; scored: number; unscored: number } {
+  return summarizeMemberScores(outcomes.map((o) => o.opportunity_score));
 }
