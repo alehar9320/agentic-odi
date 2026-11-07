@@ -1,3 +1,5 @@
+import type { Outcome } from "../types";
+
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -91,4 +93,28 @@ export function segmentBasisLine(peopleInferred: boolean): string {
   return peopleInferred
     ? "Candidate segment — grouped by the job it serves, not by researched people."
     : "People named from your evidence.";
+}
+
+/**
+ * Average only the stored numeric opportunity scores. A missing score is never
+ * treated as zero: it is excluded from both the sum and the count. `mean` is
+ * `null` when nothing is scored, and scores are not rounded here.
+ */
+export function scoredAverage(outcomes: Outcome[]): {
+  mean: number | null;
+  scored: number;
+  unscored: number;
+} {
+  let total = 0;
+  let scored = 0;
+  let unscored = 0;
+  for (const o of outcomes) {
+    if (typeof o.opportunity_score === "number" && Number.isFinite(o.opportunity_score)) {
+      total += o.opportunity_score;
+      scored += 1;
+    } else {
+      unscored += 1;
+    }
+  }
+  return { mean: scored === 0 ? null : total / scored, scored, unscored };
 }
