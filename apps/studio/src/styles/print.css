@@ -132,4 +132,41 @@
   .outcome-card {
     margin-bottom: 6mm;
   }
+
+  /* The decision brief is the document and everything around it is chrome.
+     BriefLens marks the body only while the print dialog is open, so an
+     ordinary print of the conversation is untouched. */
+  body.brief-printing .stage__thread,
+  body.brief-printing .chat,
+  body.brief-printing .bar,
+  body.brief-printing .composer,
+  body.brief-printing .rail,
+  body.brief-printing .lens__head,
+  body.brief-printing .lens__foot,
+  body.brief-printing .brief__bar,
+  body.brief-printing .brief__objection {
+    display: none !important;
+  }
+
+  body.brief-printing .lens {
+    margin-top: 0;
+    border: none;
+    border-radius: 0;
+  }
+
+  body.brief-printing .brief__doc {
+    color: #111;
+  }
+
+  body.brief-printing .brief__doc h2,
+  body.brief-printing .brief__doc h3,
+  body.brief-printing .brief__doc li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.brief-printing .brief__doc h2,
+  body.brief-printing .brief__doc h3 {
+    page-break-after: avoid;
+  }
 }

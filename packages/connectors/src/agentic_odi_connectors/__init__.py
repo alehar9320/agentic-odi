@@ -36,10 +36,12 @@ from agentic_odi_connectors.models import (
     IngestBatch,
     IngestRecord,
     McpConnectorSettings,
+    RateLimitExceededError,
     RestConnectorSettings,
 )
 from agentic_odi_connectors.paths import config_path
 from agentic_odi_connectors.protocol import Connector
+from agentic_odi_connectors.rate_limit import DEFAULT_INGEST_RATE, RateLimiter
 from agentic_odi_connectors.registry import (
     ConnectorNotFoundError,
     ConnectorRegistry,
@@ -116,6 +118,7 @@ _load_and_validate_presets()
 __all__ = [
     "AREA_LABELS",
     "ConfigurationError",
+    "DEFAULT_INGEST_RATE",
     "PRESETS",
     "KNOWN_KINDS",
     "REQUIRED_KEYS",
@@ -136,6 +139,8 @@ __all__ = [
     "MarketplaceListing",
     "MarketplaceService",
     "McpConnectorSettings",
+    "RateLimitExceededError",
+    "RateLimiter",
     "UnknownAreaError",
     "RestConnectorSettings",
     "UnknownConnectorKindError",

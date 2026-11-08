@@ -35,6 +35,7 @@ it is merged; the link is the proof.
 - [x] **`odi data export`** — back the ODI state up as JSON ([PR #293](https://github.com/alehar9320/agentic-odi/pull/293)).
 - [x] **Decide, then close the loop** — record a decision with its rejected options, derive and render the outcome roadmap, review a past decision against today's numbers, and track a bet from its captured baseline to measured ([PR #357](https://github.com/alehar9320/agentic-odi/pull/357)).
 - [x] **Segments and strategy** — define a segment by the outcomes it cares about, derive candidate groups deterministically, profile a segment's underserved and overserved halves, and record a strategy only when its evidence precondition holds ([PR #357](https://github.com/alehar9320/agentic-odi/pull/357)).
+- [x] **Conversational first-run introduction** — the agent speaks first in five short turns and returns an editable brief, replacing the setup form ([PR #362](https://github.com/alehar9320/agentic-odi/pull/362)).
 - [x] **`odi connectors list-presets`** — discover and copy a preset from the terminal ([PR #290](https://github.com/alehar9320/agentic-odi/pull/290)).
 
 ## In flight
@@ -43,7 +44,11 @@ Open pull requests that change a capability this milestone cares about. Each
 links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
-- [ ] **Resume the last job, step, or outcome after a reload** — the Studio keeps its place in browser storage ([PR #299](https://github.com/alehar9320/agentic-odi/pull/299)).
+- [ ] **A study, and the waves inside it** — a named pass over a job with a unique wave per `(job, name)`; outcomes scope to a study of their own job, and legacy rows keep belonging to no study (this change).
+- [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
+- [ ] **The database checks itself on boot and closes cleanly** — a bounded `PRAGMA quick_check` at open, a `store_corrupt` failure page that names the file and the last backup and never touches the damaged file, a WAL checkpoint on idle and on clean shutdown, and a SIGTERM stop that leaves no `-wal` behind ([#598](https://github.com/alehar9320/agentic-odi/issues/598), part of [#348](https://github.com/alehar9320/agentic-odi/issues/348)).
+- [ ] **Agents reuse before they write** — the cost-ordered ladder and its bounds in `docs/architecture/reuse.md`, the behaviour skill in `.agents/skills/reuse-first/`, the Studio vendor ledger that `docs/architecture/vendor.md` promised but never had, and an advisory `Reuses:` check in `scripts/pr_guards.py body-truth`. The eight duplicates the audit named stay open as ordinary refactoring, one pull request each ([PR #602](https://github.com/alehar9320/agentic-odi/pull/602)).
+- [ ] **The landing page points at the sample** — the site's primary call to action opens a committed, read-only sample workspace generated from a fixture, labelled a sample on every row and rendering with no network ([PR #469](https://github.com/alehar9320/agentic-odi/pull/469)).
 - [ ] **Rate-limit the ingest sink** — a token bucket sheds a high-volume batch instead of exhausting memory ([PR #298](https://github.com/alehar9320/agentic-odi/pull/298)).
 - [ ] **Job validation at the model level** — name and description constraints live in `packages/core` ([PR #296](https://github.com/alehar9320/agentic-odi/pull/296)).
 - [ ] **MCP connection limits** — timeout and pool settings so a hanging connection is bounded ([PR #294](https://github.com/alehar9320/agentic-odi/pull/294)).
@@ -53,6 +58,12 @@ counted as done.
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
+- [ ] **Outcome-based segments and the strategy they imply** — the scored outcomes group into segments, and the recorded path names the ones it beat ([PR #367](https://github.com/alehar9320/agentic-odi/pull/367)).
+- [ ] **A vendor tree that cannot rot into app code** — copied markup lives in `src/vendor`, with lint and a resolving test on its imports ([PR #417](https://github.com/alehar9320/agentic-odi/pull/417)).
+- [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
+- [ ] **Evidence becomes outcome proposals** — a stored record is mined into a scored, approvable desired outcome, and only a human approval writes it ([PR #438](https://github.com/alehar9320/agentic-odi/pull/438)).
+- [ ] **Evidence from a file at the terminal** — `evidence add --file` reads text (or stdin) on the Studio's attachment cap ([PR #415](https://github.com/alehar9320/agentic-odi/pull/415)).
+- [ ] **Every conversation in one list, with its turn count** — `GET /api/conversations` returns each stored conversation newest-first with its turns, so the Studio can show a switcher ([PR #451](https://github.com/alehar9320/agentic-odi/pull/451)).
 
 ## Next
 

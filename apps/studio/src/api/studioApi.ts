@@ -12,6 +12,7 @@ import type {
   ConnectorOperationResponse,
   ConnectorPreset,
   Conversation,
+  ConversationSummary,
   ConversationTree,
   CreateJobPayload,
   Job,
@@ -24,10 +25,15 @@ import type {
   ObservationKind,
   ObservationStatus,
   Outcome,
+  Segment,
   Signal,
   Step,
+  Strategy,
   StudioConfig,
+  SharedArtifactPayload,
+  ShareLink,
   StudioError,
+  Study,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -65,6 +71,9 @@ export function isTransportFailure(error: unknown): boolean {
   return false;
 }
 
+/** How long the boot config request may hang before boot stops waiting on it. */
+const CONFIG_TIMEOUT_MS = 1_200;
+
 /** Map an HTTP status the sidecar/worker returned (with no body) to a code. */
 function codeForStatus(status: number): string {
   if (status === 404) return "not_found";
@@ -78,7 +87,7 @@ function codeForStatus(status: number): string {
 }
 
 const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
-  mcp_unreachable: "The studio sidecar isn't reachable.",
+  mcp_unreachable: "The local Studio service isn't responding.",
   not_found: "That resource wasn't found.",
   validation: "The request was invalid.",
   conflict: "That conflicts with the current state.",
@@ -88,7 +97,7 @@ const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
 
 const SUGGESTION_FOR_CODE: Partial<Record<string, string>> = {
   mcp_unreachable:
-    "Start the studio sidecar with `python scripts/dev.py` (or `npm --prefix apps/studio run dev:full`), then click Recheck.",
+    "Start it with  uv run python scripts/dev.py  and try again.",
   not_found: "Check the identifier and try again.",
   validation: "Fix the input and try again.",
   conflict: "Reload and try again.",
@@ -127,7 +136,7 @@ export function asStudioError(error: unknown): StudioError {
   if (error instanceof TypeError || (error instanceof Error && /fetch failed|network error/i.test(error.message))) {
     return {
       code: "mcp_unreachable",
-      message: MESSAGE_FOR_CODE.mcp_unreachable ?? "The studio sidecar isn't reachable.",
+      message: MESSAGE_FOR_CODE.mcp_unreachable ?? "The local Studio service isn't responding.",
       suggestion: SUGGESTION_FOR_CODE.mcp_unreachable,
       retryable: RETRYABLE_FOR_CODE.mcp_unreachable ?? true,
     };
@@ -144,6 +153,22 @@ export function asStudioError(error: unknown): StudioError {
     message: "Something went wrong.",
     retryable: false,
   };
+}
+
+/** The per-install sidecar token, shared with the sidecar and the MCP server. */
+const STUDIO_TOKEN_KEY = "studio.token";
+
+export function getStudioToken(): string | null {
+  if (typeof localStorage === "undefined") {
+    return null;
+  }
+  return localStorage.getItem(STUDIO_TOKEN_KEY);
+}
+
+/** Headers attaching the bearer token to every sidecar call. */
+export function authHeaders(): HeadersInit {
+  const token = getStudioToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function studioError(response: Response): Promise<StudioApiError> {
@@ -182,8 +207,11 @@ async function studioError(response: Response): Promise<StudioApiError> {
   return new StudioApiError(described, response.status, false);
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(apiUrl(path), { headers: { Accept: "application/json" } });
+async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    headers: { Accept: "application/json", ...authHeaders() },
+    ...(signal ? { signal } : {}),
+  });
   if (!response.ok) {
     const error = await studioError(response);
     recordStudioError(error.error, path);
@@ -195,7 +223,7 @@ async function getJson<T>(path: string): Promise<T> {
 async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method,
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -213,7 +241,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 async function deleteJson<T>(path: string): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method: "DELETE",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...authHeaders() },
   });
   if (!response.ok) {
     const error = await studioError(response);
@@ -241,8 +269,17 @@ async function withLocal<T>(
 }
 
 export async function fetchConfig(): Promise<StudioConfig> {
-  const body = await getJson<{ defaults: StudioConfig }>("/api/config");
-  return body.defaults;
+  // Configuration is a convenience, not a gate: a proxy that accepts the
+  // connection and never answers must not hold the first screen. Bound it and
+  // let the caller fall back to the defaults it already has.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CONFIG_TIMEOUT_MS);
+  try {
+    const body = await getJson<{ defaults: StudioConfig }>("/api/config", controller.signal);
+    return body.defaults;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface SidecarDiagnostics {
@@ -413,7 +450,7 @@ export function addConnector(payload: AddConnectorPayload): Promise<ConnectorOpe
 export async function deleteConnector(name: string): Promise<ConnectorOperationResponse> {
   const response = await fetch(apiUrl(`/api/connectors/${encodeURIComponent(name)}`), {
     method: "DELETE",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...authHeaders() },
   });
   if (!response.ok) {
     const error = await studioError(response);
@@ -436,7 +473,11 @@ export async function streamChat(
   try {
     const response = await fetch(apiUrl("/api/chat"), {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        ...authHeaders(),
+      },
       body: JSON.stringify({
         ...request,
         messages: request.messages.reduce<{
@@ -535,6 +576,36 @@ export async function dismissSignal(signalId: string, mcpUrl: string): Promise<S
   });
 }
 
+export async function fetchSegments(mcpUrl: string, jobId?: string): Promise<Segment[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Segment[]>(`/api/segments?${params.toString()}`);
+}
+
+/** The opened studies, or an empty list before any study has been opened. */
+export async function fetchStudies(mcpUrl: string, jobId?: string): Promise<Study[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Study[]>(`/api/studies?${params.toString()}`);
+}
+
+/** The recorded Stage 6 path, or null when no strategy has been proposed yet. */
+export async function fetchStrategy(mcpUrl: string): Promise<Strategy | null> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  return getJson<Strategy | null>(`/api/strategy?${params.toString()}`);
+}
+
+export async function proposeStrategy(mcpUrl: string, jobId?: string): Promise<Strategy> {
+  return sendJson<Strategy>("POST", "/api/strategy/propose", {
+    mcp_url: mcpUrl,
+    job_id: jobId ?? null,
+  });
+}
+
 
 export async function fetchMemory(): Promise<Observation[]> {
   return withLocal(
@@ -600,6 +671,17 @@ export function clearMemory(): Promise<{ ok: boolean }> {
   return withLocal(
     () => deleteJson<{ ok: boolean }>("/api/memory"),
     async (bff) => bff.memory.clearMemory(),
+  );
+}
+
+/** Every thread the PM can reopen, most recently touched first. */
+export async function listConversations(): Promise<ConversationSummary[]> {
+  return withLocal(
+    () =>
+      getJson<{ conversations: ConversationSummary[] }>("/api/conversations").then(
+        (body) => body.conversations,
+      ),
+    (bff) => bff.memory.listConversations(),
   );
 }
 
@@ -739,4 +821,29 @@ export function promoteEvidence(
     `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
     payload,
   );
+}
+
+
+/**
+ * The one artifact a share token names.
+ *
+ * Unlike every other read, this does not fall through to the browser BFF: a
+ * shared payload exists only where the token was minted, and there is no local
+ * copy to invent. A token the sidecar refuses is a real failure, not a reason to
+ * serve something else.
+ */
+export function fetchSharedArtifact(token: string): Promise<SharedArtifactPayload> {
+  return getJson<SharedArtifactPayload>(`/api/share/${encodeURIComponent(token)}`);
+}
+
+/**
+ * Mint a read-only link for one artifact. The returned token is shown once;
+ * the store keeps only its hash.
+ */
+export function createShareLink(payload: {
+  kind: SharedArtifactPayload["kind"];
+  expires_in_days?: number;
+  mcp_url?: string;
+}): Promise<ShareLink> {
+  return postJson<ShareLink>("/api/share", payload);
 }

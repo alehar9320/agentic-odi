@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatMemberMean,
   formatOpportunityScore,
+  hasScore,
   isUnderserved,
   opportunityPill,
   opportunityScore,
+  scoredAverage,
+  segmentBasisLine,
+  summarizeMemberScores,
+  UNDERSERVED_THRESHOLD,
 } from "./odi";
 
 describe("opportunityScore", () => {
@@ -28,6 +34,24 @@ describe("isUnderserved", () => {
   it("treats nullish scores as served", () => {
     expect(isUnderserved(null)).toBe(false);
     expect(isUnderserved(undefined)).toBe(false);
+  });
+
+  it("sits on the exported constant, not on a literal at the call site", () => {
+    expect(UNDERSERVED_THRESHOLD).toBe(10);
+    expect(isUnderserved(UNDERSERVED_THRESHOLD)).toBe(false);
+    expect(isUnderserved(UNDERSERVED_THRESHOLD + 0.1)).toBe(true);
+  });
+});
+
+describe("hasScore", () => {
+  it("is true only for a finite number", () => {
+    expect(hasScore(12.5)).toBe(true);
+    expect(hasScore(0)).toBe(true); // a real score of zero is scored
+    expect(hasScore(null)).toBe(false);
+    expect(hasScore(undefined)).toBe(false);
+    expect(hasScore(NaN)).toBe(false);
+    expect(hasScore(Infinity)).toBe(false);
+    expect(hasScore("12.5")).toBe(false);
   });
 });
 
@@ -56,5 +80,87 @@ describe("opportunityPill", () => {
       label: "✓ Served (Opp: N/A)",
       variant: "green",
     });
+  });
+});
+
+describe("summarizeMemberScores", () => {
+  it("averages only the members that carry a stored score", () => {
+    const summary = summarizeMemberScores([16, 12, null]);
+    expect(summary.mean).toBeCloseTo(14, 5);
+    expect(summary.scored).toBe(2);
+    expect(summary.unscored).toBe(1);
+  });
+
+  it("reports no mean rather than a zero when nothing is scored", () => {
+    const summary = summarizeMemberScores([null, undefined]);
+    expect(summary.mean).toBeNull();
+    expect(summary.scored).toBe(0);
+    expect(summary.unscored).toBe(2);
+  });
+
+  it("treats a missing score as missing, never as zero", () => {
+    // A mean that counted the missing score as 0 would read 6.0, not 12.0.
+    expect(summarizeMemberScores([12, null]).mean).toBeCloseTo(12, 5);
+  });
+});
+
+describe("scoredAverage", () => {
+  function outcome(score: number | null | undefined) {
+    return { id: "O-1", opportunity_score: score } as never;
+  }
+
+  it("averages the stored scores only, never counting a missing score as zero", () => {
+    const summary = scoredAverage([outcome(12), outcome(null)]);
+    expect(summary.mean).toBeCloseTo(12, 5);
+    expect(summary.scored).toBe(1);
+    expect(summary.unscored).toBe(1);
+  });
+
+  it("reports no mean at all when nothing is scored", () => {
+    const summary = scoredAverage([outcome(null), outcome(undefined)]);
+    expect(summary.mean).toBeNull();
+    expect(summary.scored).toBe(0);
+    expect(summary.unscored).toBe(2);
+  });
+
+  it("averages the stored values, not the pre-rounded ones", () => {
+    expect(scoredAverage([outcome(11.44), outcome(11.44)]).mean).toBeCloseTo(11.44, 5);
+  });
+
+  it("has no mean for an empty board rather than a zero", () => {
+    const summary = scoredAverage([]);
+    expect(summary.mean).toBeNull();
+    expect(summary.scored).toBe(0);
+    expect(summary.unscored).toBe(0);
+  });
+});
+
+describe("formatMemberMean", () => {
+  it("names the mean, the scored count, and the unscored count", () => {
+    expect(formatMemberMean(summarizeMemberScores([12, null]))).toBe(
+      "Mean opportunity 12.0 across 1 scored · 1 not scored",
+    );
+  });
+
+  it("omits the unscored clause when every member is scored", () => {
+    expect(formatMemberMean(summarizeMemberScores([12, 16]))).toBe(
+      "Mean opportunity 14.0 across 2 scored",
+    );
+  });
+
+  it("renders Not scored instead of a fake zero, NaN, or dash", () => {
+    expect(formatMemberMean(summarizeMemberScores([null, undefined]))).toBe("Not scored");
+  });
+});
+
+describe("segmentBasisLine", () => {
+  it("calls an inferred group a candidate, not a researched market", () => {
+    expect(segmentBasisLine(true)).toBe(
+      "Candidate segment — grouped by the job it serves, not by researched people.",
+    );
+  });
+
+  it("claims only that the people were named when they were", () => {
+    expect(segmentBasisLine(false)).toBe("People named from your evidence.");
   });
 });

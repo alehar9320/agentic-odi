@@ -76,6 +76,16 @@ class ToolName(str, Enum):
     LIST_SCHEDULED_WORK = "list_scheduled_work"
     CANCEL_SCHEDULED_WORK = "cancel_scheduled_work"
     TRIGGER_SCHEDULED_WORK = "trigger_scheduled_work"
+    SEGMENT_MARKET = "segment_market"
+    GET_SEGMENTS = "get_segments"
+    GET_STRATEGY = "get_strategy"
+    PROPOSE_STRATEGY = "propose_strategy"
+    PROPOSE_OUTCOME = "propose_outcome"
+    LIST_PROPOSALS = "list_proposals"
+    APPROVE_PROPOSAL = "approve_proposal"
+    REJECT_PROPOSAL = "reject_proposal"
+    OPEN_STUDY = "open_study"
+    LIST_STUDIES = "list_studies"
 
 
 class ToolEffect(str, Enum):
@@ -203,7 +213,10 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.ADD_OUTCOME.value: ToolSpec(
         name="add_outcome",
-        summary="Add a desired Outcome to a Job.",
+        summary=(
+            "Add a desired Outcome to a Job; three questions and the person's answers "
+            "come before any score, and the score carries them as a claim_check."
+        ),
         effect=_derive_effect("add_outcome"),
         arguments=(
             "job_id",
@@ -214,8 +227,9 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "importance_n",
             "satisfaction_n",
             "score_method",
+            "claim_check",
         ),
-        required=("job_id", "statement", "importance", "satisfaction"),
+        required=("job_id", "statement"),
         returns="The created Outcome.",
         stage="2",
     ),
@@ -387,7 +401,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.EVALUATE_OUTCOME.value: ToolSpec(
         name="evaluate_outcome",
         summary="Evaluate an outcome statement against ODI format rules.",
-        effect=_derive_effect("evaluate_outcome"),
+        effect=ToolEffect.READ,
         arguments=("statement", "job_id"),
         required=("statement",),
         returns="A verdict with coded issues and suggestions.",
@@ -697,7 +711,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.COMPUTE_OPPORTUNITY.value: ToolSpec(
         name="compute_opportunity",
         summary="Compute an ODI opportunity score from importance and satisfaction.",
-        effect=_derive_effect("compute_opportunity"),
+        effect=ToolEffect.READ,
         arguments=("importance", "satisfaction"),
         required=("importance", "satisfaction"),
         returns="The opportunity score as a float.",
@@ -793,6 +807,88 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("work_id",),
         returns="The dispatched scheduled work item.",
     ),
+    ToolName.SEGMENT_MARKET.value: ToolSpec(
+        name="segment_market",
+        summary="Cluster the scored outcomes into outcome-based segments.",
+        effect=_derive_effect("segment_market"),
+        arguments=("job_id", "people"),
+        returns="The segments the outcomes clustered into, with verdict and confidence.",
+        stage="5",
+    ),
+    ToolName.GET_SEGMENTS.value: ToolSpec(
+        name="get_segments",
+        summary="List the segments the market was divided into.",
+        effect=_derive_effect("get_segments"),
+        arguments=("job_id",),
+        returns="A list of Segments. Empty until segment_market has run.",
+        stage="5",
+    ),
+    ToolName.GET_STRATEGY.value: ToolSpec(
+        name="get_strategy",
+        summary="Get the most recently recorded innovation strategy.",
+        effect=_derive_effect("get_strategy"),
+        arguments=(),
+        returns="The Strategy with its rejected alternatives, or null if none was recorded.",
+        stage="6",
+    ),
+    ToolName.PROPOSE_STRATEGY.value: ToolSpec(
+        name="propose_strategy",
+        summary="Recommend the one innovation path the segments support.",
+        effect=_derive_effect("propose_strategy"),
+        arguments=("job_id",),
+        returns="The Strategy, including every path it beat and why.",
+        stage="6",
+    ),
+    ToolName.PROPOSE_OUTCOME.value: ToolSpec(
+        name="propose_outcome",
+        summary="Propose a desired outcome mined from an evidence record.",
+        effect=_derive_effect("propose_outcome"),
+        arguments=("evidence_id",),
+        required=("evidence_id",),
+        returns="An OutcomeProposal ready for human approval.",
+        stage="2",
+    ),
+    ToolName.LIST_PROPOSALS.value: ToolSpec(
+        name="list_proposals",
+        summary="List outcome proposals, optionally filtered by status.",
+        effect=_derive_effect("list_proposals"),
+        arguments=("status",),
+        returns="A list of OutcomeProposals.",
+        stage="2",
+    ),
+    ToolName.APPROVE_PROPOSAL.value: ToolSpec(
+        name="approve_proposal",
+        summary="Approve a proposal and write it as an Outcome.",
+        effect=_derive_effect("approve_proposal"),
+        arguments=("proposal_id", "statement", "importance", "satisfaction"),
+        required=("proposal_id",),
+        returns="The created Outcome.",
+        stage="2",
+    ),
+    ToolName.REJECT_PROPOSAL.value: ToolSpec(
+        name="reject_proposal",
+        summary="Reject a proposal; nothing is written to the ODI store.",
+        effect=_derive_effect("reject_proposal"),
+        arguments=("proposal_id",),
+        required=("proposal_id",),
+        returns="The rejected OutcomeProposal.",
+        stage="2",
+    ),
+    ToolName.OPEN_STUDY.value: ToolSpec(
+        name="open_study",
+        summary="Open a named study pass over a Job at a given wave number.",
+        effect=_derive_effect("open_study"),
+        arguments=("job_id", "name", "wave", "method_notes"),
+        required=("job_id", "name", "wave"),
+        returns="The created Study, opened as planned.",
+    ),
+    ToolName.LIST_STUDIES.value: ToolSpec(
+        name="list_studies",
+        summary="List the studies opened for a Job.",
+        effect=_derive_effect("list_studies"),
+        arguments=("job_id",),
+        returns="A list of Studies. Empty until a study has been opened.",
+    ),
 }
 
 TOOL_NAMES: tuple[str, ...] = tuple(TOOL_SPECS)
@@ -802,6 +898,7 @@ _STAGE_NAMES: dict[str | None, str] = {
     "2": "Stage 2: Capture Desired Outcomes",
     "3": "Stage 3: Build the Job Map",
     "4": "Stage 4: Calculate Opportunity Scores",
+    "5": "Stage 5: Segment by Underserved Outcomes",
     "6": "Stage 6: Formulate the Innovation Strategy",
     None: "Supporting Tools",
 }
@@ -812,7 +909,7 @@ _EFFECT_ORDER: tuple[ToolEffect, ...] = (
     ToolEffect.DESTRUCTIVE,
 )
 
-_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", "6", None)
+_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", "5", "6", None)
 
 
 def capability_manifest() -> dict:

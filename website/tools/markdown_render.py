@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import posixpath
 import re
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -52,12 +53,23 @@ def _highlight_code(code: str, language: str) -> str:
 
 
 def _fence_renderer(markdown: MarkdownIt) -> None:
-    """Render fenced code with server-side syntax highlighting."""
+    """Render fenced code with server-side syntax highlighting.
+
+    A ``mermaid`` fence is the exception. It is not code to colour but a
+    diagram's source, and colouring it would be wrong twice over: the reader
+    wants the picture, and the pygments mermaid lexer is not the renderer. The
+    source is emitted escaped, so a page whose script never loads still shows
+    the diagram as text, and ``assets/diagrams.js`` replaces it with the drawing
+    where it does. That is the one place the site spends client-side JavaScript,
+    and only pages with a diagram ask for it.
+    """
 
     def render(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
         token = tokens[index]
         info = (token.info or "").strip()
         language = info.split()[0] if info else ""
+        if language == "mermaid":
+            return f'<pre class="mermaid">{escape(token.content)}</pre>'
         markup = _highlight_code(token.content, language)
         if not markup:
             return ""
@@ -89,6 +101,8 @@ def _heading_renderer(markdown: MarkdownIt) -> None:
             text = tokens[index + 1].content
         anchor = _unique_anchor(env, text)
         env["heading_open_anchor"] = (anchor, level)
+        # A table rendered after this heading is about it, so it borrows the name.
+        env["last_heading_anchor"] = anchor
         return f'<h{level} id="{anchor}">'
 
     def render_close(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
@@ -115,8 +129,34 @@ def _unique_anchor(env: dict, text: str) -> str:
     return base if not count else f"{base}-{count}"
 
 
+def _table_renderer(markdown: MarkdownIt) -> None:
+    """Name a guide's tables and their columns for a reader who cannot see them.
+
+    Markdown has no caption syntax, and a maintainer's guide is the source of
+    truth — rewriting it to satisfy a structural rule would be worse than the
+    rule. So the naming comes from what the renderer already mints: the heading
+    above the table, which is exactly what a sighted reader uses to work out
+    what a table is, is attached as ``aria-labelledby``. ``scope="col"`` then
+    tells a reader which cell in each row is the row's name.
+    """
+
+    def render_table_open(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
+        anchor = env.get("last_heading_anchor")
+        return f'<table aria-labelledby="{anchor}">' if anchor else "<table>"
+
+    def render_th_open(tokens: list, index: int, options, env, **kwargs) -> str:  # noqa: ANN001
+        style = tokens[index].attrGet("style")
+        alignment = f' style="{style}"' if style else ""
+        return f'<th scope="col"{alignment}>'
+
+    renderer: Any = markdown.renderer
+    renderer.rules["table_open"] = render_table_open
+    renderer.rules["th_open"] = render_th_open
+
+
 _fence_renderer(_MARKDOWN)
 _heading_renderer(_MARKDOWN)
+_table_renderer(_MARKDOWN)
 
 
 def slugify(text: str) -> str:

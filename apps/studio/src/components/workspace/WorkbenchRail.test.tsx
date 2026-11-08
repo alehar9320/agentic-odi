@@ -6,6 +6,7 @@ const studio = vi.hoisted(() => ({
     jobs: { id: string }[];
     steps: { id: string }[];
     outcomes: { id: string; evidence?: string }[];
+    evidence?: { id: string }[];
     source: "seed" | "mcp" | "local";
     provenance?: {
       kind: "live" | "seed" | "empty";
@@ -15,6 +16,7 @@ const studio = vi.hoisted(() => ({
     };
   },
   memory: [] as { id: string; text: string }[],
+  segments: [] as { id: string }[],
   activePanel: null as string | null,
   openPanel: vi.fn(),
   closePanel: vi.fn(),
@@ -23,6 +25,19 @@ const studio = vi.hoisted(() => ({
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => studio,
 }));
+
+const panels = vi.hoisted(() => ({ blankBlurbs: false }));
+
+vi.mock("./panels", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./panels")>();
+  return {
+    ...actual,
+    findPanel: (id: string) => {
+      const panel = actual.findPanel(id as never);
+      return panels.blankBlurbs ? { ...panel, blurb: "   " } : panel;
+    },
+  };
+});
 
 import { WorkbenchRail } from "./WorkbenchRail";
 
@@ -40,9 +55,11 @@ describe("WorkbenchRail", () => {
   beforeEach(() => {
     studio.canvas = null;
     studio.memory = [];
+    studio.segments = [];
     studio.activePanel = null;
     studio.openPanel.mockClear();
     studio.closePanel.mockClear();
+    panels.blankBlurbs = false;
   });
 
   it("stays out of the way until the thread has made something", () => {
@@ -75,6 +92,16 @@ describe("WorkbenchRail", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "What I know, 2 notes" }));
     expect(studio.openPanel).toHaveBeenCalledWith("memory");
+  });
+
+  it("counts the segments the outcomes support", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }, { id: "O-2" }] });
+    studio.segments = [{ id: "seg-1" }, { id: "seg-2" }, { id: "seg-3" }];
+
+    render(<WorkbenchRail />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Segments, 3 segments" }));
+    expect(studio.openPanel).toHaveBeenCalledWith("segments");
   });
 
   it("omits a view that has nothing to show", () => {
@@ -137,6 +164,36 @@ describe("WorkbenchRail", () => {
     expect(screen.queryByText("OFFLINE")).toBeNull();
   });
 
+  it("counts every stored record, not only the outcomes with a note", () => {
+    studio.canvas = canvas({
+      jobs: [{ id: "J-1" }],
+      steps: [{ id: "S-1" }],
+      outcomes: [{ id: "O-1" }, { id: "O-2", evidence: "a quote" }],
+      evidence: [{ id: "E-1" }],
+    });
+
+    render(<WorkbenchRail />);
+
+    expect(screen.getByRole("button", { name: "Records, 5 records" })).toBeInTheDocument();
+  });
+
+  it("opens the records lens from its chip", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+
+    render(<WorkbenchRail />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Records, 1 record" }));
+    expect(studio.openPanel).toHaveBeenCalledWith("records");
+  });
+
+  it("keeps the records chip away while nothing is stored", () => {
+    studio.canvas = canvas({ source: "mcp" });
+
+    render(<WorkbenchRail />);
+
+    expect(screen.queryByRole("button", { name: /records/i })).toBeNull();
+  });
+
   it("opens a view and closes it again from the same chip", () => {
     studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
 
@@ -154,4 +211,43 @@ describe("WorkbenchRail", () => {
 
     expect(studio.closePanel).toHaveBeenCalled();
   });
+  it("says on hover what a chip opens (#696)", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+    render(<WorkbenchRail />);
+
+    const chip = screen.getByRole("button", { name: /^landscape/i });
+    fireEvent.mouseEnter(chip);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "Every outcome scored. Anything above 10 is underserved.",
+    );
+
+    fireEvent.mouseLeave(chip);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("says it on focus too, without changing the count in the name (#696)", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+    render(<WorkbenchRail />);
+
+    const chip = screen.getByRole("button", { name: "Landscape, 1 opportunity" });
+    fireEvent.focus(chip);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/every outcome scored/i);
+    expect(chip).toHaveAccessibleName("Landscape, 1 opportunity");
+
+    fireEvent.blur(chip);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("falls back to the chip's own label when the lens has no blurb (#696)", () => {
+    panels.blankBlurbs = true;
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+    render(<WorkbenchRail />);
+
+    fireEvent.mouseEnter(screen.getByRole("button", { name: /^landscape/i }));
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Landscape$/);
+  });
+
 });

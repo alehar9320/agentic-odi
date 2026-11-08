@@ -1,10 +1,20 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { openDB, type IDBPDatabase } from "idb";
 
 import type { Observation } from "../../types";
 import { nowIso } from "../id";
 import {
+  DB_NAME,
+  DB_VERSION,
+  migrationSteps,
+  type MetaValue,
+  type StudioDb,
+} from "./migrations";
+import {
+  byCreated,
   bySeq,
+  type DrainLease,
   type LocalStore,
+  type OutboxRecord,
   type StoredConversation,
   type StoredJob,
   type StoredOutcome,
@@ -13,81 +23,66 @@ import {
   type WorkspaceSnapshot,
 } from "./types";
 
-const DB_NAME = "agentic-odi-studio";
-const DB_VERSION = 1;
+export { DB_NAME };
 
-interface StudioDb extends DBSchema {
-  meta: { key: string; value: { key: string; value: number } };
-  jobs: { key: string; value: StoredJob; indexes: { "by-seq": number } };
-  steps: {
-    key: string;
-    value: StoredStep;
-    indexes: { "by-job": string; "by-seq": number };
-  };
-  outcomes: {
-    key: string;
-    value: StoredOutcome;
-    indexes: { "by-job": string; "by-seq": number };
-  };
-  observations: {
-    key: string;
-    value: Observation;
-    indexes: { "by-created": string };
-  };
-  conversations: {
-    key: string;
-    value: StoredConversation;
-    indexes: { "by-updated": string };
-  };
-  turns: {
-    key: number;
-    value: StoredTurn;
-    indexes: { "by-conversation": string };
-  };
-}
+const DRAIN_LEASE_KEY = "drain_lease";
 
 export class IndexedDbLocalStore implements LocalStore {
   readonly durable = true;
   private readonly db: IDBPDatabase<StudioDb>;
+  private reloadNeeded = false;
+  private readonly reloadListeners = new Set<(needsReload: boolean) => void>();
 
   private constructor(db: IDBPDatabase<StudioDb>) {
     this.db = db;
+    // Another tab upgrading to a newer schema asks this connection to move
+    // aside; the browser also drops the connection on its own (`close`). Either
+    // way this page holds a dead handle and must reload before it writes again.
+    db.addEventListener("versionchange", () => this.markNeedsReload());
+    db.addEventListener("close", () => this.markNeedsReload());
   }
 
   static async open(): Promise<IndexedDbLocalStore> {
     const db = await openDB<StudioDb>(DB_NAME, DB_VERSION, {
-      upgrade(database) {
-        database.createObjectStore("meta", { keyPath: "key" });
-        const jobs = database.createObjectStore("jobs", { keyPath: "id" });
-        jobs.createIndex("by-seq", "seq");
-        const steps = database.createObjectStore("steps", { keyPath: "id" });
-        steps.createIndex("by-job", "job_id");
-        steps.createIndex("by-seq", "seq");
-        const outcomes = database.createObjectStore("outcomes", { keyPath: "id" });
-        outcomes.createIndex("by-job", "job_id");
-        outcomes.createIndex("by-seq", "seq");
-        const observations = database.createObjectStore("observations", {
-          keyPath: "id",
-        });
-        observations.createIndex("by-created", "created_at");
-        const conversations = database.createObjectStore("conversations", {
-          keyPath: "id",
-        });
-        conversations.createIndex("by-updated", "updated_at");
-        const turns = database.createObjectStore("turns", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        turns.createIndex("by-conversation", "conversation_id");
+      upgrade(database, oldVersion, newVersion) {
+        // Run the registered ladder from the version the person has up to the
+        // one this build ships. A v1 database runs only `MIGRATIONS[2]`; a fresh
+        // one runs 1 then 2. `migrationSteps` throws by name if a version has no
+        // registered step, so a bump without a migration fails loudly here.
+        for (const step of migrationSteps(oldVersion, newVersion ?? DB_VERSION)) {
+          step(database);
+        }
       },
     });
     return new IndexedDbLocalStore(db);
   }
 
+  get needsReload(): boolean {
+    return this.reloadNeeded;
+  }
+
+  onVersionChange(listener: (needsReload: boolean) => void): () => void {
+    this.reloadListeners.add(listener);
+    return () => {
+      this.reloadListeners.delete(listener);
+    };
+  }
+
+  private markNeedsReload(): void {
+    if (this.reloadNeeded) {
+      return;
+    }
+    this.reloadNeeded = true;
+    this.db.close();
+    for (const listener of this.reloadListeners) {
+      listener(true);
+    }
+  }
+
   async nextSeq(): Promise<number> {
     const tx = this.db.transaction("meta", "readwrite");
-    const current = (await tx.store.get("seq"))?.value ?? 0;
-    const next = current + 1;
+    const current = (await tx.store.get("seq"))?.value;
+    const next = (typeof current === "number" ? current : 0) + 1;
     await tx.store.put({ key: "seq", value: next });
     await tx.done;
     return next;
@@ -167,6 +162,87 @@ export class IndexedDbLocalStore implements LocalStore {
     await this.db.clear("observations");
   }
 
+  async enqueueOutbox(record: OutboxRecord): Promise<void> {
+    await this.db.put("outbox", record);
+  }
+
+  async getOutbox(id: string): Promise<OutboxRecord | undefined> {
+    return this.db.get("outbox", id);
+  }
+
+  async putOutbox(record: OutboxRecord): Promise<void> {
+    await this.db.put("outbox", record);
+  }
+
+  async deleteOutbox(id: string): Promise<void> {
+    await this.db.delete("outbox", id);
+  }
+
+  async listOutbox(): Promise<OutboxRecord[]> {
+    const records = await this.db.getAllFromIndex("outbox", "by-created");
+    return records.sort(byCreated);
+  }
+
+  async clearOutbox(): Promise<void> {
+    await this.db.clear("outbox");
+  }
+
+  async claimDrainLease(
+    holder: string,
+    now: number,
+    ttlMs: number,
+  ): Promise<DrainLease | null> {
+    // One readwrite transaction over `meta` makes read-then-write atomic, so
+    // two tabs cannot both see an empty lease and both claim it.
+    const tx = this.db.transaction("meta", "readwrite");
+    const existing = (await tx.store.get(DRAIN_LEASE_KEY))?.value;
+    const lease = isLease(existing) ? existing : null;
+    if (lease && lease.holder !== holder && lease.expires_at > now) {
+      await tx.done;
+      return lease;
+    }
+    await tx.store.put({
+      key: DRAIN_LEASE_KEY,
+      value: { holder, expires_at: now + ttlMs },
+    });
+    await tx.done;
+    return null;
+  }
+
+  async renewDrainLease(holder: string, now: number, ttlMs: number): Promise<boolean> {
+    const tx = this.db.transaction("meta", "readwrite");
+    const existing = (await tx.store.get(DRAIN_LEASE_KEY))?.value;
+    const lease = isLease(existing) ? existing : null;
+    if (!lease || lease.holder !== holder) {
+      await tx.done;
+      return false;
+    }
+    await tx.store.put({
+      key: DRAIN_LEASE_KEY,
+      value: { holder, expires_at: now + ttlMs },
+    });
+    await tx.done;
+    return true;
+  }
+
+  async releaseDrainLease(holder: string): Promise<boolean> {
+    const tx = this.db.transaction("meta", "readwrite");
+    const existing = (await tx.store.get(DRAIN_LEASE_KEY))?.value;
+    const lease = isLease(existing) ? existing : null;
+    if (!lease || lease.holder !== holder) {
+      await tx.done;
+      return false;
+    }
+    await tx.store.delete(DRAIN_LEASE_KEY);
+    await tx.done;
+    return true;
+  }
+
+  async getDrainLease(): Promise<DrainLease | null> {
+    const existing = (await this.db.get("meta", DRAIN_LEASE_KEY))?.value;
+    return isLease(existing) ? existing : null;
+  }
+
   async listConversations(): Promise<StoredConversation[]> {
     const conversations = await this.db.getAll("conversations");
     return conversations.sort((left, right) =>
@@ -202,6 +278,10 @@ export class IndexedDbLocalStore implements LocalStore {
 
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.db.getAllFromIndex("turns", "by-conversation", conversationId);
+  }
+
+  async countTurns(conversationId: string): Promise<number> {
+    return this.db.countFromIndex("turns", "by-conversation", conversationId);
   }
 
   async appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn> {
@@ -301,6 +381,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "steps",
         "outcomes",
         "observations",
+        "outbox",
         "conversations",
         "turns",
       ],
@@ -312,6 +393,7 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("steps").clear(),
       tx.objectStore("outcomes").clear(),
       tx.objectStore("observations").clear(),
+      tx.objectStore("outbox").clear(),
       tx.objectStore("conversations").clear(),
       tx.objectStore("turns").clear(),
     ]);
@@ -321,4 +403,13 @@ export class IndexedDbLocalStore implements LocalStore {
   close(): void {
     this.db.close();
   }
+}
+
+function isLease(value: MetaValue | undefined): value is DrainLease {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as DrainLease).holder === "string" &&
+    typeof (value as DrainLease).expires_at === "number"
+  );
 }

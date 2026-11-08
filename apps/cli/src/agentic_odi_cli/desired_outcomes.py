@@ -40,9 +40,19 @@ def add(
     importance: float = typer.Option(..., min=1.0, max=10.0, help="Importance score (1-10)"),
     satisfaction: float = typer.Option(..., min=1.0, max=10.0, help="Satisfaction score (1-10)"),
     step_id: str | None = typer.Option(default=None, help="Optional Step ID"),
+    claim_check: str | None = typer.Option(
+        None,
+        "--claim-check",
+        help="JSON claim check: the questions behind the score. Omit to record an unverified one.",
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
-    """Add a desired Outcome to a Job."""
+    """Add a desired Outcome to a Job.
+
+    A score must carry the questions behind it. Pass ``--claim-check`` with the
+    JSON you collected; without it the score is recorded as unverified, saying
+    no customer questions were asked.
+    """
     args: dict[str, Any] = {
         "job_id": job_id,
         "statement": statement,
@@ -51,6 +61,15 @@ def add(
     }
     if step_id is not None:
         args["step_id"] = step_id
+    if claim_check is not None:
+        try:
+            args["claim_check"] = json.loads(claim_check)
+        except json.JSONDecodeError as exc:
+            raise typer.BadParameter(f"--claim-check must be valid JSON: {exc}") from exc
+    else:
+        from agentic_odi_core import manual_claim_check
+
+        args["claim_check"] = manual_claim_check().model_dump(mode="json")
     typer.echo(
         render_saved("created", run_tool("add_outcome", args), as_json=json_output, noun="Outcome")
     )

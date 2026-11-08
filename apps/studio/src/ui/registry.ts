@@ -14,6 +14,8 @@ import {
   SegmentProfile,
   OpportunityThesis,
   OutcomeCard,
+  SegmentCard,
+  StrategyCard,
 } from "./cards";
 import {
   Callout,
@@ -57,4 +59,6 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
   "decision-review": DecisionReview,
   bet: Bet,
   "segment-profile": SegmentProfile,
+  "segment-card": SegmentCard,
+  "strategy-card": StrategyCard,
 };

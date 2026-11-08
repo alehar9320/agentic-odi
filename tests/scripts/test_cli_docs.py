@@ -31,24 +31,11 @@ def test_cli_md_contains_all_registered_commands() -> None:
     content = doc_path.read_text(encoding="utf-8")
 
     all_commands = _get_app_commands(app)
-    expected_top = {
-        "capabilities",
-        "connectors",
-        "jobs",
-        "steps",
-        "desired-outcomes",
-        "evidence",
-        "customer-outcomes",
-        "settings",
-        "profile",
-        "setup",
-        "chat",
-        "schema",
-        "score",
-        "version",
-        "update",
-    }
+    # Every group and top-level command the Typer app exposes must be named in
+    # the reference. Deriving the set from the app means a new group cannot ship
+    # undocumented.
+    top_level = {name.split(" ", 1)[0] for name in all_commands}
 
-    for cmd in expected_top:
+    for cmd in sorted(top_level):
         assert cmd in all_commands, f"Command {cmd} missing from Typer app"
         assert cmd in content, f"Command {cmd} missing from docs/cli.md"

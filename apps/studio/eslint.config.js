@@ -30,4 +30,25 @@ export default tseslint.config(
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
     },
   },
+  {
+    // Copied presentation stays a leaf: props in, markup out. The product
+    // wrapper under src/components owns state and passes data down.
+    // src/vendor/boundary.test.ts resolves relative specifiers as well, because
+    // a string pattern cannot tell "../assistant/plan" from "../../state/x".
+    files: ["src/vendor/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/state/*", "@/api/*", "@/assistant/*", "@/bff/*"],
+              message:
+                "src/vendor may not import product state, api, assistant, or bff. Take props from a wrapper under src/components.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
