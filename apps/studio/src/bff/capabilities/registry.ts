@@ -1,6 +1,10 @@
 import { authHeaders } from "../../api/studioApi";
 import { apiUrl } from "../../bridge/desktopBridge";
-import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import {
+  endpointReachability,
+  isEndpointConfiguredForSettings,
+  isPrivateHost,
+} from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
 
 export type CapabilityId =
@@ -32,9 +36,7 @@ export interface CapabilityProbe {
   id: CapabilityId;
   label: string;
   description: string;
-  /** True when `check` proves configuration only, not that anything answers. */
-  configuredOnly?: boolean;
-  check(settings: StudioConfig): Promise<boolean>;
+  check(settings: StudioConfig): Promise<{ ok: boolean; reason?: string; unproven?: boolean }>;
 }
 
 const localStatuses: Record<CapabilityId, Capability> = {
@@ -126,13 +128,6 @@ async function probeSidecar(path: string, capabilityId?: CapabilityId): Promise<
   }
 }
 
-/** Ask the sidecar whether the configured MCP server answers.
- *
- * The route is POST-only (`apps/studio-api/.../studio/router.py`), so the probe
- * posts the same body `healthMcp` does. It used to GET, so a healthy sidecar
- * answered 405 and the row said MCP was missing. The body's `reachable` is the
- * fact, not the status code: an MCP server that does not answer is unavailable
- * even when the sidecar itself replied. */
 async function probeMcp(mcpUrl: string): Promise<boolean> {
   try {
     const response = await fetch(apiUrl("/api/health/mcp"), {
@@ -151,46 +146,87 @@ async function probeMcp(mcpUrl: string): Promise<boolean> {
   }
 }
 
+
+/** The same loopback rule `modelEndpoint.ts` uses before it calls a host private. */
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  return host === "localhost" || host.endsWith(".localhost") || host === "::1" || host.startsWith("127.");
+}
+
 export class CapabilityRegistry {
   private readonly probes: CapabilityProbe[] = [
     {
       id: "browser-model",
       label: localStatuses["browser-model"].label,
       description: localStatuses["browser-model"].description,
-      check: async () => isBrowserModelAvailable(),
+      check: async () => ({ ok: isBrowserModelAvailable() }),
     },
     {
       id: "endpoint-model",
       label: localStatuses["endpoint-model"].label,
       description: localStatuses["endpoint-model"].description,
-      // Present in Settings is not the same as answering: configuration is all
-      // this check can see, so it can only ever reach `unknown` (#515).
-      configuredOnly: true,
-      check: async (settings) => isEndpointConfiguredForSettings(settings),
+      // Present in Settings is not the same as answering. Reachability is only
+      // proven when the page and the endpoint sit on the same side: a hosted
+      // page can reach a public endpoint, a device page a loopback one. Anything
+      // else is configured, not checked (#515).
+      check: async (settings) => {
+        if (!isEndpointConfiguredForSettings(settings)) {
+          return { ok: false };
+        }
+        const originClass = isPrivateHost(window.location.hostname) ? "device" : "hosted";
+        const reachability = endpointReachability(
+          {
+            base_url: settings.base_url,
+            api_key: settings.api_key,
+            model: settings.model_name,
+          },
+          { originClass },
+        );
+        if (reachability === "device-only") {
+          return {
+            ok: false,
+            reason:
+              "This endpoint is on your machine. A hosted page cannot reach it; use the desktop app or open the Studio on this device.",
+          };
+        }
+        let hostname: string;
+        try {
+          hostname = new URL(settings.base_url.trim()).hostname;
+        } catch {
+          hostname = "";
+        }
+        const proven =
+          hostname === ""
+            ? true
+            : originClass === "hosted"
+              ? !isPrivateHost(hostname)
+              : isLoopbackHost(hostname);
+        return proven ? { ok: true } : { ok: true, unproven: true };
+      },
     },
     {
       id: "sidecar-llm",
       label: localStatuses["sidecar-llm"].label,
       description: localStatuses["sidecar-llm"].description,
-      check: async () => probeSidecar("/api/capabilities", "sidecar-llm"),
+      check: async () => ({ ok: await probeSidecar("/api/capabilities", "sidecar-llm") }),
     },
     {
       id: "sidecar-connectors",
       label: localStatuses["sidecar-connectors"].label,
       description: localStatuses["sidecar-connectors"].description,
-      check: async () => probeSidecar("/api/connectors"),
+      check: async () => ({ ok: await probeSidecar("/api/connectors") }),
     },
     {
       id: "sidecar-mcp",
       label: localStatuses["sidecar-mcp"].label,
       description: localStatuses["sidecar-mcp"].description,
-      check: async (settings) => probeMcp(settings.mcp_url),
+      check: async (settings) => ({ ok: await probeMcp(settings.mcp_url) }),
     },
     {
       id: "sidecar-import",
       label: localStatuses["sidecar-import"].label,
       description: localStatuses["sidecar-import"].description,
-      check: async () => probeSidecar("/api/capabilities", "sidecar-import"),
+      check: async () => ({ ok: await probeSidecar("/api/capabilities", "sidecar-import") }),
     },
   ];
 
@@ -199,14 +235,18 @@ export class CapabilityRegistry {
       this.probes.map(async (probe) => {
         let ok: boolean;
         let reason: string | undefined;
+        let unproven = false;
         try {
-          ok = await probe.check(settings);
+          const result = await probe.check(settings);
+          ok = result.ok;
+          reason = result.reason;
+          unproven = result.unproven === true;
         } catch (error) {
           ok = false;
           reason = error instanceof Error ? error.message : "Probe failed.";
         }
         const status: Capability["status"] = ok
-          ? probe.configuredOnly
+          ? unproven
             ? "unknown"
             : "available"
           : "unavailable";

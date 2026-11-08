@@ -259,3 +259,70 @@ describe("CapabilityRegistry", () => {
     expect(statuses).toHaveLength(9);
   });
 });
+
+describe("endpoint-model reachability", () => {
+  let originalLocation: Location;
+
+  const setHostname = (value: string) => {
+    originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      get() {
+        return new Proxy(originalLocation, {
+          get(target, prop) {
+            if (prop === "hostname") return value;
+            return Reflect.get(target, prop);
+          },
+        });
+      },
+    });
+  };
+
+  afterEach(() => {
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      configurable: true,
+    });
+  });
+
+  it("reports endpoint-model as device-only for a private endpoint on a hosted page", async () => {
+    setHostname("studio.example.com");
+    const statuses = await capabilityRegistry.statuses({
+      base_url: "http://127.0.0.1:11434/v1",
+      api_key: "",
+      model_name: "qwen3:8b",
+      mcp_url: "http://localhost:8000/mcp",
+      theme: "dark",
+    });
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["endpoint-model"].status).toBe("unavailable");
+    expect(byId["endpoint-model"].reason).toContain("on your machine");
+    expect(byId["endpoint-model"].reason).toContain("desktop app");
+  });
+
+  it("reports endpoint-model as available for a private endpoint on a device page", async () => {
+    setHostname("localhost");
+    const statuses = await capabilityRegistry.statuses({
+      base_url: "http://127.0.0.1:11434/v1",
+      api_key: "",
+      model_name: "qwen3:8b",
+      mcp_url: "http://localhost:8000/mcp",
+      theme: "dark",
+    });
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["endpoint-model"].status).toBe("available");
+  });
+
+  it("reports endpoint-model as available for a public endpoint on a hosted page", async () => {
+    setHostname("studio.example.com");
+    const statuses = await capabilityRegistry.statuses({
+      base_url: "https://api.example.com/v1",
+      api_key: "sk-test",
+      model_name: "gpt-4o",
+      mcp_url: "http://localhost:8000/mcp",
+      theme: "dark",
+    });
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["endpoint-model"].status).toBe("available");
+  });
+});
