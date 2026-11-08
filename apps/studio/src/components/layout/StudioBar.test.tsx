@@ -35,6 +35,8 @@ const stubSnapshot = (overrides: Partial<UpdateSnapshot> = {}): UpdateSnapshot =
   available: null,
   progress: null,
   lastCheckedAt: null,
+  lastSuccessfulCheckAt: null,
+  actions: [],
   installed: false,
   pendingInstall: false,
   error: null,

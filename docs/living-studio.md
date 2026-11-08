@@ -830,7 +830,12 @@ bar, **Settings → Software update**, or the version line in the sidebar applie
 it immediately. Windows needs the app to exit before its installer runs, so it
 offers **Update & restart** instead. Dismissing the bar is safe: a staged update
 still applies on the next launch, and check failures are reported in Settings
-rather than interrupting the conversation.
+rather than interrupting the conversation. A failed check never borrows the
+last attempt's timestamp: Settings says plainly that the app could not check and
+names when it last reached the server successfully, or that it has not yet.
+Below that, **Recent update activity** lists the most recent updater actions of
+this session — checks, downloads, installs, skips and dismissals — newest first
+and capped, so a support conversation starts from what actually happened.
 
 In-app updates are inactive in the browser build and in `tauri dev`; both say so
 in **Settings → Software update**.
