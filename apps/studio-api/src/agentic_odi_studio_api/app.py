@@ -238,6 +238,13 @@ def create_app(
                 return JSONResponse({"error": failure.model_dump(mode="json")}, status_code=503)
         return await call_next(request)
 
+    async def _add_csp_header(request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:* http://127.0.0.1:*"
+        return response
+
+    app.middleware("http")(_add_csp_header)
+
     # Registration order is reversed: the last middleware added runs outermost,
     # so the request id is assigned before the boot check reads it.
     app.middleware("http")(_refuse_when_boot_failed)
