@@ -84,6 +84,63 @@ describe("Composer command palette", () => {
     expect(screen.getByRole("textbox")).not.toHaveAttribute("aria-activedescendant");
   });
 
+  it("keeps the highlighted command in view without moving the list further than it must", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext);
+    const scroll = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      render(<Composer {...baseProps} value="/" />);
+      const textbox = screen.getByRole("textbox");
+      scroll.mockClear();
+
+      for (let index = 0; index < 14; index += 1) {
+        fireEvent.keyDown(textbox, { key: "ArrowDown" });
+      }
+
+      const last = scroll.mock.calls.at(-1)?.[0];
+      expect(last).toMatchObject({ block: "nearest" });
+      expect(last).toMatchObject({ behavior: "smooth" });
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it("scrolls instantly when the person asks for less motion", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext);
+    const scroll = vi.fn();
+    const originalScroll = Element.prototype.scrollIntoView;
+    const originalMatchMedia = window.matchMedia;
+    Element.prototype.scrollIntoView = scroll;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: (query: string) => ({
+        matches: query.includes("prefers-reduced-motion"),
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }),
+    });
+    try {
+      render(<Composer {...baseProps} value="/" />);
+      const textbox = screen.getByRole("textbox");
+      scroll.mockClear();
+
+      fireEvent.keyDown(textbox, { key: "ArrowDown" });
+
+      expect(scroll.mock.calls.at(-1)?.[0]).toMatchObject({
+        block: "nearest",
+        behavior: "auto",
+      });
+    } finally {
+      Element.prototype.scrollIntoView = originalScroll;
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
+  });
+
   it("reaches the records lens by typing its name", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext);
     const onCommand = vi.fn();
