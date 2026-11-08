@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { isEndpointConfigured, isEndpointConfiguredForSettings } from "./modelEndpoint";
+import {
+  endpointReachability,
+  isEndpointConfigured,
+  isEndpointConfiguredForSettings,
+  isPrivateHost,
+} from "./modelEndpoint";
 
 function endpoint(overrides: Partial<{ base_url: string; api_key: string; model: string }> = {}) {
   return {
@@ -79,5 +84,70 @@ describe("model endpoint configuration", () => {
         model_name: "qwen3",
       }),
     ).toBe(true);
+  });
+});
+
+describe("endpoint reachability", () => {
+  const facts = (originClass: "device" | "hosted") => ({ originClass });
+
+  it.each([
+    ["loopback", "http://127.0.0.1:11434/v1"],
+    ["localhost by name", "http://localhost:1234/v1"],
+    ["a .localhost host", "http://lmstudio.localhost:1234/v1"],
+    ["bracketed IPv6 loopback", "http://[::1]:11434/v1"],
+    ["10/8", "http://10.0.4.9:11434/v1"],
+    ["172.16/12", "http://172.20.0.3:11434/v1"],
+    ["192.168/16", "http://192.168.1.40:11434/v1"],
+  ])("reports a private %s endpoint as reachable from a device page", (_label, base_url) => {
+    expect(endpointReachability(endpoint({ base_url, api_key: "" }), facts("device"))).toBe(
+      "reachable",
+    );
+  });
+
+  it.each([
+    ["loopback", "http://127.0.0.1:11434/v1"],
+    ["localhost by name", "http://localhost:1234/v1"],
+    ["a .localhost host", "http://lmstudio.localhost:1234/v1"],
+    ["bracketed IPv6 loopback", "http://[::1]:11434/v1"],
+    ["10/8", "http://10.0.4.9:11434/v1"],
+    ["172.16/12", "http://172.20.0.3:11434/v1"],
+    ["192.168/16", "http://192.168.1.40:11434/v1"],
+  ])("reports a private %s endpoint as device-only from a hosted page", (_label, base_url) => {
+    expect(endpointReachability(endpoint({ base_url, api_key: "" }), facts("hosted"))).toBe(
+      "device-only",
+    );
+  });
+
+  it("reports a keyed public endpoint as reachable from a hosted page", () => {
+    expect(
+      endpointReachability(endpoint({ base_url: "https://api.example.com/v1", api_key: "sk" }), facts("hosted")),
+    ).toBe("reachable");
+  });
+
+  it("reports a keyed public endpoint as reachable from a device page", () => {
+    expect(
+      endpointReachability(endpoint({ base_url: "https://api.example.com/v1", api_key: "sk" }), facts("device")),
+    ).toBe("reachable");
+  });
+
+  it("reports the sidecar proxy as reachable from a hosted page", () => {
+    expect(
+      endpointReachability(endpoint({ base_url: "http://localhost:8001/v1", api_key: "" }), facts("hosted")),
+    ).toBe("reachable");
+  });
+
+  it("is device-only for an address without a model", () => {
+    expect(endpointReachability(endpoint({ model: "" }), facts("device"))).toBe("device-only");
+  });
+
+  it("is device-only for an unparseable address", () => {
+    expect(endpointReachability(endpoint({ base_url: "not a url", api_key: "" }), facts("device"))).toBe(
+      "device-only",
+    );
+  });
+
+  it("exports isPrivateHost", () => {
+    expect(isPrivateHost("localhost")).toBe(true);
+    expect(isPrivateHost("model.example.com")).toBe(false);
   });
 });
