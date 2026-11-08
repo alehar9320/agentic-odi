@@ -71,6 +71,17 @@ export function summarizeMemberScores(
 }
 
 /**
+ * The landscape's headline average: the mean of the stored scores only. One
+ * unscored outcome cannot drag the number down, and an all-unscored board has
+ * no mean at all rather than a fake zero. Delegates the counting to
+ * `summarizeMemberScores` so there is exactly one place that decides what
+ * "scored" means.
+ */
+export function scoredAverage(outcomes: ReadonlyArray<Outcome>): MemberScoreSummary {
+  return summarizeMemberScores(outcomes.map((outcome) => outcome.opportunity_score));
+}
+
+/**
  * The one sentence a segment board shows for its member scores. `Not scored`
  * replaces the mean when nothing is scored — never `0`, `NaN`, or a dash that
  * reads as a number.

@@ -12,6 +12,7 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { ShareAction } from "../ShareAction";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
 
@@ -82,8 +83,8 @@ export function OpportunityLandscape() {
     return ids.size;
   }, [evidence]);
 
-  const avgSummary = useMemo(() => scoredAverage(outcomes), [outcomes]);
-  const avgOpportunity = avgSummary.mean === null ? "Not scored" : formatOpportunityScore(avgSummary.mean);
+  // The average counts stored scores only.
+  const averageScore = useMemo(() => scoredAverage(outcomes), [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
     return outcomes.filter((outcome) => {
@@ -137,7 +138,7 @@ export function OpportunityLandscape() {
           </p>
         </div>
 
-        {/* The view switcher, and the one action that leaves the screen for a document. */}
+        {/* The view switcher, and the actions that leave the screen — for a document, or a read-only link. */}
         <div className="field__row">
           <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", padding: 3, borderRadius: 8, border: "1px solid var(--studio-border)" }}>
             <button
@@ -175,6 +176,7 @@ export function OpportunityLandscape() {
           >
             Export brief
           </button>
+          <ShareAction />
         </div>
       </div>
 
@@ -242,8 +244,16 @@ export function OpportunityLandscape() {
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Avg Opportunity Score</div>
-            <div className="studio-metric__value">{avgOpportunity}</div>
-            {avgSummary.mean !== null && <div className="studio-metric__delta">{avgSummary.scored} scored · {avgSummary.unscored} not scored</div>}
+            <div className="studio-metric__value">
+              {averageScore.mean == null
+                ? "Not scored"
+                : formatOpportunityScore(averageScore.mean)}
+            </div>
+            {averageScore.mean == null ? null : (
+              <div className="studio-metric__delta">
+                {`${averageScore.scored} scored · ${averageScore.unscored} not scored`}
+              </div>
+            )}
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Unique Customer Quotes</div>
