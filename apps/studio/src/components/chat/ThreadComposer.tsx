@@ -7,8 +7,14 @@
  * setup wizard's composer.
  */
 
-import { AuiIf, ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  AttachmentPrimitive,
+  AuiIf,
+  ComposerPrimitive,
+  useAui,
+  useAuiState,
+} from "@assistant-ui/react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import {
   ATTACHMENT_ACCEPT,
@@ -61,9 +67,42 @@ function AttachmentThumb({ file }: { file?: File }) {
   }, [url]);
 
   if (!url) {
-    return null;
+    return <AttachmentPrimitive.unstable_Thumb className="attachment-chip__thumb" aria-hidden="true" />;
   }
   return <img className="attachment-chip__thumb" src={url} alt="" />;
+}
+
+function ComposerAttachmentChip({
+  attachment,
+  index,
+  onRemove,
+}: {
+  attachment: { id: string; name: string; file?: File };
+  index: number;
+  onRemove?: (index: number) => void;
+}) {
+  const size = formatFileSize(attachment.file?.size ?? 0);
+  return (
+    <ComposerPrimitive.AttachmentByIndex
+      index={index}
+      components={{
+        Attachment: () => (
+          <AttachmentPrimitive.Root className="attachment-chip" role="listitem">
+            <AttachmentThumb file={attachment.file} />
+            <span className="attachment-chip__meta">
+              <span className="attachment-chip__name"><AttachmentPrimitive.Name /></span>
+              {size ? <span className="attachment-chip__size">{size}</span> : null}
+            </span>
+            <AttachmentPrimitive.Remove
+              className="attachment-chip__remove"
+              aria-label={`Remove ${attachment.name}`}
+              onClick={() => onRemove?.(index)}
+            />
+          </AttachmentPrimitive.Root>
+        ),
+      }}
+    />
+  );
 }
 
 function AttachmentRow({
@@ -71,7 +110,6 @@ function AttachmentRow({
 }: {
   onRemove?: (index: number) => void;
 }) {
-  const aui = useAui();
   const attachments = useAuiState((state) => state.composer.attachments);
 
   if (attachments.length === 0) {
@@ -83,29 +121,14 @@ function AttachmentRow({
       <p className="attachment-count" aria-live="polite">
         {attachments.length} of {MAX_ATTACHMENTS} files
       </p>
-      {attachments.map((attachment, index) => {
-        const size = formatFileSize(attachment.file?.size ?? 0);
-        return (
-          <span className="attachment-chip" role="listitem" key={attachment.id}>
-            <AttachmentThumb file={attachment.file} />
-            <span className="attachment-chip__meta">
-              <span className="attachment-chip__name">{attachment.name}</span>
-              {size ? <span className="attachment-chip__size">{size}</span> : null}
-            </span>
-            <button
-              type="button"
-              className="attachment-chip__remove"
-              aria-label={`Remove ${attachment.name}`}
-              onClick={() => {
-                void aui.composer.attachment({ index }).remove();
-                onRemove?.(index);
-              }}
-            >
-              ✕
-            </button>
-          </span>
-        );
-      })}
+      {attachments.map((attachment, index) => (
+        <ComposerAttachmentChip
+          key={attachment.id}
+          attachment={attachment}
+          index={index}
+          onRemove={onRemove}
+        />
+      ))}
     </div>
   );
 }
@@ -398,11 +421,8 @@ export function ThreadComposer(props: {
 }) {
   const aui = useAui();
   const { pushToast } = useStudio();
-  const [dragging, setDragging] = useState(false);
-  // dragenter/dragleave fire for every child; count depth so moving over the
-  // textarea does not flicker the drop state off and on.
-  const dragDepth = useRef(0);
   const attachments = useAuiState((state) => state.composer.attachments);
+  const [dragging, setDragging] = useState(false);
   // A refusal names the refused file and the limit and stays on screen until the
   // person makes room, so a screen reader can reach it (a toast alone expires).
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -429,47 +449,53 @@ export function ThreadComposer(props: {
 
   return (
     <ComposerPrimitive.Root
-      className={`composer${dragging ? " is-dragging" : ""}`}
+      className="composer"
       onDragEnter={(event) => {
-        if (!hasFiles(event)) {
-          return;
-        }
+        if (!hasFiles(event)) return;
         event.preventDefault();
-        dragDepth.current += 1;
         setDragging(true);
       }}
       onDragOver={(event) => {
-        if (!hasFiles(event)) {
-          return;
-        }
-        // Without this the browser opens the dropped file instead.
+        if (!hasFiles(event)) return;
         event.preventDefault();
-      }}
-      onDragLeave={() => {
-        // Leave events often carry no types, so this only ever removes depth we
-        // added on a file drag.
-        dragDepth.current = Math.max(dragDepth.current - 1, 0);
-        if (dragDepth.current === 0) {
-          setDragging(false);
-        }
       }}
       onDrop={(event) => {
-        if (!hasFiles(event)) {
-          return;
-        }
+        if (!hasFiles(event)) return;
         event.preventDefault();
-        dragDepth.current = 0;
         setDragging(false);
         attachFiles(Array.from(event.dataTransfer.files));
       }}
     >
-      {dragging ? <p className="composer__drop-hint">Drop to attach</p> : null}
-      <ComposerBody
-        {...props}
-        onFiles={attachFiles}
-        attachmentRefusal={refusal}
-        onClearAttachmentRefusal={() => setRefusal(null)}
-      />
+      <ComposerPrimitive.AttachmentDropzone
+        className="composer__dropzone"
+        onDragEnterCapture={(event) => {
+          if (hasFiles(event)) setDragging(true);
+        }}
+        onDragLeaveCapture={(event) => {
+          const next = event.relatedTarget;
+          if (next && event.currentTarget.contains(next as Node)) return;
+          setDragging(false);
+        }}
+        onDropCapture={(event) => {
+          setDragging(false);
+          if (!hasFiles(event)) return;
+          attachFiles(Array.from(event.dataTransfer.files));
+          try {
+            Object.defineProperty(event.dataTransfer, "files", {
+              value: Object.assign([], { item: () => null }),
+              configurable: true,
+            });
+          } catch { /* ignore */ }
+        }}
+      >
+        {dragging ? <p className="composer__drop-hint">Drop to attach</p> : null}
+        <ComposerBody
+          {...props}
+          onFiles={attachFiles}
+          attachmentRefusal={refusal}
+          onClearAttachmentRefusal={() => setRefusal(null)}
+        />
+      </ComposerPrimitive.AttachmentDropzone>
     </ComposerPrimitive.Root>
   );
 }

@@ -374,4 +374,24 @@ describe("ThreadComposer mixed clipboard paste", () => {
 
     expect(sendMessage).not.toHaveBeenCalled();
   });
+  it("shows drag affordance via the dropzone and clears it on drop and leave", async () => {
+    renderComposer();
+    const dropzone = document.querySelector(".composer__dropzone") as HTMLElement;
+    expect(dropzone).toBeTruthy();
+    const file = new File(["hello"], "notes.md", { type: "text/markdown" });
+    const dataTransfer = { types: ["Files"], files: [file] };
+
+    fireEvent.dragEnter(dropzone, { dataTransfer });
+    expect(dropzone.getAttribute("data-dragging")).toBe("true");
+
+    fireEvent.drop(dropzone, { dataTransfer });
+    expect(dropzone.getAttribute("data-dragging")).toBeNull();
+    expect(await screen.findByText("notes.md")).toBeInTheDocument();
+
+    fireEvent.dragEnter(dropzone, { dataTransfer });
+    expect(dropzone.getAttribute("data-dragging")).toBe("true");
+    fireEvent.dragLeave(dropzone, { dataTransfer });
+    expect(dropzone.getAttribute("data-dragging")).toBeNull();
+  });
+
 });
