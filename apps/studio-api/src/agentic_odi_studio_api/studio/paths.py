@@ -42,3 +42,7 @@ def issue_token() -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(token, encoding="utf-8")
     return token
+
+from agentic_odi_core.token import issue_token, load_token, token_path
+
+__all__ = ["TOKEN_PATH_ENV", "issue_token", "load_token", "token_path"]

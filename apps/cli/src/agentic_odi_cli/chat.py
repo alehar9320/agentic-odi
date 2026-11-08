@@ -275,6 +275,16 @@ def handle_command(
     return None
 
 
+def _get_mcp_transport(mcp_url: str):
+    from fastmcp.client.transports import StreamableHttpTransport
+
+    from agentic_odi_core import load_token
+
+    token = load_token()
+    headers = {"Authorization": f"Bearer {token}"} if token else None
+    return StreamableHttpTransport(url=mcp_url, headers=headers)
+
+
 async def _try_connect_mcp(mcp_url: str) -> tuple[Any, list[Any], str | None]:
     """Attempt to connect to the MCP server and list its tools.
 
@@ -283,10 +293,11 @@ async def _try_connect_mcp(mcp_url: str) -> tuple[Any, list[Any], str | None]:
         (None, [], error_message) on failure.
     """
     try:
-        async with Client(mcp_url) as c:
+        transport = _get_mcp_transport(mcp_url)
+        async with Client(transport) as c:
             tools = await c.list_tools()
         # Re-create a fresh context manager for the caller to manage lifetime.
-        return Client(mcp_url), tools, None
+        return Client(_get_mcp_transport(mcp_url)), tools, None
     except Exception as exc:  # noqa: BLE001
         return None, [], str(exc)
 
@@ -571,7 +582,7 @@ async def _run_chat(config: ChatConfig) -> int:
                         mcp_url=new_url,
                     )
                     session.update_config(new_config)
-                    session.mcp_client = Client(new_url)
+                    session.mcp_client = Client(_get_mcp_transport(new_url))
                     session.tools = _to_openai_tools(new_tools)
                     session.tool_names = [t["function"]["name"] for t in session.tools]
                     session.connection_state.mcp_ok = True

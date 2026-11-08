@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
-import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import { endpointReachability, isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
 import { formatRelativeTime } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -183,10 +183,25 @@ export function StudioBar({
   // talk model-to — so guessing from the endpoint alone would read "no model connected"
   // forever on a machine where the model is in fact answering. "Connecting" is for a
   // connection somebody is trying to make and has not yet heard back from.
+  const endpointConfig = {
+    base_url: settings.base_url,
+    api_key: settings.api_key,
+    model: settings.model_name,
+  };
   const endpointConfigured = isEndpointConfiguredForSettings({
     base_url: settings.base_url,
     api_key: settings.api_key,
     model_name: settings.model_name,
+  });
+  const endpointReach = endpointReachability(endpointConfig, {
+    originClass:
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname === "::1" ||
+        window.location.hostname.endsWith(".localhost"))
+        ? "loopback"
+        : "remote",
   });
   const status =
     llmHealth.healthy === true
@@ -365,8 +380,16 @@ export function StudioBar({
           type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
-          aria-label={`Model status: ${status}. ${statusDetail}`}
-          title={statusDetail}
+          aria-label={
+            endpointReach === "device-only"
+              ? "Model status: local endpoint, not reachable from this page"
+              : `Model status: ${status}. ${statusDetail}`
+          }
+          title={
+            endpointReach === "device-only"
+              ? "local endpoint, not reachable from this page"
+              : statusDetail
+          }
         >
           <StatusDot
             tone={status === "Local mode" ? "warn" : status === "Connecting" ? "unknown" : "ok"}

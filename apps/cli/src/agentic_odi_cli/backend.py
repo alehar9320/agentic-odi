@@ -800,6 +800,16 @@ class MCPBackend(Backend):
         return _parse_remote(tool_name, text)
 
 
+def _get_mcp_transport(mcp_url: str):
+    from fastmcp.client.transports import StreamableHttpTransport
+
+    from agentic_odi_core import load_token
+
+    token = load_token()
+    headers = {"Authorization": f"Bearer {token}"} if token else None
+    return StreamableHttpTransport(url=mcp_url, headers=headers)
+
+
 def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> str:
     from fastmcp import Client
 
@@ -808,8 +818,10 @@ def _call_mcp(tool: str, args: dict[str, Any], mcp_url: str, timeout: float) -> 
     if flags.is_enabled("developer_mode"):
         typer.echo(f"[debug] MCP call: {tool} args={args}", err=True)
 
+    transport = _get_mcp_transport(mcp_url)
+
     async def _run() -> str:
-        async with Client(mcp_url, timeout=timeout, init_timeout=timeout) as client:
+        async with Client(transport, timeout=timeout, init_timeout=timeout) as client:
             result = await client.call_tool(tool, args)
             return result.content[0].text  # type: ignore[index]
 

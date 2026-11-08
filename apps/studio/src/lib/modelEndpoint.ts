@@ -84,3 +84,33 @@ export function isEndpointConfiguredForSettings(settings: {
     model: settings.model_name,
   });
 }
+
+
+/**
+ * Whether a model endpoint can actually be reached from this page. A configured
+ * endpoint on a private host is device-only when the page is served from a
+ * non-loopback origin (e.g. a hosted Studio); a loopback page can reach it.
+ */
+export function endpointReachability(
+  config: ModelEndpointConfig,
+  facts?: { originClass?: "loopback" | "remote" },
+): "reachable" | "device-only" | "unconfigured" {
+  if (!isEndpointConfigured(config)) {
+    return "unconfigured";
+  }
+  if (isSidecarProxy(config.base_url)) {
+    return "unconfigured";
+  }
+  if (facts?.originClass === "remote") {
+    let hostname: string;
+    try {
+      hostname = new URL(config.base_url).hostname;
+    } catch {
+      return "reachable";
+    }
+    if (isPrivateHost(hostname)) {
+      return "device-only";
+    }
+  }
+  return "reachable";
+}

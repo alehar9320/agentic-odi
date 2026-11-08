@@ -1,6 +1,6 @@
 import { authHeaders } from "../../api/studioApi";
 import { apiUrl } from "../../bridge/desktopBridge";
-import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import { endpointReachability, isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
 
 export type CapabilityId =
@@ -130,7 +130,30 @@ export class CapabilityRegistry {
       id: "endpoint-model",
       label: localStatuses["endpoint-model"].label,
       description: localStatuses["endpoint-model"].description,
-      check: async (settings) => isEndpointConfiguredForSettings(settings),
+      check: async (settings) => {
+        const config = {
+          base_url: settings.base_url,
+          api_key: settings.api_key,
+          model: settings.model_name,
+        };
+        if (!isEndpointConfiguredForSettings(settings)) {
+          return false;
+        }
+        const reachability = endpointReachability(config, {
+          originClass: typeof window !== "undefined" && window.location?.hostname
+            ? (window.location.hostname === "localhost" ||
+                window.location.hostname === "127.0.0.1" ||
+                window.location.hostname === "::1" ||
+                window.location.hostname.endsWith(".localhost"))
+              ? "loopback"
+              : "remote"
+            : "loopback",
+        });
+        if (reachability === "device-only") {
+          return false;
+        }
+        return reachability === "reachable";
+      },
     },
     {
       id: "sidecar-llm",
