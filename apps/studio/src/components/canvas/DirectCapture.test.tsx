@@ -121,6 +121,97 @@ describe("DirectCapture", () => {
 
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
+
+  it("renders a statement error beside the statement and keeps what was typed", async () => {
+    harness.state.addOutcome = vi.fn(async () => {
+      throw new StudioApiError({
+        code: "validation",
+        message: "That is not an ODI statement.",
+        field: "statement",
+        suggestion: "Start with minimize or maximize.",
+        retryable: false,
+      });
+    });
+
+    render(<DirectCapture />);
+    fireEvent.change(screen.getByLabelText(/desired outcome/i), {
+      target: { value: "Minimize the time it takes to ship" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(
+      screen.getByLabelText(/desired outcome/i).getAttribute("aria-describedby"),
+    ).toContain("dc-statement-error");
+    expect(screen.getByLabelText(/desired outcome/i)).toHaveValue(
+      "Minimize the time it takes to ship",
+    );
+  });
+
+  it("renders an importance error beside the ratings", async () => {
+    harness.state.addOutcome = vi.fn(async () => {
+      throw new StudioApiError({
+        code: "out_of_range",
+        message: "importance must be between 1 and 10",
+        field: "importance",
+        retryable: false,
+      });
+    });
+
+    render(<DirectCapture />);
+    fireEvent.change(screen.getByLabelText(/desired outcome/i), {
+      target: { value: "Minimize the time it takes to ship" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(
+      screen.getByLabelText(/^Current satisfaction/).getAttribute("aria-describedby"),
+    ).toContain("dc-range-error");
+  });
+
+  it("renders a satisfaction error beside the ratings", async () => {
+    harness.state.addOutcome = vi.fn(async () => {
+      throw new StudioApiError({
+        code: "out_of_range",
+        message: "satisfaction must be between 1 and 10",
+        field: "satisfaction",
+        retryable: false,
+      });
+    });
+
+    render(<DirectCapture />);
+    fireEvent.change(screen.getByLabelText(/desired outcome/i), {
+      target: { value: "Minimize the time it takes to ship" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(
+      screen.getByLabelText(/^Current satisfaction/).getAttribute("aria-describedby"),
+    ).toContain("dc-range-error");
+  });
+
+  it("sends an unattributable validation error to form level instead of a field", async () => {
+    harness.state.addOutcome = vi.fn(async () => {
+      throw new StudioApiError({
+        code: "validation",
+        message: "The request was invalid.",
+        retryable: false,
+      });
+    });
+
+    render(<DirectCapture />);
+    fireEvent.change(screen.getByLabelText(/desired outcome/i), {
+      target: { value: "Minimize the time it takes to ship" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(screen.getByLabelText(/desired outcome/i)).toHaveValue(
+      "Minimize the time it takes to ship",
+    );
+  });
 });
 
 describe("DirectCapture score preview", () => {
