@@ -14,6 +14,24 @@ export interface Step {
   order?: number;
 }
 
+/** A question put to the person that they did not answer, and why not. */
+export interface ClaimSkip {
+  question: string;
+  reason?: string;
+}
+
+/**
+ * The questions behind a score. `verified` arrives derived from the core model —
+ * a check is verified when at least one question was answered — so a card must
+ * read it rather than compare the lists itself.
+ */
+export interface ClaimCheck {
+  asked?: string[];
+  answers?: string[];
+  skips?: ClaimSkip[];
+  verified?: boolean;
+}
+
 export interface Outcome {
   id?: string;
   job_id?: string;
@@ -21,6 +39,7 @@ export interface Outcome {
   importance?: number | null;
   satisfaction?: number | null;
   opportunity_score?: number | null;
+  claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
 }
@@ -172,6 +191,39 @@ export interface StudioError {
   suggestion?: string | null;
   retryable: boolean;
   request_id?: string | null;
+  //: Which outcome field the failure belongs to, so the form can render it
+  //: beside the statement or rating the person mistyped. Absent when the
+  //: failure cannot be attributed to a single field.
+  field?: "statement" | "importance" | "satisfaction" | null;
+}
+
+/** The one artifact a shared link carries. More kinds are additive. */
+export type SharedArtifactKind = "landscape" | "vision";
+
+/**
+ * The scoped payload a share token returns: exactly one artifact, its own
+ * evidence, and the expiry. It never carries the canvas, memory, conversations,
+ * connector settings, or the brief — the page renders only what is here.
+ */
+export interface SharedArtifactPayload {
+  kind: SharedArtifactKind;
+  expires_at: string;
+  generated_at: string;
+  source: "local" | "mcp" | "seed";
+  /** The job context a landscape names; absent for a vision. */
+  jobs?: Job[];
+  outcomes?: Outcome[];
+  evidence?: Evidence[];
+  /** The person's own words, when the artifact is a vision. */
+  vision?: string;
+}
+
+/** What a mint call returns: the raw token is shown once and never again. */
+export interface ShareLink {
+  id: string;
+  token: string;
+  url: string;
+  expires_at: string;
 }
 
 export type StudioTheme = "light" | "dark";

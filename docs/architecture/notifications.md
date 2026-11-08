@@ -24,9 +24,12 @@ Connector and agent-work kinds belong to
 
 ## Identity and dedupe
 
-`fingerprint = sha256("kind|subject_kind|subject_id|discriminator")`. Recording a
-signal whose fingerprint already exists returns the existing record instead of
-creating a second one, so re-running an ingest cannot flood the inbox.
+`fingerprint = sha256("kind|subject_kind|subject_id|discriminator")`, plus the store
+event id of the change when the emitter passes one. Recording a signal whose
+fingerprint already exists returns the existing record instead of creating a second
+one, so re-running an ingest cannot flood the inbox. See
+[signals.md](signals.md) for why the event id, and not only the value, identifies a
+signal.
 
 ## Storage
 

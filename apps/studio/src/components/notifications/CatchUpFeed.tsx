@@ -4,6 +4,7 @@ import { formatRelativeTime } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
 import type { Signal, SignalKind, SignalSeverity } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { StatusDot } from "../status/StatusDot";
 import {
   BoltIcon,
   CheckIcon,
@@ -193,7 +194,7 @@ export function CatchUpFeed() {
                 />
                 <div className="card__head">
                   <div className="catchup-card__meta">
-                    {unreadCard && <span className="status-dot" title="Unread signal" />}
+                    {unreadCard && <StatusDot tone="ok" label="Unread signal" />}
                     <span className={`badge ${SEVERITY_BADGE[item.severity]}`}>
                       <span className="catchup-card__badge">
                         {kindIcon(item.kind)}
