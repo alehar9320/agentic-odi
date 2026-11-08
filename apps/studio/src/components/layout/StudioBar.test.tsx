@@ -36,6 +36,8 @@ const stubSnapshot = (overrides: Partial<UpdateSnapshot> = {}): UpdateSnapshot =
   available: null,
   progress: null,
   lastCheckedAt: null,
+  lastSuccessfulCheckAt: null,
+  actions: [],
   installed: false,
   pendingInstall: false,
   error: null,
@@ -150,6 +152,45 @@ describe("StudioBar", () => {
     expect(
       screen.getByRole("button", { name: /model status: connecting\. health not checked yet\./i }),
     ).toBeInTheDocument();
+  });
+
+  it("says a local endpoint is not reachable from a hosted page", () => {
+    // #804: a hosted page cannot reach a private endpoint, so the bar says why.
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      get() {
+        return new Proxy(originalLocation, {
+          get(target, prop) {
+            if (prop === "hostname") return "studio.example.com";
+            return Reflect.get(target, prop);
+          },
+        });
+      },
+    });
+    try {
+      vi.mocked(useStudio).mockReturnValue(
+        stubContext({
+          llmHealth: { healthy: null, message: "" },
+          settings: {
+            base_url: "http://127.0.0.1:11434/v1",
+            api_key: "",
+            model_name: "qwen3:8b",
+            mcp_url: "",
+            theme: "dark",
+          },
+        }) as never,
+      );
+      render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+      expect(
+        screen.getByRole("button", {
+          name: /model status: connecting\. local endpoint, not reachable from this page/i,
+        }),
+      ).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "location", { value: originalLocation, configurable: true });
+    }
   });
 
   it("keeps the brand mark decorative and labels the home control in text", () => {

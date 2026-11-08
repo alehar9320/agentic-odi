@@ -302,6 +302,12 @@ uv run pytest tests/contract         # cross-package contracts
 uv run pytest tests/scripts          # dev launcher
 ```
 
+The pre-PR procedure is not "run everything". It is the **default** tier in
+[`.agents/workflows/test.md`](../.agents/workflows/test.md): the fast tier,
+plus type checking, plus the studio units. The full tier — the studio build
+and the browser e2e suite — is CI's job and is not asked of anyone before
+they open a pull request.
+
 The MCP server contract test compares the live FastMCP registry with
 `packages/core/src/agentic_odi_core/contract.py`, so add or change a tool in
 both places. The CLI local-backend contract test keeps `_LOCAL_HANDLERS` aligned
