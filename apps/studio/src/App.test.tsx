@@ -756,6 +756,90 @@ describe("boot failure", () => {
   });
 });
 
+describe("composer shortcuts (#692)", () => {
+  it("puts the caret in the composer with Meta+K from the home stage", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(composer).not.toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    expect(composer).toHaveFocus();
+  });
+
+  it("leaves the composer alone while a modal owns the screen", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.click(screen.getByRole("button", { name: /open what's new changelog/i }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    expect(composer).not.toHaveFocus();
+  });
+
+  it("starts a command from outside an editable field with /", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    expect(composer).toHaveValue("");
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    fireEvent.keyDown(document.body, { key: "/" });
+
+    expect(composer).toHaveValue("/");
+    expect(composer).toHaveFocus();
+    expect(await screen.findByRole("listbox", { name: /commands/i })).toBeInTheDocument();
+  });
+
+  it("lets / be a character inside a field", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    composer.focus();
+
+    fireEvent.keyDown(composer, { key: "/" });
+
+    expect(composer).toHaveValue("");
+    expect(composer).toHaveFocus();
+    expect(screen.queryByRole("listbox", { name: /commands/i })).toBeNull();
+  });
+
+  it("gives Escape somewhere to go when nothing else is open", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(composer).not.toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(composer).toHaveFocus();
+  });
+
+  it("closes an open lens on Escape without also moving the caret", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
+    expect(
+      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+    ).toBeInTheDocument();
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    const close = screen.getByRole("button", { name: /close workspace view/i });
+    close.focus();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+    });
+    expect(composer).not.toHaveFocus();
+  });
+});
+
 describe("the bar's new thread can be undone (#319)", () => {
   async function withAThread() {
     window.localStorage.removeItem("studio.brief");

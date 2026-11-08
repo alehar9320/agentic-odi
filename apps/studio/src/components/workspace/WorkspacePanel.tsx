@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { useFocusTrap } from "../../lib/useFocusTrap";
 import { useStudio } from "../../state/StudioContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { CloseIcon } from "../icons";
 import { PanelBoundary } from "./PanelBoundary";
+import type { WorkspacePanelId } from "../../types";
 import { findPanel, type PanelDefinition } from "./panels";
 
 const MOBILE_QUERY = "(max-width: 1023px)";
@@ -30,9 +31,60 @@ export function WorkspacePanel() {
   const { activePanel, closePanel, sendMessage } = useStudio();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const panel = activePanel ? findPanel(activePanel) : null;
+  const panelId = panel?.id ?? null;
   const panelRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // Where each lens was left. The body remounts with the lens, so the position
+  // has to outlive the DOM to come back with it — per panel, never global (#696).
+  const scrollByPanel = useRef(new Map<WorkspacePanelId, number>());
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  // A lens opens from the rail, a canvas card, a banner, or a slash command,
+  // and the composer is autofocused: "whatever held focus" is the composer, not
+  // the control the person used. Remember that control instead (#692).
+  const openerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    function rememberOpener(event: MouseEvent) {
+      const target = event.target;
+      const control =
+        target instanceof Element ? target.closest("button, a[href], [role=button]") : null;
+      openerRef.current = control instanceof HTMLElement ? control : null;
+    }
+    document.addEventListener("click", rememberOpener, true);
+    return () => document.removeEventListener("click", rememberOpener, true);
+  }, []);
 
   useFocusTrap(panelRef, isMobile && Boolean(panel));
+
+  // On a wide screen the lens opens under the keyboard, so focus goes to the
+  // heading and comes back to the control that opened it. The composer is
+  // autofocused, so recording "whatever held focus" would pull the caret out
+  // of the lens and into the thread on Escape; only a lens with no distinct
+  // opener falls back to the previously focused element. The mobile sheet
+  // keeps its trap and its own return path; this stays out of its way (#696).
+  useEffect(() => {
+    if (!panelId) {
+      const target = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (target?.isConnected) {
+        target.focus();
+      }
+      return;
+    }
+    if (isMobile) {
+      return;
+    }
+    const opener = openerRef.current;
+    openerRef.current = null;
+    returnFocusRef.current =
+      opener?.isConnected && opener !== headingRef.current
+        ? opener
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+    headingRef.current?.focus();
+  }, [panelId, isMobile]);
 
   // Everything behind the sheet is out of reach while it is open.
   useEffect(() => {
@@ -79,6 +131,26 @@ export function WorkspacePanel() {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [isMobile, activePanel, closePanel]);
 
+  // A lens opens where it was left; a different lens starts at its top.
+  useLayoutEffect(() => {
+    if (!panelId) {
+      return;
+    }
+    const body = bodyRef.current;
+    if (!body) {
+      return;
+    }
+    body.scrollTop = scrollByPanel.current.get(panelId) ?? 0;
+  }, [panelId]);
+
+  function rememberScroll() {
+    const body = bodyRef.current;
+    if (!body || !panelId) {
+      return;
+    }
+    scrollByPanel.current.set(panelId, body.scrollTop);
+  }
+
   if (!panel) {
     return null;
   }
@@ -116,7 +188,9 @@ export function WorkspacePanel() {
               {panel.icon}
             </span>
             <div>
-              <h2 className="lens__title">{panel.title}</h2>
+              <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
+                {panel.title}
+              </h2>
               <p className="lens__blurb">{panel.blurb}</p>
             </div>
           </div>
@@ -131,7 +205,7 @@ export function WorkspacePanel() {
           </button>
         </header>
 
-        <div className="lens__body">
+        <div className="lens__body" ref={bodyRef} onScroll={rememberScroll}>
           <div className="lens__content">
             <PanelBoundary name={panel.id}>
               <PanelBody panel={panel} />
