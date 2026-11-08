@@ -484,49 +484,38 @@ describe("first-run tour", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { level: 2 })).toHaveTextContent(
-      "What do you want to win?",
+      "Hear it in a customer's words.",
     );
   });
 
-  it("starts the boss-priority conversation from the tour", async () => {
+  it("walks the three scenes and finishes the tour", async () => {
     prepareFreshRun();
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Show me around" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: /My boss handed me a priority/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-
-    expect(
-      await screen.findByText("A quick look at your instruments."),
-    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Make it real" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start with my own" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
     });
-    expect(
-      await screen.findByText(/My boss handed me a priority\. Help me turn it/),
-    ).toBeInTheDocument();
   });
 
-  it("starts the find-opportunity conversation from the tour", async () => {
+  it("resumes the tour at the scene it stopped on", async () => {
     prepareFreshRun();
+    window.localStorage.setItem(
+      "studio.onboarding",
+      JSON.stringify({ status: "active", scene: 2, reason: null, version: 2 }),
+    );
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Show me around" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: /Help me find the next one/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await screen.findByText("A quick look at your instruments.");
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Find my next opportunity" }));
 
-    expect(
-      await screen.findByText(/I need to find the next opportunity worth chasing/),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).toBeNull();
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("heading", { level: 2 })).toHaveTextContent(
+      "See where the outcome lands.",
+    );
   });
 });
 

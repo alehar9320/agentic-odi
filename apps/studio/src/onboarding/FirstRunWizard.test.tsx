@@ -3,26 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ONBOARDING_STORAGE_KEY } from "./storage";
 
-const studio = vi.hoisted(() => ({
-  settings: {
-    base_url: "http://localhost:8001/v1",
-    api_key: "local",
-    model_name: "local-tools-model",
-    mcp_url: "http://localhost:8000/mcp",
-  },
-  saveSettings: vi.fn(),
-  sidecarReachable: true as boolean | null,
-  mcpReachable: true,
-  llmHealth: { healthy: true as boolean | null, message: "ok" },
-  checkConnections: vi.fn(),
-  openPanel: vi.fn(),
-  openSetup: vi.fn(),
-  closeSetup: vi.fn(),
-  sendMessage: vi.fn(),
-}));
-
 vi.mock("../state/StudioContext", () => ({
-  useStudio: () => studio,
+  useStudio: () => ({ settings: {}, saveSettings: vi.fn(), checkConnections: vi.fn() }),
 }));
 
 import { FirstRunWizard } from "./FirstRunWizard";
@@ -73,23 +55,13 @@ function continueButton() {
   return screen.getByRole("button", { name: "Continue" });
 }
 
+function heading() {
+  return screen.getByRole("heading", { level: 2 });
+}
+
 describe("FirstRunWizard", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    studio.sidecarReachable = true;
-    studio.mcpReachable = true;
-    studio.llmHealth = { healthy: true, message: "ok" };
-    studio.saveSettings.mockClear();
-    studio.checkConnections.mockReset();
-    studio.checkConnections.mockResolvedValue({
-      sidecarReachable: true,
-      mcpReachable: true,
-      llmHealthy: true,
-    });
-    studio.openPanel.mockClear();
-    studio.openSetup.mockClear();
-    studio.closeSetup.mockClear();
-    studio.sendMessage.mockClear();
   });
 
   it("never opens by itself, even on a fresh run", () => {
@@ -99,106 +71,78 @@ describe("FirstRunWizard", () => {
     expect(stored()).toBeNull();
   });
 
-  it("greets a user who asks for the tour and focuses the step heading", () => {
+  it("greets a user who asks for the tour on the first scene", () => {
     renderWizard();
 
     expect(screen.getByRole("dialog")).toHaveAttribute("aria-modal", "true");
-    const heading = screen.getByRole("heading", { level: 2 });
-    expect(heading).toHaveTextContent("What do you want to win?");
-    expect(heading).toHaveFocus();
+    expect(heading()).toHaveTextContent("Hear it in a customer's words.");
+    expect(heading()).toHaveFocus();
+    expect(screen.getByText("Scene 1 of 3")).toBeInTheDocument();
   });
 
-  it("walks from a chosen starting point to the matching surface", async () => {
+  it("walks forward through the three scenes", () => {
     renderWizard();
 
     fireEvent.click(continueButton());
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "What's on your mind?",
-    );
-    expect(continueButton()).toBeDisabled();
+    expect(heading()).toHaveTextContent("Turn the quote into a scored outcome.");
+    expect(screen.getByText("Scene 2 of 3")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Help me find the next one/ }));
-    expect(continueButton()).toBeEnabled();
     fireEvent.click(continueButton());
+    expect(heading()).toHaveTextContent("See where the outcome lands.");
+    expect(screen.getByText("Scene 3 of 3")).toBeInTheDocument();
+  });
 
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "A quick look at your instruments.",
-    );
+  it("labels the sample on every scene", () => {
+    renderWizard();
+
+    expect(screen.getAllByText("Sample").length).toBeGreaterThan(0);
     fireEvent.click(continueButton());
+    expect(screen.getAllByText("Sample").length).toBeGreaterThan(0);
+    fireEvent.click(continueButton());
+    expect(screen.getAllByText("Sample").length).toBeGreaterThan(0);
+  });
 
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Your first move.");
-    expect(
-      screen.getByText("We start in the conversation. Tell me what you already know."),
-    ).toBeInTheDocument();
+  it("finishes the tour from the last scene and stays closed", async () => {
+    renderWizard();
 
-    fireEvent.click(screen.getByRole("button", { name: "Find my next opportunity" }));
+    fireEvent.click(continueButton());
+    fireEvent.click(continueButton());
+    fireEvent.click(screen.getByRole("button", { name: "Start with my own" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(studio.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining("I need to find the next opportunity"),
-    );
-    expect(studio.openPanel).not.toHaveBeenCalled();
-    expect(studio.openSetup).not.toHaveBeenCalled();
-    expect(stored()).toMatchObject({
-      status: "done",
-      step: 3,
-      goal: "find-opportunity",
-      version: 1,
-    });
+    expect(stored()).toMatchObject({ status: "done", scene: 2, version: 2 });
   });
 
-  it("starts the conversation from the chosen door", () => {
+  it("skips one scene without ending the tour", () => {
     renderWizard();
 
-    fireEvent.click(continueButton());
-    fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
-    fireEvent.click(continueButton());
-    fireEvent.click(continueButton());
-    fireEvent.click(screen.getByRole("button", { name: "Sharpen my opportunity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip this scene" }));
 
-    expect(studio.closeSetup).toHaveBeenCalledTimes(1);
-    expect(studio.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining("I have an opportunity in mind"),
-    );
-    expect(studio.openSetup).not.toHaveBeenCalled();
-    expect(studio.openPanel).not.toHaveBeenCalled();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(heading()).toHaveTextContent("Turn the quote into a scored outcome.");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(stored()).toMatchObject({ status: "active", scene: 1 });
   });
 
-  it("skips on request and remembers it", () => {
+  it("skips the whole tour in one click and records why", () => {
     const { unmount } = renderWizard();
 
     fireEvent.click(screen.getByRole("button", { name: "Skip the tour" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(stored()).toMatchObject({ status: "skipped" });
-    expect(studio.openPanel).not.toHaveBeenCalled();
-    expect(studio.openSetup).not.toHaveBeenCalled();
+    expect(stored()).toMatchObject({ status: "skipped", reason: "not-now" });
 
     unmount();
     renderClosed();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("skips one step without ending the tour", () => {
-    renderWizard();
-
-    fireEvent.click(screen.getByRole("button", { name: "Skip this step" }));
-
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "What's on your mind?",
-    );
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(stored()).toMatchObject({ status: "active", step: 1 });
-  });
-
-  it("skips with Escape", () => {
+  it("skips with Escape, recording a dismissal", () => {
     renderWizard();
 
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(stored()).toMatchObject({ status: "skipped" });
+    expect(stored()).toMatchObject({ status: "skipped", reason: "dismissed" });
   });
 
   it("keeps Tab inside the dialog", () => {
@@ -211,38 +155,34 @@ describe("FirstRunWizard", () => {
     expect(screen.getByRole("button", { name: "Skip the tour" })).toHaveFocus();
   });
 
-  it("does not let Shift+Tab escape from the step heading", () => {
+  it("does not let Shift+Tab escape from the scene heading", () => {
     renderWizard();
 
-    const heading = screen.getByRole("heading", { level: 2 });
-    heading.focus();
-    fireEvent.keyDown(heading, { key: "Tab", shiftKey: true });
+    const h = heading();
+    h.focus();
+    fireEvent.keyDown(h, { key: "Tab", shiftKey: true });
 
     expect(continueButton()).toHaveFocus();
   });
 
-  it("resumes an unfinished tour where it stopped", () => {
-    seed({ status: "active", step: 2, goal: "have-opportunity", version: 1 });
+  it("resumes an unfinished tour at the same scene", () => {
+    seed({ status: "active", scene: 2, reason: null, version: 2 });
 
     renderWizard();
 
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "A quick look at your instruments.",
-    );
+    expect(heading()).toHaveTextContent("See where the outcome lands.");
   });
 
   it("starts from the top once the tour is finished", () => {
-    seed({ status: "done", step: 3, goal: "have-opportunity", version: 1 });
+    seed({ status: "done", scene: 2, reason: null, version: 2 });
 
     renderWizard();
 
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "What do you want to win?",
-    );
+    expect(heading()).toHaveTextContent("Hear it in a customer's words.");
   });
 
   it("stays closed after completion until it is asked for", () => {
-    seed({ status: "done", step: 3, goal: "have-opportunity", version: 1 });
+    seed({ status: "done", scene: 2, reason: null, version: 2 });
 
     renderClosed();
 
@@ -271,47 +211,20 @@ describe("FirstRunWizard", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("probes the instruments when their state is unknown", async () => {
-    studio.sidecarReachable = null;
-    studio.llmHealth = { healthy: null, message: "checking" };
-    renderWizard();
-
-    fireEvent.click(continueButton());
-    fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
-    fireEvent.click(continueButton());
-
-    await waitFor(() => expect(studio.checkConnections).toHaveBeenCalled());
-  });
-
-  it("offers inline repair when the model is unreachable", async () => {
-    studio.llmHealth = { healthy: false, message: "Connection refused" };
-    renderWizard();
-
-    fireEvent.click(continueButton());
-    fireEvent.click(screen.getByRole("button", { name: /I have one in mind/ }));
-    fireEvent.click(continueButton());
-
-    expect(screen.getByText("Connection refused")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Base URL"), {
-      target: { value: "http://127.0.0.1:11434/v1" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save & test" }));
-
-    await waitFor(() => expect(studio.saveSettings).toHaveBeenCalled());
-    expect(studio.saveSettings.mock.calls[0][0]).toMatchObject({
-      base_url: "http://127.0.0.1:11434/v1",
-      model_name: "local-tools-model",
-    });
-    expect(studio.checkConnections).toHaveBeenCalledWith(
-      expect.objectContaining({ base_url: "http://127.0.0.1:11434/v1" }),
-    );
-    await waitFor(() =>
-      expect(screen.getByText("The model answered. You are ready.")).toBeInTheDocument(),
-    );
+  it("makes no network call in any scene", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    try {
+      renderWizard();
+      fireEvent.click(continueButton());
+      fireEvent.click(continueButton());
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it("can be replayed from anywhere in the app", async () => {
-    seed({ status: "done", step: 3, goal: "have-opportunity", version: 1 });
+    seed({ status: "done", scene: 2, reason: null, version: 2 });
 
     function Replay() {
       const { restart } = useOnboarding();
@@ -332,11 +245,9 @@ describe("FirstRunWizard", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Replay tour" }));
 
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "What do you want to win?",
-    );
+    expect(heading()).toHaveTextContent("Hear it in a customer's words.");
     await waitFor(() =>
-      expect(stored()).toMatchObject({ status: "active", step: 0, goal: null }),
+      expect(stored()).toMatchObject({ status: "active", scene: 0, reason: null }),
     );
   });
 });
