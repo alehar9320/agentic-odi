@@ -21,6 +21,7 @@ export type BannerKind =
   | "sidecar-down"
   | "model-offline"
   | "offline"
+  | "app-update-ready"
   | "update-available"
   | "update-ready"
   | "write-rejected"
@@ -35,7 +36,8 @@ export type BannerActionId =
   | "open-capture"
   | "open-jobmap"
   | "install-update"
-  | "restart";
+  | "restart"
+  | "reload-app";
 
 export interface BannerAction {
   label: string;
