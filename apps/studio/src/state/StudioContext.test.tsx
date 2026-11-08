@@ -15,6 +15,7 @@ import {
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
 import { StudioProvider, useStudio } from "./StudioContext";
+import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
 
 const CONVERSATION = {
   id: "c-1",
@@ -951,7 +952,7 @@ describe("StudioContext on a desktop install whose model is down", () => {
   });
 });
 
-describe("StudioContext health polling", () => {
+describe("StudioContext probe scheduling", () => {
   beforeEach(() => {
     localStorage.clear();
     chatBody = null;
@@ -967,28 +968,147 @@ describe("StudioContext health polling", () => {
   });
 
   afterEach(() => {
+    llmUnhealthy = false;
+    vi.restoreAllMocks();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
-  it("re-probes the model every 30 seconds and when the window comes back", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+  /** Drive `document.visibilityState`, which jsdom reports as a static getter. */
+  function driveVisibility(initial: DocumentVisibilityState = "visible") {
+    let state = initial;
+    const spy = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockImplementation(() => state);
+    return {
+      hide() {
+        state = "hidden";
+      },
+      show() {
+        state = "visible";
+      },
+      restore() {
+        spy.mockRestore();
+      },
+    };
+  }
+
+  it("probes on a jittered cadence while the window is visible", async () => {
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(2_500);
     });
-    const initial = llmHealthFetches;
+    const afterBoot = llmHealthFetches;
+    expect(afterBoot).toBeGreaterThan(0);
+
+    // The scheduler armed at mount for PROBE_BASE_MS ±20%, so from mount nothing
+    // fires before the shortest wait. The boot's own probe has already run.
+    const shortest = PROBE_BASE_MS * (1 - PROBE_JITTER);
+    const longest = PROBE_BASE_MS * (1 + PROBE_JITTER);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(shortest - 2_500 - 1_000);
+    });
+    expect(llmHealthFetches).toBe(afterBoot);
+
+    // ...and one has fired by the longest.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(longest - shortest + 2_000);
+    });
+    expect(llmHealthFetches).toBeGreaterThan(afterBoot);
+  });
+
+  it("makes no request at all while the window is hidden", async () => {
+    const visibility = driveVisibility("hidden");
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const afterBoot = llmHealthFetches;
 
     await act(async () => {
-      vi.advanceTimersByTime(30_000);
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
     });
-    expect(llmHealthFetches).toBeGreaterThan(initial);
+    expect(llmHealthFetches).toBe(afterBoot);
+    visibility.restore();
+  });
 
-    const afterInterval = llmHealthFetches;
+  it("probes once when the window comes back after the answer has gone stale", async () => {
+    const visibility = driveVisibility("visible");
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    visibility.hide();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+    });
+    const whileHidden = llmHealthFetches;
+
+    visibility.show();
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    expect(llmHealthFetches).toBeGreaterThan(afterInterval);
-    expect(result.current.llmHealth.healthy).toBe(true);
+    expect(llmHealthFetches).toBe(whileHidden + 1);
+    visibility.restore();
+  });
+
+  it("backs off when the model keeps refusing instead of hammering it", async () => {
+    llmUnhealthy = true;
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const start = llmHealthFetches;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+    });
+    const refused = llmHealthFetches - start;
+    // Ten minutes at the base cadence is about twenty probes; the ladder asks
+    // fewer than a third of that, and jitter cannot move a count across that gap.
+    expect(refused).toBeGreaterThan(0);
+    expect(refused).toBeLessThan(8);
+  });
+
+  it("collapses a burst of endpoint edits into one debounced probe", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const before = llmHealthFetches;
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8001/v1" });
+      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8002/v1" });
+      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8003/v1" });
+    });
+    // Typing a URL is many saves in a row; none of them probes yet.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROBE_SETTINGS_DEBOUNCE_MS - 1);
+    });
+    expect(llmHealthFetches).toBe(before);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(llmHealthFetches).toBe(before + 1);
+  });
+
+  it("does not probe when an edit leaves the endpoints alone", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const before = llmHealthFetches;
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROBE_SETTINGS_DEBOUNCE_MS + 1_000);
+    });
+    expect(llmHealthFetches).toBe(before);
   });
 });
 
