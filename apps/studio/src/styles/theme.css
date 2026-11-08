@@ -4981,8 +4981,50 @@ details[open] summary {
 .lens__heading {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 11px;
   min-width: 0;
+  flex: 1;
+}
+
+.lens__where {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.lens__siblings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 100%;
+  margin-top: 2px;
+}
+
+.lens__sibling {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.lens__sibling:hover,
+.lens__sibling:focus-visible {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--line) 60%, var(--text));
+}
+
+.lens__sibling[aria-current="true"] {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .lens__icon {

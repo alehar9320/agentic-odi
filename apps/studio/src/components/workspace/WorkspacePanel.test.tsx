@@ -5,18 +5,25 @@ const brokenPanel = vi.hoisted(() => ({ renders: 0, fail: true }));
 
 const studio = vi.hoisted(() => ({
   activePanel: "landscape" as string | null,
+  openPanel: vi.fn(),
   closePanel: vi.fn(),
   sendMessage: vi.fn(async () => undefined),
+  conversationId: "c1",
+  conversations: [{ id: "c1", title: "Pricing research", turn_count: 2 }],
+  memory: [],
+  segments: [],
   canvas: {
-    jobs: [],
-    steps: [],
+    jobs: [{ id: "J-1", name: "Ship" }],
+    steps: [{ id: "S-1", job_id: "J-1", name: "Plan", order: 1 }],
     outcomes: [
       {
         id: "O-1",
+        job_id: "J-1",
         statement: "Minimize the time it takes to ship",
         importance: 9,
         satisfaction: 3,
         opportunity_score: 15,
+        evidence: "quote",
       },
     ],
     source: "seed" as const,
@@ -63,20 +70,25 @@ describe("WorkspacePanel", () => {
   beforeEach(() => {
     brokenPanel.renders = 0;
     studio.activePanel = "landscape";
+    studio.openPanel.mockClear();
     studio.closePanel.mockClear();
     studio.sendMessage.mockClear();
+    studio.conversationId = "c1";
+    studio.conversations = [{ id: "c1", title: "Pricing research", turn_count: 2 }];
     studio.canvasState = {
       kind: "ready",
       data: {
-        jobs: [],
-        steps: [],
+        jobs: [{ id: "J-1", name: "Ship" }],
+        steps: [{ id: "S-1", job_id: "J-1", name: "Plan", order: 1 }],
         outcomes: [
           {
             id: "O-1",
+            job_id: "J-1",
             statement: "Minimize the time it takes to ship",
             importance: 9,
             satisfaction: 3,
             opportunity_score: 15,
+            evidence: "quote",
           },
         ],
         source: "seed",
@@ -87,12 +99,12 @@ describe("WorkspacePanel", () => {
   it("renders the view as a lens, not a takeover", () => {
     render(<WorkspacePanel />);
 
+    const lens = screen.getByRole("complementary", { name: /opportunity landscape/i });
+    expect(lens).toBeInTheDocument();
+    expect(screen.getByText(/a lens on the conversation, not a separate place/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("complementary", { name: /opportunity landscape/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/a lens on the conversation, not a separate place/i),
-    ).toBeInTheDocument();
+      screen.getByRole("heading", { name: /opportunity landscape/i }),
+    ).toHaveAccessibleName(/opportunity landscape/i);
   });
 
   it("returns to the conversation through a question, not a menu", () => {
@@ -113,6 +125,60 @@ describe("WorkspacePanel", () => {
 
     expect(studio.closePanel).toHaveBeenCalled();
     expect(studio.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("names the conversation and artifact in the header (#324)", () => {
+    render(<WorkspacePanel />);
+
+    expect(screen.getByText("Pricing research")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /opportunity landscape/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("lists sibling artifacts with counts and switches without closing (#324)", () => {
+    const { rerender } = render(<WorkspacePanel />);
+
+    const siblingNav = screen.getByRole("navigation", { name: /other views|siblings/i });
+    expect(within(siblingNav).getByRole("button", { name: /job map.*1/i })).toBeInTheDocument();
+    expect(within(siblingNav).getByRole("button", { name: /evidence.*1/i })).toBeInTheDocument();
+
+    fireEvent.click(within(siblingNav).getByRole("button", { name: /job map/i }));
+
+    expect(studio.openPanel).toHaveBeenCalledWith("jobmap");
+    expect(studio.closePanel).not.toHaveBeenCalled();
+
+    studio.activePanel = "jobmap";
+    rerender(<WorkspacePanel />);
+
+    expect(
+      screen.getByRole("complementary", { name: /universal job map/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /universal job map/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("returns focus to the opener on Escape (#324)", () => {
+    const opener = document.createElement("button");
+    opener.textContent = "Open landscape";
+    document.body.append(opener);
+    opener.focus();
+
+    const { rerender } = render(<WorkspacePanel />);
+    expect(
+      screen.getByRole("heading", { name: /opportunity landscape/i }),
+    ).toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(studio.closePanel).toHaveBeenCalled();
+
+    studio.activePanel = null;
+    rerender(<WorkspacePanel />);
+
+    expect(opener).toHaveFocus();
+    opener.remove();
   });
 
   it("moves focus into the lens and gives it back to the chip when it closes (#696)", () => {
