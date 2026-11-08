@@ -83,7 +83,10 @@ export function OpportunityLandscape() {
     return ids.size;
   }, [evidence]);
 
-  const avgOpportunity = useMemo(() => scoredAverage(outcomes), [outcomes]);
+// The average counts stored scores only. Dividing by every outcome would
+  // read an unscored record as a zero and drag a strong landscape down; the
+  // caption names how many scored so the number can be explained from the screen.
+  const averageScore = useMemo(() => scoredAverage(outcomes), [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
     return outcomes.filter((outcome) => {
@@ -244,10 +247,14 @@ export function OpportunityLandscape() {
           <div className="studio-metric">
             <div className="studio-metric__label">Avg Opportunity Score</div>
             <div className="studio-metric__value">
-              {avgOpportunity.mean == null ? "Not scored" : formatOpportunityScore(avgOpportunity.mean)}
+{averageScore.mean == null
+                ? "Not scored"
+                : formatOpportunityScore(averageScore.mean)}
             </div>
-            {avgOpportunity.mean != null && (
-              <div className="studio-metric__delta">{`${avgOpportunity.scored} scored · ${avgOpportunity.unscored} not scored`}</div>
+            {averageScore.mean == null ? null : (
+              <div className="studio-metric__delta">
+                {`${averageScore.scored} scored · ${averageScore.unscored} not scored`}
+              </div>
             )}
           </div>
           <div className="studio-metric">
