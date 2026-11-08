@@ -178,6 +178,26 @@ export function isSlashCommand(text: string): boolean {
 }
 
 /**
+ * Whether a keystroke belongs to the field it was typed in.
+ *
+ * A shortcut that turns `/` into "open the palette" must never eat a slash the
+ * person meant to type, so the shell asks this before it acts.
+ */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  if (!element || typeof element.tagName !== "string") {
+    return false;
+  }
+  const tag = element.tagName.toLowerCase();
+  return (
+    tag === "input" ||
+    tag === "textarea" ||
+    tag === "select" ||
+    element.isContentEditable === true
+  );
+}
+
+/**
  * Rank matches: an exact command first, then names that start with the query,
  * then any keyword/description hit. Declared order breaks ties.
  */

@@ -68,6 +68,7 @@ import { textOf } from "../assistant/convert";
 import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
+import { deriveDeviceStatus, type DeviceStatus } from "./deviceStatus";
 import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
@@ -456,6 +457,8 @@ export interface StudioContextValue {
   connectorsError: StudioError | null;
   /** Probed availability of local and sidecar capabilities. */
   capabilities: Capability[];
+  /** One answer for what works here, derived from `capabilities`. */
+  deviceStatus: DeviceStatus;
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
   refreshCapabilities: () => Promise<void>;
@@ -667,6 +670,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [presetError, setPresetError] = useState<StudioError | null>(null);
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [capabilitiesCheckedAt, setCapabilitiesCheckedAt] = useState<string | null>(null);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [serverSignals, setServerSignals] = useState<Signal[]>([]);
   const [unreadSignalCount, setUnreadSignalCount] = useState(0);
@@ -923,6 +927,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const refreshCapabilities = useCallback(async () => {
     try {
       setCapabilities(await capabilityRegistry.statuses(settings));
+      setCapabilitiesCheckedAt(new Date().toISOString());
     } catch {
       /* Capability probes are advisory; a probe failure leaves the list empty. */
       setCapabilities([]);
@@ -1070,11 +1075,33 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   // The theme lives on <html> so every surface, portal, and native control
   // follows one class instead of each component tracking its own copy.
+  const appliedTheme = useRef<StudioTheme | null>(null);
   useEffect(() => {
     const root = document.documentElement;
+    const previous = appliedTheme.current;
+    appliedTheme.current = theme;
     root.classList.toggle("theme-light", theme === "light");
     root.classList.toggle("theme-dark", theme === "dark");
     root.style.colorScheme = theme;
+
+    // Only a change the person made cross-fades; the first paint is already the
+    // right colour (see index.html). Reduced motion swaps instantly, and the
+    // stylesheet's own reduce rule shortens the fade if it somehow runs.
+    if (previous === null || previous === theme) {
+      return;
+    }
+    const reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      return;
+    }
+    root.classList.add("theme-fading");
+    const timer = window.setTimeout(() => root.classList.remove("theme-fading"), 140);
+    return () => {
+      window.clearTimeout(timer);
+      root.classList.remove("theme-fading");
+    };
   }, [theme]);
 
   const saveSettings = useCallback((config: StudioConfig) => {
@@ -2419,6 +2446,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     refreshMemory,
   ]);
 
+  const deviceStatus = useMemo(
+    () => deriveDeviceStatus(capabilities, capabilitiesCheckedAt),
+    [capabilities, capabilitiesCheckedAt],
+  );
+
   const value = useMemo<StudioContextValue>(
     () => ({
       settings,
@@ -2497,6 +2529,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       connectors,
       connectorsError,
       capabilities,
+      deviceStatus,
       presets,
       presetError,
       refreshConnectors,
@@ -2620,6 +2653,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       connectors,
       connectorsError,
       capabilities,
+      deviceStatus,
       presets,
       presetError,
       refreshConnectors,

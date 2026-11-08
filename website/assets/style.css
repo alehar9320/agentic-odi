@@ -276,6 +276,14 @@ body::before {
   font-style: italic;
 }
 
+caption {
+  caption-side: top;
+  padding-bottom: 8px;
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
 .prose table {
   width: 100%;
   border-collapse: collapse;
