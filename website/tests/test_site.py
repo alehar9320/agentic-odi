@@ -506,18 +506,11 @@ def test_every_page_resolves_its_own_assets(page: str):
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference was the long pole: every tool's argument table and the
-    # whole ODI schema live on that one page, so it grows with each paginated
-    # list tool and each entity we add. The V2MOM entity, the five
-    # scheduled-work tools, and the three signal tools bring the page to ~78 KB;
-    # the four Stage 5 and 6 tools (segment_market, get_segments, get_strategy,
-    # propose_strategy) bring it to ~80 KB; the four outcome-proposal tools
-    # (propose_outcome, list_proposals, approve_proposal, reject_proposal)
-    # bring it to ~85 KB. The assistant-ui ledger (issue #429) puts 129 rows
-    # on the Development page, which now reaches ~93 KB and is the new long
-    # pole; it is a coverage record, not decoration, so the ceiling moves.
-    # The Study entity and its two tools (open_study, list_studies) add the
-    # last few KB to the MCP reference page.
-    # Pre-existing CI failure unrelated to PR #820 (openhands/issue-531):
-    # the Development page has grown past 100 KB with accumulated docs content.
-    assert size <= 120 * 1024, f"{page}: {size} bytes"
+    # The page budget is a soft ceiling: individual pages are coverage records
+    # (ledgers, entity docs, schema references), not decoration, so the ceiling
+    # moves with legitimate content growth rather than trimming reference
+    # material. The Development page now exceeds 100 KB: the assistant-ui ledger
+    # (issue #429) contributes 129 rows, and the Study entity plus its two
+    # tools (open_study, list_studies) and the outcome-proposal tools add the
+    # rest. Bump the ceiling to keep the page green while the content stays.
+    assert size <= 110 * 1024, f"{page}: {size} bytes"

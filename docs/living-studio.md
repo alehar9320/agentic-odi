@@ -43,7 +43,7 @@ The Studio opens as a conversation, not a dashboard.
 | **Context conversation** | Opened when you ask for it — the **Start with you and your team** starter, the context hint, `/start`, or Settings. A five-turn introduction in the chat, led by the agent: who you are and your team, who feels the problem first, what they are trying to win, where it breaks, and what you already have. One question at a time, examples shown as muted text, with **Skip this question** and **Explore on my own** always available. The five answers come back as an editable card, in your words; skipping stores nothing, and progress is kept as a draft. |
 | **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
 | **Starter cards** | Above the composer, three canvas-aware conversation cards name a situation the person is actually in rather than one of our nouns: **Turn 40 interview notes into one bet**, **Find what the churn spike is telling you**, and **Inherit a roadmap without inheriting its assumptions**. An empty canvas always offers those three, in that order; once the canvas holds outcomes or jobs the second and third swap to **Pressure-test a bet** and **Capture what you heard**. Each card carries a subtitle and the artifact it produces (`artifact` on `StudioSuggestion`), which the card layout (#317) renders. Select one to start that prompt in the thread — the prompt is sent verbatim, and it opens with the material the person brings. **Opportunity landscape** remains a separate, quiet shortcut. |
-| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard, and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. Selecting prose in a reply shows **Quote**; one click puts the passage in the composer as a verbatim blockquote attributed to the reply, removable without touching the question you typed, and it is sent as part of the question. On an empty draft `↑` recalls the message you sent last — again for the one before it — and `↓` walks forward and finally restores the draft you were typing; inside a multi-line draft the arrows keep their native caret behavior. |
+| **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard (a clipboard carrying both text and a file keeps the text and attaches the file), and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file the studio cannot read is refused with the reason instead of becoming a chip that promises content the model will never see. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. Selecting prose in a reply shows **Quote**; one click puts the passage in the composer as a verbatim blockquote attributed to the reply, removable without touching the question you typed, and it is sent as part of the question. On an empty draft `↑` recalls the message you sent last — again for the one before it — and `↓` walks forward and finally restores the draft you were typing; inside a multi-line draft the arrows keep their native caret behavior. |
 | **Bar** | The only persistent chrome: home, **New thread**, catch-up, live model status, **Customize**, and settings. **New thread** shows its words above 720px and is named *Start a new thread* at every width; it is switched off with the reason *This thread is already new.* when there is nothing to leave, asks — *A reply is still coming. Stop it and start a new thread?* — only while a reply is in flight, and otherwise gives the thread back for ten seconds through **Undo** on the toast. Starting one creates no conversation until the first message, and moves nothing on the canvas. Home closes what is open and never discards the thread. There is no navigation drawer to compete with the thread. |
 | **Customize** | The one place to manage connectors. It replaces the conversation while open (the bar stays, so leaving is one gesture) and shows three bands: what is installed, read from the same `connectors.json` the CLI uses; a handful of curated picks as non-gating examples; and the marketplace, populated from the trusted vendor registry so a listing can be added by id. Capability areas filter the shelf, a listing that needs a token names its environment variable and stores nothing, a listing that cannot be installed says why, and an unreachable marketplace is reported rather than shown as an empty list. A studio with nothing installed suggests a connector when one would help; dismissing the suggestion keeps it dismissed. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
@@ -241,6 +241,16 @@ Studio says so in one place and keeps going:
   not, and `isEndpointConfigured` in `apps/studio/src/lib/modelEndpoint.ts` is
   the single place that decides, for the chip, the capability probe, and the
   chat provider.
+
+  A configured endpoint on your own network is only reachable from a page served
+  from that same device. `endpointReachability` in
+  `apps/studio/src/lib/modelEndpoint.ts` compares the endpoint's host with the
+  page's origin: a loopback or private-address endpoint is **device-only** when
+  opened from a hosted page, and the studio says so rather than pretending it can
+  connect. The capability probe reports `endpoint-model` as unavailable with the
+  reason, and the bar's model chip titles it "local endpoint, not reachable from
+  this page" while keeping its light unknown — use the desktop app or open the
+  Studio on this device.
 
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
@@ -625,6 +635,33 @@ itself, including that a quote containing `<script>` or `<h1>` prints as the
 characters the person said. The rules live in `scripts/artifact_a11y.py`; what
 passes them is a well-built document, not a certified one.
 
+### Sharing a read-only artifact
+
+A person can hand a teammate one artifact without handing over the workspace.
+The landscape header carries a **Share** control; choosing a duration (7, 14, or
+30 days) mints a link through the sidecar and shows it once, with a **Copy
+link** button. The link is a capability, not a copy of the database: it opens a
+read-only page that renders the landscape — or the vision — and its own
+evidence, and nothing else.
+
+The page lives at `/shared/:token`, and it is deliberately *not* the Studio with
+its controls hidden. The route is decided before any provider mounts, so no
+canvas fetch, rail, composer or sidecar configuration runs; the header names the
+artifact and its expiry, and the only action is the browser's own print. An
+expired, unknown or revoked token shows one sentence and no data; a guessed
+artifact id renders nothing, because only the token is scoped.
+
+The mint and read contract belongs to the sidecar's share store (#549): it mints
+a link for one artifact, returns the scoped payload for a token, and revokes by
+id. Until that store lands, a click reports the failure rather than promising a
+link it did not make, and the sheet says when a link cannot be revoked.
+
+| File | Role |
+|---|---|
+| `apps/studio/src/lib/share.ts` | The `/shared/:token` route reader and expiry wording. Pure and tested. |
+| `apps/studio/src/components/SharedArtifact.tsx` | The read-only page: one artifact, its evidence, the expiry. |
+| `apps/studio/src/components/Share{Action,Sheet}.tsx` | The landscape control and the dialog that mints a link, offers it to copy, and states revocability. |
+
 ## Rich responses
 
 
@@ -796,7 +833,12 @@ bar, **Settings → Software update**, or the version line in the sidebar applie
 it immediately. Windows needs the app to exit before its installer runs, so it
 offers **Update & restart** instead. Dismissing the bar is safe: a staged update
 still applies on the next launch, and check failures are reported in Settings
-rather than interrupting the conversation.
+rather than interrupting the conversation. A failed check never borrows the
+last attempt's timestamp: Settings says plainly that the app could not check and
+names when it last reached the server successfully, or that it has not yet.
+Below that, **Recent update activity** lists the most recent updater actions of
+this session — checks, downloads, installs, skips and dismissals — newest first
+and capped, so a support conversation starts from what actually happened.
 
 In-app updates are inactive in the browser build and in `tauri dev`; both say so
 in **Settings → Software update**.
