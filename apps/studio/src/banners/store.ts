@@ -55,6 +55,12 @@ export function raiseBanner(state: BannerState, spec: BannerSpec, now = Date.now
 }
 
 export function resolveBanner(state: BannerState, kind: BannerKind): BannerState {
+  // Return the same state when nothing matches, so a `resolve` for an absent
+  // banner — a condition that is already clear, checked on every render — is a
+  // no-op React can bail out of rather than a fresh state object.
+  if (!state.banners.some((banner) => banner.kind === kind)) {
+    return state;
+  }
   return { banners: state.banners.filter((banner) => banner.kind !== kind) };
 }
 
