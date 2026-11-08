@@ -1,10 +1,19 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The browser BFF is the first-run answer path, and it lives in IndexedDB.
 import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
+import {
+  CountedStudio,
+  expectRenderBudget,
+  getCounts,
+  resetCounts,
+  streamOfDeltas,
+  typeIntoComposer,
+} from "../test/renderCounts";
+import type { StudioContextValue } from "./StudioContext";
 import { StudioProvider, useStudio } from "./StudioContext";
 
 const CONVERSATION = {
@@ -1067,6 +1076,43 @@ describe("StudioContext theme", () => {
     expect(JSON.parse(localStorage.getItem("studio.settings") ?? "{}").theme).toBe("light");
   });
 
+  it("cross-fades a theme change and clears the class when it ends", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+
+    expect(document.documentElement.classList.contains("theme-fading")).toBe(true);
+    await waitFor(() =>
+      expect(document.documentElement.classList.contains("theme-fading")).toBe(false),
+    );
+  });
+
+  it("swaps the theme instantly when reduced motion is requested", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(document.documentElement.classList.contains("theme-fading")).toBe(false);
+  });
+
   it("keeps the chosen theme across a remount", async () => {
     localStorage.setItem("studio.settings", JSON.stringify({ theme: "light" }));
     const { unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
@@ -1839,5 +1885,117 @@ describe("StudioContext agent focus", () => {
 
     expect(headPatches.length).toBe(patches);
   });
+  });
+});
+
+describe("Studio render budget (#502)", () => {
+  // The boot fires a health probe, a canvas read, and a connector list, and
+  // their answers land whenever the microtask queue feels like it. A scenario
+  // that started before they did would be counting that race, not the
+  // interaction, so the stub below tracks how many calls are still open.
+  let inFlight = 0;
+
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    canvasRecords = {};
+    bootCorrupt = false;
+    llmUnhealthy = false;
+    inFlight = 0;
+    resetCounts();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      inFlight += 1;
+      try {
+        return await route(input, init);
+      } finally {
+        inFlight -= 1;
+      }
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function countedStudio(): Promise<StudioContextValue> {
+    let studio: StudioContextValue | null = null;
+    render(<CountedStudio onStudio={(value) => { studio = value; }} />);
+    await waitFor(() => expect(studio).not.toBeNull());
+    // Let the boot's own answers arrive and commit before the count starts: a
+    // budget measures one interaction, and nothing else.
+    await act(async () => {
+      for (let tick = 0; tick < 10; tick += 1) {
+        await new Promise((settleTick) => { setTimeout(settleTick, 0); });
+      }
+    });
+    expect(inFlight, "the boot never went quiet").toBe(0);
+    resetCounts();
+    return studio as unknown as StudioContextValue;
+  }
+
+  it("counts each of the four pinned surfaces while a reply streams", async () => {
+    chatStream = streamOfDeltas(40);
+    const studio = await countedStudio();
+
+    await act(async () => {
+      await studio.sendMessage("hello");
+    });
+
+    expect(Object.keys(getCounts()).sort()).toEqual([
+      "banners",
+      "composer",
+      "landscape",
+      "rail",
+    ]);
+  });
+
+  // Baseline measured on 2026-11-05 at commit c403ba17: the commits each pinned
+  // surface makes for one interaction, counted from a boot that has gone quiet.
+  // Exact on purpose — the state splits (#503, #504, #505) may only lower a
+  // number here, and a rise has to be argued with, surface by surface.
+  //
+  // What they say: a keystroke renders the composer twice and nothing else; a
+  // streamed reply renders the composer five times and the rest of the screen
+  // twice; one health flip reaches every surface, and turns a single boolean
+  // into five renders of the banner area.
+  const STREAM_BUDGET = { banners: 2, composer: 5, landscape: 2, rail: 2 };
+  const TYPING_BUDGET = { banners: 0, composer: 40, landscape: 0, rail: 0 };
+  const HEALTH_BUDGET = { banners: 5, composer: 1, landscape: 1, rail: 1 };
+
+  it("streams forty deltas within its budget", async () => {
+    chatStream = streamOfDeltas(40);
+    const studio = await countedStudio();
+
+    await act(async () => {
+      await studio.sendMessage("hello");
+    });
+
+    expectRenderBudget(STREAM_BUDGET);
+  });
+
+  it("takes twenty keystrokes within its budget", async () => {
+    await countedStudio();
+    const input = screen.getByRole("textbox", { name: "Message the studio" });
+
+    await act(async () => {
+      typeIntoComposer(input as HTMLTextAreaElement, 20);
+    });
+
+    expectRenderBudget(TYPING_BUDGET);
+  });
+
+  it("answers one health poll turning unhealthy within its budget", async () => {
+    await countedStudio();
+    llmUnhealthy = true;
+
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expectRenderBudget(HEALTH_BUDGET);
   });
 });

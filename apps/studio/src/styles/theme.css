@@ -56,6 +56,35 @@ html.theme-light {
   --surface-hover: rgba(15, 23, 42, 0.07);
 }
 
+/* More contrast: muted text climbs one step, hairlines thicken, and the
+   accent keeps its 3:1 focus ring. Both themes are named inside the query so
+   the light values are not shadowed by their earlier declaration. */
+@media (prefers-contrast: more) {
+  :root {
+    --muted: #c6cad3;
+    --faint: #adb2bf;
+    --line: rgba(255, 255, 255, 0.16);
+    --line-strong: rgba(255, 255, 255, 0.3);
+  }
+
+  html.theme-light {
+    --muted: #3a4050;
+    --faint: #454c5c;
+    --line: rgba(15, 23, 42, 0.22);
+    --line-strong: rgba(15, 23, 42, 0.4);
+  }
+
+  .bar,
+  .banner,
+  .outcome-card,
+  .settings-drawer,
+  .changelog-modal,
+  .diagnostics-modal,
+  .studio-metric {
+    border-width: 1.5px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1369,6 +1398,28 @@ a {
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* A pasted document is a message, not the screen: eight lines, a fade, and one
+   control that says there is more (#696). */
+.message--user .message__bubble.is-clamped {
+  position: relative;
+  max-height: 12.8em;
+  overflow: hidden;
+}
+
+.message--user .message__bubble.is-clamped::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2.4em;
+  background: linear-gradient(to bottom, transparent, var(--surface-hover));
+  pointer-events: none;
+}
+
+.message__more {
+  margin-top: 4px;
 }
 
 /* Editing a question happens in the bubble it was asked in. */
@@ -3228,6 +3279,18 @@ button.message__tag:hover {
   }
 }
 
+/* StudioContext holds this class for one theme change only, so the tokens
+   cross-fade for 120ms instead of snapping. Reduced motion never adds it, and
+   the global reduce rule shortens it if it runs anyway. */
+html.theme-fading,
+html.theme-fading *,
+html.theme-fading *::before,
+html.theme-fading *::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 120ms;
+  transition-timing-function: linear;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -4525,6 +4588,48 @@ button.message__tag:hover {
   -webkit-backdrop-filter: blur(12px) saturate(160%);
 }
 
+/* ------------------------------------------------------------------ */
+/* Preferences owned by the operating system                           */
+/* ------------------------------------------------------------------ */
+
+/* Reduced transparency: the glass becomes a surface. Every blur is removed
+   and the overlay scrims go opaque, so text never sits on moving wallpaper. */
+@media (prefers-reduced-transparency: reduce) {
+  .scrim,
+  .bar,
+  .outcome-card,
+  .settings-drawer,
+  .banner,
+  .changelog-modal,
+  .changelog-overlay,
+  .diagnostics-overlay,
+  .suggestion-modal,
+  .catchup-summary,
+  .studio-metric {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .bar,
+  .outcome-card,
+  .settings-drawer,
+  .banner,
+  .changelog-modal,
+  .catchup-summary,
+  .studio-metric {
+    background-color: var(--bg-raised);
+  }
+
+  .changelog-overlay,
+  .diagnostics-overlay,
+  .suggestion-modal,
+  .scrim {
+    background-color: var(--bg);
+  }
+}
+
+
+
 /* 2. Apple-style range slider dynamics */
 input[type="range"] {
   -webkit-appearance: none;
@@ -4831,6 +4936,7 @@ details[open] summary {
 }
 
 .rail__chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -4862,6 +4968,25 @@ details[open] summary {
 .rail__icon {
   display: inline-flex;
   opacity: 0.8;
+}
+
+/* What a chip opens, said on hover and on focus, not in an empty title (#696). */
+.rail__tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
 }
 
 .rail__count {
@@ -5232,6 +5357,74 @@ details[open] summary {
 }
 
 .reasoning__body[hidden] {
+  display: none;
+}
+
+/* The run row: one line for the thinking and the calls a turn did. It is the
+   same quiet card as the thought process inside it — the answer stays the loud
+   thing — and it carries no animation of its own, so a reader who asked for
+   reduced motion gets the same row they always did. */
+.work-block {
+  margin: 2px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+  overflow: hidden;
+}
+
+.work-block.is-running {
+  border-color: rgba(139, 140, 248, 0.26);
+}
+
+.work-block__trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.work-block__trigger:hover {
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+}
+
+.work-block__chevron {
+  margin-left: auto;
+  transition: transform 0.16s ease;
+}
+
+.work-block__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* The calls keep their own rows inside here; the card is the fold, not a new
+   skin on them. */
+.work-block__body {
+  padding: 0 14px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.work-block__body .reasoning {
+  margin: 10px 0 0;
+  border: 0;
+  background: transparent;
+}
+
+.work-block__body .reasoning__body {
+  padding: 8px 2px 4px;
+  border-top: 0;
+}
+
+.work-block__body[hidden] {
   display: none;
 }
 
@@ -5751,7 +5944,8 @@ details[open] summary {
 .quiet-action:focus-visible,
 .branch-picker__step:focus-visible,
 .attachment-chip__remove:focus-visible,
-.reasoning__summary:focus-visible {
+.reasoning__summary:focus-visible,
+.work-block__trigger:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -6650,6 +6844,21 @@ details[open] summary {
   cursor: pointer;
 }
 
+.update-settings__log {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.update-settings__log-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+}
+
 .update-settings__toggle input {
   accent-color: var(--accent);
 }
@@ -6771,4 +6980,301 @@ details[open] summary {
   margin: 0;
   font-size: 0.8rem;
   color: var(--amber);
+}
+
+/* ------------------------------------------------------------------ */
+/* Sharing: the sheet that mints a link, and the page it opens        */
+/* ------------------------------------------------------------------ */
+
+/* The share control sits in the landscape header beside the view switch. */
+.share-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.share-action__reason {
+  margin: 0;
+  max-width: 260px;
+  text-align: right;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.share-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(11, 13, 19, 0.7);
+  backdrop-filter: blur(10px);
+}
+
+.share-sheet__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(26, 32, 48, 0.96), rgba(15, 20, 32, 0.98));
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55);
+}
+
+.share-sheet__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  padding: 5px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.share-sheet__close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.share-sheet__title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 620;
+}
+
+.share-sheet__body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.share-sheet__error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 9px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--studio-red);
+  font-size: 0.78rem;
+}
+
+.share-sheet__result,
+.share-sheet__create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.share-sheet__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.share-sheet__field .select {
+  width: auto;
+}
+
+.share-sheet__primary {
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
+.share-sheet__note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+/* The read-only page. No chrome, no navigation: one artifact and its expiry. */
+.shared-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 720px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.shared-page__status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.shared-page__head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.shared-page__eyebrow {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shared-page__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.shared-page__expiry {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.shared-page__sample {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(240, 179, 74, 0.3);
+  border-radius: 10px;
+  background: rgba(240, 179, 74, 0.08);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.shared-page__sample strong {
+  color: var(--amber);
+}
+
+.shared-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shared-section__title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.shared-page__empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.82rem;
+}
+
+.shared-outcomes,
+.shared-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shared-outcome,
+.shared-evidence__item {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.shared-outcome--hot {
+  border-color: rgba(240, 179, 74, 0.28);
+  background: rgba(240, 179, 74, 0.045);
+}
+
+.shared-outcome__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shared-outcome__id {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.shared-outcome__statement {
+  margin: 8px 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.shared-outcome__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.shared-outcome__meta b {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.shared-evidence__name {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.shared-evidence__content {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.shared-vision {
+  margin: 0;
+  padding-left: 16px;
+  border-left: 3px solid var(--accent);
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+/* Selection and the caret carry the brand instead of the browser default. */
+::selection {
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
+  color: var(--text);
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: var(--accent);
 }
