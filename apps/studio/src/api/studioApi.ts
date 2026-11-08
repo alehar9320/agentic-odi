@@ -30,11 +30,14 @@ import type {
   Step,
   Strategy,
   StudioConfig,
+  SharedArtifactPayload,
+  ShareLink,
   StudioError,
   Study,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
+import { applyPendingWrites } from "../bff/pending";
 
 /** A failure the sidecar reported, kept whole so the UI can show it. */
 export class StudioApiError extends Error {
@@ -266,6 +269,40 @@ async function withLocal<T>(
   }
 }
 
+/**
+ * A write that goes to the sidecar when it answers and to the local store, plus
+ * the outbox, when it does not.
+ *
+ * The returned record carries `pending: true` when the write was queued rather
+ * than acknowledged, so the caller can show a receipt that says where the change
+ * lives. A sidecar that answers with an application error (400/401/409) is a real
+ * failure and is rethrown untouched — the fallback is for a sidecar that is not
+ * there, not for one that refused.
+ */
+async function queuedWrite<T>(
+  sidecar: () => Promise<T>,
+  local: (bff: Awaited<ReturnType<typeof getStudioBff>>) => Promise<T>,
+): Promise<T> {
+  try {
+    return await sidecar();
+  } catch (error) {
+    if (!isTransportFailure(error)) {
+      throw error;
+    }
+    const bff = await getStudioBff();
+    const record = await local(bff);
+    // `pending` rides along on the record so the caller's receipt can say where
+    // the change lives; it is not part of the entity the sidecar returns.
+    return { ...record, pending: true } as T;
+  }
+}
+
+/** Overlay the writes still queued on this device onto a canvas read. */
+async function overlayPending(canvas: CanvasData): Promise<CanvasData> {
+  const bff = await getStudioBff();
+  return applyPendingWrites(canvas, await bff.listOutbox());
+}
+
 export async function fetchConfig(): Promise<StudioConfig> {
   // Configuration is a convenience, not a gate: a proxy that accepts the
   // connection and never answers must not hold the first screen. Bound it and
@@ -305,10 +342,13 @@ export function fetchChangelog(): Promise<ChangelogData> {
 }
 
 export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
-  return withLocal(
+  const canvas = await withLocal(
     () => getJson<CanvasData>(`/api/canvas?mcp_url=${encodeURIComponent(mcpUrl)}`),
     (bff) => bff.data.fetchCanvas(),
   );
+  // A queued write has not reached the sidecar, so a read that answered from it
+  // would erase the optimistic edit. Overlay the outbox on every read path.
+  return overlayPending(canvas);
 }
 
 export function healthMcp(mcpUrl: string): Promise<McpHealth> {
@@ -337,27 +377,50 @@ export function fetchModels(config: {
 }
 
 export function addStep(payload: AddStepPayload): Promise<Step> {
-  return postJson<Step>("/api/steps", payload);
+  return queuedWrite<Step>(
+    () => postJson<Step>("/api/steps", payload),
+    (bff) =>
+      bff.addStep({ job_id: payload.job_id, name: payload.name, order: payload.order }),
+  );
 }
 
 export function addOutcome(payload: AddOutcomePayload): Promise<Outcome> {
-  return postJson<Outcome>("/api/outcomes", payload);
+  return queuedWrite<Outcome>(
+    () => postJson<Outcome>("/api/outcomes", payload),
+    (bff) =>
+      bff.addOutcome({
+        job_id: payload.job_id,
+        statement: payload.statement,
+        importance: payload.importance,
+        satisfaction: payload.satisfaction,
+      }),
+  );
 }
 
 export function createJob(payload: CreateJobPayload): Promise<Job> {
-  return postJson<Job>("/api/jobs", payload);
+  return queuedWrite<Job>(
+    () => postJson<Job>("/api/jobs", payload),
+    (bff) => bff.createJob({ name: payload.name, description: payload.description }),
+  );
 }
 
 export function updateJob(
   jobId: string,
   payload: { name?: string; description?: string; mcp_url: string },
 ): Promise<Job> {
-  return sendJson<Job>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload);
+  return queuedWrite<Job>(
+    () => sendJson<Job>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload),
+    (bff) => bff.updateJob(jobId, { name: payload.name, description: payload.description }),
+  );
 }
 
 export function deleteJob(jobId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/jobs/${encodeURIComponent(jobId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ deleted: string }>(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/jobs/${encodeURIComponent(jobId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteJob(jobId),
   );
 }
 
@@ -365,12 +428,19 @@ export function updateStep(
   stepId: string,
   payload: { name?: string; order?: number; mcp_url: string },
 ): Promise<Step> {
-  return sendJson<Step>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload);
+  return queuedWrite<Step>(
+    () => sendJson<Step>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload),
+    (bff) => bff.updateStep(stepId, { name: payload.name, order: payload.order }),
+  );
 }
 
 export function deleteStep(stepId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/steps/${encodeURIComponent(stepId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ deleted: string }>(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/steps/${encodeURIComponent(stepId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteStep(stepId),
   );
 }
 
@@ -378,16 +448,29 @@ export function updateOutcome(
   outcomeId: string,
   payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
 ): Promise<Outcome> {
-  return sendJson<Outcome>(
-    "PATCH",
-    `/api/outcomes/${encodeURIComponent(outcomeId)}`,
-    payload,
+  return queuedWrite<Outcome>(
+    () =>
+      sendJson<Outcome>(
+        "PATCH",
+        `/api/outcomes/${encodeURIComponent(outcomeId)}`,
+        payload,
+      ),
+    (bff) =>
+      bff.updateOutcome(outcomeId, {
+        statement: payload.statement,
+        importance: payload.importance,
+        satisfaction: payload.satisfaction,
+      }),
   );
 }
 
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ deleted: string }>(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteOutcome(outcomeId),
   );
 }
 
@@ -819,4 +902,29 @@ export function promoteEvidence(
     `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
     payload,
   );
+}
+
+
+/**
+ * The one artifact a share token names.
+ *
+ * Unlike every other read, this does not fall through to the browser BFF: a
+ * shared payload exists only where the token was minted, and there is no local
+ * copy to invent. A token the sidecar refuses is a real failure, not a reason to
+ * serve something else.
+ */
+export function fetchSharedArtifact(token: string): Promise<SharedArtifactPayload> {
+  return getJson<SharedArtifactPayload>(`/api/share/${encodeURIComponent(token)}`);
+}
+
+/**
+ * Mint a read-only link for one artifact. The returned token is shown once;
+ * the store keeps only its hash.
+ */
+export function createShareLink(payload: {
+  kind: SharedArtifactPayload["kind"];
+  expires_in_days?: number;
+  mcp_url?: string;
+}): Promise<ShareLink> {
+  return postJson<ShareLink>("/api/share", payload);
 }
