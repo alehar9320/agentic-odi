@@ -2251,10 +2251,11 @@ describe("Studio render budget (#502)", () => {
   // What they say: a keystroke renders the composer twice and nothing else; a
   // streamed reply renders the composer five times and the rest of the screen
   // twice; one health flip reaches every surface, and turns a single boolean
-  // into five renders of the banner area.
+  // into six renders of the banner area — the extra render is the top dock
+  // mounting for the first time when the first banner appears (#651).
   const STREAM_BUDGET = { banners: 2, composer: 5, landscape: 2, rail: 2 };
   const TYPING_BUDGET = { banners: 0, composer: 40, landscape: 0, rail: 0 };
-  const HEALTH_BUDGET = { banners: 5, composer: 1, landscape: 1, rail: 1 };
+  const HEALTH_BUDGET = { banners: 6, composer: 1, landscape: 1, rail: 1 };
 
   it("streams forty deltas within its budget", async () => {
     chatStream = streamOfDeltas(40);
