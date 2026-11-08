@@ -1,4 +1,4 @@
-import type { ExistingSolution, OutcomeAlternativeLink, OutcomeInterval } from "../types";
+import type { ExistingSolution, Outcome, OutcomeAlternativeLink, OutcomeInterval } from "../types";
 
 export interface PillDescriptor {
   label: string;
@@ -245,6 +245,17 @@ export function summarizeMemberScores(
     }
   }
   return { mean: scored === 0 ? null : total / scored, scored, unscored };
+}
+
+/**
+ * The landscape's headline average: the mean of the stored scores only. One
+ * unscored outcome cannot drag the number down, and an all-unscored board has
+ * no mean at all rather than a fake zero. Delegates the counting to
+ * `summarizeMemberScores` so there is exactly one place that decides what
+ * "scored" means.
+ */
+export function scoredAverage(outcomes: ReadonlyArray<Outcome>): MemberScoreSummary {
+  return summarizeMemberScores(outcomes.map((outcome) => outcome.opportunity_score));
 }
 
 /**
