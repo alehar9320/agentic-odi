@@ -1,10 +1,11 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import { authHeaders } from "../api/studioApi";
 import { nowIso } from "./id";
-import type { CanvasData, ChangelogData, Observation } from "../types";
-import type { LocalStore } from "./store/types";
+import type { CanvasData, ChangelogData, Observation, Outcome } from "../types";
+import type { LocalStore, OutboxRecord } from "./store/types";
 import type { WorkspaceSnapshot } from "./store/types";
 import { openLocalStore } from "./store/openStore";
+import { replayCaptures } from "./capture";
 import { LocalDataService } from "./data/localDataService";
 import { LocalMemoryService } from "./memory/localMemoryService";
 import { ChatOrchestrator } from "./chat/orchestrator";
@@ -33,6 +34,58 @@ export class StudioBff {
 
   async fetchCanvas(): Promise<CanvasData> {
     return this.data.fetchCanvas();
+  }
+
+  /**
+   * Queue a capture made while the sidecar is unreachable, so it survives the
+   * dead network and syncs once when it returns. The record is written to the
+   * local store and enqueued here; the idempotency key is minted at capture
+   * time inside the data service.
+   */
+  async queueCapture(input: {
+    job_id: string;
+    statement: string;
+    importance: number | null;
+    satisfaction: number | null;
+    step_id?: string | null;
+  }): Promise<Outcome> {
+    return this.data.queueCapture(input);
+  }
+
+  /** The captures still waiting to sync, oldest first. */
+  async listQueuedCaptures(): Promise<Outcome[]> {
+    return this.data.listQueuedCaptures();
+  }
+
+  /** How many captures are waiting, which is what the badge shows. */
+  async countQueuedCaptures(): Promise<number> {
+    return this.data.countQueuedCaptures();
+  }
+
+  /** Mark a capture the sidecar refused, so it is surfaced, not retried forever. */
+  async failQueuedCapture(id: string, message: string): Promise<void> {
+    return this.data.failQueuedCapture(id, message);
+  }
+
+  /** The captures the sidecar refused, kept so the UI can surface them. */
+  async listFailedCaptures(): Promise<Outcome[]> {
+    return this.data.listFailedCaptures();
+  }
+
+  /** Drop a queued capture the person no longer wants. */
+  async discardQueuedCapture(id: string): Promise<void> {
+    return this.data.discardQueuedCapture(id);
+  }
+
+  /**
+   * Replay the queued captures through `send`, at most once across the tabs
+   * that share the outbox. `send` is the transport, so the BFF never speaks
+   * HTTP itself and the caller keeps the `Idempotency-Key`.
+   */
+  async replayCaptures(
+    send: (record: OutboxRecord) => Promise<void> | void,
+  ): Promise<number> {
+    return replayCaptures({ store: this.store, send });
   }
 
   /**

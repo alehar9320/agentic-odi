@@ -1,7 +1,21 @@
 import type { CanvasData, Job, Outcome, Step } from "../../types";
+import {
+  countQueuedCaptures as countCaptures,
+  failCapture,
+  listFailedCaptures as listFailed,
+  listQueuedCaptures as listCaptures,
+  outcomeFromCapture,
+  queueCapture as enqueueCapture,
+} from "../capture";
 import { notFound, validation } from "../errors";
 import { newId, nowIso } from "../id";
-import type { LocalStore, StoredJob, StoredOutcome, StoredStep } from "../store/types";
+import type {
+  LocalStore,
+  OutboxRecord,
+  StoredJob,
+  StoredOutcome,
+  StoredStep,
+} from "../store/types";
 
 export function computeOpportunityScore(importance: number, satisfaction: number): number {
   return importance + Math.max(importance - satisfaction, 0);
@@ -274,5 +288,73 @@ export class LocalDataService {
       validateScore(importance, "Importance") ?? importance,
       validateScore(satisfaction, "Satisfaction") ?? satisfaction,
     );
+  }
+
+  /**
+   * Queue a capture made while the sidecar is unreachable. The idempotency key
+   * is minted once here, at capture time, so a replay after a lost response
+   * stores exactly one record. The intent is validated against the same rules
+   * an online write uses, so a queued capture cannot become a stored record the
+   * sidecar would have refused.
+   */
+  async queueCapture(input: {
+    job_id: string;
+    statement: string;
+    importance: number | null;
+    satisfaction: number | null;
+    step_id?: string | null;
+  }): Promise<Outcome> {
+    if (!(await this.store.getJob(input.job_id))) {
+      throw notFound("Job", input.job_id);
+    }
+    if (input.step_id && !(await this.store.getStep(input.step_id))) {
+      throw notFound("Step", input.step_id);
+    }
+    const record = await enqueueCapture(this.store, {
+      job_id: input.job_id,
+      statement: validateName(input.statement, "Outcome statement"),
+      importance: validateScore(input.importance, "Importance"),
+      satisfaction: validateScore(input.satisfaction, "Satisfaction"),
+      step_id: input.step_id ?? null,
+    });
+    return this.captureOutcome(record);
+  }
+
+  /** The captures still waiting to sync, oldest first. */
+  async listQueuedCaptures(): Promise<Outcome[]> {
+    const records = await listCaptures(this.store);
+    return records.map((record) => this.captureOutcome(record));
+  }
+
+  /** How many captures are waiting, which is what the badge shows. */
+  async countQueuedCaptures(): Promise<number> {
+    return countCaptures(this.store);
+  }
+
+  /** The captures the sidecar refused, kept so the UI can surface them. */
+  async listFailedCaptures(): Promise<Outcome[]> {
+    const records = await listFailed(this.store);
+    return records.map((record) => this.captureOutcome(record));
+  }
+
+  /**
+   * A capture the sidecar refused while online: it is not retried forever, and
+   * it is not dropped. The record is kept as failed so the UI can surface it.
+   */
+  async failQueuedCapture(id: string, message: string): Promise<void> {
+    await failCapture(this.store, id, message);
+  }
+
+  /** Drop a queued capture the person no longer wants, so the badge follows. */
+  async discardQueuedCapture(id: string): Promise<void> {
+    if (!(await this.store.getOutbox(id))) {
+      throw notFound("Queued capture", id);
+    }
+    await this.store.deleteOutbox(id);
+  }
+
+  private captureOutcome(record: OutboxRecord): Outcome {
+    const outcome = outcomeFromCapture(record);
+    return { ...stripOutcome(outcome), pending: true };
   }
 }

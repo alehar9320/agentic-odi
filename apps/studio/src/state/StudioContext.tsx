@@ -17,6 +17,7 @@ import type {
 } from "@assistant-ui/react";
 
 import { focusLabel, focusPointer } from "../lib/focus";
+import { useCaptureQueue } from "../lib/useCaptureQueue";
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -49,6 +50,7 @@ import {
   fetchUnreadSignalCount,
   healthLlm,
   healthMcp,
+  isTransportFailure,
   listConversations as apiListConversations,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
@@ -62,6 +64,7 @@ import {
   type AddObservationPayload,
   type UpdateObservationPayload,
 } from "../api/studioApi";
+import { getStudioBff } from "../bff/index";
 import type { RawSseEvent } from "../api/sse";
 import { preparedAttachments } from "../assistant/attachments";
 import { textOf } from "../assistant/convert";
@@ -91,6 +94,7 @@ import type {
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
+  Outcome,
   Segment,
   Signal,
   SignalSubjectKind,
@@ -415,6 +419,22 @@ export interface StudioContextValue {
   offlineReplyFor: string | null;
   addStep: (payload: Omit<AddStepPayload, "mcp_url">) => Promise<void>;
   addOutcome: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
+  /**
+   * Record a capture made while the sidecar is unreachable. It is written to
+   * this device and queued, so a dead network cannot lose it; it syncs once
+   * when the sidecar returns.
+   */
+  queueCapture: (payload: Omit<AddOutcomePayload, "mcp_url">) => Promise<void>;
+  /** How many captures are waiting to sync, which is what the badge shows. */
+  queuedCaptures: number;
+  /** The captures still waiting to sync, oldest first. */
+  queuedCaptureList: Outcome[];
+  /** The captures the sidecar refused, kept so they are surfaced, not dropped. */
+  failedCaptures: Outcome[];
+  /** Replay the queued captures now; returns how many were sent. */
+  replayCaptures: () => Promise<number>;
+  /** Drop a queued capture the person no longer wants. */
+  discardQueuedCapture: (id: string) => Promise<void>;
   createJob: (payload: { name: string; description?: string }) => Promise<string | null>;
   updateJob: (jobId: string, payload: { name?: string; description?: string }) => Promise<void>;
   deleteJob: (jobId: string) => Promise<void>;
@@ -653,6 +673,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
+  const captureQueue = useCaptureQueue(settings.mcp_url);
   const [bootError, setBootError] = useState<StudioError | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -1314,6 +1335,38 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
+  );
+
+  /**
+   * Queue a capture made while the sidecar is unreachable.
+   *
+   * A transport failure is not a lost edit once the record is queued: the
+   * capture is written to this device and waits, and the badge counts it. An
+   * application failure from the sidecar (a refusal) still throws, so the form
+   * can show it and nothing is queued for a request the sidecar rejected.
+   */
+  const queueCapture = useCallback(
+    async (payload: Omit<AddOutcomePayload, "mcp_url">) => {
+      try {
+        await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", "Outcome captured successfully!");
+      } catch (error) {
+        if (!isTransportFailure(error)) {
+          throw error;
+        }
+        const bff = await getStudioBff();
+        await bff.queueCapture({
+          job_id: payload.job_id,
+          statement: payload.statement,
+          importance: payload.importance,
+          satisfaction: payload.satisfaction,
+        });
+        pushToast("info", "Saved on this device · will sync when the sidecar is back.");
+        await captureQueue.refresh();
+      }
+      await refreshCanvas();
+    },
+    [settings.mcp_url, pushToast, refreshCanvas, captureQueue],
   );
 
   const createJob = useCallback(
@@ -2510,6 +2563,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       offlineReplyFor,
       addStep,
       addOutcome,
+      queueCapture,
+      queuedCaptures: captureQueue.waiting,
+      queuedCaptureList: captureQueue.queued,
+      failedCaptures: captureQueue.failed,
+      replayCaptures: captureQueue.replay,
+      discardQueuedCapture: captureQueue.discard,
       promoteEvidence,
       createJob,
       updateJob,
@@ -2634,6 +2693,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       offlineReplyFor,
       addStep,
       addOutcome,
+      queueCapture,
+      captureQueue,
       promoteEvidence,
       createJob,
       updateJob,

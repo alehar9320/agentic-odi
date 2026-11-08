@@ -2306,6 +2306,25 @@ input[type="range"] {
   font-size: 0.95rem;
 }
 
+/* The capture outbox: how many captures are waiting for the sidecar. */
+.queue-badge {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
+/* A refused capture is surfaced, not silently dropped. */
+.queue-badge--failed {
+  border-color: rgba(240, 179, 74, 0.35);
+  background: rgba(240, 179, 74, 0.06);
+  color: #d6c19b;
+}
+
 /* Evidence */
 .notice {
   margin: 0;

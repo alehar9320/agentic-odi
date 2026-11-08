@@ -42,6 +42,11 @@ export interface Outcome {
   claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
+  /**
+   * True when the outcome is queued on this device and has not reached the
+   * sidecar yet. It is never set on an outcome the server returned.
+   */
+  pending?: boolean;
 }
 
 export interface Evidence {

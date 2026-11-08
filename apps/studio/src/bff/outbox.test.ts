@@ -72,6 +72,48 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe("drainOutbox with a select filter", () => {
+  it("sends only the records the filter accepts, leaving the rest pending", async () => {
+    const store = new MemoryLocalStore();
+    await store.enqueueOutbox(record({ id: "capture-1", entity: "outcome", kind: "create" }));
+    await store.enqueueOutbox(record({ id: "edit-1", entity: "job", kind: "update" }));
+
+    const sent: string[] = [];
+    const outcome = await drainOutbox({
+      store,
+      send: (entry) => {
+        sent.push(entry.id);
+      },
+      select: (entry) => entry.entity === "outcome" && entry.kind === "create",
+    });
+
+    expect(outcome.sent).toBe(1);
+    expect(sent).toEqual(["capture-1"]);
+    // The record the filter skipped is untouched, so the path that owns it
+    // still finds it pending.
+    expect(await store.getOutbox("edit-1")).toMatchObject({ state: "pending" });
+  });
+
+  it("skips a record the send marked failed, so it is not acknowledged", async () => {
+    const store = new MemoryLocalStore();
+    await store.enqueueOutbox(record({ id: "capture-1" }));
+
+    const outcome = await drainOutbox({
+      store,
+      send: async (entry) => {
+        // The replay marked this one failed; the drain must not overwrite that.
+        await store.putOutbox({ ...entry, state: "failed", last_error: "refused" });
+      },
+    });
+
+    expect(outcome.sent).toBe(0);
+    expect(await store.getOutbox("capture-1")).toMatchObject({
+      state: "failed",
+      last_error: "refused",
+    });
+  });
+});
+
 describe("drainOutbox with navigator.locks", () => {
   it("sends each record once when two drains race", async () => {
     const locks = new FakeLockManager();

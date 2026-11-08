@@ -1,5 +1,6 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import { getStudioBff } from "../bff/index";
+import type { OutboxRecord } from "../bff/store/types";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -220,10 +221,20 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
+async function sendJson<T>(
+  method: "POST" | "PATCH",
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method,
-    headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...headers,
+      ...authHeaders(),
+    },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -234,8 +245,12 @@ async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown
   return (await response.json()) as T;
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  return sendJson<T>("POST", path, body);
+async function postJson<T>(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<T> {
+  return sendJson<T>("POST", path, body, headers);
 }
 
 async function deleteJson<T>(path: string): Promise<T> {
@@ -344,6 +359,34 @@ export function addStep(payload: AddStepPayload): Promise<Step> {
 
 export function addOutcome(payload: AddOutcomePayload): Promise<Outcome> {
   return postJson<Outcome>("/api/outcomes", payload);
+}
+
+/**
+ * Send one queued capture. The record's `id` is its idempotency key, minted at
+ * capture time, so a replay after a lost response carries the same key and the
+ * sidecar stores one record rather than two. The key travels in the standard
+ * `Idempotency-Key` header; a sidecar that does not honour it yet still sees
+ * the same body on a replay.
+ */
+export function sendQueuedCapture(record: OutboxRecord, mcpUrl: string): Promise<Outcome> {
+  const payload = record.payload as {
+    job_id: string;
+    statement: string;
+    importance: number | null;
+    satisfaction: number | null;
+    step_id?: string | null;
+  };
+  return postJson<Outcome>(
+    "/api/outcomes",
+    {
+      mcp_url: mcpUrl,
+      job_id: payload.job_id,
+      statement: payload.statement,
+      importance: payload.importance ?? undefined,
+      satisfaction: payload.satisfaction ?? undefined,
+    },
+    { "Idempotency-Key": record.id },
+  );
 }
 
 export function createJob(payload: CreateJobPayload): Promise<Job> {

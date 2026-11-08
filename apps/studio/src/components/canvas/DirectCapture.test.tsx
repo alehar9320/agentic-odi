@@ -7,7 +7,9 @@ import { DirectCapture } from "./DirectCapture";
 const harness = vi.hoisted(() => ({
   state: {
     canvas: { jobs: [{ id: "JOB-1", name: "Ship a service" }], steps: [], outcomes: [] } as unknown,
-    addOutcome: vi.fn<(payload: unknown) => Promise<void>>(),
+    queueCapture: vi.fn<(payload: unknown) => Promise<void>>(),
+    queuedCaptures: 0,
+    failedCaptures: [] as unknown[],
     createJob: vi.fn<(payload: unknown) => Promise<string | null>>(),
   },
 }));
@@ -55,7 +57,7 @@ describe("DirectCapture", () => {
   });
 
   it("records the typed outcome with the chosen scores unchanged", async () => {
-    harness.state.addOutcome = vi.fn(async () => undefined);
+    harness.state.queueCapture = vi.fn(async () => undefined);
 
     render(<DirectCapture />);
     fireEvent.change(screen.getByLabelText(/desired outcome/i), {
@@ -66,7 +68,7 @@ describe("DirectCapture", () => {
     fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
 
     await waitFor(() => {
-      expect(harness.state.addOutcome).toHaveBeenCalledWith({
+      expect(harness.state.queueCapture).toHaveBeenCalledWith({
         job_id: "JOB-1",
         statement: "Minimize the time it takes to rotate deployment secrets",
         importance: 9.2,
@@ -76,7 +78,7 @@ describe("DirectCapture", () => {
   });
 
   it("shows the server's suggestion next to the form and keeps what was typed", async () => {
-    harness.state.addOutcome = vi.fn(async () => {
+    harness.state.queueCapture = vi.fn(async () => {
       throw new StudioApiError({
         code: "out_of_range",
         message: "importance must be between 1 and 10",
@@ -101,7 +103,7 @@ describe("DirectCapture", () => {
   });
 
   it("clears the failure once the outcome is recorded", async () => {
-    harness.state.addOutcome = vi.fn(async () => {
+    harness.state.queueCapture = vi.fn(async () => {
       throw new StudioApiError({
         code: "out_of_range",
         message: "importance must be between 1 and 10",
@@ -116,14 +118,14 @@ describe("DirectCapture", () => {
     fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
 
-    harness.state.addOutcome = vi.fn(async () => undefined);
+    harness.state.queueCapture = vi.fn(async () => undefined);
     fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
 
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 
   it("renders a statement error beside the statement and keeps what was typed", async () => {
-    harness.state.addOutcome = vi.fn(async () => {
+    harness.state.queueCapture = vi.fn(async () => {
       throw new StudioApiError({
         code: "validation",
         message: "That is not an ODI statement.",
@@ -149,7 +151,7 @@ describe("DirectCapture", () => {
   });
 
   it("renders an importance error beside the ratings", async () => {
-    harness.state.addOutcome = vi.fn(async () => {
+    harness.state.queueCapture = vi.fn(async () => {
       throw new StudioApiError({
         code: "out_of_range",
         message: "importance must be between 1 and 10",
@@ -171,7 +173,7 @@ describe("DirectCapture", () => {
   });
 
   it("renders a satisfaction error beside the ratings", async () => {
-    harness.state.addOutcome = vi.fn(async () => {
+    harness.state.queueCapture = vi.fn(async () => {
       throw new StudioApiError({
         code: "out_of_range",
         message: "satisfaction must be between 1 and 10",
@@ -193,7 +195,7 @@ describe("DirectCapture", () => {
   });
 
   it("sends an unattributable validation error to form level instead of a field", async () => {
-    harness.state.addOutcome = vi.fn(async () => {
+    harness.state.queueCapture = vi.fn(async () => {
       throw new StudioApiError({
         code: "validation",
         message: "The request was invalid.",
@@ -221,5 +223,38 @@ describe("DirectCapture score preview", () => {
     const { container } = render(<DirectCapture />);
 
     expect(container.querySelector(".score-preview b")?.textContent).toBe("13.5");
+  });
+});
+
+describe("DirectCapture offline capture", () => {
+  it("keeps the typed capture when the network is down and does not fail the form", async () => {
+    // A queued capture is not a failure: the queue-aware path resolves, the
+    // field clears, and no error lands on the form.
+    harness.state.queueCapture = vi.fn(async () => undefined);
+
+    render(<DirectCapture />);
+    fireEvent.change(screen.getByLabelText(/desired outcome/i), {
+      target: { value: "Minimize the time it takes to ship" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(screen.getByLabelText(/desired outcome/i)).toHaveValue("");
+  });
+
+  it("says how many captures are waiting to sync", () => {
+    harness.state.queuedCaptures = 2;
+    render(<DirectCapture />);
+
+    expect(screen.getByRole("status").textContent).toContain("2 captures waiting to sync");
+    harness.state.queuedCaptures = 0;
+  });
+
+  it("surfaces a capture the sidecar refused instead of dropping it silently", () => {
+    harness.state.failedCaptures = [{ id: "cap-1" }] as unknown[];
+    render(<DirectCapture />);
+
+    expect(screen.getByRole("alert").textContent).toContain("refused by the sidecar");
+    harness.state.failedCaptures = [];
   });
 });
