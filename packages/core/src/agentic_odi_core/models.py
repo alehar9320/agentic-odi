@@ -409,7 +409,8 @@ class Signal(BaseModel):
     #: True when the attention budget withheld this signal from the feed.
     suppressed: bool = False
     fingerprint: str = Field(
-        ..., description="sha256 of kind|subject_kind|subject_id|discriminator"
+        ...,
+        description="sha256 of kind|subject_kind|subject_id|discriminator, plus source event id",
     )
 
 

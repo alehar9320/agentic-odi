@@ -271,6 +271,24 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_MODEL` | CLI chat, Studio chat | `local-tools-model` |
 | `AGENTIC_ODI_API_KEY` | CLI chat, Studio chat | `local` |
 
+## Endpoint reachability
+
+A model endpoint configured on loopback or a private address (Ollama, LM Studio)
+is only reachable from a page served from that same device. `endpointReachability`
+in `apps/studio/src/lib/modelEndpoint.ts` compares the endpoint's host with the
+page's origin (`window.location.hostname`):
+
+- endpoint on a private host, page on the device → **reachable**
+- endpoint on a private host, page hosted elsewhere → **device-only**: the hosted
+  page cannot reach the person's machine, so `endpoint-model` is reported
+  unavailable with the reason to use the desktop app or open the Studio on this
+  device
+- sidecar proxy and public hosts → **reachable** from either
+
+The capability probe and the bar's model chip both read this, so a person is told
+why a local model cannot be reached from this page instead of being shown a generic
+offline state.
+
 ## Trust Boundaries
 
 Each process, the credentials it holds, and what crosses every wire are

@@ -31,6 +31,13 @@ class LlmHealthRequest(BaseModel):
     model: str = ""
 
 
+class LlmHealthResponse(BaseModel):
+    healthy: bool
+    message: str
+    checked_at: str  # ISO 8601 UTC when the probe last ran
+    cached: bool  # whether the answer was served from the TTL cache
+
+
 class ModelListRequest(BaseModel):
     """Which backend to ask for its model ids. The key travels in the body, not
     the query string, so it never lands in a URL or an access log."""
@@ -497,3 +504,29 @@ class ProposalOut(BaseModel):
     source_name: str
     status: str
     created_at: str
+
+
+class MintShareRequest(BaseModel):
+    """Mint one scoped, expiring, read-only link for one artifact."""
+
+    artifact_kind: Literal["outcome", "segment", "strategy"]
+    artifact_id: str = Field(min_length=1)
+    #: Days until the link expires. Omitted means 7; the range is 1–30.
+    ttl_days: int | None = Field(default=None, ge=1, le=30)
+
+
+class ShareMintResponse(BaseModel):
+    """The one time the raw token is shown. Only its hash is stored."""
+
+    id: str
+    token: str
+    url: str
+    expires_at: str
+
+
+class SharedArtifactResponse(BaseModel):
+    """Exactly the named artifact and its own evidence. Nothing else."""
+
+    artifact_kind: str
+    artifact: dict[str, Any]
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
