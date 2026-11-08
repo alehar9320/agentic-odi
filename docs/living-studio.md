@@ -232,7 +232,10 @@ Studio says so in one place and keeps going:
   lands; a value the studio cannot use (a URL that is not an address, an empty
   model name) is refused beside the field with the reason and the last good value
   stays in effect. There is no Save button and no way for one section's edit to
-  discard another's.
+  discard another's. Each section is its own module under
+  `apps/studio/src/components/settings/sections/` and reports its own loading and
+  failure in place, so a connector fetch that fails shows its error in the
+  Connections section and leaves the Model controls beside it working.
   A keyless server on your own network (Ollama, LM Studio, anything on loopback
   or a private address) counts as configured; a public URL without a key does
   not, and `isEndpointConfigured` in `apps/studio/src/lib/modelEndpoint.ts` is
@@ -453,7 +456,7 @@ cites the issue or PR that landed it.
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
 | `apps/studio/src/components/settings/SavedField.tsx` | A field that saves when it is left, states **Saved** in its section, and refuses an unusable value beside itself with the reason. |
-| `apps/studio/src/components/settings/sections/` | The Model and Studio bridge sections, each a module with its own fields and save line. |
+| `apps/studio/src/components/settings/sections/` | One module per Settings section — Model, Studio bridge, Data, Updates, About, Install — each reading its own source and reporting its own loading and error state. |
 | `apps/studio/src/components/settings/validation.ts` | What Settings accepts before it writes: a full http(s) URL, and a non-empty model name. |
 
 The sidecar remains the source of truth for what happened. Its additions are
