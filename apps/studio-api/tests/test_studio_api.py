@@ -21,11 +21,17 @@ OFFLINE = {
 
 
 def _client() -> TestClient:
-    return TestClient(create_app(InMemoryRepository()))
+    app = create_app(InMemoryRepository())
+    client = TestClient(app)
+    client.headers.update({"Authorization": f"Bearer {app.state.studio_token}"})
+    return client
 
 
 def _mcp_client() -> TestClient:
-    return TestClient(create_app(InMemoryRepository(), backend="mcp"))
+    app = create_app(InMemoryRepository(), backend="mcp")
+    client = TestClient(app)
+    client.headers.update({"Authorization": f"Bearer {app.state.studio_token}"})
+    return client
 
 
 def _closed_port() -> int:
@@ -490,6 +496,48 @@ def test_post_outcome_uses_local_service() -> None:
         ODIService(repo).get_outcomes(job.id)[0].statement
         == "Minimize the time to ship a release when the build is green"
     )
+
+
+def test_outcome_validation_names_the_field() -> None:
+    repo = InMemoryRepository()
+    job = ODIService(repo).add_job(name="Local job")
+    client = TestClient(create_app(repo))
+
+    # A malformed statement is attributed to the statement field.
+    bad_statement = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "http://unused",
+            "job_id": job.id,
+            "statement": "fast",
+            "importance": 8.0,
+            "satisfaction": 3.0,
+        },
+    )
+    assert bad_statement.status_code == 422
+    assert bad_statement.json()["error"]["code"] == "validation"
+    assert bad_statement.json()["error"]["field"] == "statement"
+
+    # An out-of-range rating is attributed to the rating it names. The create
+    # schema clamps scores itself, so an out-of-range score reaches the service
+    # through the update path.
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "http://unused",
+            "job_id": job.id,
+            "statement": "Minimize the time it takes to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 3.0,
+        },
+    ).json()
+    out_of_range = client.patch(
+        f"/api/outcomes/{outcome['id']}",
+        json={"importance": 42},
+    )
+    assert out_of_range.status_code == 422
+    assert out_of_range.json()["error"]["code"] == "out_of_range"
+    assert out_of_range.json()["error"]["field"] == "importance"
 
 
 # ---------------------------------------------------------------------------

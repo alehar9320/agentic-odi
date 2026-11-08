@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isUnderserved, opportunityScore, UNDERSERVED_THRESHOLD } from "../../lib/odi";
 import type { CanvasState } from "../../types";
@@ -35,6 +35,13 @@ const harness = vi.hoisted(() => ({
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => harness.state,
 }));
+
+function renderWith(outcomes: unknown[]) {
+  harness.state.canvasState = {
+    kind: "ready",
+    data: { ...mockCanvasData, outcomes },
+  } as unknown as CanvasState;
+}
 
 describe("OpportunityLandscape Data Visualization", () => {
   beforeEach(() => {
@@ -352,13 +359,6 @@ describe("OpportunityLandscape canvas states", () => {
 });
 
 describe("OpportunityLandscape stored versus displayed score", () => {
-  function renderWith(outcomes: unknown[]) {
-    harness.state.canvasState = {
-      kind: "ready",
-      data: { ...mockCanvasData, outcomes },
-    } as unknown as CanvasState;
-  }
-
   beforeEach(() => {
     harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
     harness.state.focusedSubject = null;
@@ -416,6 +416,62 @@ describe("OpportunityLandscape stored versus displayed score", () => {
   });
 });
 
+describe("OpportunityLandscape motion preference", () => {
+  function stubMotion(reduced: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: reduced && query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+  }
+
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("pulses the underserved ring when motion is allowed", () => {
+    stubMotion(false);
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.querySelectorAll("animate").length).toBeGreaterThan(0);
+  });
+
+  it("keeps a still ring and no animation when motion is reduced", () => {
+    stubMotion(true);
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.querySelectorAll("animate")).toHaveLength(0);
+    expect(container.querySelectorAll('circle[opacity="0.4"]').length).toBeGreaterThan(0);
+  });
+
+  it("does not move the nodes when the pulse is removed", () => {
+    stubMotion(false);
+    const moving = render(<OpportunityLandscape />);
+    const positions = Array.from(moving.container.querySelectorAll("circle"), (circle) =>
+      `${circle.getAttribute("cx")},${circle.getAttribute("cy")}`,
+    );
+    moving.unmount();
+
+    stubMotion(true);
+    const still = render(<OpportunityLandscape />);
+    const stillPositions = Array.from(still.container.querySelectorAll("circle"), (circle) =>
+      `${circle.getAttribute("cx")},${circle.getAttribute("cy")}`,
+    );
+
+    expect(stillPositions).toEqual(positions);
+  });
+});
+
 describe("OpportunityLandscape score rendering", () => {
   beforeEach(() => {
     harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
@@ -437,6 +493,62 @@ describe("OpportunityLandscape score rendering", () => {
 
     const tile = screen.getByText("Avg Opportunity Score").parentElement;
     expect(tile?.textContent).toContain("12.5");
+  });
+
+  // One unscored record must not drag the headline down as if it were a zero.
+  // 16 and an unrated outcome average to 16.0, not 8.0, and the caption names
+  // the split so the number can be explained from the screen.
+  it("averages only the stored scores and names how many scored", () => {
+    renderWith([
+      {
+        id: "O-SCORED",
+        statement: "Minimize the time to sync a secret",
+        importance: 9,
+        satisfaction: 2,
+        opportunity_score: 12,
+      },
+      {
+        id: "O-UNSCORED",
+        statement: "Minimize the time to answer a ticket",
+        importance: 5,
+        satisfaction: 5,
+        opportunity_score: null,
+      },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("12.0");
+    expect(tile?.textContent).not.toContain("6.0");
+    expect(tile?.textContent).toContain("1 scored · 1 not scored");
+  });
+
+  // With nothing scored there is no mean. The tile says so in words rather than
+  // printing a fabricated 0.0, NaN, or N/A that reads as a number.
+  it("says Not scored when no outcome carries a score, with no numeric delta", () => {
+    renderWith([
+      {
+        id: "O-UNSCORED",
+        statement: "Minimize the time to answer a ticket",
+        importance: 5,
+        satisfaction: 5,
+        opportunity_score: null,
+      },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(within(tile as HTMLElement).getByText("Not scored")).toBeInTheDocument();
+    expect(tile?.textContent).not.toContain("0.0");
+    expect(tile?.textContent).not.toContain("NaN");
+    expect(tile?.textContent).not.toContain("scored ·");
+  });
+
+  it("shows the scored caption the same string a screen reader reads", () => {
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("2 scored · 0 not scored");
   });
 
   // An outcome the sidecar never scored shows "—" and "Not scored" in the table,
