@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
-import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import { isEndpointConfiguredForSettings, endpointReachability, isPrivateHost } from "../../lib/modelEndpoint";
 import { formatRelativeTime } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -19,6 +19,7 @@ import {
   SunIcon,
 } from "../icons";
 import { OdiMascot } from "../OdiMascot";
+import { StatusDot } from "../status/StatusDot";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -187,6 +188,18 @@ export function StudioBar({
     api_key: settings.api_key,
     model_name: settings.model_name,
   });
+  const originClass = isPrivateHost(window.location.hostname) ? "device" : "hosted";
+  const reachability = endpointConfigured
+    ? endpointReachability(
+        {
+          base_url: settings.base_url,
+          api_key: settings.api_key,
+          model: settings.model_name,
+        },
+        { originClass },
+      )
+    : "reachable";
+  const deviceOnly = reachability === "device-only";
   const status =
     llmHealth.healthy === true
       ? "Live"
@@ -195,8 +208,9 @@ export function StudioBar({
         : endpointConfigured || sidecarReachable === true
           ? "Connecting"
           : "Local";
-  const statusDetail =
-    status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
+  const statusDetail = deviceOnly
+    ? "local endpoint, not reachable from this page"
+    : status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
   const updateReady = update.phase === "ready";
   const versionText = updateReady
     ? "Update ready"
@@ -367,10 +381,8 @@ export function StudioBar({
           aria-label={`Model status: ${status}. ${statusDetail}`}
           title={statusDetail}
         >
-          <span
-            className={`status-dot${status === "Local mode" ? " is-warn" : ""}${
-              status === "Connecting" ? " is-unknown" : ""
-            }`}
+          <StatusDot
+            tone={status === "Local mode" ? "warn" : status === "Connecting" ? "unknown" : "ok"}
           />
           {status}
         </button>

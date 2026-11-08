@@ -60,6 +60,20 @@ describe("decision brief print", () => {
     expect(rules).toContain(".brief__objection");
   });
 
+  it("keeps the document's own text out of the hiding list", () => {
+    const hiding = [...printCss.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .filter(([, , body]) => /display:\s*none/.test(body))
+      .map(([, selectors]) => selectors.replace(/\s+/g, " ").trim())
+      .filter((selectors) => selectors.includes("brief-printing"));
+
+    expect(hiding.length).toBeGreaterThan(0);
+    for (const selectors of hiding) {
+      // Hiding the chrome is the point; hiding a paragraph, a heading, a list
+      // or the document itself would print a paper with holes in it.
+      expect(selectors).not.toMatch(/brief__doc|\.md-/);
+    }
+  });
+
   it("prints the brief dark on white and never orphans a heading or a line", () => {
     const rules = briefRules(printCss);
     expect(rules).toMatch(/\.brief__doc[^}]*color:\s*#111/s);

@@ -218,3 +218,89 @@ describe("BriefLens", () => {
     expect(screen.getAllByText("Not recorded.").length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * The brief is an artifact, so it is held to the structure every artifact is
+ * audited against. The authoritative rule set is `scripts/artifact_a11y.py`,
+ * which is Python and cannot reach a React tree; these are its rules for the
+ * one document the studio renders in the browser and exports as a file.
+ */
+describe("the brief's structure", () => {
+  function renderBrief(): Element {
+    render(<BriefLens />);
+    return screen.getByRole("article", { name: "Decision brief" });
+  }
+
+  function headingLevels(root: Element): number[] {
+    return Array.from(root.querySelectorAll("h1, h2, h3, h4, h5, h6")).map((heading) =>
+      Number(heading.tagName.slice(1)),
+    );
+  }
+
+  it("carries exactly one title", () => {
+    expect(renderBrief().querySelectorAll("h1")).toHaveLength(1);
+  });
+
+  it("never skips a heading level", () => {
+    const levels = headingLevels(renderBrief());
+    const skips = levels.slice(1).filter((level, index) => level > levels[index] + 1);
+    expect(skips).toEqual([]);
+  });
+
+  it("labels every chart it draws", () => {
+    const unlabelled = Array.from(renderBrief().querySelectorAll("svg")).filter(
+      (chart) =>
+        chart.getAttribute("aria-hidden") !== "true" &&
+        !chart.getAttribute("aria-label") &&
+        !chart.getAttribute("aria-labelledby") &&
+        !chart.querySelector("title"),
+    );
+    expect(unlabelled).toEqual([]);
+  });
+
+  it("uses each id once", () => {
+    const ids = Array.from(renderBrief().querySelectorAll("[id]")).map((node) => node.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("keeps what a reader must know inside the printed document", () => {
+    studio.canvas = canvas({ source: "seed" });
+
+    render(<BriefLens />);
+    const doc = screen.getByRole("article", { name: "Decision brief" });
+
+    // The print sheet hides the sheet's chrome; everything that tells a reader
+    // how much to trust the page has to be in the part that survives.
+    expect(
+      within(doc).getByText("Demo data. Nothing here comes from your research."),
+    ).toBeInTheDocument();
+    expect(within(doc).getAllByText("Not recorded.").length).toBeGreaterThan(0);
+  });
+
+  it("renders research as text, never as markup", () => {
+    studio.canvas = canvas({
+      evidence: [
+        {
+          id: "E-9",
+          outcome_id: "O-1",
+          source_name: 'Supporter "Nick"',
+          item_type: "call",
+          name: "<h1>The upgrade that failed</h1>",
+          content: 'He said "<script>alert(1)</script>" and meant it.',
+          url: null,
+        },
+      ],
+    });
+
+    render(<BriefLens />);
+    const doc = screen.getByRole("article", { name: "Decision brief" });
+
+    // Nothing escaped the parser as an element…
+    expect(document.querySelector("script")).toBeNull();
+    expect(doc.querySelectorAll("h1")).toHaveLength(1);
+    // …and a reader still gets every character of what the person said.
+    expect(within(doc).getByText(/<script>alert\(1\)<\/script>/)).toBeInTheDocument();
+    expect(within(doc).getByText(/The upgrade that failed/)).toBeInTheDocument();
+    expect(within(doc).getByText(/Supporter "Nick"/)).toBeInTheDocument();
+  });
+});
