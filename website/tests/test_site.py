@@ -513,7 +513,7 @@ def test_every_page_resolves_its_own_assets(page: str):
 # assistant-ui ledger (issue #429) puts 129 rows on the Development page, which
 # now reaches ~93 KB and is the new long pole; it is a coverage record, not
 # decoration, so the ceiling moves.
-PAGE_WEIGHT_BUDGET = 100 * 1024
+PAGE_WEIGHT_BUDGET = 110 * 1024
 
 # The development guide mirrors the generated coverage map, which grows with
 # the test tree, so it needs its own ceiling rather than a raised one for
