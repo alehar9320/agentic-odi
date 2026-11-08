@@ -29,8 +29,9 @@
   </div>
   {% if tool.params %}
   <table class="tool-doc__args">
+    <caption>Arguments accepted by this tool, and whether each one is required.</caption>
     <thead>
-      <tr><th>Argument</th><th>Type</th><th>Required</th></tr>
+      <tr><th scope="col">Argument</th><th scope="col">Type</th><th scope="col">Required</th></tr>
     </thead>
     <tbody>
       {% for param in tool.params %}

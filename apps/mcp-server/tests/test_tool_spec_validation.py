@@ -77,8 +77,9 @@ def test_main_validates_before_serving(mcp, monkeypatch):
         return mcp
 
     monkeypatch.setattr(mcp_server, "create_server", fake_create_server)
-    monkeypatch.setattr(mcp_server, "validate_at_startup", lambda _server: calls.append("validate"))
-    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append("run"))
+    monkeypatch.setattr(mcp_server, "validate_at_startup", lambda *_: calls.append("validate"))
+    monkeypatch.setattr(mcp_server.uvicorn, "run", lambda app, **kwargs: calls.append("run"))
+    monkeypatch.setattr(mcp_server, "_configured_token", lambda: "test-token")
 
     mcp_server.main([])
 

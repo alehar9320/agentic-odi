@@ -231,6 +231,45 @@ async def test_delete_customer_outcome_reports_missing_ids(
     assert sentence(text) == "Customer outcome not found: missing"
 
 
+def _capture_uvicorn(monkeypatch) -> list[dict]:
+    """Record what ``server.main`` hands to the server instead of listening.
+
+    Without this the test would bind a real socket and never return, because
+    ``main`` now serves an ASGI app it builds itself.
+    """
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        server.uvicorn,
+        "run",
+        lambda app, **kwargs: calls.append({"app": app, **kwargs}),
+    )
+    monkeypatch.setattr(server, "_configured_token", lambda: "test-token")
+    # The merged entry point builds its own store (ADR 0006); the test serves the
+    # module's server so no repository is opened on disk.
+    monkeypatch.setattr(server, "create_server", lambda: server.mcp)
+    return calls
+
+
+def test_main_serves_the_token_gated_app(monkeypatch) -> None:
+    calls = _capture_uvicorn(monkeypatch)
+
+    server.main([])
+
+    assert calls[0]["host"] == "127.0.0.1"
+    assert calls[0]["port"] == 8000
+    # The gate is the point of the change: an app served without it is not gated.
+    assert isinstance(calls[0]["app"], server._AuthMiddleware)
+    assert calls[0]["app"].token == "test-token"
+
+
+def test_main_passes_an_explicit_port_through(monkeypatch) -> None:
+    calls = _capture_uvicorn(monkeypatch)
+
+    server.main(["--port", "8010"])
+
+    assert calls[0]["port"] == 8010
+
+
 @pytest.mark.asyncio
 async def test_open_study_reports_a_missing_job_as_an_envelope(
     mcp,
@@ -245,21 +284,15 @@ async def test_open_study_reports_a_missing_job_as_an_envelope(
     assert sentence(text) == "Job not found: missing"
 
 
-def test_main_runs_the_http_transport(mcp, monkeypatch) -> None:
-    calls: list[dict] = []
-    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
-    monkeypatch.setattr(server, "create_server", lambda: mcp)
+def test_main_builds_the_store_before_serving(mcp, monkeypatch) -> None:
+    """The entry point is where the store is built (ADR 0006), before validation."""
+    calls: list[object] = []
+    monkeypatch.setattr(server, "create_server", lambda: (calls.append("create"), mcp)[1])
+    monkeypatch.setattr(server, "validate_at_startup", lambda *_: calls.append("validate"))
+    monkeypatch.setattr(server, "setup_graceful_shutdown", lambda: None)
+    monkeypatch.setattr(server.uvicorn, "run", lambda app, **kwargs: calls.append("run"))
+    monkeypatch.setattr(server, "_configured_token", lambda: "")
 
     server.main([])
 
-    assert calls == [{"transport": "http", "port": 8000}]
-
-
-def test_main_passes_an_explicit_port_through(mcp, monkeypatch) -> None:
-    calls: list[dict] = []
-    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
-    monkeypatch.setattr(server, "create_server", lambda: mcp)
-
-    server.main(["--port", "8010"])
-
-    assert calls == [{"transport": "http", "port": 8010}]
+    assert calls == ["create", "validate", "run"]
