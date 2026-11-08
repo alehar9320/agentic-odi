@@ -21,6 +21,7 @@ export type BannerKind =
   | "sidecar-down"
   | "model-offline"
   | "offline"
+  | "app-update-ready"
   | "update-available"
   | "update-ready"
   | "write-rejected"
@@ -35,7 +36,8 @@ export type BannerActionId =
   | "open-capture"
   | "open-jobmap"
   | "install-update"
-  | "restart";
+  | "restart"
+  | "reload-app";
 
 export interface BannerAction {
   label: string;
@@ -49,6 +51,12 @@ export interface BannerAction {
    * agent for something, written as the user would say it.
    */
   intent?: string;
+  /**
+   * A one-off callback that closes over state the banner system must not know
+   * about — Undo restoring a transcript the store has already dropped. Used
+   * when there is no studio action and no message to send.
+   */
+  run?: () => void;
   tone: "primary" | "ghost";
 }
 

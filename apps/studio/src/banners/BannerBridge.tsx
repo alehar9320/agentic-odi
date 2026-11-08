@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { useOnlineStatus } from "../lib/onlineStatus";
+import { dismissAppUpdate, reloadForUpdate, useAppUpdate } from "../lib/swUpdate";
 import { useStudio } from "../state/StudioContext";
 import { useBanner } from "./BannerProvider";
 import type { BannerActionId } from "./types";
@@ -21,8 +22,10 @@ export function BannerBridge() {
     sidecarReachable,
     dismissedSidecarNotice,
     llmHealth,
+    streaming,
   } = useStudio();
   const online = useOnlineStatus();
+  const appUpdate = useAppUpdate();
 
   useEffect(() => {
     // One sentence when the connection goes, resolved when it comes back. The
@@ -34,6 +37,17 @@ export function BannerBridge() {
       resolve("offline");
     }
   }, [online, raise, resolve]);
+
+  useEffect(() => {
+    // A staged build is offered once, and never mid-sentence: while a turn is
+    // streaming the offer waits, so activating the new worker cannot reload the
+    // page under a reply that is still arriving.
+    if (appUpdate.ready && !appUpdate.dismissed && !streaming) {
+      raise({ kind: "app-update-ready" });
+    } else {
+      resolve("app-update-ready");
+    }
+  }, [appUpdate.ready, appUpdate.dismissed, streaming, raise, resolve]);
 
   useEffect(() => {
     // The offline strip is the one line while the browser has no network: this
@@ -96,6 +110,11 @@ export function useBannerActionDispatcher(): {
         // The desktop updater is not wired to banners yet. Nothing is claimed
         // and nothing pretends to happen.
         break;
+      case "reload-app":
+        // Take the waiting worker and reload into the new build. This is the one
+        // place an update activates, and only from a person's click.
+        reloadForUpdate();
+        break;
     }
   }
 
@@ -104,6 +123,11 @@ export function useBannerActionDispatcher(): {
     // row: it must survive the next failed probe, or the strip would return.
     if (id === "sidecar-down") {
       dismissSidecarNotice();
+    }
+    // The update offer is once per page: dismissing it must not bring it back on
+    // the next render, and it must never loop.
+    if (id === "app-update-ready") {
+      dismissAppUpdate();
     }
     dismiss(id);
   }
