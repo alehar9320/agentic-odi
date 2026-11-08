@@ -25,12 +25,12 @@ describe("arrivedSince", () => {
 
 describe("arrivalLabel", () => {
   it("names the count when something arrived", () => {
-    expect(arrivalLabel(3)).toBe("3 new · Jump to latest");
-    expect(arrivalLabel(1)).toBe("1 new · Jump to latest");
+    expect(arrivalLabel(3)).toBe("3 new ↓");
+    expect(arrivalLabel(1)).toBe("1 new ↓");
   });
 
-  it("falls back to the plain label when nothing arrived", () => {
-    expect(arrivalLabel(0)).toBe("Jump to latest");
+  it("says only that it is the latest when there is no count", () => {
+    expect(arrivalLabel(0)).toBe("Latest ↓");
   });
 });
 

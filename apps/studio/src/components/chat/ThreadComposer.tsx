@@ -22,6 +22,7 @@ import {
 import { dictationSupported } from "../../assistant/dictation";
 import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
+import { registerComposer } from "../../lib/composerFocus";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import {
@@ -155,7 +156,31 @@ function ComposerBody({
     onCommand(command);
   }
 
+  // The runtime owns the textarea, so the shell's shortcuts reach it through
+  // the id this composer already gives its input and label.
+  useEffect(
+    () =>
+      registerComposer({
+        focus: () => document.getElementById(inputId)?.focus(),
+        startCommand: () => {
+          aui.composer.setText("/");
+          setHighlight(0);
+          setDismissedFor("");
+          document.getElementById(inputId)?.focus();
+        },
+      }),
+    [aui, inputId],
+  );
+
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // An input method owns the keyboard while it composes: choosing a Japanese,
+    // Chinese, or Korean candidate must never run a command, move the palette,
+    // recall history, or send. `keyCode === 229` covers WebKit shells that leave
+    // `isComposing` unset on the keydown that commits the candidate.
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+      return;
+    }
+
     if (open) {
       if (event.nativeEvent.isComposing || event.keyCode === 229) {
         return;
@@ -285,14 +310,26 @@ function ComposerBody({
           aria-haspopup="listbox"
           aria-controls={open ? paletteId : undefined}
           onKeyDown={onKeyDown}
+          // This composer owns pasting: the library's built-in handler would
+          // preventDefault whenever the clipboard carries a file, which is the
+          // one case that must keep its text. Disabling it avoids a double
+          // attach and leaves the decision below.
+          addAttachmentOnPaste={false}
           onPaste={(event) => {
             // A screenshot on the clipboard is a file, not text: attach it
-            // rather than letting the browser paste a placeholder name.
+            // rather than letting the browser paste a placeholder name. But a
+            // clipboard can carry both — a screenshot and the paragraph that
+            // explains it — and swallowing the text is a silent loss. When text
+            // is present, attach the files and leave the paste unprevented so
+            // the browser inserts the text at the caret.
             const files = Array.from(event.clipboardData?.files ?? []);
             if (files.length === 0) {
               return;
             }
-            event.preventDefault();
+            const text = event.clipboardData?.getData("text/plain") ?? "";
+            if (text === "") {
+              event.preventDefault();
+            }
             onFiles(files);
           }}
         />
