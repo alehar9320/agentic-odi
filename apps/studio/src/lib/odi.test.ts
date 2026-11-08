@@ -7,6 +7,7 @@ import {
   isUnderserved,
   opportunityPill,
   opportunityScore,
+  scoredAverage,
   segmentBasisLine,
   summarizeMemberScores,
   UNDERSERVED_THRESHOLD,
@@ -100,6 +101,37 @@ describe("summarizeMemberScores", () => {
   it("treats a missing score as missing, never as zero", () => {
     // A mean that counted the missing score as 0 would read 6.0, not 12.0.
     expect(summarizeMemberScores([12, null]).mean).toBeCloseTo(12, 5);
+  });
+});
+
+describe("scoredAverage", () => {
+  function outcome(score: number | null | undefined) {
+    return { id: "O-1", opportunity_score: score } as never;
+  }
+
+  it("averages the stored scores only, never counting a missing score as zero", () => {
+    const summary = scoredAverage([outcome(12), outcome(null)]);
+    expect(summary.mean).toBeCloseTo(12, 5);
+    expect(summary.scored).toBe(1);
+    expect(summary.unscored).toBe(1);
+  });
+
+  it("reports no mean at all when nothing is scored", () => {
+    const summary = scoredAverage([outcome(null), outcome(undefined)]);
+    expect(summary.mean).toBeNull();
+    expect(summary.scored).toBe(0);
+    expect(summary.unscored).toBe(2);
+  });
+
+  it("averages the stored values, not the pre-rounded ones", () => {
+    expect(scoredAverage([outcome(11.44), outcome(11.44)]).mean).toBeCloseTo(11.44, 5);
+  });
+
+  it("has no mean for an empty board rather than a zero", () => {
+    const summary = scoredAverage([]);
+    expect(summary.mean).toBeNull();
+    expect(summary.scored).toBe(0);
+    expect(summary.unscored).toBe(0);
   });
 });
 

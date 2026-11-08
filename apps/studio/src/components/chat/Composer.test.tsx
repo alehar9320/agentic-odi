@@ -251,7 +251,7 @@ describe("ThreadComposer attachments", () => {
     const file = new File(["png"], "screenshot.png", { type: "image/png" });
 
     fireEvent.paste(screen.getByRole("textbox", { name: "Message the studio" }), {
-      clipboardData: { files: [file] },
+      clipboardData: { files: [file], getData: () => "" },
     });
 
     expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
