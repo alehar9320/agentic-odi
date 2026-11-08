@@ -134,3 +134,22 @@ export function buildRecords(canvas: CanvasData | null | undefined): RecordRow[]
 
   return rows;
 }
+
+/** The field that names each kind, read from `types.ts` rather than invented here. */
+const TITLE_FIELD: Record<RecordKind, "name" | "statement"> = {
+  job: "name",
+  step: "name",
+  outcome: "statement",
+  evidence: "name",
+};
+
+/**
+ * What the store calls this record.
+ *
+ * The only words a chip may repeat: a name the browser made up would let the
+ * composer claim the person is looking at something the record never said.
+ */
+export function recordTitle(row: RecordRow): string {
+  const named = row.record as { name?: string; statement?: string };
+  return text(named[TITLE_FIELD[row.kind]]);
+}

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
   useUpdateSnapshot: vi.fn(),
@@ -35,6 +35,8 @@ const stubSnapshot = (overrides: Partial<UpdateSnapshot> = {}): UpdateSnapshot =
   available: null,
   progress: null,
   lastCheckedAt: null,
+  lastSuccessfulCheckAt: null,
+  actions: [],
   installed: false,
   pendingInstall: false,
   error: null,
@@ -137,6 +139,45 @@ describe("StudioBar", () => {
     expect(
       screen.getByRole("button", { name: /model status: connecting\. health not checked yet\./i }),
     ).toBeInTheDocument();
+  });
+
+  it("says a local endpoint is not reachable from a hosted page", () => {
+    // #804: a hosted page cannot reach a private endpoint, so the bar says why.
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      get() {
+        return new Proxy(originalLocation, {
+          get(target, prop) {
+            if (prop === "hostname") return "studio.example.com";
+            return Reflect.get(target, prop);
+          },
+        });
+      },
+    });
+    try {
+      vi.mocked(useStudio).mockReturnValue(
+        stubContext({
+          llmHealth: { healthy: null, message: "" },
+          settings: {
+            base_url: "http://127.0.0.1:11434/v1",
+            api_key: "",
+            model_name: "qwen3:8b",
+            mcp_url: "",
+            theme: "dark",
+          },
+        }) as never,
+      );
+      render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+      expect(
+        screen.getByRole("button", {
+          name: /model status: connecting\. local endpoint, not reachable from this page/i,
+        }),
+      ).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "location", { value: originalLocation, configurable: true });
+    }
   });
 
   it("keeps the brand mark decorative and labels the home control in text", () => {
@@ -361,5 +402,159 @@ describe("StudioBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
 
     expect(screen.getByRole("menuitem", { name: /new conversation/i })).toBeInTheDocument();
+  });
+});
+
+describe("StudioBar new thread control (#319)", () => {
+  const originalMatchMedia = window.matchMedia;
+  let wide = true;
+
+  const transcript = [
+    { id: "t-1", parentId: null, role: "user", content: "Where do I start?" },
+    { id: "t-2", parentId: "t-1", role: "assistant", content: "Name the job." },
+  ];
+
+  beforeEach(() => {
+    wide = true;
+    vi.mocked(useUpdateSnapshot).mockReturnValue(stubSnapshot() as never);
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query === "(min-width: 720px)" && wide,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia,
+    });
+  });
+
+  function renderBar(overrides: Record<string, unknown> = {}) {
+    const onNew = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        streaming: false,
+        activePanel: null,
+        customizeOpen: false,
+        setupOpen: false,
+        ...overrides,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={onNew} onChangelog={() => {}} />);
+    return { onNew };
+  }
+
+  it("says the words New thread where there is room for them", () => {
+    const { onNew } = renderBar({ messages: transcript });
+
+    const control = screen.getByRole("button", { name: "Start a new thread" });
+    expect(control).toHaveTextContent("New thread");
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  it("keeps the name when the bar drops the words", () => {
+    wide = false;
+    renderBar({ messages: transcript });
+
+    const control = screen.getByRole("button", { name: "Start a new thread" });
+    expect(control).not.toHaveTextContent("New thread");
+  });
+
+  it("names in the tooltip what a new thread leaves alone", () => {
+    renderBar({ messages: transcript });
+
+    expect(screen.getByRole("button", { name: "Start a new thread" })).toHaveAttribute(
+      "title",
+      expect.stringContaining("Your jobs, outcomes, and evidence stay."),
+    );
+  });
+
+  it("disables the control and says the thread is already new", () => {
+    const { onNew } = renderBar({ messages: [] });
+
+    const control = screen.getByRole("button", { name: "Start a new thread" });
+    expect(control).toBeDisabled();
+    const describedBy = control.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy as string)).toHaveTextContent(
+      "This thread is already new.",
+    );
+
+    fireEvent.click(control);
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  it("stays live on an empty thread when a view is still open to leave", () => {
+    // The bar's plus is the documented way out of the first-run setup, so an
+    // empty transcript must not switch it off while setup is on screen.
+    renderBar({ messages: [], setupOpen: true });
+
+    expect(screen.getByRole("button", { name: "Start a new thread" })).toBeEnabled();
+  });
+
+  it("asks before discarding a reply that is still coming", () => {
+    const { onNew } = renderBar({ messages: transcript, streaming: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+
+    const ask = screen.getByRole("dialog", { name: /stop the reply and start a new thread/i });
+    expect(ask).toHaveTextContent("A reply is still coming. Stop it and start a new thread?");
+    expect(onNew).not.toHaveBeenCalled();
+    expect(ask).toHaveTextContent("Keep writing");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keep writing" }));
+  });
+
+  it("keeps the reply running when the person chooses Keep writing", () => {
+    const { onNew } = renderBar({ messages: transcript, streaming: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep writing" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  it("closes the ask on Escape without starting anything", () => {
+    const { onNew } = renderBar({ messages: transcript, streaming: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+    // Escape from wherever the focus sits inside the ask — which is the only
+    // place it is not trapping anyone.
+    fireEvent.keyDown(screen.getByRole("button", { name: "Keep writing" }), { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  it("stops the stream and starts the thread on the second choice", () => {
+    const { onNew } = renderBar({ messages: transcript, streaming: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stop and start" }));
+
+    expect(onNew).toHaveBeenCalledWith({ stop: true });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("starts the thread with one click when nothing is streaming", () => {
+    const { onNew } = renderBar({ messages: transcript });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+
+    expect(onNew).toHaveBeenCalledTimes(1);
+    expect(onNew).not.toHaveBeenCalledWith({ stop: true });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

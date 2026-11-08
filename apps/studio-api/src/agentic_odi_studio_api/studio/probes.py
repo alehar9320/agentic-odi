@@ -5,6 +5,12 @@ from __future__ import annotations
 import asyncio
 import os
 import socket
+import threading
+import time
+from collections import OrderedDict
+from collections.abc import Callable
+from datetime import datetime, timezone
+from typing import Any, NamedTuple
 from urllib.parse import urlparse
 
 from openai import AsyncOpenAI
@@ -15,6 +21,50 @@ DEFAULT_MODEL = "local-tools-model"
 DEFAULT_MCP_URL = "http://localhost:8000/mcp"
 
 OFFLINE_MESSAGE = "LLM server offline (Local Studio Mode enabled)"
+
+#: How long a probe result may be reused before it is considered stale.
+_PROBE_TTL_SECONDS = 30.0
+
+#: Ceiling on cached entries so opening many tabs / endpoints cannot grow the
+#: map without bound. Stale entries are evicted on read; the map is trimmed to
+#: this cap on write.
+_PROBE_CACHE_CAP = 512
+
+
+class ProbeResult(NamedTuple):
+    """The outcome of one probe, stamped when it was obtained.
+
+    Only the boolean and the reason message a probe already returns are kept --
+    never a credential or a response body.
+    """
+
+    healthy: bool
+    message: str
+    checked_at: str  # ISO 8601 UTC
+
+
+#: (endpoint, model) -> (monotonic timestamp, ProbeResult). Keyed on the
+#: endpoint and model only -- never on a credential -- so concurrent tabs
+#: sharing an endpoint reuse a single probe.
+_PROBE_CACHE: OrderedDict[tuple[str, str], tuple[float, ProbeResult]] = OrderedDict()
+_PROBE_CACHE_LOCK = threading.Lock()
+
+
+def _iso_utc(ts: float) -> str:
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
+def _evict_stale(now: float) -> None:
+    """Drop cache entries older than the TTL."""
+    stale = [key for key, (ts, _) in _PROBE_CACHE.items() if now - ts > _PROBE_TTL_SECONDS]
+    for key in stale:
+        _PROBE_CACHE.pop(key, None)
+
+
+def _trim_to_cap() -> None:
+    """Drop the oldest entries until the cache is within its cap."""
+    while len(_PROBE_CACHE) > _PROBE_CACHE_CAP:
+        _PROBE_CACHE.popitem(last=False)
 
 
 def _load_profile_fallback() -> dict[str, str]:
@@ -104,8 +154,9 @@ async def list_models(base_url: str, api_key: str) -> tuple[list[str], str | Non
     return sorted(model_id for model_id in ids if model_id), None
 
 
-async def check_llm_health(base_url: str, api_key: str, model_name: str) -> tuple[bool, str]:
-    """Non-blocking LLM health probe with an instant socket pre-check."""
+async def _probe_llm_health(base_url: str, api_key: str, model_name: str) -> tuple[bool, str]:
+    """The actual network probe: socket pre-check, then model list."""
+
     if not is_endpoint_reachable(base_url, timeout=0.3):
         return False, OFFLINE_MESSAGE
 
@@ -116,3 +167,61 @@ async def check_llm_health(base_url: str, api_key: str, model_name: str) -> tupl
     except Exception as exc:  # noqa: BLE001
         status, detail = classify_llm_error(exc)
         return False, f"{status}: {detail}"
+
+
+async def check_llm_health(base_url: str, api_key: str, model_name: str) -> tuple[bool, str]:
+    """Non-blocking LLM health probe with an instant socket pre-check.
+
+    Pure probe with no caching: every call re-checks the endpoint. Chat and
+    other callers that must see fresh results use this directly; the HTTP route
+    uses :func:`probe_llm_health` when it wants a TTL cache.
+    """
+
+    return await _probe_llm_health(base_url, api_key, model_name)
+
+
+async def probe_llm_health(
+    base_url: str,
+    api_key: str,
+    model_name: str,
+    now: Callable[[], float] = time.monotonic,
+    fresh: bool = False,
+) -> dict[str, Any]:
+    """Probe with a TTL cache so concurrent tabs cause one upstream probe.
+
+    Returns ``{"healthy", "message", "checked_at", "cached"}``. When ``fresh``
+    is true the cache is bypassed and the entry refreshed, so a user-initiated
+    "check now" is never stale. Results are keyed on (endpoint, model) -- never
+    on a credential -- and the map is bounded by TTL eviction and a size cap.
+    """
+
+    key = (base_url, model_name)
+    t = now()
+
+    with _PROBE_CACHE_LOCK:
+        _evict_stale(t)
+        if not fresh:
+            entry = _PROBE_CACHE.get(key)
+            if entry is not None:
+                stored_ts, stored = entry
+                if t - stored_ts <= _PROBE_TTL_SECONDS:
+                    return {
+                        "healthy": stored.healthy,
+                        "message": stored.message,
+                        "checked_at": stored.checked_at,
+                        "cached": True,
+                    }
+
+    healthy, message = await _probe_llm_health(base_url, api_key, model_name)
+    result = ProbeResult(healthy=healthy, message=message, checked_at=_iso_utc(t))
+
+    with _PROBE_CACHE_LOCK:
+        _PROBE_CACHE[key] = (t, result)
+        _trim_to_cap()
+
+    return {
+        "healthy": result.healthy,
+        "message": result.message,
+        "checked_at": result.checked_at,
+        "cached": False,
+    }

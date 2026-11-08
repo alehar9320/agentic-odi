@@ -5,13 +5,17 @@
  * queueing); the setup wizard's composer is a controlled textarea because its
  * turns are local until the context is saved. The command palette, the
  * connector chips, and the hint row are the same in both, so they live here.
+ * The focus chip is the exception: it speaks for the canvas, so only the
+ * thread composer mounts it.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useAuiState } from "@assistant-ui/react";
 
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
+import { detectPlatform, shortcutLabels } from "../../updater/platform";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
 
 const PILL_ICONS: ReactNode[] = [
@@ -73,6 +77,61 @@ export function SuggestionPills() {
   );
 }
 
+/**
+ * One row of the palette. It keeps itself visible: the highlighted command is
+ * scrolled to with `block: "nearest"`, so the list moves as little as it can
+ * and never hides the row the person is on.
+ */
+function PaletteOption({
+  id,
+  active,
+  command,
+  onHover,
+  onChoose,
+}: {
+  id: string;
+  active: boolean;
+  command: StudioCommand;
+  onHover: () => void;
+  onChoose: () => void;
+}) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+    const element = ref.current;
+    if (!element || typeof element.scrollIntoView !== "function") {
+      return;
+    }
+    element.scrollIntoView({
+      block: "nearest",
+      behavior: reducedMotion ? "auto" : "smooth",
+    });
+  }, [active, reducedMotion]);
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      role="option"
+      id={id}
+      aria-selected={active}
+      className={`palette__item${active ? " is-active" : ""}`}
+      onMouseEnter={onHover}
+      onClick={onChoose}
+    >
+      <code className="palette__name">{command.name}</code>
+      <span className="palette__text">
+        <span className="palette__label">{command.label}</span>
+        <span className="palette__description">{command.description}</span>
+      </span>
+    </button>
+  );
+}
+
 export function CommandPalette({
   id,
   open,
@@ -97,22 +156,14 @@ export function CommandPalette({
     <div className="palette" role="listbox" id={id} aria-label="Commands">
       {matches.length ? (
         matches.map((command, index) => (
-          <button
+          <PaletteOption
             key={command.id}
-            type="button"
-            role="option"
             id={`${id}-option-${index}`}
-            aria-selected={index === activeIndex}
-            className={`palette__item${index === activeIndex ? " is-active" : ""}`}
-            onMouseEnter={() => onHover(index)}
-            onClick={() => onChoose(command)}
-          >
-            <code className="palette__name">{command.name}</code>
-            <span className="palette__text">
-              <span className="palette__label">{command.label}</span>
-              <span className="palette__description">{command.description}</span>
-            </span>
-          </button>
+            active={index === activeIndex}
+            command={command}
+            onHover={() => onHover(index)}
+            onChoose={() => onChoose(command)}
+          />
         ))
       ) : (
         <p className="palette__empty">
@@ -159,14 +210,54 @@ export function ConnectorChips() {
   );
 }
 
+/**
+ * What the agent was told about the screen, so the person can see it, check it,
+ * and take it back.
+ *
+ * Renders only when the canvas can name the selection: a chip for a record this
+ * snapshot cannot read would be claiming something the store never said.
+ */
+export function ContextChip() {
+  const { focusedSubject, focusedSubjectLabel, clearFocus, revealFocusedSubject } = useStudio();
+
+  if (!focusedSubject || !focusedSubjectLabel) {
+    return null;
+  }
+
+  return (
+    <div className="composer__focus" role="status">
+      <button
+        type="button"
+        className="composer__focus-chip"
+        aria-label={`Looking at: ${focusedSubjectLabel}`}
+        onClick={revealFocusedSubject}
+      >
+        <span>Looking at: {focusedSubjectLabel}</span>
+      </button>
+      <button
+        type="button"
+        className="quiet-action"
+        aria-label="Stop telling the agent what you are looking at"
+        onClick={clearFocus}
+      >
+        <span aria-hidden>✕</span>
+      </button>
+    </div>
+  );
+}
+
 export function ComposerHint({ trailing }: { trailing?: ReactNode } = {}) {
   const { settings, llmHealth, brief } = useStudio();
   const offline = llmHealth.healthy === false;
+  // The keycaps are the machine's, not ours: macOS prints ⌘ and ↵ where the
+  // other desktops spell them out.
+  const keys = shortcutLabels(detectPlatform());
 
   return (
     <div className="composer__hint">
       <span>
-        <kbd>Enter</kbd> to send · <kbd>/</kbd> for commands
+        <kbd>{keys.focus}</kbd> to focus · <kbd>{keys.send}</kbd> to send · <kbd>/</kbd> for
+        commands
         {brief ? ` · ${brief.product_name || "your job"}` : ""}
       </span>
       <span className="composer__hint-end">
