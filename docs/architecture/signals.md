@@ -121,3 +121,6 @@ store.
 - It does not dedupe across kinds or subjects; fingerprints are per transition.
 - It does not let the model author a signal directly. Only the service emitters
   write them.
+- It does not carry the onboarding funnel. Those five names are `FUNNEL_EVENT`s in
+  the same append-only log — counts an operator checks, never news, never in the
+  bell. See [The onboarding funnel](funnel.md).
