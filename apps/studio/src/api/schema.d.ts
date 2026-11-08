@@ -1652,6 +1652,21 @@ export interface components {
             mcp_url: string;
         };
         /**
+         * MintShareRequest
+         * @description Mint one scoped, expiring, read-only link for one artifact.
+         */
+        MintShareRequest: {
+            /**
+             * Artifact Kind
+             * @enum {string}
+             */
+            artifact_kind: "outcome" | "segment" | "strategy";
+            /** Artifact Id */
+            artifact_id: string;
+            /** Ttl Days */
+            ttl_days?: number | null;
+        };
+        /**
          * ModelListRequest
          * @description Which backend to ask for its model ids. The key travels in the body, not
          *     the query string, so it never lands in a URL or an access log.
@@ -1827,6 +1842,36 @@ export interface components {
             };
             /** Job Id */
             job_id?: string | null;
+        };
+        /**
+         * ShareMintResponse
+         * @description The one time the raw token is shown. Only its hash is stored.
+         */
+        ShareMintResponse: {
+            /** Id */
+            id: string;
+            /** Token */
+            token: string;
+            /** Url */
+            url: string;
+            /** Expires At */
+            expires_at: string;
+        };
+        /**
+         * SharedArtifactResponse
+         * @description Exactly the named artifact and its own evidence. Nothing else.
+         */
+        SharedArtifactResponse: {
+            /** Artifact Kind */
+            artifact_kind: string;
+            /** Artifact */
+            artifact: {
+                [key: string]: unknown;
+            };
+            /** Evidence */
+            evidence?: {
+                [key: string]: unknown;
+            }[];
         };
         /**
          * SignalActionRequest
