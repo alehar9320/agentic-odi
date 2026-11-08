@@ -27,6 +27,7 @@ dev = [
     "pytest==9.2.0",
     "pytest-asyncio==1.4.1",
     "pytest-cov==7.1.0",
+    "pytest-timeout==2.4.0",
     "ruff==0.17.3",
     "grimp==3.18",
     "pillow==12.3.0",
@@ -69,6 +70,11 @@ format-command = "uv run ruff format --stdin-filename {filename}"
 asyncio_mode = "strict"
 pythonpath = [".", "brand/src"]
 testpaths = ["apps", "brand", "packages", "tests", "website"]
+timeout = 30
+markers = [
+    "integration: slower-tier tests that may exceed the default ceiling",
+    "client_process: tests that spawn an external process",
+]
 
 [tool.coverage.run]
 source = [
