@@ -99,6 +99,16 @@ transition in `localStorage["studio.onboarding"]`, so a reload resumes at the
 same scene, and it is replayable from Settings. Nothing opens it automatically,
 and a fresh install writes no record until the person asks for it.
 
+Scene one does the first half of the work rather than describing it: the quote
+appears with its source line, the tour asks the one question that matters —
+what is this person trying to get done? — and the three answers are a job, a
+workaround, and a solution in disguise. A wrong pick names what it actually is
+and lets the person try again; the right one reveals the evidence record (the
+quote) and the outcome linked to it. Scene two scores that outcome with the real
+`opportunityScore` from `apps/studio/src/lib/odi.ts`, showing the arithmetic
+before the number ("Importance 9, plus the 6-point gap, is 15.") and flipping the
+underserved label at the same threshold of 10 the rest of the studio uses.
+
 The sample is data, not a store write: it carries `source: "sample"` and
 `simulated: true`, it is built once and frozen, and it never reaches
 IndexedDB, the canvas, the rail counts, or the landscape totals.
@@ -111,8 +121,9 @@ Everything lives in `apps/studio/src/onboarding/`:
 | `machine.ts` | Pure state transitions (`{ status, scene, reason }`), no React or storage |
 | `storage.ts` | Versioned, defensive `localStorage` persistence |
 | `OnboardingProvider.tsx` | Explicit opening, persistence, replay |
-| `FirstRunWizard.tsx`, `steps.tsx`, `onboarding.css` | The dialog and the scene router |
-| `../lib/sampleLoop.ts` | The one sample brief the scenes rehearse on |
+| `FirstRunWizard.tsx`, `steps.tsx`, `onboarding.css` | The dialog and the three scenes |
+| `../lib/sampleLoop.ts` | The one sample brief and the real scoring helper the scenes use |
+| `../lib/odi.ts` | `opportunityScore`, the threshold, and the arithmetic sentence |
 | `../features/flags.ts` | The `firstRunWizard` toggle |
 
 `App.tsx` only wires the provider and the wizard around the existing shell;

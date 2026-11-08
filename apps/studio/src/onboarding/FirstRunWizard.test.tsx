@@ -170,7 +170,11 @@ describe("FirstRunWizard", () => {
     last.focus();
     fireEvent.keyDown(last, { key: "Tab" });
 
-    expect(screen.getByRole("button", { name: "Skip the tour" })).toHaveFocus();
+    // The scene's first answer holds the initial focus, so a Tab from the last
+    // control wraps to it rather than leaving the dialog.
+    expect(
+      screen.getByRole("button", { name: /Know which config is live/ }),
+    ).toHaveFocus();
   });
 
   it("does not let Shift+Tab escape from the scene heading", () => {

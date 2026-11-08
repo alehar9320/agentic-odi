@@ -31,6 +31,23 @@ export function formatOpportunityScore(score: number | null | undefined): string
   return score.toFixed(1);
 }
 
+/** A whole number reads as itself; anything else keeps one decimal. */
+function trimNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/**
+ * The score's arithmetic in one sentence, so the number is never a bare result:
+ * "Importance 9, plus the 6-point gap, is 15." The gap is the part above
+ * satisfaction that the formula adds, and it is named as zero when there is none.
+ */
+export function opportunityArithmetic(importance: number, satisfaction: number): string {
+  const gap = Math.max(importance - satisfaction, 0);
+  const score = opportunityScore(importance, satisfaction);
+  const gapPhrase = gap > 0 ? `plus the ${trimNumber(gap)}-point gap` : "plus no gap";
+  return `Importance ${trimNumber(importance)}, ${gapPhrase}, is ${trimNumber(score)}.`;
+}
+
 export function opportunityPill(score: number | null | undefined): PillDescriptor {
   const formatted = formatOpportunityScore(score);
   if (isUnderserved(score)) {
