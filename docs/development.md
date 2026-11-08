@@ -36,281 +36,14 @@ with every other change.
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,
 documented `AGENTIC_ODI_*` variables are read somewhere, the README's Code
-Overview paths exist, and the assistant-ui ledger below is internally honest:
+Overview paths exist, and the assistant-ui ledger on its own page is internally honest:
 every Adopted row names a file that exists and cites a delivered issue or PR,
 the group counts match the tally, and the projection in
-[Living Studio](living-studio.md) matches the Adopted and Partial rows here.
+[Living Studio](living-studio.md) matches the Adopted and Partial rows in it.
 
 ## The assistant-ui ledger
 
-The Studio runs on assistant-ui, and "we use assistant-ui" is not a coverage
-claim. This is. One hundred and twenty-nine relevant capabilities from
-`@assistant-ui/react@0.15.31` and `@assistant-ui/core@0.3.32` (read from the
-published type definitions, not from docs prose), each in exactly one state,
-each Adopted row citing the issue or PR that put it in a person's hands. The
-surface areas `@assistant-ui/vue`, `/ink`, `/native`, `cli`, and `cloud` are
-out of scope by platform, not by judgement: this is a React app with a local
-sidecar.
-
-**Counting rule.** A row is *Adopted* only when all four hold: a person can use
-the capability in the Studio today; the File cell names a file that exists; the
-Delivered cell cites an issue that closed or a PR that merged into `main` (the
-check in `scripts/doc_check.py` proves the citation is in the repository's own
-history); and a test names it. A row missing any of the four is *Partial*, and
-the Where / why cell says what is missing. A row is never Adopted because the
-dependency is installed. Deciding against something is a result: *Rejected*
-rows carry the reason so it is not re-litigated every quarter; *Decision* rows
-name the question that must be answered first.
-
-**Keeping this ledger true.** Closing a capability issue means editing its rows
-here in the same pull request: *Planned* → *Adopted*, with the file that now
-owns it and this PR's number in Delivered. Finding a capability we missed means
-adding a row before writing code — with a status; a row with no status is a
-wish. The projection in `docs/living-studio.md` (Adopted + Partial rows, in the
-person's words) must stay in step, which the check enforces.
-
-Verified against the installed types; source of truth: this table.
-
-### Runtime, store, and adapters
-
-The external store is the whole bridge. Every capability below is switched on
-by the presence of one handler.
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `useExternalStoreRuntime` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | The bridge itself: the sidecar's store, presented as a thread. |
-| `AssistantRuntimeProvider` | Adopted | `apps/studio/src/App.tsx` | #238 | One provider, whole app. |
-| `convertMessage` (`toThreadMessageLike`) | Adopted | `apps/studio/src/assistant/convert.ts` | #238 | The only mapping between `ChatMessage`/`ChatPart` and runtime messages. |
-| `isRunning` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | Driven by `streaming`. |
-| `setMessages` (branch switch) | Adopted | `apps/studio/src/state/StudioContext.tsx` | #238 | `switchBranch` swaps the visible path; the sidecar persists `head_id`. |
-| `onNew` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `sendMessage`. |
-| `onEdit` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `editFrom`. |
-| `onReload` (regenerate) | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `regenerateFrom`. |
-| `onCancel` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `stopStreaming`. |
-| `onRespondToToolApproval` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `respondToApproval`, the write gate. |
-| `adapters.attachments` | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text capped at 20k chars, images at 5 MB, refusals explained. |
-| runtime `suggestions` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `suggestionsFor`, computed from canvas state. |
-| `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | `apps/studio/src/state/StudioContext.tsx` | — | Branching works through `setMessages` and `head_id`; the dedicated adapter is unused, so the runtime infers branches from parent ids. |
-| `queue` adapter | Planned | — | #410 | Keeps a follow-up while a reply runs. |
-| `onResume` / `thread.canResume` | Planned | — | #424 | Continues a dropped run. |
-| `adapters.threadList` switch bridge | Planned | — | #408 | The same row as the Thread list group's `adapters.threadList`, listed here because the runtime side is where the handlers switch on. |
-| `onDelete` (message) | Rejected | — | — | The transcript is the audit trail behind every claim. A turn can be edited, regenerated, or branched; deleting it breaks the record the ODI method depends on. |
-| `MessageNotSentError` / `isMessageNotSentError` | Decision | — | — | Meaningful only if a send can be dropped. #410 removes the last drop; revisit afterwards, not before. |
-| `useLocalRuntime` | Rejected | — | — | A model adapter would be a second message store beside the sidecar's. |
-| `useAssistantTransportRuntime` | Rejected | — | — | The sidecar owns the wire (SSE + approvals). This would be a second transport. |
-| `ThreadHistoryAdapter` / persistence adapters | Rejected | — | — | The sidecar persists turns and branches; adopting this would double-write. Only the list adapter is adopted (#408). |
-| `ExportedMessageRepository` | Rejected | — | — | Same double-store problem. Export is a Markdown file (`apps/studio/src/lib/export.ts`), not a message repository. |
-| `useRemoteThreadListRuntime`, `useCloudThreadListAdapter`, `AssistantCloud` | Rejected | — | — | Local-first: no account, no cloud, no outbound thread sync. |
-| Prebuilt `ExternalThread`, `SingleThreadList`, `InMemoryThreadList`, `RemoteThreadList` | Rejected | — | — | A prebuilt thread cannot carry the ODI part renderers; adopting it would can the three-file part bridge. |
-| `createThreadRowsSelector` / `ThreadRow` | Decision | — | — | Group the conversation list by day once #408 lands. Decide from real list lengths, not now. |
-| `groupPartByType` / `GroupedParts` | Planned | — | #392 | Fallback if `ChainOfThoughtPrimitive` cannot exclude a pending approval. |
-| `getExternalStoreMessages` / `bindExternalStoreMessage` | Rejected | — | — | One store. These exist to reconcile foreign messages, which we do not accept. |
-
-### Thread
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `ThreadPrimitive.Root` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | The transcript's shell. |
-| `ThreadPrimitive.Viewport` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | Scrolling and the latest-message affordance. |
-| `ThreadPrimitive.Messages` | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #238 | The message map. |
-| `ThreadPrimitive.Empty` | Rejected | — | — | Deprecated; `AuiIf` on `state.thread.isEmpty` is the replacement, and `ChatStage` should move to it the next time it changes (see #408 task 6). |
-| `ThreadPrimitive.If` | Decision | — | — | We use `AuiIf`; do not mix two conditional idioms in one tree. |
-| `ThreadPrimitive.ScrollToBottom` | Decision | — | — | `LatestMessageButton` is hand-rolled over `useThreadViewport`. Adopt only if the primitive keeps the reduced-motion behavior. |
-| `ThreadPrimitive.LoadEarlier` / `thread.hasEarlier` | Decision | — | — | Needs sidecar paging over a branch tree. Worth it only for very long threads; measure first. |
-| `ThreadPrimitive.ViewportFooter` | Decision | — | — | The composer is outside the viewport by design; no problem to solve. |
-| `ThreadPrimitive.ViewportProvider` | Rejected | — | — | One viewport; the provider exists for multiple viewports on one thread. |
-| `ThreadPrimitive.Row` | Decision | — | — | Only with `createThreadRowsSelector`, together. |
-| `ThreadPrimitive.MessageByIndex` / `Unstable_MessageById` | Rejected | — | — | The Messages map covers it; addressing one message by position is fragile under branching. |
-| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | `apps/studio/src/components/chat/composerParts.tsx` | — | The data (`suggestions`) is adopted; the pills are hand-rolled because they carry the artifact-preview copy. Adopting the primitives would drop that copy; `SuggestionByIndex` is not an option since the list is computed from canvas state. |
-
-### Message and parts
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `MessagePrimitive.Parts` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | With the `components` map. |
-| `MessagePrimitive.Attachments` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | User turns show what was sent. |
-| `MessagePrimitive.Root` | Partial | `apps/studio/src/components/chat/Conversation.tsx` | — | The message wrapper is a hand-written article carrying `aria-busy` and the assistant avatar. |
-| `MessagePrimitive.Quote` | Adopted | `apps/studio/src/assistant/quote.ts` | #435 | Renders the quoted passage on a sent turn. |
-| `MessagePrimitive.Error` / `ErrorPrimitive` | Rejected | — | — | `FailurePanel` already renders the structured error, the retry copy, and the Try again action from `metadata.custom.error`. Swapping adds nothing and loses the ODI failure language. |
-| `GenerativeUIRender` / `MessagePrimitive.GenerativeUI` | Decision | — | — | Would let a model emit UI we did not validate. The ODI catalog is schema-validated; revisit only if validation moves server-side. |
-| `MessagePrimitive.GroupedParts` | Planned | — | #392 | See the runtime table. |
-| `MessagePrimitive.PartByIndex` / `Content` | Rejected | — | — | `Parts` is the one path; aliases would be a second. |
-| `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | `apps/studio/src/assistant/parts.tsx` | — | Rendered through the `components` map (custom `TextPart`, `FilePart`) rather than the bare primitives, which cannot show claim chips or extraction state. |
-| `MessagePartPrimitive.InProgress` | Decision | — | — | Our `TypingPart` shows a phase ("checking the sidecar"). The primitive would flatten that to a generic indicator. |
-| `MessagePartPrimitive.Messages` | Rejected | — | — | Nested conversations are not a Studio surface. |
-| `useMessagePartText/Reasoning/Source/File/Image/Data` | Rejected | — | — | The `components` map already receives exactly these props. |
-
-### Composer
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer's skeleton. |
-| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | Bounded by `apps/studio/src/assistant/attachments.ts`. |
-| `ComposerPrimitive.AttachmentDropzone` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | Dropping works: the composer has its own `onDragOver`/`onDrop` with the same accept rules as `attachmentRejection`. Adopting the primitive would only relocate the same logic. |
-| `ComposerPrimitive.Queue` | Planned | — | #410 | Renders the pending lane. |
-| `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #435 | Shows and clears the quote before send. |
-| `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | `apps/studio/src/assistant/dictation.ts` | #433 | Dictation, hidden where unsupported. |
-| `ComposerPrimitive.Resume` | Planned | — | #424 | Appears only with a checkpoint. |
-| `ComposerPrimitive.TriggerPopover` (and its `Root`/`Items`/`Item`/`Categories`/`CategoryItem`/`Back`) | Planned | — | #426 | `@` mentions and `/` commands. |
-| `ComposerPrimitive.If` | Decision | — | — | `AuiIf` is the idiom already in use. |
-| `ComposerPrimitive.AttachmentByIndex` | Rejected | — | — | Attachment chips iterate their own list. |
-| `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | `quote` and `dictation` are read today; `queue` arrives with #410, and `submission`/`inTransit` matter to that issue's honesty: a sent message the thread does not show yet must not look lost. |
-
-### Action bar
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | The reply's own controls. |
-| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Planned | — | #412 | Read a reply aloud. |
-| `ActionBarPrimitive.FeedbackPositive` / `.FeedbackNegative` | Planned | — | #414 | Local-only rating. |
-| `ActionBarPrimitive.ExportMarkdown` | Partial | `apps/studio/src/lib/export.ts` | — | Whole-conversation Markdown export exists and also serialises generated surfaces. Adopting the primitive for one reply would produce a second, weaker export format. |
-| `ActionBarMorePrimitive` | Decision | — | — | An overflow menu earns its place only when the action row exceeds ~5 buttons; #412 and #414 add two. Revisit after both land. |
-
-### Branch picker
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | Exposed only when `branchCount > 1`. Branching, editing, and regenerating round-trip through the sidecar's `head_id`. |
-
-### Attachments
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction capped at 20k chars, images capped at 5 MB, refusals explained. |
-| Drop and paste | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer follows the same accept rules as the input. |
-| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Rejected | — | — | The current chip shows extraction state and the reason a file was refused. The primitive would show a name and a thumbnail, which is less than the person needs. |
-
-### Thread list
-
-The whole group exists in the sidecar already (`conversations` with `head_id`);
-only the surface is missing.
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `adapters.threadList` | Planned | — | #408 | `threads`, `threadId`, `isLoading`, `onSwitchToThread`, `onSwitchToNewThread`. |
-| `ExternalStoreThreadData` fields | Planned | — | #408 | `status`, `id`, `title`, `custom` — there are no timestamp fields. Ordering data must ride in `custom`. |
-| `ThreadListPrimitive.Root` / `.New` / `.Items` / `.ItemByIndex` | Planned | — | #408 | The switcher. |
-| `ThreadListPrimitive.LoadMore` / `threads.hasMore` | Decision | — | — | The external-store adapter has no paging hook; `hasMore`/`isLoadingMore` are populated by the remote runtimes we rejected. Cap the fetch server-side and offer Show all, or adopt the remote runtime. |
-| `ThreadListItemPrimitive.Root` / `.Trigger` / `.Title` | Planned | — | #408 | One row, keyboard reachable. |
-| `ThreadListItemPrimitive.Delete` | Planned | — | #409 | Confirmed delete, turns and all. |
-| `ThreadListItemPrimitive.Archive` / `.Unarchive` | Decision | — | — | Needs an `archived_at` migration and an `archivedThreads` feed. Build only if real lists pass ~20 threads. |
-| `ThreadListItemMorePrimitive` (`Root`/`Trigger`/`Content`/`Item`/`Separator`) | Planned | — | #409 | One keyboard-navigable menu instead of hover buttons. |
-| `threads.item().rename()` / `.updateCustom()` | Planned | — | #409 | Inline rename and per-row metadata (`updatedAt` cannot live on `ExternalStoreThreadData`, so it rides in `custom`). |
-| `threads.item().generateTitle()` | Rejected | — | — | Needs a model adapter the Studio does not have, and the sidecar already derives a title from the first turn. A client-side title would be a second authority. |
-
-### Queue
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `createMessageQueue(driver)` | Planned | — | #410 | `driver.run(message, {steer})`, optional `driver.cancel`. |
-| `MessageQueueController` | Planned | — | #410 | `notifyBusy` / `notifyIdle` / `notifyCancelled` / `hold` / `release` / `clear` / `subscribe` — the cancel pause is why we must not hand-roll. |
-| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Planned | — | #410 | One lane above the composer. |
-| `QueueItemState.prompt` | Rejected | — | — | Deprecated in the installed types; derive text from `parts`. |
-
-### Reasoning and work
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Planned | — | #392 | One disclosure per settled turn. |
-| Pending approvals inside a group | Rejected | — | — | A pending write is a question, not history. It stays ungrouped and visible, always. |
-| `useToolCallElapsed` | Planned | — | #392 | "Worked for Ns · N tools". |
-| `useMessageTiming` | Decision | — | — | Tokens/second is engineering telemetry. Useful to us, not to the PM; expose it only behind a diagnostics toggle if at all. |
-
-### Selection and quote
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `SelectionToolbarPrimitive.Root` / `.Quote` | Adopted | `apps/studio/src/components/chat/SelectionToolbar.tsx` | #435 | Quote on select, inside one message. |
-| `data-aui-quote-selectable="false"` | Adopted | `apps/studio/src/assistant/parts.tsx` | #435 | Marks tool traces, approval cards, and generated surfaces as non-prose; inline claim chips stay selectable. |
-| `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | `apps/studio/src/assistant/quote.ts` | #435 | The quote persists in `metadata.custom.quote` and renders on the sent turn. |
-
-### Errors and honesty
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| Structured turn failure | Adopted | `apps/studio/src/components/FailurePanel.tsx` | #129 | `metadata.custom.error` / `retryText`, rendered by `FailurePanel`. |
-| `unstable_useMessageStallDetection` | Adopted | `apps/studio/src/components/chat/StallNotice.tsx` | #431 | Speaks only when output stops moving. |
-| `MessageNotSentError` | Decision | — | — | See the runtime table. |
-| `ErrorPrimitive` | Rejected | — | — | See the message table. |
-
-### Assistant modal
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `AssistantModalPrimitive` (`Root`/`Trigger`/`Content`/`Anchor`) | Decision | — | — | A floating assistant on the canvas. The composer already stays on screen while a lens is open; a second surface must justify a second runtime instance and a second place errors can appear. |
-
-### State hooks and utilities
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `useAuiState` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | Read across the transcript and composer. |
-| `useAui` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | Imperative actions. |
-| `AuiIf` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | The conditional idiom in use. |
-| `useAuiEvent` | Decision | — | — | Events are for cross-surface coordination; one surface has nothing to coordinate yet. |
-| `unstable_useMentionAdapter` / `unstable_useSlashCommandAdapter` | Planned | — | #426 | Composer triggers. |
-| `unstable_useComposerInputHistory` | Adopted | `apps/studio/src/assistant/composerHistory.ts` | #430 | ArrowUp recall. |
-| `useSmooth` | Decision | — | — | Smoothes bursty SSE text. Might read as deliberate rather than laggy — needs a comparison, not a guess. |
-| `useThreadViewport` (viewport state) | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #245 | `isAtBottom` / `scrollToBottom` drive the latest-message affordance. |
-| `useThreadViewportAutoScroll` / `useScrollLock` | Rejected | — | — | The viewport already owns auto-scroll, and the only overlay that could need a scroll lock is the lens rail, which does not scroll the thread. |
-| `unstable_useThreadMessageIds` | Decision | — | — | Only needed if a list needs message identity outside a message scope. |
-| `useToolArgsStatus` | Decision | — | — | Belongs to the tool card work, if it needs per-argument state. |
-| `createSuggestionAdapter` | Rejected | — | — | Suggestions come from canvas state through the runtime prop; a second adapter is a second source. |
-| `useInlineRender` | Rejected | — | — | Belongs to frontend tools, which the MCP server owns. |
-| `unstable_useLiveCompletionAdapter` | Rejected | — | — | Inline completion is not a Studio interaction; it would compete with dictation. |
-
-### Model context — "the assistant sees the app"
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `useAssistantContext` / `ModelContextRegistry` / `mergeModelContexts` / `useModelContextSnapshot` | Planned | — | #425 | Register the focused record and the open lens, attach them to the turn. |
-| `makeAssistantVisible` | Planned | — | #425 | Wrap canvas cards so their state is describable. |
-| `useAssistantInstructions` | Rejected | — | — | The sidecar assembles the ODI system prompt. A client-side instruction layer would be a second authority and would drift from the methodology guardrails. |
-| `AssistantFrameHost` / `AssistantFrameProvider` / `useAssistantFrameHost` / `frame` transport | Decision | — | — | Embeds the assistant in someone else's page. The Studio is the product surface, not an embedded widget. |
-
-### Tools and toolkits
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| Tool approval gate | Adopted | `apps/studio/src/assistant/convert.ts` | #238 | Plus the sidecar approval registry; a pending write blocks the turn. |
-| Tool result rendering | Adopted | `apps/studio/src/assistant/parts.tsx` | #238 | `tools: { Fallback: ToolPart }`. |
-| `makeAssistantTool` / `useAssistantTool` / `makeAssistantToolUI` / `useAssistantToolUI` / `useAuiToolOverrides` | Rejected | — | — | The MCP server owns execution and approval. A client-side path could run a tool twice and split the audit trail. |
-| `defineToolkit` / `Toolkit` / `stubTool` / `externalTool` / `providerTool` | Rejected | — | — | Same. Two tool registries is the failure mode. |
-| `hitl` / `hitlTool` / `humanTool` | Rejected | — | — | Our approval gate is the human-in-the-loop mechanism, and it is already audited server-side. |
-| `defineMcpToolkit` | Decision | — | — | It would let tool presentation follow MCP metadata. Only worth it if the MCP server starts publishing per-tool display hints. |
-| `Interactables` (`useAssistantInteractable`, `unstable_useInteractable`, `useInteractableState`) | Decision | — | — | The strongest unreleased idea on this list: the agent hands back a live control whose state it can read next turn. Needs a protocol decision — who owns the state, and what happens on reload — before it is an increment. |
-| `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | `apps/studio/src/components/chat/Conversation.tsx` | — | We use the `components.data.by_name` map for the validated ODI catalog and claims. The client-level `DataRenderers` scope would be a second registration path for the same thing. |
-
-### Generative UI and MCP Apps
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| ODI surfaces as `data` parts | Adopted | `apps/studio/src/ui` | #55 | Validated by a catalog manifest and rendered through the same `UiRenderer`. |
-| `GenerativeUIRender` / A2UI / `json-generative-ui` | Decision | — | — | Model-authored UI would bypass schema validation. Revisit only with server-side validation and a CSP story. |
-| MCP Apps (`McpAppRenderer`, `csp`, `bridge`, `ui://` resources) | Decision | — | — | Connector tools could render their own UI inline. Blocked on the sandbox origin and CSP decision, and there is no front door yet (#90). Never ship a frame before that. |
-| Realtime voice (`createVoiceSession`, `OpenAIRealtimeVoiceAdapter`, `useVoiceState`/`useVoiceVolume`/`useVoiceControls`) | Decision | — | — | Needs an audio provider, a cost, and even WebKit support in Tauri. #413 (dictation) covered the realistic need first. |
-
-### Observability
-
-| Capability | Status | File | Delivered | Where / why |
-|---|---|---|---|---|
-| `DevToolsHooks` / `DevToolsProviderApi` | Rejected | — | — | Developer surface, not a PM surface. `docs/` and the sidecar's diagnostics already cover the need. |
-| `webmcp` host/registration | Rejected | — | — | Would expose the Studio's actions to an external agent browser. Out of scope for a local-first app with approvals. |
-
-### The count
-
-| Status | Rows |
-|---|---|
-| Adopted | 39 |
-| Partial | 8 |
-| Planned | 25 |
-| Decision | 26 |
-| Rejected | 31 |
-| Total | 129 |
-
-Read it as: **47** of the library's 129 relevant capabilities already deliver
-something a person can use, **25** more are carried by open issues, **26** rows
-wait on a named decision, and **31** are rejected with a reason. Every row is
-accounted for — that is the whole point of the page.
+The coverage table has its own page, [The assistant-ui ledger](assistant-ui-ledger.md) — **52** of the library's 129 relevant capabilities deliver something a person can use, **20** more are carried by open issues, **26** wait on a named decision, and **31** are rejected with a reason. It moved off this page so the Development page stays inside its 100 KiB budget; `scripts/doc_check.py` still reads it there, and still fails if the projection in [Living Studio](living-studio.md) drifts from it.
 
 ## Frontend & Desktop Checks (studio)
 
@@ -365,14 +98,17 @@ compiled stylesheet.
 ### Conversational UI coverage
 
 The agent-composed surfaces, first-minute guidance, and the product tour are
-covered at these levels. `ChatStage.test.tsx` also covers the latest-message
-control while following a streamed turn and returning to the live end:
+covered at these levels. `ChatStage.test.tsx` covers the jump-to-latest control
+while following a streamed turn — the arrival count, the polite announcement, the
+return to the live end, and the keyboard path — and `arrivalCount.test.ts` holds
+the pure count arithmetic:
 
 | File | What it covers |
 |---|---|
 | `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
 | `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
+| `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | The segment board's members and basis (#559): each segment lists its member outcomes with their stored scores, the mean is over scored members only with "Not scored" for none, an inferred group is called a candidate, a missing member is dropped and counted, a member opens in the landscape by mouse and keyboard, and the empty state names the next step |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
 | `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
 | `apps/studio/src/diagnostics/` | Recursive secret/URL/path redaction, 256 KiB cap, opt-in memory-only capture, local-only metadata fetch, and accessible diagnostics preview/export |
@@ -384,13 +120,15 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
 | `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
 | `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
+| `apps/studio/src/assistant/speech.test.ts`, `src/components/chat/Speech.test.tsx` | The speech support gate, speaking a settled reply, stopping on request and on Escape, and the absence of the control where the API is missing |
 | `apps/studio/src/components/chat/ThreadComposer.test.tsx` | Recall of previously sent messages with `ArrowUp`/`ArrowDown`, draft restoration, and the editing and sending keys it must not break |
+| `apps/studio/src/assistant/queue.test.ts`, `src/components/chat/QueueLane.test.tsx` | The follow-up lane (#410): enqueue preserves order, steer interrupts once, a cancel pauses instead of draining, a failed dispatch restores rather than drops; the lane rows read their text from parts and their Run-now and remove controls act on one item only |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
 | `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
 | `apps/studio/src/assistant/starterCopy.test.ts` | The first-run starter lint: situation-first titles, material-first prompts, a promised artifact, no quality adjectives, no claim literal, and the untouched returning-user swaps |
-| `apps/studio/src/components/chat/SuggestionPills.test.tsx` | A starter click sends its exported prompt verbatim, and the starters stay disabled while a reply streams |
+| `apps/studio/src/components/chat/SuggestionPills.test.tsx` | A starter click sends its exported prompt verbatim, and a starter clicked while a reply streams enqueues instead of being dropped (#410) |
 | `apps/studio-api/tests/test_studio_models.py` | Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, `/api/models` response shape |
-| `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, branch switching, approval answers |
+| `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, the follow-up queue against a gated stream (#410), branch switching, approval answers |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
 | `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
 | `apps/studio-api/tests/test_studio_chat_stream.py` | Reasoning and source events, attachment prompt assembly, terminal-event invariants |
@@ -403,7 +141,7 @@ control while following a streamed turn and returning to the live end:
 | `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
 | `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
 | `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface with zero violations; contrast is scoped to the token audit and documented there |
+| `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface, the decision brief included, with zero violations; contrast is scoped to the token audit and documented there |
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
 | `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
@@ -564,10 +302,49 @@ uv run pytest tests/contract         # cross-package contracts
 uv run pytest tests/scripts          # dev launcher
 ```
 
+The pre-PR procedure is not "run everything". It is the **default** tier in
+[`.agents/workflows/test.md`](../.agents/workflows/test.md): the fast tier,
+plus type checking, plus the studio units. The full tier — the studio build
+and the browser e2e suite — is CI's job and is not asked of anyone before
+they open a pull request.
+
 The MCP server contract test compares the live FastMCP registry with
 `packages/core/src/agentic_odi_core/contract.py`, so add or change a tool in
 both places. The CLI local-backend contract test keeps `_LOCAL_HANDLERS` aligned
 with the same tool names.
+
+### Artifact structure
+
+An artifact is HTML a person reads without the app: a built website page, the
+sample workspace, the offline shell, the decision brief. All of them are judged
+by one rule set, `scripts/artifact_a11y.py`, which reports six structural defects:
+
+- `single-h1` — the document holds exactly one `<h1>`; none and two are both defects.
+- `heading-order` — a heading never skips a level.
+- `table-caption` — a data table is named, by a `<caption>` or by an
+  `aria-labelledby` that resolves to an `id` the document actually contains.
+- `table-header-scope` — every `<th>` declares `scope` of row, col, rowgroup or colgroup.
+- `image-label` — an `<img>` carries `alt`, and an `<svg>` is either decoration
+  (`aria-hidden="true"`) or a chart with a label a reader can be told.
+- `duplicate-id` — no `id` is used twice, so a link or a label cannot point at the
+  wrong element.
+
+```bash
+uv run pytest tests/scripts/test_artifact_a11y.py           # the rules, on fixtures
+uv run pytest website/tests/test_site.py -k artifact_audit   # every built page against them
+```
+
+`scripts/artifact_renderers.py` is the inventory: one row per renderer, plus the
+artifacts that have none. `tests/scripts/test_artifact_inventory.py` scans the
+artifact roots for the markup that gives a renderer away, so a new file writing
+`<h1>` or `<table>` under one of those roots fails the suite by name until it is
+registered as a `Renderer(...)` row.
+
+Zero violations is a structural check. It is not WCAG conformance and it is not
+a screen-reader certification — nobody has read these artifacts with an actual
+reader, which is ALH-252's work. The memo, the one-pager and the shared page are
+recorded in the inventory as having no renderer at all, so there is nothing here
+to audit for them yet.
 
 ### End-to-end testing
 
@@ -645,6 +422,46 @@ within a month. The deterministic guard is
 rather than seconds, and a return to the full rescan (206,010 rows) fails it on
 any machine.
 
+## Render budget
+
+The cold-open number above is one screen appearing. The second cost is a screen
+that re-renders while you use it, and that is what the Studio's state splits
+(#503, #504, #505) are for. Their precondition is a number, so
+`apps/studio/src/test/renderCounts.tsx` counts renders and
+`src/state/StudioContext.test.tsx` pins them.
+
+Four surfaces are instrumented — the composer, the opportunity landscape, the
+workbench rail, and the banner area — mounted inside the real provider stack.
+A counter rendered *beside* a context consumer cannot see that consumer re-render
+(React bails out below a provider whose children element is stable), so each
+surface is wrapped in a `Profiler` and the number is commits that included it.
+
+| Scenario | composer | landscape | rail | banners |
+|---|---|---|---|---|
+| Forty streamed deltas | 5 | 2 | 2 | 2 |
+| Twenty keystrokes in the composer | 40 | 0 | 0 | 0 |
+| One health poll turning unhealthy | 1 | 1 | 1 | 5 |
+
+Baseline recorded on 2026-11-05 at commit `c403ba17`.
+
+```bash
+npm --prefix apps/studio test -- --run src/state/StudioContext.test.tsx   # the budget
+npm --prefix apps/studio test -- --run src/test/renderCounts.test.tsx     # the harness
+```
+
+Two things make these numbers usable. They are **exact, not ceilings**: the split
+issues may only lower a row, and a rise — or a drop — fails with the surface
+named, so it has to be argued with and re-recorded in the same pull request. And
+the scenario starts only once the boot has gone quiet: the harness waits for the
+fetches the boot left in flight, because a health answer landing mid-typing
+otherwise measures the race instead of the interaction.
+
+The harness is imported by tests alone, and the shipped bundle is byte-identical
+to the baseline it was taken against (`index-BLu6eXb1.js`, 1,321.24 kB / 392.52 kB
+gzip; `index-BXj2fr1g.css`, 106.89 kB / 20.56 kB gzip). A wall-clock render
+budget is deliberately not asserted: it would fail on a busy runner for reasons
+unrelated to the code under review.
+
 ## Test Coverage
 
 CI runs the suite on Python **3.10, 3.11, and 3.12** and uploads one combined
@@ -700,17 +517,17 @@ uv run pytest \
 
 | Area | What it covers |
 |---|---|
-| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, and the per-segment cold-open budget |
+| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, the onboarding funnel counters, and the per-segment cold-open budget |
 | `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
-| `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, and step/outcome passthrough |
-| `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, connectors, and startup performance |
+| `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, step/outcome passthrough, and the funnel endpoints |
+| `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, the funnel report, connectors, and startup performance |
 | `packages/connectors/tests/` | Catalog presets, registry persistence, factory, MCP and REST connectors, evidence mapping, and sink |
 | `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
-| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift |
+| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift; the artifact structural rules and the renderer inventory gate |
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, OG art reproducibility, and README sync |
+| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, every built page through the artifact rule set, OG art reproducibility, and README sync |
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the
