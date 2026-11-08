@@ -15,6 +15,7 @@ AGENT = "🤖 agent"
         # What this repo actually looks like: owner's account, agent branch.
         ("alehar9320", "User", "slay/6538dc1a-promote-evidence", [], AGENT),
         ("alehar9320", "User", "jules/fix-the-thing", [], AGENT),
+        ("alehar9320", "User", "agent/issue-753-claim", [], AGENT),
         # Agent identity visible only in the commit, not the branch.
         (
             "alehar9320",
