@@ -28,7 +28,6 @@ from agentic_odi_core.compare import (
     align_outcomes,
 )
 from agentic_odi_core.errors import ConflictError, NotFoundError, ValidationError
-from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     classify_opportunity,
@@ -62,10 +61,10 @@ from agentic_odi_core.models import (
     JobStage,
     Outcome,
     Rejection,
+    ScoreMethod,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
-    ScoreMethod,
     ScoreSnapshot,
     Segment,
     SegmentVerdict,
@@ -74,6 +73,8 @@ from agentic_odi_core.models import (
     Step,
     Strategy,
     StrategyKind,
+    Study,
+    StudyStatus,
     ValueBasis,
     ValueUnit,
     compute_opportunity_score,
@@ -83,18 +84,11 @@ from agentic_odi_core.review import DecisionReview, review_decision
 from agentic_odi_core.roadmap import Roadmap, build_roadmap
 from agentic_odi_core.segment_profile import SegmentProfile, build_segment_profile
 from agentic_odi_core.segmentation import (
-    SegmentCandidateSet,
-    suggest_segment_candidates,
-)
-    Study,
-    StudyStatus,
-    compute_opportunity_score,
-)
-from agentic_odi_core.repository import Repository, page
-from agentic_odi_core.segmentation import (
     MIN_OUTCOMES_PER_SEGMENT,
     OutcomeClusterStrategy,
     SegmentationStrategy,
+    SegmentCandidateSet,
+    suggest_segment_candidates,
     unclustered_outcomes,
 )
 from agentic_odi_core.strategy import propose_strategy as build_strategy
@@ -561,12 +555,7 @@ class ODIService:
         return self.repo.add_score_snapshot(snapshot)
 
     def update_outcome(
-        self,
-        outcome_id: str,
-        updates: dict[str, Any],
-        *,
-        at: str | None = None,
-        note: str | None = None,
+        self, outcome_id: str, updates: dict[str, Any], at: str | None = None
     ) -> Outcome:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
@@ -582,24 +571,18 @@ class ODIService:
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
         require_outcome_statement(statement)
-        updates = dict(updates)
         if importance is not None and satisfaction is not None:
+            updates = dict(updates)
             updates["opportunity_score"] = compute_opportunity_score(importance, satisfaction)
         else:
+            updates = dict(updates)
             updates["opportunity_score"] = None
-        # Validate the *whole* resulting record before mutating, so switching a
-        # survey to an estimate with a sample still attached fails atomically.
-        current = existing.model_dump(exclude_unset=True)
-        current.update(updates)
-        try:
-            Outcome.model_validate(current)
-        except PydanticValidationError as exc:
-            raise ValidationError(_first_line(str(exc))) from exc
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
             raise OutcomeNotFoundError(outcome_id)
+        self._capture_snapshot(res, at=at or _now_iso())
         self._emit_outcome_updates(existing, res)
-        self._capture_snapshot(res, at=at or _now_iso(), note=note)
+        self._count_outcome_milestones(res)
         return res
 
     def set_outcome_value(
@@ -1498,77 +1481,9 @@ class ODIService:
 
     # ---------------------------------------------------------------- segments
 
-    def add_segment(
-        self,
-        job_id: str,
-        name: str,
-        criterion: str,
-        outcome_ids: list[str],
-        notes: str | None = None,
-        origin: SegmentOrigin | str = SegmentOrigin.MANUAL,
-        candidate_fingerprint: str | None = None,
-    ) -> Segment:
-        """Create a segment: a named group defined by the outcomes it cares about.
 
-        Every member must belong to ``job_id``; a cross-job or missing member is
-        refused before any write, because a segment that spans jobs would corrupt
-        every profile built on it. Duplicate member ids are normalised to one
-        occurrence, keeping first-seen order. No demographic field exists, by
-        design — that is the method's actual claim.
-        """
-        if self.repo.get_job(job_id) is None:
-            raise JobNotFoundError(job_id)
-        name = name.strip()
-        if not name:
-            raise ValidationError("A segment needs a name.")
-        criterion = criterion.strip()
-        if not criterion:
-            raise ValidationError("A segment needs a criterion saying why the group is coherent.")
 
-        members = _normalise_member_ids(outcome_ids)
-        if not members:
-            raise ValidationError("A segment needs at least one member outcome.")
-        for outcome_id in members:
-            outcome = self.repo.get_outcome(outcome_id)
-            if outcome is None:
-                raise OutcomeNotFoundError(outcome_id)
-            if outcome.job_id != job_id:
-                raise ValidationError(
-                    f"Outcome {outcome_id} belongs to a different job; "
-                    "a segment's members must all come from its job."
-                )
 
-        try:
-            resolved_origin = SegmentOrigin(origin)
-        except ValueError as exc:
-            raise ValidationError(
-                f"Unknown segment origin: {origin!r}. "
-                f"Use one of {[o.value for o in SegmentOrigin]}."
-            ) from exc
-
-        segment = Segment(
-            job_id=job_id,
-            name=name,
-            criterion=criterion,
-            outcome_ids=members,
-            notes=notes,
-            origin=resolved_origin,
-            candidate_fingerprint=candidate_fingerprint,
-        )
-        return self.repo.add_segment(segment)
-
-    def get_segment(self, segment_id: str) -> Segment | None:
-        return self.repo.get_segment(segment_id)
-
-    def list_segments(
-        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[Segment]:
-        return self.repo.list_segments(job_id, limit=limit, offset=offset)
-
-    def delete_segment(self, segment_id: str) -> None:
-        """Delete a segment. Outcomes are never touched — only the lens on them."""
-        if not self.repo.delete_segment(segment_id):
-            raise SegmentNotFoundError(segment_id)
 
     def suggest_segments(self, job_id: str) -> SegmentCandidateSet:
         """Propose segment candidates from the scores. Persists nothing (D2).
@@ -1581,51 +1496,6 @@ class ODIService:
         outcomes = self.repo.get_outcomes(job_id, limit=None)
         return suggest_segment_candidates(outcomes)
 
-    def accept_segment_candidate(
-        self,
-        job_id: str,
-        fingerprint: str,
-        name: str | None = None,
-        criterion: str | None = None,
-    ) -> Segment:
-        """Accept exactly the candidate the person saw (D2.2/ALH-161).
-
-        The candidate is recomputed from the current landscape and matched by its
-        stable fingerprint, so acceptance targets precisely the proposal that was
-        shown. A fingerprint that no longer matches is **stale** (membership
-        changed since it was suggested) and is refused with a message naming the
-        reason rather than silently accepting a different group.
-
-        Repeat acceptance is idempotent: a segment already created from this
-        fingerprint is returned instead of creating a second one, so a retry
-        cannot duplicate a segment. ``name`` and ``criterion`` are the
-        human-confirmed labels; they default to the candidate's own so acceptance
-        needs no extra typing.
-        """
-        candidates = self.suggest_segments(job_id)
-        match = next((c for c in candidates.candidates if c.fingerprint == fingerprint), None)
-        if match is None:
-            raise ValidationError(
-                "No candidate matches that fingerprint for this job; it is stale "
-                "(the scores changed since it was proposed). Suggest again and accept "
-                "the candidate you are shown."
-            )
-
-        for existing in self.repo.list_segments(job_id, limit=None):
-            if (
-                existing.origin is SegmentOrigin.CANDIDATE
-                and existing.candidate_fingerprint == fingerprint
-            ):
-                return existing
-
-        return self.add_segment(
-            job_id=job_id,
-            name=name if name is not None else match.name,
-            criterion=criterion if criterion is not None else match.rationale,
-            outcome_ids=list(match.members),
-            origin=SegmentOrigin.CANDIDATE,
-            candidate_fingerprint=fingerprint,
-        )
 
     def segment_profile(self, segment_id: str) -> SegmentProfile:
         """Read a segment's servability, split into underserved and overserved.
@@ -1713,13 +1583,7 @@ class ODIService:
         )
         return self.repo.add_strategy(strategy)
 
-    def get_strategy(self, strategy_id: str) -> Strategy | None:
-        return self.repo.get_strategy(strategy_id)
 
-    def list_strategies(
-        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[Strategy]:
-        return self.repo.list_strategies(segment_id, limit=limit, offset=offset)
 
     def latest_strategy(self, segment_id: str) -> Strategy | None:
         """The most recently chosen strategy for a segment, or ``None``."""
@@ -1921,14 +1785,7 @@ class ODIService:
         )
         return [self.save_segment(item) for item in strategy.segment(jobs, outcomes)]
 
-    def list_segments(self, job_id: str | None = None) -> list[Segment]:
-        return self.repo.list_segments(job_id=job_id)
 
-    def get_segment(self, segment_id: str) -> Segment:
-        segment = self.repo.get_segment(segment_id)
-        if segment is None:
-            raise SegmentNotFoundError(segment_id, "run segment_market to produce segments")
-        return segment
 
     def save_segment(self, segment: Segment) -> Segment:
         """Persist one segment, rejecting one the store cannot vouch for."""
@@ -2014,13 +1871,7 @@ class ODIService:
             return self.repo.list_segments(job_id=job_id)
         return [self.get_segment(segment_id) for segment_id in segment_ids]
 
-    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
-        return self.repo.list_strategies(segment_id=segment_id)
 
-    def get_strategy(self) -> Strategy | None:
-        """The most recently recorded strategy, or ``None``."""
-        strategies = self.repo.list_strategies()
-        return strategies[-1] if strategies else None
 
     def save_strategy(self, strategy: Strategy) -> Strategy:
         """Persist a strategy, requiring the alternatives it beat."""
@@ -2051,3 +1902,67 @@ class ODIService:
             discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
         )
         return saved
+
+    def add_segment(
+        self,
+        job_id: str,
+        name: str,
+        job_statement: str | None = None,
+        outcome_ids: list[str] | None = None,
+        origin: str = "manual",
+    ) -> Segment:
+        """Create a segment through main's ``save_segment`` writer.
+
+        Main owns the Segment model, so the fields it declares are filled here
+        and nothing else is: the PR's ``origin`` becomes main's
+        ``people_inferred`` when the group was proposed rather than typed.
+        """
+        fields = Segment.model_fields
+        kwargs: dict[str, Any] = {"job_id": job_id, "name": name,
+                                  "outcome_ids": list(outcome_ids or [])}
+        if "people" in fields:
+            kwargs["people"] = name
+            kwargs["people_inferred"] = str(origin) != "manual"
+        if "job_statement" in fields:
+            kwargs["job_statement"] = job_statement or name
+        if "rationale" in fields and job_statement:
+            kwargs["rationale"] = job_statement
+        return self.save_segment(Segment(**kwargs))
+
+    def choose_strategy(
+        self,
+        segment_id: str,
+        kind: str,
+        rationale: str = "",
+        expected_effect: str | None = None,
+        chosen_at: str | None = None,
+    ) -> Strategy:
+        """Record a path through main's ``save_strategy`` writer.
+
+        ``rationale`` is main's ``thesis``; the PR's ``expected_effect`` has no
+        home on main's Strategy and is not invented into one.
+        """
+        fields = Strategy.model_fields
+        kwargs: dict[str, Any] = {"segment_id": segment_id, "kind": StrategyKind(kind)}
+        if "thesis" in fields:
+            kwargs["thesis"] = rationale or (expected_effect or "")
+        if "created_at" in fields and chosen_at:
+            kwargs["created_at"] = chosen_at
+        return self.save_strategy(Strategy(**kwargs))
+
+    def get_segment(self, segment_id: str) -> Segment:
+            segment = self.repo.get_segment(segment_id)
+            if segment is None:
+                raise SegmentNotFoundError(segment_id, "run segment_market to produce segments")
+            return segment
+
+    def list_segments(self, job_id: str | None = None) -> list[Segment]:
+            return self.repo.list_segments(job_id=job_id)
+
+    def get_strategy(self) -> Strategy | None:
+            """The most recently recorded strategy, or ``None``."""
+            strategies = self.repo.list_strategies()
+            return strategies[-1] if strategies else None
+
+    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
+            return self.repo.list_strategies(segment_id=segment_id)

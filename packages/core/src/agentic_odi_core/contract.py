@@ -78,7 +78,6 @@ class ToolName(str, Enum):
     TRIGGER_SCHEDULED_WORK = "trigger_scheduled_work"
     SEGMENT_MARKET = "segment_market"
     GET_SEGMENTS = "get_segments"
-    GET_STRATEGY = "get_strategy"
     PROPOSE_STRATEGY = "propose_strategy"
     PROPOSE_OUTCOME = "propose_outcome"
     LIST_PROPOSALS = "list_proposals"

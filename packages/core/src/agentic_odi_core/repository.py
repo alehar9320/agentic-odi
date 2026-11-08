@@ -328,27 +328,6 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
             del self.customer_outcomes[key]
-        for key in [k for k, v in self.decisions.items() if v.job_id == job_id]:
-            del self.decisions[key]
-        for key in [
-            k
-            for k, v in self.bets.items()
-            if v.decision_id not in self.decisions or v.outcome_id not in self.outcomes
-        ]:
-            del self.bets[key]
-        self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id in self.outcomes]
-        for key in [
-            k
-            for k, v in self.evidence.items()
-            if v.job_id == job_id
-            or (v.step_id is not None and v.step_id not in self.steps)
-            or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-        ]:
-            del self.evidence[key]
-        for key in [k for k, v in self.segments.items() if v.job_id == job_id]:
-            del self.segments[key]
-        for key in [k for k, v in self.strategies.items() if v.segment_id not in self.segments]:
-            del self.strategies[key]
         #: Do not destroy research evidence: unlink references to the removed
         #: job, its steps and its outcomes instead of deleting the rows.
         for key, ev in list(self.evidence.items()):
@@ -363,6 +342,14 @@ class InMemoryRepository:
                 current = ev.model_dump(exclude_unset=True)
                 current.update(updates)
                 self.evidence[key] = Evidence.model_validate(current)
+        #: The PR's decisions and bets hang off the removed job's outcomes, so
+        #: they cascade; the evidence rows stay, unlinked.
+        for key in [k for k, v in self.decisions.items() if v.job_id == job_id]:
+            del self.decisions[key]
+        for key in [k for k, v in self.bets.items()
+                    if v.decision_id not in self.decisions or v.outcome_id not in self.outcomes]:
+            del self.bets[key]
+        self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id in self.outcomes]
         return True
 
     def add_step(self, step: Step) -> Step:

@@ -11,7 +11,6 @@ from agentic_odi_core.models import (
     DecisionConfidence,
     JobStage,
     ScoreMethod,
-    SegmentOrigin,
     StrategyKind,
     ValueBasis,
     ValueUnit,
@@ -189,7 +188,6 @@ class AddSegmentRequest(BaseModel):
     criterion: str = Field(min_length=1)
     outcome_ids: list[str] = Field(min_length=1)
     notes: str | None = None
-    origin: SegmentOrigin = SegmentOrigin.MANUAL
 
 
 class AcceptSegmentCandidateRequest(BaseModel):

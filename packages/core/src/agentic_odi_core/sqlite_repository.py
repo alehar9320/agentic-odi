@@ -171,37 +171,6 @@ class SQLiteRepository(Repository):
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
-            job_outcome_ids = {k for k, v in self.outcomes.items() if v.job_id == job_id}
-            job_decision_ids = {k for k, v in self.decisions.items() if v.job_id == job_id}
-            for key in [k for k, v in self.steps.items() if v.job_id == job_id]:
-                del self.steps[key]
-            for key in job_outcome_ids:
-                self.outcomes.pop(key, None)
-            for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
-                del self.customer_outcomes[key]
-            for key in job_decision_ids:
-                self.decisions.pop(key, None)
-            for key in [
-                k
-                for k, v in self.bets.items()
-                if v.decision_id in job_decision_ids or v.outcome_id in job_outcome_ids
-            ]:
-                del self.bets[key]
-            self.score_snapshots = [
-                s for s in self.score_snapshots if s.outcome_id not in job_outcome_ids
-            ]
-            for key in [
-                k
-                for k, v in self.evidence.items()
-                if v.job_id == job_id
-                or (v.step_id is not None and v.step_id not in self.steps)
-                or (v.outcome_id is not None and v.outcome_id not in self.outcomes)
-            ]:
-                del self.evidence[key]
-            for key in [k for k, v in self.segments.items() if v.job_id == job_id]:
-                del self.segments[key]
-            for key in [k for k, v in self.strategies.items() if v.segment_id not in self.segments]:
-                del self.strategies[key]
             deleted_steps = {k for k, v in self.steps.items() if v.job_id == job_id}
             for key in deleted_steps:
                 del self.steps[key]
@@ -224,6 +193,20 @@ class SQLiteRepository(Repository):
                     current = record.model_dump(exclude_unset=True)
                     current.update(updates)
                     self.evidence[key] = Evidence.model_validate(current)
+            #: The PR's decisions and bets hang off the removed job's outcomes,
+            #: so they cascade; the evidence rows stay, unlinked.
+            for key in [k for k, v in self.decisions.items() if v.job_id == job_id]:
+                del self.decisions[key]
+            for key in [
+                k
+                for k, v in self.bets.items()
+                if v.decision_id not in self.decisions or v.outcome_id not in self.outcomes
+            ]:
+                del self.bets[key]
+            self.score_snapshots = [
+                s for s in self.score_snapshots if s.outcome_id in self.outcomes
+            ]
+
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
