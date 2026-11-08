@@ -1,5 +1,20 @@
 # Testing
 
+## Tiers
+
+There are three tiers of verification, named in
+[`.agents/workflows/test.md`](../.agents/workflows/test.md):
+
+| Tier | What it runs | Who runs it |
+|---|---|---|
+| **Fast** | pytest on the changed packages, ruff on the changed files | anyone who wants a quick answer |
+| **Default** | the fast tier, plus type checking, plus the studio units | **the bar for opening a PR** |
+| **Full** | the default tier, plus the studio build, plus the browser e2e suite | CI |
+
+The full tier is CI's responsibility and is not asked of anyone before they
+open a pull request. The commands below are the default tier; the fast tier
+is pytest on the changed packages plus `uv run ruff check .`.
+
 ## Commands
 
 ```bash
@@ -151,8 +166,9 @@ cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && 
 ```
 
 The self-updater lives in `apps/studio/src/updater/` and is covered by vitest:
-`machine.test.ts` (state transitions), `service.test.ts` (scheduling,
-download, and install), `transport.test.ts` (Tauri boundary), and the
+`machine.test.ts` (state transitions, including the failed-check status line
+naming the last *successful* check), `service.test.ts` (scheduling, download,
+install, and the bounded in-session action log), `transport.test.ts` (Tauri boundary), and the
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
