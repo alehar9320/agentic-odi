@@ -105,17 +105,3 @@ export function segmentBasisLine(peopleInferred: boolean): string {
     : "People named from your evidence.";
 }
 
-export function scoredAverage(outcomes: Outcome[]): { mean: number | null; scored: number; unscored: number } {
-  let total = 0;
-  let scored = 0;
-  let unscored = 0;
-  for (const o of outcomes) {
-    if (typeof o.opportunity_score === "number" && Number.isFinite(o.opportunity_score)) {
-      total += o.opportunity_score;
-      scored += 1;
-    } else {
-      unscored += 1;
-    }
-  }
-  return { mean: scored === 0 ? null : total / scored, scored, unscored };
-}
