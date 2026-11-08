@@ -13,12 +13,14 @@ import re
 
 import extract
 import pytest
+from artifact_a11y import audit_html
 from site_support import (
     CATALOG_PY,
     CATALOG_TS,
     CONTRACT_PY,
     CORE_MODELS_PY,
     MCP_SERVER_PY,
+    STANDALONE_PAGES,
     _built_root,
     all_pages,
     h1_text,
@@ -138,22 +140,25 @@ def test_page_has_the_required_basics(page: str):
     assert 'lang="en"' in html
     assert '<meta charset="utf-8">' in html
     assert "width=device-width" in html
+    # The audit reports how many <h1> a page has and whether its levels skip;
+    # only the shell's own contract says the title comes first.
+    first_heading = re.search(r"<h([1-6])\b", html)
+    assert first_heading is not None and first_heading.group(1) == "1", (
+        f"{page} must open on its <h1>"
+    )
 
 
-@pytest.mark.parametrize("page", all_pages())
-def test_page_has_exactly_one_h1(page: str):
-    html = read_page(page)
-    assert html.count("<h1") == 1, f"{page} must have exactly one <h1>"
+@pytest.mark.parametrize("page", all_pages() + sorted(STANDALONE_PAGES))
+def test_page_passes_the_artifact_audit(page: str):
+    """Every page is an artifact, including the two that skip the shell.
 
-
-@pytest.mark.parametrize("page", all_pages())
-def test_page_headings_never_skip_a_level(page: str):
-    html = read_page(page)
-    levels = [int(level) for level in re.findall(r"<h([1-6])\b", html)]
-    assert levels, f"{page} has no headings"
-    assert levels[0] == 1, f"{page} must start at <h1>"
-    for previous, current in zip(levels, levels[1:], strict=False):
-        assert current <= previous + 1, f"{page} skips from <h{previous}> to <h{current}>"
+    `all_pages()` deliberately excludes the standalone pages because they are
+    not subject to the site shell's contract. That exemption was never about
+    their structure, and a page a reader downloads or forwards — the sample
+    workspace above all — is exactly where the structure matters.
+    """
+    violations = audit_html(read_page(page))
+    assert violations == [], "\n".join(str(v) for v in violations)
 
 
 @pytest.mark.parametrize("page", all_pages())
@@ -195,13 +200,6 @@ def test_no_milestone_dates(page: str):
     html = read_page(page)
     assert not QUARTER.search(html), f"{page} contains a quarter"
     assert not MONTH_YEAR.search(html), f"{page} contains a month and year"
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_decorative_svg_is_hidden_from_assistive_tech(page: str):
-    html = read_page(page)
-    for tag in re.findall(r"<svg\b[^>]*>", html):
-        assert "aria-hidden" in tag or "role=" in tag, f"{page}: {tag}"
 
 
 # ---------------------------------------------------------------- landing
@@ -508,19 +506,15 @@ def test_every_page_resolves_its_own_assets(page: str):
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference was the long pole: every tool's argument table and the
-    # whole ODI schema live on that one page, so it grows with each paginated
-    # list tool and each entity we add. The V2MOM entity, the five
-    # scheduled-work tools, and the three signal tools bring the page to ~78 KB;
-    # the four Stage 5 and 6 tools (segment_market, get_segments, get_strategy,
-    # propose_strategy) bring it to ~80 KB; the four outcome-proposal tools
-    # (propose_outcome, list_proposals, approve_proposal, reject_proposal)
-    # bring it to ~85 KB. The assistant-ui ledger (issue #429) puts 129 rows
-    # on the Development page, which now reaches ~93 KB and is the new long
-    # pole; it is a coverage record, not decoration, so the ceiling moves.
-    # The Study entity and its two tools (open_study, list_studies) add the
-    # last few KB to the MCP reference page. The six theme tools (add_theme,
-    # rename_theme, delete_theme, list_themes, assign_theme, unassign_theme)
-    # and the Theme entity push it past 100 KB, so the ceiling moves again —
-    # the page is the contract record, not decoration.
+    # The page budget is a soft ceiling: individual pages are coverage records
+    # (ledgers, entity docs, schema references), not decoration, so the ceiling
+    # moves with legitimate content growth rather than trimming reference
+    # material. The MCP reference page is the long pole — every tool's argument
+    # table and the whole ODI schema live there — and the six theme tools
+    # (add_theme, rename_theme, delete_theme, list_themes, assign_theme,
+    # unassign_theme) with the Theme entity push it past 100 KB. The Development
+    # page also exceeds 100 KB: the assistant-ui ledger (issue #429) contributes
+    # 129 rows, and the Study entity plus its two tools (open_study, list_studies)
+    # and the outcome-proposal tools add the rest. The ceiling keeps both green
+    # while the content stays.
     assert size <= 110 * 1024, f"{page}: {size} bytes"

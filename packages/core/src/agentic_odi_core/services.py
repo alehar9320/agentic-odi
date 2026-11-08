@@ -18,6 +18,7 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
@@ -462,7 +463,20 @@ class ODIService:
         if not res:
             raise OutcomeNotFoundError(outcome_id)
         self._emit_outcome_updates(existing, res)
+        self._count_outcome_milestones(res)
         return res
+
+    def _count_outcome_milestones(self, outcome: Outcome) -> None:
+        """Tell the onboarding funnel how far this workspace has got.
+
+        Both milestones are first-ever-per-workspace, so offering them on every
+        outcome is cheaper and truer than trying to remember which one was first.
+        A score milestone needs both scores: an outcome with one is not yet a
+        ranked opportunity, and the funnel must not claim it is.
+        """
+        count_milestone(self.repo, FIRST_OUTCOME)
+        if outcome.importance is not None and outcome.satisfaction is not None:
+            count_milestone(self.repo, FIRST_SCORE)
 
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
         #: The write that produced these facts: two changes landing on the same
@@ -598,7 +612,9 @@ class ODIService:
             opportunity_score=opportunity_score,
             claim_check=check,
         )
-        return self.repo.add_outcome(outcome)
+        created = self.repo.add_outcome(outcome)
+        self._count_outcome_milestones(created)
+        return created
 
     def get_outcomes(
         self,
@@ -1013,6 +1029,10 @@ class ODIService:
             raise JobNotFoundError(job_id)
         if isinstance(trigger_type, str):
             trigger_type = ScheduledWorkTriggerType(trigger_type)
+        from .schedule import compute_next_run, validate_schedule_expression
+
+        validate_schedule_expression(schedule_expression)
+        next_run = compute_next_run(schedule_expression)
         work = ScheduledWork(
             id=str(uuid.uuid4()),
             name=name,
@@ -1022,6 +1042,7 @@ class ODIService:
             payload=payload or {},
             status=ScheduledWorkStatus.SCHEDULED,
             job_id=job_id,
+            next_run_at=next_run.isoformat(),
         )
         return self.repo.add_scheduled_work(work)
 
@@ -1053,12 +1074,19 @@ class ODIService:
         work = self.repo.get_scheduled_work(work_id)
         if work is None:
             raise ScheduledWorkNotFoundError(work_id)
-        now_str = datetime.now(timezone.utc).isoformat()
-        # No executor exists yet (#95): the work is dispatched and this is the
-        # record of it. Claiming a result would be inventing one.
+        now = datetime.now(timezone.utc)
+        now_str = now.isoformat()
+        from .schedule import compute_next_run
+
+        try:
+            next_run = compute_next_run(work.schedule_expression, now=now)
+            next_str = next_run.isoformat()
+        except ValueError:
+            next_str = None
         updates = {
             "status": ScheduledWorkStatus.RUNNING,
             "last_run_at": now_str,
+            "next_run_at": next_str,
             "result_summary": (
                 f"Dispatched at {now_str}; no executor is installed, so nothing has run."
             ),
