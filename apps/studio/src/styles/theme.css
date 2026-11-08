@@ -6845,6 +6845,21 @@ details[open] summary {
   cursor: pointer;
 }
 
+.update-settings__log {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.update-settings__log-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+}
+
 .update-settings__toggle input {
   accent-color: var(--accent);
 }
@@ -6966,6 +6981,291 @@ details[open] summary {
   margin: 0;
   font-size: 0.8rem;
   color: var(--amber);
+}
+
+/* ------------------------------------------------------------------ */
+/* Sharing: the sheet that mints a link, and the page it opens        */
+/* ------------------------------------------------------------------ */
+
+/* The share control sits in the landscape header beside the view switch. */
+.share-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.share-action__reason {
+  margin: 0;
+  max-width: 260px;
+  text-align: right;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.share-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(11, 13, 19, 0.7);
+  backdrop-filter: blur(10px);
+}
+
+.share-sheet__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(26, 32, 48, 0.96), rgba(15, 20, 32, 0.98));
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55);
+}
+
+.share-sheet__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  padding: 5px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.share-sheet__close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.share-sheet__title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 620;
+}
+
+.share-sheet__body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.share-sheet__error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 9px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--studio-red);
+  font-size: 0.78rem;
+}
+
+.share-sheet__result,
+.share-sheet__create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.share-sheet__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.share-sheet__field .select {
+  width: auto;
+}
+
+.share-sheet__primary {
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
+.share-sheet__note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+/* The read-only page. No chrome, no navigation: one artifact and its expiry. */
+.shared-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 720px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.shared-page__status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.shared-page__head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.shared-page__eyebrow {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shared-page__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.shared-page__expiry {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.shared-page__sample {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(240, 179, 74, 0.3);
+  border-radius: 10px;
+  background: rgba(240, 179, 74, 0.08);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.shared-page__sample strong {
+  color: var(--amber);
+}
+
+.shared-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shared-section__title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.shared-page__empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.82rem;
+}
+
+.shared-outcomes,
+.shared-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shared-outcome,
+.shared-evidence__item {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.shared-outcome--hot {
+  border-color: rgba(240, 179, 74, 0.28);
+  background: rgba(240, 179, 74, 0.045);
+}
+
+.shared-outcome__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shared-outcome__id {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.shared-outcome__statement {
+  margin: 8px 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.shared-outcome__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.shared-outcome__meta b {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.shared-evidence__name {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.shared-evidence__content {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.shared-vision {
+  margin: 0;
+  padding-left: 16px;
+  border-left: 3px solid var(--accent);
+  font-size: 1.1rem;
+  line-height: 1.6;
 }
 
 /* Selection and the caret carry the brand instead of the browser default. */
