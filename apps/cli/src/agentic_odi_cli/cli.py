@@ -612,5 +612,29 @@ def update_cmd(
         _reexec_current()
 
 
+
+@app.command("backup")
+def backup_cmd(db_path: str = typer.Option(None, "--db")):
+    """Write a verified snapshot of the local database."""
+    from agentic_odi_core.recovery import backup_database
+    path = db_path or _default_db_path()
+    out = backup_database(path)
+    typer.echo(f"Backup written: {out}")
+
+
+@app.command("restore")
+def restore_cmd(backup_file: str, db_path: str = typer.Option(None, "--db")):
+    """Restore a verified backup, keeping the current file as .pre-restore."""
+    from agentic_odi_core.recovery import restore_database
+    path = db_path or _default_db_path()
+    safety = restore_database(backup_file, path)
+    typer.echo(f"Restored. Previous file kept as {safety}")
+
+
+def _default_db_path() -> str:
+    import os
+    return os.path.expanduser("~/.agentic-odi/odi.db")
+
+
 if __name__ == "__main__":
     app()

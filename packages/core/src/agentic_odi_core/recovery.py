@@ -90,3 +90,65 @@ def corrupt_store_message(error: StoreCorrupt, *, backup: Path | None = None) ->
         f"{error.label} failed its integrity check: {error.path}. "
         f"{backup_line} The file has been left untouched — restore a backup before opening it again."
     )
+
+
+import shutil
+import sqlite3
+from datetime import datetime, timezone
+
+
+def _timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def backup_database(db_path: str, *, directory=None) -> Path:
+    """Write a verified snapshot of ``db_path`` using SQLite's online backup.
+
+    Returns the path of the new backup file. Raises StoreCorrupt? No—raises
+    if source cannot be opened.
+    """
+    folder = directory if directory is not None else backups_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    prefix = backup_prefix(db_path)
+    dest = folder / f"{prefix}-{_timestamp()}.db"
+    src = sqlite3.connect(db_path)
+    try:
+        dst = sqlite3.connect(str(dest))
+        try:
+            src.backup(dst)
+            dst.commit()
+        finally:
+            dst.close()
+    finally:
+        src.close()
+    # verify
+    conn = sqlite3.connect(str(dest))
+    try:
+        res = conn.execute("PRAGMA integrity_check").fetchone()
+    finally:
+        conn.close()
+    if not res or str(res[0]).lower() != "ok":
+        try:
+            dest.unlink()
+        except OSError:
+            pass
+        raise RuntimeError("backup failed integrity check")
+    return dest
+
+
+def restore_database(backup_path, db_path: str) -> Path:
+    """Verify ``backup_path``, keep current db as ``<name>.pre-restore``, swap."""
+    bpath = Path(backup_path)
+    conn = sqlite3.connect(str(bpath))
+    try:
+        res = conn.execute("PRAGMA integrity_check").fetchone()
+    finally:
+        conn.close()
+    if not res or str(res[0]).lower() != "ok":
+        raise ValueError(f"backup failed integrity check: {bpath}")
+    db = Path(db_path)
+    safety = db.with_suffix(db.suffix + ".pre-restore")
+    if db.exists():
+        shutil.copy2(db, safety)
+    shutil.copy2(bpath, db)
+    return safety
