@@ -105,6 +105,30 @@ async def test_compute_opportunity_tool():
 
 
 @pytest.mark.asyncio
+async def test_explain_opportunity_tool_returns_the_algebra():
+    async with Client(mcp) as client:
+        res = await client.call_tool(
+            "explain_opportunity", {"importance": 8.6, "satisfaction": 4.9}
+        )
+
+    payload = json.loads(res.content[0].text)  # type: ignore[index]
+    assert payload["score"] == pytest.approx(12.3)
+    assert payload["gap"] == pytest.approx(3.7)
+    assert payload["threshold"] == 10.0
+    assert payload["underserved"] is True
+
+
+@pytest.mark.asyncio
+async def test_explain_opportunity_out_of_range_answers_with_a_code():
+    async with Client(mcp) as client:
+        res = await client.call_tool("explain_opportunity", {"importance": 11, "satisfaction": 5})
+
+    payload = json.loads(res.content[0].text)  # type: ignore[index]
+    assert payload["error"]["code"] == "out_of_range"
+    assert "between 1.0 and 10.0" in payload["message"]
+
+
+@pytest.mark.asyncio
 async def test_get_capabilities_mentions_customer_outcomes():
     async with Client(mcp) as client:
         res = await client.call_tool("get_capabilities", {})

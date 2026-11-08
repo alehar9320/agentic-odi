@@ -1,0 +1,7 @@
+[
+  {"importance": 1, "satisfaction": 1, "score": 1.0, "underserved": false},
+  {"importance": 10, "satisfaction": 1, "score": 19.0, "underserved": true},
+  {"importance": 10, "satisfaction": 10, "score": 10.0, "underserved": false},
+  {"importance": 5, "satisfaction": 10, "score": 5.0, "underserved": false},
+  {"importance": 8.6, "satisfaction": 4.9, "score": 12.3, "underserved": true}
+]

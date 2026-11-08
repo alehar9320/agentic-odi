@@ -87,6 +87,7 @@ from agentic_odi_core.models import (
     ValueMetric,
     compute_opportunity_score,
     create_job,
+    explain_opportunity_score,
     job_stage_catalog,
 )
 from agentic_odi_core.remote import (
@@ -238,6 +239,7 @@ __all__ = [
     "Repository",
     "build_repository",
     "compute_opportunity_score",
+    "explain_opportunity_score",
     "create_job",
     "customer_outcome_not_found",
     "error_status",

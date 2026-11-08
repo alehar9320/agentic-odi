@@ -87,6 +87,38 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
     return float(importance + max(importance - satisfaction, 0.0))
 
 
+def explain_opportunity_score(
+    importance: float | None, satisfaction: float | None
+) -> dict[str, Any]:
+    """Explain how an opportunity score is computed.
+
+    Returns the algebra behind the number: the two inputs, the gap between
+    them, the score, and the threshold it is measured against. ``None`` for
+    either input is reported as an absent input, never as a zero.
+    """
+    inputs_present = importance is not None and satisfaction is not None
+    gap: float | None = None
+    score: float | None = None
+    if importance is not None and satisfaction is not None:
+        gap = round(max(importance - satisfaction, 0.0), 4)
+        if importance > satisfaction:
+            score = round(2.0 * importance - satisfaction, 4)
+        else:
+            score = float(importance)
+    return {
+        "importance": importance,
+        "satisfaction": satisfaction,
+        "gap": gap,
+        "score": score,
+        "threshold": 10.0,
+        "underserved": bool(score is not None and score > 10.0),
+        "min_score": 1.0,
+        "max_score": 19.0,
+        "inputs_present": inputs_present,
+        "method": "importance + max(importance - satisfaction, 0)",
+    }
+
+
 JOB_NAME_PATTERN = r"^[A-Za-z0-9 _-]+$"
 JOB_NAME_MIN_LENGTH = 3
 JOB_NAME_MAX_LENGTH = 64
