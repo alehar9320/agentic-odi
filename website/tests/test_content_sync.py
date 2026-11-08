@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 
+import build_sample
 import extract
 from site_support import (
     CATALOG_PY,
@@ -160,3 +161,72 @@ def test_the_copy_control_reports_that_it_copied():
     script = (SITE / "assets" / "main.js").read_text(encoding="utf-8")
     assert 'document.querySelectorAll("[data-copy]")' in script
     assert 'button.textContent = "Copied"' in script
+
+
+# ------------------------------------------------------------ the sample workspace
+
+SAMPLE_FIXTURE = SITE / "content" / "sample-study.json"
+SAMPLE_OUTPUT = SITE / "sample" / "index.html"
+EXTERNAL_REFERENCE = re.compile(r"https?://", re.IGNORECASE)
+
+
+def _sample_fixture() -> dict:
+    return json.loads(SAMPLE_FIXTURE.read_text(encoding="utf-8"))
+
+
+def test_the_landing_primary_cta_points_at_the_committed_sample():
+    # The primary call to action is the sample, not an adjectives-based claim.
+    # It points at the committed page, so the site keeps working when the API
+    # is down.
+    landing = read_page("index.html")
+    hero = landing.split('class="hero__actions"', 1)[1].split("</div>", 1)[0]
+    assert 'href="sample/"' in hero
+    assert SAMPLE_OUTPUT.is_file()
+    # "resolves to" means the href lands on the committed page: the page the
+    # build serves at that href is the committed file, byte for byte.
+    assert read_page("sample/index.html") == SAMPLE_OUTPUT.read_text(encoding="utf-8")
+
+
+def test_the_sample_page_is_served_by_the_site_build():
+    html = read_page("sample/index.html")
+    assert "<h1" in html
+    assert "sample" in html.lower()
+
+
+def test_the_committed_sample_matches_a_fresh_render():
+    # The drift alarm: the committed page is regenerated from the fixture and
+    # compared byte for byte, so it cannot disagree with the fixture.
+    assert SAMPLE_OUTPUT.read_text(encoding="utf-8") == build_sample.render()
+
+
+def test_the_committed_sample_has_no_external_reference():
+    # The no-network rule is a grep over the committed file: there is no server
+    # in the path to test, so the assertion is on the artifact itself.
+    html = SAMPLE_OUTPUT.read_text(encoding="utf-8")
+    assert not EXTERNAL_REFERENCE.search(html)
+    for tag in re.findall(r"<(?:script|link|img|iframe)\b[^>]*>", html, re.IGNORECASE):
+        assert "http" not in tag.lower(), tag
+
+
+def test_the_sample_page_states_its_generation_date():
+    fixture = _sample_fixture()
+    html = read_page("sample/index.html")
+    assert fixture["generated"] in html
+    assert "<time" in html
+
+
+def test_every_sample_row_carries_the_sample_marker():
+    fixture = _sample_fixture()
+    rows = 1 + len(fixture["steps"]) + len(fixture["outcomes"]) + len(fixture["evidence"])
+    html = read_page("sample/index.html")
+    assert html.count('class="marker"') == rows
+
+
+def test_the_sample_build_refuses_an_invented_numeral():
+    # The application's own rule, applied to the build: every numeral on the
+    # page must exist in the fixture. The check is exercised directly, so a
+    # numeral the template hardcodes rather than reads is a build failure.
+    fixture = _sample_fixture()
+    page = build_sample.render()
+    assert build_sample.invented_numbers(page, fixture) == []
+    assert build_sample.invented_numbers(page + " 4242", fixture) == ["4242"]

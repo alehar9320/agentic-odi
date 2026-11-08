@@ -6,6 +6,8 @@ import type { BannerKind } from "./types";
 const ALL_KINDS: BannerKind[] = [
   "sidecar-down",
   "model-offline",
+  "offline",
+  "app-update-ready",
   "update-available",
   "update-ready",
   "write-rejected",
@@ -44,11 +46,37 @@ describe("BANNER_CATALOG", () => {
     expect(entry.dismissible).toBe(false);
   });
 
+  it("names what still works when the browser is offline, without claiming sync", () => {
+    const entry = BANNER_CATALOG["offline"];
+    expect(entry.severity).toBe("info");
+    expect(entry.life).toBe("persistent");
+    expect(entry.dock).toBe("top");
+    // A persistent banner with no key would dedupe by kind only; the copy has to
+    // name the device-local work and must not promise a sync that #306 owns.
+    expect(`${entry.title} ${entry.body}`).toMatch(/offline/i);
+    expect(`${entry.title} ${entry.body}`).toMatch(/device|here/i);
+    expect(`${entry.title} ${entry.body}`).not.toMatch(/sync/i);
+  });
+
   it("keeps the toast kinds transient and in the corner", () => {
     for (const kind of ["info", "success", "error"] as const) {
       expect(BANNER_CATALOG[kind].life).toBe("transient");
       expect(BANNER_CATALOG[kind].dock).toBe("corner");
     }
+  });
+
+  it("offers a reload, never a forced one, when a new build is staged", () => {
+    const entry = BANNER_CATALOG["app-update-ready"];
+    expect(entry.severity).toBe("info");
+    expect(entry.life).toBe("persistent");
+    expect(entry.dock).toBe("top");
+    // The copy names the version and the action is an explicit reload, so the
+    // update never swaps code on its own.
+    expect(`${entry.title} ${entry.body}`).toMatch(/new version/i);
+    expect(entry.actions?.[0]).toMatchObject({
+      label: "Reload for the new version",
+      action: "reload-app",
+    });
   });
 });
 

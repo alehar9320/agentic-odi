@@ -60,7 +60,8 @@ def test_a_draft_has_exactly_the_evidence_contract_fields() -> None:
     drafts = drafts_from_batch(_batch())
     draft = drafts[0]
 
-    assert draft.model_dump() == {
+    dumped = draft.model_dump()
+    assert dumped == {
         "source_name": "gong",
         "source_kind": "mcp",
         "item_type": "resource",
@@ -71,9 +72,10 @@ def test_a_draft_has_exactly_the_evidence_contract_fields() -> None:
         "job_id": None,
         "step_id": None,
         "outcome_id": None,
+        "discriminator": draft.discriminator,
     }
     # The ODI store owns ids; a draft must not invent one.
-    assert "id" not in draft.model_dump()
+    assert "id" not in dumped
 
 
 def test_unknown_payload_keys_stay_inside_raw() -> None:
@@ -106,6 +108,7 @@ def test_unknown_payload_keys_stay_inside_raw() -> None:
         "job_id",
         "step_id",
         "outcome_id",
+        "discriminator",
     }
 
 

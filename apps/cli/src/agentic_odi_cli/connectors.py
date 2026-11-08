@@ -405,6 +405,21 @@ def ingest_connector(
     outcome_id: str | None = typer.Option(
         None, "--outcome-id", help="Link evidence to a desired Outcome."
     ),
+    propose: bool = typer.Option(
+        True,
+        "--propose/--no-propose",
+        help="Create proposals instead of writing outcomes directly (default: on).",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Write outcomes directly instead of creating proposals (opt-in, destructive).",
+    ),
+    tool_args: str | None = typer.Option(
+        None,
+        "--tool-args",
+        help='Per-tool arguments as a JSON object, e.g. \'{"tool_name": {"arg": "val"}}\'.',
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Fetch and validate records without writing anything."
     ),
@@ -418,10 +433,34 @@ def ingest_connector(
             err=True,
         )
         raise typer.Exit(code=1)
+    from agentic_odi_connectors.models import RateLimitExceededError
     from agentic_odi_connectors.registry import ConnectorNotFoundError, UnknownConnectorKindError
 
+    parsed_tool_args: dict[str, dict] = {}
+    import json
+
+    if tool_args is not None:
+        try:
+            parsed_tool_args = json.loads(tool_args)
+            if not isinstance(parsed_tool_args, dict):
+                typer.echo("Error: --tool-args must be a JSON object.", err=True)
+                raise typer.Exit(code=1)
+        except json.JSONDecodeError as exc:
+            typer.echo(f"Error: --tool-args is not valid JSON: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+
     try:
+        from agentic_odi_connectors.models import ConnectorConfig
+
         connector_config = _registry(config).get(name)
+        # Apply per-tool arg overrides
+        settings = dict(connector_config.settings)
+        settings["tool_args"] = {**settings.get("tool_args", {}), **parsed_tool_args}
+        connector_config = ConnectorConfig(
+            name=connector_config.name,
+            kind=connector_config.kind,
+            settings=settings,
+        )
         connector = build_connector(connector_config)
     except (ConnectorNotFoundError, UnknownConnectorKindError) as exc:
         typer.echo(f"Error: {exc}", err=True)
@@ -441,30 +480,76 @@ def ingest_connector(
             preview["evidence_drafts"] = len(drafts)
         typer.echo(json.dumps(preview, indent=2))
         return
-    get_default_sink().append(batch)
+    try:
+        get_default_sink().append(batch)
+    except RateLimitExceededError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
     typer.echo(batch.model_dump_json())
     if drafts is None:
         return
-    for draft in drafts:
-        typer.echo(
-            render_saved(
-                "created",
-                run_tool(
-                    "add_evidence",
-                    {
-                        "source_name": draft.source_name,
-                        "source_kind": draft.source_kind,
-                        "item_type": draft.item_type,
-                        "name": draft.name,
-                        "content": draft.content,
-                        "url": draft.url,
-                        "raw": draft.raw,
-                        "job_id": draft.job_id,
-                        "step_id": draft.step_id,
-                        "outcome_id": draft.outcome_id,
-                    },
-                ),
-                as_json=False,
-                noun="Evidence",
+    if apply:
+        # Original destructive behavior: write outcomes directly
+        for draft in drafts:
+            typer.echo(
+                render_saved(
+                    "created",
+                    run_tool(
+                        "add_evidence",
+                        {
+                            "source_name": draft.source_name,
+                            "source_kind": draft.source_kind,
+                            "item_type": draft.item_type,
+                            "name": draft.name,
+                            "content": draft.content,
+                            "url": draft.url,
+                            "raw": draft.raw,
+                            "job_id": draft.job_id,
+                            "step_id": draft.step_id,
+                            "outcome_id": draft.outcome_id,
+                        },
+                    ),
+                    as_json=False,
+                    noun="Evidence",
+                )
             )
+    elif propose:
+        # Default: create proposals instead of writing outcomes
+        from agentic_odi_core import ODIService, build_repository
+
+        repo = build_repository()
+        service = ODIService(repo)
+        for draft in drafts:
+            evidence = service.add_evidence(
+                source_name=draft.source_name,
+                source_kind=draft.source_kind,
+                name=draft.name,
+                content=draft.content,
+                item_type=draft.item_type,
+                url=draft.url,
+                raw=draft.raw,
+                job_id=draft.job_id,
+                step_id=draft.step_id,
+                outcome_id=draft.outcome_id,
+            )
+            proposal = service.propose_outcome_from_evidence(evidence.id)
+            typer.echo(
+                render_saved(
+                    "created",
+                    {
+                        "id": proposal.id,
+                        "status": proposal.status.value,
+                        "statement": proposal.statement,
+                        "importance": proposal.importance,
+                        "satisfaction": proposal.satisfaction,
+                        "confidence": proposal.confidence,
+                        "rationale": proposal.rationale,
+                    },
+                    as_json=False,
+                    noun="Proposal",
+                )
+            )
+    else:
+        typer.echo(
+            "No action taken. Use --propose (default) to create proposals or --apply to write outcomes directly."
         )

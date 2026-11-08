@@ -16,6 +16,7 @@ from agentic_odi_cli.chat import (
     handle_command,
 )
 from agentic_odi_cli.cli import app
+from agentic_odi_core import ModelRouter
 from typer.testing import CliRunner
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
@@ -40,6 +41,7 @@ class _FakeSession:
         self.cleared = False
         self.config = _config()
         self.connection_state = ConnectionState(llm_ok=True, mcp_ok=True, mcp_tool_count=2)
+        self.router = ModelRouter()
 
     def clear(self) -> None:
         self.cleared = True
@@ -281,6 +283,7 @@ class _FullFakeSession:
         self.connection_state = connection_state
         self.tool_names: list[str] = ["add_job", "get_jobs"]
         self.cleared = False
+        self.router = ModelRouter()
 
     def clear(self) -> None:
         self.cleared = True

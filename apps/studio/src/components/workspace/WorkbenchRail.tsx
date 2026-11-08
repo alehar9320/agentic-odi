@@ -1,9 +1,18 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
+import { buildRecords } from "../../lib/records";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
-import { ClusterIcon, CompassIcon, RouteIcon, SignalIcon, SparkIcon } from "../icons";
+import {
+  ClusterIcon,
+  CompassIcon,
+  RouteIcon,
+  SignalIcon,
+  SparkIcon,
+  TableIcon,
+} from "../icons";
+import { findPanel } from "./panels";
 
 interface RailItem {
   id: WorkspacePanelId;
@@ -23,13 +32,25 @@ interface RailItem {
  */
 export function WorkbenchRail() {
   const { canvas, memory, segments, activePanel, openPanel, closePanel } = useStudio();
+  // One tooltip at a time: the chip under the pointer or the keyboard (#696).
+  const [openTip, setOpenTip] = useState<WorkspacePanelId | null>(null);
 
   const items = useMemo<RailItem[]>(() => {
     const outcomes = canvas?.outcomes ?? [];
     const steps = canvas?.steps ?? [];
     const evidence = outcomes.filter((outcome) => outcome.evidence?.trim()).length;
+    const records = buildRecords(canvas);
 
     const rail: RailItem[] = [];
+    if (records.length > 0) {
+      rail.push({
+        id: "records",
+        label: "Records",
+        count: records.length,
+        noun: records.length === 1 ? "record" : "records",
+        icon: <TableIcon size={14} />,
+      });
+    }
     if (outcomes.length > 0) {
       rail.push({
         id: "landscape",
@@ -96,6 +117,10 @@ export function WorkbenchRail() {
         ) : null}
         {items.map((item) => {
           const open = activePanel === item.id;
+          // The panel registry owns the sentence; a lens without one says what
+          // its chip already says rather than opening an empty tooltip.
+          const blurb = findPanel(item.id).blurb.trim() || item.label;
+          const showing = openTip === item.id;
           return (
             <li key={item.id}>
               <button
@@ -103,6 +128,11 @@ export function WorkbenchRail() {
                 className={`rail__chip${open ? " is-open" : ""}`}
                 aria-current={open ? "page" : undefined}
                 aria-label={`${item.label}, ${item.count} ${item.noun}`}
+                aria-describedby={showing ? `rail-tip-${item.id}` : undefined}
+                onMouseEnter={() => setOpenTip(item.id)}
+                onMouseLeave={() => setOpenTip((current) => (current === item.id ? null : current))}
+                onFocus={() => setOpenTip(item.id)}
+                onBlur={() => setOpenTip((current) => (current === item.id ? null : current))}
                 onClick={() => (open ? closePanel() : openPanel(item.id))}
               >
                 <span className="rail__icon" aria-hidden="true">
@@ -110,6 +140,11 @@ export function WorkbenchRail() {
                 </span>
                 {item.label}
                 <span className="rail__count">{item.count}</span>
+                {showing && (
+                  <span id={`rail-tip-${item.id}`} className="rail__tip" role="tooltip">
+                    {blurb}
+                  </span>
+                )}
               </button>
             </li>
           );
