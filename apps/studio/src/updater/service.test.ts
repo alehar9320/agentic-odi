@@ -62,6 +62,71 @@ function createService(
   });
 }
 
+describe("check honesty", () => {
+  it("does not move lastSuccessfulCheckAt when a check fails", async () => {
+    const transport = makeTransport();
+    const service = createService(transport);
+
+    await service.check();
+    const succeededAt = service.getSnapshot().lastSuccessfulCheckAt;
+    expect(succeededAt).not.toBeNull();
+
+    transport.check = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    await service.retry();
+
+    const snapshot = service.getSnapshot();
+    expect(snapshot.phase).toBe("error");
+    expect(snapshot.lastSuccessfulCheckAt).toBe(succeededAt);
+    expect(service.statusLine()).toMatch(/last successful check was/i);
+  });
+
+  it("logs a failed check as a failed check", async () => {
+    const transport = makeTransport({
+      check: vi.fn(async () => {
+        throw new Error("offline");
+      }),
+    });
+    const service = createService(transport);
+
+    await service.check();
+
+    expect(service.getSnapshot().actions[0].kind).toBe("check-failed");
+  });
+
+  it("records what it did, newest first and bounded", async () => {
+    const service = createService(makeTransport());
+
+    await service.check();
+    expect(service.getSnapshot().actions[0].kind).toBe("check-succeeded");
+    expect(service.getSnapshot().actions.map((action) => action.kind)).toContain(
+      "check-started",
+    );
+
+    for (let index = 0; index < 12; index += 1) {
+      await service.check();
+    }
+
+    const actions = service.getSnapshot().actions;
+    expect(actions.length).toBeLessThanOrEqual(20);
+    expect(actions[0].kind).toBe("check-succeeded");
+  });
+
+  it("keeps a broken background check out of the banner", async () => {
+    const transport = makeTransport({
+      check: vi.fn(async () => {
+        throw new Error("offline");
+      }),
+    });
+    const service = createService(transport);
+
+    await service.check();
+
+    expect(service.bannerView()).toBeNull();
+  });
+});
+
 beforeEach(() => {
   vi.useFakeTimers();
 });

@@ -11,6 +11,7 @@ import {
 
 const options = {
   version: "1.2.3",
+  versionSource: "build" as const,
   build: "2026-10-30",
   platform: "Desktop",
   theme: "light",
