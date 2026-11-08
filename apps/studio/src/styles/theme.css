@@ -6002,6 +6002,28 @@ details[open] summary {
   padding: 8px 22px 0;
 }
 
+/* With nothing to show, the top strip must not leave a banner-shaped gap at the
+   top of the window. The viewport stays mounted — Radix keeps it registered so
+   the corner dock's toasts still portal into it — but it collapses to zero so
+   the chrome sits where it belongs. The overflow row rides along with the dock
+   that owns it, so it is not empty either. */
+.banner-dock--top.banner-dock--empty {
+  padding: 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* When there is no top banner, the chrome still wants a small, deliberate
+   breathing space against the window edge — not the banner strip's own
+   padding, which is sized to frame a notice. The bar is the first thing at
+   the top, and this is the only margin it pays. When a top banner is present
+   the strip's own padding already frames the chrome, so this margin does not
+   apply and the strip's behaviour is unchanged. */
+.studio-app:not(:has(.banner-dock--top:not(.banner-dock--empty))) > .bar {
+  margin-top: 4px;
+}
+
 .banner-dock--corner {
   position: fixed;
   right: 18px;
