@@ -29,6 +29,24 @@ export function formatOpportunityScore(score: number | null | undefined): string
   return score.toFixed(1);
 }
 
+export function scoredAverage(
+  outcomes: ReadonlyArray<{ opportunity_score?: number | null }>,
+): { mean: number | null; scored: number; unscored: number } {
+  let total = 0;
+  let scored = 0;
+  let unscored = 0;
+  for (const o of outcomes) {
+    const v = o.opportunity_score;
+    if (typeof v === "number" && Number.isFinite(v)) {
+      total += v;
+      scored += 1;
+    } else {
+      unscored += 1;
+    }
+  }
+  return { mean: scored === 0 ? null : total / scored, scored, unscored };
+}
+
 export function opportunityPill(score: number | null | undefined): PillDescriptor {
   const formatted = formatOpportunityScore(score);
   if (isUnderserved(score)) {
