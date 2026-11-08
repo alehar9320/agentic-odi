@@ -239,6 +239,16 @@ Studio says so in one place and keeps going:
   the single place that decides, for the chip, the capability probe, and the
   chat provider.
 
+  A configured endpoint on your own network is only reachable from a page served
+  from that same device. `endpointReachability` in
+  `apps/studio/src/lib/modelEndpoint.ts` compares the endpoint's host with the
+  page's origin: a loopback or private-address endpoint is **device-only** when
+  opened from a hosted page, and the studio says so rather than pretending it can
+  connect. The capability probe reports `endpoint-model` as unavailable with the
+  reason, and the bar's model chip titles it "local endpoint, not reachable from
+  this page" while keeping its light unknown — use the desktop app or open the
+  Studio on this device.
+
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
 
@@ -820,7 +830,12 @@ bar, **Settings → Software update**, or the version line in the sidebar applie
 it immediately. Windows needs the app to exit before its installer runs, so it
 offers **Update & restart** instead. Dismissing the bar is safe: a staged update
 still applies on the next launch, and check failures are reported in Settings
-rather than interrupting the conversation.
+rather than interrupting the conversation. A failed check never borrows the
+last attempt's timestamp: Settings says plainly that the app could not check and
+names when it last reached the server successfully, or that it has not yet.
+Below that, **Recent update activity** lists the most recent updater actions of
+this session — checks, downloads, installs, skips and dismissals — newest first
+and capped, so a support conversation starts from what actually happened.
 
 In-app updates are inactive in the browser build and in `tauri dev`; both say so
 in **Settings → Software update**.
