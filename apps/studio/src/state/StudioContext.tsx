@@ -267,6 +267,17 @@ export const EMPTY_CONFIG: StudioConfig = {
 
 export type ToastKind = "success" | "error" | "info";
 
+/**
+ * What the receipt says for a write that came back. A record the sidecar
+ * acknowledged reports the acknowledgement; a record still queued on this
+ * device says where the change lives instead of claiming it was saved to the
+ * studio. Only the sidecar's own acknowledgement earns the second message.
+ */
+export function writeReceipt(record: unknown, acknowledged: string): string {
+  const pending = (record as { pending?: boolean } | null | undefined)?.pending === true;
+  return pending ? "Saved on this device · will sync" : acknowledged;
+}
+
 export interface Toast {
   id: number;
   kind: ToastKind;
@@ -1409,8 +1420,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
       try {
-        await apiAddStep({ ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Step added to Job Map!");
+        const step = await apiAddStep({ ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", writeReceipt(step, "Step added to Job Map!"));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Error adding step: ${(error as Error).message}`);
@@ -1422,9 +1433,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const addOutcome = useCallback(
     async (payload: Omit<AddOutcomePayload, "mcp_url">) => {
       // The form that asked for this shows the failure where the user typed
-      // it, so the error travels up instead of disappearing into a toast.
-      await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", "Outcome captured successfully!");
+      // it, so the error travels up instead of disappearing into a toast. A
+      // transport failure does not travel up: the write is queued locally and
+      // the receipt says where it lives.
+      const outcome = await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
+      pushToast("success", writeReceipt(outcome, "Outcome captured successfully!"));
       await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -1433,7 +1446,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
       const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", `Job created: ${payload.name}`);
+      pushToast("success", writeReceipt(job, `Job created: ${payload.name}`));
       await refreshCanvas();
       return job.id ?? null;
     },
@@ -1443,8 +1456,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const updateJob = useCallback(
     async (jobId: string, payload: { name?: string; description?: string }) => {
       try {
-        await apiUpdateJob(jobId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Job updated.");
+        const job = await apiUpdateJob(jobId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", writeReceipt(job, "Job updated."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the job: ${(error as Error).message}`);
@@ -1456,8 +1469,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const deleteJob = useCallback(
     async (jobId: string) => {
       try {
-        await apiDeleteJob(jobId, settings.mcp_url);
-        pushToast("success", "Job removed.");
+        const result = await apiDeleteJob(jobId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Job removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the job: ${(error as Error).message}`);
@@ -1469,8 +1482,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const updateStep = useCallback(
     async (stepId: string, payload: { name?: string; order?: number }) => {
       try {
-        await apiUpdateStep(stepId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Step updated.");
+        const step = await apiUpdateStep(stepId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", writeReceipt(step, "Step updated."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the step: ${(error as Error).message}`);
@@ -1482,8 +1495,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const deleteStep = useCallback(
     async (stepId: string) => {
       try {
-        await apiDeleteStep(stepId, settings.mcp_url);
-        pushToast("success", "Step removed.");
+        const result = await apiDeleteStep(stepId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Step removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the step: ${(error as Error).message}`);
@@ -1498,8 +1511,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       payload: { statement?: string; importance?: number; satisfaction?: number },
     ) => {
       try {
-        await apiUpdateOutcome(outcomeId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Outcome updated.");
+        const outcome = await apiUpdateOutcome(outcomeId, {
+          ...payload,
+          mcp_url: settings.mcp_url,
+        });
+        pushToast("success", writeReceipt(outcome, "Outcome updated."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
@@ -1511,8 +1527,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const deleteOutcome = useCallback(
     async (outcomeId: string) => {
       try {
-        await apiDeleteOutcome(outcomeId, settings.mcp_url);
-        pushToast("success", "Outcome removed.");
+        const result = await apiDeleteOutcome(outcomeId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Outcome removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the outcome: ${(error as Error).message}`);
@@ -1524,8 +1540,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const deleteEvidence = useCallback(
     async (evidenceId: string) => {
       try {
-        await apiDeleteEvidence(evidenceId, settings.mcp_url);
-        pushToast("success", "Evidence removed.");
+        const result = await apiDeleteEvidence(evidenceId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Evidence removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the evidence: ${(error as Error).message}`);
@@ -1547,8 +1563,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       },
     ) => {
       // The form keeps the error beside the quote it came from.
-      await apiPromoteEvidence(evidenceId, { ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", `Promoted the evidence to a ${payload.target}.`);
+      const result = await apiPromoteEvidence(evidenceId, {
+        ...payload,
+        mcp_url: settings.mcp_url,
+      });
+      pushToast("success", writeReceipt(result, `Promoted the evidence to a ${payload.target}.`));
       await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
