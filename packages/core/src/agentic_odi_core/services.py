@@ -14,9 +14,11 @@ from pydantic import ValidationError as PydanticValidationError
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
+    classify_opportunity,
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
@@ -45,6 +47,8 @@ from agentic_odi_core.models import (
     SignalKind,
     Step,
     Strategy,
+    Study,
+    StudyStatus,
     compute_opportunity_score,
 )
 from agentic_odi_core.repository import Repository, page
@@ -79,6 +83,14 @@ class CustomerOutcomeNotFoundError(NotFoundError):
     def __init__(self, outcome_id: str) -> None:
         self.outcome_id = outcome_id
         super().__init__(outcome_id, "customer_outcome")
+
+
+class StudyNotFoundError(NotFoundError):
+    """Raised when a study id does not resolve."""
+
+    def __init__(self, study_id: str, hint: str | None = None) -> None:
+        self.study_id = study_id
+        super().__init__(study_id, "study", hint)
 
 
 class ScheduledWorkNotFoundError(NotFoundError, ValueError):
@@ -260,16 +272,18 @@ def _first_line(text: str) -> str:
 
 
 def _opportunity_crossing(before: float | None, after: float | None) -> tuple[str, str] | None:
-    """Did the opportunity score cross 10, and in which direction?
+    """Did the opportunity score enter or leave the underserved bucket?
 
-    Crossing up is urgent — a big unserved opportunity just surfaced;
-    crossing down is a notice.
+    The line is ``classify_opportunity``'s, not a second threshold: underserved
+    is strictly above 10, so a score that climbs onto exactly 10 has crossed
+    nothing and one that moves from 10 to 11 has. Entering is urgent — a real
+    unserved opportunity just surfaced; leaving is a notice.
     """
-    if before is None or after is None:
-        return None
-    if before < 10.0 <= after:
+    was = classify_opportunity(before)
+    now = classify_opportunity(after)
+    if was != "underserved" and now == "underserved":
         return ("up", "urgent")
-    if before >= 10.0 > after:
+    if was == "underserved" and now != "underserved":
         return ("down", "notice")
     return None
 
@@ -298,19 +312,22 @@ class ODIService:
         severity: str = "info",
         detail: str | None = None,
         discriminator: str = "",
+        source_event_id: int | None = None,
     ) -> Signal:
         """Record one fact. A signal with the same fingerprint already exists.
 
-        ``discriminator`` is the thing that changed (a new score, a record id);
-        the fingerprint is sha256 over ``kind|subject_kind|subject_id|
-        discriminator``, so re-recording the same fact returns the first signal
-        instead of spamming the feed.
+        ``discriminator`` is the thing that changed (a new score, a record id) and
+        ``source_event_id`` the store event that carried the change. The fingerprint
+        is sha256 over ``kind|subject_kind|subject_id|discriminator``, with the source
+        id appended when one is given. Naming the change and not only the value it
+        landed on is what lets a second move to the same score be its own signal,
+        while a retry of one change stays one signal. Without a source id the
+        fingerprint is exactly what it was before, so stored signals still dedupe.
         """
-        fingerprint = hashlib.sha256(
-            "|".join([kind.value, subject_kind or "", subject_id or "", discriminator]).encode(
-                "utf-8"
-            )
-        ).hexdigest()
+        fact = [kind.value, subject_kind or "", subject_id or "", discriminator]
+        if source_event_id is not None:
+            fact.append(str(source_event_id))
+        fingerprint = hashlib.sha256("|".join(fact).encode("utf-8")).hexdigest()
         for existing in self.repo.signals.values():
             if existing.fingerprint == fingerprint:
                 return existing
@@ -405,6 +422,9 @@ class ODIService:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
             raise OutcomeNotFoundError(outcome_id)
+        study_id = updates.get("study_id")
+        if study_id is not None:
+            self._validate_study_scope(existing, study_id)
         statement = updates.get("statement", existing.statement)
         importance = updates.get("importance", existing.importance)
         satisfaction = updates.get("satisfaction", existing.satisfaction)
@@ -423,9 +443,25 @@ class ODIService:
         if not res:
             raise OutcomeNotFoundError(outcome_id)
         self._emit_outcome_updates(existing, res)
+        self._count_outcome_milestones(res)
         return res
 
+    def _count_outcome_milestones(self, outcome: Outcome) -> None:
+        """Tell the onboarding funnel how far this workspace has got.
+
+        Both milestones are first-ever-per-workspace, so offering them on every
+        outcome is cheaper and truer than trying to remember which one was first.
+        A score milestone needs both scores: an outcome with one is not yet a
+        ranked opportunity, and the funnel must not claim it is.
+        """
+        count_milestone(self.repo, FIRST_OUTCOME)
+        if outcome.importance is not None and outcome.satisfaction is not None:
+            count_milestone(self.repo, FIRST_SCORE)
+
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
+        #: The write that produced these facts: two changes landing on the same
+        #: score are two changes, one change reported twice is one signal.
+        source_event_id = self.repo.last_event_id()
         if before.importance != after.importance or before.satisfaction != after.satisfaction:
             self.record_signal(
                 SignalKind.OUTCOME_SCORED,
@@ -437,18 +473,21 @@ class ODIService:
                     f"satisfaction {before.satisfaction} -> {after.satisfaction}"
                 ),
                 discriminator=f"importance={after.importance},satisfaction={after.satisfaction}",
+                source_event_id=source_event_id,
             )
         crossing = _opportunity_crossing(before.opportunity_score, after.opportunity_score)
         if crossing is not None:
             direction, severity = crossing
             self.record_signal(
                 SignalKind.OPPORTUNITY_CROSSED,
-                f'Opportunity score crossed 10 ({direction}): "{after.statement[:60]}"',
+                f"Opportunity score {before.opportunity_score} -> {after.opportunity_score} "
+                f'({direction}): "{after.statement[:60]}"',
                 subject_kind="outcome",
                 subject_id=after.id,
                 severity=severity,
                 detail=f"{before.opportunity_score} -> {after.opportunity_score}",
                 discriminator=f"{direction}:{after.opportunity_score}",
+                source_event_id=source_event_id,
             )
 
     def _emit_job_map_completed(self, job_id: str) -> None:
@@ -553,7 +592,9 @@ class ODIService:
             opportunity_score=opportunity_score,
             claim_check=check,
         )
-        return self.repo.add_outcome(outcome)
+        created = self.repo.add_outcome(outcome)
+        self._count_outcome_milestones(created)
+        return created
 
     def get_outcomes(
         self,
@@ -564,6 +605,72 @@ class ODIService:
         sort: str = "opportunity_score",
     ) -> list[Outcome]:
         return self.repo.get_outcomes(job_id, step_id, limit=limit, offset=offset, sort=sort)
+
+    # -- Studies: one named pass over a Job, and the wave inside it ----------
+
+    def open_study(
+        self, job_id: str, name: str, wave: int, method_notes: str | None = None
+    ) -> Study:
+        """Open a study — one named pass over a Job, at a given wave number.
+
+        A study opens ``planned``; ``fielding`` and ``closed`` are later
+        transitions and nothing here moves to them automatically. The same
+        ``(job_id, name)`` may not repeat a wave, so an accidental re-run of a
+        pass is refused while a deliberate later wave is expressible.
+        """
+        if self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        clash = next(
+            (
+                study
+                for study in self.repo.list_studies(job_id)
+                if study.name == name and study.wave == wave
+            ),
+            None,
+        )
+        if clash is not None:
+            raise ValidationError(
+                f"Study '{name}' already has wave {wave} for this job; open wave {wave + 1} instead."
+            )
+        study = Study(job_id=job_id, name=name, wave=wave, method_notes=method_notes)
+        return self.repo.add_study(study)
+
+    def close_study(self, study_id: str) -> Study:
+        """Close a study once. A second close keeps the first ``closed_at``."""
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id)
+        if study.status is StudyStatus.CLOSED:
+            return study
+        closed = self.repo.update_study(
+            study_id,
+            {
+                "status": StudyStatus.CLOSED.value,
+                "closed_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        if closed is None:
+            raise StudyNotFoundError(study_id)
+        return closed
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        return self.repo.list_studies(job_id=job_id)
+
+    def get_study(self, study_id: str) -> Study:
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id, "open a study first")
+        return study
+
+    def _validate_study_scope(self, outcome: Outcome, study_id: str) -> None:
+        study = self.repo.get_study(study_id)
+        if study is None:
+            raise StudyNotFoundError(study_id)
+        if study.job_id != outcome.job_id:
+            raise ValidationError(
+                f"Study {study_id} belongs to job {study.job_id}, not the outcome's job "
+                f"{outcome.job_id}; an outcome may only join a study of its own job."
+            )
 
     def add_customer_outcome(
         self,
@@ -902,6 +1009,10 @@ class ODIService:
             raise JobNotFoundError(job_id)
         if isinstance(trigger_type, str):
             trigger_type = ScheduledWorkTriggerType(trigger_type)
+        from .schedule import compute_next_run, validate_schedule_expression
+
+        validate_schedule_expression(schedule_expression)
+        next_run = compute_next_run(schedule_expression)
         work = ScheduledWork(
             id=str(uuid.uuid4()),
             name=name,
@@ -911,6 +1022,7 @@ class ODIService:
             payload=payload or {},
             status=ScheduledWorkStatus.SCHEDULED,
             job_id=job_id,
+            next_run_at=next_run.isoformat(),
         )
         return self.repo.add_scheduled_work(work)
 
@@ -942,12 +1054,19 @@ class ODIService:
         work = self.repo.get_scheduled_work(work_id)
         if work is None:
             raise ScheduledWorkNotFoundError(work_id)
-        now_str = datetime.now(timezone.utc).isoformat()
-        # No executor exists yet (#95): the work is dispatched and this is the
-        # record of it. Claiming a result would be inventing one.
+        now = datetime.now(timezone.utc)
+        now_str = now.isoformat()
+        from .schedule import compute_next_run
+
+        try:
+            next_run = compute_next_run(work.schedule_expression, now=now)
+            next_str = next_run.isoformat()
+        except ValueError:
+            next_str = None
         updates = {
             "status": ScheduledWorkStatus.RUNNING,
             "last_run_at": now_str,
+            "next_run_at": next_str,
             "result_summary": (
                 f"Dispatched at {now_str}; no executor is installed, so nothing has run."
             ),
@@ -1021,6 +1140,7 @@ class ODIService:
             severity=severity,
             detail=segment.rationale[:500],
             discriminator=f"verdict={segment.verdict},confidence={segment.confidence}",
+            source_event_id=self.repo.last_event_id(),
         )
 
     def unclustered_outcomes(self, job_id: str | None = None) -> list[Outcome]:

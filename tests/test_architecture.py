@@ -14,6 +14,7 @@ cannot exist in one of them alone.
 
 from __future__ import annotations
 
+import ast
 import functools
 import importlib.util
 import re
@@ -187,3 +188,115 @@ def test_no_app_imports_another_app() -> None:
     }
     crossing = {edge for edge in _observed_edges() if edge[0] in apps and edge[1] in apps}
     assert not crossing, f"one app imports another, which the layout forbids: {_format(crossing)}"
+
+
+CORE = ROOT / "packages/core/src/agentic_odi_core"
+
+# The four groups described in docs/architecture/README.md and decided in
+# docs/architecture/adr/0005-core-layers-and-the-contract-split.md. Every module
+# in the package belongs to exactly one of them, which
+# test_every_core_module_is_in_exactly_one_group checks, so this block cannot
+# fall behind the document it describes. ``__init__.py`` is excluded: it
+# re-exports the whole package and would belong to all four.
+CORE_LAYERS: dict[str, tuple[str, ...]] = {
+    "domain": ("models", "evaluation", "mapping", "corpus", "schedule"),
+    "persistence": (
+        "repository",
+        "sqlite_repository",
+        "intent_store",
+        "events",
+        "funnel",
+        "factory",
+        "integrity",
+        "recovery",
+    ),
+    "methodology": ("services", "segmentation", "strategy", "router", "messages", "steve_jobs"),
+    "contract": ("contract", "errors", "remote", "schema", "connection", "consent"),
+}
+
+CORE_PACKAGE = "agentic_odi_core"
+
+
+def _imported_core_modules(module_path: Path) -> set[str]:
+    """Names of ``agentic_odi_core`` modules this file imports.
+
+    Parsed rather than grepped: ``repository.py`` says ``add_strategy`` a dozen
+    times and imports no methodology module at all, so a text match on the
+    group's names would report a violation that is not one.
+    """
+    tree = ast.parse(module_path.read_text(encoding="utf-8"), filename=str(module_path))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                parts = alias.name.split(".")
+                if parts[0] == CORE_PACKAGE and len(parts) > 1:
+                    imported.add(parts[1])
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                # A relative import stays inside the package, but it names the
+                # same modules, so it has to be read the same way.
+                if node.module:
+                    imported.add(node.module.split(".")[0])
+                else:
+                    imported.update(alias.name for alias in node.names)
+                continue
+            parts = (node.module or "").split(".")
+            if parts[0] != CORE_PACKAGE:
+                continue
+            if len(parts) > 1:
+                imported.add(parts[1])
+            else:
+                # ``from agentic_odi_core import services`` — the names are modules.
+                imported.update(alias.name for alias in node.names)
+    return imported
+
+
+def test_persistence_imports_no_methodology() -> None:
+    """Persistence stores what the other groups decide; it does not decide anything.
+
+    The direction the layering depends on: ``services.py`` owns the ODI service
+    door, and a repository that reached back into it would make storage and
+    methodology one knot instead of two layers.
+    """
+    methodology = set(CORE_LAYERS["methodology"])
+    breaches: list[tuple[str, str]] = []
+    for module in CORE_LAYERS["persistence"]:
+        path = CORE / f"{module}.py"
+        assert path.is_file(), (
+            f"{path.relative_to(ROOT)} is listed as persistence but does not exist"
+        )
+        for imported in methodology & _imported_core_modules(path):
+            breaches.append((module, imported))
+    assert not breaches, (
+        "persistence imports methodology, which inverts the layering: "
+        + _format({(f"persistence/{m}", f"methodology/{i}") for m, i in breaches})
+        + ". Persistence may hold domain types; it may not call the service door."
+    )
+
+
+def test_every_core_module_is_in_exactly_one_group() -> None:
+    """So a newcomer editing `packages/core` can name the group they are in.
+
+    The four groups are a claim the docs make about the package; this is what
+    keeps the claim current as modules are added and removed. It also refuses an
+    invented file: issue #467 lists `signals` under methodology, and there is no
+    `signals.py` — a signal is a domain type that persistence stores and
+    methodology raises — so a group list copied from the issue would fail here
+    rather than in review.
+    """
+    grouped = [module for group in CORE_LAYERS.values() for module in group]
+    duplicates = sorted({module for module in grouped if grouped.count(module) > 1})
+    real = {path.stem for path in CORE.glob("*.py")} - {"__init__"}
+    ungrouped = sorted(real - set(grouped))
+    invented = sorted(set(grouped) - real)
+    assert not (duplicates or ungrouped or invented), (
+        f"CORE_LAYERS must name every module in {CORE.relative_to(ROOT)} once: "
+        f"in two groups: {_format_names(duplicates)}; in no group: "
+        f"{_format_names(ungrouped)}; not a module: {_format_names(invented)}. "
+        "Edit this list and docs/architecture/README.md together."
+    )
+
+
+def _format_names(names: list[str]) -> str:
+    return ", ".join(names) or "none"

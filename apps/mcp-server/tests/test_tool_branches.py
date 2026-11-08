@@ -10,6 +10,7 @@ from agentic_odi_mcp_server import mcp
 from agentic_odi_mcp_server import mcp_server as server
 from fastmcp import Client
 from mcp.types import TextContent
+from mcp_failures import failure, sentence
 
 
 def _text(result) -> str:
@@ -86,7 +87,9 @@ async def test_add_outcome_rejects_out_of_range_scores() -> None:
             },
         )
 
-    assert _text(result) == ("Error: importance and satisfaction must be between 1.0 and 10.0")
+    text = _text(result)
+    assert failure(text).code.value == "out_of_range"
+    assert sentence(text) == "Error: importance and satisfaction must be between 1.0 and 10.0"
 
 
 @pytest.mark.asyncio
@@ -110,8 +113,9 @@ async def test_add_outcome_rejects_a_skip_without_a_reason() -> None:
         )
 
     text = _text(result)
-    assert text.startswith("Error:")
-    assert "reason" in text
+    assert failure(text).code.value == "validation"
+    assert sentence(text).startswith("Error:")
+    assert "reason" in sentence(text)
 
 
 @pytest.mark.asyncio
@@ -129,7 +133,9 @@ async def test_add_customer_outcome_reports_validation_errors() -> None:
             },
         )
 
-    assert _text(result).startswith("Error: ")
+    text = _text(result)
+    assert failure(text).code.value == "validation"
+    assert sentence(text).startswith("Error: ")
 
 
 @pytest.mark.asyncio
@@ -139,7 +145,9 @@ async def test_update_customer_outcome_reports_missing_ids() -> None:
             "update_customer_outcome", {"outcome_id": "missing", "importance": 9.0}
         )
 
-    assert _text(result) == "Customer outcome not found: missing"
+    text = _text(result)
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Customer outcome not found: missing"
 
 
 @pytest.mark.asyncio
@@ -193,7 +201,9 @@ async def test_update_customer_outcome_reports_validation_errors() -> None:
             {"outcome_id": outcome_id, "category": "not-a-category"},
         )
 
-    assert _text(result).startswith("Error: ")
+    text = _text(result)
+    assert failure(text).code.value == "validation"
+    assert sentence(text).startswith("Error: ")
 
 
 @pytest.mark.asyncio
@@ -201,22 +211,54 @@ async def test_delete_customer_outcome_reports_missing_ids() -> None:
     async with Client(mcp) as client:
         result = await client.call_tool("delete_customer_outcome", {"outcome_id": "missing"})
 
-    assert _text(result) == "Customer outcome not found: missing"
+    text = _text(result)
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Customer outcome not found: missing"
 
 
-def test_main_runs_the_http_transport(monkeypatch) -> None:
+def _capture_uvicorn(monkeypatch) -> list[dict]:
+    """Record what ``server.main`` hands to the server instead of listening.
+
+    Without this the test would bind a real socket and never return, because
+    ``main`` now serves an ASGI app it builds itself.
+    """
     calls: list[dict] = []
-    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(
+        server.uvicorn,
+        "run",
+        lambda app, **kwargs: calls.append({"app": app, **kwargs}),
+    )
+    monkeypatch.setattr(server, "_configured_token", lambda: "test-token")
+    return calls
+
+
+def test_main_serves_the_token_gated_app(monkeypatch) -> None:
+    calls = _capture_uvicorn(monkeypatch)
 
     server.main([])
 
-    assert calls == [{"transport": "http", "port": 8000}]
+    assert calls[0]["host"] == "127.0.0.1"
+    assert calls[0]["port"] == 8000
+    # The gate is the point of the change: an app served without it is not gated.
+    assert isinstance(calls[0]["app"], server._AuthMiddleware)
+    assert calls[0]["app"].token == "test-token"
 
 
 def test_main_passes_an_explicit_port_through(monkeypatch) -> None:
-    calls: list[dict] = []
-    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
+    calls = _capture_uvicorn(monkeypatch)
 
     server.main(["--port", "8010"])
 
-    assert calls == [{"transport": "http", "port": 8010}]
+    assert calls[0]["port"] == 8010
+
+
+@pytest.mark.asyncio
+async def test_open_study_reports_a_missing_job_as_an_envelope() -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "open_study", {"job_id": "missing", "name": "Q3 sweep", "wave": 1}
+        )
+
+    text = _text(result)
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Job not found: missing"

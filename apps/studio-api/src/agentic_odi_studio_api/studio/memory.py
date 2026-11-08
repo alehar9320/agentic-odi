@@ -21,6 +21,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agentic_odi_core.errors import StoreCorrupt
+from agentic_odi_core.integrity import ensure_intact
+
 from agentic_odi_studio_api.studio.claims import (
     Claim,
     EvidenceSnapshot,
@@ -45,6 +48,10 @@ MAX_TEXT = 2_000
 MAX_CONTEXT_TEXT = 500
 MAX_CONTEXT_CHARS = 4_000
 MAX_SUGGESTED_IN_CONTEXT = 10
+
+#: How many threads the history list carries. The switcher's full UI (#408)
+#: owns paging; this slice shows the recent ones and stops.
+MAX_CONVERSATIONS = 20
 
 
 class MemoryError(ValueError):
@@ -192,6 +199,35 @@ class Observation:
         }
 
 
+@dataclass
+class Share:
+    """One scoped, expiring, read-only capability.
+
+    The raw token is never here: only its SHA-256 hash is stored, so a reader of
+    the database cannot reconstruct the link.
+    """
+
+    id: str
+    token_hash: str
+    artifact_kind: str
+    artifact_id: str
+    created_at: str
+    expires_at: str
+    revoked_at: str | None = None
+    last_read_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "artifact_kind": self.artifact_kind,
+            "artifact_id": self.artifact_id,
+            "created_at": self.created_at,
+            "expires_at": self.expires_at,
+            "revoked_at": self.revoked_at,
+            "last_read_at": self.last_read_at,
+        }
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
@@ -237,6 +273,19 @@ CREATE TABLE IF NOT EXISTS observations (
 );
 
 CREATE INDEX IF NOT EXISTS observations_by_status ON observations(status);
+
+CREATE TABLE IF NOT EXISTS shares (
+    id TEXT PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
+    artifact_kind TEXT NOT NULL,
+    artifact_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT,
+    last_read_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS shares_by_hash ON shares(token_hash);
 """
 
 
@@ -308,24 +357,51 @@ class StudioMemory:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._lock = threading.RLock()
+        self._closed = False
         self._connection = sqlite3.connect(
             ":memory:" if self._memory else str(self.db_path),
             check_same_thread=False,
         )
         self._connection.row_factory = sqlite3.Row
-        self._connection.execute("PRAGMA foreign_keys = ON")
-        if not self._memory:
-            self._connection.execute("PRAGMA journal_mode = WAL")
-            # Another process may be mid-write; wait for it briefly rather
-            # than failing the turn with "database is locked".
-            self._connection.execute("PRAGMA busy_timeout = 5000")
-        with self._connection:
-            self._connection.executescript(_SCHEMA)
-            _migrate(self._connection)
+        try:
+            if not self._memory:
+                # Same gate as the ODI store, but a distinct label: losing the
+                # conversation history is recoverable in a way the canvas is
+                # not, and the message should say so.
+                ensure_intact(self._connection, str(self.db_path), label="Your Studio memory")
+            self._connection.execute("PRAGMA foreign_keys = ON")
+            if not self._memory:
+                self._connection.execute("PRAGMA journal_mode = WAL")
+                # Another process may be mid-write; wait for it briefly rather
+                # than failing the turn with "database is locked".
+                self._connection.execute("PRAGMA busy_timeout = 5000")
+            with self._connection:
+                self._connection.executescript(_SCHEMA)
+                _migrate(self._connection)
+        except sqlite3.DatabaseError as exc:
+            self._connection.close()
+            raise StoreCorrupt(str(self.db_path), [str(exc)], label="Your Studio memory") from exc
+        except BaseException:
+            self._connection.close()
+            raise
 
     def close(self) -> None:
         with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            if not self._memory:
+                # Fold the write-ahead log back so a clean stop leaves no
+                # sidecar for the next process to recover.
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             self._connection.close()
+
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """Fold the write-ahead log back into the database file."""
+        with self._lock:
+            if self._memory or self._closed:
+                return
+            self._connection.execute(f"PRAGMA wal_checkpoint({mode})")
 
     # -- conversations -----------------------------------------------------
 
@@ -362,8 +438,13 @@ class StudioMemory:
             ).fetchone()
         return None if row is None else self._conversation_from_row(row)
 
-    def list_conversations(self) -> list[ConversationSummary]:
-        """Every conversation, most recently touched first, with its turn count."""
+    def list_conversations(self, limit: int = MAX_CONVERSATIONS) -> list[ConversationSummary]:
+        """The recent conversations, most recently touched first, with turn counts.
+
+        The title is whatever the first question set; a thread nobody has spoken
+        in yet carries an empty one. No turn bodies are read: the list is metadata
+        and a count, so a history strip never pays for the prose behind it.
+        """
         with self._lock:
             rows = self._connection.execute(
                 """
@@ -374,7 +455,9 @@ class StudioMemory:
                          WHERE turns.conversation_id = conversations.id) AS turn_count
                   FROM conversations
                  ORDER BY conversations.updated_at DESC, conversations.created_at DESC
-                """
+                 LIMIT ?
+                """,
+                (limit,),
             ).fetchall()
         return [
             ConversationSummary(
@@ -677,6 +760,84 @@ class StudioMemory:
             self._connection.execute("DELETE FROM observations")
             self._connection.execute("DELETE FROM conversations")
 
+    # -- shares ------------------------------------------------------------
+
+    def create_share(
+        self,
+        *,
+        token_hash: str,
+        artifact_kind: str,
+        artifact_id: str,
+        expires_at: str,
+    ) -> Share:
+        share = Share(
+            id=f"shr_{uuid.uuid4().hex[:12]}",
+            token_hash=token_hash,
+            artifact_kind=artifact_kind,
+            artifact_id=artifact_id,
+            created_at=_now(),
+            expires_at=expires_at,
+        )
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT INTO shares "
+                "(id, token_hash, artifact_kind, artifact_id, created_at, expires_at, "
+                " revoked_at, last_read_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)",
+                (
+                    share.id,
+                    share.token_hash,
+                    share.artifact_kind,
+                    share.artifact_id,
+                    share.created_at,
+                    share.expires_at,
+                ),
+            )
+        return share
+
+    def get_share(self, share_id: str) -> Share | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM shares WHERE id = ?", (share_id,)
+            ).fetchone()
+        return None if row is None else self._share_from_row(row)
+
+    def get_share_by_token_hash(self, token_hash: str) -> Share | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM shares WHERE token_hash = ?", (token_hash,)
+            ).fetchone()
+        return None if row is None else self._share_from_row(row)
+
+    def list_shares(self) -> list[Share]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM shares ORDER BY created_at DESC, rowid DESC"
+            ).fetchall()
+        return [self._share_from_row(row) for row in rows]
+
+    def revoke_share(self, share_id: str) -> bool:
+        """Set ``revoked_at`` once. Idempotent: a second call changes nothing."""
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "UPDATE shares SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+                (_now(), share_id),
+            )
+            if cursor.rowcount:
+                return True
+            exists = self._connection.execute(
+                "SELECT 1 FROM shares WHERE id = ?", (share_id,)
+            ).fetchone()
+        return exists is not None
+
+    def record_share_read(self, share_id: str) -> None:
+        """Record that the owner's link was read. No reader identity is stored."""
+        with self._lock, self._connection:
+            self._connection.execute(
+                "UPDATE shares SET last_read_at = ? WHERE id = ?",
+                (_now(), share_id),
+            )
+
     # -- prompt context ----------------------------------------------------
 
     def memory_context(self) -> str:
@@ -752,6 +913,20 @@ class StudioMemory:
         )
 
     @staticmethod
+    def _share_from_row(row: sqlite3.Row) -> Share:
+        keys = row.keys()
+        return Share(
+            id=row["id"],
+            token_hash=row["token_hash"],
+            artifact_kind=row["artifact_kind"],
+            artifact_id=row["artifact_id"],
+            created_at=row["created_at"],
+            expires_at=row["expires_at"],
+            revoked_at=row["revoked_at"] if "revoked_at" in keys else None,
+            last_read_at=row["last_read_at"] if "last_read_at" in keys else None,
+        )
+
+    @staticmethod
     def _observation_from_row(row: sqlite3.Row) -> Observation:
         try:
             data = json.loads(row["data"])
@@ -772,6 +947,7 @@ class StudioMemory:
 
 __all__ = [
     "MAX_CONTEXT_CHARS",
+    "MAX_CONVERSATIONS",
     "MAX_SUGGESTED_IN_CONTEXT",
     "OBSERVATION_KINDS",
     "OBSERVATION_STATUSES",
@@ -780,6 +956,7 @@ __all__ = [
     "MemoryError",
     "Observation",
     "ObservationNotFoundError",
+    "Share",
     "StudioMemory",
     "Turn",
     "TurnCitation",
