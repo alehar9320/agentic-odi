@@ -273,6 +273,12 @@ class SQLiteRepository(Repository):
         except ValidationError:
             pass
 
+    def last_event_id(self) -> int:
+        """Rowid of the event most recently applied, 0 before any write."""
+        with self._lock:
+            self._sync()
+            return self._last_event_id
+
     def add_job(self, job: Job) -> Job:
         with self._lock:
             self.store.append(

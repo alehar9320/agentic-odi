@@ -43,6 +43,7 @@ missing.
 | HTTP with retries | `packages/connectors/src/agentic_odi_connectors/http.py` | `urllib.request.urlopen` in `rest/connector.py` and `marketplace.py` |
 | HTTP from the CLI | `httpx` (declared by `apps/cli`) | `urllib.request.urlopen` in `apps/cli/src/agentic_odi_cli/update.py` |
 | ISO-8601 timestamps | `datetime.isoformat()` | `strftime("%Y-%m-%dT%H:%M:%SZ")` in `apps/cli/src/agentic_odi_cli/profile.py` and `apps/cli/src/agentic_odi_cli/flags.py` |
+| Structural rules for artifact HTML | `scripts/artifact_a11y.py` (stdlib `html.parser`, six rules) with its inventory in `scripts/artifact_renderers.py` | none left — the four heading, anchor and decorative-svg regexes in `website/tests/test_site.py` were folded in rather than kept as a second opinion |
 
 These rows are the record of an audit, not a to-do list with a deadline. Fixing them
 is ordinary refactoring, one pull request per concern.
@@ -95,7 +96,8 @@ commit can be re-fetched:
 
 | What copied | Where recorded | Enforced by |
 | --- | --- | --- |
-| Studio UI under `apps/studio/src/vendor` | `apps/studio/vendor.lock.json`, plus a `vendored:` header per file | `apps/studio/src/vendor/ledger.test.ts` |
+| Studio UI under `apps/studio/src/vendor` | `apps/studio/vendor.lock.json`, plus a `vendored:` header per file | `apps/studio/src/vendor/ledger.test.ts` and `tests/scripts/test_vendor_policy.py` |
+| The npm packages those copies depend on | the dependency table in `docs/architecture/vendor.md` | `tests/scripts/test_vendor_policy.py`, which also holds every recorded licence to its SPDX allowlist |
 | Reference prose under `.agents/skills/reuse-first/references` | a `vendored:` HTML header naming upstream, commit, SPDX id, retrieval date, and drift | review, and the re-copy rule in `docs/architecture/vendor.md` |
 | Skills from an upstream pack | `skills-lock.json` | `npx skills update` — never hand-edit this file, and never add a skill to it that upstream does not publish |
 

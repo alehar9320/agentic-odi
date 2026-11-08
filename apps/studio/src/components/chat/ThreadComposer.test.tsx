@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
+import type { StudioCommand } from "../../lib/commands";
 import type { StudioContextValue } from "../../state/StudioContext";
 import type { ChatMessage } from "../../types";
 import { ThreadComposer } from "./ThreadComposer";
@@ -42,14 +43,28 @@ const history: ChatMessage[] = [
   { id: "a-2", parentId: "u-2", role: "assistant", content: "Another answer" },
 ];
 
-function renderComposer(overrides: Record<string, unknown> = {}) {
+function renderComposer(
+  overrides: Record<string, unknown> = {},
+  onCommand: (command: StudioCommand) => void = () => {},
+) {
   vi.mocked(useStudio).mockReturnValue(context(history, overrides));
   render(
     <StudioRuntimeProvider>
-      <ThreadComposer onCommand={() => {}} />
+      <ThreadComposer onCommand={onCommand} />
     </StudioRuntimeProvider>,
   );
   return screen.getByRole("textbox", { name: "Message the studio" }) as HTMLTextAreaElement;
+}
+
+/**
+ * `fireEvent`'s `key` and `isComposing` init both land on the native event, so
+ * this is the same event shape a real input method emits mid-composition.
+ */
+function composingKeyDown(
+  input: HTMLTextAreaElement,
+  init: { key: string; shiftKey?: boolean },
+) {
+  fireEvent.keyDown(input, { ...init, isComposing: true });
 }
 
 function recalls(): string[] {
@@ -113,5 +128,250 @@ describe("ThreadComposer recall", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(sendMessage).toHaveBeenCalledWith("Send this", expect.anything());
+  });
+});
+
+describe("ThreadComposer during IME composition", () => {
+  it("leaves a composing Enter to the input method", () => {
+    const onCommand = vi.fn();
+    const sendMessage = vi.fn(async () => {});
+    const input = renderComposer({ sendMessage }, onCommand);
+
+    fireEvent.change(input, { target: { value: "/" } });
+    composingKeyDown(input, { key: "Enter" });
+
+    expect(onCommand).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(input.value).toBe("/");
+  });
+
+  it("treats the legacy keyCode 229 as composition too", () => {
+    const onCommand = vi.fn();
+    const sendMessage = vi.fn(async () => {});
+    const input = renderComposer({ sendMessage }, onCommand);
+
+    fireEvent.change(input, { target: { value: "/" } });
+    // WebKit can commit a candidate with `isComposing` unset and keyCode 229.
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+
+    expect(onCommand).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(input.value).toBe("/");
+  });
+
+  it("does not move the palette highlight on a composing arrow", () => {
+    const input = renderComposer();
+
+    fireEvent.change(input, { target: { value: "/" } });
+    composingKeyDown(input, { key: "ArrowDown" });
+
+    expect(screen.getAllByRole("option")[0]).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("does not dismiss the palette on a composing Escape", () => {
+    const input = renderComposer();
+
+    fireEvent.change(input, { target: { value: "/" } });
+    composingKeyDown(input, { key: "Escape" });
+
+    expect(screen.getByRole("listbox", { name: "Commands" })).toBeInTheDocument();
+  });
+
+  it("does not recall history on a composing arrow", () => {
+    const input = renderComposer();
+
+    composingKeyDown(input, { key: "ArrowUp" });
+
+    expect(input.value).toBe("");
+    expect(recalls()).toHaveLength(0);
+  });
+
+  it("runs the highlighted command on a plain Enter once composition ends", () => {
+    const onCommand = vi.fn();
+    const input = renderComposer({}, onCommand);
+
+    fireEvent.change(input, { target: { value: "/status" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "status" }));
+  });
+
+  it("moves the highlight and closes on plain arrows and Escape", () => {
+    const input = renderComposer();
+
+    fireEvent.change(input, { target: { value: "/" } });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(screen.getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("keeps Shift+Enter a newline and still sends a plain Enter", () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = renderComposer({ sendMessage });
+
+    fireEvent.change(input, { target: { value: "Send this" } });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(sendMessage).toHaveBeenCalledWith("Send this", expect.anything());
+  });
+});
+
+describe("ThreadComposer focus chip", () => {
+  const statement = "Reduce the time to reconcile a failed payment";
+  const focusedSubject = { kind: "outcome", id: "O-9" };
+
+  function withFocus(overrides: Record<string, unknown> = {}) {
+    renderComposer({ focusedSubject, focusedSubjectLabel: statement, ...overrides });
+  }
+
+  it("admits which record the agent was told about", () => {
+    withFocus();
+
+    expect(screen.getByRole("button", { name: `Looking at: ${statement}` })).toBeTruthy();
+  });
+
+  it("announces the focus to a screen reader", () => {
+    withFocus();
+
+    const announced = screen
+      .getAllByRole("status")
+      .some((region) => (region.textContent ?? "").includes(statement));
+    expect(announced).toBe(true);
+  });
+
+  it("says nothing when the screen has selected nothing", () => {
+    renderComposer();
+
+    expect(screen.queryByRole("button", { name: /Looking at/ })).toBeNull();
+  });
+
+  it("says nothing about a selection the canvas cannot name", () => {
+    renderComposer({ focusedSubject, focusedSubjectLabel: null });
+
+    expect(screen.queryByRole("button", { name: /Looking at/ })).toBeNull();
+  });
+
+  it("takes the person to the record when they press the chip", () => {
+    const revealFocusedSubject = vi.fn();
+    withFocus({ revealFocusedSubject });
+
+    fireEvent.click(screen.getByRole("button", { name: `Looking at: ${statement}` }));
+
+    expect(revealFocusedSubject).toHaveBeenCalledOnce();
+  });
+
+  it("stops speaking for the screen when the person clears it", () => {
+    const clearFocus = vi.fn();
+    withFocus({ clearFocus });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Stop telling the agent what you are looking at" }),
+    );
+
+    expect(clearFocus).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ThreadComposer mixed clipboard paste", () => {
+  const draft = "first line\nsecond line";
+
+  /**
+   * jsdom performs no clipboard default action, so the test supplies the one a
+   * browser would: when the composer leaves the paste unprevented, the text is
+   * inserted at the caret and the input event the app listens for is fired.
+   */
+  function paste(
+    input: HTMLTextAreaElement,
+    { text, files }: { text?: string; files?: File[] },
+  ): boolean {
+    const clipboardData = {
+      files: files ?? [],
+      getData: (type: string) => (type === "text/plain" ? (text ?? "") : ""),
+    };
+    const notPrevented = fireEvent.paste(input, { clipboardData });
+    if (notPrevented && text) {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      const next = input.value.slice(0, start) + text + input.value.slice(end);
+      fireEvent.change(input, { target: { value: next } });
+    }
+    return notPrevented;
+  }
+
+  it("keeps the pasted text when the clipboard also carries an image", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = renderComposer({ sendMessage });
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+    const image = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    const notPrevented = paste(input, { text: "inserted", files: [image] });
+
+    expect(notPrevented).toBe(true);
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("inserts text-only paste once and attaches nothing", () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+
+    paste(input, { text: "inserted" });
+
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(screen.queryByRole("listitem")).toBeNull();
+  });
+
+  it("attaches an image-only paste and inserts no text", async () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+    const image = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    const notPrevented = paste(input, { files: [image] });
+
+    expect(notPrevented).toBe(false);
+    expect(input.value).toBe(draft);
+    expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
+  });
+
+  it("keeps the text and still names a refused file", () => {
+    const pushToast = vi.fn();
+    const input = renderComposer({ pushToast });
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+    const pdf = new File(["x"], "deck.pdf", { type: "application/pdf" });
+
+    paste(input, { text: "inserted", files: [pdf] });
+
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("deck.pdf"));
+    expect(screen.queryByText("deck.pdf")).toBeNull();
+  });
+
+  it("inserts multiline unicode text verbatim", () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: "α β" } });
+    input.setSelectionRange(3, 3);
+
+    paste(input, { text: "héllo\nwörld" });
+
+    expect(input.value).toBe("α βhéllo\nwörld");
+  });
+
+  it("never sends the turn from a paste", () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = renderComposer({ sendMessage });
+    const image = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    paste(input, { text: "inserted", files: [image] });
+
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });

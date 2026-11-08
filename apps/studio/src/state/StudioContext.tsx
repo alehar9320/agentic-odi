@@ -16,6 +16,7 @@ import type {
   MessageQueueController,
 } from "@assistant-ui/react";
 
+import { focusLabel, focusPointer } from "../lib/focus";
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -67,7 +68,8 @@ import { textOf } from "../assistant/convert";
 import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
-import { loadSession, saveSession, type StudioSession } from "../lib/session";
+import { deriveDeviceStatus, type DeviceStatus } from "./deviceStatus";
+import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -85,6 +87,7 @@ import type {
   ConnectorSuggestion,
   ConversationSummary,
   CustomizeTarget,
+  FocusSubject,
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
@@ -265,7 +268,37 @@ export interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
+  /** One-off callback, for a toast that can hand back what it just took. */
+  action?: { label: string; run: () => void };
+  /** How long the toast stays up. Defaults to six seconds. */
+  durationMs?: number;
 }
+
+/**
+ * What `startNewThread()` hands back: the snapshot lives in a ref, so the only
+ * way to reach it is through the handle that took it.
+ */
+export interface NewThreadHandle {
+  undo: () => void;
+  commit: () => void;
+}
+
+interface ThreadSnapshot {
+  messages: ChatMessage[];
+  conversationId: string | null;
+  toolActivity: ToolActivity[];
+  offlineReplyFor: string | null;
+  scrollTop: number;
+  undoToastId: number;
+}
+
+/**
+ * The thread's scroll box, owned by the assistant-ui viewport primitive in
+ * `ChatStage`. Undo restores a transcript the way the person left it, and the
+ * reading position is part of what they left; the store has no other handle on
+ * it, so the snapshot reaches for the one element the thread scrolls in.
+ */
+const THREAD_VIEWPORT_SELECTOR = ".chat__scroll";
 
 export interface ToolActivity {
   name: string;
@@ -328,6 +361,7 @@ export interface StudioContextValue {
   messages: ChatMessage[];
   streaming: boolean;
   thinkingPhase: string | null;
+  toolActivity: ToolActivity[];
   /**
    * Enter a turn through the follow-up queue (#410): idle, it starts now;
    * mid-run, it waits its turn. The promise settles when the send is accepted,
@@ -350,6 +384,12 @@ export interface StudioContextValue {
    */
   queue: ExternalThreadQueueAdapter | null;
   clearChat: () => void;
+  /**
+   * Leave this thread behind without deleting it. Returns null when there is
+   * nothing to leave, or when a reply is still coming and `stop` was not given
+   * — the caller asks first.
+   */
+  startNewThread: (options?: { stop?: boolean }) => NewThreadHandle | null;
   conversationId: string | null;
   /** The recent threads, newest first, as the history list shows them. */
   conversations: ConversationSummary[];
@@ -403,7 +443,11 @@ export interface StudioContextValue {
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
   toasts: Toast[];
-  pushToast: (kind: ToastKind, message: string) => void;
+  pushToast: (
+    kind: ToastKind,
+    message: string,
+    options?: { action?: { label: string; run: () => void }; durationMs?: number },
+  ) => number;
   dismissToast: (id: number) => void;
   connectors: ConnectorListItem[];
   presets: ConnectorPreset[];
@@ -413,6 +457,8 @@ export interface StudioContextValue {
   connectorsError: StudioError | null;
   /** Probed availability of local and sidecar capabilities. */
   capabilities: Capability[];
+  /** One answer for what works here, derived from `capabilities`. */
+  deviceStatus: DeviceStatus;
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
   refreshCapabilities: () => Promise<void>;
@@ -455,7 +501,13 @@ export interface StudioContextValue {
   focusSignalSubject: (signal: Signal) => void;
   /** Point the studio at a subject and remember it for the next visit. */
   focusSubject: (kind: SignalSubjectKind, id: string) => void;
-  focusedSubject: { kind: SignalSubjectKind; id: string } | null;
+  /** Stop speaking for the screen: forget the selection and the next visit's. */
+  clearFocus: () => void;
+  focusedSubject: FocusSubject | null;
+  /** What the snapshot calls the focused record, or null when it cannot name it. */
+  focusedSubjectLabel: string | null;
+  /** Open the lens that holds the focused record, so the person can check it. */
+  revealFocusedSubject: () => void;
   /** The job that owns the focused subject, so canvas panels can select it. */
   focusedJobId: string | null;
   /** Stage 5: the segments the scored outcomes support, read from the store. */
@@ -483,7 +535,7 @@ function loadSettings(): StudioConfig {
   return EMPTY_CONFIG;
 }
 
-function loadFocusedSubject(): { kind: SignalSubjectKind; id: string } | null {
+function loadFocusedSubject(): FocusSubject | null {
   const session = loadSession();
   if (!session) {
     return null;
@@ -618,6 +670,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [presetError, setPresetError] = useState<StudioError | null>(null);
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [capabilitiesCheckedAt, setCapabilitiesCheckedAt] = useState<string | null>(null);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [serverSignals, setServerSignals] = useState<Signal[]>([]);
   const [unreadSignalCount, setUnreadSignalCount] = useState(0);
@@ -625,10 +678,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [strategy, setStrategy] = useState<Strategy | null>(null);
   const [segmentsError, setSegmentsError] = useState<StudioError | null>(null);
-  const [focusedSubject, setFocusedSubject] = useState<{
-    kind: SignalSubjectKind;
-    id: string;
-  } | null>(loadFocusedSubject);
+  const [focusedSubject, setFocusedSubject] = useState<FocusSubject | null>(loadFocusedSubject);
   const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
@@ -728,17 +778,124 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
 
-  const pushToast = useCallback((kind: ToastKind, message: string) => {
-    const id = (toastId.current += 1);
-    setToasts((prev) => [...prev, { id, kind, message }]);
-    window.setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 6000);
-  }, []);
+  const pushToast = useCallback(
+    (
+      kind: ToastKind,
+      message: string,
+      options?: { action?: { label: string; run: () => void }; durationMs?: number },
+    ) => {
+      const id = (toastId.current += 1);
+      setToasts((prev) => [
+        ...prev,
+        {
+          id,
+          kind,
+          message,
+          ...(options?.action ? { action: options.action } : {}),
+          ...(options?.durationMs ? { durationMs: options.durationMs } : {}),
+        },
+      ]);
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((toast) => toast.id !== id));
+      }, options?.durationMs ?? 6000);
+      return id;
+    },
+    [],
+  );
 
   const dismissToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
+
+  const threadSnapshot = useRef<ThreadSnapshot | null>(null);
+
+  /** Put the thread back exactly as the snapshot left it, and stop offering Undo. */
+  const undoNewThread = useCallback(() => {
+    const snapshot = threadSnapshot.current;
+    if (!snapshot) {
+      return;
+    }
+    threadSnapshot.current = null;
+    dismissToast(snapshot.undoToastId);
+    setMessages(snapshot.messages);
+    setConversationId(snapshot.conversationId);
+    setToolActivity(snapshot.toolActivity);
+    setOfflineReplyFor(snapshot.offlineReplyFor);
+    const viewport = document.querySelector<HTMLElement>(THREAD_VIEWPORT_SELECTOR);
+    if (viewport) {
+      viewport.scrollTop = snapshot.scrollTop;
+    }
+  }, [dismissToast]);
+
+  /**
+   * The new thread is in use, so the snapshot is stale. Handing it back now
+   * would splice two threads together, which is worse than no Undo at all.
+   */
+  const commitNewThread = useCallback(() => {
+    const snapshot = threadSnapshot.current;
+    if (!snapshot) {
+      return;
+    }
+    threadSnapshot.current = null;
+    dismissToast(snapshot.undoToastId);
+    pushToast("info", "New thread started.");
+  }, [dismissToast, pushToast]);
+
+  const startNewThread = useCallback(
+    (options?: { stop?: boolean }) => {
+      if (streaming) {
+        if (!options?.stop) {
+          return null;
+        }
+      } else if (messages.length === 0) {
+        return null;
+      }
+
+      const viewport = document.querySelector<HTMLElement>(THREAD_VIEWPORT_SELECTOR);
+      threadSnapshot.current = {
+        messages,
+        conversationId,
+        toolActivity,
+        offlineReplyFor,
+        scrollTop: viewport?.scrollTop ?? 0,
+        undoToastId: 0,
+      };
+
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setMessages([]);
+      setToolActivity([]);
+      setStreaming(false);
+      setThinkingPhase(null);
+      setOfflineReplyFor(null);
+      // Not `apiCreateConversation`: the sidecar names the conversation on the
+      // `conversation` frame of the first reply, so a thread nobody wrote to
+      // never becomes a row in the store — and never becomes what boot restores.
+      setConversationId(null);
+
+      const handle: NewThreadHandle = { undo: undoNewThread, commit: commitNewThread };
+      threadSnapshot.current.undoToastId = pushToast(
+        "success",
+        "New thread. Your last one is still saved.",
+        {
+          durationMs: 10_000,
+          action: { label: "Undo", run: () => handle.undo() },
+        },
+      );
+      return handle;
+    },
+    [
+      streaming,
+      messages,
+      conversationId,
+      toolActivity,
+      offlineReplyFor,
+      pushToast,
+      undoNewThread,
+      commitNewThread,
+    ],
+  );
+
 
   const dismissConnectorSuggestion = useCallback((preset: string) => {
     setConnectorSuggestions((prev) => prev.filter((s) => s !== preset));
@@ -770,6 +927,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const refreshCapabilities = useCallback(async () => {
     try {
       setCapabilities(await capabilityRegistry.statuses(settings));
+      setCapabilitiesCheckedAt(new Date().toISOString());
     } catch {
       /* Capability probes are advisory; a probe failure leaves the list empty. */
       setCapabilities([]);
@@ -917,11 +1075,33 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   // The theme lives on <html> so every surface, portal, and native control
   // follows one class instead of each component tracking its own copy.
+  const appliedTheme = useRef<StudioTheme | null>(null);
   useEffect(() => {
     const root = document.documentElement;
+    const previous = appliedTheme.current;
+    appliedTheme.current = theme;
     root.classList.toggle("theme-light", theme === "light");
     root.classList.toggle("theme-dark", theme === "dark");
     root.style.colorScheme = theme;
+
+    // Only a change the person made cross-fades; the first paint is already the
+    // right colour (see index.html). Reduced motion swaps instantly, and the
+    // stylesheet's own reduce rule shortens the fade if it somehow runs.
+    if (previous === null || previous === theme) {
+      return;
+    }
+    const reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      return;
+    }
+    root.classList.add("theme-fading");
+    const timer = window.setTimeout(() => root.classList.remove("theme-fading"), 140);
+    return () => {
+      window.clearTimeout(timer);
+      root.classList.remove("theme-fading");
+    };
   }, [theme]);
 
   const saveSettings = useCallback((config: StudioConfig) => {
@@ -1284,6 +1464,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Stop speaking for the screen. The session slot goes with the selection, so a
+   * reload cannot resurrect a focus the person just dismissed.
+   */
+  const clearFocus = useCallback(() => {
+    setFocusedSubject(null);
+    clearSession();
+  }, []);
+
+  /**
    * What a card does when activated: read the signal, then take the person to
    * the record it names. This is the job `targetId` never did.
    */
@@ -1316,6 +1505,35 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       openPanel("evidence");
     },
     [openPanel],
+  );
+
+  /**
+   * Where the chip's promise came from: open the lens holding the record the
+   * agent was told about, so the person can go read it instead of taking the
+   * composer's word for it.
+   */
+  const revealFocusedSubject = useCallback(() => {
+    if (!focusedSubject) {
+      return;
+    }
+    if (focusedSubject.kind === "evidence") {
+      focusEvidence(focusedSubject.id);
+      return;
+    }
+    const panel = PANEL_FOR_SUBJECT[focusedSubject.kind];
+    if (panel) {
+      openPanel(panel);
+    }
+  }, [focusedSubject, focusEvidence, openPanel]);
+
+  /**
+   * What the snapshot calls the focused record, or null when it holds no such
+   * record. The composer chip renders on this, never on the raw selection: an
+   * indicator the canvas cannot name would claim a fact the store never said.
+   */
+  const focusedSubjectLabel = useMemo(
+    () => focusLabel(canvasState.data, focusedSubject),
+    [canvasState.data, focusedSubject],
   );
 
   /** The job owning the focused subject, so canvas panels can select it. */
@@ -1417,6 +1635,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       // because a background probe once said "down" is what made a working studio
       // look broken before the person had done anything.
       cancelScheduledProbes();
+      // Writing here is the proof the new thread was wanted: Undo is spent.
+      commitNewThread();
 
       const userMessage: ChatMessage = existingUserMessage ?? {
         id: crypto.randomUUID(),
@@ -1733,6 +1953,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             attachments,
             approvals: true,
             assistant_id: assistantId,
+            focus: focusPointer(focusedSubject),
           },
           handleEvent,
           controller.signal,
@@ -1785,10 +2006,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       settings,
       brief,
       conversationId,
+      focusedSubject,
       refreshCanvas,
       refreshConnectors,
       refreshConversations,
       cancelScheduledProbes,
+      commitNewThread,
     ],
   );
 
@@ -2223,6 +2446,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     refreshMemory,
   ]);
 
+  const deviceStatus = useMemo(
+    () => deriveDeviceStatus(capabilities, capabilitiesCheckedAt),
+    [capabilities, capabilitiesCheckedAt],
+  );
+
   const value = useMemo<StudioContextValue>(
     () => ({
       settings,
@@ -2266,6 +2494,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       stopStreaming,
       queue: turnQueue?.adapter ?? null,
       clearChat,
+      startNewThread,
       conversationId,
       conversations,
       refreshConversations,
@@ -2300,6 +2529,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       connectors,
       connectorsError,
       capabilities,
+      deviceStatus,
       presets,
       presetError,
       refreshConnectors,
@@ -2334,7 +2564,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSignal,
       focusSignalSubject,
       focusSubject,
+      clearFocus,
       focusedSubject,
+      focusedSubjectLabel,
+      revealFocusedSubject,
       focusedJobId,
       segments,
       strategy,
@@ -2385,6 +2618,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       stopStreaming,
       turnQueue,
       clearChat,
+      startNewThread,
       conversationId,
       conversations,
       refreshConversations,
@@ -2419,6 +2653,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       connectors,
       connectorsError,
       capabilities,
+      deviceStatus,
       presets,
       presetError,
       refreshConnectors,
@@ -2453,7 +2688,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       dismissSignal,
       focusSignalSubject,
       focusSubject,
+      clearFocus,
       focusedSubject,
+      focusedSubjectLabel,
+      revealFocusedSubject,
       focusedJobId,
       segments,
       strategy,

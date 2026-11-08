@@ -29,3 +29,23 @@ export function detectPlatform(userAgent?: string): DesktopPlatform {
 export function installAfterDownload(platform: DesktopPlatform): boolean {
   return platform !== "windows";
 }
+
+/**
+ * The keycaps the person's own keyboard prints.
+ *
+ * macOS writes modifiers and Enter as symbols; Windows and Linux spell them
+ * out. The label comes from here rather than from a branch in JSX, so the hint
+ * cannot drift from the shortcuts the shell actually implements.
+ */
+export interface ShortcutLabels {
+  /** Focus the composer from anywhere. */
+  focus: string;
+  /** Send the drafted message. */
+  send: string;
+}
+
+export function shortcutLabels(platform: DesktopPlatform): ShortcutLabels {
+  return platform === "macos"
+    ? { focus: "⌘K", send: "↵" }
+    : { focus: "Ctrl K", send: "Enter" };
+}

@@ -56,6 +56,35 @@ html.theme-light {
   --surface-hover: rgba(15, 23, 42, 0.07);
 }
 
+/* More contrast: muted text climbs one step, hairlines thicken, and the
+   accent keeps its 3:1 focus ring. Both themes are named inside the query so
+   the light values are not shadowed by their earlier declaration. */
+@media (prefers-contrast: more) {
+  :root {
+    --muted: #c6cad3;
+    --faint: #adb2bf;
+    --line: rgba(255, 255, 255, 0.16);
+    --line-strong: rgba(255, 255, 255, 0.3);
+  }
+
+  html.theme-light {
+    --muted: #3a4050;
+    --faint: #454c5c;
+    --line: rgba(15, 23, 42, 0.22);
+    --line-strong: rgba(15, 23, 42, 0.4);
+  }
+
+  .bar,
+  .banner,
+  .outcome-card,
+  .settings-drawer,
+  .changelog-modal,
+  .diagnostics-modal,
+  .studio-metric {
+    border-width: 1.5px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -219,6 +248,87 @@ a {
 
 .bar__menu {
   position: relative;
+}
+
+/* The bar's new-thread control: a plus that says what it does, an ask that
+ * only interrupts while a reply is in the air, and a reason when there is
+ * nothing to leave. */
+.bar__new-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.bar__new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+}
+
+.bar__new:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.bar__new:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bar__new-ask {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.bar__new-ask p {
+  margin: 0;
+  color: var(--text);
+}
+
+.bar__new-choice {
+  padding: 5px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.bar__new-choice:hover {
+  background: var(--surface-hover);
+}
+
+.bar__new-choice--stop {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-contrast, var(--text));
 }
 
 .bar__menu-list {
@@ -731,6 +841,7 @@ a {
 
 .composer__send:focus-visible,
 .composer__suggestion:focus-visible,
+.composer__focus-chip:focus-visible,
 .palette__item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
@@ -951,6 +1062,46 @@ a {
 
 .composer__mic.is-listening {
   color: var(--accent);
+}
+
+/* What the agent was told about the screen. Quiet on purpose — this row is an
+   admission the person can check and take back, not something to act on. A
+   stored statement runs long, so the chip truncates rather than shoving the
+   composer off the screen. */
+.composer__focus {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0 0 6px;
+  padding: 0 4px;
+}
+
+.composer__focus-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.composer__focus-chip:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.composer__focus-chip span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 52ch;
 }
 
 /* A quoted passage sits above the input, verbatim and removable. */
@@ -1200,6 +1351,28 @@ a {
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* A pasted document is a message, not the screen: eight lines, a fade, and one
+   control that says there is more (#696). */
+.message--user .message__bubble.is-clamped {
+  position: relative;
+  max-height: 12.8em;
+  overflow: hidden;
+}
+
+.message--user .message__bubble.is-clamped::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2.4em;
+  background: linear-gradient(to bottom, transparent, var(--surface-hover));
+  pointer-events: none;
+}
+
+.message__more {
+  margin-top: 4px;
 }
 
 /* Editing a question happens in the bubble it was asked in. */
@@ -1753,6 +1926,54 @@ a {
 .card__meta b {
   color: var(--muted);
   font-weight: 600;
+}
+
+/* The interview behind the number. Verified reads as settled; an unverified
+   score is dashed and amber, so a guess never borrows a measured claim's look. */
+.claim-check {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.claim-check--unverified {
+  border-left-style: dashed;
+}
+
+.claim-check__head {
+  margin: 0 0 4px;
+}
+
+.claim-check__head b {
+  color: var(--muted);
+}
+
+.claim-check--unverified .claim-check__head b {
+  color: var(--amber);
+}
+
+.claim-check__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.claim-check__group {
+  margin-top: 4px;
+  color: var(--faint);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.claim-check__item em {
+  display: block;
+  color: var(--faint);
+  font-style: normal;
 }
 
 .card__evidence {
@@ -3011,6 +3232,18 @@ button.message__tag:hover {
   }
 }
 
+/* StudioContext holds this class for one theme change only, so the tokens
+   cross-fade for 120ms instead of snapping. Reduced motion never adds it, and
+   the global reduce rule shortens it if it runs anyway. */
+html.theme-fading,
+html.theme-fading *,
+html.theme-fading *::before,
+html.theme-fading *::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 120ms;
+  transition-timing-function: linear;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -3805,6 +4038,93 @@ button.message__tag:hover {
   color: #e2e8f0;
 }
 
+/* Segment member outcomes: one row per outcome, each a way into the landscape. */
+.ui-members {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-members__label {
+  margin: 0;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--studio-muted);
+}
+
+.ui-members__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ui-member {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ui-member:hover,
+.ui-member:focus-visible {
+  background: rgba(129, 140, 248, 0.12);
+  border-color: rgba(129, 140, 248, 0.4);
+}
+
+.ui-member__id {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--studio-indigo);
+}
+
+.ui-member__statement {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.84rem;
+  color: var(--studio-text);
+}
+
+.ui-member__score {
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--studio-muted);
+}
+
+.ui-member__score--underserved {
+  color: var(--studio-amber);
+}
+
+.ui-members__mean {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--studio-text);
+}
+
+/* Where the segment's people came from: candidate or named. */
+.ui-basis {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--studio-muted);
+}
+
 /* Segment and strategy cards */
 .ui-bets {
   margin: 10px 0 0;
@@ -4221,6 +4541,48 @@ button.message__tag:hover {
   -webkit-backdrop-filter: blur(12px) saturate(160%);
 }
 
+/* ------------------------------------------------------------------ */
+/* Preferences owned by the operating system                           */
+/* ------------------------------------------------------------------ */
+
+/* Reduced transparency: the glass becomes a surface. Every blur is removed
+   and the overlay scrims go opaque, so text never sits on moving wallpaper. */
+@media (prefers-reduced-transparency: reduce) {
+  .scrim,
+  .bar,
+  .outcome-card,
+  .settings-drawer,
+  .banner,
+  .changelog-modal,
+  .changelog-overlay,
+  .diagnostics-overlay,
+  .suggestion-modal,
+  .catchup-summary,
+  .studio-metric {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .bar,
+  .outcome-card,
+  .settings-drawer,
+  .banner,
+  .changelog-modal,
+  .catchup-summary,
+  .studio-metric {
+    background-color: var(--bg-raised);
+  }
+
+  .changelog-overlay,
+  .diagnostics-overlay,
+  .suggestion-modal,
+  .scrim {
+    background-color: var(--bg);
+  }
+}
+
+
+
 /* 2. Apple-style range slider dynamics */
 input[type="range"] {
   -webkit-appearance: none;
@@ -4275,14 +4637,17 @@ details[open] summary {
 }
 
 /* 6. Live status pill dot pulse indicator */
-.studio-pill::before,
-.status-dot::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+
+/* A pill is a label, not an indicator: no pseudo-element here, or the label
+ * grows a dot it never asked for. */
+.studio-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 @keyframes pill-dot-pulse {
@@ -4294,12 +4659,6 @@ details[open] summary {
     opacity: 0.4;
     transform: scale(0.75);
   }
-}
-
-.pill-green::before,
-.pill-amber::before,
-.pill-blue::before {
-  animation: pill-dot-pulse 2s ease-in-out infinite;
 }
 
 /* 16. Evidence stream signal pulse */
@@ -4457,6 +4816,7 @@ details[open] summary {
 }
 
 .status-dot {
+  display: inline-block;
   width: 7px;
   height: 7px;
   flex: none;
@@ -4473,6 +4833,14 @@ details[open] summary {
 .status-dot.is-unknown {
   background: #5b616c;
   box-shadow: none;
+}
+
+/* Forced-colors mode suppresses backgrounds, so the disc would vanish; a ring
+ * keeps the state visible without adding a second dot. */
+@media (forced-colors: active) {
+  .status-dot {
+    border: 1px solid CanvasText;
+  }
 }
 
 .bar__bell {
@@ -4521,6 +4889,7 @@ details[open] summary {
 }
 
 .rail__chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -4552,6 +4921,25 @@ details[open] summary {
 .rail__icon {
   display: inline-flex;
   opacity: 0.8;
+}
+
+/* What a chip opens, said on hover and on focus, not in an empty title (#696). */
+.rail__tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
 }
 
 .rail__count {
@@ -4922,6 +5310,74 @@ details[open] summary {
 }
 
 .reasoning__body[hidden] {
+  display: none;
+}
+
+/* The run row: one line for the thinking and the calls a turn did. It is the
+   same quiet card as the thought process inside it — the answer stays the loud
+   thing — and it carries no animation of its own, so a reader who asked for
+   reduced motion gets the same row they always did. */
+.work-block {
+  margin: 2px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+  overflow: hidden;
+}
+
+.work-block.is-running {
+  border-color: rgba(139, 140, 248, 0.26);
+}
+
+.work-block__trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.work-block__trigger:hover {
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+}
+
+.work-block__chevron {
+  margin-left: auto;
+  transition: transform 0.16s ease;
+}
+
+.work-block__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* The calls keep their own rows inside here; the card is the fold, not a new
+   skin on them. */
+.work-block__body {
+  padding: 0 14px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.work-block__body .reasoning {
+  margin: 10px 0 0;
+  border: 0;
+  background: transparent;
+}
+
+.work-block__body .reasoning__body {
+  padding: 8px 2px 4px;
+  border-top: 0;
+}
+
+.work-block__body[hidden] {
   display: none;
 }
 
@@ -5441,7 +5897,8 @@ details[open] summary {
 .quiet-action:focus-visible,
 .branch-picker__step:focus-visible,
 .attachment-chip__remove:focus-visible,
-.reasoning__summary:focus-visible {
+.reasoning__summary:focus-visible,
+.work-block__trigger:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -6340,6 +6797,21 @@ details[open] summary {
   cursor: pointer;
 }
 
+.update-settings__log {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.update-settings__log-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+}
+
 .update-settings__toggle input {
   accent-color: var(--accent);
 }
@@ -6655,4 +7127,300 @@ details[open] summary {
   gap: 12px;
   padding: 16px 24px 20px;
   border-top: 1px solid var(--studio-border);
+}
+/* ------------------------------------------------------------------ */
+/* Sharing: the sheet that mints a link, and the page it opens        */
+/* ------------------------------------------------------------------ */
+
+/* The share control sits in the landscape header beside the view switch. */
+.share-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.share-action__reason {
+  margin: 0;
+  max-width: 260px;
+  text-align: right;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.share-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(11, 13, 19, 0.7);
+  backdrop-filter: blur(10px);
+}
+
+.share-sheet__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(26, 32, 48, 0.96), rgba(15, 20, 32, 0.98));
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55);
+}
+
+.share-sheet__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  padding: 5px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.share-sheet__close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.share-sheet__title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 620;
+}
+
+.share-sheet__body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.share-sheet__error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 9px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--studio-red);
+  font-size: 0.78rem;
+}
+
+.share-sheet__result,
+.share-sheet__create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.share-sheet__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.share-sheet__field .select {
+  width: auto;
+}
+
+.share-sheet__primary {
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
+.share-sheet__note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+/* The read-only page. No chrome, no navigation: one artifact and its expiry. */
+.shared-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 720px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.shared-page__status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.shared-page__head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.shared-page__eyebrow {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shared-page__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.shared-page__expiry {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.shared-page__sample {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(240, 179, 74, 0.3);
+  border-radius: 10px;
+  background: rgba(240, 179, 74, 0.08);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.shared-page__sample strong {
+  color: var(--amber);
+}
+
+.shared-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shared-section__title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.shared-page__empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.82rem;
+}
+
+.shared-outcomes,
+.shared-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shared-outcome,
+.shared-evidence__item {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.shared-outcome--hot {
+  border-color: rgba(240, 179, 74, 0.28);
+  background: rgba(240, 179, 74, 0.045);
+}
+
+.shared-outcome__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shared-outcome__id {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.shared-outcome__statement {
+  margin: 8px 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.shared-outcome__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.shared-outcome__meta b {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.shared-evidence__name {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.shared-evidence__content {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.shared-vision {
+  margin: 0;
+  padding-left: 16px;
+  border-left: 3px solid var(--accent);
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+/* Selection and the caret carry the brand instead of the browser default. */
+::selection {
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
+  color: var(--text);
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: var(--accent);
 }

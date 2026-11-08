@@ -164,6 +164,11 @@ agentic-odi desired-outcomes undo <token>
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
 agentic-odi summary <job-id> --top 3 --json
+
+# Onboarding funnel: launch, first message, first outcome, first score, return
+agentic-odi stats
+agentic-odi stats --json
+agentic-odi stats --reset --yes
 ```
 
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
@@ -174,7 +179,9 @@ collected — `asked`, `answers`, and `skips` (each skip needs a reason). Omit i
 and the score is recorded as unverified, saying no customer questions were
 asked, so a by-hand score is never mistaken for an interrogated one. The MCP
 `add_outcome` tool is stricter: it refuses a score with no `claim_check` at all,
-and a score with no numbers is always legal.
+and a score with no numbers is always legal. Its description puts the interview
+first — three questions to the customer before any number, and their replies as
+the answers.
 
 Job names are validated by the core model: 3–64 characters drawn from letters,
 digits, spaces, underscores, and hyphens. Descriptions may be up to 500
