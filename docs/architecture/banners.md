@@ -87,17 +87,37 @@ thing, and the system stays legible because it does not absorb everything.
   off `navigator.onLine`. While the browser is offline it is the only strip: the
   `sidecar-down` and `model-offline` kinds are held back, because their copy and
   their Recheck action assume a network. Each resumes when the connection does.
+- The `app-update-ready` kind (#545) is raised from `BannerBridge` off
+  `src/lib/swUpdate.ts` when a new service worker is staged. It is held back while
+  a turn is streaming, so the reload it offers can never land under a reply that
+  is still arriving, and its one action is an explicit reload — never automatic.
 
 ## The offline page and the worker
 
-`offline.html` (in `public/`) is the one page the service worker serves for a
-navigation it cannot answer, so the `offline` kind above is the in-app half of the
-same story. `src/sw.ts` owns the fallback and answers `/api/**` with nothing at
-all; `src/lib/swRouting.ts` holds the routing rules and `respondToNavigation` so
-both are unit-testable without a service-worker global. The shell precache and
-cache-first asset rules are #545's work, not this worker's.
+`src/sw.ts` (built to `dist/sw.js`) is the offline shell. It precaches the files
+the app build emitted — `index.html`, the hashed JS and CSS, the icons, the
+manifest, and `/offline.html` — under one `studio-shell-<version>` cache, so the
+installed app **opens with no network** and renders from cache (#545).
+
+A navigation is answered network-first, and the cached shell answers when the
+network cannot, in three seconds. `offline.html` (in `public/`) is the last
+resort: it is served only when the shell cache was evicted, so the `offline` kind
+above is the in-app half of the same story. `/api/**` is passed straight through
+and never cached — a cached canvas response would defeat the BFF's fallback — and
+`src/lib/swRouting.ts` holds the routing rules, the cache-name rule, and the
+handlers so all of it is unit-testable without a service-worker global.
+
+A new build gets a new cache name, so `activate` retires the old cache, but the
+waiting worker is left alone: `src/lib/swUpdate.ts` watches for it and raises the
+`app-update-ready` banner, and only a person's click sends `SKIP_WAITING` and
+reloads. An update therefore never swaps code under a streamed turn.
 
 ## Verification
 
 - Unit tests: `npm test -- banners` (store rules, provider, stack, bridge, toasts).
+- Worker tests: `npm test -- swRouting swUpdate` (routing, precache, the update
+  handshake).
+- Browser tests: `npm run test:e2e -- no-sidecar/offline.spec.ts` (shell from
+  cache with no network, `offline.html` only on an evicted cache, the API never
+  cached, and one update offer that never reloads on its own).
 - Visual snapshots: `npm run test:visual` — one snapshot per severity and dock.
