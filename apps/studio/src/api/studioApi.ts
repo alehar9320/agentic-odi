@@ -976,11 +976,6 @@ export async function getStorageFacts(): Promise<StorageFacts> {
   };
 }
 
-export async function exportWorkspace(): Promise<string> {
-  const bff = await getStudioBff();
-  return bff.exportWorkspace();
-}
-
 export async function importWorkspace(json: string): Promise<void> {
   const bff = await getStudioBff();
   await bff.importWorkspace(json);
