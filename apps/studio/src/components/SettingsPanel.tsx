@@ -1,61 +1,24 @@
 import { useEffect, useState } from "react";
 
-import { useStudio } from "../state/StudioContext";
-import type { ConnectionReport } from "../state/StudioContext";
-import type { ConnectorPreset } from "../types";
-import { FailurePanel } from "./FailurePanel";
-import { StatusDot } from "./status/StatusDot";
+import { useStudio, type ConnectionReport } from "../state/StudioContext";
 import { AboutSection } from "./settings/sections/AboutSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
+import { ContextSection } from "./settings/sections/ContextSection";
+import { DataSection } from "./settings/sections/DataSection";
+import { InstallSection } from "./settings/sections/InstallSection";
 import { ModelSection } from "./settings/sections/ModelSection";
-import { initInstall, isDismissed, isInstalled, offerInstall, dismissInstall } from "../install";
-import { UpdateSettings } from "../updater";
+import { UpdatesSection } from "./settings/sections/UpdatesSection";
 
-function InstallSection() {
-  const canInstall = !isInstalled() && !isDismissed();
-  return (
-    <section className="settings__install" aria-labelledby="settings-install-heading">
-      <h3 className="settings__title" id="settings-install-heading">
-        Install
-      </h3>
-      <p className="muted">
-        Open the Studio in its own window. The site works offline and the window
-        keeps your place when you reopen it.
-      </p>
-      {canInstall ? (
-        <button
-          type="button"
-          className="button button--ghost"
-          onClick={() => {
-            const offered = offerInstall();
-            if (!offered) {
-              dismissInstall();
-            }
-          }}
-        >
-          Install app
-        </button>
-      ) : null}
-    </section>
-  );
-}
-
-const PRESET_AREAS: ConnectorPreset["area"][] = [
-  "voice-of-customer",
-  "quantitative-data",
-  "market-intelligence",
-  "strategy-alignment",
-  "knowledge-output",
-];
-
-const AREA_LABELS: Record<ConnectorPreset["area"], string> = {
-  "voice-of-customer": "Voice of customer & qualitative research",
-  "quantitative-data": "Quantitative data & opportunity scoring",
-  "market-intelligence": "Market & competitive intelligence",
-  "strategy-alignment": "Product strategy & backlog alignment",
-  "knowledge-output": "Strategy & knowledge management output",
-};
-
+/**
+ * Settings is a frame, not a section. Each named section below is its own
+ * module that reads its own source and reports its own failure, so a broken
+ * connector fetch shows its error in Connections and leaves the model controls
+ * beside it working.
+ *
+ * The one piece of state kept here is the connection survey: opening Settings
+ * is the person asking what is connected. The answer belongs to the panel that
+ * asked, so a passive read never restyles the window.
+ */
 export function SettingsPanel() {
   const {
     settings,
@@ -75,8 +38,10 @@ export function SettingsPanel() {
     mcpReachable,
     connectors,
     connectorsError,
+    connectorsLoading,
     presets,
     presetError,
+    presetsLoading,
     refreshPresets,
     refreshConnectors,
     addConnector,
@@ -108,55 +73,19 @@ export function SettingsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Offer the app install prompt once; dismissal is remembered.
-  useEffect(() => {
-    initInstall();
-  }, []);
-
-  const modelHealthy = survey ? survey.llmHealthy : llmHealth.healthy;
-  const sidecarKnown = survey ? survey.sidecarReachable : sidecarReachable;
-  const mcpKnown = survey ? survey.mcpReachable : mcpReachable;
-
-  const presetGroups = PRESET_AREAS.map((area) => ({
-    area,
-    label: AREA_LABELS[area],
-    presets: presets.filter((preset) => preset.area === area),
-  })).filter((group) => group.presets.length > 0);
-
   return (
     <div className="settings">
-      <div className="settings__context">
-        <div>
-          <p className="settings__context-label">Your context</p>
-          <p className="settings__context-value">
-            {brief?.job_statement
-              ? `${brief.product_name || "Your product"} — ${brief.job_statement}`
-              : "Not set yet. The studio starts every reply from this."}
-          </p>
-          {brief?.v2mom?.vision && (
-            <p className="settings__context-value">
-              <strong>Vision:</strong> {brief.v2mom.vision}
-            </p>
-          )}
-        </div>
-        <button type="button" className="button button--ghost" onClick={openSetup}>
-          {brief ? "Edit context" : "Set up context"}
-        </button>
-      </div>
+      <ContextSection
+        brief={brief}
+        openSetup={openSetup}
+        displayName={displayName}
+        setDisplayName={setDisplayName}
+        closeSetup={closeSetup}
+        clearChat={clearChat}
+        refreshCanvas={refreshCanvas}
+      />
 
-      <div className="field">
-        <label htmlFor="display-name">
-          Your name <span className="field__hint">optional — used in the greeting</span>
-        </label>
-        <input
-          id="display-name"
-          className="input"
-          value={displayName}
-          placeholder="Ada"
-          autoComplete="given-name"
-          onChange={(event) => setDisplayName(event.target.value)}
-        />
-      </div>
+      <DataSection sidecarReachable={sidecarReachable} />
 
       <ModelSection
         settings={settings}
@@ -167,161 +96,27 @@ export function SettingsPanel() {
         refreshModels={refreshModels}
       />
 
-      <ConnectionsSection settings={settings} saveSettings={saveSettings}>
-        <ul className="connection-list">
-          <li>
-            <StatusDot
-              tone={modelHealthy === false ? "warn" : modelHealthy === null ? "unknown" : "ok"}
-            />
-            <span>Model</span>
-            <span className="connection-list__value">
-              {modelHealthy === false
-                ? "offline"
-                : modelHealthy === null
-                  ? "not checked"
-                  : "reachable"}
-            </span>
-          </li>
-          <li>
-            <StatusDot
-              tone={sidecarKnown === false ? "warn" : sidecarKnown === null ? "unknown" : "ok"}
-            />
-            <span>Sidecar</span>
-            <span className="connection-list__value">
-              {sidecarKnown === false ? "unavailable" : sidecarKnown === null ? "unknown" : "reachable"}
-            </span>
-          </li>
-          <li>
-            <StatusDot tone={mcpKnown ? "ok" : "unknown"} />
-            <span>Local FastMCP server</span>
-            <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
-          </li>
-        </ul>
-        <p className="muted">
-          Only the model and MCP server above are live. No data source is connected yet — add one
-          from the presets below.
-        </p>
+      <ConnectionsSection
+        settings={settings}
+        saveSettings={saveSettings}
+        modelHealthy={survey ? survey.llmHealthy : llmHealth.healthy}
+        sidecarKnown={survey ? survey.sidecarReachable : sidecarReachable}
+        mcpKnown={survey ? survey.mcpReachable : mcpReachable}
+        capabilities={capabilities}
+        connectors={connectors}
+        connectorsError={connectorsError}
+        connectorsLoading={connectorsLoading}
+        presets={presets}
+        presetError={presetError}
+        presetsLoading={presetsLoading}
+        refreshConnectors={refreshConnectors}
+        refreshPresets={refreshPresets}
+        addConnector={addConnector}
+        deleteConnector={deleteConnector}
+        openCustomize={openCustomize}
+      />
 
-        <h3 className="settings__title">Capabilities</h3>
-        <ul className="connection-list">
-          {capabilities.map((capability) => (
-            <li key={capability.id}>
-              <StatusDot tone={capability.status === "available" ? "ok" : "warn"} />
-              <span>{capability.label}</span>
-              <span className="connection-list__value">
-                {capability.status === "available" ? "available" : "unavailable"}
-                {capability.reason ? ` — ${capability.reason}` : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        {sidecarKnown === false ? (
-          <p className="muted">
-            Connectors require the local sidecar. Data and conversation still work
-            without it; connect a sidecar to add MCP or REST data sources.
-          </p>
-        ) : (
-          <>
-            <h3 className="settings__title">Connectors</h3>
-            <button
-              type="button"
-              className="button settings__manage"
-              onClick={() => openCustomize()}
-            >
-              Manage connectors
-            </button>
-            {connectorsError ? (
-              <FailurePanel
-                error={connectorsError}
-                retryText="reload"
-                onRetry={() => void refreshConnectors()}
-              />
-            ) : connectors.length === 0 ? (
-              <p className="muted">No connectors registered. Pick a preset to add one.</p>
-            ) : (
-              <ul className="connection-list">
-                {connectors.map((connector) => (
-                  <li key={connector.name}>
-                    <span className="connection-list__value">
-                      {connector.name} · {connector.kind}
-                      {connector.enabled ? "" : " (disabled)"}
-                    </span>
-                    <button
-                      type="button"
-                      className="button button--ghost"
-                      aria-label={`Remove ${connector.name}`}
-                      onClick={() => void deleteConnector(connector.name)}
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <h4 className="settings__title">Add a data source</h4>
-            {presetError ? (
-              <FailurePanel
-                error={presetError}
-                retryText="reload"
-                onRetry={() => void refreshPresets()}
-              />
-            ) : presetGroups.length === 0 ? (
-              <p className="muted">No presets available.</p>
-            ) : (
-              <div className="settings__presets">
-                {presetGroups.map((group) => (
-                  <section
-                    key={group.area}
-                    className="settings__preset-group"
-                    aria-label={group.label}
-                  >
-                    <h5 className="settings__preset-title">{group.label}</h5>
-                    <ul className="connection-list">
-                      {group.presets.map((preset) => (
-                        <li key={preset.id}>
-                          <span className="connection-list__value">
-                            {preset.label}{" "}
-                            <code className="settings__preset-id">{preset.id}</code>
-                            {" · "}
-                            {preset.auth === "oauth" ? "OAuth" : "No auth"}
-                          </span>
-                          <button
-                            type="button"
-                            className="button button--ghost"
-                            aria-label={`Connect ${preset.label}`}
-                            onClick={() => void addConnector({ preset: preset.id })}
-                          >
-                            Connect
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                ))}
-              </div>
-            )}
-            </>
-          )}
-      </ConnectionsSection>
-
-      <div className="settings__actions">
-        <button
-          type="button"
-          className="button"
-          onClick={() => {
-            closeSetup();
-            clearChat();
-          }}
-        >
-          Start a new conversation
-        </button>
-        <button type="button" className="button button--ghost" onClick={() => void refreshCanvas()}>
-          Sync canvas
-        </button>
-      </div>
-
-      <UpdateSettings />
+      <UpdatesSection />
 
       <AboutSection settings={settings} capabilities={capabilities} />
 

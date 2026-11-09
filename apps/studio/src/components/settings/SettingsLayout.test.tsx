@@ -15,7 +15,7 @@ import type { StudioContextValue } from "../../state/StudioContext";
 
 const transport: UpdateTransport = {
   supported: () => true,
-  currentVersion: async () => __STUDIO_APP_VERSION__,
+  currentVersion: async () => __STUDIO_VERSION__,
   check: async () => null,
   relaunch: async () => undefined,
 };
@@ -95,7 +95,7 @@ describe("Settings layout (#533)", () => {
     renderPanel();
 
     const about = screen.getByRole("region", { name: "About" });
-    expect(within(about).getByText(`v${__STUDIO_APP_VERSION__}`)).toBeInTheDocument();
+    expect(within(about).getByText(`v${__STUDIO_VERSION__}`)).toBeInTheDocument();
     expect(within(about).getByText(__STUDIO_BUILD_COMMIT__)).toBeInTheDocument();
     expect(within(about).getByText(__STUDIO_BUILD_DATE__)).toBeInTheDocument();
     expect(within(about).getByText(/canvas of human intent/i)).toBeInTheDocument();

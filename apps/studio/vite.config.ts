@@ -5,37 +5,6 @@ import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-/**
- * The release version, read from the committed build-info source.
- *
- * `apps/cli/src/agentic_odi_cli/_build_info.py` is bumped by release-please and
- * pinned to `.release-please-manifest.json` by `tests/scripts/test_version_sync.py`,
- * so Settings can report the app version without inventing one. `apps/studio/package.json`
- * is bumped alongside it and is the fallback. `STUDIO_APP_VERSION` lets the
- * release workflow override it for a tagged build.
- */
-function buildInfoVersion(): string {
-  try {
-    const source = readFileSync(
-      fileURLToPath(new URL("../../apps/cli/src/agentic_odi_cli/_build_info.py", import.meta.url)),
-      "utf8",
-    );
-    const match = /^VERSION\s*=\s*"([^"]+)"/m.exec(source);
-    if (match) {
-      return match[1];
-    }
-  } catch {
-    // Fall through to the studio's own declared version.
-  }
-  try {
-    const pkg = JSON.parse(
-      readFileSync(fileURLToPath(new URL("./package.json", import.meta.url)), "utf8"),
-    ) as { version?: string };
-    return pkg.version ?? "0.0.0";
-  } catch {
-    return "0.0.0";
-  }
-}
 // The build version is the single source of truth: read from package.json here
 // and baked in as a define so no component can carry a second literal that
 // drifts from the release manifest.
@@ -53,12 +22,11 @@ export default defineConfig({
     },
   },
   clearScreen: false,
-  // Settings → About reports which build is running. The version follows the
-  // committed build-info source, the date is baked in at build time, and the
-  // commit is the CI-provided sha ("dev" in a source checkout). Applies to
-  // vitest transforms too.
+  // Settings → About reports which build is running. The version is
+  // `__STUDIO_VERSION__` from package.json (see src/lib/version.ts), the date is
+  // baked in at build time, and the commit is the CI-provided sha ("dev" in a
+  // source checkout). Applies to vitest transforms too.
   define: {
-    __STUDIO_APP_VERSION__: JSON.stringify(process.env.STUDIO_APP_VERSION ?? buildInfoVersion()),
     __STUDIO_BUILD_DATE__: JSON.stringify(
       process.env.STUDIO_BUILD_DATE ?? new Date().toISOString().slice(0, 10),
     ),

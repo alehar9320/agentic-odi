@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { fetchDiagnostics } from "../../../api/studioApi";
 import type { SidecarDiagnostics } from "../../../api/studioApi";
+import type { Capability } from "../../../bff/capabilities/registry";
 import {
   createDiagnosticsBundle,
   diagnosticsEntryCount,
@@ -10,8 +11,10 @@ import {
 import { DiagnosticsModal } from "../../../diagnostics/DiagnosticsModal";
 import { PRODUCT_NAME } from "../../../lib/brand";
 import { resolveTheme } from "../../../lib/theme";
+import { versionLabel } from "../../../lib/version";
 import { useOnboarding } from "../../../onboarding/context";
 import type { StudioConfig } from "../../../types";
+import { useUpdateSnapshot } from "../../../updater";
 import { detectPlatform } from "../../../updater/platform";
 
 const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
@@ -27,27 +30,28 @@ const PRODUCT_ESSAY =
   "then talk about it: every bet traces back to evidence, and impact is simulated before code " +
   "gets written.";
 
-/**
- * What this build is: the version, commit, build date, platform, and the
- * product essay. Read-only facts, never a control — the updater's state and
- * action live in the Updates section.
- *
- * The version comes from the build-info source injected at build time
- * (`__STUDIO_APP_VERSION__`), so it moves with the release without being
- * invented here.
- */
-export function AboutSection({
-  settings,
-  capabilities,
-}: {
+interface AboutSectionProps {
   settings: StudioConfig;
-  capabilities: unknown[];
-}) {
+  capabilities: Capability[];
+}
+
+/**
+ * The honest facts about this build: which version, which commit, cut when, and
+ * for which platform — plus the essay about what the studio is and the one way
+ * to start the tour. Read-only: the updater's state and its action live in
+ * Updates, so nothing here repeats them.
+ *
+ * The version is never a literal. `versionLabel` takes the desktop updater's
+ * running version when it has one and falls back to the version baked in from
+ * `apps/studio/package.json`, which release-please bumps alongside
+ * `_build_info.py`.
+ */
+export function AboutSection({ settings, capabilities }: AboutSectionProps) {
+  const snapshot = useUpdateSnapshot();
   const platform = detectPlatform();
   const { enabled: tourEnabled, openTour } = useOnboarding();
+  const label = versionLabel(snapshot.currentVersion);
   const [diagnosticsJson, setDiagnosticsJson] = useState<string | null>(null);
-  const version = __STUDIO_APP_VERSION__;
-  const commit = __STUDIO_BUILD_COMMIT__;
 
   async function prepareDiagnostics() {
     startDiagnosticsCapture();
@@ -61,9 +65,9 @@ export function AboutSection({
       // Export remains available when the local sidecar is down.
     }
     const bundle = createDiagnosticsBundle({
-      version,
-      versionSource: "build",
-      build: `${__STUDIO_BUILD_DATE__} (${commit})`,
+      version: label.version,
+      versionSource: label.source,
+      build: `${__STUDIO_BUILD_DATE__} (${__STUDIO_BUILD_COMMIT__})`,
       platform: PLATFORM_LABELS[platform],
       theme: resolveTheme(settings.theme),
       reachable,
@@ -89,9 +93,9 @@ export function AboutSection({
       <p className="muted">{PRODUCT_ESSAY}</p>
       <dl>
         <dt>Version</dt>
-        <dd>{version ? `v${version}` : "—"}</dd>
+        <dd>v{label.version}</dd>
         <dt>Commit</dt>
-        <dd>{commit}</dd>
+        <dd>{__STUDIO_BUILD_COMMIT__}</dd>
         <dt>Build date</dt>
         <dd>{__STUDIO_BUILD_DATE__}</dd>
         <dt>Platform</dt>

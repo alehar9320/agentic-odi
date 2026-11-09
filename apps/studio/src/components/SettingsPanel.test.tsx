@@ -45,6 +45,8 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     refreshModels: vi.fn().mockResolvedValue(undefined),
     mcpReachable: false,
     pushToast: vi.fn(),
+    connectorsLoading: false,
+    presetsLoading: false,
     connectors: [{ name: "notion", kind: "mcp", enabled: true }],
     presets: [
       {
@@ -291,11 +293,11 @@ describe("SettingsPanel about section", () => {
   it("reports the build facts and the product essay, not the updater", async () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
 
-    // The version comes from the build-info source, not the updater: About
-    // answers "what is this build", so a stale updater snapshot must not move it.
+    // A browser build has no desktop version to report, so About shows the
+    // build version (#799) beside the commit, date, platform, and essay.
     const aboutService = createUpdateService({
       transport: {
-        supported: () => true,
+        supported: () => false,
         currentVersion: async () => "0.11.0",
         check: async () => null,
         relaunch: async () => undefined,
@@ -312,7 +314,7 @@ describe("SettingsPanel about section", () => {
     );
 
     const about = screen.getByRole("region", { name: "About" });
-    expect(within(about).getByText(`v${__STUDIO_APP_VERSION__}`)).toBeInTheDocument();
+    expect(within(about).getByText(`v${STUDIO_VERSION}`)).toBeInTheDocument();
     expect(within(about).getByText(__STUDIO_BUILD_COMMIT__)).toBeInTheDocument();
     expect(within(about).getByText(__STUDIO_BUILD_DATE__)).toBeInTheDocument();
     expect(within(about).getByText(/macOS|Windows|Linux|Desktop/)).toBeInTheDocument();
@@ -400,5 +402,49 @@ describe("SettingsPanel connection survey", () => {
     expect(await screen.findByText("unavailable")).toBeInTheDocument();
     expect(surveyConnections).toHaveBeenCalledOnce();
     expect(recheckConnections).not.toHaveBeenCalled();
+  });
+});
+
+describe("SettingsPanel section modules", () => {
+  it("composes the sections in order", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    const { container } = renderPanel();
+
+    // Context, Data, Model, Connections (bridge), Updates, About, Install.
+    expect(screen.getByText(/your context/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^data$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^model$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /studio bridge/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Updates" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("Your context")).toBeLessThan(text.indexOf("Data"));
+    expect(text.indexOf("Data")).toBeLessThan(text.indexOf("Model"));
+    expect(text.indexOf("Model")).toBeLessThan(text.indexOf("Studio bridge"));
+  });
+
+  it("keeps the Model section intact when the connector fetch fails", () => {
+    // #531: a broken connector fetch shows the Connections error and leaves the
+    // model controls beside it working, because each section owns its failure.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [],
+        connectorsError: {
+          code: "mcp_unreachable",
+          message: "The connector list is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+        models: ["local-tools-model"],
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
+    expect(screen.getByLabelText(/^model/i)).toHaveValue("m");
+    expect(screen.getByLabelText("Base URL")).toHaveValue("http://x");
   });
 });
