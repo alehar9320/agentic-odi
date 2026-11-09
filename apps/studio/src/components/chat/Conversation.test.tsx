@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
 import type { ChatMessage } from "../../types";
@@ -13,7 +13,8 @@ const harness = vi.hoisted(() => ({
     streaming: false,
     thinkingPhase: null as string | null,
     toolActivity: [] as unknown[],
-    offlineReply: false,
+    offlineReplyFor: null as string | null,
+    openPanel: vi.fn<(panel: string) => void>(),
     canvas: null,
     regenerateFrom: vi.fn(),
     editFrom: vi.fn(),
@@ -64,6 +65,15 @@ function renderTurn(messages: ChatMessage[]) {
     </StudioRuntimeProvider>,
   );
 }
+
+// The clamp reads real layout, which jsdom does not compute. Each test that
+// stubs it registers the way back here, so no later test inherits a fake height.
+let restoreLayout: (() => void) | null = null;
+
+afterEach(() => {
+  restoreLayout?.();
+  restoreLayout = null;
+});
 
 describe("Conversation", () => {
   it("renders prose and surfaces in the agent's order", () => {
@@ -292,11 +302,18 @@ describe("Conversation", () => {
 });
 
 describe("Conversation offline context", () => {
-  it("marks a content-less offline turn as local guidance", () => {
-    harness.state.offlineReply = true;
+  it("names the provenance on the one reply that needs it and offers the fix", () => {
+    harness.state.offlineReplyFor = "m-2";
     const { container } = renderTurn([
       {
         id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "From the model.",
+        parts: [{ kind: "text", text: "From the model." }],
+      },
+      {
+        id: "m-2",
         parentId: null,
         role: "assistant",
         content: "",
@@ -304,9 +321,15 @@ describe("Conversation offline context", () => {
       },
     ]);
 
-    expect(screen.getByText("Local guidance")).toBeInTheDocument();
-    expect(container.querySelector(".message__tag")).not.toBeNull();
-    harness.state.offlineReply = false;
+    const chips = container.querySelectorAll("button.message__tag");
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent("Local draft, no model connected");
+
+    fireEvent.click(chips[0] as HTMLButtonElement);
+    expect(harness.state.openPanel).toHaveBeenCalledWith("settings");
+
+    harness.state.offlineReplyFor = null;
+    harness.state.openPanel.mockClear();
   });
 });
 
@@ -409,4 +432,52 @@ describe("Conversation failures", () => {
 
     expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
   });
+  it("clamps a pasted document behind a keyboard-reachable Show more (#696)", () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+      configurable: true,
+      get: () => 400,
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get: () => 128,
+    });
+    // Both stubs shadow jsdom's Element getters; deleting the own properties on
+    // HTMLElement.prototype puts the real measurement back for later tests.
+    restoreLayout = () => {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
+    };
+
+    const paste = Array.from({ length: 30 }, (_, index) => `Line ${index + 1} of a pasted doc`).join(
+      "\n",
+    );
+    renderTurn([{ id: "m-1", parentId: null, role: "user", content: paste }]);
+
+    const bubble = document.querySelector(".message__bubble") as HTMLElement;
+    expect(bubble).toHaveClass("is-clamped");
+
+    const more = screen.getByRole("button", { name: "Show more" });
+    expect(more).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(more);
+
+    expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(bubble).not.toHaveClass("is-clamped");
+    // Clamping is presentation: the whole message is still the message, so Copy
+    // (which reads the turn, not the bubble) copies all of it.
+    expect(bubble.textContent).toContain("Line 30 of a pasted doc");
+    expect(screen.getByRole("button", { name: "Copy message" })).toBeInTheDocument();
+
+  });
+
+  it("leaves a short message alone, with no control to expand (#696)", () => {
+    renderTurn([{ id: "m-1", parentId: null, role: "user", content: "Short question." }]);
+
+    expect(document.querySelector(".message__bubble")).not.toHaveClass("is-clamped");
+    expect(screen.queryByRole("button", { name: /show more/i })).toBeNull();
+  });
+
 });

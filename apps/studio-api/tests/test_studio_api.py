@@ -200,7 +200,7 @@ def test_chat_offline_default_points_at_manual_work() -> None:
     events = _stream("/api/chat", _chat_body("hello world"))
 
     content = json.loads(events["message"][-1])["content"]
-    assert "no model is reachable" in content
+    assert "no model is reachable" in content.lower()
     assert "/capture" in content
     assert "/help" in content
 
@@ -492,6 +492,48 @@ def test_post_outcome_uses_local_service() -> None:
     )
 
 
+def test_outcome_validation_names_the_field() -> None:
+    repo = InMemoryRepository()
+    job = ODIService(repo).add_job(name="Local job")
+    client = TestClient(create_app(repo))
+
+    # A malformed statement is attributed to the statement field.
+    bad_statement = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "http://unused",
+            "job_id": job.id,
+            "statement": "fast",
+            "importance": 8.0,
+            "satisfaction": 3.0,
+        },
+    )
+    assert bad_statement.status_code == 422
+    assert bad_statement.json()["error"]["code"] == "validation"
+    assert bad_statement.json()["error"]["field"] == "statement"
+
+    # An out-of-range rating is attributed to the rating it names. The create
+    # schema clamps scores itself, so an out-of-range score reaches the service
+    # through the update path.
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "http://unused",
+            "job_id": job.id,
+            "statement": "Minimize the time it takes to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 3.0,
+        },
+    ).json()
+    out_of_range = client.patch(
+        f"/api/outcomes/{outcome['id']}",
+        json={"importance": 42},
+    )
+    assert out_of_range.status_code == 422
+    assert out_of_range.json()["error"]["code"] == "out_of_range"
+    assert out_of_range.json()["error"]["field"] == "importance"
+
+
 # ---------------------------------------------------------------------------
 # /api/changelog
 # ---------------------------------------------------------------------------
@@ -601,6 +643,38 @@ def test_chat_resumes_an_existing_conversation() -> None:
     assert conversation["id"] == created["id"]
     latest = client.get("/api/conversations/latest").json()
     assert len(latest["turns"]) == 2
+
+
+def test_the_conversation_list_is_empty_before_the_first_chat() -> None:
+    client = _client()
+
+    response = client.get("/api/conversations")
+
+    assert response.status_code == 200
+    assert response.json() == {"conversations": []}
+
+
+def test_the_conversation_list_leads_with_the_most_recent_thread() -> None:
+    client = _client()
+    first = client.post("/api/conversations").json()["conversation"]["id"]
+    second = client.post("/api/conversations").json()["conversation"]["id"]
+
+    listed = client.get("/api/conversations").json()["conversations"]
+
+    assert [item["id"] for item in listed] == [second, first]
+
+
+def test_the_conversation_list_reports_the_turns_a_chat_persisted() -> None:
+    client = _client()
+    events = _stream_with(client, "/api/chat", _chat_body("hello there"))
+    conversation_id = json.loads(events["conversation"][0])["id"]
+
+    item = client.get("/api/conversations").json()["conversations"][0]
+
+    assert set(item) == {"id", "title", "created_at", "updated_at", "head_id", "turn_count"}
+    assert item["id"] == conversation_id
+    assert item["title"] == "hello there"
+    assert item["turn_count"] == 2
 
 
 def test_clear_memory_removes_conversations_and_observations() -> None:

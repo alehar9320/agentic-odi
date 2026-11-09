@@ -65,6 +65,12 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     refreshPresets: vi.fn().mockResolvedValue(undefined),
     refreshCapabilities: vi.fn().mockResolvedValue(undefined),
+    surveyConnections: vi.fn().mockResolvedValue({
+      sidecarReachable: true,
+      mcpReachable: false,
+      llmHealthy: true,
+      llmMessage: "ok",
+    }),
     capabilities: [],
     ...overrides,
   }) as unknown as StudioContextValue;
@@ -314,5 +320,34 @@ describe("SettingsPanel about section", () => {
     expect(within(about).getByText(__STUDIO_BUILD_DATE__)).toBeInTheDocument();
     expect(within(about).getByText(/macOS|Windows|Linux|Desktop/)).toBeInTheDocument();
     expect(within(about).getByText(aboutService.statusLine())).toBeInTheDocument();
+  });
+});
+
+describe("SettingsPanel connection survey", () => {
+  it("answers its own rows without telling the rest of the studio", async () => {
+    // #309: opening a settings panel is a question about connections, not a request to
+    // restyle the window. The measurement belongs to the panel; the recorder that can
+    // raise "the sidecar isn't running" only runs when the person presses Recheck.
+    const surveyConnections = vi.fn().mockResolvedValue({
+      sidecarReachable: false,
+      mcpReachable: false,
+      llmHealthy: false,
+      llmMessage: "connection refused",
+    });
+    const recheckConnections = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        surveyConnections,
+        recheckConnections,
+        sidecarReachable: null,
+        llmHealth: { healthy: null, message: "" },
+      }),
+    );
+
+    renderPanel();
+
+    expect(await screen.findByText("unavailable")).toBeInTheDocument();
+    expect(surveyConnections).toHaveBeenCalledOnce();
+    expect(recheckConnections).not.toHaveBeenCalled();
   });
 });
