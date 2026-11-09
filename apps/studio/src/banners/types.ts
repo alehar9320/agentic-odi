@@ -18,8 +18,6 @@ export type BannerLife = "persistent" | "transient";
 export type BannerDock = "top" | "corner";
 
 export type BannerKind =
-  | "sidecar-down"
-  | "model-offline"
   | "offline"
   | "app-update-ready"
   | "update-available"
@@ -31,10 +29,6 @@ export type BannerKind =
 
 /** A studio action a banner button can invoke directly. */
 export type BannerActionId =
-  | "recheck-sidecar"
-  | "open-setup"
-  | "open-capture"
-  | "open-jobmap"
   | "install-update"
   | "restart"
   | "reload-app";

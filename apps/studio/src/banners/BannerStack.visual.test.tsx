@@ -33,26 +33,24 @@ function Frame({ children }: { children: ReactNode }) {
 // One Chromatic snapshot per test. Four states prove every severity, both docks,
 // the multi-action layout, and the overflow affordance without spending the free
 // plan's snapshot budget.
-it("renders a critical top strip with its actions", async () => {
+it("renders a critical top strip", async () => {
   const screen = await render(
     <Frame>
-      <BannerStack banners={[banner("sidecar-down")]} />
+      <BannerStack banners={[banner("write-rejected")]} />
     </Frame>,
   );
 
-  await expect.element(screen.getByText(/sidecar isn't running/i)).toBeVisible();
-  await expect.element(screen.getByRole("button", { name: "Recheck" })).toBeVisible();
+  await expect.element(screen.getByText(/write was rejected/i)).toBeVisible();
 });
 
-it("renders the warning strip with every way to keep working", async () => {
+it("renders an informational top strip", async () => {
   const screen = await render(
     <Frame>
-      <BannerStack banners={[banner("model-offline")]} />
+      <BannerStack banners={[banner("offline")]} />
     </Frame>,
   );
 
-  await expect.element(screen.getByText(/Working by hand/i)).toBeVisible();
-  await expect.element(screen.getByRole("button", { name: "Map the job" })).toBeVisible();
+  await expect.element(screen.getByText(/you're offline/i)).toBeVisible();
 });
 
 it("stacks corner toasts for success, info, and error", async () => {
@@ -75,7 +73,7 @@ it("stacks corner toasts for success, info, and error", async () => {
 it("collapses the excess into an overflow count", async () => {
   const screen = await render(
     <Frame>
-      <BannerStack banners={[banner("sidecar-down")]} overflow={4} />
+      <BannerStack banners={[banner("write-rejected")]} overflow={4} />
     </Frame>,
   );
 

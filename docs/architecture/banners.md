@@ -28,7 +28,7 @@ have direct tests rather than being inferred from a screenshot.
 
 **Identity decides dedupe.** A banner with a stable identity — a persistent
 condition, or any banner given a `key` — updates in place. A retry loop that
-raises `sidecar-down` ten times paints one strip. A transient banner with no key
+raises `offline` ten times paints one strip. A transient banner with no key
 is an event ("Added connector X"), so two of them are two facts and both stay.
 
 **A kind is a closed set owned by the client.** The agent never composes a
@@ -79,14 +79,15 @@ thing, and the system stays legible because it does not absorb everything.
 
 - `components/Toasts.tsx` — replaced by `BannerToasts.tsx`; `pushToast` keeps its
   signature, so its call sites in `StudioContext.tsx` did not change.
-- `components/notices/SidecarNotice.tsx` — replaced by the `sidecar-down` kind,
-  raised from `BannerBridge`. Dismissing it records a session-long choice, so the
-  next failed probe cannot bring it back.
-- `components/chat/OfflineNotice.tsx` — replaced by the `model-offline` kind.
+- `components/notices/SidecarNotice.tsx` — replaced by a `sidecar-down` kind,
+  then removed in #507: a missing sidecar is a supported state, not an outage, so
+  it raises nothing and the capability control (#509) is where the state is read.
+- `components/chat/OfflineNotice.tsx` — replaced by a `model-offline` kind, then
+  removed in #507 for the same reason: a missing model is a supported state.
 - The `offline` kind (browser connectivity, #546) is raised from `BannerBridge`
-  off `navigator.onLine`. While the browser is offline it is the only strip: the
-  `sidecar-down` and `model-offline` kinds are held back, because their copy and
-  their Recheck action assume a network. Each resumes when the connection does.
+  off `navigator.onLine`. While the browser is offline it is the only strip: a
+  missing sidecar or model raises nothing anyway, and the offline copy names what
+  still works on the device.
 - The `app-update-ready` kind (#545) is raised from `BannerBridge` off
   `src/lib/swUpdate.ts` when a new service worker is staged. It is held back while
   a turn is streaming, so the reload it offers can never land under a reply that

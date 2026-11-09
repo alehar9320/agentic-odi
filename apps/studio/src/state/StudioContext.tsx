@@ -239,7 +239,6 @@ const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
-const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const THESES_KEY = "studio.theses";
 
 /** How often a focused window re-reads the signal inbox from the store. */
@@ -363,11 +362,8 @@ export interface StudioContextValue {
   bootError: StudioError | null;
   /** Re-probe after a backup is restored; clears `bootError` on a clean answer. */
   recheckBoot: () => Promise<void>;
-  /** Whether the user has dismissed this session's sidecar-down notice. */
-  dismissedSidecarNotice: boolean;
   /** Probe again now, e.g. after the user started the sidecar. */
   recheckConnections: () => Promise<void>;
-  dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   /** Measure the same three connections for one panel, without changing what the studio believes. */
@@ -603,14 +599,6 @@ function loadCanvasCache(): CanvasData | null {
   return null;
 }
 
-function loadSidecarNoticeDismissed(): boolean {
-  try {
-    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
 function loadDisplayName(): string {
   try {
     return localStorage.getItem(DISPLAY_NAME_KEY) ?? "";
@@ -685,7 +673,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
-  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -1307,9 +1294,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       } else {
         setLlmHealth((previous) => (previous.healthy === true ? llm : previous));
       }
-      if (sidecar) {
-        setDismissedSidecarNotice(false);
-      }
       return report;
     },
     [],
@@ -1379,15 +1363,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const handle = idleProbeRef.current;
     idleProbeRef.current = null;
     handle?.cancel();
-  }, []);
-
-  const dismissSidecarNotice = useCallback(() => {
-    setDismissedSidecarNotice(true);
-    try {
-      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
-    } catch {
-      /* storage unavailable */
-    }
   }, []);
 
   const refreshCanvas = useCallback(async () => {
@@ -2667,8 +2642,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       sidecarReachable,
       bootError,
       recheckBoot,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
       recheckConnections,
       checkConnections,
       surveyConnections,
@@ -2793,8 +2766,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       sidecarReachable,
       bootError,
       recheckBoot,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
       recheckConnections,
       checkConnections,
       surveyConnections,
