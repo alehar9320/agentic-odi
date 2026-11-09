@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useState, type RefObject } from "react";
 
 import { isCommandDraft, matchCommands, type StudioCommand } from "../../lib/commands";
+import { registerComposer } from "../../lib/composerFocus";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, StopIcon } from "../icons";
 import { CommandPalette, ComposerHint, ConnectorChips } from "./composerParts";
@@ -68,16 +69,20 @@ export function Composer({
     inputRef.current?.focus();
   }, [autoFocus, inputRef]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [inputRef]);
+  // The shell owns ⌘/Ctrl+K and `/`; this is how it reaches this textarea.
+  useEffect(
+    () =>
+      registerComposer({
+        focus: () => inputRef.current?.focus(),
+        startCommand: () => {
+          onChange("/");
+          setHighlight(0);
+          setDismissedFor("");
+          inputRef.current?.focus();
+        },
+      }),
+    [inputRef, onChange],
+  );
 
   const canSend = value.trim().length > 0 && !streaming;
   const activeIndex = Math.min(highlight, Math.max(matches.length - 1, 0));
@@ -156,8 +161,8 @@ export function Composer({
           placeholder={
             placeholder ??
             (offline
-              ? "Model offline — type / for shortcuts, or add what you know…"
-              : "What's on your mind?")
+              ? "Model offline — type / for commands, or capture what you know…"
+              : "Start with what's on your mind…")
           }
           aria-haspopup="listbox"
           aria-controls={paletteOpen ? paletteId : undefined}

@@ -7,7 +7,7 @@
  * added in exactly two files.
  */
 
-import { useMemo } from "react";
+import { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActionBarPrimitive,
@@ -32,13 +32,16 @@ import {
   ToolPart,
   TypingPart,
 } from "../../assistant/parts";
+import { formatClockTime, formatDayHeading, startsNewDay } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
-import type { StudioError } from "../../types";
+import type { ChatMessage, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
-import { CheckIcon, CopyIcon } from "../icons";
+import { CheckIcon, CopyIcon, SpeakerIcon } from "../icons";
 import { Markdown } from "./Markdown";
 import { StallNotice } from "./StallNotice";
+import { WorkBlock } from "./WorkBlock";
+import { workGrouping } from "./workGrouping";
 
 const PHASE_LABEL: Record<string, string> = {
   health_check: "Waking the model",
@@ -53,14 +56,64 @@ function phaseLabel(phase: string | null): string {
   return PHASE_LABEL[phase] ?? "Thinking";
 }
 
+/**
+ * Where each turn sits in the studio's own list, so a message can read its own
+ * timestamp and the one before it. The runtime draws the turns but keeps no
+ * clock of its own; the model that does is the one the transcript came from.
+ */
+const TranscriptClockContext = createContext<{
+  order: Map<string, number>;
+  messages: ChatMessage[];
+} | null>(null);
+
+interface MessageStamp {
+  iso: string;
+  clock: string;
+  previousIso?: string;
+}
+
+function useMessageStamp(): MessageStamp | null {
+  const transcript = useContext(TranscriptClockContext);
+  const id = useAuiState((state) => state.message.id);
+  const index = transcript?.order.get(id);
+  if (!transcript || index === undefined) {
+    return null;
+  }
+  const iso = transcript.messages[index]?.createdAt;
+  if (!iso) {
+    return null;
+  }
+  return { iso, clock: formatClockTime(iso), previousIso: transcript.messages[index - 1]?.createdAt };
+}
+
+/**
+ * The line between two calendar days: Today and Yesterday are said in words,
+ * anything older is dated. Only drawn where the day actually changes.
+ */
+function DayDivider() {
+  const stamp = useMessageStamp();
+  if (!stamp || !startsNewDay(stamp.iso, stamp.previousIso)) {
+    return null;
+  }
+  const heading = formatDayHeading(stamp.iso);
+  return (
+    <div className="conversation__day" role="separator" aria-label={heading}>
+      {heading}
+    </div>
+  );
+}
+
 function AssistantMessage() {
   const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
   const id = useAuiState((state) => state.message.id);
+  const stamp = useMessageStamp();
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
+  const parts = useAuiState((state) => state.message.parts);
   const hasText = useAuiState((state) =>
     state.message.content.some((part) => part.type === "text" && part.text.trim().length > 0),
   );
+  const groupBy = useMemo(() => workGrouping(parts), [parts]);
   const error = useAuiState(
     (state) => state.message.metadata.custom?.error as StudioError | undefined,
   );
@@ -69,9 +122,11 @@ function AssistantMessage() {
   );
 
   return (
-    // `aria-busy` keeps a screen reader from announcing every streamed token;
-    // it reads the reply once the turn settles.
-    <article className="message message--assistant" aria-busy={running}>
+    <>
+      <DayDivider />
+      {/* `aria-busy` keeps a screen reader from announcing every streamed token;
+          it reads the reply once the turn settles. */}
+      <article className="message message--assistant" aria-busy={running}>
       <AssistantAvatar />
       <div className="message__body">
         {/* Named on the reply it describes, never on every reply on screen, and
@@ -86,16 +141,43 @@ function AssistantMessage() {
           </button>
         ) : null}
 
-        <MessagePrimitive.Parts
-          components={{
-            Text: TextPart,
-            Reasoning: ReasoningPart,
-            Source: SourcePart,
-            File: FilePart,
-            data: { by_name: { [SURFACE_PART]: SurfacePart, [CLAIMS_PART]: ClaimsPart } },
-            tools: { Fallback: ToolPart },
+        {/* One row for the work a turn did, and the answer on its own. The
+            grouping is ours rather than `ChainOfThoughtPrimitive` because that
+            primitive gathers every adjacent tool call into the group, including
+            a write that is still asking — and a question is not history. */}
+        <MessagePrimitive.GroupedParts groupBy={groupBy} indicator="never">
+          {({ part, children }) => {
+            switch (part.type) {
+              case "group-work":
+                return (
+                  <WorkBlock
+                    calls={part.indices.filter((index) => parts[index]?.type === "tool-call").length}
+                    running={running}
+                  >
+                    {children}
+                  </WorkBlock>
+                );
+              case "text":
+                return <TextPart />;
+              case "reasoning":
+                return <ReasoningPart />;
+              case "source":
+                return <SourcePart />;
+              case "file":
+                return <FilePart />;
+              case "data":
+                return part.name === SURFACE_PART ? (
+                  <SurfacePart />
+                ) : part.name === CLAIMS_PART ? (
+                  <ClaimsPart />
+                ) : null;
+              case "tool-call":
+                return <ToolPart {...part} />;
+              default:
+                return null;
+            }
           }}
-        />
+        </MessagePrimitive.GroupedParts>
 
         {running && !hasText ? <TypingPart label={phaseLabel(thinkingPhase)} /> : null}
         {running && hasText ? <span className="caret" aria-hidden="true" /> : null}
@@ -140,12 +222,20 @@ function AssistantMessage() {
         </AuiIf>
 
         {!running ? (
+          // The exact time rides with the actions: visible on hover or focus,
+          // and spoken as part of the group's name for touch and for readers
+          // who never see a hover at all.
           <ActionBarPrimitive.Root
             className="message__actions"
             role="group"
-            aria-label="Reply actions"
+            aria-label={stamp ? `Reply actions, ${stamp.clock}` : "Reply actions"}
             hideWhenRunning
           >
+            {stamp ? (
+              <time className="message__time" dateTime={stamp.iso}>
+                {stamp.clock}
+              </time>
+            ) : null}
             <ActionBarPrimitive.Copy
               className="quiet-action"
               aria-label={copied ? "Reply copied" : "Copy reply"}
@@ -153,24 +243,82 @@ function AssistantMessage() {
               {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
               {copied ? "Copied" : "Copy"}
             </ActionBarPrimitive.Copy>
+            {/* Speech is a per-reply action, never a mode: the control is
+                absent where the shell has no speech API, and only one reply
+                speaks at a time because the runtime owns the utterance. */}
+            <AuiIf
+              condition={(state) =>
+                state.message.speech == null &&
+                state.message.content.some(
+                  (part) => part.type === "text" && part.text.trim().length > 0,
+                )
+              }
+            >
+              <ActionBarPrimitive.Speak className="quiet-action" aria-label="Read reply aloud">
+                <SpeakerIcon size={14} />
+                Read aloud
+              </ActionBarPrimitive.Speak>
+            </AuiIf>
+            <AuiIf condition={(state) => state.message.speech != null}>
+              <ActionBarPrimitive.StopSpeaking className="quiet-action" aria-label="Stop reading">
+                Stop reading
+              </ActionBarPrimitive.StopSpeaking>
+            </AuiIf>
+            <AuiIf condition={(state) => state.message.speech != null}>
+              <p className="sr-only" role="status">
+                Reading this reply aloud.
+              </p>
+            </AuiIf>
             <ActionBarPrimitive.Reload className="quiet-action" aria-label="Regenerate reply">
               Regenerate
             </ActionBarPrimitive.Reload>
           </ActionBarPrimitive.Root>
         ) : null}
       </div>
-    </article>
+      </article>
+    </>
   );
 }
 
 function UserMessage() {
   const copied = useAuiState((state) => state.message.isCopied);
+  const stamp = useMessageStamp();
+
+  // A pasted document is a message, not the screen. The bubble starts clamped at
+  // eight lines; when the text fits, the clamp and its control disappear. Copy
+  // still reads the turn, so the whole message is what gets copied (#696).
+  const [clamped, setClamped] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const bubble = bubbleRef.current;
+    if (!bubble) {
+      return;
+    }
+    setClamped(bubble.scrollHeight > bubble.clientHeight + 1);
+  }, []);
 
   return (
-    <article className="message message--user">
-      <div className="message__bubble">
+    <>
+      <DayDivider />
+      <article className="message message--user">
+      <div
+        ref={bubbleRef}
+        className={`message__bubble${clamped && !expanded ? " is-clamped" : ""}`}
+      >
         <MessagePrimitive.Parts components={{ Text: TextPart }} />
       </div>
+      {clamped && (
+        <button
+          type="button"
+          className="quiet-action message__more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
       <MessagePrimitive.Attachments>
         {({ attachment }) => {
           // The turn owns the id; the prepared copy (if this session still has
@@ -196,8 +344,13 @@ function UserMessage() {
       <ActionBarPrimitive.Root
         className="message__actions message__actions--user"
         role="group"
-        aria-label="Message actions"
+        aria-label={stamp ? `Message actions, ${stamp.clock}` : "Message actions"}
       >
+        {stamp ? (
+          <time className="message__time" dateTime={stamp.iso}>
+            {stamp.clock}
+          </time>
+        ) : null}
         <ActionBarPrimitive.Edit className="quiet-action" aria-label="Edit message">
           Edit
         </ActionBarPrimitive.Edit>
@@ -208,15 +361,19 @@ function UserMessage() {
           {copied ? "Copied" : "Copy"}
         </ActionBarPrimitive.Copy>
       </ActionBarPrimitive.Root>
-    </article>
+      </article>
+    </>
   );
 }
 
 function SystemMessage() {
   return (
-    <article className="message message--notice">
-      <MessagePrimitive.Parts components={{ Text: TextPart }} />
-    </article>
+    <>
+      <DayDivider />
+      <article className="message message--notice">
+        <MessagePrimitive.Parts components={{ Text: TextPart }} />
+      </article>
+    </>
   );
 }
 
@@ -258,6 +415,15 @@ export function Conversation() {
     return "";
   }, [messages]);
 
+  // The clock the transcript reads from, kept beside the turn list it describes.
+  const clock = useMemo(
+    () => ({
+      order: new Map(messages.map((message, index) => [message.id, index])),
+      messages,
+    }),
+    [messages],
+  );
+
   return (
     <UiActionContext.Provider
       value={{ onIntent: (intent) => void sendMessage(intent), busy: streaming }}
@@ -269,16 +435,18 @@ export function Conversation() {
       <p className="sr-only" role="status" aria-live="polite" aria-busy={streaming}>
         {streaming ? phaseLabel(thinkingPhase) : latestReply}
       </p>
-      <div className="conversation" role="log" aria-label="Conversation">
-        <ThreadPrimitive.Messages
-          components={{
-            UserMessage,
-            AssistantMessage,
-            SystemMessage,
-            EditComposer,
-          }}
-        />
-      </div>
+      <TranscriptClockContext.Provider value={clock}>
+        <div className="conversation" role="log" aria-label="Conversation">
+          <ThreadPrimitive.Messages
+            components={{
+              UserMessage,
+              AssistantMessage,
+              SystemMessage,
+              EditComposer,
+            }}
+          />
+        </div>
+      </TranscriptClockContext.Provider>
     </UiActionContext.Provider>
   );
 }

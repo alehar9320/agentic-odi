@@ -179,7 +179,7 @@ describe("Catch Up reads the signal inbox", () => {
     fireEvent.click(card);
 
     await waitFor(() => expect(markSignalRead).toHaveBeenCalledWith("sig-1", MCP_URL));
-    expect(await screen.findByRole("heading", { name: /the job/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /universal job map/i })).toBeInTheDocument();
   });
 
   it("makes the card itself a native button so Enter and Space activate it", async () => {

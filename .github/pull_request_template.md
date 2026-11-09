@@ -31,6 +31,14 @@
 - Tests added:
 - Net line delta:
 
+<!-- Verification tiers: say which tier was the highest one the author ran,
+     and which were skipped and why. The tiers are named in
+     .agents/workflows/test.md: fast, default (the bar for opening a PR), and
+     full (CI's job). A PR that ran only the fast tier must not read as if it
+     ran the default tier, and a PR that ran nothing must say so. -->
+- Highest tier run:
+- Tiers skipped:
+
 ## Mock/stub disclosure
 
 <!-- List anything simulated, stubbed, or faked. Write "none" when nothing is. -->

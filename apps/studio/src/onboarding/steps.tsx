@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from "react";
 
 import { BoltIcon, CompassIcon, SignalIcon, SparkIcon } from "../components/icons";
-import { GOALS, type GoalIconName, type GoalId, type OnboardingGoal } from "./content";
+import { GOALS, type GoalIconName, type GoalId } from "./content";
 
 /* ------------------------------------------------------------------ */
 /* Shared                                                             */
@@ -104,7 +104,7 @@ export function GoalStep({
       </div>
       <p className="wizard-hint">
         {goal
-          ? "Ready when you are. One message is enough."
+          ? "Continue when you are ready. Everything stays one message away."
           : "Pick one to start."}
       </p>
     </>
@@ -137,7 +137,7 @@ function StatusRow({
   value: boolean | null;
 }) {
   const state = value === true ? "ok" : value === false ? "warn" : "pending";
-  const text = value === true ? "Connected" : value === false ? "Not ready" : "Checking";
+  const text = value === true ? "Connected" : value === false ? "Not reachable" : "Checking";
 
   return (
     <div className={`wizard-check wizard-check--${state}`}>
@@ -178,17 +178,17 @@ export function ReadinessStep({
       <div className="wizard-checks">
         <StatusRow
           label="Studio service"
-          detail="The local helper running this window."
+          detail="The local sidecar serving this window."
           value={status.sidecar}
         />
         <StatusRow
-          label="Data bridge"
-          detail="Your jobs, steps, and insights."
+          label="MCP server"
+          detail="Your jobs, outcomes, and evidence."
           value={status.mcp}
         />
         <StatusRow
-          label="AI assistant"
-          detail="The model helping with conversation."
+          label="Copilot model"
+          detail="The OpenAI-compatible model behind the chat."
           value={status.model}
         />
       </div>
@@ -196,7 +196,8 @@ export function ReadinessStep({
       {modelDown ? (
         <div className="wizard-config">
           <p className="wizard-config__hint">
-            The studio works on its own. An AI assistant makes conversation richer — but you can add that later in Settings.
+            The studio still opens and works by hand. Point it at a model now, or connect
+            one later in Settings.
           </p>
           {modelMessage ? <p className="wizard-config__message">{modelMessage}</p> : null}
 
@@ -267,30 +268,5 @@ export function ReadinessStep({
         </div>
       )}
     </>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Step 4 — first move                                                */
-/* ------------------------------------------------------------------ */
-
-export function LaunchStep({ goal }: { goal: OnboardingGoal }) {
-  return (
-    <div className="wizard-launch">
-      <div className="wizard-choice">
-        <GoalIcon name={goal.icon} />
-        <span>
-          <span className="wizard-choice__title">{goal.title}</span>
-          <span className="wizard-choice__result">{goal.result}</span>
-        </span>
-      </div>
-
-      <div className="wizard-destination">
-        <p className="wizard-destination__label">Where this goes</p>
-        <p className="wizard-destination__detail">{goal.destinationLabel}</p>
-      </div>
-
-      <p className="wizard-hint">Replay this tour from Settings whenever you want.</p>
-    </div>
   );
 }
