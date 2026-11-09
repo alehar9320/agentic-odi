@@ -10,6 +10,7 @@ import { LocalMemoryService } from "./memory/localMemoryService";
 import { ChatOrchestrator } from "./chat/orchestrator";
 import { CapabilityRegistry, capabilityRegistry } from "./capabilities/registry";
 import { BffError } from "./errors";
+import { storageFacts } from "./storageFacts";
 
 /** One queued write, as the caller describes it before the store assigns an id. */
 interface QueuedWriteInput {
@@ -46,6 +47,11 @@ export class StudioBff {
   /** The queued writes still waiting for the sidecar, oldest first. */
   async listOutbox(): Promise<OutboxRecord[]> {
     return this.store.listOutbox();
+  }
+
+  /** Storage facts for the local store. */
+  async storageFacts(): Promise<Awaited<ReturnType<typeof storageFacts>>> {
+    return storageFacts(this.store);
   }
 
   private async enqueue(input: QueuedWriteInput): Promise<OutboxRecord> {

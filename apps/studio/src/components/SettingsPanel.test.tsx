@@ -387,20 +387,22 @@ describe("SettingsPanel connection survey", () => {
 });
 
 describe("SettingsPanel section modules", () => {
-  it("composes the five sections in order", () => {
+  it("composes the sections in order", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
 
     const { container } = renderPanel();
 
-    // Data (context), Model, Connections (bridge), Updates, About.
+    // Context, Data, Model, Connections (bridge), Updates, About, Install.
     expect(screen.getByText(/your context/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^data$/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^model$/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /studio bridge/i })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: /software update/i })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
 
     const text = container.textContent ?? "";
-    expect(text.indexOf("Your context")).toBeLessThan(text.indexOf("Model"));
+    expect(text.indexOf("Your context")).toBeLessThan(text.indexOf("Data"));
+    expect(text.indexOf("Data")).toBeLessThan(text.indexOf("Model"));
     expect(text.indexOf("Model")).toBeLessThan(text.indexOf("Studio bridge"));
   });
 
