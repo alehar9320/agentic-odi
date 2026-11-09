@@ -153,8 +153,8 @@ function StudioShell() {
           <CustomizePage />
         ) : (
           <div className="stage__split">
-            <WorkbenchRail />
             <div className="stage__thread">
+              <WorkbenchRail />
               <ChatStage />
             </div>
             <WorkspacePanel />

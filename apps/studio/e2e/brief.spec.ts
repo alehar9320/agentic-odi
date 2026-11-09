@@ -101,9 +101,9 @@ test.describe("the decision brief", () => {
   });
 });
 
-/** The landscape row on the map. */
+/** The landscape chip in the workbench rail. */
 function railLandscape(page: Page) {
   return page
-    .getByRole("navigation", { name: "Studio" })
+    .getByRole("navigation", { name: "Your work" })
     .getByRole("button", { name: /^Landscape,/ });
 }

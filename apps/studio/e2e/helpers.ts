@@ -44,12 +44,12 @@ export async function openStudio(page: Page): Promise<void> {
   }
 }
 
-/** The map — the persistent list of every destination the Studio has. */
+/** The workbench rail — the list of views the user can open. */
 export function rail(page: Page) {
-  return page.getByRole("navigation", { name: "Studio" });
+  return page.getByRole("navigation", { name: "Your work" });
 }
 
-/** The docked view (the "lens") that a map row opens. */
+/** The docked view (the "lens") that a rail item opens. */
 export function lens(page: Page) {
   // The guidance line is also an `aside` with an accessible name, so it is
   // complementary too; scope to the docked lens itself.
@@ -118,9 +118,10 @@ export interface SeededOutcome {
 /**
  * Put a job and its outcomes in the repository.
  *
- * A map row counts what the repository holds, so a test that checks a count
- * or a populated view needs real artifacts behind it. Seeding through the API
- * rather than the UI keeps the test about the view it is actually checking.
+ * The workbench rail only appears once the thread has produced something
+ * worth looking at, so a test that exercises the rail needs real artifacts
+ * behind it. Seeding through the API rather than the UI keeps the test about
+ * the view it is actually checking.
  */
 export async function seedOutcomes(
   request: APIRequestContext,
