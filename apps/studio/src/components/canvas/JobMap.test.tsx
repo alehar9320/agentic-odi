@@ -25,7 +25,9 @@ const mocks = vi.hoisted(() => ({
 const harness = vi.hoisted(() => ({
   state: {
     canvasState: { kind: "ready", data: null } as unknown,
+    canvasCached: false,
     refreshCanvas: vi.fn(),
+    openPanel: vi.fn(),
     addStep: vi.fn(),
     focusedJobId: null as string | null,
     ...mocks,
@@ -39,6 +41,7 @@ vi.mock("../../state/StudioContext", () => ({
 describe("JobMap Interactive Visualization", () => {
   beforeEach(() => {
     harness.state.canvasState = { kind: "ready", data: mockCanvasData };
+    harness.state.canvasCached = false;
     harness.state.focusedJobId = null;
   });
 
@@ -226,5 +229,71 @@ describe("JobMap failures", () => {
 
     expect(screen.getByRole("alert").textContent).toContain("The MCP server is unreachable.");
     expect(screen.queryByText("0 steps")).toBeNull();
+  });
+});
+
+describe("JobMap canvas cache", () => {
+  beforeEach(() => {
+    harness.state.canvasCached = false;
+    harness.state.focusedJobId = null;
+  });
+
+  it("draws the saved copy instead of a skeleton while the sidecar answers", () => {
+    // A cold load: the cached canvas is on disk, the sidecar has not answered.
+    harness.state.canvasState = {
+      kind: "loading",
+      data: {
+        ...mockCanvasData,
+        provenance: {
+          kind: "live",
+          reason: "store",
+          generated_at: new Date(Date.now() - 4 * 60_000).toISOString(),
+          record_counts: { jobs: 1, steps: 2, outcomes: 0, evidence: 0 },
+        },
+      },
+    };
+    harness.state.canvasCached = true;
+
+    const { container } = render(<JobMap />);
+
+    // The saved steps are on screen, and no skeleton stands in for them.
+    expect(screen.getByText("Define payload parameters")).toBeInTheDocument();
+    expect(container.querySelector(".skeleton")).toBeNull();
+    expect(screen.getByText("Saved 4 minutes ago")).toBeInTheDocument();
+  });
+
+  it("draws a warm reload without claiming it is a saved copy", () => {
+    // Live data held while a reload runs: drawn, but not captioned as cached.
+    harness.state.canvasState = { kind: "loading", data: mockCanvasData };
+
+    const { container } = render(<JobMap />);
+
+    expect(screen.getByText("Define payload parameters")).toBeInTheDocument();
+    expect(container.querySelector(".skeleton")).toBeNull();
+    expect(screen.queryByText(/saved/i)).toBeNull();
+  });
+
+  it("keeps the skeleton when a genuinely empty store is still loading", () => {
+    harness.state.canvasState = {
+      kind: "loading",
+      data: { jobs: [], steps: [], outcomes: [], source: "local" },
+    };
+
+    const { container } = render(<JobMap />);
+
+    expect(container.querySelector(".skeleton")).not.toBeNull();
+  });
+
+  it("says there is no saved copy and offers the action that creates one", () => {
+    harness.state.canvasState = {
+      kind: "empty",
+      data: { jobs: [], steps: [], outcomes: [], source: "local" },
+    };
+
+    render(<JobMap />);
+
+    expect(screen.getByText("No saved copy on this device")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /capture what you know/i }));
+    expect(harness.state.openPanel).toHaveBeenCalledWith("capture");
   });
 });

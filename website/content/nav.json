@@ -12,6 +12,7 @@
     {
       "title": "Build",
       "guides": [
+        { "slug": "method", "title": "The method, stage by stage", "source": "docs/method.md", "blurb": "The eight job-map stages as a practitioner works them." },
         { "slug": "cli", "title": "CLI reference", "source": "docs/cli.md", "blurb": "Backends, chat, entities, and scoring." },
         { "slug": "connectors", "title": "Connectors", "source": "docs/connectors.md", "blurb": "The registry, the presets, and the protocol." },
         { "slug": "mcp", "title": "MCP tool reference", "source": null, "blurb": "Every tool the server exposes." },

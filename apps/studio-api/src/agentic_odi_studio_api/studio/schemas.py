@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
 from agentic_odi_core.models import JobStage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
     from agentic_odi_connectors.marketplace import MarketplaceListing
@@ -29,6 +29,13 @@ class LlmHealthRequest(BaseModel):
     base_url: str
     api_key: str = ""
     model: str = ""
+
+
+class LlmHealthResponse(BaseModel):
+    healthy: bool
+    message: str
+    checked_at: str  # ISO 8601 UTC when the probe last ran
+    cached: bool  # whether the answer was served from the TTL cache
 
 
 class ModelListRequest(BaseModel):
@@ -167,6 +174,19 @@ class AttachmentRef(BaseModel):
     data_url: str | None = Field(default=None, max_length=8_000_000)
 
 
+class FocusRef(BaseModel):
+    """Which record the person is looking at, as a pointer and nothing more.
+
+    The client names the id; only the store has the words. Extra keys are
+    rejected so a browser cannot slip its own label into the prompt.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["job", "step", "outcome", "evidence"]
+    id: str = Field(min_length=1, max_length=64)
+
+
 class ChatRequest(BaseModel):
     base_url: str
     api_key: str = ""
@@ -184,6 +204,8 @@ class ChatRequest(BaseModel):
     #: The id the client is streaming this reply under, so the persisted branch
     #: tree matches the one on screen.
     assistant_id: str | None = None
+    #: The record the person has selected on screen, if any.
+    focus: FocusRef | None = None
 
 
 class ApprovalDecisionRequest(BaseModel):
@@ -305,6 +327,16 @@ class ConversationModel(BaseModel):
     created_at: str
     updated_at: str
     head_id: str | None = None
+
+
+class ConversationSummaryModel(ConversationModel):
+    """A conversation in the history list: its metadata plus how much is in it."""
+
+    turn_count: int = 0
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationSummaryModel] = Field(default_factory=list)
 
 
 class ConversationResponse(BaseModel):
