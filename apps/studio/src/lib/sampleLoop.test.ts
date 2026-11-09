@@ -1,37 +1,53 @@
 import { describe, expect, it } from "vitest";
 
-import { SAMPLE_JOB_ID, SAMPLE_OUTCOME_ID, SAMPLE_QUOTE_ID, isSampleRecord, sampleLoop } from "./sampleLoop";
+import { isUnderserved } from "./odi";
+import {
+  SAMPLE_EVIDENCE_ID,
+  SAMPLE_EVIDENCE_IDS,
+  SAMPLE_JOB_ID,
+  SAMPLE_OUTCOME_ID,
+  SAMPLE_OUTCOME_IDS,
+  SAMPLE_STEP_ID,
+  sampleCanvas,
+  sampleRecordsForTour,
+} from "./sampleLoop";
 
-describe("sampleLoop", () => {
-  it("is created only once, even if the tour restarts", () => {
-    expect(sampleLoop()).toBe(sampleLoop());
-    expect(sampleLoop()).toBe(sampleLoop());
+describe("sample brief", () => {
+  it("is the sample job, step, evidence, and three scored outcomes", () => {
+    const canvas = sampleCanvas();
+
+    expect(canvas.jobs.map((job) => job.id)).toEqual([SAMPLE_JOB_ID]);
+    expect(canvas.steps.map((step) => step.id)).toEqual([SAMPLE_STEP_ID]);
+    expect(canvas.evidence?.map((item) => item.id)).toEqual([...SAMPLE_EVIDENCE_IDS]);
+    expect(canvas.outcomes.map((outcome) => outcome.id)).toEqual([...SAMPLE_OUTCOME_IDS]);
+    // Bundled sample data, never the person's live canvas.
+    expect(canvas.source).toBe("seed");
   });
 
-  it("is frozen, so a scene cannot edit the one sample", () => {
-    expect(Object.isFrozen(sampleLoop())).toBe(true);
+  it("scores the sample outcome as underserved so the highlight has a reason", () => {
+    const canvas = sampleCanvas();
+    const landed = canvas.outcomes.find((outcome) => outcome.id === SAMPLE_OUTCOME_ID);
+
+    expect(landed).toBeDefined();
+    expect(landed?.opportunity_score).toBe(15);
+    expect(isUnderserved(landed?.opportunity_score)).toBe(true);
   });
 
-  it("carries one quote and one unscored outcome", () => {
-    const sample = sampleLoop();
-    expect(sample.quote.text).toContain("spreadsheet of config keys");
-    expect(sample.outcome.importance).toBeNull();
-    expect(sample.outcome.satisfaction).toBeNull();
-    expect(sample.outcome.opportunity_score).toBeNull();
+  it("names every record the tour made, for removal", () => {
+    const records = sampleRecordsForTour();
+
+    expect(records).toContainEqual({ kind: "evidence", id: SAMPLE_EVIDENCE_ID });
+    expect(records).toContainEqual({ kind: "step", id: SAMPLE_STEP_ID });
+    expect(records).toContainEqual({ kind: "job", id: SAMPLE_JOB_ID });
+    expect(records.filter((record) => record.kind === "outcome")).toHaveLength(
+      SAMPLE_OUTCOME_IDS.length,
+    );
   });
 
-  it("labels every record as a sample", () => {
-    const sample = sampleLoop();
-    expect(sample.source).toBe("sample");
-    expect(sample.simulated).toBe(true);
-    expect(sample.quote.source).toContain("sample");
-  });
+  it("returns a fresh canvas each call so a scene cannot mutate the sample", () => {
+    const first = sampleCanvas();
+    first.jobs[0].name = "changed";
 
-  it("knows only its own ids, so a real record is never removed", () => {
-    expect(isSampleRecord({ id: SAMPLE_JOB_ID })).toBe(true);
-    expect(isSampleRecord({ id: SAMPLE_QUOTE_ID })).toBe(true);
-    expect(isSampleRecord({ id: SAMPLE_OUTCOME_ID })).toBe(true);
-    expect(isSampleRecord({ id: "job-123" })).toBe(false);
-    expect(isSampleRecord(null)).toBe(false);
+    expect(sampleCanvas().jobs[0].name).not.toBe("changed");
   });
 });
