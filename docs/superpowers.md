@@ -28,8 +28,10 @@ This project ships [Superpowers](https://github.com/obra/superpowers) for
 [Freebuff](https://freebuff.com) as repo-local skills plus a session-start
 bootstrap. No plugin or hook is required:
 
-- **Skills**: `.agents/skills/` contains 15 Superpowers skills. Freebuff
-  discovers them automatically; load one with the `skill` tool.
+- **Skills**: `.agents/skills/` contains the 15 vendored Superpowers skills plus
+  repo-owned skills that `skills-lock.json` does not track (`reuse-first`,
+  `preparing-a-pr-for-merge`, `draining-the-pr-queue`). Freebuff discovers all of
+  them automatically; load one with the `skill` tool.
 - **Bootstrap**: `AGENTS.md` injects the `using-superpowers` rules and the
   Freebuff tool mapping at session start.
 - **Mapping**: `.agents/skills/using-superpowers/references/freebuff-tools.md`
