@@ -1,103 +1,23 @@
 import { apiUrl } from "../bridge/desktopBridge";
+import { newId, nowIso } from "./id";
+import type { CanvasData, ChangelogData, Job, Observation, Outcome, Step } from "../types";
+import type { LocalStore, OutboxEntity, OutboxKind, OutboxRecord } from "./store/types";
 import { authHeaders } from "../api/studioApi";
-import { nowIso } from "./id";
-import type { CanvasData, ChangelogData, Evidence, Observation } from "../types";
-import type {
-  LocalStore,
-  StoredConversation,
-  StoredJob,
-  StoredOutcome,
-  StoredStep,
-  StoredTurn,
-  WorkspaceSnapshot,
-  WorkspaceSummary,
-} from "./store/types";
-import { WORKSPACE_SNAPSHOT_VERSION } from "./store/types";
+import type { WorkspaceSnapshot } from "./store/types";
 import { openLocalStore } from "./store/openStore";
 import { LocalDataService } from "./data/localDataService";
 import { LocalMemoryService } from "./memory/localMemoryService";
 import { ChatOrchestrator } from "./chat/orchestrator";
 import { CapabilityRegistry, capabilityRegistry } from "./capabilities/registry";
 import { BffError } from "./errors";
+import { storageFacts } from "./storageFacts";
 
-const EXPORT_HINT =
-  "Export the workspace again and try importing the file unchanged.";
-
-/** The list fields a snapshot carries, read defensively. */
-function readList<T>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
-/**
- * Turn a version 1 payload into a version 2 snapshot.
- *
- * Version 1 had no `evidence`; every other list is carried across untouched, so
- * an old file keeps every record it held.
- */
-function migrateFromV1(raw: Record<string, unknown>): WorkspaceSnapshot {
-  return {
-    version: WORKSPACE_SNAPSHOT_VERSION,
-    jobs: readList<StoredJob>(raw.jobs),
-    steps: readList<StoredStep>(raw.steps),
-    outcomes: readList<StoredOutcome>(raw.outcomes),
-    observations: readList<Observation>(raw.observations),
-    evidence: [],
-    conversations: readList<StoredConversation>(raw.conversations),
-    turns: readList<StoredTurn>(raw.turns),
-  };
-}
-
-/**
- * Read an exported workspace file into a snapshot this build can restore.
- *
- * Accepts the current version and migrates version 1 on the way in. Any other
- * version is refused with the version it found, because silently ignoring the
- * parts a newer file carries would be a backup that drops records.
- */
-export function parseWorkspaceSnapshot(json: string): WorkspaceSnapshot {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(json);
-  } catch {
-    throw new BffError("validation", "The workspace file is not valid JSON.", {
-      suggestion: EXPORT_HINT,
-    });
-  }
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    throw new BffError(
-      "validation",
-      "The workspace file is not a workspace snapshot.",
-      { suggestion: EXPORT_HINT },
-    );
-  }
-  const record = raw as Record<string, unknown>;
-  const version = record.version;
-  if (version === 1) {
-    return migrateFromV1(record);
-  }
-  if (version === WORKSPACE_SNAPSHOT_VERSION) {
-    return {
-      version: WORKSPACE_SNAPSHOT_VERSION,
-      jobs: readList<StoredJob>(record.jobs),
-      steps: readList<StoredStep>(record.steps),
-      outcomes: readList<StoredOutcome>(record.outcomes),
-      observations: readList<Observation>(record.observations),
-      evidence: readList<Evidence>(record.evidence),
-      conversations: readList<StoredConversation>(record.conversations),
-      turns: readList<StoredTurn>(record.turns),
-    };
-  }
-  const found = version === undefined ? "none" : String(version);
-  throw new BffError(
-    "validation",
-    `This workspace file is version ${found}, but this build reads up to version ${WORKSPACE_SNAPSHOT_VERSION}.`,
-    {
-      suggestion:
-        typeof version === "number" && version > WORKSPACE_SNAPSHOT_VERSION
-          ? "Update the studio, then import the file again."
-          : EXPORT_HINT,
-    },
-  );
+/** One queued write, as the caller describes it before the store assigns an id. */
+interface QueuedWriteInput {
+  kind: OutboxKind;
+  entity: OutboxEntity;
+  local_id: string | null;
+  payload: unknown;
 }
 
 export class StudioBff {
@@ -124,6 +44,139 @@ export class StudioBff {
     return this.data.fetchCanvas();
   }
 
+  /** The queued writes still waiting for the sidecar, oldest first. */
+  async listOutbox(): Promise<OutboxRecord[]> {
+    return this.store.listOutbox();
+  }
+
+  /** Storage facts for the local store. */
+  async storageFacts(): Promise<Awaited<ReturnType<typeof storageFacts>>> {
+    return storageFacts(this.store);
+  }
+
+  private async enqueue(input: QueuedWriteInput): Promise<OutboxRecord> {
+    const record: OutboxRecord = {
+      id: newId(),
+      kind: input.kind,
+      entity: input.entity,
+      local_id: input.local_id,
+      server_id: null,
+      payload: input.payload,
+      depends_on: [],
+      state: "pending",
+      attempts: 0,
+      last_error: null,
+      created_at: nowIso(),
+      acknowledged_at: null,
+    };
+    await this.store.enqueueOutbox(record);
+    return record;
+  }
+
+  /**
+   * Apply a write to the local store and queue it for the sidecar. The local
+   * record comes back so the caller can show it now; the outbox record is what
+   * says the sidecar has not seen it yet.
+   */
+  async createJob(payload: { name: string; description?: string }): Promise<Job> {
+    const job = await this.data.createJob(payload);
+    await this.enqueue({
+      kind: "create",
+      entity: "job",
+      local_id: job.id,
+      payload: { name: job.name, description: job.description },
+    });
+    return job;
+  }
+
+  async updateJob(
+    jobId: string,
+    payload: { name?: string; description?: string },
+  ): Promise<Job> {
+    const job = await this.data.updateJob(jobId, payload);
+    await this.enqueue({ kind: "update", entity: "job", local_id: jobId, payload });
+    return job;
+  }
+
+  async deleteJob(jobId: string): Promise<{ deleted: string }> {
+    const result = await this.data.deleteJob(jobId);
+    await this.enqueue({ kind: "delete", entity: "job", local_id: jobId, payload: {} });
+    return result;
+  }
+
+  async addStep(input: { job_id: string; name: string; order: number }): Promise<Step> {
+    const step = await this.data.addStep(input);
+    await this.enqueue({
+      kind: "create",
+      entity: "step",
+      local_id: step.id ?? null,
+      payload: { job_id: input.job_id, name: step.name, order: step.order },
+    });
+    return step;
+  }
+
+  async updateStep(
+    stepId: string,
+    payload: { name?: string; order?: number },
+  ): Promise<Step> {
+    const step = await this.data.updateStep(stepId, payload);
+    await this.enqueue({ kind: "update", entity: "step", local_id: stepId, payload });
+    return step;
+  }
+
+  async deleteStep(stepId: string): Promise<{ deleted: string }> {
+    const result = await this.data.deleteStep(stepId);
+    await this.enqueue({ kind: "delete", entity: "step", local_id: stepId, payload: {} });
+    return result;
+  }
+
+  async addOutcome(input: {
+    job_id: string;
+    statement: string;
+    importance: number | null;
+    satisfaction: number | null;
+    step_id?: string | null;
+  }): Promise<Outcome> {
+    const outcome = await this.data.addOutcome(input);
+    await this.enqueue({
+      kind: "create",
+      entity: "outcome",
+      local_id: outcome.id ?? null,
+      payload: {
+        job_id: input.job_id,
+        statement: outcome.statement,
+        importance: outcome.importance,
+        satisfaction: outcome.satisfaction,
+        step_id: input.step_id ?? null,
+      },
+    });
+    return outcome;
+  }
+
+  async updateOutcome(
+    outcomeId: string,
+    payload: {
+      statement?: string;
+      importance?: number | null;
+      satisfaction?: number | null;
+    },
+  ): Promise<Outcome> {
+    const outcome = await this.data.updateOutcome(outcomeId, payload);
+    await this.enqueue({ kind: "update", entity: "outcome", local_id: outcomeId, payload });
+    return outcome;
+  }
+
+  async deleteOutcome(outcomeId: string): Promise<{ deleted: string }> {
+    const result = await this.data.deleteOutcome(outcomeId);
+    await this.enqueue({
+      kind: "delete",
+      entity: "outcome",
+      local_id: outcomeId,
+      payload: {},
+    });
+    return result;
+  }
+
   /**
    * The changelog comes from the sidecar's release data. Without it there is
    * nothing honest to show, so return an empty list rather than inventing notes.
@@ -132,52 +185,31 @@ export class StudioBff {
     return { releases: [] };
   }
 
-  /**
-   * Serialize the whole local workspace (canvas, memory, conversations) to a
-   * readable JSON snapshot at the current version.
-   *
-   * Queued-but-unsent intents are not portable, so they are excluded and their
-   * presence is recorded in the file rather than silently dropped.
-   */
+  /** Serialize the whole local workspace (canvas, memory, conversations) to JSON. */
   async exportWorkspace(): Promise<string> {
     const snapshot = await this.store.snapshot();
-    const outbox = await this.store.listOutbox();
-    const pending = outbox.some(
-      (record) => record.state === "pending" || record.state === "sending",
-    );
-    return JSON.stringify(
-      { ...snapshot, exported_at: nowIso(), pending_writes_excluded: pending },
-      null,
-      2,
-    );
+    return JSON.stringify({ ...snapshot, exported_at: nowIso() }, null, 2);
   }
 
-  /** What the workspace holds, so a caller can name it before replacing it. */
-  async workspaceSummary(): Promise<WorkspaceSummary> {
-    const snapshot = await this.store.snapshot();
-    const counts = {
-      jobs: snapshot.jobs.length,
-      steps: snapshot.steps.length,
-      outcomes: snapshot.outcomes.length,
-      observations: snapshot.observations.length,
-      evidence: snapshot.evidence.length,
-      conversations: snapshot.conversations.length,
-      turns: snapshot.turns.length,
-    };
-    const records = Object.values(counts).reduce((total, count) => total + count, 0);
-    return { records, counts, empty: records === 0 };
-  }
-
-  /**
-   * Replace the whole local workspace with an imported JSON snapshot.
-   *
-   * A version 1 file is migrated on the way in; a version this build cannot read
-   * is refused with the version it found, so the mismatch is explained rather
-   * than swallowed. Restoring is destructive by nature — the caller confirms
-   * first, and this method never asks.
-   */
+  /** Replace the whole local workspace with an imported JSON snapshot. */
   async importWorkspace(json: string): Promise<void> {
-    const snapshot = parseWorkspaceSnapshot(json);
+    let snapshot: WorkspaceSnapshot;
+    try {
+      snapshot = JSON.parse(json) as WorkspaceSnapshot;
+    } catch {
+      throw new BffError(
+        "validation",
+        "The workspace file is not valid JSON.",
+        { suggestion: "Export the workspace again and try importing the file unchanged." },
+      );
+    }
+    if (!snapshot || snapshot.version !== 1) {
+      throw new BffError(
+        "validation",
+        `Unsupported workspace version ${snapshot?.version}.`,
+        { suggestion: "Export the workspace again and try importing the file unchanged." },
+      );
+    }
     await this.store.restore(snapshot);
   }
 

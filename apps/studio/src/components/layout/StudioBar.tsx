@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
-import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
-import { formatRelativeTime } from "../../lib/relativeTime";
+import { isEndpointConfiguredForSettings, endpointReachability, isPrivateHost } from "../../lib/modelEndpoint";
+import { formatRelativeTime, groupByDay } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
@@ -61,10 +61,12 @@ export function StudioBar({
   const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [askOpen, setAskOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
+  const activeHistoryRef = useRef<HTMLButtonElement>(null);
   // An empty transcript is only nothing to lose when nothing is on screen to
   // leave: the plus is the documented way out of the first-run setup, and a
   // disabled control there would strand the person in it.
@@ -152,6 +154,18 @@ export function StudioBar({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [historyOpen]);
+  // Opening the list lands on the thread already on screen: with forty in the
+  // list the one being read can be well below the fold, and hunting for it is
+  // work the app can do. Reduced motion gets the jump instead of the glide.
+  useEffect(() => {
+    if (!historyOpen) {
+      return;
+    }
+    const active = activeHistoryRef.current;
+    if (active && typeof active.scrollIntoView === "function") {
+      active.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+    }
+  }, [historyOpen, reduceMotion]);
 
   function toggleHistory() {
     setHistoryOpen((open) => {
@@ -188,6 +202,18 @@ export function StudioBar({
     api_key: settings.api_key,
     model_name: settings.model_name,
   });
+  const originClass = isPrivateHost(window.location.hostname) ? "device" : "hosted";
+  const reachability = endpointConfigured
+    ? endpointReachability(
+        {
+          base_url: settings.base_url,
+          api_key: settings.api_key,
+          model: settings.model_name,
+        },
+        { originClass },
+      )
+    : "reachable";
+  const deviceOnly = reachability === "device-only";
   const status =
     llmHealth.healthy === true
       ? "Live"
@@ -196,8 +222,9 @@ export function StudioBar({
         : endpointConfigured || sidecarReachable === true
           ? "Connecting"
           : "Local";
-  const statusDetail =
-    status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
+  const statusDetail = deviceOnly
+    ? "local endpoint, not reachable from this page"
+    : status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
   const updateReady = update.phase === "ready";
   const versionText = updateReady
     ? "Update ready"
@@ -310,26 +337,45 @@ export function StudioBar({
               {conversations.length === 0 ? (
                 <p className="bar__history-empty">No conversations yet.</p>
               ) : (
-                conversations.map((conversation) => {
-                  const current = conversation.id === conversationId;
-                  return (
-                    <button
-                      key={conversation.id}
-                      type="button"
-                      role="menuitem"
-                      className="bar__menu-item bar__history-item"
-                      aria-current={current ? "true" : undefined}
-                      onClick={() => selectConversation(conversation.id)}
-                    >
-                      <span className="bar__history-title">
-                        {conversation.title.trim() || "New conversation"}
-                      </span>
-                      <span className="bar__history-meta">
-                        {formatRelativeTime(conversation.updated_at)}
-                      </span>
-                    </button>
-                  );
-                })
+                groupByDay(conversations, (conversation) => conversation.updated_at).map((group) => (
+                  // The group carries the day in its accessible name; the line
+                  // above it is the same word made visible.
+                  <div
+                    key={group.section}
+                    className="bar__history-group"
+                    role="group"
+                    aria-label={group.label}
+                  >
+                    <p className="bar__history-day">{group.label}</p>
+                    {group.items.map((conversation) => {
+                      const current = conversation.id === conversationId;
+                      return (
+                        <button
+                          key={conversation.id}
+                          ref={current ? activeHistoryRef : undefined}
+                          type="button"
+                          role="menuitem"
+                          className="bar__menu-item bar__history-item"
+                          aria-current={current ? "true" : undefined}
+                          onClick={() => selectConversation(conversation.id)}
+                        >
+                          <span className="bar__history-title">
+                            {conversation.title.trim() || "New conversation"}
+                          </span>
+                          {/* A thread with no turns has nothing to count, so
+                              it says nothing rather than "0 turns". */}
+                          {conversation.turn_count > 0 ? (
+                            <span className="bar__history-meta">
+                              {formatRelativeTime(conversation.updated_at)} ·{" "}
+                              {conversation.turn_count}{" "}
+                              {conversation.turn_count === 1 ? "turn" : "turns"}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))
               )}
             </div>
           )}

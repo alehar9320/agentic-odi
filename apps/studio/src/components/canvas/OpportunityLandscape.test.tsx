@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isUnderserved, opportunityScore, UNDERSERVED_THRESHOLD } from "../../lib/odi";
 import type { CanvasState } from "../../types";
-import { OpportunityLandscape, plotX, plotY } from "./OpportunityLandscape";
+import { OpportunityLandscape, OpportunityPlot, plotX, plotY } from "./OpportunityLandscape";
 
 // Mock StudioContext
 const mockCanvasData = {
@@ -35,6 +35,13 @@ const harness = vi.hoisted(() => ({
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => harness.state,
 }));
+
+function renderWith(outcomes: unknown[]) {
+  harness.state.canvasState = {
+    kind: "ready",
+    data: { ...mockCanvasData, outcomes },
+  } as unknown as CanvasState;
+}
 
 describe("OpportunityLandscape Data Visualization", () => {
   beforeEach(() => {
@@ -352,13 +359,6 @@ describe("OpportunityLandscape canvas states", () => {
 });
 
 describe("OpportunityLandscape stored versus displayed score", () => {
-  function renderWith(outcomes: unknown[]) {
-    harness.state.canvasState = {
-      kind: "ready",
-      data: { ...mockCanvasData, outcomes },
-    } as unknown as CanvasState;
-  }
-
   beforeEach(() => {
     harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
     harness.state.focusedSubject = null;
@@ -495,6 +495,62 @@ describe("OpportunityLandscape score rendering", () => {
     expect(tile?.textContent).toContain("12.5");
   });
 
+  // One unscored record must not drag the headline down as if it were a zero.
+  // 16 and an unrated outcome average to 16.0, not 8.0, and the caption names
+  // the split so the number can be explained from the screen.
+  it("averages only the stored scores and names how many scored", () => {
+    renderWith([
+      {
+        id: "O-SCORED",
+        statement: "Minimize the time to sync a secret",
+        importance: 9,
+        satisfaction: 2,
+        opportunity_score: 12,
+      },
+      {
+        id: "O-UNSCORED",
+        statement: "Minimize the time to answer a ticket",
+        importance: 5,
+        satisfaction: 5,
+        opportunity_score: null,
+      },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("12.0");
+    expect(tile?.textContent).not.toContain("6.0");
+    expect(tile?.textContent).toContain("1 scored · 1 not scored");
+  });
+
+  // With nothing scored there is no mean. The tile says so in words rather than
+  // printing a fabricated 0.0, NaN, or N/A that reads as a number.
+  it("says Not scored when no outcome carries a score, with no numeric delta", () => {
+    renderWith([
+      {
+        id: "O-UNSCORED",
+        statement: "Minimize the time to answer a ticket",
+        importance: 5,
+        satisfaction: 5,
+        opportunity_score: null,
+      },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(within(tile as HTMLElement).getByText("Not scored")).toBeInTheDocument();
+    expect(tile?.textContent).not.toContain("0.0");
+    expect(tile?.textContent).not.toContain("NaN");
+    expect(tile?.textContent).not.toContain("scored ·");
+  });
+
+  it("shows the scored caption the same string a screen reader reads", () => {
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("2 scored · 0 not scored");
+  });
+
   // An outcome the sidecar never scored shows "—" and "Not scored" in the table,
   // never a fabricated "0.0" / "NORMAL".
   it("shows an unscored outcome as — and Not scored in the table rather than as a zero", () => {
@@ -629,5 +685,43 @@ describe("OpportunityLandscape underserved boundary", () => {
     const action = screen.getByRole("button", { name: "Export brief" });
     expect(action).toBeDisabled();
     expect(action).toHaveAttribute("title", "Nothing to brief yet");
+  });
+});
+
+describe("OpportunityPlot highlight", () => {
+  const outcomes = mockCanvasData.outcomes;
+
+  it("marks exactly the highlighted outcome and no other", () => {
+    const { container } = render(
+      <OpportunityPlot
+        outcomes={outcomes}
+        selectedOutcomeId={null}
+        highlightedOutcomeId="O-101"
+        onSelectOutcome={() => {}}
+        onHoverOutcome={() => {}}
+        activeOutcome={null}
+        compact
+      />,
+    );
+
+    const highlighted = container.querySelectorAll(".matrix-node--highlighted");
+    expect(highlighted).toHaveLength(1);
+    expect(highlighted[0]).toHaveAttribute("data-highlighted", "true");
+    expect(highlighted[0]).toHaveAccessibleName(/^O-101,/);
+  });
+
+  it("marks nothing when no outcome is highlighted", () => {
+    const { container } = render(
+      <OpportunityPlot
+        outcomes={outcomes}
+        selectedOutcomeId={null}
+        onSelectOutcome={() => {}}
+        onHoverOutcome={() => {}}
+        activeOutcome={null}
+        compact
+      />,
+    );
+
+    expect(container.querySelectorAll(".matrix-node--highlighted")).toHaveLength(0);
   });
 });

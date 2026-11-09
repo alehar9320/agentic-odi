@@ -3,7 +3,6 @@ import { nowIso } from "../id";
 import {
   byCreated,
   bySeq,
-  WORKSPACE_SNAPSHOT_VERSION,
   type DrainLease,
   type LocalStore,
   type OutboxRecord,
@@ -256,14 +255,11 @@ export class MemoryLocalStore implements LocalStore {
     const observations = await this.listObservations();
     const conversations = await this.listConversations();
     return {
-      version: WORKSPACE_SNAPSHOT_VERSION,
+      version: 1,
       jobs,
       steps,
       outcomes,
       observations,
-      // The browser store holds no evidence yet (read-only through the sidecar
-      // until #306); the field travels so the file shape is version 2.
-      evidence: [],
       conversations,
       turns: [...this.turns],
     };

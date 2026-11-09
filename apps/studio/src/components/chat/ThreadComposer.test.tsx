@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { ATTACHMENT_READ_FAILURE } from "../../assistant/attachments";
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
 import type { StudioCommand } from "../../lib/commands";
+import { focusableWithin } from "../../lib/useFocusTrap";
 import type { StudioContextValue } from "../../state/StudioContext";
 import type { ChatMessage } from "../../types";
 import { ThreadComposer } from "./ThreadComposer";
@@ -273,5 +275,210 @@ describe("ThreadComposer focus chip", () => {
     );
 
     expect(clearFocus).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ThreadComposer mixed clipboard paste", () => {
+  const draft = "first line\nsecond line";
+
+  /**
+   * jsdom performs no clipboard default action, so the test supplies the one a
+   * browser would: when the composer leaves the paste unprevented, the text is
+   * inserted at the caret and the input event the app listens for is fired.
+   */
+  function paste(
+    input: HTMLTextAreaElement,
+    { text, files }: { text?: string; files?: File[] },
+  ): boolean {
+    const clipboardData = {
+      files: files ?? [],
+      getData: (type: string) => (type === "text/plain" ? (text ?? "") : ""),
+    };
+    const notPrevented = fireEvent.paste(input, { clipboardData });
+    if (notPrevented && text) {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      const next = input.value.slice(0, start) + text + input.value.slice(end);
+      fireEvent.change(input, { target: { value: next } });
+    }
+    return notPrevented;
+  }
+
+  it("keeps the pasted text when the clipboard also carries an image", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = renderComposer({ sendMessage });
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+    const image = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    const notPrevented = paste(input, { text: "inserted", files: [image] });
+
+    expect(notPrevented).toBe(true);
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("inserts text-only paste once and attaches nothing", () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+
+    paste(input, { text: "inserted" });
+
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(screen.queryByRole("listitem")).toBeNull();
+  });
+
+  it("attaches an image-only paste and inserts no text", async () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+    const image = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    const notPrevented = paste(input, { files: [image] });
+
+    expect(notPrevented).toBe(false);
+    expect(input.value).toBe(draft);
+    expect(await screen.findByText("screenshot.png")).toBeInTheDocument();
+  });
+
+  it("keeps the text and still names a refused file", () => {
+    const pushToast = vi.fn();
+    const input = renderComposer({ pushToast });
+    fireEvent.change(input, { target: { value: draft } });
+    input.setSelectionRange(10, 10);
+    const pdf = new File(["x"], "deck.pdf", { type: "application/pdf" });
+
+    paste(input, { text: "inserted", files: [pdf] });
+
+    expect(input.value).toBe("first lineinserted\nsecond line");
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("deck.pdf"));
+    expect(screen.queryByText("deck.pdf")).toBeNull();
+  });
+
+  it("inserts multiline unicode text verbatim", () => {
+    const input = renderComposer();
+    fireEvent.change(input, { target: { value: "α β" } });
+    input.setSelectionRange(3, 3);
+
+    paste(input, { text: "héllo\nwörld" });
+
+    expect(input.value).toBe("α βhéllo\nwörld");
+  });
+
+  it("never sends the turn from a paste", () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = renderComposer({ sendMessage });
+    const image = new File(["png"], "screenshot.png", { type: "image/png" });
+
+    paste(input, { text: "inserted", files: [image] });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A file the browser hands over by name but gives nothing back for: a locked
+ * transcript, a disk hiccup, a tab that lost the handle.
+ */
+function unreadableFile(name: string): File {
+  const file = new File(["x"], name, { type: "text/markdown" });
+  Object.defineProperty(file, "text", {
+    value: () => Promise.reject(new Error("Read interrupted")),
+  });
+  return file;
+}
+
+function readableFile(name: string): File {
+  return new File(["a thought worth sending"], name, { type: "text/markdown" });
+}
+
+function composerWithFiles(overrides: Record<string, unknown> = {}) {
+  vi.mocked(useStudio).mockReturnValue(context([], overrides));
+  const { container } = render(
+    <StudioRuntimeProvider>
+      <ThreadComposer onCommand={() => {}} />
+    </StudioRuntimeProvider>,
+  );
+  return {
+    root: container.querySelector(".composer") as HTMLElement,
+    input: screen.getByRole("textbox", { name: "Message the studio" }) as HTMLTextAreaElement,
+  };
+}
+
+function dropFiles(root: HTMLElement, files: File[]) {
+  fireEvent.dragEnter(root, { dataTransfer: { types: ["Files"], files } });
+  fireEvent.drop(root, { dataTransfer: { types: ["Files"], files } });
+}
+
+describe("ThreadComposer unreadable attachments", () => {
+  it("names the file and says it could not be read", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [unreadableFile("notes.md")]);
+
+    const failure = await screen.findByText(ATTACHMENT_READ_FAILURE);
+    expect(failure.closest(".attachment-chip")).toHaveTextContent("notes.md");
+  });
+
+  it("keeps the draft and the readable file beside a failed one", async () => {
+    const { root, input } = composerWithFiles();
+    fireEvent.change(input, { target: { value: "a draft in progress" } });
+
+    dropFiles(root, [readableFile("good.md"), unreadableFile("notes.md")]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+
+    expect(screen.getByText("good.md")).toBeInTheDocument();
+    expect(input.value).toBe("a draft in progress");
+  });
+
+  it("leaves the failed chip on the tab path so it can be removed", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [unreadableFile("notes.md")]);
+
+    const remove = await screen.findByRole("button", { name: "Remove notes.md" });
+    expect(focusableWithin(root)).toContain(remove);
+
+    fireEvent.click(remove);
+
+    await waitFor(() => expect(screen.queryByText(ATTACHMENT_READ_FAILURE)).toBeNull());
+  });
+
+  it("holds the turn back while a file could not be read", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const { root, input } = composerWithFiles({ sendMessage });
+
+    dropFiles(root, [readableFile("good.md"), unreadableFile("notes.md")]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+
+    fireEvent.change(input, { target: { value: "Read these" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
+  });
+
+  it("sends once the failed file is gone, and with only the readable one", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const { root, input } = composerWithFiles({ sendMessage });
+
+    dropFiles(root, [readableFile("good.md"), unreadableFile("notes.md")]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove notes.md" }));
+    await waitFor(() => expect(screen.queryByText(ATTACHMENT_READ_FAILURE)).toBeNull());
+
+    fireEvent.change(input, { target: { value: "Read these" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    const [text, attachments] = sendMessage.mock.calls[0] as unknown as [
+      string,
+      { name: string }[],
+    ];
+    expect(text).toBe("Read these");
+    expect(attachments.map((attachment) => attachment.name)).toEqual(["good.md"]);
   });
 });

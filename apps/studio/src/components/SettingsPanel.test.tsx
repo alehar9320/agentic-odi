@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
 import { UpdateProvider, createUpdateService } from "../updater";
@@ -11,29 +11,8 @@ vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 
-vi.mock("../api/studioApi", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../api/studioApi")>();
-  return {
-    ...actual,
-    exportWorkspace: vi.fn(),
-    importWorkspace: vi.fn(),
-    workspaceSummary: vi.fn(),
-    readWorkspaceSnapshot: vi.fn(),
-  };
-});
-
-vi.mock("../lib/download", () => ({ downloadFile: vi.fn() }));
-
 import { useStudio } from "../state/StudioContext";
 import type { StudioContextValue } from "../state/StudioContext";
-import {
-  exportWorkspace,
-  importWorkspace,
-  readWorkspaceSnapshot,
-  workspaceSummary,
-} from "../api/studioApi";
-import { downloadFile } from "../lib/download";
-import type { WorkspaceSummary } from "../bff/store/types";
 
 const transport: UpdateTransport = {
   supported: () => false,
@@ -66,6 +45,8 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     refreshModels: vi.fn().mockResolvedValue(undefined),
     mcpReachable: false,
     pushToast: vi.fn(),
+    connectorsLoading: false,
+    presetsLoading: false,
     connectors: [{ name: "notion", kind: "mcp", enabled: true }],
     presets: [
       {
@@ -405,138 +386,46 @@ describe("SettingsPanel connection survey", () => {
   });
 });
 
-function workspaceSummaryStub(overrides: Partial<WorkspaceSummary["counts"]> = {}) {
-  const counts = {
-    jobs: 0,
-    steps: 0,
-    outcomes: 0,
-    observations: 0,
-    evidence: 0,
-    conversations: 0,
-    turns: 0,
-    ...overrides,
-  };
-  const records = Object.values(counts).reduce((total, count) => total + count, 0);
-  return { records, counts, empty: records === 0 };
-}
+describe("SettingsPanel section modules", () => {
+  it("composes the sections in order", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
 
-describe("SettingsPanel workspace export and import", () => {
-  beforeEach(() => {
-    vi.mocked(exportWorkspace).mockReset();
-    vi.mocked(importWorkspace).mockReset();
-    vi.mocked(workspaceSummary).mockReset();
-    vi.mocked(readWorkspaceSnapshot).mockReset();
-    vi.mocked(downloadFile).mockReset();
+    const { container } = renderPanel();
+
+    // Context, Data, Model, Connections (bridge), Updates, About, Install.
+    expect(screen.getByText(/your context/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^data$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^model$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /studio bridge/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /software update/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("Your context")).toBeLessThan(text.indexOf("Data"));
+    expect(text.indexOf("Data")).toBeLessThan(text.indexOf("Model"));
+    expect(text.indexOf("Model")).toBeLessThan(text.indexOf("Studio bridge"));
   });
 
-  it("downloads the whole workspace as one JSON file and reports it", async () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-    vi.mocked(exportWorkspace).mockResolvedValue('{"version":2}');
-    vi.mocked(workspaceSummary).mockResolvedValue(workspaceSummaryStub({ jobs: 2, outcomes: 1 }));
-
-    renderPanel();
-
-    fireEvent.click(screen.getByRole("button", { name: /export my workspace/i }));
-
-    await waitFor(() =>
-      expect(downloadFile).toHaveBeenCalledWith(
-        '{"version":2}',
-        "agentic-odi-workspace.json",
-        "application/json",
-      ),
-    );
-    expect(await screen.findByRole("status")).toHaveTextContent(/Exported/);
-    expect(screen.getByRole("status")).toHaveTextContent(/2 jobs/);
-  });
-
-  it("imports into an empty workspace without asking to replace anything", async () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-    vi.mocked(readWorkspaceSnapshot).mockResolvedValue({ version: 2 } as never);
-    vi.mocked(workspaceSummary)
-      .mockResolvedValueOnce(workspaceSummaryStub())
-      .mockResolvedValueOnce(workspaceSummaryStub({ jobs: 1 }));
-    vi.mocked(importWorkspace).mockResolvedValue(undefined);
-
-    renderPanel();
-
-    const file = new File(['{"version":2}'], "agentic-odi-workspace.json", {
-      type: "application/json",
-    });
-    fireEvent.change(screen.getByLabelText(/import workspace/i), {
-      target: { files: [file] },
-    });
-
-    await waitFor(() => expect(importWorkspace).toHaveBeenCalledOnce());
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    expect(await screen.findByRole("status")).toHaveTextContent(/Imported/);
-  });
-
-  it("asks before replacing a non-empty workspace and cancelling changes nothing", async () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-    vi.mocked(readWorkspaceSnapshot).mockResolvedValue({ version: 2 } as never);
-    vi.mocked(workspaceSummary).mockResolvedValue(workspaceSummaryStub({ jobs: 3, turns: 5 }));
-
-    renderPanel();
-
-    const file = new File(['{"version":2}'], "agentic-odi-workspace.json", {
-      type: "application/json",
-    });
-    fireEvent.change(screen.getByLabelText(/import workspace/i), {
-      target: { files: [file] },
-    });
-
-    const dialog = await screen.findByRole("alertdialog");
-    expect(dialog).toHaveTextContent(/3 jobs/);
-    expect(dialog).toHaveTextContent(/5 messages/);
-
-    fireEvent.click(within(dialog).getByRole("button", { name: /cancel/i }));
-
-    expect(importWorkspace).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(screen.queryByRole("status")).toBeNull();
-  });
-
-  it("replaces the workspace only after the confirmation is accepted", async () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-    vi.mocked(readWorkspaceSnapshot).mockResolvedValue({ version: 2 } as never);
-    vi.mocked(workspaceSummary)
-      .mockResolvedValueOnce(workspaceSummaryStub({ jobs: 1 }))
-      .mockResolvedValueOnce(workspaceSummaryStub({ jobs: 4 }));
-    vi.mocked(importWorkspace).mockResolvedValue(undefined);
-
-    renderPanel();
-
-    const file = new File(['{"version":2}'], "agentic-odi-workspace.json", {
-      type: "application/json",
-    });
-    fireEvent.change(screen.getByLabelText(/import workspace/i), {
-      target: { files: [file] },
-    });
-
-    const dialog = await screen.findByRole("alertdialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: /replace workspace/i }));
-
-    await waitFor(() => expect(importWorkspace).toHaveBeenCalledOnce());
-    expect(await screen.findByRole("status")).toHaveTextContent(/4 jobs/);
-  });
-
-  it("reports a version mismatch before anything is replaced", async () => {
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-    vi.mocked(readWorkspaceSnapshot).mockRejectedValue(
-      new Error("This workspace file is version 99, but this build reads up to version 2."),
+  it("keeps the Model section intact when the connector fetch fails", () => {
+    // #531: a broken connector fetch shows the Connections error and leaves the
+    // model controls beside it working, because each section owns its failure.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [],
+        connectorsError: {
+          code: "mcp_unreachable",
+          message: "The connector list is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+        models: ["local-tools-model"],
+      }),
     );
 
     renderPanel();
 
-    const file = new File(['{"version":99}'], "agentic-odi-workspace.json", {
-      type: "application/json",
-    });
-    fireEvent.change(screen.getByLabelText(/import workspace/i), {
-      target: { files: [file] },
-    });
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(/version 99/);
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    expect(importWorkspace).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
+    expect(screen.getByLabelText(/^model/i)).toHaveValue("m");
+    expect(screen.getByLabelText("Base URL")).toHaveValue("http://x");
   });
 });

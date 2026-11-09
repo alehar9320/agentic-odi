@@ -12,6 +12,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
   ATTACHMENT_ACCEPT,
+  ATTACHMENT_READ_FAILURE,
   MAX_ATTACHMENT_CHARS,
   MAX_ATTACHMENTS,
   MAX_IMAGE_BYTES,
@@ -84,13 +85,23 @@ function AttachmentRow({
         {attachments.length} of {MAX_ATTACHMENTS} files
       </p>
       {attachments.map((attachment, index) => {
-        const size = formatFileSize(attachment.file?.size ?? 0);
+        const failed =
+          attachment.status.type === "incomplete" && attachment.status.reason === "error";
+        const size = failed ? "" : formatFileSize(attachment.file?.size ?? 0);
         return (
-          <span className="attachment-chip" role="listitem" key={attachment.id}>
+          <span
+            className={`attachment-chip${failed ? " attachment-chip--failed" : ""}`}
+            role="listitem"
+            key={attachment.id}
+          >
             <AttachmentThumb file={attachment.file} />
             <span className="attachment-chip__meta">
               <span className="attachment-chip__name">{attachment.name}</span>
-              {size ? <span className="attachment-chip__size">{size}</span> : null}
+              {failed ? (
+                <span className="attachment-chip__failure">{ATTACHMENT_READ_FAILURE}</span>
+              ) : size ? (
+                <span className="attachment-chip__size">{size}</span>
+              ) : null}
             </span>
             <button
               type="button"
@@ -138,6 +149,15 @@ function ComposerBody({
   const paletteId = useId();
   const text = useAuiState((state) => state.composer.text);
   const running = useAuiState((state) => state.thread.isRunning);
+  // A file whose bytes never became content has to be dealt with before the
+  // turn goes out: sending anyway would hand the model a plausible name and
+  // nothing behind it.
+  const readBlocked = useAuiState((state) =>
+    state.composer.attachments.some(
+      (attachment) =>
+        attachment.status.type === "incomplete" && attachment.status.reason === "error",
+    ),
+  );
   const [highlight, setHighlight] = useState(0);
   // Remember which draft was dismissed, so typing again re-opens the palette
   // without an effect that writes state on every keystroke.
@@ -231,7 +251,9 @@ function ComposerBody({
       text.trim() !== ""
     ) {
       event.preventDefault();
-      aui.composer.send({ steer: false });
+      if (!readBlocked) {
+        aui.composer.send({ steer: false });
+      }
       return;
     }
 
@@ -310,11 +332,27 @@ function ComposerBody({
           aria-haspopup="listbox"
           aria-controls={open ? paletteId : undefined}
           onKeyDown={onKeyDown}
+          // This composer owns pasting: the library's built-in handler would
+          // preventDefault whenever the clipboard carries a file, which is the
+          // one case that must keep its text. Disabling it avoids a double
+          // attach and leaves the decision below.
+          addAttachmentOnPaste={false}
           onPaste={(event) => {
             // A screenshot on the clipboard is a file, not text: attach it
-            // rather than letting the browser paste a placeholder name.
+            // rather than letting the browser paste a placeholder name. But a
+            // clipboard can carry both — a screenshot and the paragraph that
+            // explains it — and swallowing the text is a silent loss. When text
+            // is present, attach the files and leave the paste unprevented so
+            // the browser inserts the text at the caret.
             const files = Array.from(event.clipboardData?.files ?? []);
             if (files.length === 0) {
+              return;
+            }
+            const text = event.clipboardData?.getData?.("text/plain") ?? "";
+            if (text !== "") {
+              // Mixed payload: let the browser insert the text at the caret,
+              // and attach the files alongside it.
+              onFiles(files);
               return;
             }
             event.preventDefault();
@@ -363,7 +401,11 @@ function ComposerBody({
               <StopIcon size={16} />
             </ComposerPrimitive.Cancel>
           ) : (
-            <ComposerPrimitive.Send className="composer__send" aria-label="Send message">
+            <ComposerPrimitive.Send
+              className="composer__send"
+              aria-label="Send message"
+              disabled={readBlocked}
+            >
               <ArrowUpIcon size={18} />
             </ComposerPrimitive.Send>
           )}
