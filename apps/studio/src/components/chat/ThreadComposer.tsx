@@ -7,7 +7,13 @@
  * setup wizard's composer.
  */
 
-import { AuiIf, ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
+import {
+  AttachmentPrimitive,
+  AuiIf,
+  ComposerPrimitive,
+  useAui,
+  useAuiState,
+} from "@assistant-ui/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
@@ -67,12 +73,7 @@ function AttachmentThumb({ file }: { file?: File }) {
   return <img className="attachment-chip__thumb" src={url} alt="" />;
 }
 
-function AttachmentRow({
-  onRemove,
-}: {
-  onRemove?: (index: number) => void;
-}) {
-  const aui = useAui();
+function AttachmentRow({ onRemove }: { onRemove?: () => void }) {
   const attachments = useAuiState((state) => state.composer.attachments);
 
   if (attachments.length === 0) {
@@ -84,39 +85,45 @@ function AttachmentRow({
       <p className="attachment-count" aria-live="polite">
         {attachments.length} of {MAX_ATTACHMENTS} files
       </p>
-      {attachments.map((attachment, index) => {
-        const failed =
-          attachment.status.type === "incomplete" && attachment.status.reason === "error";
-        const size = failed ? "" : formatFileSize(attachment.file?.size ?? 0);
-        return (
-          <span
-            className={`attachment-chip${failed ? " attachment-chip--failed" : ""}`}
-            role="listitem"
-            key={attachment.id}
-          >
-            <AttachmentThumb file={attachment.file} />
-            <span className="attachment-chip__meta">
-              <span className="attachment-chip__name">{attachment.name}</span>
-              {failed ? (
-                <span className="attachment-chip__failure">{ATTACHMENT_READ_FAILURE}</span>
-              ) : size ? (
-                <span className="attachment-chip__size">{size}</span>
-              ) : null}
-            </span>
-            <button
-              type="button"
-              className="attachment-chip__remove"
-              aria-label={`Remove ${attachment.name}`}
-              onClick={() => {
-                void aui.composer.attachment({ index }).remove();
-                onRemove?.(index);
-              }}
+      {/* `Attachments` scopes each chip to its own attachment, so `Root`,
+          `Name` and `Remove` read and act on the right one; the extraction
+          state, the refusal reason and the size ride inside `Root` as children. */}
+      <ComposerPrimitive.Attachments>
+        {({ attachment }) => {
+          const failed =
+            attachment.status.type === "incomplete" && attachment.status.reason === "error";
+          const size = failed ? "" : formatFileSize(attachment.file?.size ?? 0);
+          return (
+            <AttachmentPrimitive.Root
+              className={`attachment-chip${failed ? " attachment-chip--failed" : ""}`}
+              role="listitem"
             >
-              ✕
-            </button>
-          </span>
-        );
-      })}
+              {isImageLike(attachment.contentType ?? "") ? (
+                <AttachmentPrimitive.unstable_Thumb>
+                  <AttachmentThumb file={attachment.file} />
+                </AttachmentPrimitive.unstable_Thumb>
+              ) : null}
+              <span className="attachment-chip__meta">
+                <span className="attachment-chip__name">
+                  <AttachmentPrimitive.Name />
+                </span>
+                {failed ? (
+                  <span className="attachment-chip__failure">{ATTACHMENT_READ_FAILURE}</span>
+                ) : size ? (
+                  <span className="attachment-chip__size">{size}</span>
+                ) : null}
+              </span>
+              <AttachmentPrimitive.Remove
+                className="attachment-chip__remove"
+                aria-label={`Remove ${attachment.name}`}
+                onClick={() => onRemove?.()}
+              >
+                ✕
+              </AttachmentPrimitive.Remove>
+            </AttachmentPrimitive.Root>
+          );
+        }}
+      </ComposerPrimitive.Attachments>
     </div>
   );
 }

@@ -110,7 +110,7 @@ by the presence of one handler.
 | `ComposerPrimitive.Resume` | Planned | — | #424 | Appears only with a checkpoint. |
 | `ComposerPrimitive.TriggerPopover` (and its `Root`/`Items`/`Item`/`Categories`/`CategoryItem`/`Back`) | Planned | — | #426 | `@` mentions and `/` commands. |
 | `ComposerPrimitive.If` | Decision | — | — | `AuiIf` is the idiom already in use. |
-| `ComposerPrimitive.AttachmentByIndex` | Rejected | — | — | Attachment chips iterate their own list. |
+| `ComposerPrimitive.AttachmentByIndex` | Rejected | — | — | The composer renders chips through `ComposerPrimitive.Attachments`, which scopes each to its attachment; the bare by-index form stays unused. |
 | `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | `quote` and `dictation` are read today; `queue` arrives with #410, and `submission`/`inTransit` matter to that issue's honesty: a sent message the thread does not show yet must not look lost. |
 
 ## Action bar
@@ -135,7 +135,7 @@ by the presence of one handler.
 |---|---|---|---|---|
 | Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction capped at 20k chars, images capped at 5 MB, refusals explained. |
 | Drop and paste | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer follows the same accept rules as the input. |
-| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Rejected | — | — | The current chip shows extraction state and the reason a file was refused. The primitive would show a name and a thumbnail, which is less than the person needs. |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | this PR | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`, which scopes each chip to its own attachment; the extraction state, the refusal reason and the size ride inside `Root` as children, so the primitive shows more than a name. The sent-turn chip in `parts.tsx` still writes its own `attachment-chip` markup. |
 
 ## Thread list
 
