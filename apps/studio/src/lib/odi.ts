@@ -1,5 +1,4 @@
 import type { Outcome } from "../types";
-
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -122,3 +121,4 @@ export function segmentBasisLine(peopleInferred: boolean): string {
     ? "Candidate segment — grouped by the job it serves, not by researched people."
     : "People named from your evidence.";
 }
+

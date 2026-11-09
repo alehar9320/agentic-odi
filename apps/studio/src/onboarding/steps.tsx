@@ -13,6 +13,8 @@ import {
   type SampleOutcome,
 } from "../lib/sampleLoop";
 import { SCENES, type TourSceneId } from "./content";
+import { BoltIcon, CompassIcon, SignalIcon, SparkIcon } from "../components/icons";
+import { GOALS, type GoalIconName, type GoalId } from "./content";
 
 /* ------------------------------------------------------------------ */
 /* Shared                                                             */
