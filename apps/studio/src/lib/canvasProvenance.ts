@@ -32,3 +32,54 @@ export function canvasStatus(data: CanvasData | null | undefined): CanvasStatus 
   const label = reason.startsWith("mcp_") ? "OFFLINE" : "DEMO";
   return { label, detail: `sample data — ${detail}` };
 }
+
+/** Whether a canvas holds anything worth drawing, so a board is not drawn over nothing. */
+export function canvasHasRecords(data: CanvasData | null | undefined): boolean {
+  if (!data) {
+    return false;
+  }
+  return data.jobs.length > 0 || data.steps.length > 0 || data.outcomes.length > 0;
+}
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/** When the saved copy was produced, from the one timestamp the cache carries. */
+export function savedAtTime(data: CanvasData | null | undefined): number | null {
+  const iso = data?.provenance?.generated_at;
+  if (!iso) {
+    return null;
+  }
+  const parsed = Date.parse(iso);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * The caption for a board drawn from the saved copy. It names when the copy was
+ * saved when the cache carries a timestamp, and claims no time it does not have.
+ * `now` is injectable so the wording is testable without a clock.
+ */
+export function savedCopyCaption(
+  data: CanvasData | null | undefined,
+  now: number = Date.now(),
+): string {
+  const at = savedAtTime(data);
+  if (at === null) {
+    return "Saved copy on this device";
+  }
+  const elapsed = Math.max(0, now - at);
+  if (elapsed < MINUTE) {
+    return "Saved just now";
+  }
+  if (elapsed < HOUR) {
+    const minutes = Math.round(elapsed / MINUTE);
+    return `Saved ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
+  if (elapsed < DAY) {
+    const hours = Math.round(elapsed / HOUR);
+    return `Saved ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+  const days = Math.round(elapsed / DAY);
+  return `Saved ${days} day${days === 1 ? "" : "s"} ago`;
+}
