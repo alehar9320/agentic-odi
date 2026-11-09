@@ -254,6 +254,16 @@ export function MenuIcon(props: IconProps) {
   );
 }
 
+export function HistoryIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" />
+      <path d="M3.5 4.5V9h4.5" />
+      <path d="M12 8v4.5l3 1.8" />
+    </Icon>
+  );
+}
+
 
 export function BellIcon(props: IconProps) {
   return (
@@ -277,6 +287,15 @@ export function MoonIcon(props: IconProps) {
   return (
     <Icon {...props}>
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+    </Icon>
+  );
+}
+
+export function TableIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="M3 10h18M9 10v9" />
     </Icon>
   );
 }

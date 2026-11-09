@@ -12,6 +12,7 @@ import type {
   ConnectorOperationResponse,
   ConnectorPreset,
   Conversation,
+  ConversationSummary,
   ConversationTree,
   CreateJobPayload,
   Job,
@@ -30,6 +31,7 @@ import type {
   Strategy,
   StudioConfig,
   StudioError,
+  Study,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -86,8 +88,11 @@ function codeForStatus(status: number): string {
   return "internal";
 }
 
+/** How long the boot config request may hang before boot stops waiting on it. */
+const CONFIG_TIMEOUT_MS = 1_200;
+
 const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
-  mcp_unreachable: "The studio sidecar isn't reachable.",
+  mcp_unreachable: "The local Studio service isn't responding.",
   sidecar_unavailable: "This studio has no sidecar behind it.",
   not_found: "That resource wasn't found.",
   validation: "The request was invalid.",
@@ -98,7 +103,7 @@ const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
 
 const SUGGESTION_FOR_CODE: Partial<Record<string, string>> = {
   mcp_unreachable:
-    "Start the studio sidecar with `python scripts/dev.py` (or `npm --prefix apps/studio run dev:full`), then click Recheck.",
+    "Start it with  uv run python scripts/dev.py  and try again.",
   sidecar_unavailable:
     "Nothing is broken: this studio runs from your browser. Add a sidecar when you want live MCP data.",
   not_found: "Check the identifier and try again.",
@@ -194,8 +199,11 @@ async function studioError(response: Response): Promise<StudioApiError> {
   return new StudioApiError(described, response.status, false);
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(apiUrl(path), { headers: { Accept: "application/json" } });
+async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    headers: { Accept: "application/json" },
+    ...(signal ? { signal } : {}),
+  });
   if (!response.ok) {
     const error = await studioError(response);
     recordStudioError(error.error, path);
@@ -253,8 +261,17 @@ async function withLocal<T>(
 }
 
 export async function fetchConfig(): Promise<StudioConfig> {
-  const body = await getJson<{ defaults: StudioConfig }>("/api/config");
-  return body.defaults;
+  // Configuration is a convenience, not a gate: a proxy that accepts the
+  // connection and never answers must not hold the first screen. Bound it and
+  // let the caller fall back to the defaults it already has.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CONFIG_TIMEOUT_MS);
+  try {
+    const body = await getJson<{ defaults: StudioConfig }>("/api/config", controller.signal);
+    return body.defaults;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface SidecarDiagnostics {
@@ -279,6 +296,26 @@ export function fetchChangelog(): Promise<ChangelogData> {
     () => getJson<ChangelogData>("/api/changelog"),
     (bff) => bff.fetchChangelog(),
   );
+}
+
+/** Every thread the PM can reopen, most recently touched first. */
+export async function listConversations(): Promise<ConversationSummary[]> {
+  return withLocal(
+    () =>
+      getJson<{ conversations: ConversationSummary[] }>("/api/conversations").then(
+        (body) => body.conversations,
+      ),
+    (bff) => bff.memory.listConversations(),
+  );
+}
+
+/** The opened studies, or an empty list before any study has been opened. */
+export async function fetchStudies(mcpUrl: string, jobId?: string): Promise<Study[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Study[]>(`/api/studies?${params.toString()}`);
 }
 
 export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {

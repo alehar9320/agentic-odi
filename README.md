@@ -82,14 +82,34 @@ per-platform archives with SHA-256 checksums for a manual download. See
   in-place guidance appears only after the first exchange. It turns "a customer
   still reconciles invoices by hand" into a scored outcome, a job map, and a
   ranked opportunity board — inline in the thread. Every claim in a reply names
-  the record behind it, or says it is a hypothesis.
+  the record behind it, or says it is a hypothesis. A score names the questions
+  that produced it, and a number with no customer answer behind it reads as
+  unverified instead of settling the matter. The bar's history list keeps
+  the last twenty threads one click away, each named by its first question and
+  marked when it is the one on screen.
+- **A document when the conversation needs one.** `/brief` writes the decision
+  brief from the canvas — the ranked bets, the records behind each, what argues
+  against them, and the next evidence to collect — as Markdown a review can read
+  with or without the Studio. Provenance travels with it: demo rows are excluded
+  from every count and labelled, and every number counts records instead of
+  generating prose.
 - **Local-first by default.** The CLI and server work with no network and no
   account. Point them at a remote MCP server with one flag.
+- **Evidence becomes outcomes.** An ingested record is mined into a scored,
+  approvable outcome proposal — statement, direction, importance, satisfaction,
+  and a stated confidence, with its rationale and the quote it came from.
+  Approving writes it through the same validated path as any other outcome;
+  rejecting writes nothing. The mining is deterministic and offline.
 - **A catch-up that means something.** Writes emit signals — an outcome
   re-scored, evidence promoted, a job map completed — stored in the same
   event log and read by the CLI, any MCP client, and the Studio's bell.
   Nothing is invented, and the feed is deduped and budgeted so it stays
   worth opening.
+- **A check on whether onboarding works.** Five counters — launch, first message,
+  first outcome, first score, return session — are appended to the same local
+  event log as the records and read back by `agentic-odi stats`. The numbers never
+  leave the machine, a counter that has not happened reads as zero rather than a
+  guess, and restarting the measurement marks the log instead of erasing history.
 
 ## How it works
 
@@ -139,15 +159,24 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its
-  sidecar-owned transcript, with attachments, tool traces, approvals, and
-  branch-aware editing and regeneration. Settings → About also offers an
-  opt-in, redacted local diagnostics preview; no report is uploaded. See
+  sidecar-owned transcript, with attachments, tool traces under one foldable
+  work row per turn, opt-in approvals for
+  chat writes and unknown tools, and branch-aware editing and regeneration.
+  Settings → About also offers an opt-in, redacted local diagnostics preview; no
+  report is uploaded. See
   [The Living Studio](docs/living-studio.md).
+- **The agent knows what you are looking at.** Select a job, step, outcome, or
+  evidence record and the Studio tells the sidecar only *which* record — kind and
+  id — never what it says. The sidecar re-reads that record from the store and
+  answers about it in the store's own words; an id the store does not have earns
+  no sentence. A quiet chip in the composer names what was said on your behalf,
+  opens the record when you press it, and can be dismissed.
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
 ```bash
 odi jobs list
 odi desired-outcomes list --job-id <id>
+odi studies open --job <id> --name "Invoice sweep" --wave 1   # one pass; re-running is a new wave
 odi segments run --job <id>          # Stage 5: who the scored outcomes point at
 odi strategy propose                 # Stage 6: the bet, and the paths it beat
 odi signals unread                    # what changed while you were away
@@ -180,14 +209,17 @@ soon". See [External Connectors](docs/connectors.md).
 |---|---|
 | [The Living Studio](docs/living-studio.md) | The chat-first interface, first run, approvals, memory, and the desktop app |
 | [CLI Reference](docs/cli.md) | Backends, chat, entities, scoring, and environment variables |
+| [The Method, Stage by Stage](docs/method.md) | The eight job-map stages as a practitioner works them — what each is for, the mistakes, and the commands |
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Reuse First](docs/architecture/reuse.md) | The ladder agents walk before writing code: reuse what exists, adopt what is declared, copy with provenance, then build |
 | [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
+| [Agent assignment](docs/agents.md) | Which agents take issues, how they claim one, and when a claim expires |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
 
 Every guide is also published on the
@@ -201,20 +233,38 @@ A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
 shared tooling at the root. Packages live in `packages/`, runnable services in
 `apps/`, and deployment assets in `infra/`. The
 [architecture index](docs/architecture/README.md) explains how the pieces fit
-together and where each contract is enforced:
+together and where each contract is enforced; its Dependency Direction diagram
+is a contract of its own — `tests/test_architecture.py` checks the drawn arrows
+against the declared dependencies and the real imports, so the picture cannot
+drift from the workspace. The distributions are:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
-| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, Segments, Strategy, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, and context tools over HTTP. SQLite by default. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) answers a navigation it cannot reach with `public/offline.html`, so an uncached deep link opened offline gets a themed page instead of the browser's error page. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
-| **`scripts/`** | — | Dev launcher, binary build, installer tests, and the deterministic study-corpus generator (`gen_corpus.py`). |
+| **`scripts/`** | — | Dev launcher, binary build, installer tests, the deterministic study-corpus generator (`gen_corpus.py`), and the shared structural audit every artifact HTML passes through (`artifact_a11y.py`, with its renderer inventory in `artifact_renderers.py`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
+
+Inside `packages/core` there are four groups, and the rules between them are
+written down rather than implied — with `errors.py`, the exception hierarchy, open
+to every group. **Domain** (`models.py`, `evaluation.py`, `mapping.py`,
+`corpus.py`) is the vocabulary and imports no other group. **Persistence**
+(`repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`,
+`factory.py`) stores what the other groups decide and may not import methodology —
+`tests/test_architecture.py` enforces that one rule, and also refuses a new core
+module that belongs to no group. **Methodology** (`services.py`, `segmentation.py`,
+`strategy.py`, `router.py`, `messages.py`, `steve_jobs.py`) owns the service door,
+which is `services.py`. **Contract** (`contract.py`, `errors.py`, `remote.py`,
+`schema.py`, `connection.py`, `consent.py`) is the MCP wire protocol; anything may
+import it and it imports no persistence or methodology. The full table, and the
+reason `contract.py` is not its own package yet, is in
+[ADR 0005](docs/architecture/adr/0005-core-layers-and-the-contract-split.md).
 
 ## Contributing
 
@@ -224,7 +274,7 @@ request:
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy apps packages && uv run pytest
-uv run python scripts/doc_check.py   # documented commands, paths, routes, and env vars exist
+uv run python scripts/doc_check.py   # documented commands, paths, routes, env vars, and the assistant-ui ledger hold up
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage
