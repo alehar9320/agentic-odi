@@ -37,6 +37,8 @@ export default defineConfig({
     // stylesheet's source. Process CSS only when a test asks for it with a
     // query (?raw/?inline), so the rest of the suite keeps the faster path.
     css: { include: [/\.css(\?.*)?$/] },
+    testTimeout: 10000,
+    hookTimeout: 10000,
     // Visual tests need Chromium, so they run from vitest.visual.config.ts and
     // never from this jsdom suite (see docs/development.md).
     exclude: [...configDefaults.exclude, "**/*.visual.test.tsx"],

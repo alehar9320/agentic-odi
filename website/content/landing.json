@@ -5,8 +5,8 @@
     "title": "Your roadmap is a guess.",
     "sub": "An MCP server that hands your agents verified customer outcomes \u2014 and the evidence behind them.",
     "primary": {
-      "label": "Run it in 60 seconds",
-      "href": "#run"
+      "label": "Open the sample workspace",
+      "href": "sample/"
     },
     "secondary": {
       "label": "Open the Living Studio",
