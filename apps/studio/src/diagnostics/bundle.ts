@@ -21,6 +21,7 @@ export interface DiagnosticStream {
 
 export interface DiagnosticsBundleOptions {
   version: string;
+  versionSource: "build" | "desktop";
   build: string;
   platform: string;
   theme: string;
@@ -123,6 +124,7 @@ export function createDiagnosticsBundle(options: DiagnosticsBundleOptions): Reco
     schema: 1,
     app: {
       version: options.version,
+      versionSource: options.versionSource,
       build: options.build,
       platform: options.platform,
       theme: options.theme,

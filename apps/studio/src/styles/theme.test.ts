@@ -50,6 +50,31 @@ function contrast(foreground: string, background: string): number {
 const TEXT_TOKENS = ["text", "muted", "faint", "accent", "green", "amber"];
 const SURFACES = ["bg", "bg-raised"];
 
+describe("reduced transparency", () => {
+  it("drops every blur and goes opaque", () => {
+    const start = themeCss.indexOf("@media (prefers-reduced-transparency: reduce)");
+    expect(start, "missing the reduced-transparency block").toBeGreaterThanOrEqual(0);
+    const block = themeCss.slice(start, start + 1400);
+    for (const selector of [
+      ".scrim",
+      ".bar",
+      ".outcome-card",
+      ".settings-drawer",
+      ".banner",
+      ".changelog-modal",
+      ".changelog-overlay",
+      ".diagnostics-overlay",
+      ".suggestion-modal",
+      ".catchup-summary",
+      ".studio-metric",
+    ]) {
+      expect(block, `${selector} keeps its blur`).toContain(selector);
+    }
+    expect(block).toContain("backdrop-filter: none");
+    expect(block).toContain("background-color: var(--bg-raised)");
+  });
+});
+
 describe("theme contrast", () => {
   for (const [name, tokens] of [
     ["dark", dark],
@@ -75,6 +100,29 @@ describe("theme contrast", () => {
   }
 });
 
+describe("more contrast", () => {
+  it("promotes muted and faint past AAA and thickens hairlines", () => {
+    const start = themeCss.indexOf("@media (prefers-contrast: more)");
+    expect(start, "missing the more-contrast block").toBeGreaterThanOrEqual(0);
+    const block = themeCss.slice(start, start + 1400);
+    const promoted = {
+      dark: { muted: "#c6cad3", faint: "#adb2bf" },
+      light: { muted: "#3a4050", faint: "#454c5c" },
+    };
+    for (const [name, tokens] of [
+      ["dark", promoted.dark],
+      ["light", promoted.light],
+    ] as const) {
+      const background = name === "dark" ? dark.bg : light.bg;
+      for (const [token, value] of Object.entries(tokens)) {
+        expect(block, `${name} --${token} is not promoted`).toContain(`--${token}: ${value}`);
+        expect(contrast(value, background), `${name} --${token} on --bg`).toBeGreaterThanOrEqual(7);
+      }
+    }
+    expect(block).toContain("border-width: 1.5px");
+  });
+});
+
 describe("theme tokens", () => {
   it("defines every custom property the stylesheet references without a fallback", () => {
     const referenced = new Set(
@@ -84,6 +132,14 @@ describe("theme tokens", () => {
       (name) => !new RegExp(`--${name}:`).test(themeCss),
     );
     expect(missing).toEqual([]);
+  });
+});
+
+describe("theme change", () => {
+  it("cross-fades only through the fading class", () => {
+    expect(themeCss).toMatch(
+      /html\.theme-fading[^{]*\{[^}]*transition-duration:\s*120ms/,
+    );
   });
 });
 
@@ -116,5 +172,14 @@ describe("starter card surface", () => {
     const body = phone![1];
     expect(body).toMatch(/\.composer__pills\s*\{[^}]*flex-direction:\s*column/);
     expect(body).toMatch(/\.composer__pills \.suggestion\s*\{[^}]*width:\s*100%/);
+  });
+});
+
+describe("selection and caret", () => {
+  it("carries the accent into selection and the caret", () => {
+    expect(themeCss).toMatch(
+      /::selection\s*\{[^}]*background:\s*color-mix\(in srgb,\s*var\(--accent\)/,
+    );
+    expect(themeCss).toMatch(/caret-color:\s*var\(--accent\)/);
   });
 });

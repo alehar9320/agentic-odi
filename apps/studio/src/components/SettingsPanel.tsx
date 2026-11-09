@@ -10,17 +10,18 @@ import {
 import { DiagnosticsModal } from "../diagnostics/DiagnosticsModal";
 import { PRODUCT_NAME } from "../lib/brand";
 import { resolveTheme } from "../lib/theme";
+import { versionLabel } from "../lib/version";
 import { useOnboarding } from "../onboarding/context";
 import { useStudio } from "../state/StudioContext";
 import type { ConnectionReport } from "../state/StudioContext";
 import type { ConnectorPreset, StudioConfig } from "../types";
 import { FailurePanel } from "./FailurePanel";
+import { StatusDot } from "./status/StatusDot";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ModelSection } from "./settings/sections/ModelSection";
+import { initInstall, isDismissed, isInstalled, offerInstall, dismissInstall } from "../install";
 import { UpdateSettings, useUpdateService, useUpdateSnapshot } from "../updater";
 import { detectPlatform } from "../updater/platform";
-
-const STUDIO_VERSION = "0.14.0";
 
 const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
   macos: "macOS",
@@ -44,6 +45,7 @@ function AboutSection({
   const service = useUpdateService();
   const snapshot = useUpdateSnapshot();
   const platform = detectPlatform();
+  const label = versionLabel(snapshot.currentVersion);
   const [diagnosticsJson, setDiagnosticsJson] = useState<string | null>(null);
 
   async function prepareDiagnostics() {
@@ -58,7 +60,8 @@ function AboutSection({
       // Export remains available when the local sidecar is down.
     }
     const bundle = createDiagnosticsBundle({
-      version: snapshot.currentVersion ?? STUDIO_VERSION,
+      version: label.version,
+      versionSource: label.source,
       build: __STUDIO_BUILD_DATE__,
       platform: PLATFORM_LABELS[platform],
       theme: resolveTheme(settings.theme),
@@ -84,7 +87,7 @@ function AboutSection({
       <p className="muted">{PRODUCT_NAME} is a local-first workspace for outcome-driven work.</p>
       <dl>
         <dt>Version</dt>
-        <dd>{snapshot.currentVersion ? `v${snapshot.currentVersion}` : "—"}</dd>
+        <dd>v{label.version}</dd>
         <dt>Build</dt>
         <dd>{__STUDIO_BUILD_DATE__}</dd>
         <dt>Platform</dt>
@@ -114,6 +117,35 @@ function AboutSection({
           engineAvailable={JSON.parse(diagnosticsJson).engine !== null}
           onClose={() => setDiagnosticsJson(null)}
         />
+      ) : null}
+    </section>
+  );
+}
+
+function InstallSection() {
+  const canInstall = !isInstalled() && !isDismissed();
+  return (
+    <section className="settings__install" aria-labelledby="settings-install-heading">
+      <h3 className="settings__title" id="settings-install-heading">
+        Install
+      </h3>
+      <p className="muted">
+        Open the Studio in its own window. The site works offline and the window
+        keeps your place when you reopen it.
+      </p>
+      {canInstall ? (
+        <button
+          type="button"
+          className="button button--ghost"
+          onClick={() => {
+            const offered = offerInstall();
+            if (!offered) {
+              dismissInstall();
+            }
+          }}
+        >
+          Install app
+        </button>
       ) : null}
     </section>
   );
@@ -188,6 +220,11 @@ export function SettingsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Offer the app install prompt once; dismissal is remembered.
+  useEffect(() => {
+    initInstall();
+  }, []);
+
   const modelHealthy = survey ? survey.llmHealthy : llmHealth.healthy;
   const sidecarKnown = survey ? survey.sidecarReachable : sidecarReachable;
   const mcpKnown = survey ? survey.mcpReachable : mcpReachable;
@@ -245,10 +282,8 @@ export function SettingsPanel() {
       <ConnectionsSection settings={settings} saveSettings={saveSettings}>
         <ul className="connection-list">
           <li>
-            <span
-              className={`status-dot${modelHealthy === false ? " is-warn" : ""}${
-                modelHealthy === null ? " is-unknown" : ""
-              }`}
+            <StatusDot
+              tone={modelHealthy === false ? "warn" : modelHealthy === null ? "unknown" : "ok"}
             />
             <span>Model</span>
             <span className="connection-list__value">
@@ -260,8 +295,8 @@ export function SettingsPanel() {
             </span>
           </li>
           <li>
-            <span
-              className={`status-dot${sidecarKnown === false ? " is-warn" : sidecarKnown === null ? " is-unknown" : ""}`}
+            <StatusDot
+              tone={sidecarKnown === false ? "warn" : sidecarKnown === null ? "unknown" : "ok"}
             />
             <span>Sidecar</span>
             <span className="connection-list__value">
@@ -269,7 +304,7 @@ export function SettingsPanel() {
             </span>
           </li>
           <li>
-            <span className={`status-dot${mcpKnown ? "" : " is-unknown"}`} />
+            <StatusDot tone={mcpKnown ? "ok" : "unknown"} />
             <span>Local FastMCP server</span>
             <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
           </li>
@@ -283,11 +318,7 @@ export function SettingsPanel() {
         <ul className="connection-list">
           {capabilities.map((capability) => (
             <li key={capability.id}>
-              <span
-                className={`status-dot${
-                  capability.status === "available" ? "" : " is-warn"
-                }`}
-              />
+              <StatusDot tone={capability.status === "available" ? "ok" : "warn"} />
               <span>{capability.label}</span>
               <span className="connection-list__value">
                 {capability.status === "available" ? "available" : "unavailable"}
@@ -417,6 +448,8 @@ export function SettingsPanel() {
       <UpdateSettings />
 
       <AboutSection settings={settings} capabilities={capabilities} />
+
+      <InstallSection />
 
       <details className="disclosure">
         <summary>How the studio works</summary>

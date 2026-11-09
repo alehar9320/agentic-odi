@@ -36,6 +36,10 @@ export function BannerToasts() {
         kind: TOAST_KIND[toast.kind] ?? "info",
         key: `toast-${toast.id}`,
         body: toast.message,
+        ...(toast.durationMs ? { durationMs: toast.durationMs } : {}),
+        ...(toast.action
+          ? { actions: [{ label: toast.action.label, run: toast.action.run, tone: "ghost" as const }] }
+          : {}),
       });
     }
     shown.current = live;
