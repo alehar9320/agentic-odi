@@ -10,6 +10,7 @@ from doc_check import (
     documented_cli_commands,
     documented_env_vars,
     documented_file_paths,
+    ledger_errors,
     missing_cli_commands,
     missing_env_vars,
     missing_file_paths,
@@ -182,8 +183,6 @@ def test_the_repository_documentation_matches_the_code() -> None:
 def test_env_vars_are_not_invented_by_the_checker() -> None:
     assert documented_env_vars("`AGENTIC_ODI_DB` then `AGENTIC_ODI_DB`") == {"AGENTIC_ODI_DB"}
 
-from doc_check import LEDGER_SOURCE, ledger_errors
-
 
 def _ledger(root: Path, source: str, projection: str = "") -> list[str]:
     return ledger_errors(source, projection or _projection(source), root=root, delivered=set())
@@ -199,8 +198,7 @@ def test_ledger_rejects_planned_row_when_studio_imports_named_primitive(tmp_path
     studio = tmp_path / "apps" / "studio" / "src" / "components" / "chat"
     studio.mkdir(parents=True)
     (studio / "Conversation.tsx").write_text(
-        'import { ActionBarPrimitive } from "@assistant-ui/react";\n'
-        "<ActionBarPrimitive.Speak />\n",
+        'import { ActionBarPrimitive } from "@assistant-ui/react";\n<ActionBarPrimitive.Speak />\n',
         encoding="utf-8",
     )
     source = (
