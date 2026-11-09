@@ -10,8 +10,8 @@ const studio = vi.hoisted(() => ({
   dismissToast: vi.fn(),
 }));
 
-vi.mock("../state/StudioContext", () => ({
-  useStudio: () => studio,
+vi.mock("../state/notices/NoticesContext", () => ({
+  useNoticesList: () => ({ toasts: studio.toasts }),
 }));
 
 function shell() {

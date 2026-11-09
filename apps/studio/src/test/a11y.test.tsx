@@ -11,6 +11,7 @@ import { createRef } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, it, vi } from "vitest";
 
+import { useSettings } from "../state/settings/SettingsContext";
 import { StudioRuntimeProvider } from "../assistant/StudioRuntime";
 import { BriefLens } from "../components/brief/BriefLens";
 import { CatchUpFeed } from "../components/notifications/CatchUpFeed";
@@ -118,6 +119,21 @@ const state = vi.hoisted(() => ({
 vi.mock("../state/StudioContext", () => ({
   useStudio: () => state,
 }));
+vi.mock("../state/settings/SettingsContext", () => ({
+  useSettings: vi.fn(),
+}));
+vi.mocked(useSettings).mockReturnValue({
+  settings: {
+    base_url: state.settings.base_url,
+    api_key: state.settings.api_key,
+    model_name: state.settings.model_name,
+    mcp_url: state.settings.mcp_url,
+    theme: "dark" as const,
+  },
+  saveSettings: state.saveSettings,
+  theme: "dark" as const,
+  setTheme: vi.fn(),
+});
 
 const transport: UpdateTransport = {
   supported: () => false,

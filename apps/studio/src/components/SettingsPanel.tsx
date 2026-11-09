@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useOnboarding } from "../onboarding/context";
 import { useStudio, type ConnectionReport } from "../state/StudioContext";
+import { useSettings } from "../state/settings/SettingsContext";
 import { AboutSection } from "./settings/sections/AboutSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ContextSection } from "./settings/sections/ContextSection";
@@ -21,9 +22,8 @@ import { UpdatesSection } from "./settings/sections/UpdatesSection";
  * asked, so a passive read never restyles the window.
  */
 export function SettingsPanel() {
+  const { settings, saveSettings } = useSettings();
   const {
-    settings,
-    saveSettings,
     displayName,
     setDisplayName,
     brief,

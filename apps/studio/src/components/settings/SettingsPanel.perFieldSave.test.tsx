@@ -9,8 +9,12 @@ import { SettingsPanel } from "../SettingsPanel";
 vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
+vi.mock("../../state/settings/SettingsContext", () => ({
+  useSettings: vi.fn(),
+}));
 
 import { useStudio } from "../../state/StudioContext";
+import { useSettings } from "../../state/settings/SettingsContext";
 import type { StudioContextValue } from "../../state/StudioContext";
 
 const transport: UpdateTransport = {
@@ -79,6 +83,12 @@ describe("Settings saves per field", () => {
   it("saves a changed model when the field is left and says so once", () => {
     const saveSettings = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
+    vi.mocked(useSettings).mockReturnValue({
+      settings: stubContext({ saveSettings }).settings,
+      saveSettings,
+      theme: "dark" as const,
+      setTheme: vi.fn(),
+    });
 
     renderPanel();
 
@@ -101,6 +111,12 @@ describe("Settings saves per field", () => {
   it("fires no request for an unchanged value", () => {
     const saveSettings = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
+    vi.mocked(useSettings).mockReturnValue({
+      settings: stubContext({ saveSettings }).settings,
+      saveSettings,
+      theme: "dark" as const,
+      setTheme: vi.fn(),
+    });
 
     renderPanel();
 
@@ -115,6 +131,12 @@ describe("Settings saves per field", () => {
   it("refuses an invalid URL beside the field and keeps the old value in use", () => {
     const saveSettings = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
+    vi.mocked(useSettings).mockReturnValue({
+      settings: stubContext({ saveSettings }).settings,
+      saveSettings,
+      theme: "dark" as const,
+      setTheme: vi.fn(),
+    });
 
     renderPanel();
 
@@ -131,6 +153,12 @@ describe("Settings saves per field", () => {
   it("refuses a bridge URL that is not an address", () => {
     const saveSettings = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
+    vi.mocked(useSettings).mockReturnValue({
+      settings: stubContext({ saveSettings }).settings,
+      saveSettings,
+      theme: "dark" as const,
+      setTheme: vi.fn(),
+    });
 
     renderPanel();
 
@@ -145,6 +173,12 @@ describe("Settings saves per field", () => {
   it("saves the bridge URL on blur, once", () => {
     const saveSettings = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
+    vi.mocked(useSettings).mockReturnValue({
+      settings: stubContext({ saveSettings }).settings,
+      saveSettings,
+      theme: "dark" as const,
+      setTheme: vi.fn(),
+    });
 
     renderPanel();
 
@@ -164,6 +198,12 @@ describe("Settings saves per field", () => {
   it("saves a changed API key on blur without validating it", () => {
     const saveSettings = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
+    vi.mocked(useSettings).mockReturnValue({
+      settings: stubContext({ saveSettings }).settings,
+      saveSettings,
+      theme: "dark" as const,
+      setTheme: vi.fn(),
+    });
 
     renderPanel();
 
