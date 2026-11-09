@@ -32,7 +32,6 @@ const studio = vi.hoisted(() => ({
   deleteOutcome: vi.fn<(id: string) => Promise<void>>(async () => {}),
   deleteStep: vi.fn<(id: string) => Promise<void>>(async () => {}),
   deleteJob: vi.fn<(id: string) => Promise<void>>(async () => {}),
-  refreshCanvas: vi.fn(async () => {}),
 }));
 
 vi.mock("../state/StudioContext", () => ({
@@ -118,7 +117,6 @@ describe("FirstRunWizard", () => {
     studio.deleteOutcome.mockClear();
     studio.deleteStep.mockClear();
     studio.deleteJob.mockClear();
-    studio.refreshCanvas.mockClear();
   });
 
   it("never opens by itself, even on a fresh run", () => {
@@ -156,7 +154,7 @@ describe("FirstRunWizard", () => {
     fireEvent.click(continueButton());
 
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Where it lands.");
-    expect(screen.getByText("Opportunity map")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Opportunity map" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 

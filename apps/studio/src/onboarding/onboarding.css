@@ -378,58 +378,6 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Step 4 — first move                                                */
-/* ------------------------------------------------------------------ */
-
-.wizard-launch {
-  display: grid;
-  gap: 16px;
-}
-
-.wizard-choice {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.wizard-choice__title {
-  display: block;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.wizard-choice__result {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.83rem;
-  color: var(--muted);
-}
-
-.wizard-destination {
-  padding: 14px 18px;
-  border-left: 2px solid rgba(139, 140, 248, 0.7);
-  border-radius: 0 10px 10px 0;
-  background: rgba(139, 140, 248, 0.07);
-}
-
-.wizard-destination__label {
-  margin: 0 0 4px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--faint);
-}
-
-.wizard-destination__detail {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: var(--text);
-}
-
-/* ------------------------------------------------------------------ */
 /* Step 4 — where it lands                                            */
 /* ------------------------------------------------------------------ */
 

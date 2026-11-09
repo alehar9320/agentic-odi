@@ -83,9 +83,7 @@ export function OpportunityLandscape() {
     return ids.size;
   }, [evidence]);
 
-  // The average counts stored scores only. Dividing by every outcome would
-  // read an unscored record as a zero and drag a strong landscape down; the
-  // caption names how many scored so the number can be explained from the screen.
+  // The average counts stored scores only.
   const averageScore = useMemo(() => scoredAverage(outcomes), [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
@@ -389,7 +387,7 @@ interface MatrixViewProps {
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
-  /** The sample outcome the tour points at, drawn larger than the rest. */
+  /** The one outcome the tour points at, ringed apart from the rest. */
   highlightedOutcomeId?: string | null;
   sample?: boolean;
   /** Drops the detail sidebar and stacks the plot, for a narrow container. */

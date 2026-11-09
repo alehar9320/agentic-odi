@@ -4,8 +4,8 @@ import { useStudio } from "../state/StudioContext";
 import { useOnboarding } from "./context";
 import { STEPS, goalById, type GoalId } from "./content";
 import { LAST_STEP_INDEX, stepAt } from "./machine";
-import { removeSampleRecords, planSampleRemoval, sampleRecordsIn } from "./sampleCleanup";
 import { LandScene } from "./LandScene";
+import { planSampleRemoval, removeSampleRecords, sampleRecordsIn } from "./sampleCleanup";
 import { sampleRecordsForTour } from "../lib/sampleLoop";
 import {
   GoalStep,
