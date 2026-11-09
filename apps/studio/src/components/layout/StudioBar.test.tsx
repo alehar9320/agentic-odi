@@ -26,9 +26,6 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   pushToast: vi.fn(),
   saveSettings: vi.fn(),
   settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "dark" },
-  // The palette actually painted. A bar that guessed it from `settings.theme`
-  // would go stale the moment the operating system moved.
-  theme: "dark" as const,
   ...overrides,
 });
 
@@ -38,6 +35,8 @@ const stubSnapshot = (overrides: Partial<UpdateSnapshot> = {}): UpdateSnapshot =
   available: null,
   progress: null,
   lastCheckedAt: null,
+  lastSuccessfulCheckAt: null,
+  actions: [],
   installed: false,
   pendingInstall: false,
   error: null,
@@ -142,6 +141,45 @@ describe("StudioBar", () => {
     ).toBeInTheDocument();
   });
 
+  it("says a local endpoint is not reachable from a hosted page", () => {
+    // #804: a hosted page cannot reach a private endpoint, so the bar says why.
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      get() {
+        return new Proxy(originalLocation, {
+          get(target, prop) {
+            if (prop === "hostname") return "studio.example.com";
+            return Reflect.get(target, prop);
+          },
+        });
+      },
+    });
+    try {
+      vi.mocked(useStudio).mockReturnValue(
+        stubContext({
+          llmHealth: { healthy: null, message: "" },
+          settings: {
+            base_url: "http://127.0.0.1:11434/v1",
+            api_key: "",
+            model_name: "qwen3:8b",
+            mcp_url: "",
+            theme: "dark",
+          },
+        }) as never,
+      );
+      render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+      expect(
+        screen.getByRole("button", {
+          name: /model status: connecting\. local endpoint, not reachable from this page/i,
+        }),
+      ).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "location", { value: originalLocation, configurable: true });
+    }
+  });
+
   it("keeps the brand mark decorative and labels the home control in text", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext() as never);
     const { container } = render(
@@ -161,26 +199,6 @@ describe("StudioBar", () => {
     fireEvent.click(getByRole("button", { name: "Switch to light theme" }));
 
     expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "light" }));
-  });
-
-  it("offers the palette opposite the one it is painting, not the stored choice", () => {
-    const saveSettings = vi.fn();
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        saveSettings,
-        theme: "light",
-        settings: { base_url: "", api_key: "", model_name: "", mcp_url: "", theme: "system" },
-      }) as never,
-    );
-    const { getByRole } = render(
-      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
-    );
-
-    // Following the system, and the system is light: the bar offers dark and
-    // pins it, rather than reasoning about a stored value that names no palette.
-    fireEvent.click(getByRole("button", { name: "Switch to dark theme" }));
-
-    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "dark" }));
   });
 
   it("exports the conversation as Markdown from the overflow menu", () => {
@@ -319,7 +337,7 @@ describe("StudioBar", () => {
     expect(refreshConversations).toHaveBeenCalledOnce();
     expect(within(menu).getByText("Where does onboarding leak?")).toBeInTheDocument();
     expect(within(menu).getByText("Price the churn spike")).toBeInTheDocument();
-    expect(within(menu).getByText("Just now")).toBeInTheDocument();
+    expect(within(menu).getByText(/Just now · 4 turns/)).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -538,5 +556,179 @@ describe("StudioBar new thread control (#319)", () => {
     expect(onNew).toHaveBeenCalledTimes(1);
     expect(onNew).not.toHaveBeenCalledWith({ stop: true });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+// Shared by the history tests: one thread, and a bar with its list open.
+const conversation = (id: string, title: string, updatedAt: string, turnCount: number) => ({
+  id,
+  title,
+  created_at: updatedAt,
+  updated_at: updatedAt,
+  head_id: null,
+  turn_count: turnCount,
+});
+
+function openHistory(overrides: Record<string, unknown>) {
+  vi.mocked(useStudio).mockReturnValue(stubContext(overrides) as never);
+  const view = render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+  return {
+    menu: screen.getByRole("menu", { name: "Recent conversations" }),
+    unmount: view.unmount,
+  };
+}
+
+describe("history opens on the thread in view (#694 D11)", () => {
+  it("opens on the thread in view, gliding unless motion is reduced", () => {
+    const scrollIntoView = vi.fn();
+    const received: Element[] = [];
+    const original = (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: function (this: Element, options: ScrollIntoViewOptions) {
+        received.push(this);
+        scrollIntoView(options);
+      },
+    });
+
+    const media = (matches: boolean) =>
+      vi.fn((query: string) => ({
+        matches: query.includes("prefers-reduced-motion") ? matches : false,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }));
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: media(true) });
+
+    try {
+      const conversations = [
+        conversation("c-2", "The thread on screen", new Date(2026, 9, 22, 9, 0).toISOString(), 2),
+        conversation("c-1", "An older thread", new Date(2026, 9, 20, 9, 0).toISOString(), 1),
+      ];
+
+      const reduced = openHistory({ conversationId: "c-2", conversations });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" });
+      expect(received[0]).toBe(
+        within(reduced.menu).getByRole("menuitem", { name: /the thread on screen/i }),
+      );
+
+      reduced.unmount();
+      scrollIntoView.mockClear();
+      received.length = 0;
+      Object.defineProperty(window, "matchMedia", { configurable: true, value: media(false) });
+
+      openHistory({ conversationId: "c-2", conversations });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+    } finally {
+      if (original === undefined) {
+        delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      } else {
+        Object.defineProperty(Element.prototype, "scrollIntoView", {
+          configurable: true,
+          value: original,
+        });
+      }
+      Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia });
+    }
+  });
+});
+
+describe("history says when and how much (#694 D12)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads when it happened and how many turns it holds", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    const { menu } = openHistory({
+      conversations: [
+        conversation("c-1", "Pricing the churn spike", new Date(2026, 9, 22, 8, 0).toISOString(), 6),
+      ],
+    });
+
+    expect(within(menu).getByText("2h ago · 6 turns")).toBeInTheDocument();
+  });
+
+  it("gives a thread with no turns no meta line at all", () => {
+    const { menu } = openHistory({
+      conversations: [
+        conversation("c-1", "A fresh thread", new Date(2026, 9, 22, 9, 0).toISOString(), 0),
+      ],
+    });
+
+    expect(within(menu).getByText("A fresh thread")).toBeInTheDocument();
+    expect(menu.querySelector(".bar__history-meta")).toBeNull();
+    expect(within(menu).queryByText(/turns?/)).toBeNull();
+  });
+});
+
+describe("history is grouped by day (#694 D13)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function groupingOf(row: Element): number {
+    let groups = 0;
+    for (let node = row.parentElement; node; node = node.parentElement) {
+      if (node.getAttribute("role") === "group") {
+        groups += 1;
+      }
+    }
+    return groups;
+  }
+
+  it("heads the list by day, in order, only where there are rows", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    openHistory({
+      conversations: [
+        conversation("c-3", "This morning", new Date(2026, 9, 22, 9, 0).toISOString(), 2),
+        conversation("c-2", "Last night", new Date(2026, 9, 21, 23, 0).toISOString(), 1),
+        conversation("c-1", "Last week", new Date(2026, 9, 15, 9, 0).toISOString(), 3),
+      ],
+    });
+
+    const headings = Array.from(document.querySelectorAll(".bar__history-day")).map(
+      (node) => node.textContent,
+    );
+    expect(headings).toEqual(["Today", "Yesterday", "Earlier"]);
+
+    expect(
+      within(screen.getByRole("group", { name: "Today" })).getAllByRole("menuitem"),
+    ).toHaveLength(1);
+    expect(
+      within(screen.getByRole("group", { name: "Yesterday" })).getAllByRole("menuitem"),
+    ).toHaveLength(1);
+
+    // A row sits under exactly one heading, never repeated under two.
+    for (const row of screen.getAllByRole("menuitem")) {
+      const group = row.closest('[role="group"]') as HTMLElement;
+      expect(group.querySelectorAll(".bar__history-day")).toHaveLength(1);
+      expect(groupingOf(row)).toBe(1);
+    }
+  });
+
+  it("leaves out a day with nothing in it", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    openHistory({
+      conversations: [
+        conversation("c-1", "This morning", new Date(2026, 9, 22, 9, 0).toISOString(), 1),
+      ],
+    });
+
+    expect(screen.getByRole("group", { name: "Today" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Yesterday" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Earlier" })).toBeNull();
   });
 });

@@ -1,3 +1,4 @@
+import type { Outcome } from "../types";
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -14,25 +15,6 @@ export function opportunityScore(importance: number, satisfaction: number): numb
 
 export function isUnderserved(score: number | null | undefined): boolean {
   return score != null && score > UNDERSERVED_THRESHOLD;
-}
-
-/** The score at which an underserved outcome stops being a gap and becomes a
- * deep one. The map gives it its own shape, so the number lives here and not
- * in a component that cannot be measured. */
-export const DEEP_SCORE = 15;
-
-export type ScoreBand = "served" | "underserved" | "deep";
-
-/**
- * Which of the three bands the map draws a score falls in. An unscored outcome
- * is `served`: the map plots what the store holds, and a missing score is not
- * evidence of a gap.
- */
-export function bandOf(score: number | null | undefined): ScoreBand {
-  if (score != null && score >= DEEP_SCORE) {
-    return "deep";
-  }
-  return isUnderserved(score) ? "underserved" : "served";
 }
 
 /** True only when the store actually holds a numeric score for this outcome.
@@ -89,6 +71,17 @@ export function summarizeMemberScores(
 }
 
 /**
+ * The landscape's headline average: the mean of the stored scores only. One
+ * unscored outcome cannot drag the number down, and an all-unscored board has
+ * no mean at all rather than a fake zero. Delegates the counting to
+ * `summarizeMemberScores` so there is exactly one place that decides what
+ * "scored" means.
+ */
+export function scoredAverage(outcomes: ReadonlyArray<Outcome>): MemberScoreSummary {
+  return summarizeMemberScores(outcomes.map((outcome) => outcome.opportunity_score));
+}
+
+/**
  * The one sentence a segment board shows for its member scores. `Not scored`
  * replaces the mean when nothing is scored — never `0`, `NaN`, or a dash that
  * reads as a number.
@@ -111,3 +104,4 @@ export function segmentBasisLine(peopleInferred: boolean): string {
     ? "Candidate segment — grouped by the job it serves, not by researched people."
     : "People named from your evidence.";
 }
+

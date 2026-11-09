@@ -35,7 +35,7 @@ function isSidecarProxy(baseUrl: string): boolean {
   return loopback && url.port === "8001" && path === "/v1";
 }
 
-function isPrivateHost(hostname: string): boolean {
+export function isPrivateHost(hostname: string): boolean {
   const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
 
   if (host === "localhost" || host.endsWith(".localhost") || host === "::1" || host === "0.0.0.0") {
@@ -83,4 +83,40 @@ export function isEndpointConfiguredForSettings(settings: {
     api_key: settings.api_key,
     model: settings.model_name,
   });
+}
+
+/** Where this page itself is hosted: on the person's device or on a hosted origin. */
+export type EndpointFacts = {
+  originClass: "device" | "hosted";
+};
+
+/** Whether this page can reach the endpoint right now.
+ *
+ * A device page reaches endpoints on its own machine or LAN. A hosted page cannot
+ * reach a private (localhost / RFC1918) endpoint, so a local model is device-only
+ * when opened from a hosted page. The sidecar proxy and public hosts are reachable
+ * from either. */
+export type EndpointReachability = "reachable" | "device-only";
+
+export function endpointReachability(
+  config: ModelEndpointConfig,
+  facts: EndpointFacts,
+): EndpointReachability {
+  const baseUrl = config.base_url.trim();
+  if (!baseUrl || !config.model.trim()) {
+    return "device-only";
+  }
+  if (isSidecarProxy(baseUrl)) {
+    return "reachable";
+  }
+  let hostname: string;
+  try {
+    hostname = new URL(baseUrl).hostname;
+  } catch {
+    return "device-only";
+  }
+  if (isPrivateHost(hostname)) {
+    return facts.originClass === "device" ? "reachable" : "device-only";
+  }
+  return "reachable";
 }

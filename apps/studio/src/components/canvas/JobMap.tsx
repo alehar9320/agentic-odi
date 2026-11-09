@@ -219,27 +219,66 @@ export function JobMap() {
               aria-pressed={isSelected}
               aria-label={`Filter steps by ${phase.name}`}
               onClick={() => setSelectedPhaseIndex(isSelected ? null : idx)}
-              className={[
-                "jobmap__tile",
-                isSelected ? "jobmap__tile--selected" : "",
-                hasSteps ? "" : "jobmap__tile--empty",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                font: "inherit",
+                color: "inherit",
+                background: isSelected
+                  ? "rgba(129, 140, 248, 0.2)"
+                  : hasSteps
+                    ? "rgba(255, 255, 255, 0.04)"
+                    : "rgba(255, 255, 255, 0.01)",
+                border: isSelected
+                  ? "1px solid var(--studio-indigo)"
+                  : hasSteps
+                    ? "1px solid var(--studio-border)"
+                    : "1px dashed rgba(255, 255, 255, 0.05)",
+                borderRadius: 8,
+                padding: "10px 12px",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                position: "relative",
+              }}
             >
               <span
-                className={
-                  hasSteps ? "jobmap__phase" : "jobmap__phase jobmap__phase--empty"
-                }
+                style={{
+                  display: "block",
+                  fontSize: "0.78rem",
+                  fontWeight: 700,
+                  color: hasSteps ? "var(--studio-text)" : "var(--studio-muted)",
+                }}
               >
                 {phase.name}
               </span>
-              <span className="jobmap__desc">{phase.desc}</span>
-              <span className="jobmap__foot">
+              <span
+                style={{
+                  display: "block",
+                  fontSize: "0.7rem",
+                  color: "var(--studio-muted)",
+                  marginTop: 2,
+                  height: 28,
+                  overflow: "hidden",
+                }}
+              >
+                {phase.desc}
+              </span>
+              <span
+                style={{
+                  marginTop: 8,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <span
-                  className={
-                    hasSteps ? "studio-pill jobmap__pill jobmap__pill--filled" : "studio-pill jobmap__pill jobmap__pill--empty"
-                  }
+                  className="studio-pill"
+                  style={{
+                    padding: "2px 6px",
+                    background: hasSteps ? "rgba(129, 140, 248, 0.15)" : "transparent",
+                    color: hasSteps ? "var(--studio-indigo)" : "rgba(255,255,255,0.2)",
+                  }}
                 >
                   {bucket.steps.length} {bucket.steps.length === 1 ? "step" : "steps"}
                 </span>

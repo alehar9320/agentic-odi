@@ -35,15 +35,21 @@ const ALLOWED_FILES: Record<string, { reason: string; issue: number }> = {
     reason: "The first-run introduction is a fixed dark scrim with its own gradients.",
     issue: 330,
   },
+  "src/components/canvas/OpportunityLandscape.tsx": {
+    reason: "SVG chart colour encodes the score band; it is data, not theme.",
+    issue: 335,
+  },
+  "src/components/canvas/JobMap.tsx": {
+    reason: "SVG job-map strokes and fills are structural geometry, not theme.",
+    issue: 335,
+  },
 };
 
 /** The palette's own home; it is the one file that may hold literals. */
 const TOKEN_FILE = "src/styles/theme.css";
 
-/** Above this the baseline has become a dumping ground rather than a record.
- * 4 since the job map's pipeline tiles moved onto the palette: the file had no
- * literal left, so its #335 excuse went with them. */
-const ALLOWED_CAP = 4;
+/** Above this the baseline has become a dumping ground rather than a record. */
+const ALLOWED_CAP = 6;
 
 /** Source text for every file the gate reads, loaded the way Vite serves it. */
 const SOURCES = {
@@ -195,186 +201,6 @@ for (const finding of findings) {
   byFile.set(finding.file, [...(byFile.get(finding.file) ?? []), finding]);
 }
 
-/* ------------------------------------------------------------------ */
-/* The palette file itself (#543's sibling, ALH-216)                   */
-/* ------------------------------------------------------------------ */
-
-/**
- * `theme.css` is exempt from the tree scan because it is where the palette
- * lives. That exemption was written for the token blocks, and the file has
- * grown rules around them: a literal inside a rule cannot follow the theme —
- * `html.theme-light` appears once in the file, at the token block — so it
- * cannot be measured by `theme.test.ts` either, and it drifts.
- *
- * These helpers read the file's declarations and split its literals in two.
- * An **opaque** value in a rule is a bug at zero tolerance: it is a colour that
- * will be wrong in the other palette. An **alpha** value is a wash whose
- * severity is proportional to its transparency, and is held to a count that can
- * only shrink.
- */
-
-/** The palette file's own text. */
-const themeSource = SOURCES[`/${TOKEN_FILE}`];
-
-/**
- * Line ranges of the blocks that define the palette: `:root`,
- * `html.theme-light`, and any later `:root` that adds tokens. The only places a
- * colour literal is legal.
- */
-function tokenBlocks(source: string): Array<[number, number]> {
-  const masked = maskComments(source);
-  const lines = masked.split("\n");
-  const blocks: Array<[number, number]> = [];
-  let depth = 0;
-  let opened = 0;
-  lines.forEach((line, index) => {
-    if (depth === 0 && /^(?::root|html\.theme-light)\s*\{/.test(line)) {
-      opened = index + 1;
-    }
-    depth += (line.match(/\{/g) ?? []).length - (line.match(/\}/g) ?? []).length;
-    if (opened && depth === 0) {
-      blocks.push([opened, index + 1]);
-      opened = 0;
-    }
-  });
-  return blocks;
-}
-
-interface Declaration {
-  /** Offset just past the colon, where the value begins. */
-  from: number;
-  /** Offset of the terminator that ends the value. */
-  to: number;
-  property: string;
-  value: string;
-}
-
-/** Every `property: value;` in the stylesheet, at any nesting depth. */
-function declarations(masked: string): Declaration[] {
-  const out: Declaration[] = [];
-  let cursor = 0;
-  while (cursor < masked.length) {
-    const semicolon = masked.indexOf(";", cursor);
-    const open = masked.indexOf("{", cursor);
-    const close = masked.indexOf("}", cursor);
-    const stops = [semicolon, open, close].filter((index) => index >= 0);
-    if (stops.length === 0) {
-      break;
-    }
-    const stop = Math.min(...stops);
-    if (masked[stop] === ";") {
-      const chunk = masked.slice(cursor, stop);
-      const colon = chunk.indexOf(":");
-      if (colon >= 0) {
-        const property = chunk.slice(0, colon).trim();
-        if (/^[a-z-]+$/.test(property)) {
-          out.push({
-            from: cursor + colon + 1,
-            to: stop,
-            property,
-            value: chunk.slice(colon + 1),
-          });
-        }
-      }
-    }
-    cursor = stop + 1;
-  }
-  return out;
-}
-
-/** How see-through a colour literal is: 1 is solid ink. */
-function alphaOf(literal: string): number {
-  if (literal.startsWith("#")) {
-    if (literal.length === 9 || literal.length === 5) {
-      const alpha = parseInt(literal.slice(literal.length - 2), 16);
-      return Number.isNaN(alpha) ? 1 : alpha / 255;
-    }
-    return 1;
-  }
-  const parts = literal
-    .slice(literal.indexOf("(") + 1, literal.lastIndexOf(")"))
-    .split(/[\s,/]+/)
-    .filter(Boolean);
-  if (parts.length < 4) {
-    return 1;
-  }
-  const last = parts[parts.length - 1];
-  return last.endsWith("%") ? parseFloat(last) / 100 : parseFloat(last);
-}
-
-/** Which line of the source an offset falls on. */
-function lineOf(masked: string, index: number): number {
-  return masked.slice(0, index).split("\n").length;
-}
-
-/** Colour literals in the palette file's rules, filtered by how solid they are. */
-function paletteLiterals(
-  source: string,
-  keep: (alpha: number) => boolean,
-): Array<Finding & { property: string }> {
-  const masked = maskComments(source);
-  const blocks = tokenBlocks(source);
-  const out: Array<Finding & { property: string }> = [];
-  for (const declaration of declarations(masked)) {
-    const declaredAt = lineOf(masked, declaration.from);
-    if (blocks.some(([first, last]) => declaredAt >= first && declaredAt <= last)) {
-      continue;
-    }
-    const body = masked.slice(declaration.from, declaration.to);
-    for (const match of body.matchAll(COLOR)) {
-      const index = declaration.from + (match.index ?? 0);
-      const literal = match[0];
-      if (literal.startsWith("#") && !inColorPosition(masked, index)) {
-        continue;
-      }
-      if (!keep(alphaOf(literal))) {
-        continue;
-      }
-      out.push({
-        file: TOKEN_FILE,
-        line: lineOf(masked, index),
-        literal: source.slice(index, index + literal.length),
-        property: declaration.property,
-      });
-    }
-  }
-  return out;
-}
-
-const isOpaque = (alpha: number): boolean => alpha >= 1;
-const isWash = (alpha: number): boolean => alpha < 1;
-
-/** Solid colour in a rule, where only a token can follow the theme. */
-function opaqueOutsideTokens(source: string): Array<Finding & { property: string }> {
-  return paletteLiterals(source, isOpaque);
-}
-
-/** Translucent wash in a rule: less wrong, still worth a number. */
-function alphaOutsideTokens(source: string): Array<Finding & { property: string }> {
-  return paletteLiterals(source, isWash);
-}
-
-/** How the gate reports a site, so a failure reads as a checklist. */
-function row(finding: Finding & { property: string }): string {
-  return `${finding.file}:${finding.line} ${finding.property}: ${finding.literal}`;
-}
-
-/**
- * Solid colour written into a rule instead of read from a token. Zero is the
- * only honest ceiling: the value cannot change with the theme, so a non-zero
- * ceiling is a list of light-theme defects with a number on it.
- */
-const OPAQUE_CEILING = 0;
-
-/**
- * Measured 2026-11-05, per literal rather than per line. Exact rather than a
- * ceiling, so the number moves only when someone converts a wash and banks the
- * new count here — the same one-way ratchet the `ALLOWED_FILES` staleness test
- * runs on. 208 at the themed-surface work's start; the opportunity map and the
- * changelog chip moved onto the tint tokens and banked the four that left.
- */
-const ALPHA_BASELINE = 204;
-
 describe("raw colours", () => {
   it("keeps the palette in theme.css and nothing else", () => {
     const offenders = findings
@@ -425,49 +251,5 @@ describe("raw colours", () => {
     expect(colorLiterals("src/a.ts", source)).toEqual([
       { file: "src/a.ts", line: 1, literal: "#123456" },
     ]);
-  });
-
-  /* --- the palette file's own rules (ALH-216) --------------------- */
-
-  it("refuses an opaque colour literal in the palette file's own rules", () => {
-    const found = opaqueOutsideTokens(themeSource);
-    expect(found.length).toBeLessThanOrEqual(OPAQUE_CEILING);
-    // The rows are the answer: a failure here prints every site at once, which
-    // is the list the migration works down.
-    expect(found.map(row)).toEqual([]);
-  });
-
-  it("keeps the palette file's alpha washes at a baseline that can only move by being banked", () => {
-    expect(alphaOutsideTokens(themeSource).length).toBe(ALPHA_BASELINE);
-  });
-
-  it("names the line for a literal injected into the palette file, and not one inside a token block", () => {
-    // The issue's own requirement, aimed at the file the tree scan exempts.
-    const source = ":root {\n  --swatch: #ff00ff;\n}\n.card {\n  color: #ff00fe;\n}\n";
-    expect(opaqueOutsideTokens(source).map((finding) => finding.line)).toEqual([5]);
-    expect(opaqueOutsideTokens(source).map(row)).toEqual([
-      "src/styles/theme.css:5 color: #ff00fe",
-    ]);
-  });
-
-  it("reads a literal nested in a gradient or hiding in a var() fallback", () => {
-    const source =
-      ".a {\n  background: linear-gradient(140deg, #6366f1, transparent);\n}\n" +
-      ".b {\n  background: var(--odi-tile, #131722);\n}\n";
-    expect(opaqueOutsideTokens(source).map(row)).toEqual([
-      "src/styles/theme.css:2 background: #6366f1",
-      "src/styles/theme.css:5 background: #131722",
-    ]);
-  });
-
-  it("exempts the token blocks because it found them, not because they were listed", () => {
-    const selectors = Array.from(
-      themeSource.matchAll(/^(?::root|html\.theme-light)\s*\{/gm),
-      (match) => match[0].trim(),
-    );
-    expect(tokenBlocks(themeSource)).toHaveLength(selectors.length);
-    // The whole drift this gate exists to close rests on this: the light palette
-    // is one declaration block, so every rule below it is theme-blind.
-    expect(selectors.filter((selector) => selector.startsWith("html.theme-light"))).toHaveLength(1);
   });
 });

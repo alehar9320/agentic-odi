@@ -1,10 +1,9 @@
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isUnderserved, opportunityScore, UNDERSERVED_THRESHOLD } from "../../lib/odi";
-import { literalPaint } from "../../test/paintedColors";
 import type { CanvasState } from "../../types";
-import { OpportunityLandscape, plotX, plotY } from "./OpportunityLandscape";
+import { OpportunityLandscape, OpportunityPlot, plotX, plotY } from "./OpportunityLandscape";
 
 // Mock StudioContext
 const mockCanvasData = {
@@ -36,6 +35,13 @@ const harness = vi.hoisted(() => ({
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => harness.state,
 }));
+
+function renderWith(outcomes: unknown[]) {
+  harness.state.canvasState = {
+    kind: "ready",
+    data: { ...mockCanvasData, outcomes },
+  } as unknown as CanvasState;
+}
 
 describe("OpportunityLandscape Data Visualization", () => {
   beforeEach(() => {
@@ -353,13 +359,6 @@ describe("OpportunityLandscape canvas states", () => {
 });
 
 describe("OpportunityLandscape stored versus displayed score", () => {
-  function renderWith(outcomes: unknown[]) {
-    harness.state.canvasState = {
-      kind: "ready",
-      data: { ...mockCanvasData, outcomes },
-    } as unknown as CanvasState;
-  }
-
   beforeEach(() => {
     harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
     harness.state.focusedSubject = null;
@@ -417,6 +416,62 @@ describe("OpportunityLandscape stored versus displayed score", () => {
   });
 });
 
+describe("OpportunityLandscape motion preference", () => {
+  function stubMotion(reduced: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: reduced && query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+  }
+
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("pulses the underserved ring when motion is allowed", () => {
+    stubMotion(false);
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.querySelectorAll("animate").length).toBeGreaterThan(0);
+  });
+
+  it("keeps a still ring and no animation when motion is reduced", () => {
+    stubMotion(true);
+    const { container } = render(<OpportunityLandscape />);
+
+    expect(container.querySelectorAll("animate")).toHaveLength(0);
+    expect(container.querySelectorAll('circle[opacity="0.4"]').length).toBeGreaterThan(0);
+  });
+
+  it("does not move the nodes when the pulse is removed", () => {
+    stubMotion(false);
+    const moving = render(<OpportunityLandscape />);
+    const positions = Array.from(moving.container.querySelectorAll("circle"), (circle) =>
+      `${circle.getAttribute("cx")},${circle.getAttribute("cy")}`,
+    );
+    moving.unmount();
+
+    stubMotion(true);
+    const still = render(<OpportunityLandscape />);
+    const stillPositions = Array.from(still.container.querySelectorAll("circle"), (circle) =>
+      `${circle.getAttribute("cx")},${circle.getAttribute("cy")}`,
+    );
+
+    expect(stillPositions).toEqual(positions);
+  });
+});
+
 describe("OpportunityLandscape score rendering", () => {
   beforeEach(() => {
     harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
@@ -438,6 +493,62 @@ describe("OpportunityLandscape score rendering", () => {
 
     const tile = screen.getByText("Avg Opportunity Score").parentElement;
     expect(tile?.textContent).toContain("12.5");
+  });
+
+  // One unscored record must not drag the headline down as if it were a zero.
+  // 16 and an unrated outcome average to 16.0, not 8.0, and the caption names
+  // the split so the number can be explained from the screen.
+  it("averages only the stored scores and names how many scored", () => {
+    renderWith([
+      {
+        id: "O-SCORED",
+        statement: "Minimize the time to sync a secret",
+        importance: 9,
+        satisfaction: 2,
+        opportunity_score: 12,
+      },
+      {
+        id: "O-UNSCORED",
+        statement: "Minimize the time to answer a ticket",
+        importance: 5,
+        satisfaction: 5,
+        opportunity_score: null,
+      },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("12.0");
+    expect(tile?.textContent).not.toContain("6.0");
+    expect(tile?.textContent).toContain("1 scored · 1 not scored");
+  });
+
+  // With nothing scored there is no mean. The tile says so in words rather than
+  // printing a fabricated 0.0, NaN, or N/A that reads as a number.
+  it("says Not scored when no outcome carries a score, with no numeric delta", () => {
+    renderWith([
+      {
+        id: "O-UNSCORED",
+        statement: "Minimize the time to answer a ticket",
+        importance: 5,
+        satisfaction: 5,
+        opportunity_score: null,
+      },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(within(tile as HTMLElement).getByText("Not scored")).toBeInTheDocument();
+    expect(tile?.textContent).not.toContain("0.0");
+    expect(tile?.textContent).not.toContain("NaN");
+    expect(tile?.textContent).not.toContain("scored ·");
+  });
+
+  it("shows the scored caption the same string a screen reader reads", () => {
+    render(<OpportunityLandscape />);
+
+    const tile = screen.getByText("Avg Opportunity Score").parentElement;
+    expect(tile?.textContent).toContain("2 scored · 0 not scored");
   });
 
   // An outcome the sidecar never scored shows "—" and "Not scored" in the table,
@@ -519,7 +630,7 @@ describe("OpportunityLandscape underserved boundary", () => {
 
   it("renders the underserved polygon derived from the score formula", () => {
     const { container } = render(<OpportunityLandscape />);
-    const polygon = container.querySelector(".opportunity-matrix__band");
+    const polygon = container.querySelector("polygon");
     expect(polygon).not.toBeNull();
     expect(polygon?.getAttribute("points")).toBe("40,20 40,180 480,40 480,20");
   });
@@ -551,7 +662,7 @@ describe("OpportunityLandscape underserved boundary", () => {
 
   it("places (9,2) inside the shaded polygon and (3,8) outside", () => {
     const { container } = render(<OpportunityLandscape />);
-    const polygon = container.querySelector<SVGPolygonElement>(".opportunity-matrix__band")!;
+    const polygon = container.querySelector("polygon")!;
     const points = polygon.getAttribute("points")!;
     expect(pointInPolygon(plotX(2), plotY(9), points)).toBe(true);
     expect(pointInPolygon(plotX(8), plotY(3), points)).toBe(false);
@@ -577,83 +688,40 @@ describe("OpportunityLandscape underserved boundary", () => {
   });
 });
 
-describe("the map draws from the palette and from shape, not from a hex", () => {
-  /** Three outcomes, one per band, so the encoding can be counted. */
-  function seedThreeBands() {
-    harness.state.canvasState = {
-      kind: "ready",
-      data: {
-        jobs: [{ id: "JOB-1", name: "Deploy Service" }],
-        steps: [],
-        outcomes: [
-          { id: "O-201", statement: "Served", importance: 6, satisfaction: 6, opportunity_score: 6 },
-          { id: "O-202", statement: "Underserved", importance: 8, satisfaction: 5, opportunity_score: 11 },
-          { id: "O-203", statement: "Deep", importance: 9, satisfaction: 2, opportunity_score: 16 },
-        ],
-        source: "seed",
-      },
-    } as unknown as CanvasState;
-  }
+describe("OpportunityPlot highlight", () => {
+  const outcomes = mockCanvasData.outcomes;
 
-  beforeEach(() => {
-    seedThreeBands();
+  it("marks exactly the highlighted outcome and no other", () => {
+    const { container } = render(
+      <OpportunityPlot
+        outcomes={outcomes}
+        selectedOutcomeId={null}
+        highlightedOutcomeId="O-101"
+        onSelectOutcome={() => {}}
+        onHoverOutcome={() => {}}
+        activeOutcome={null}
+        compact
+      />,
+    );
+
+    const highlighted = container.querySelectorAll(".matrix-node--highlighted");
+    expect(highlighted).toHaveLength(1);
+    expect(highlighted[0]).toHaveAttribute("data-highlighted", "true");
+    expect(highlighted[0]).toHaveAccessibleName(/^O-101,/);
   });
 
-  it("marks a band by shape as well as colour", () => {
-    const { container } = render(<OpportunityLandscape />);
-    expect(container.querySelectorAll("circle.opportunity-matrix__node--served")).toHaveLength(1);
-    expect(container.querySelectorAll("rect.opportunity-matrix__node--underserved")).toHaveLength(1);
-    expect(container.querySelectorAll("polygon.opportunity-matrix__node--deep")).toHaveLength(1);
-  });
+  it("marks nothing when no outcome is highlighted", () => {
+    const { container } = render(
+      <OpportunityPlot
+        outcomes={outcomes}
+        selectedOutcomeId={null}
+        onSelectOutcome={() => {}}
+        onHoverOutcome={() => {}}
+        activeOutcome={null}
+        compact
+      />,
+    );
 
-  it("names every band shape in a legend the reader can read", () => {
-    const { container } = render(<OpportunityLandscape />);
-    const legend = container.querySelector(".opportunity-matrix__legend");
-    expect(legend).not.toBeNull();
-    const text = legend?.textContent ?? "";
-    for (const word of ["Served", "circle", "Underserved", "square", "Deep", "triangle"]) {
-      expect(text.toLowerCase()).toContain(word.toLowerCase());
-    }
-  });
-
-  it("paints the map only through classes the theme can reach", () => {
-    const { container } = render(<OpportunityLandscape />);
-    expect(literalPaint(container)).toEqual([]);
-    const plot = container.querySelector(".opportunity-matrix__plot");
-    expect(plot?.querySelector(".opportunity-matrix__band")).not.toBeNull();
-    expect(plot?.querySelectorAll(".opportunity-matrix__grid").length).toBeGreaterThan(0);
-    expect(plot?.querySelectorAll(".opportunity-matrix__axis").length).toBeGreaterThan(0);
-  });
-
-  it("keeps the decorative gradient out of the plot", () => {
-    const { container } = render(<OpportunityLandscape />);
-    expect(container.querySelector("linearGradient")).toBeNull();
-    expect(container.querySelector("[fill^='url(']")).toBeNull();
-  });
-
-  it("holds still under reduced motion and still shows the band", () => {
-    const { container } = render(<OpportunityLandscape />);
-    // The pulse is decoration: a reader who never sees it still learns which
-    // band each marker is in, because the marker itself says so.
-    container.querySelectorAll("animate").forEach((node) => node.remove());
-    expect(container.querySelectorAll("circle.opportunity-matrix__node--served")).toHaveLength(1);
-    expect(container.querySelectorAll("rect.opportunity-matrix__node--underserved")).toHaveLength(1);
-    expect(container.querySelectorAll("polygon.opportunity-matrix__node--deep")).toHaveLength(1);
-  });
-
-  it("draws the map without referencing an outside resource", () => {
-    const { container } = render(<OpportunityLandscape />);
-    const svg = container.querySelector("svg");
-    expect(svg?.innerHTML ?? "").not.toMatch(/xlink:href|https?:\/\//);
-  });
-
-  it("carries the selected row and the underserved pill as classes", () => {
-    render(<OpportunityLandscape />);
-    fireEvent.click(screen.getByText("📋 Table View"));
-    const row = document.querySelector(".opportunity-matrix__row--underserved");
-    expect(row).not.toBeNull();
-    expect(document.querySelector(".opportunity-matrix__pill--underserved")).not.toBeNull();
-    fireEvent.click(row!);
-    expect(row).toHaveClass("opportunity-matrix__row--selected");
+    expect(container.querySelectorAll(".matrix-node--highlighted")).toHaveLength(0);
   });
 });

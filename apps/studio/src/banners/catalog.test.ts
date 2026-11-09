@@ -7,6 +7,7 @@ const ALL_KINDS: BannerKind[] = [
   "sidecar-down",
   "model-offline",
   "offline",
+  "app-update-ready",
   "update-available",
   "update-ready",
   "write-rejected",
@@ -62,6 +63,20 @@ describe("BANNER_CATALOG", () => {
       expect(BANNER_CATALOG[kind].life).toBe("transient");
       expect(BANNER_CATALOG[kind].dock).toBe("corner");
     }
+  });
+
+  it("offers a reload, never a forced one, when a new build is staged", () => {
+    const entry = BANNER_CATALOG["app-update-ready"];
+    expect(entry.severity).toBe("info");
+    expect(entry.life).toBe("persistent");
+    expect(entry.dock).toBe("top");
+    // The copy names the version and the action is an explicit reload, so the
+    // update never swaps code on its own.
+    expect(`${entry.title} ${entry.body}`).toMatch(/new version/i);
+    expect(entry.actions?.[0]).toMatchObject({
+      label: "Reload for the new version",
+      action: "reload-app",
+    });
   });
 });
 

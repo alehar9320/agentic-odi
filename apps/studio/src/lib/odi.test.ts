@@ -1,18 +1,97 @@
+/// <reference types="node" />
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import {
-  bandOf,
-  DEEP_SCORE,
   formatMemberMean,
   formatOpportunityScore,
   hasScore,
   isUnderserved,
   opportunityPill,
   opportunityScore,
+  scoredAverage,
   segmentBasisLine,
   summarizeMemberScores,
   UNDERSERVED_THRESHOLD,
 } from "./odi";
+
+// The fixture is the contract between the Python service and the TypeScript
+// client. It lives in `packages/core/tests/fixtures/opportunity-score.json` and
+// is read by both languages; neither side may re-derive its expected values.
+const FIXTURE_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../packages/core/tests/fixtures/opportunity-score.json",
+);
+
+function loadScoreFixture() {
+  return JSON.parse(readFileSync(FIXTURE_PATH, "utf8")) as {
+    formula: string;
+    cases: Array<{
+      id: string;
+      importance: number | null;
+      satisfaction: number | null;
+      score: number | null;
+    }>;
+  };
+}
+
+describe("the shared scoring fixture", () => {
+  it("is valid JSON with the documented formula and no comments", () => {
+    const fixture = loadScoreFixture();
+    expect(fixture.formula).toBe("importance + max(importance - satisfaction, 0)");
+    expect(Array.isArray(fixture.cases)).toBe(true);
+    expect(fixture.cases.length).toBeGreaterThan(0);
+    // A comment would make the file invalid JSON, so parsing it is the check.
+    expect(() => JSON.parse(readFileSync(FIXTURE_PATH, "utf8"))).not.toThrow();
+  });
+
+  it("covers importance 0-20, satisfaction above, equal and below, plus a null pair", () => {
+    const fixture = loadScoreFixture();
+    const importances = fixture.cases
+      .map((c) => c.importance)
+      .filter((v): v is number => v !== null);
+    expect(Math.min(...importances)).toBe(0);
+    expect(Math.max(...importances)).toBe(20);
+    expect(fixture.cases.some((c) => c.importance === null && c.satisfaction === null)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! > c.satisfaction!)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! < c.satisfaction!)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! === c.satisfaction!)).toBe(true);
+  });
+
+  it("agrees with the shared function on every scored case", () => {
+    const fixture = loadScoreFixture();
+    for (const c of fixture.cases) {
+      if (c.importance === null || c.satisfaction === null) {
+        expect(c.score).toBeNull();
+        continue;
+      }
+      expect(opportunityScore(c.importance, c.satisfaction)).toBeCloseTo(c.score ?? 0, 5);
+    }
+  });
+
+  it("fails when the fixture's expected value drifts from the function", () => {
+    // The fixture is the contract: editing a case's `score` must break this
+    // assertion, so the two sides cannot drift apart while each keeps passing.
+    const fixture = loadScoreFixture();
+    const drifted = {
+      ...fixture,
+      cases: fixture.cases.map((c) =>
+        c.importance !== null && c.satisfaction !== null && c.score !== null
+          ? { ...c, score: c.score + 1 }
+          : c,
+      ),
+    };
+    expect(() => {
+      for (const c of drifted.cases) {
+        if (c.importance === null || c.satisfaction === null || c.score === null) continue;
+        expect(opportunityScore(c.importance, c.satisfaction)).toBeCloseTo(c.score, 5);
+      }
+    }).toThrow();
+  });
+});
 
 describe("opportunityScore", () => {
   it("computes importance + max(importance - satisfaction, 0)", () => {
@@ -22,28 +101,6 @@ describe("opportunityScore", () => {
   it("never subtracts when satisfaction exceeds importance", () => {
     expect(opportunityScore(4, 9)).toBeCloseTo(4, 5);
     expect(opportunityScore(8, 8)).toBeCloseTo(8, 5);
-  });
-});
-
-describe("bandOf", () => {
-  it("splits the score range into the three bands the map draws", () => {
-    expect(bandOf(null)).toBe("served");
-    expect(bandOf(4)).toBe("served");
-    expect(bandOf(10)).toBe("served");
-    expect(bandOf(10.5)).toBe("underserved");
-    expect(bandOf(14.9)).toBe("underserved");
-    expect(bandOf(DEEP_SCORE)).toBe("deep");
-    expect(bandOf(20)).toBe("deep");
-  });
-
-  it("agrees with isUnderserved below the deep threshold, so one score cannot be two things", () => {
-    for (let score = 0; score <= 20; score = Number((score + 0.1).toFixed(1))) {
-      const band = bandOf(score);
-      expect(band === "underserved" || band === "deep").toBe(isUnderserved(score));
-      if (score < DEEP_SCORE) {
-        expect(band === "underserved").toBe(isUnderserved(score));
-      }
-    }
   });
 });
 
@@ -124,6 +181,37 @@ describe("summarizeMemberScores", () => {
   it("treats a missing score as missing, never as zero", () => {
     // A mean that counted the missing score as 0 would read 6.0, not 12.0.
     expect(summarizeMemberScores([12, null]).mean).toBeCloseTo(12, 5);
+  });
+});
+
+describe("scoredAverage", () => {
+  function outcome(score: number | null | undefined) {
+    return { id: "O-1", opportunity_score: score } as never;
+  }
+
+  it("averages the stored scores only, never counting a missing score as zero", () => {
+    const summary = scoredAverage([outcome(12), outcome(null)]);
+    expect(summary.mean).toBeCloseTo(12, 5);
+    expect(summary.scored).toBe(1);
+    expect(summary.unscored).toBe(1);
+  });
+
+  it("reports no mean at all when nothing is scored", () => {
+    const summary = scoredAverage([outcome(null), outcome(undefined)]);
+    expect(summary.mean).toBeNull();
+    expect(summary.scored).toBe(0);
+    expect(summary.unscored).toBe(2);
+  });
+
+  it("averages the stored values, not the pre-rounded ones", () => {
+    expect(scoredAverage([outcome(11.44), outcome(11.44)]).mean).toBeCloseTo(11.44, 5);
+  });
+
+  it("has no mean for an empty board rather than a zero", () => {
+    const summary = scoredAverage([]);
+    expect(summary.mean).toBeNull();
+    expect(summary.scored).toBe(0);
+    expect(summary.unscored).toBe(0);
   });
 });
 

@@ -5,7 +5,6 @@ import { OnboardingProvider } from "../../onboarding/OnboardingProvider";
 import { UpdateProvider, createUpdateService } from "../../updater";
 import type { UpdateTransport } from "../../updater/types";
 import { SettingsPanel } from "../SettingsPanel";
-import type { StudioConfig } from "../../types";
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
@@ -23,20 +22,16 @@ const transport: UpdateTransport = {
 
 const service = createUpdateService({ transport, storage: null, document: null });
 
-const PANEL_SETTINGS: StudioConfig = {
-  base_url: "http://localhost:8001/v1",
-  api_key: "local",
-  model_name: "local-tools-model",
-  mcp_url: "http://localhost:8000/mcp",
-  theme: "dark",
-};
-
 const stubContext = (overrides: Record<string, unknown> = {}) =>
   ({
-    settings: PANEL_SETTINGS,
+    settings: {
+      base_url: "http://localhost:8001/v1",
+      api_key: "local",
+      model_name: "local-tools-model",
+      mcp_url: "http://localhost:8000/mcp",
+      theme: "dark",
+    },
     saveSettings: vi.fn(),
-    // The palette actually painted, as the provider publishes it.
-    theme: "dark" as const,
     displayName: "Ada",
     setDisplayName: vi.fn(),
     brief: null,
@@ -52,7 +47,9 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     mcpReachable: false,
     pushToast: vi.fn(),
     connectors: [],
+    connectorsLoading: false,
     presets: [],
+    presetsLoading: false,
     addConnector: vi.fn().mockResolvedValue({ ok: true, name: "notion" }),
     deleteConnector: vi.fn().mockResolvedValue({ ok: true, name: "notion" }),
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
@@ -176,17 +173,5 @@ describe("Settings saves per field", () => {
 
     expect(saveSettings).toHaveBeenCalledTimes(1);
     expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ api_key: "sk-live-123" }));
-  });
-
-  it("reads a stored theme that is not a theme as no choice at all", () => {
-    // Something else wrote the settings key, or an older build did. The panel
-    // still opens, and the group lands on the one choice that cannot be wrong.
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({ settings: { ...PANEL_SETTINGS, theme: "neon" } }),
-    );
-
-    renderPanel();
-
-    expect(screen.getByRole("radio", { name: /follow the system/i })).toBeChecked();
   });
 });

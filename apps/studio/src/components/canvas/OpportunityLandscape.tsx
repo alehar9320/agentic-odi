@@ -2,15 +2,17 @@ import { useMemo, useRef, useState } from "react";
 
 import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
 import {
-  bandOf,
   formatOpportunityScore,
   hasScore,
   isUnderserved,
+  scoredAverage,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { ShareAction } from "../ShareAction";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
 
@@ -81,10 +83,8 @@ export function OpportunityLandscape() {
     return ids.size;
   }, [evidence]);
 
-  const avgOpportunity = useMemo(() => {
-    const total = outcomes.reduce((acc, o) => acc + (o.opportunity_score ?? 0), 0);
-    return formatOpportunityScore(outcomes.length ? total / outcomes.length : null);
-  }, [outcomes]);
+  // The average counts stored scores only.
+  const averageScore = useMemo(() => scoredAverage(outcomes), [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
     return outcomes.filter((outcome) => {
@@ -134,15 +134,13 @@ export function OpportunityLandscape() {
             Opportunity Landscape
           </p>
           <p className="caption" style={{ marginTop: 4, margin: 0, color: "var(--studio-muted)" }}>
-            Interactive 2D Opportunity Matrix mapping Importance vs. Satisfaction. Scores above 10 mark
-            underserved market needs; a marker's shape says which band it is in, so the map reads on a
-            greyscale printout and to a colour-blind reader as well as on a lit screen.
+            Interactive 2D Opportunity Matrix mapping Importance vs. Satisfaction. Scores above 10 mark underserved market needs and pulse as primary innovation levers.
           </p>
         </div>
 
-        {/* The view switcher, and the one action that leaves the screen for a document. */}
+        {/* The view switcher, and the actions that leave the screen — for a document, or a read-only link. */}
         <div className="field__row">
-          <div className="opportunity-matrix__toggle">
+          <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", padding: 3, borderRadius: 8, border: "1px solid var(--studio-border)" }}>
             <button
               type="button"
               className={`studio-button ${viewMode === "matrix" ? "studio-button--primary" : ""}`}
@@ -178,6 +176,7 @@ export function OpportunityLandscape() {
           >
             Export brief
           </button>
+          <ShareAction />
         </div>
       </div>
 
@@ -245,7 +244,16 @@ export function OpportunityLandscape() {
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Avg Opportunity Score</div>
-            <div className="studio-metric__value">{avgOpportunity}</div>
+            <div className="studio-metric__value">
+              {averageScore.mean == null
+                ? "Not scored"
+                : formatOpportunityScore(averageScore.mean)}
+            </div>
+            {averageScore.mean == null ? null : (
+              <div className="studio-metric__delta">
+                {`${averageScore.scored} scored · ${averageScore.unscored} not scored`}
+              </div>
+            )}
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Unique Customer Quotes</div>
@@ -307,7 +315,7 @@ export function OpportunityLandscape() {
           Capture an outcome to see it here.
         </p>
       ) : viewMode === "matrix" ? (
-        <OpportunityMatrixView
+        <OpportunityPlot
           outcomes={filteredOutcomes}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
@@ -379,7 +387,11 @@ interface MatrixViewProps {
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
-  sample: boolean;
+  /** The one outcome the tour points at, ringed apart from the rest. */
+  highlightedOutcomeId?: string | null;
+  sample?: boolean;
+  /** Drops the detail sidebar and stacks the plot, for a narrow container. */
+  compact?: boolean;
 }
 
 interface PlottedOutcome {
@@ -396,11 +408,6 @@ interface PlottedOutcome {
 // underserved boundary is `importance = 5 + satisfaction / 2`, derived from
 // `importance + max(importance - satisfaction, 0) > 10`; it runs from
 // (satisfaction 0, importance 5) to (satisfaction 10, importance 10).
-/** An upward marker around (cx, cy): the deep band's shape. */
-function trianglePoints(cx: number, cy: number, reach: number): string {
-  return [`${cx},${cy - reach}`, `${cx + reach},${cy + reach}`, `${cx - reach},${cy + reach}`].join(" ");
-}
-
 const PLOT_LEFT = 40;
 const PLOT_RIGHT = 480;
 const PLOT_TOP = 20;
@@ -427,17 +434,21 @@ const underservedPolygonPoints = [
   .map(([x, y]) => `${x},${y}`)
   .join(" ");
 
-function OpportunityMatrixView({
+export function OpportunityPlot({
   outcomes,
   selectedOutcomeId,
   onSelectOutcome,
   onHoverOutcome,
   activeOutcome,
-  sample,
+  sample = false,
+  highlightedOutcomeId = null,
+  compact = false,
 }: MatrixViewProps) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
+  // The pulse is decoration; with reduce-motion the ring stays still.
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   const plotted: PlottedOutcome[] = outcomes.map((outcome) => {
     const importance = Math.min(Math.max(outcome.importance ?? 5, 0), 10);
@@ -530,12 +541,26 @@ function OpportunityMatrixView({
 
   return (
     <div
-      className="opportunity-matrix"
-      style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}
+      className={`opportunity-matrix${compact ? " opportunity-matrix--compact" : ""}`}
+      style={{
+        display: "grid",
+        gridTemplateColumns: compact ? "1fr" : "1fr 320px",
+        gap: 16,
+      }}
     >
       {/* Interactive 2D Chart */}
-      <div className="opportunity-matrix__panel">
-        <div className="opportunity-matrix__axes">
+      <div
+        style={{
+          background: "rgba(11, 13, 19, 0.6)",
+          border: "1px solid var(--studio-border)",
+          borderRadius: 12,
+          padding: 16,
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: "0.78rem", color: "var(--studio-muted)" }}>
           <span>Y-Axis: Importance (0 - 10)</span>
           <span>X-Axis: Satisfaction (0 - 10)</span>
         </div>
@@ -555,6 +580,10 @@ function OpportunityMatrixView({
             <desc id="opportunity-map-desc">{summary}</desc>
             {/* Grid background lines */}
             <defs>
+              <linearGradient id="underservedGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="rgba(251, 191, 36, 0.15)" />
+                <stop offset="100%" stopColor="rgba(251, 191, 36, 0.02)" />
+              </linearGradient>
               <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur stdDeviation="3" result="blur" />
                 <feComposite in="SourceGraphic" in2="blur" operator="over" />
@@ -568,13 +597,13 @@ function OpportunityMatrixView({
               return (
                 <g key={val}>
                   {/* Vertical grid line */}
-                  <line className="opportunity-matrix__grid" x1={x} y1={PLOT_TOP} x2={x} y2={PLOT_DATA_BOTTOM} strokeDasharray="3,3" />
-                  <text className="opportunity-matrix__axis" x={x} y={338} fontSize="10" textAnchor="middle">
+                  <line x1={x} y1={PLOT_TOP} x2={x} y2={PLOT_DATA_BOTTOM} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
+                  <text x={x} y={338} fill="var(--studio-muted)" fontSize="10" textAnchor="middle">
                     {val}
                   </text>
                   {/* Horizontal grid line */}
-                  <line className="opportunity-matrix__grid" x1={PLOT_LEFT} y1={y} x2={PLOT_RIGHT} y2={y} strokeDasharray="3,3" />
-                  <text className="opportunity-matrix__axis" x={30} y={y + 3} fontSize="10" textAnchor="end">
+                  <line x1={PLOT_LEFT} y1={y} x2={PLOT_RIGHT} y2={y} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
+                  <text x={30} y={y + 3} fill="var(--studio-muted)" fontSize="10" textAnchor="end">
                     {val}
                   </text>
                 </g>
@@ -584,25 +613,16 @@ function OpportunityMatrixView({
             {/* Underserved / High Opportunity Region Polygon (Imp + max(Imp - Sat, 0) > 10) */}
             {/* High importance, low satisfaction area top-left */}
             <polygon
-              className="opportunity-matrix__band"
               points={underservedPolygonPoints}
+              fill="url(#underservedGlow)"
+              stroke="rgba(251, 191, 36, 0.2)"
+              strokeWidth="1"
               strokeDasharray="4,4"
             />
-            <text
-              className="opportunity-matrix__zone-label opportunity-matrix__zone-label--underserved"
-              x={60}
-              y={45}
-              fontSize="11"
-            >
+            <text x={60} y={45} fill="var(--studio-amber)" fontSize="11" fontWeight="600" opacity="0.8">
               ★ Underserved Innovation Zone (Opp Score &gt; 10)
             </text>
-            <text
-              className="opportunity-matrix__zone-label opportunity-matrix__zone-label--overserved"
-              x={470}
-              y={310}
-              fontSize="11"
-              textAnchor="end"
-            >
+            <text x={470} y={310} fill="rgba(255,255,255,0.2)" fontSize="11" textAnchor="end">
               Overserved Zone
             </text>
 
@@ -613,73 +633,59 @@ function OpportunityMatrixView({
               const isSelected = selectedOutcomeId === outcome.id;
               const isHovered = activeOutcome?.id === outcome.id;
 
-              const band = bandOf(plot.score);
-              const reach = isSelected ? 9 : isHovered ? 8 : 6;
-              const nodeClass = `opportunity-matrix__node opportunity-matrix__node--${band}`;
+              let nodeColor = plot.underserved ? "#fbbf24" : "var(--studio-indigo)";
+              if (plot.score >= 15) nodeColor = "#f87171";
 
               return (
                 <g key={outcome.id}>
                   {/* Pulse ring for underserved */}
                   {plot.underserved && (
                     <circle
-                      className={`opportunity-matrix__node-edge opportunity-matrix__node-edge--${band}`}
                       cx={cx}
                       cy={cy}
                       r={isSelected ? 16 : 12}
                       fill="none"
+                      stroke={nodeColor}
+                      strokeWidth="1.5"
+                      opacity="0.4"
                     >
-                      <animate
-                        attributeName="r"
-                        values={isSelected ? "12;18;12" : "8;14;8"}
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
-                      <animate
-                        attributeName="opacity"
-                        values="0.6;0.1;0.6"
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
+                      {!reducedMotion && (
+                        <>
+                          <animate
+                            attributeName="r"
+                            values={isSelected ? "12;18;12" : "8;14;8"}
+                            dur="3s"
+                            repeatCount="indefinite"
+                          />
+                          <animate
+                            attributeName="opacity"
+                            values="0.6;0.1;0.6"
+                            dur="3s"
+                            repeatCount="indefinite"
+                          />
+                        </>
+                      )}
                     </circle>
                   )}
 
-                  {/* The marker. Three shapes, so a band survives a sheet that
-                      prints without colour and an eye that does not separate
-                      amber from red. */}
-                  {band === "underserved" ? (
-                    <rect
-                      className={nodeClass}
-                      x={cx - reach}
-                      y={cy - reach}
-                      width={reach * 2}
-                      height={reach * 2}
-                      rx={2}
-                      filter={plot.underserved || isSelected ? "url(#glowEffect)" : undefined}
-                    />
-                  ) : band === "deep" ? (
-                    <polygon
-                      className={nodeClass}
-                      points={trianglePoints(cx, cy, reach + 1)}
-                      filter={isSelected ? "url(#glowEffect)" : undefined}
-                    />
-                  ) : (
-                    <circle
-                      className={nodeClass}
-                      cx={cx}
-                      cy={cy}
-                      r={reach}
-                      filter={isSelected ? "url(#glowEffect)" : undefined}
-                    />
-                  )}
+                  {/* Main Node Point */}
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isSelected ? 9 : isHovered ? 8 : 6}
+                    fill={nodeColor}
+                    stroke="#0b0d13"
+                    strokeWidth="2"
+                    filter={plot.underserved || isSelected ? "url(#glowEffect)" : undefined}
+                  />
 
                   {/* Node ID Label */}
                   <text
-                    className={`opportunity-matrix__label${
-                      isSelected || isHovered ? " opportunity-matrix__label--active" : ""
-                    }`}
                     x={cx}
                     y={cy - 12}
+                    fill={isSelected || isHovered ? "#ffffff" : "var(--studio-muted)"}
                     fontSize={isSelected ? "12" : "10"}
+                    fontWeight={isSelected || isHovered ? "700" : "500"}
                     textAnchor="middle"
                   >
                     {outcome.id}
@@ -707,7 +713,8 @@ function OpportunityMatrixView({
                   }
                 }}
                 type="button"
-                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}`}
+                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}${highlightedOutcomeId === id ? " matrix-node--highlighted" : ""}`}
+                data-highlighted={highlightedOutcomeId === id ? "true" : undefined}
                 style={{ left: `${(plot.cx / 500) * 100}%`, top: `${(plot.cy / 360) * 100}%` }}
                 tabIndex={id === rovingId ? 0 : -1}
                 aria-pressed={isSelected}
@@ -724,30 +731,6 @@ function OpportunityMatrixView({
               />
             );
           })}
-
-          <ul className="opportunity-matrix__legend" aria-label="How to read the markers">
-            <li>
-              <span
-                className="opportunity-matrix__key opportunity-matrix__key--served"
-                aria-hidden="true"
-              />
-              Served (circle)
-            </li>
-            <li>
-              <span
-                className="opportunity-matrix__key opportunity-matrix__key--underserved"
-                aria-hidden="true"
-              />
-              Underserved (square)
-            </li>
-            <li>
-              <span
-                className="opportunity-matrix__key opportunity-matrix__key--deep"
-                aria-hidden="true"
-              />
-              Deep gap (triangle)
-            </li>
-          </ul>
 
           <ul className="sr-only" aria-label="Opportunities on the map">
             {rendered.map((plot) => (
@@ -812,7 +795,7 @@ function OpportunityTableView({
     <div style={{ overflowX: "auto", border: "1px solid var(--studio-border)", borderRadius: 12 }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem", textAlign: "left" }}>
         <thead>
-          <tr className="opportunity-matrix__header-row" style={{ borderBottom: "1px solid var(--studio-border)" }}>
+          <tr style={{ background: "rgba(255, 255, 255, 0.03)", borderBottom: "1px solid var(--studio-border)", color: "var(--studio-muted)" }}>
             <th style={{ padding: "10px 14px" }}>ID</th>
             <th style={{ padding: "10px 14px" }}>Desired Outcome Statement</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Importance</th>
@@ -840,16 +823,14 @@ function OpportunityTableView({
                     onSelectOutcome(outcome.id);
                   }
                 }}
-                className={[
-                  "opportunity-matrix__row",
-                  underserved ? "opportunity-matrix__row--underserved" : "",
-                  isSelected ? "opportunity-matrix__row--selected" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
                 style={{
                   borderBottom: "1px solid var(--studio-border)",
                   cursor: "pointer",
+                  background: isSelected
+                    ? "rgba(129, 140, 248, 0.12)"
+                    : underserved
+                    ? "rgba(251, 191, 36, 0.03)"
+                    : "transparent",
                   transition: "background 0.15s ease",
                 }}
               >
@@ -877,9 +858,11 @@ function OpportunityTableView({
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span
-                    className={`studio-pill opportunity-matrix__pill${
-                      underserved ? " opportunity-matrix__pill--underserved" : ""
-                    }`}
+                    className="studio-pill"
+                    style={{
+                      background: underserved ? "rgba(251, 191, 36, 0.15)" : "rgba(255,255,255,0.05)",
+                      color: underserved ? "var(--studio-amber)" : "var(--studio-muted)",
+                    }}
                   >
                     {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : "Not scored"}
                   </span>

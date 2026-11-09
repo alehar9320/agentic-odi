@@ -35,8 +35,6 @@ Open pull requests that change a capability this milestone cares about. Each
 links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
-- [ ] **Choose light, dark, or the system** — a Settings radiogroup for the three, one `matchMedia` subscription in the provider so *Follow the system* repaints while the window is open, the bar's toggle pinning the opposite palette, and the token contrast gate widened to the error colour (this change).
-- [ ] **Every surface reads the palette** — `theme.css` is the only place a colour is written, so a component that inlines a hex fails the build; the browser gate walks every lens the workspace can open in both palettes instead of the six anyone happened to measure; paper is ink, with the three bands as three greys on three shapes; and the offline one-pager follows the operating system rather than defaulting to dark (this change).
 - [ ] **A study, and the waves inside it** — a named pass over a job with a unique wave per `(job, name)`; outcomes scope to a study of their own job, and legacy rows keep belonging to no study (this change).
 - [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
 - [ ] **The database checks itself on boot and closes cleanly** — a bounded `PRAGMA quick_check` at open, a `store_corrupt` failure page that names the file and the last backup and never touches the damaged file, a WAL checkpoint on idle and on clean shutdown, and a SIGTERM stop that leaves no `-wal` behind ([#598](https://github.com/alehar9320/agentic-odi/issues/598), part of [#348](https://github.com/alehar9320/agentic-odi/issues/348)).
@@ -56,6 +54,7 @@ counted as done.
 - [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
 - [ ] **Evidence becomes outcome proposals** — a stored record is mined into a scored, approvable desired outcome, and only a human approval writes it ([PR #438](https://github.com/alehar9320/agentic-odi/pull/438)).
 - [ ] **Evidence from a file at the terminal** — `evidence add --file` reads text (or stdin) on the Studio's attachment cap ([PR #415](https://github.com/alehar9320/agentic-odi/pull/415)).
+- [ ] **A traceability report: orphans, unfunded, drift** — an outcome names the V2MOM method or measure it advances, the link is refused if the target does not exist, and a read-only report names the orphans, the unfunded objectives, and the links the vision dropped (issue [#591](https://github.com/alehar9320/agentic-odi/issues/591)).
 - [ ] **Every conversation in one list, with its turn count** — `GET /api/conversations` returns each stored conversation newest-first with its turns, so the Studio can show a switcher ([PR #451](https://github.com/alehar9320/agentic-odi/pull/451)).
 
 ## Next

@@ -18,6 +18,7 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
@@ -27,6 +28,7 @@ from agentic_odi_core.mapping import (
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    V2MOM,
     BusinessValue,
     ClaimCheck,
     ClaimSkip,
@@ -37,6 +39,7 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
+    OutcomeAlignment,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -58,6 +61,13 @@ from agentic_odi_core.segmentation import (
     unclustered_outcomes,
 )
 from agentic_odi_core.strategy import propose_strategy as build_strategy
+from agentic_odi_core.traceability import (
+    Objective,
+    TraceabilityReport,
+    compute_traceability_report,
+    objective_key,
+    objectives_from_v2mom,
+)
 
 
 class JobNotFoundError(NotFoundError):
@@ -442,7 +452,20 @@ class ODIService:
         if not res:
             raise OutcomeNotFoundError(outcome_id)
         self._emit_outcome_updates(existing, res)
+        self._count_outcome_milestones(res)
         return res
+
+    def _count_outcome_milestones(self, outcome: Outcome) -> None:
+        """Tell the onboarding funnel how far this workspace has got.
+
+        Both milestones are first-ever-per-workspace, so offering them on every
+        outcome is cheaper and truer than trying to remember which one was first.
+        A score milestone needs both scores: an outcome with one is not yet a
+        ranked opportunity, and the funnel must not claim it is.
+        """
+        count_milestone(self.repo, FIRST_OUTCOME)
+        if outcome.importance is not None and outcome.satisfaction is not None:
+            count_milestone(self.repo, FIRST_SCORE)
 
     def _emit_outcome_updates(self, before: Outcome, after: Outcome) -> None:
         #: The write that produced these facts: two changes landing on the same
@@ -578,7 +601,9 @@ class ODIService:
             opportunity_score=opportunity_score,
             claim_check=check,
         )
-        return self.repo.add_outcome(outcome)
+        created = self.repo.add_outcome(outcome)
+        self._count_outcome_milestones(created)
+        return created
 
     def get_outcomes(
         self,
@@ -993,6 +1018,10 @@ class ODIService:
             raise JobNotFoundError(job_id)
         if isinstance(trigger_type, str):
             trigger_type = ScheduledWorkTriggerType(trigger_type)
+        from .schedule import compute_next_run, validate_schedule_expression
+
+        validate_schedule_expression(schedule_expression)
+        next_run = compute_next_run(schedule_expression)
         work = ScheduledWork(
             id=str(uuid.uuid4()),
             name=name,
@@ -1002,6 +1031,7 @@ class ODIService:
             payload=payload or {},
             status=ScheduledWorkStatus.SCHEDULED,
             job_id=job_id,
+            next_run_at=next_run.isoformat(),
         )
         return self.repo.add_scheduled_work(work)
 
@@ -1033,12 +1063,19 @@ class ODIService:
         work = self.repo.get_scheduled_work(work_id)
         if work is None:
             raise ScheduledWorkNotFoundError(work_id)
-        now_str = datetime.now(timezone.utc).isoformat()
-        # No executor exists yet (#95): the work is dispatched and this is the
-        # record of it. Claiming a result would be inventing one.
+        now = datetime.now(timezone.utc)
+        now_str = now.isoformat()
+        from .schedule import compute_next_run
+
+        try:
+            next_run = compute_next_run(work.schedule_expression, now=now)
+            next_str = next_run.isoformat()
+        except ValueError:
+            next_str = None
         updates = {
             "status": ScheduledWorkStatus.RUNNING,
             "last_run_at": now_str,
+            "next_run_at": next_str,
             "result_summary": (
                 f"Dispatched at {now_str}; no executor is installed, so nothing has run."
             ),
@@ -1197,3 +1234,98 @@ class ODIService:
             discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
         )
         return saved
+
+    # -- Traceability: what an outcome advances ------------------------------
+
+    def save_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        """Persist the vision, values, methods, obstacles, and measures."""
+        return self.repo.add_v2mom(v2mom)
+
+    def get_v2mom(self) -> V2MOM | None:
+        """The stored vision and its lists, or ``None`` when none was captured."""
+        return self.repo.get_v2mom()
+
+    def link_outcome(self, outcome_id: str, field: str, text: str) -> Outcome:
+        """Record that an outcome advances one V2MOM method or measure.
+
+        The target must exist *now*: ``text`` is matched against the current
+        vision under ``field`` and unknown text is a validation error naming the
+        entries that do exist, never a fuzzy match. Linking the same pair twice
+        is idempotent.
+        """
+        outcome = self.repo.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        objective = self._resolve_objective(field, text)
+        alignment = OutcomeAlignment(field=field, key=objective.key, text=objective.text)
+        if any(
+            existing.field == alignment.field and existing.key == alignment.key
+            for existing in outcome.trace
+        ):
+            return outcome
+        # The repository event payload must stay JSON-serializable, so the link
+        # travels as its plain dict form rather than as the model.
+        trace = [*outcome.trace, alignment.model_dump(mode="json")]
+        updated = self.repo.update_outcome(outcome_id, {"trace": trace})
+        if updated is None:
+            raise OutcomeNotFoundError(outcome_id)
+        return updated
+
+    def unlink_outcome(self, outcome_id: str, field: str, key: str) -> Outcome:
+        """Remove one link from an outcome. Removing a link that is not there is a no-op."""
+        outcome = self.repo.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        remaining = [
+            alignment.model_dump(mode="json")
+            for alignment in outcome.trace
+            if not (alignment.field == field and alignment.key == key)
+        ]
+        updated = self.repo.update_outcome(outcome_id, {"trace": remaining})
+        if updated is None:
+            raise OutcomeNotFoundError(outcome_id)
+        return updated
+
+    def list_alignments(self, outcome_id: str | None = None) -> list[dict[str, str]]:
+        """Every recorded link, optionally for one outcome."""
+        outcomes = (
+            [self.repo.get_outcome(outcome_id)]
+            if outcome_id is not None
+            else list(self.repo.outcomes.values())
+        )
+        return [
+            {
+                "outcome_id": outcome.id,
+                "field": alignment.field,
+                "key": alignment.key,
+                "text": alignment.text,
+            }
+            for outcome in outcomes
+            if outcome is not None
+            for alignment in outcome.trace
+        ]
+
+    def traceability_report(self) -> TraceabilityReport:
+        """The three failures: orphans, unfunded objectives, and drift.
+
+        Read-only: it never repairs a link, and with no objectives defined it
+        says so rather than returning three empty sections.
+        """
+        return compute_traceability_report(self.repo.get_v2mom(), list(self.repo.outcomes.values()))
+
+    def _resolve_objective(self, field: str, text: str) -> Objective:
+        """Find the current objective named by ``text``, or refuse.
+
+        The refusal names the entries that do exist, because "unknown objective"
+        with no list is a dead end for the caller.
+        """
+        objectives = objectives_from_v2mom(self.repo.get_v2mom())
+        available = [item for item in objectives if item.field == field]
+        wanted = objective_key(field, text)
+        for objective in available:
+            if objective.key == wanted:
+                return objective
+        known = ", ".join(f'"{item.text}"' for item in available) or "none"
+        raise ValidationError(
+            f"No {field} in the vision matches {text!r}. Current {field}s: {known}."
+        )
