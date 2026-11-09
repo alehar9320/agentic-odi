@@ -134,6 +134,12 @@ persistence group, which may not call the service door":
 `errors.py` is the exception hierarchy the whole package raises, so it is the one
 module any group may import.
 
+`packages/core` ships one optional extra, `xlsx`, and it buys exactly one thing: the workbook
+reader in `outcome_import.py`. `openpyxl` is imported inside `read_xlsx_rows` and nowhere else in
+the distribution, because a module-level import would make `agentic_odi_core` unimportable without
+a spreadsheet library — and no gate would notice, since the architecture test reads only each
+member's `[project] dependencies` block, where an extra is invisible.
+
 Two things this does not claim. It is not a package boundary — all four groups
 share the `agentic_odi_core` namespace, and moving a file is out of scope for the
 decision it documents. And only one row is machine-checked: the

@@ -177,6 +177,9 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   row the CLI would refuse is refused with its line number in the file and the rest
   still land, `--dry-run` prints the run without writing it, and a theme name that
   matches nothing — or matches two — leaves its rows unfiled and says which lines.
+  An `.xlsx` goes through the same validator with `pip install
+  'agentic-odi-core[xlsx]'`: stored values only, never a computed formula, and never
+  a guessed sheet — `--sheet Backlog` when more than one tab has rows.
 - **A real conversation runtime.** The Studio uses assistant-ui over its
   sidecar-owned transcript, with attachments, tool traces under one foldable
   work row per turn, opt-in approvals for

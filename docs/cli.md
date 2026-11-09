@@ -151,6 +151,7 @@ agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.cs
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes import outcomes.csv --job-id <job-id> --dry-run
 agentic-odi desired-outcomes import outcomes.csv --job-id <job-id>
+agentic-odi desired-outcomes import workbook.xlsx --job-id <job-id> --sheet Backlog
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
 agentic-odi desired-outcomes search --job-id <job-id> --text "three days"
 agentic-odi desired-outcomes search --theme <theme-id> --stage execute --confidence scored
@@ -255,6 +256,17 @@ guessing what a research file meant is how a library gets quietly wrong.
 `--dry-run` writes nothing and prints the same report a real run would, minus the
 ids. An import has no undo token: a write run prints the ids it created, and
 `desired-outcomes delete` takes them back one at a time.
+
+A `.xlsx` is that same file by another route — same header, same refusals, same
+report — with the line numbers a spreadsheet app shows in the gutter. Which sheet
+is read is never guessed: rows in one tab are read, rows in two or more refuse the
+whole run and name the tabs, and `--sheet Backlog` picks one. A formula is read as
+the value the workbook stored, never computed: an uncached formula in `statement`,
+`importance`, or `satisfaction` refuses its row and names the cell, because a score
+nobody calculated is not the same thing as no score entered, while the same cell in
+`theme` or `stage` reads as empty and the report says how many. Reading a workbook
+needs the optional extra (`pip install 'agentic-odi-core[xlsx]'`); a build without
+it prints the install path and points at CSV, which it reads anyway.
 
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows

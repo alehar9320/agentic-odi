@@ -41,6 +41,7 @@ from agentic_odi_core import (
     ToolName,
     ValueOutOfRangeError,
     error_status,
+    format_for_name,
     import_outcomes,
     invalid_strategy_request,
     manual_claim_check,
@@ -49,7 +50,7 @@ from agentic_odi_core import (
 from agentic_odi_core.query import OutcomeQuery
 from agentic_odi_core.funnel import count_reset, read_counts
 from agentic_odi_core.remote import StudioError, StudioErrorCode
-from fastapi import APIRouter, File, Form, Query, Request
+from fastapi import APIRouter, File, Form, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
@@ -854,8 +855,9 @@ class McpImportTarget:
 @router.post("/outcomes/import", response_model=dict[str, Any])
 def import_outcomes_api(
     request: Request,
-    file: bytes = File(...),
+    file: Annotated[UploadFile, File()],
     job_id: str = Form(...),
+    sheet: str = Form(""),
     dry_run: bool = Form(False),
     mcp_url: str = Form(""),
 ) -> dict[str, Any]:
@@ -866,7 +868,12 @@ def import_outcomes_api(
     row, the theme names that matched nothing or matched two, the columns read and
     ignored, and ``aborted`` when the server stopped answering — so the Studio
     shows what the terminal shows. A bad row is a 200 with a reason; a bad request
-    (no file, an unknown job) is the 422 or 404 every other outcome route gives.
+    (no file, an unknown job, a name that is not a spreadsheet this build can read)
+    is the 422 or 404 or 400 every other outcome route gives.
+
+    The uploaded file's name picks the reader, the same way the terminal's does, so
+    a ``.xlsx`` needs no extra field; ``sheet`` names the tab when the workbook
+    holds rows in more than one and refuses to guess.
     """
     try:
         if _uses_mcp(request):
@@ -877,12 +884,15 @@ def import_outcomes_api(
             if _service(request).get_job(job_id) is None:
                 raise JobNotFoundError(job_id)
             target = ServiceImportTarget(_service(request))
-        report = import_outcomes(parse_outcome_table(file), target, job_id=job_id, dry_run=dry_run)
+        #: The name is read before the bytes are: a file this build cannot open is a mistake
+        #: about the request, and no part of it can be a row's fault.
+        fmt = format_for_name(file.filename or "")
+        table = parse_outcome_table(file.file.read(), fmt=fmt, sheet=sheet or None)
     except StudioHTTPError:
         raise
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
-    return report.as_dict()
+    return import_outcomes(table, target, job_id=job_id, dry_run=dry_run).as_dict()
 
 
 @router.post("/jobs")

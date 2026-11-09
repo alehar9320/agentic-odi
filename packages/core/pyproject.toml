@@ -7,6 +7,12 @@ dependencies = [
     "pydantic",
 ]
 
+[project.optional-dependencies]
+# Reading an .xlsx is optional: the core package is imported by the MCP server, the
+# sidecar, the CLI and every test, and a spreadsheet library in that path is a
+# dependency nobody asked for until they hand over a workbook.
+xlsx = ["openpyxl>=3.1"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

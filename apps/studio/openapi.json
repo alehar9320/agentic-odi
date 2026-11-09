@@ -1362,7 +1362,7 @@
     "/api/outcomes/import": {
       "post": {
         "summary": "Import Outcomes Api",
-        "description": "Import a spreadsheet of desired Outcomes into one Job.\n\nThe body is ``ImportReport``'s own dictionary \u2014 ``created`` with a line number\nand an outcome id per row, ``refused`` with the service's own sentence per bad\nrow, the theme names that matched nothing or matched two, the columns read and\nignored, and ``aborted`` when the server stopped answering \u2014 so the Studio\nshows what the terminal shows. A bad row is a 200 with a reason; a bad request\n(no file, an unknown job) is the 422 or 404 every other outcome route gives.",
+        "description": "Import a spreadsheet of desired Outcomes into one Job.\n\nThe body is ``ImportReport``'s own dictionary \u2014 ``created`` with a line number\nand an outcome id per row, ``refused`` with the service's own sentence per bad\nrow, the theme names that matched nothing or matched two, the columns read and\nignored, and ``aborted`` when the server stopped answering \u2014 so the Studio\nshows what the terminal shows. A bad row is a 200 with a reason; a bad request\n(no file, an unknown job, a name that is not a spreadsheet this build can read)\nis the 422 or 404 or 400 every other outcome route gives.\n\nThe uploaded file's name picks the reader, the same way the terminal's does, so\na ``.xlsx`` needs no extra field; ``sheet`` names the tab when the workbook\nholds rows in more than one and refuses to guess.",
         "operationId": "import_outcomes_api_api_outcomes_import_post",
         "requestBody": {
           "content": {
@@ -4035,6 +4035,11 @@
           "job_id": {
             "type": "string",
             "title": "Job Id"
+          },
+          "sheet": {
+            "type": "string",
+            "title": "Sheet",
+            "default": ""
           },
           "dry_run": {
             "type": "boolean",

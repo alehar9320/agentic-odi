@@ -1,10 +1,12 @@
-"""ALH-222 (M2-04.1) — ``POST /api/outcomes/import``.
+"""A CSV and a workbook through one route: ``POST /api/outcomes/import``.
 
 The route is an adapter: whatever the shared loop reports *is* the body, so the
 Studio renders a calculation it did not make. What is pinned here is what only the
 HTTP door can pin — that a bad row is a 200 with a reason while a bad *request* is
-a 404 or a 422, and that the MCP branch drives the five existing outcome tools
-rather than a new import-shaped one. The rules of the loop itself live in
+a 404 or a 422, or, since ALH-223, the 400 for a file this build cannot open at all
+(no xlsx reader, rows in two sheets, a name that is not a spreadsheet) — and that
+the MCP branch drives the five existing outcome tools rather than a new
+import-shaped one. The rules of the loop itself live in
 ``packages/core/tests/test_outcome_import.py``.
 """
 
@@ -330,3 +332,145 @@ def test_the_cli_and_the_upload_report_the_same_run() -> None:
     body = _upload(client, job_id, dry_run="true").json()
 
     assert body == preview
+
+
+# --- ALH-223: the same route, opened with a workbook ----------------------------
+
+
+def _as_saved(cell: str) -> object:
+    """A cell the way ``Save as`` writes one: a number in the file stays a number."""
+    try:
+        return float(cell)
+    except ValueError:
+        return cell
+
+
+def _workbook_bytes(sheets: dict[str, list[list[object]]]) -> bytes:
+    """Workbook bytes, written here rather than borrowed from core's suite: this test pins the
+    door, not the XML, and pytest's import path does not cross suites."""
+    import io
+
+    import openpyxl
+
+    book = openpyxl.Workbook()
+    for index, (name, rows) in enumerate(sheets.items()):
+        worksheet = book.active if index == 0 else book.create_sheet()
+        worksheet.title = name
+        for row in rows:
+            worksheet.append(list(row))
+    buffer = io.BytesIO()
+    book.save(buffer)
+    return buffer.getvalue()
+
+
+def _fixture_rows() -> list[list[object]]:
+    import csv
+    import io
+
+    return [
+        [_as_saved(cell) for cell in row]
+        for row in csv.reader(io.StringIO(FIXTURE.read_text(encoding="utf-8")))
+        if row
+    ]
+
+
+def _upload_workbook(
+    client: TestClient, job_id: str, source: bytes, name: str = "outcomes.xlsx", **fields: Any
+):
+    return client.post(
+        "/api/outcomes/import",
+        files={
+            "file": (
+                name,
+                source,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        data={"job_id": job_id, **fields},
+    )
+
+
+def test_the_same_rows_uploaded_as_a_workbook_report_the_same_run() -> None:
+    client, _, job_id = _seeded_service()
+    from_csv = _upload(client, job_id, dry_run="true").json()
+
+    body = _upload_workbook(
+        client, job_id, _workbook_bytes({"Outcomes": _fixture_rows()}), dry_run="true"
+    ).json()
+
+    assert body == from_csv
+
+
+def test_a_workbook_with_rows_in_two_sheets_is_an_envelope_until_one_is_named() -> None:
+    client, service, job_id = _seeded_service()
+    document = _workbook_bytes(
+        {
+            "Backlog": [
+                ["statement", "importance"],
+                ["Minimize the cost of a duplicate charge when the ledger closes twice", 6.0],
+            ],
+            "Q3": [
+                ["statement"],
+                [
+                    "Minimize the time to reconcile a supplier invoice when the statement "
+                    "arrives late"
+                ],
+            ],
+        }
+    )
+
+    response = _upload_workbook(client, job_id, document)
+
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == StudioErrorCode.VALIDATION.value
+    assert "Backlog, Q3" in response.text and "--sheet" in response.text
+    assert service.get_outcomes(job_id) == []
+
+    body = _upload_workbook(client, job_id, document, sheet="Q3").json()
+
+    assert [entry["statement"] for entry in body["created"]] == [
+        "Minimize the time to reconcile a supplier invoice when the statement arrives late"
+    ]
+
+
+def test_a_sheet_named_on_a_csv_is_the_same_envelope_as_a_sheet_that_is_not_there() -> None:
+    client, _, job_id = _seeded_service()
+
+    response = _upload(client, job_id, sheet="Backlog")
+
+    assert response.status_code == 400, response.text
+    assert "CSV has no sheets" in response.text
+
+
+def test_a_build_without_the_xlsx_extra_is_an_envelope_and_writes_nothing(
+    monkeypatch,
+) -> None:
+    import sys
+
+    client, service, job_id = _seeded_service()
+    document = _workbook_bytes({"Outcomes": _fixture_rows()})
+    monkeypatch.setitem(sys.modules, "openpyxl", None)
+
+    response = _upload_workbook(client, job_id, document)
+
+    assert response.status_code == 400, response.text
+    assert "agentic-odi-core[xlsx]" in response.text
+    assert service.get_outcomes(job_id) == []
+
+
+def test_a_name_that_is_not_a_spreadsheet_is_refused_before_a_row_is_read() -> None:
+    """The rule ALH-222 set, applied to a file: a bad request is an envelope, a bad row is a 200.
+
+    Nothing in a file this build cannot open can be a row's fault, so the report never starts.
+    """
+    client, service, job_id = _seeded_service()
+
+    response = client.post(
+        "/api/outcomes/import",
+        files={"file": ("notes.txt", b"statement\nMinimize anything\n", "text/plain")},
+        data={"job_id": job_id},
+    )
+
+    assert response.status_code == 400, response.text
+    assert "'txt'" in response.text
+    assert service.get_outcomes(job_id) == []

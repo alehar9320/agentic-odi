@@ -483,7 +483,12 @@ export interface paths {
          *     row, the theme names that matched nothing or matched two, the columns read and
          *     ignored, and ``aborted`` when the server stopped answering — so the Studio
          *     shows what the terminal shows. A bad row is a 200 with a reason; a bad request
-         *     (no file, an unknown job) is the 422 or 404 every other outcome route gives.
+         *     (no file, an unknown job, a name that is not a spreadsheet this build can read)
+         *     is the 422 or 404 or 400 every other outcome route gives.
+         *
+         *     The uploaded file's name picks the reader, the same way the terminal's does, so
+         *     a ``.xlsx`` needs no extra field; ``sheet`` names the tab when the workbook
+         *     holds rows in more than one and refuses to guess.
          */
         post: operations["import_outcomes_api_api_outcomes_import_post"];
         delete?: never;
@@ -1316,6 +1321,11 @@ export interface components {
             file: string;
             /** Job Id */
             job_id: string;
+            /**
+             * Sheet
+             * @default
+             */
+            sheet: string;
             /**
              * Dry Run
              * @default false
