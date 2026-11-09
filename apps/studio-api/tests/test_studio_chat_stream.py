@@ -256,17 +256,27 @@ def test_an_approved_write_runs(monkeypatch) -> None:
     [
         ("add_job", {"name": "Retention"}, 'Add Job "Retention"'),
         ("delete_job", {"job_id": "JOB-1"}, 'Delete Job "JOB-1"'),
-        ("update_outcome", {"outcome_id": "O-2", "statement": "Reduce rework"}, 'Update Outcome "Reduce rework"'),
+        (
+            "update_outcome",
+            {"outcome_id": "O-2", "statement": "Reduce rework"},
+            'Update Outcome "Reduce rework"',
+        ),
         ("schedule_work", {"name": "Weekly scan"}, 'Schedule work "Weekly scan"'),
         ("mark_signal_read", {"signal_id": "SIG-9"}, 'Mark signal "SIG-9"'),
         ("cancel_scheduled_work", {"work_id": "W-3"}, 'Cancel scheduled work "W-3"'),
-        ("add_evidence", {"source_name": "Support tickets"}, 'Add evidence record "Support tickets"'),
+        (
+            "add_evidence",
+            {"source_name": "Support tickets"},
+            'Add evidence record "Support tickets"',
+        ),
         ("add_step", {"job_id": "J-1"}, "Add a Step"),
         ("add_connector", {}, "Add a connector"),
         ("unknown_tool", {}, "Run unknown tool"),
     ],
 )
-def test_the_prompt_names_the_artifact_and_its_value(monkeypatch, name, arguments, consequence) -> None:
+def test_the_prompt_names_the_artifact_and_its_value(
+    monkeypatch, name, arguments, consequence
+) -> None:
     _install(
         monkeypatch,
         [
@@ -290,7 +300,13 @@ def test_a_long_argument_is_truncated_in_the_prompt(monkeypatch) -> None:
     _install(
         monkeypatch,
         [
-            _FakeStream([_chunk(tool_calls=[_tool_call(json.dumps({"statement": statement}), "add_outcome")])]),
+            _FakeStream(
+                [
+                    _chunk(
+                        tool_calls=[_tool_call(json.dumps({"statement": statement}), "add_outcome")]
+                    )
+                ]
+            ),
             _FakeStream([_chunk(content="Understood.")]),
         ],
     )
@@ -300,8 +316,8 @@ def test_a_long_argument_is_truncated_in_the_prompt(monkeypatch) -> None:
         )
     )
     consequence = next(data for name, data in events if name == "approval")["consequence"]
-    assert consequence.startswith("Add Outcome \"Minimize the time")
-    assert consequence.endswith("…\"")
+    assert consequence.startswith('Add Outcome "Minimize the time')
+    assert consequence.endswith('…"')
     assert len(consequence) < len(statement)
 
 
@@ -324,7 +340,9 @@ def test_a_new_tool_gets_a_sentence_without_a_new_branch() -> None:
         == 'Delete Widget "W-1"'
     )
     # Unknown to TOOL_SPECS still names the tool rather than raising.
-    assert chat._consequence_for("future_tool", {}, TOOL_SPECS.get("future_tool")) == "Run future tool"
+    assert (
+        chat._consequence_for("future_tool", {}, TOOL_SPECS.get("future_tool")) == "Run future tool"
+    )
 
 
 def test_an_empty_or_absent_argument_names_the_kind_not_a_blank() -> None:
@@ -334,7 +352,10 @@ def test_an_empty_or_absent_argument_names_the_kind_not_a_blank() -> None:
     assert chat._consequence_for("delete_job", {}, TOOL_SPECS["delete_job"]) == "Delete a Job"
     # add_connector is a local tool with no TOOL_SPECS entry; the override still
     # names it rather than falling back to "Run add connector".
-    assert chat._consequence_for("add_connector", {}, TOOL_SPECS.get("add_connector")) == "Add a connector"
+    assert (
+        chat._consequence_for("add_connector", {}, TOOL_SPECS.get("add_connector"))
+        == "Add a connector"
+    )
 
 
 def test_the_consequence_never_dumps_raw_arguments() -> None:
