@@ -16,6 +16,13 @@ If `~/.local/bin` is not on your PATH, add it (e.g.,
 uses `~\AppData\Local\agentic-odi\` and copies `.exe` files to
 `~\AppData\Local\agentic-odi\bin\`.
 
+Or download a per-platform archive directly:
+
+[Download Linux](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz)
+[Download macOS Apple Silicon](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz)
+[Download macOS Intel](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz)
+[Download Windows](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip)
+
 ## Update
 
 By default, `odi` auto-checks for updates once every 24 hours and applies the
