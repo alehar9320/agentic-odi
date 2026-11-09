@@ -1,12 +1,8 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import { newId, nowIso } from "./id";
 import type { CanvasData, ChangelogData, Job, Observation, Outcome, Step } from "../types";
-import type { LocalStore, OutboxEntity, OutboxKind, OutboxRecord } from "./store/types";
+import type { LocalStore, OutboxEntity, OutboxKind, OutboxRecord, WorkspaceSnapshot } from "./store/types";
 import { authHeaders } from "../api/studioApi";
-import { nowIso } from "./id";
-import type { CanvasData, ChangelogData, Observation, Outcome } from "../types";
-import type { LocalStore, OutboxRecord } from "./store/types";
-import type { WorkspaceSnapshot } from "./store/types";
 import { openLocalStore } from "./store/openStore";
 import { replayCaptures } from "./capture";
 import { LocalDataService } from "./data/localDataService";
