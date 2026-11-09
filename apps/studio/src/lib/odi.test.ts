@@ -1,3 +1,8 @@
+/// <reference types="node" />
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,6 +17,81 @@ import {
   summarizeMemberScores,
   UNDERSERVED_THRESHOLD,
 } from "./odi";
+
+// The fixture is the contract between the Python service and the TypeScript
+// client. It lives in `packages/core/tests/fixtures/opportunity-score.json` and
+// is read by both languages; neither side may re-derive its expected values.
+const FIXTURE_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../packages/core/tests/fixtures/opportunity-score.json",
+);
+
+function loadScoreFixture() {
+  return JSON.parse(readFileSync(FIXTURE_PATH, "utf8")) as {
+    formula: string;
+    cases: Array<{
+      id: string;
+      importance: number | null;
+      satisfaction: number | null;
+      score: number | null;
+    }>;
+  };
+}
+
+describe("the shared scoring fixture", () => {
+  it("is valid JSON with the documented formula and no comments", () => {
+    const fixture = loadScoreFixture();
+    expect(fixture.formula).toBe("importance + max(importance - satisfaction, 0)");
+    expect(Array.isArray(fixture.cases)).toBe(true);
+    expect(fixture.cases.length).toBeGreaterThan(0);
+    // A comment would make the file invalid JSON, so parsing it is the check.
+    expect(() => JSON.parse(readFileSync(FIXTURE_PATH, "utf8"))).not.toThrow();
+  });
+
+  it("covers importance 0-20, satisfaction above, equal and below, plus a null pair", () => {
+    const fixture = loadScoreFixture();
+    const importances = fixture.cases
+      .map((c) => c.importance)
+      .filter((v): v is number => v !== null);
+    expect(Math.min(...importances)).toBe(0);
+    expect(Math.max(...importances)).toBe(20);
+    expect(fixture.cases.some((c) => c.importance === null && c.satisfaction === null)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! > c.satisfaction!)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! < c.satisfaction!)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! === c.satisfaction!)).toBe(true);
+  });
+
+  it("agrees with the shared function on every scored case", () => {
+    const fixture = loadScoreFixture();
+    for (const c of fixture.cases) {
+      if (c.importance === null || c.satisfaction === null) {
+        expect(c.score).toBeNull();
+        continue;
+      }
+      expect(opportunityScore(c.importance, c.satisfaction)).toBeCloseTo(c.score ?? 0, 5);
+    }
+  });
+
+  it("fails when the fixture's expected value drifts from the function", () => {
+    // The fixture is the contract: editing a case's `score` must break this
+    // assertion, so the two sides cannot drift apart while each keeps passing.
+    const fixture = loadScoreFixture();
+    const drifted = {
+      ...fixture,
+      cases: fixture.cases.map((c) =>
+        c.importance !== null && c.satisfaction !== null && c.score !== null
+          ? { ...c, score: c.score + 1 }
+          : c,
+      ),
+    };
+    expect(() => {
+      for (const c of drifted.cases) {
+        if (c.importance === null || c.satisfaction === null || c.score === null) continue;
+        expect(opportunityScore(c.importance, c.satisfaction)).toBeCloseTo(c.score, 5);
+      }
+    }).toThrow();
+  });
+});
 
 describe("opportunityScore", () => {
   it("computes importance + max(importance - satisfaction, 0)", () => {
