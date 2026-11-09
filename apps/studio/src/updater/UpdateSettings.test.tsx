@@ -97,6 +97,40 @@ describe("UpdateSettings", () => {
     expect(within(section).getAllByRole("button")).toHaveLength(1);
   });
 
+  it("says it could not check, and when it last could", async () => {
+    const healthy = makeTransport();
+    const service = renderSettings(healthy);
+
+    await act(async () => {
+      await service.check();
+    });
+
+    healthy.check = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    await act(async () => {
+      await service.retry();
+    });
+
+    expect(
+      await screen.findByText(/couldn't reach the update server\. last successful check was/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^checked .* ago$/i)).toBeNull();
+  });
+
+  it("shows a bounded, newest-first list of what the updater did", async () => {
+    const service = renderSettings(makeTransport());
+
+    await act(async () => {
+      await service.check();
+    });
+
+    fireEvent.click(screen.getByText("Recent update activity"));
+
+    expect(screen.getByText("Reached the update server")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
   it("checks on request", async () => {
     const transport = makeTransport();
     renderSettings(transport);

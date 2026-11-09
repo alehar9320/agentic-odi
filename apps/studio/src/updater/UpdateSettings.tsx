@@ -1,13 +1,32 @@
 import { StatusDot } from "../components/status/StatusDot";
+import { formatActionTime } from "./machine";
 import { useUpdateService, useUpdateSnapshot } from "./UpdateProvider";
+import type { UpdateActionKind } from "./types";
+
+const ACTION_LABELS: Record<UpdateActionKind, string> = {
+  "check-started": "Checked for updates",
+  "check-succeeded": "Reached the update server",
+  "check-failed": "Couldn't reach the update server",
+  "download-started": "Started downloading",
+  "download-finished": "Finished downloading",
+  "download-failed": "The download didn't finish",
+  "install-started": "Started installing",
+  installed: "Update installed",
+  "install-failed": "The install didn't finish",
+  skipped: "Skipped this version",
+  dismissed: "Dismissed the update",
+  "restart-failed": "Couldn't restart the app",
+};
+
+const ACTION_LOG_LIMIT = 6;
 
 /**
  * Updates: one line that says where things stand, and at most one action.
  *
  * The running version and the build facts live in About; the bar's version
  * pill and the banner carry the urgent restart. This row is the quiet,
- * configuration-facing summary, so the detail (release notes, when the last
- * check ran, the running version) is deliberately absent here.
+ * configuration-facing summary, so the release notes, the last-check time, and
+ * the skip control are deliberately absent here.
  */
 export function UpdateSettings() {
   const service = useUpdateService();
@@ -18,6 +37,7 @@ export function UpdateSettings() {
     snapshot.phase === "checking" ||
     snapshot.phase === "downloading" ||
     snapshot.phase === "installing";
+  const recentActions = snapshot.actions.slice(0, ACTION_LOG_LIMIT);
 
   const action = !supported ? null : snapshot.phase === "ready" ? (
     <button
@@ -62,6 +82,23 @@ export function UpdateSettings() {
         <span>{service.statusLine()}</span>
         {action}
       </p>
+
+      {supported && recentActions.length > 0 && (
+        <details className="disclosure update-settings__activity">
+          <summary>Recent update activity</summary>
+          <ul className="update-settings__log">
+            {recentActions.map((entry, index) => (
+              <li
+                key={`${entry.kind}-${entry.at}-${index}`}
+                className="update-settings__log-row"
+              >
+                <span>{ACTION_LABELS[entry.kind]}</span>
+                <span className="muted">{formatActionTime(entry.at)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {supported && (
         <label className="update-settings__toggle">

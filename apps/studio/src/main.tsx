@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { installDiagnosticsConsoleCapture } from "./diagnostics/bundle";
 import { removeBootShell } from "./lib/boot";
-import { SERVICE_WORKER_URL } from "./lib/swRouting";
+import { initServiceWorker } from "./lib/swUpdate";
 import "./styles/theme.css";
 import "./styles/records.css";
 import "./styles/brief.css";
@@ -16,17 +16,19 @@ import "./vendor/index.css";
 installDiagnosticsConsoleCapture();
 
 /**
- * Register the service worker so an uncached navigation while offline gets the
- * themed `/offline.html` instead of the browser's error page (#546).
+ * Register the service worker and watch for the next build (#545).
+ *
+ * The worker precaches the shell, so the installed app opens with no network, and
+ * it is what answers an uncached navigation with `/offline.html` (#546). It never
+ * swaps code on its own: a new build waits until the person asks, through the
+ * `app-update-ready` banner, so an update can never interrupt a streamed turn.
  *
  * Production only: in dev the worker would cache Vite's module responses and
  * serve stale code, and a failure to register must never break the app.
  */
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register(SERVICE_WORKER_URL).catch(() => {
-      // An unregistered worker costs the offline fallback, not the app.
-    });
+    initServiceWorker();
   });
 }
 

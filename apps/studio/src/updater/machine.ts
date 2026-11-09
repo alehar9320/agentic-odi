@@ -14,6 +14,8 @@ export const INITIAL_SNAPSHOT: UpdateSnapshot = {
   available: null,
   progress: null,
   lastCheckedAt: null,
+  lastSuccessfulCheckAt: null,
+  actions: [],
   installed: false,
   pendingInstall: false,
   error: null,
@@ -52,6 +54,7 @@ export function reduce(snapshot: UpdateSnapshot, event: UpdateEvent): UpdateSnap
         installed: false,
         pendingInstall: false,
         lastCheckedAt: event.at,
+        lastSuccessfulCheckAt: event.at,
         error: null,
         dismissedVersion: null,
       };
@@ -66,6 +69,7 @@ export function reduce(snapshot: UpdateSnapshot, event: UpdateEvent): UpdateSnap
         installed: false,
         pendingInstall: false,
         lastCheckedAt: event.at,
+        lastSuccessfulCheckAt: event.at,
         error: null,
       };
 
@@ -79,6 +83,7 @@ export function reduce(snapshot: UpdateSnapshot, event: UpdateEvent): UpdateSnap
         installed: false,
         pendingInstall: false,
         lastCheckedAt: event.at,
+        lastSuccessfulCheckAt: event.at,
         error: null,
         dismissedVersion: null,
       };
@@ -241,24 +246,48 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
+/** "just now", "5 minutes ago", "2 hours ago" — one wording for every age. */
+function relativeElapsed(at: number, now: number): string {
+  const elapsed = Math.max(0, now - at);
+  if (elapsed < MINUTE) {
+    return "just now";
+  }
+  if (elapsed < HOUR) {
+    const minutes = Math.round(elapsed / MINUTE);
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
+  if (elapsed < DAY) {
+    const hours = Math.round(elapsed / HOUR);
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+  const days = Math.round(elapsed / DAY);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 export function describeCheckedAt(at: number | null, now: number): string {
   if (at === null) {
     return "Not checked yet";
   }
-  const elapsed = Math.max(0, now - at);
-  if (elapsed < MINUTE) {
-    return "Checked just now";
+  return `Checked ${relativeElapsed(at, now)}`;
+}
+
+/**
+ * The honesty line after a failed check: never a bare "Checked N minutes
+ * ago", which would imply a success that did not happen.
+ */
+export function describeLastSuccess(at: number | null, now: number): string {
+  if (at === null) {
+    return "It has not reached the server yet.";
   }
-  if (elapsed < HOUR) {
-    const minutes = Math.round(elapsed / MINUTE);
-    return `Checked ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
-  }
-  if (elapsed < DAY) {
-    const hours = Math.round(elapsed / HOUR);
-    return `Checked ${hours} hour${hours === 1 ? "" : "s"} ago`;
-  }
-  const days = Math.round(elapsed / DAY);
-  return `Checked ${days} day${days === 1 ? "" : "s"} ago`;
+  return `Last successful check was ${relativeElapsed(at, now)}.`;
+}
+
+/** The clock time of one logged action, so a list row needs no render-time clock. */
+export function formatActionTime(at: number): string {
+  const date = new Date(at);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
 }
 
 /** One plain sentence for Settings. Never an error code. */
@@ -270,7 +299,13 @@ export function statusLine(snapshot: UpdateSnapshot, now: number): string {
   }
 
   if (snapshot.phase === "error") {
-    return snapshot.error ?? "The update could not be completed.";
+    const message = snapshot.error ?? "The update could not be completed.";
+    // A check that never reached the server has no update to talk about. Say
+    // that plainly, and name the last check that did succeed.
+    if (snapshot.available === null) {
+      return `${message} ${describeLastSuccess(snapshot.lastSuccessfulCheckAt, now)}`;
+    }
+    return message;
   }
 
   if (snapshot.phase === "checking") {
