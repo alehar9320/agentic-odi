@@ -57,17 +57,20 @@ class SQLiteRepository(Repository):
         # Remember the file size before opening: if the store is corrupt and
         # SQLite modifies the file while failing to open it, restore the
         # original size so a damaged file is never silently altered.
-        original_size: int | None = None
+        original_stat: os.stat_result | None = None
         if os.path.exists(db_path):
-            original_size = os.path.getsize(db_path)
+            original_stat = os.stat(db_path)
         try:
             self.store = IntentStore(db_path, check_same_thread=False)
         except StoreCorrupt:
-            if original_size is not None:
-                with open(db_path, "r+b") as fh:
-                    fh.truncate(original_size)
+            if original_stat is not None:
+                if os.path.getsize(db_path) != original_stat.st_size:
+                    with open(db_path, "r+b") as fh:
+                        fh.truncate(original_stat.st_size)
+                os.utime(db_path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
             raise
         self._last_event_id = 0
+        self._checkpoint("TRUNCATE")
         self._load_snapshot()
 
     def _checkpoint(self, mode: str = "TRUNCATE") -> None:
@@ -923,7 +926,6 @@ class SQLiteRepository(Repository):
     def close(self) -> None:
         """Close the event store and let SQLite clean up its journal files."""
         with self._lock:
-            self._checkpoint("TRUNCATE")
             self.store.close()
 
     def health(self) -> bool:

@@ -60,8 +60,8 @@ def test_store_corrupt_carries_the_path_and_the_integrity_rows(tmp_path):
 
     error = collected.value
     assert error.path == db
-    assert error.rows
-    assert len(error.rows) <= 20
+    assert error.problems
+    assert len(error.problems) <= 20
 
 
 def test_corrupt_database_is_left_exactly_as_it_was(tmp_path):

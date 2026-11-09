@@ -248,6 +248,12 @@ class Share:
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
+            "artifact_kind": self.artifact_kind,
+            "artifact_id": self.artifact_id,
+            "created_at": self.created_at,
+            "expires_at": self.expires_at,
+            "revoked_at": self.revoked_at,
+            "last_read_at": self.last_read_at,
         }
 
 

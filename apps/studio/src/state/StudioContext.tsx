@@ -254,9 +254,6 @@ function currentPath(): string {
   return window.location.hash.replace(/^#/, "") || "/";
 }
 
-/** How often the studio re-probes the model and the MCP server. */
-const HEALTH_POLL_INTERVAL_MS = 30_000;
-
 /** How often a focused window re-reads the signal inbox from the store. */
 const SIGNAL_POLL_INTERVAL_MS = 60_000;
 
