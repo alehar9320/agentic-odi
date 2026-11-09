@@ -1,13 +1,6 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-// The stylesheet is read from source rather than via a `?raw` import so the
-// test does not depend on a CSS loader plugin being present in the runner.
-const themeCss = readFileSync(
-  fileURLToPath(new URL("./theme.css", import.meta.url)),
-  "utf8",
-);
+import themeCss from "./theme.css?raw";
 
 describe("display face", () => {
   it("declares a serif display family on a token", () => {
