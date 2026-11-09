@@ -10,9 +10,20 @@ import { STUDIO_VERSION } from "../lib/version";
 vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
+vi.mock("../state/settings/SettingsContext", () => ({
+  useSettings: vi.fn(),
+}));
 
 import { useStudio } from "../state/StudioContext";
+import { useSettings } from "../state/settings/SettingsContext";
 import type { StudioContextValue } from "../state/StudioContext";
+
+vi.mocked(useSettings).mockReturnValue({
+  settings: { base_url: "http://x", api_key: "k", model_name: "m", mcp_url: "u", theme: "dark" as const },
+  saveSettings: vi.fn(),
+  theme: "dark" as const,
+  setTheme: vi.fn(),
+});
 
 const transport: UpdateTransport = {
   supported: () => false,

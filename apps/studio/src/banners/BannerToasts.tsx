@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { useStudio } from "../state/StudioContext";
+import { useNoticesList } from "../state/notices/NoticesContext";
 import { useBanner } from "./BannerProvider";
 import type { BannerKind } from "./types";
 
@@ -20,7 +20,7 @@ const TOAST_KIND: Record<string, BannerKind> = {
  * already on screen.
  */
 export function BannerToasts() {
-  const { toasts } = useStudio();
+  const { toasts } = useNoticesList();
   const { raise, dismiss } = useBanner();
   const shown = useRef<Set<string>>(new Set());
 

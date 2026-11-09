@@ -6,10 +6,12 @@ import { UpdateProvider, createUpdateService } from "../updater";
 import type { UpdateTransport } from "../updater/types";
 import { SettingsPanel } from "../components/SettingsPanel";
 import { useStudio } from "../state/StudioContext";
+import { useSettings } from "../state/settings/SettingsContext";
 import type { StudioContextValue } from "../state/StudioContext";
 import { DiagnosticsModal } from "./DiagnosticsModal";
 
 vi.mock("../state/StudioContext", () => ({ useStudio: vi.fn() }));
+vi.mock("../state/settings/SettingsContext", () => ({ useSettings: vi.fn() }));
 
 const modalProps = {
   json: '{\n  "schema": 1\n}',
@@ -77,6 +79,18 @@ function stubContext(): StudioContextValue {
 describe("DiagnosticsModal", () => {
   beforeEach(() => {
     modalProps.onClose.mockClear();
+    vi.mocked(useSettings).mockReturnValue({
+      settings: {
+        base_url: "http://localhost:8001/v1",
+        api_key: "local-secret",
+        model_name: "model",
+        mcp_url: "http://localhost:8000/mcp",
+        theme: "dark",
+      },
+      saveSettings: vi.fn(),
+      theme: "dark" as const,
+      setTheme: vi.fn(),
+    });
   });
 
   afterEach(() => {

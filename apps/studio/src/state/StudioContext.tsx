@@ -114,6 +114,8 @@ import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
 import { resolveTheme } from "../lib/theme";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
+import { NoticesProvider } from "./notices/NoticesContext";
+import { SettingsProvider } from "./settings/SettingsContext";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -330,6 +332,8 @@ export interface ConnectionReport {
 export interface StudioContextValue {
   settings: StudioConfig;
   saveSettings: (config: StudioConfig) => void;
+  theme: StudioTheme;
+  setTheme: (theme: StudioTheme) => void;
   displayName: string;
   setDisplayName: (name: string) => void;
   brief: StudioBrief | null;
@@ -1190,6 +1194,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       writeSettings(config);
     },
     [writeSettings],
+  );
+
+  const setTheme = useCallback(
+    (next: StudioTheme) => {
+      saveSettings({ ...settings, theme: next });
+    },
+    [settings, saveSettings],
   );
 
   const setDisplayName = useCallback((name: string) => {
@@ -2634,6 +2645,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     () => ({
       settings,
       saveSettings,
+      theme,
+      setTheme,
       displayName,
       setDisplayName,
       brief,
@@ -2760,6 +2773,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [
       settings,
       saveSettings,
+      theme,
+      setTheme,
       displayName,
       setDisplayName,
       brief,
@@ -2885,7 +2900,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
+  return (
+    <StudioContext.Provider value={value}>
+      <NoticesProvider
+        toasts={toasts}
+        pushToast={pushToast}
+        dismissToast={dismissToast}
+        sidecarReachable={sidecarReachable}
+        dismissedSidecarNotice={dismissedSidecarNotice}
+        dismissSidecarNotice={dismissSidecarNotice}
+        recheckConnections={recheckConnections}
+      >
+        <SettingsProvider
+          settings={settings}
+          saveSettings={saveSettings}
+          theme={theme}
+          setTheme={setTheme}
+        >
+          {children}
+        </SettingsProvider>
+      </NoticesProvider>
+    </StudioContext.Provider>
+  );
 }
 
 export function useStudio(): StudioContextValue {

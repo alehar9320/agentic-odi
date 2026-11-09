@@ -16,6 +16,8 @@ import {
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
 import { StudioProvider, useStudio } from "./StudioContext";
+import { useNoticesActions, useNoticesList } from "./notices/NoticesContext";
+import { useSettings } from "./settings/SettingsContext";
 import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
 
 const CONVERSATION = {
@@ -2287,5 +2289,76 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+
+  describe("context split isolation (#503)", () => {
+    it("does not re-render an action-only notices consumer when a toast is pushed", () => {
+      const renders = { n: 0 };
+      let pushToast: ((kind: "info", message: string) => number) | null = null;
+      const ActionOnly = () => {
+        const { pushToast: p } = useNoticesActions();
+        pushToast = p;
+        renders.n += 1;
+        return null;
+      };
+      render(<StudioProvider><ActionOnly /></StudioProvider>);
+      const before = renders.n;
+      act(() => {
+        pushToast!("info", "a toast");
+      });
+      expect(renders.n).toBe(before);
+    });
+
+    it("does not re-render a notices-list consumer when the theme changes", () => {
+      const renders = { n: 0 };
+      let setTheme: ((theme: "light" | "dark") => void) | null = null;
+      const ListOnly = () => {
+        const { toasts } = useNoticesList();
+        renders.n += 1;
+        return <div data-testid="list">{toasts.length}</div>;
+      };
+      const ThemeSetter = () => {
+        const { setTheme: s } = useSettings();
+        setTheme = s;
+        return null;
+      };
+      render(
+        <StudioProvider>
+          <ListOnly />
+          <ThemeSetter />
+        </StudioProvider>,
+      );
+      const before = renders.n;
+      act(() => {
+        setTheme!("light");
+      });
+      expect(renders.n).toBe(before);
+    });
+
+    it("does not re-render a settings-only consumer when a toast is pushed", () => {
+      const renders = { n: 0 };
+      let pushToast: ((kind: "info", message: string) => number) | null = null;
+      const SettingsOnly = () => {
+        const { theme } = useSettings();
+        renders.n += 1;
+        return <div data-testid="settings">{theme}</div>;
+      };
+      const NoticesSetter = () => {
+        const { pushToast: p } = useNoticesActions();
+        pushToast = p;
+        return null;
+      };
+      render(
+        <StudioProvider>
+          <SettingsOnly />
+          <NoticesSetter />
+        </StudioProvider>,
+      );
+      const before = renders.n;
+      act(() => {
+        pushToast!("info", "a toast");
+      });
+      expect(renders.n).toBe(before);
+    });
   });
 });
