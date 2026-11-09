@@ -210,6 +210,16 @@ export function MicIcon(props: IconProps) {
   );
 }
 
+export function SpeakerIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 9.5h3l5-4v13l-5-4H4z" />
+      <path d="M16 9a4 4 0 0 1 0 6" />
+      <path d="M18.5 6.5a8 8 0 0 1 0 11" />
+    </Icon>
+  );
+}
+
 export function AlertIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -250,6 +260,16 @@ export function MenuIcon(props: IconProps) {
   return (
     <Icon {...props}>
       <path d="M4 7h16M4 12h16M4 17h10" />
+    </Icon>
+  );
+}
+
+export function HistoryIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" />
+      <path d="M3.5 4.5V9h4.5" />
+      <path d="M12 8v4.5l3 1.8" />
     </Icon>
   );
 }

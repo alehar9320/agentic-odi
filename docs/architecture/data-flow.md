@@ -70,8 +70,9 @@ reports the app's `localStorage` keys with their byte sizes.
 Three constraints shape what it is allowed to say:
 
 - `database` is imported from `apps/studio/src/bff/store/indexedDbStore.ts`, not
-  restated there — the name has one source of truth. A memory store reports
-  `null` and `persistent: false`, because nothing in it survives the tab.
+  restated there — the name is defined once in
+  `apps/studio/src/bff/store/migrations.ts` and re-exported. A memory store
+  reports `null` and `persistent: false`, because nothing in it survives the tab.
 - `lastWrite` is derived. The `meta` store holds only a sequence counter, so no
   write time is recorded anywhere to read; the selector takes the newest
   `updated_at` across jobs, steps, outcomes, observations, and conversations,
@@ -259,6 +260,24 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_MODEL` | CLI chat, Studio chat | `local-tools-model` |
 | `AGENTIC_ODI_API_KEY` | CLI chat, Studio chat | `local` |
 
+## Endpoint reachability
+
+A model endpoint configured on loopback or a private address (Ollama, LM Studio)
+is only reachable from a page served from that same device. `endpointReachability`
+in `apps/studio/src/lib/modelEndpoint.ts` compares the endpoint's host with the
+page's origin (`window.location.hostname`):
+
+- endpoint on a private host, page on the device → **reachable**
+- endpoint on a private host, page hosted elsewhere → **device-only**: the hosted
+  page cannot reach the person's machine, so `endpoint-model` is reported
+  unavailable with the reason to use the desktop app or open the Studio on this
+  device
+- sidecar proxy and public hosts → **reachable** from either
+
+The capability probe and the bar's model chip both read this, so a person is told
+why a local model cannot be reached from this page instead of being shown a generic
+offline state.
+
 ## Trust Boundaries
 
 Each process, the credentials it holds, and what crosses every wire are
@@ -286,6 +305,12 @@ MCP tool result (text)
   produces a readable message. Write routes no longer wrap their result in
   `{"ok": true, "result": ...}`: a success is the object, a delete is
   `{"deleted": id}`.
+- **The same envelope over MCP.** A failing tool returns
+  `{"error": StudioError, "message": "Error: …"}` as its text: the code,
+  retryability, detail, suggestion, and request id travel as data, and the
+  sentence stays for a client that only reads prose. `parse_tool_result` tries
+  that JSON first and falls back to the prose forms, so a server predating the
+  envelope is still understood.
 - **One terminal chat event.** Every `/api/chat` stream ends with exactly one
   `message` or one `error`. A recoverable tool error stays a tool result the
   model can read, but it is reported as `status: "error"` and counted. A fatal

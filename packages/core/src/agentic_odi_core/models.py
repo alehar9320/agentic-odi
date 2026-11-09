@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class Direction(str, Enum):
@@ -127,6 +127,26 @@ class Step(BaseModel):
     )
 
 
+#: The V2MOM lists an outcome may advance. The vision is a statement, values
+#: are principles, and obstacles are risks, so none of them is a target.
+ObjectiveField = Literal["method", "measure"]
+
+
+class OutcomeAlignment(BaseModel):
+    """A claim that an Outcome advances one V2MOM objective.
+
+    ``field`` is ``method`` or ``measure``; ``key`` is the content key computed
+    from ``field`` and ``text`` when the link was made; ``text`` is the
+    canonical objective text then. Storing the key *and* the text means a
+    reworded objective shows up as drift carrying the text the outcome was
+    linked to, and the key is never re-derived under a later normalization rule.
+    """
+
+    field: ObjectiveField = Field(..., description="Which V2MOM list the objective lives in")
+    key: str = Field(..., description="Frozen content key for the objective text")
+    text: str = Field(..., description="The objective text as it read when the link was made")
+
+
 class ClaimSkip(BaseModel):
     """One question that went unanswered, and why it was skipped.
 
@@ -181,8 +201,19 @@ class Outcome(BaseModel):
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
     )
+    trace: list[OutcomeAlignment] = Field(
+        default_factory=list,
+        description=(
+            "The V2MOM methods and measures this outcome advances. Empty means "
+            "the outcome is unlinked, which the traceability report calls an orphan."
+        ),
+    )
     claim_check: ClaimCheck | None = Field(
         None, description="The questions that produced the score, and what came back"
+    )
+    study_id: str | None = Field(
+        None,
+        description="The Study wave this outcome was measured in, or None for a row that predates studies",
     )
 
 
@@ -264,6 +295,45 @@ class CustomerOutcome(BaseModel):
     @property
     def opportunity_score(self) -> float:
         return self.customer_value.opportunity_score
+
+
+class StudyStatus(str, Enum):
+    """Where a study is in its own life: opened, collecting, or closed."""
+
+    PLANNED = "planned"
+    FIELDING = "fielding"
+    CLOSED = "closed"
+
+
+class Study(BaseModel):
+    """One named pass over a Job, and the wave number of that pass.
+
+    A study is a container, not a measurement: it names a slice of research so a
+    later wave can be compared with an earlier one. ``wave`` is unique per
+    ``(job_id, name)`` within the store — that guarantee needs to see the other
+    rows, so it lives in the service, while the model owns the invariants it can
+    check alone: a wave is a positive pass number, and ``closed_at`` appears if
+    and only if the study is closed.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str = Field(..., description="The Job this study takes one pass over")
+    name: str = Field(..., description="Human label for the study, e.g. 'reconciliation sweep'")
+    wave: int = Field(..., ge=1, description="1-based pass number within (job_id, name)")
+    status: StudyStatus = Field(StudyStatus.PLANNED, description="Where the study is in its life")
+    opened_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    closed_at: datetime | None = Field(None, description="Set once, when the study closes")
+    method_notes: str | None = Field(
+        None, description="How this pass was run, so a later wave is comparable"
+    )
+
+    @model_validator(mode="after")
+    def _closure_matches_status(self) -> Study:
+        if self.status is StudyStatus.CLOSED and self.closed_at is None:
+            raise ValueError("A closed study must carry a closed_at")
+        if self.status is not StudyStatus.CLOSED and self.closed_at is not None:
+            raise ValueError("Only a closed study may carry a closed_at")
+        return self
 
 
 class SegmentVerdict(str, Enum):
@@ -366,7 +436,8 @@ class Signal(BaseModel):
     #: True when the attention budget withheld this signal from the feed.
     suppressed: bool = False
     fingerprint: str = Field(
-        ..., description="sha256 of kind|subject_kind|subject_id|discriminator"
+        ...,
+        description="sha256 of kind|subject_kind|subject_id|discriminator, plus source event id",
     )
 
 

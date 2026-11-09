@@ -1,13 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
-import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import { isEndpointConfiguredForSettings, endpointReachability, isPrivateHost } from "../../lib/modelEndpoint";
+import { formatRelativeTime, groupByDay } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
-import { BellIcon, MenuIcon, MoonIcon, PlugIcon, PlusIcon, SettingsIcon, SunIcon } from "../icons";
+import {
+  BellIcon,
+  HistoryIcon,
+  MenuIcon,
+  MoonIcon,
+  PlugIcon,
+  PlusIcon,
+  SettingsIcon,
+  SunIcon,
+} from "../icons";
 import { OdiMascot } from "../OdiMascot";
+import { StatusDot } from "../status/StatusDot";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -20,15 +32,23 @@ export function StudioBar({
   onChangelog,
 }: {
   onHome: () => void;
-  onNew: () => void;
+  onNew: (options?: { stop?: boolean }) => void;
   onChangelog: () => void;
 }) {
   const {
+    conversationId,
+    conversations,
     llmHealth,
     messages,
+    openConversation,
+    refreshConversations,
     sidecarReachable,
+    streaming,
     unreadSignalCount,
     openPanel,
+    activePanel,
+    customizeOpen,
+    setupOpen,
     openCustomize,
     pushToast,
     saveSettings,
@@ -38,7 +58,20 @@ export function StudioBar({
   const theme = resolveTheme(settings.theme);
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const wide = useMediaQuery("(min-width: 720px)");
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const [askOpen, setAskOpen] = useState(false);
+  const askRef = useRef<HTMLDivElement>(null);
+  const keepWritingRef = useRef<HTMLButtonElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const activeHistoryRef = useRef<HTMLButtonElement>(null);
+  // An empty transcript is only nothing to lose when nothing is on screen to
+  // leave: the plus is the documented way out of the first-run setup, and a
+  // disabled control there would strand the person in it.
+  const nothingToLeave =
+    messages.length === 0 && !streaming && !setupOpen && !customizeOpen && activePanel === null;
 
   useEffect(() => {
     if (!menuOpen) {
@@ -62,6 +95,96 @@ export function StudioBar({
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!askOpen) {
+      return;
+    }
+    // The ask is an interruption, not a mode: focus lands on the choice that
+    // changes nothing, so an accidental Enter keeps the reply.
+    keepWritingRef.current?.focus();
+    function onPointerDown(event: MouseEvent) {
+      if (askRef.current && !askRef.current.contains(event.target as Node)) {
+        setAskOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [askOpen]);
+
+  function startThread() {
+    if (streaming) {
+      setAskOpen((open) => !open);
+      return;
+    }
+    onNew();
+  }
+
+  function onAskKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape" || !askOpen) {
+      return;
+    }
+    // Stop the keystroke before the shell's global Escape hears it: closing the
+    // ask is not the same as cancelling the reply still streaming behind it.
+    event.stopPropagation();
+    setAskOpen(false);
+  }
+
+  // The history list is read when it opens, not polled: a thread created by a
+  // turn is added to the list by the turn itself.
+  useEffect(() => {
+    if (!historyOpen) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (historyRef.current && !historyRef.current.contains(event.target as Node)) {
+        setHistoryOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setHistoryOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [historyOpen]);
+  // Opening the list lands on the thread already on screen: with forty in the
+  // list the one being read can be well below the fold, and hunting for it is
+  // work the app can do. Reduced motion gets the jump instead of the glide.
+  useEffect(() => {
+    if (!historyOpen) {
+      return;
+    }
+    const active = activeHistoryRef.current;
+    if (active && typeof active.scrollIntoView === "function") {
+      active.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+    }
+  }, [historyOpen, reduceMotion]);
+
+  function toggleHistory() {
+    setHistoryOpen((open) => {
+      if (!open) {
+        void refreshConversations();
+      }
+      return !open;
+    });
+  }
+
+  function selectConversation(id: string) {
+    setHistoryOpen(false);
+    if (id !== conversationId) {
+      void openConversation(id).catch(() =>
+        pushToast("error", "I couldn't open that conversation."),
+      );
+    }
+  }
+
   function exportConversation() {
     const exportedAt = new Date();
     downloadMarkdown(conversationToMarkdown(messages, exportedAt), exportFilename(exportedAt));
@@ -79,6 +202,18 @@ export function StudioBar({
     api_key: settings.api_key,
     model_name: settings.model_name,
   });
+  const originClass = isPrivateHost(window.location.hostname) ? "device" : "hosted";
+  const reachability = endpointConfigured
+    ? endpointReachability(
+        {
+          base_url: settings.base_url,
+          api_key: settings.api_key,
+          model: settings.model_name,
+        },
+        { originClass },
+      )
+    : "reachable";
+  const deviceOnly = reachability === "device-only";
   const status =
     llmHealth.healthy === true
       ? "Live"
@@ -87,8 +222,9 @@ export function StudioBar({
         : endpointConfigured || sidecarReachable === true
           ? "Connecting"
           : "Local";
-  const statusDetail =
-    status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
+  const statusDetail = deviceOnly
+    ? "local endpoint, not reachable from this page"
+    : status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
   const updateReady = update.phase === "ready";
   const versionText = updateReady
     ? "Update ready"
@@ -134,15 +270,117 @@ export function StudioBar({
           ✨ What's New
         </button>
 
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="New conversation"
-          title="New conversation"
-          onClick={onNew}
-        >
-          <PlusIcon size={17} />
-        </button>
+        <div className="bar__new-wrap" ref={askRef} onKeyDown={onAskKeyDown}>
+          <button
+            type="button"
+            className="bar__new"
+            onClick={startThread}
+            disabled={nothingToLeave}
+            aria-label="Start a new thread"
+            aria-describedby={nothingToLeave ? "bar-new-reason" : undefined}
+            aria-haspopup={streaming ? "dialog" : undefined}
+            aria-expanded={streaming ? askOpen : undefined}
+            title="New thread. Your jobs, outcomes, and evidence stay."
+          >
+            <PlusIcon size={17} />
+            {wide && <span>New thread</span>}
+          </button>
+
+          {nothingToLeave && (
+            <span id="bar-new-reason" className="sr-only">
+              This thread is already new.
+            </span>
+          )}
+
+          {askOpen && (
+            <div className="bar__new-ask" role="dialog" aria-label="Stop the reply and start a new thread?">
+              <p>A reply is still coming. Stop it and start a new thread?</p>
+              <button
+                type="button"
+                ref={keepWritingRef}
+                className="bar__new-choice"
+                onClick={() => setAskOpen(false)}
+              >
+                Keep writing
+              </button>
+              <button
+                type="button"
+                className="bar__new-choice bar__new-choice--stop"
+                onClick={() => {
+                  setAskOpen(false);
+                  onNew({ stop: true });
+                }}
+              >
+                Stop and start
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="bar__menu" ref={historyRef}>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Conversation history"
+            title="Conversation history"
+            aria-haspopup="menu"
+            aria-expanded={historyOpen}
+            onClick={toggleHistory}
+          >
+            <HistoryIcon size={17} />
+          </button>
+          {historyOpen && (
+            <div
+              className="bar__menu-list bar__history"
+              role="menu"
+              aria-label="Recent conversations"
+            >
+              {conversations.length === 0 ? (
+                <p className="bar__history-empty">No conversations yet.</p>
+              ) : (
+                groupByDay(conversations, (conversation) => conversation.updated_at).map((group) => (
+                  // The group carries the day in its accessible name; the line
+                  // above it is the same word made visible.
+                  <div
+                    key={group.section}
+                    className="bar__history-group"
+                    role="group"
+                    aria-label={group.label}
+                  >
+                    <p className="bar__history-day">{group.label}</p>
+                    {group.items.map((conversation) => {
+                      const current = conversation.id === conversationId;
+                      return (
+                        <button
+                          key={conversation.id}
+                          ref={current ? activeHistoryRef : undefined}
+                          type="button"
+                          role="menuitem"
+                          className="bar__menu-item bar__history-item"
+                          aria-current={current ? "true" : undefined}
+                          onClick={() => selectConversation(conversation.id)}
+                        >
+                          <span className="bar__history-title">
+                            {conversation.title.trim() || "New conversation"}
+                          </span>
+                          {/* A thread with no turns has nothing to count, so
+                              it says nothing rather than "0 turns". */}
+                          {conversation.turn_count > 0 ? (
+                            <span className="bar__history-meta">
+                              {formatRelativeTime(conversation.updated_at)} ·{" "}
+                              {conversation.turn_count}{" "}
+                              {conversation.turn_count === 1 ? "turn" : "turns"}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
 
         <button
           type="button"
@@ -176,10 +414,8 @@ export function StudioBar({
           aria-label={`Model status: ${status}. ${statusDetail}`}
           title={statusDetail}
         >
-          <span
-            className={`status-dot${status === "Local mode" ? " is-warn" : ""}${
-              status === "Connecting" ? " is-unknown" : ""
-            }`}
+          <StatusDot
+            tone={status === "Local mode" ? "warn" : status === "Connecting" ? "unknown" : "ok"}
           />
           {status}
         </button>

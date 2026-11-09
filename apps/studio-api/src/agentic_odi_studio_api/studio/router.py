@@ -36,6 +36,7 @@ from agentic_odi_core import (
     invalid_strategy_request,
     manual_claim_check,
 )
+from agentic_odi_core.funnel import count_reset, read_counts
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
@@ -62,10 +63,10 @@ from agentic_odi_studio_api.studio.memory import (
     StudioMemory,
 )
 from agentic_odi_studio_api.studio.probes import (
-    check_llm_health,
     defaults,
     is_endpoint_reachable,
     list_models,
+    probe_llm_health,
 )
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
@@ -87,11 +88,14 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationTreeResponse,
     CreateJobRequest,
     LatestConversationResponse,
+    LinkOutcomeRequest,
     LlmHealthRequest,
+    LlmHealthResponse,
     LlmProxyRequest,
     MarketplaceListingOut,
     MarketplaceSearchResponse,
     McpHealthRequest,
+    MintShareRequest,
     ModelListRequest,
     ObservationCreateRequest,
     ObservationListResponse,
@@ -103,13 +107,22 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeStrategyRequest,
     RejectProposalRequest,
     ScheduleWorkRequest,
+    SharedArtifactResponse,
+    ShareMintResponse,
     SignalActionRequest,
+    TraceabilityReportResponse,
     TurnNode,
     UpdateConversationRequest,
     UpdateCustomerOutcomeRequest,
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
+)
+from agentic_odi_studio_api.studio.sharing import (
+    ShareError,
+    ShareNotFoundError,
+    ShareService,
+    UnknownArtifactError,
 )
 
 router = APIRouter(prefix="/api")
@@ -155,6 +168,12 @@ def _first_validation_error(exc: ValidationError) -> str:
     return f"{location}: {message}" if location else message
 
 
+def _outcome_field(message: str) -> str | None:
+    """Return ``importance`` or ``satisfaction`` when a rating error names one."""
+    first = message.split(maxsplit=1)[0] if message.strip() else ""
+    return first if first in {"importance", "satisfaction"} else None
+
+
 def _as_http_error(exc: Exception) -> StudioHTTPError:
     """Translate domain errors into typed HTTP responses without leaking 500s."""
     if isinstance(exc, ValidationError):
@@ -164,7 +183,7 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         )
     if isinstance(exc, OutcomeStatementError):
         return StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field="statement"),
             status_code=422,
         )
     if isinstance(
@@ -189,7 +208,14 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             status_code=422,
         )
     if isinstance(exc, ValueOutOfRangeError):
-        return StudioHTTPError(StudioError(code=StudioErrorCode.OUT_OF_RANGE, message=str(exc)))
+        return StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.OUT_OF_RANGE,
+                message=str(exc),
+                field=_outcome_field(str(exc)),
+            ),
+            status_code=422,
+        )
     if isinstance(exc, OdiError):
         status = error_status(exc)
         return StudioHTTPError(
@@ -283,6 +309,29 @@ def get_diagnostics(request: Request) -> dict[str, Any]:
     }
 
 
+@router.get("/stats")
+def get_stats(request: Request) -> dict[str, Any]:
+    """The onboarding funnel, counted from this machine's own event log.
+
+    Every counter is always named, and one that has not happened answers with a
+    zero and no timestamps rather than an invented history. Nothing leaves the
+    machine: these numbers come from the same store the records do.
+    """
+    return read_counts(_service(request))
+
+
+@router.post("/stats/reset")
+def reset_stats(request: Request) -> dict[str, Any]:
+    """Start the measurement over and return the counters as they now stand.
+
+    A reset appends a marker; the events it supersedes stay in the log. The
+    asking happens in whatever surface calls this — a click that erases a
+    measurement should not be the kind that fires straight away.
+    """
+    count_reset(_service(request))
+    return read_counts(_service(request))
+
+
 @router.get("/changelog")
 def get_changelog_route() -> dict:
     return get_changelog()
@@ -293,10 +342,20 @@ def post_mcp_health(body: McpHealthRequest) -> dict:
     return {"reachable": is_endpoint_reachable(body.mcp_url)}
 
 
-@router.post("/health/llm")
-async def post_llm_health(body: LlmHealthRequest) -> dict:
-    healthy, message = await check_llm_health(body.base_url, body.api_key, body.model)
-    return {"healthy": healthy, "message": message}
+@router.post("/health/llm", response_model=LlmHealthResponse)
+async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) -> dict:
+    """Probe the configured LLM endpoint, cached per (endpoint, model).
+
+    Concurrent tabs within the TTL cause a single upstream probe. ``?fresh=true``
+    bypasses the cache so a user-initiated "check now" is never stale.
+    """
+    result = await probe_llm_health(body.base_url, body.api_key, body.model, fresh=fresh)
+    return {
+        "healthy": result["healthy"],
+        "message": result["message"],
+        "checked_at": result["checked_at"],
+        "cached": result["cached"],
+    }
 
 
 @router.post("/models")
@@ -811,6 +870,31 @@ async def get_segments(
     ]
 
 
+@router.get("/studies", response_model=list[dict[str, Any]])
+async def get_studies(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The opened studies, same records under both backends.
+
+    Empty until the agent has run ``open_study``: a study is opened as a named
+    pass over a job, never typed into the canvas.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_STUDIES.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [
+        study.model_dump(mode="json") for study in _service(request).list_studies(job_id=job_id)
+    ]
+
+
 @router.get("/strategy", response_model=dict[str, Any] | None)
 async def get_strategy(
     request: Request,
@@ -850,6 +934,86 @@ async def post_strategy_propose(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return strategy.model_dump(mode="json")
+
+
+@router.get("/traceability", response_model=TraceabilityReportResponse)
+async def get_traceability(
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Orphans, unfunded objectives, and links the vision dropped.
+
+    Read-only. With no objectives defined the report carries
+    ``objectives_defined: false`` and a message, not three empty sections that
+    would read as a clean bill of health.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_TRACEABILITY_REPORT.value, {}
+        )
+        return _payload_from_text(result)
+    return _service(request).traceability_report().as_dict()
+
+
+@router.get("/alignments", response_model=list[dict[str, Any]])
+async def get_alignments(
+    request: Request,
+    outcome_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The V2MOM links recorded on outcomes, optionally for one outcome."""
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if outcome_id:
+            arguments["outcome_id"] = outcome_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_OUTCOME_ALIGNMENTS.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return _service(request).list_alignments(outcome_id)
+
+
+@router.post("/outcomes/{outcome_id}/alignments", response_model=dict[str, Any])
+async def post_outcome_alignment(
+    outcome_id: str, body: LinkOutcomeRequest, request: Request
+) -> dict[str, Any]:
+    """Link an outcome to one method or measure the vision currently holds."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.LINK_OUTCOME.value,
+            {"outcome_id": outcome_id, "field": body.field, "text": body.text},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).link_outcome(outcome_id, body.field, body.text)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
+
+
+@router.delete("/outcomes/{outcome_id}/alignments/{field}/{key}", response_model=dict[str, Any])
+async def delete_outcome_alignment(
+    outcome_id: str,
+    field: str,
+    key: str,
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Remove one recorded link. Removing a link that is not there is a no-op."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.UNLINK_OUTCOME.value,
+            {"outcome_id": outcome_id, "field": field, "key": key},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).unlink_outcome(outcome_id, field, key)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
 
 
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:
@@ -1086,7 +1250,11 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
 
 @router.get("/conversations", response_model=ConversationListResponse)
 def list_conversations(request: Request) -> ConversationListResponse:
-    """The history a switcher lists: every thread, most recent touch first."""
+    """The history a switcher lists: at most 20 threads, most recent touch first.
+
+    Titles come from the first question, so the list names each thread without
+    carrying a single turn body.
+    """
     conversations = _memory(request).list_conversations()
     return ConversationListResponse(
         conversations=[conversation.to_dict() for conversation in conversations]
@@ -1613,3 +1781,73 @@ async def reject_proposal_api(
         "ok": True,
         "result": _proposal_out(proposal).model_dump(mode="json"),
     }
+
+
+# -- sharing (issue #549) ------------------------------------------------------
+
+
+def _sharing(request: Request) -> ShareService:
+    return request.app.state.sharing
+
+
+def _share_not_found() -> StudioHTTPError:
+    """One body for every dead token, so a probe cannot tell them apart."""
+    return StudioHTTPError(
+        StudioError(
+            code=StudioErrorCode.NOT_FOUND,
+            message="This link is not available. It may have expired or been revoked.",
+        ),
+        status_code=404,
+    )
+
+
+@router.post("/share", response_model=ShareMintResponse)
+def mint_share(body: MintShareRequest, request: Request) -> ShareMintResponse:
+    """Mint a scoped, expiring, read-only link for one artifact.
+
+    The raw token is returned exactly once; only its hash is stored. Creation
+    happens through this route only, so the token is never minted by a page.
+    """
+    try:
+        minted = _sharing(request).mint(body.artifact_kind, body.artifact_id, body.ttl_days)
+    except UnknownArtifactError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)),
+            status_code=404,
+        ) from exc
+    except ShareError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            status_code=422,
+        ) from exc
+    return ShareMintResponse(**minted.to_dict())
+
+
+@router.get("/share", response_model=list[dict[str, Any]])
+def list_shares(request: Request) -> list[dict[str, Any]]:
+    """The owner's links, without tokens: id, artifact, and the key dates."""
+    return [share.to_dict() for share in _sharing(request).list_shares()]
+
+
+@router.delete("/share/{share_id}")
+def revoke_share(share_id: str, request: Request) -> dict[str, bool]:
+    """Revoke a link. Effective immediately, and idempotent."""
+    try:
+        _sharing(request).revoke(share_id)
+    except ShareNotFoundError as exc:
+        raise _share_not_found() from exc
+    return {"ok": True}
+
+
+@router.get("/share/{token}", response_model=SharedArtifactResponse)
+def read_shared(token: str, request: Request) -> SharedArtifactResponse:
+    """Read exactly the one artifact a token names, and its own evidence.
+
+    A malformed, unknown, expired, or revoked token is the same ``404``; the
+    response never says which. There is no list and no canvas here.
+    """
+    try:
+        payload = _sharing(request).read(token)
+    except ShareNotFoundError as exc:
+        raise _share_not_found() from exc
+    return SharedArtifactResponse(**payload)
