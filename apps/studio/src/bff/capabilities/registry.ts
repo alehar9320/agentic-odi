@@ -1,6 +1,10 @@
+import { authHeaders } from "../../api/studioApi";
 import { apiUrl } from "../../bridge/desktopBridge";
-import { collectDeviceSignals, computeEligibility, firstEligibleTier } from "../../edge/ladder";
-import { isEndpointConfiguredForSettings } from "../../lib/modelEndpoint";
+import {
+  endpointReachability,
+  isEndpointConfiguredForSettings,
+  isPrivateHost,
+} from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
 
 export type CapabilityId =
@@ -26,13 +30,7 @@ export interface CapabilityProbe {
   id: CapabilityId;
   label: string;
   description: string;
-  check(settings: StudioConfig): Promise<ProbeResult>;
-}
-
-export interface ProbeResult {
-  ok: boolean;
-  /** One human sentence for why a capability is out of reach. */
-  reason?: string;
+  check(settings: StudioConfig): Promise<{ ok: boolean; reason?: string }>;
 }
 
 const localStatuses: Record<CapabilityId, Capability> = {
@@ -56,8 +54,8 @@ const localStatuses: Record<CapabilityId, Capability> = {
   },
   "browser-model": {
     id: "browser-model",
-    label: "In-browser model",
-    description: "Runs free GPU-accelerated models on this device when no paid endpoint is set.",
+    label: "Browser built-in model",
+    description: "Uses the browser's built-in large language model when present.",
     status: "unavailable",
   },
   "endpoint-model": {
@@ -92,16 +90,9 @@ const localStatuses: Record<CapabilityId, Capability> = {
   },
 };
 
-async function browserModelProbe(): Promise<ProbeResult> {
-  const eligibility = computeEligibility(await collectDeviceSignals());
-  if (firstEligibleTier(eligibility)) {
-    return { ok: true };
-  }
-  const reason =
-    eligibility.reasons[0] ??
-    eligibility.tiers.find((decision) => decision.reason)?.reason ??
-    "No in-browser model fits this device right now.";
-  return { ok: false, reason };
+function isBrowserModelAvailable(): boolean {
+  const ai = (globalThis as { ai?: { languageModel?: unknown } }).ai;
+  return Boolean(ai && typeof ai.languageModel === "function");
 }
 
 /** Probe a same-origin sidecar route. In the browser this is the Worker
@@ -113,6 +104,7 @@ async function browserModelProbe(): Promise<ProbeResult> {
 async function probeSidecar(path: string, capabilityId?: CapabilityId): Promise<boolean> {
   try {
     const response = await fetch(apiUrl(path), {
+      headers: authHeaders(),
       signal: AbortSignal.timeout(2000),
     });
     if (!response.ok) {
@@ -136,13 +128,34 @@ export class CapabilityRegistry {
       id: "browser-model",
       label: localStatuses["browser-model"].label,
       description: localStatuses["browser-model"].description,
-      check: async () => browserModelProbe(),
+      check: async () => ({ ok: isBrowserModelAvailable() }),
     },
     {
       id: "endpoint-model",
       label: localStatuses["endpoint-model"].label,
       description: localStatuses["endpoint-model"].description,
-      check: async (settings) => ({ ok: isEndpointConfiguredForSettings(settings) }),
+      check: async (settings) => {
+        if (!isEndpointConfiguredForSettings(settings)) {
+          return { ok: false };
+        }
+        const originClass = isPrivateHost(window.location.hostname) ? "device" : "hosted";
+        const reachability = endpointReachability(
+          {
+            base_url: settings.base_url,
+            api_key: settings.api_key,
+            model: settings.model_name,
+          },
+          { originClass },
+        );
+        if (reachability === "device-only") {
+          return {
+            ok: false,
+            reason:
+              "This endpoint is on your machine. A hosted page cannot reach it; use the desktop app or open the Studio on this device.",
+          };
+        }
+        return { ok: true };
+      },
     },
     {
       id: "sidecar-llm",

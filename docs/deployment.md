@@ -8,6 +8,11 @@ by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml).
 
 - A push to `main` runs the website tests, builds `_site` from `website/`, and
   deploys the artifact with `actions/deploy-pages`.
+- The same tests run on every pull request in the `website` job of
+  [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), whose result feeds the
+  required `CI green` check, so a failing page cannot merge. `website/tests/test_ci_required.py`
+  pins that wiring — the job runs the suite, carries no `continue-on-error`, and gates
+  both `CI green` and this deploy.
 - No site build output is committed; CI generates `_site` on every push.
 - `workflow_dispatch` republishes the site from the Actions tab without a code
   change.
@@ -219,6 +224,68 @@ Workers Builds settings (Workers & Pages → your Worker → Settings → Builds
 
 A Worker has no run command: the Worker script runs on Cloudflare. Set `name` in
 `wrangler.jsonc` to the Worker you created before the first deploy.
+
+### Which release is live
+
+`GET /api/build` answers `{"version": "<tag>"}`, read from `vars.RELEASE_VERSION`
+in `wrangler.jsonc`. The Worker replies before the sidecar proxy, so a deployment
+without a tunnel still identifies itself, and any other method gets a 405 with
+`Allow: GET`. The body carries nothing but the version: no environment values,
+and never a deploy timestamp, so two deploys of one tag report the same string.
+
+`RELEASE_VERSION` is not a release-please `extra-files` entry, so cutting a release
+means editing it in the same commit as the tag. `scripts/check_version_parity.py`
+covers the miss and names `wrangler.jsonc` when the declared value drifts from
+`.release-please-manifest.json`.
+
+```bash
+curl -s https://agentic-odi.alehar.workers.dev/api/build
+uv run python scripts/check_version_parity.py
+```
+
+### Is the deployed first run keeping its promises?
+
+`GET /api/build` answers with a tag, and two deploys of one tag answer the same — which is
+why it cannot tell you whether the merge you are waiting for landed. `GET /api/deploy`
+answers that: `{"build_id", "commit", "entry"}`, where `entry` is the bundle this Worker's
+own asset shelf serves, read from the asset rather than echoed from a var.
+
+```bash
+curl -s https://agentic-odi.alehar.workers.dev/api/deploy
+```
+
+The two identity fields default to `"unknown"` in `wrangler.jsonc`. They fill in when the
+dashboard's **Deploy command** passes them, so that line is the one to edit after the first
+deploy of this change:
+
+```
+npx wrangler deploy --var COMMIT_SHA:$(git rev-parse HEAD) --var BUILD_ID:$(git rev-parse --short HEAD)
+```
+
+`scripts/verify-hosted-first-run.sh` asks the deployed host the questions the README makes
+on a visitor's behalf. It polls the production URL first, so a deploy that has not finished
+landing is never read as a broken one, and then prints one dated line per promise:
+
+| Promise | What it protects |
+|---|---|
+| `local data is advertised`, `local memory is advertised`, `the deterministic assistant is advertised` | the capabilities a sidecar-less visitor is told work |
+| `a job write falls back in a code the browser understands`, `the canvas falls back in a code the browser understands` | a 502 whose `error.code` is `sidecar_unavailable`. `mcp_unreachable` is a different product: it is the body that stops the browser serving the capabilities it just advertised (#491) |
+| `the entry page names its bundle` | a served page that names an `assets/index-*.js` at all |
+| `the served bundle belongs to the deploy that claims it` | a Worker that moved while the page stayed cached against the previous bundle |
+| `the deploy reports this commit` | a merge that reached `main` but not the branch that deploys — how #492 and #609 went unnoticed on 2026-11-01 |
+
+A `FAIL` prints the response body it got, not just an exit code, and a deploy that reports
+`unknown` for its commit fails with the `wrangler deploy` line above so the missing wiring is
+named. Run it by hand, or let the `hosted-first-run` job run it: `schedule` (Sunday 06:00 UTC,
+alongside `updater-e2e`) and `workflow_dispatch`, never as a pull-request gate. The job sits
+outside `ci-green`'s `needs:` because a broken deploy is news about the deploy, not about the
+pull request that happened to share the branch. Its dated lines are printed in the job log and
+kept as the `hosted-first-run-log` artifact on failure.
+
+Pass this URL only ever counts as informational: `--base-url` exists so the checks can be
+exercised against a stub in `tests/scripts/test_verify_hosted_first_run.py`, and any target
+other than production prints `NON-PRODUCTION TARGET`. A preview URL is ephemeral and is never
+evidence that the hosted first run works.
 
 ### Pull request previews
 

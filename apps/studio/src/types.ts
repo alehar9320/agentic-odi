@@ -1,9 +1,12 @@
+import type { RecordKind } from "./lib/records";
 import type { UiCatalogManifest, UiNode } from "./ui/protocol";
 
 export interface Job {
   id: string;
   name?: string;
   description?: string;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
 }
 
 export interface Step {
@@ -11,6 +14,26 @@ export interface Step {
   job_id?: string;
   name?: string;
   order?: number;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
+}
+
+/** A question put to the person that they did not answer, and why not. */
+export interface ClaimSkip {
+  question: string;
+  reason?: string;
+}
+
+/**
+ * The questions behind a score. `verified` arrives derived from the core model —
+ * a check is verified when at least one question was answered — so a card must
+ * read it rather than compare the lists itself.
+ */
+export interface ClaimCheck {
+  asked?: string[];
+  answers?: string[];
+  skips?: ClaimSkip[];
+  verified?: boolean;
 }
 
 export interface Outcome {
@@ -20,8 +43,11 @@ export interface Outcome {
   importance?: number | null;
   satisfaction?: number | null;
   opportunity_score?: number | null;
+  claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
 }
 
 export interface Evidence {
@@ -57,6 +83,11 @@ export type SegmentVerdict = "underserved" | "overserved" | "appropriately_serve
  * job and evidenced by outcomes. `verdict` is null when an outcome in the group
  * has no score — the studio reports that as "not enough signal" rather than
  * guessing. No demographic field exists here by design.
+ *
+ * `people_inferred` is the provenance of the group itself: true when `people`
+ * was derived from the outcomes rather than supplied, which the board words as
+ * a candidate segment. The `basis` field (#475) will name the derivation more
+ * precisely; it is deliberately not added here.
  */
 export interface Segment {
   id: string;
@@ -72,8 +103,26 @@ export interface Segment {
   created_at: string;
 }
 
-export type StrategyKind = "differentiated" | "disruptive" | "new_market";
+/**
+ * A study is one named pass over a job. `wave` is the pass number, from 1:
+ * opening the same study again is a new wave, not a second copy. `closed_at` is
+ * set only once the study is closed, and `method_notes` is the researcher's own
+ * account of how the pass was run, when they have given it.
+ */
+export type StudyStatus = "planned" | "fielding" | "closed";
 
+export interface Study {
+  id: string;
+  job_id: string;
+  name: string;
+  wave: number;
+  status: StudyStatus;
+  opened_at: string;
+  closed_at?: string | null;
+  method_notes?: string | null;
+}
+
+export type StrategyKind = "differentiated" | "disruptive" | "new_market";
 export interface RejectedPath {
   kind: StrategyKind;
   why: string;
@@ -148,6 +197,39 @@ export interface StudioError {
   suggestion?: string | null;
   retryable: boolean;
   request_id?: string | null;
+  //: Which outcome field the failure belongs to, so the form can render it
+  //: beside the statement or rating the person mistyped. Absent when the
+  //: failure cannot be attributed to a single field.
+  field?: "statement" | "importance" | "satisfaction" | null;
+}
+
+/** The one artifact a shared link carries. More kinds are additive. */
+export type SharedArtifactKind = "landscape" | "vision";
+
+/**
+ * The scoped payload a share token returns: exactly one artifact, its own
+ * evidence, and the expiry. It never carries the canvas, memory, conversations,
+ * connector settings, or the brief — the page renders only what is here.
+ */
+export interface SharedArtifactPayload {
+  kind: SharedArtifactKind;
+  expires_at: string;
+  generated_at: string;
+  source: "local" | "mcp" | "seed";
+  /** The job context a landscape names; absent for a vision. */
+  jobs?: Job[];
+  outcomes?: Outcome[];
+  evidence?: Evidence[];
+  /** The person's own words, when the artifact is a vision. */
+  vision?: string;
+}
+
+/** What a mint call returns: the raw token is shown once and never again. */
+export interface ShareLink {
+  id: string;
+  token: string;
+  url: string;
+  expires_at: string;
 }
 
 export type StudioTheme = "light" | "dark";
@@ -250,14 +332,6 @@ export type ChatPart =
       claims: Claim[];
     };
 
-/**
- * A reply this browser's own model wrote. It is the only provenance worth
- * storing: a turn from a configured endpoint is on the server already, and the
- * rule-based draft is named from the live stream — main's mechanism, unchanged
- * by this.
- */
-export type ReplyProvenance = "edge";
-
 export interface ChatMessage {
   /** Stable id. Branching and persisted turns are keyed by it. */
   id: string;
@@ -281,10 +355,11 @@ export interface ChatMessage {
   /** The question this turn answered, kept so a failed turn can be retried. */
   retryText?: string;
   /**
-   * Set on a reply this browser produced, from the turn's own stored record, so
-   * the label outlives the stream that first showed it.
+   * When the turn was written, ISO 8601. Optional because a thread saved before
+   * this field existed replays without it: the transcript then shows no clock
+   * rather than an invented one.
    */
-  provenance?: ReplyProvenance;
+  createdAt?: string;
 }
 
 /**
@@ -326,6 +401,7 @@ export interface StudioBrief {
 export type WorkspacePanelId =
   | "records"
   | "landscape"
+  | "brief"
   | "jobmap"
   | "segments"
   | "evidence"
@@ -361,6 +437,23 @@ export type SignalSubjectKind =
   | "segment"
   | "strategy";
 
+/** A selected record on screen, whatever kind it is. */
+export interface FocusSubject {
+  kind: SignalSubjectKind;
+  id: string;
+}
+
+/**
+ * A record the sidecar can read back from its own store.
+ *
+ * The kinds are the ones `lib/records.ts` already enumerates: a pointer may
+ * only name a record the store is able to show.
+ */
+export type FocusPointer = {
+  kind: RecordKind;
+  id: string;
+};
+
 export interface Signal {
   id: string;
   kind: SignalKind;
@@ -394,6 +487,8 @@ export interface ChatStreamRequest {
   approvals?: boolean;
   /** The id this client is streaming the reply under. */
   assistant_id?: string | null;
+  /** The record the person has selected, as a pointer and nothing more. */
+  focus?: FocusPointer | null;
 }
 
 /** One turn in a persisted conversation, as the branch tree exposes it. */
@@ -405,8 +500,6 @@ export interface TurnNode {
   created_at: string;
   /** What each sentence stands behind, restored from the turn's citations. */
   claims?: Claim[];
-  /** Who wrote this reply, as the browser that produced it recorded it. */
-  provenance?: ReplyProvenance;
 }
 
 export interface ConversationTree {

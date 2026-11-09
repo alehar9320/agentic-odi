@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
+import { useOnlineStatus } from "../lib/onlineStatus";
+import { dismissAppUpdate, reloadForUpdate, useAppUpdate } from "../lib/swUpdate";
 import { useStudio } from "../state/StudioContext";
-import { edgeManager, hasModelEndpoint } from "../edge/manager";
-import { formatGB, tierById } from "../edge/ladder";
 import { useBanner } from "./BannerProvider";
 import type { BannerActionId } from "./types";
 
@@ -22,130 +22,51 @@ export function BannerBridge() {
     sidecarReachable,
     dismissedSidecarNotice,
     llmHealth,
-    settings,
+    streaming,
   } = useStudio();
-  // Bumped whenever something changes what the browser could do with a model:
-  // an answered consent question, or a tier that just landed. Download
-  // progress deliberately does not bump it — that would re-run this whole
-  // decision dozens of times per second to reach the same conclusion.
-  const [edgeRevision, setEdgeRevision] = useState(0);
+  const online = useOnlineStatus();
+  const appUpdate = useAppUpdate();
 
   useEffect(() => {
-    if (sidecarReachable === false && !dismissedSidecarNotice) {
+    // One sentence when the connection goes, resolved when it comes back. The
+    // stable kind means a flapping connection updates this row in place instead
+    // of stacking a copy per event, so it is not repeated on every action.
+    if (!online) {
+      raise({ kind: "offline" });
+    } else {
+      resolve("offline");
+    }
+  }, [online, raise, resolve]);
+
+  useEffect(() => {
+    // A staged build is offered once, and never mid-sentence: while a turn is
+    // streaming the offer waits, so activating the new worker cannot reload the
+    // page under a reply that is still arriving.
+    if (appUpdate.ready && !appUpdate.dismissed && !streaming) {
+      raise({ kind: "app-update-ready" });
+    } else {
+      resolve("app-update-ready");
+    }
+  }, [appUpdate.ready, appUpdate.dismissed, streaming, raise, resolve]);
+
+  useEffect(() => {
+    // The offline strip is the one line while the browser has no network: this
+    // strip's Recheck and Start-the-sidecar actions could not succeed anyway.
+    if (sidecarReachable === false && !dismissedSidecarNotice && online) {
       raise({ kind: "sidecar-down" });
     } else {
       resolve("sidecar-down");
     }
-  }, [sidecarReachable, dismissedSidecarNotice, raise, resolve]);
+  }, [sidecarReachable, dismissedSidecarNotice, online, raise, resolve]);
 
   useEffect(() => {
-    // Three states, and only one strip at a time: the browser is already
-    // answering, it could answer if the person said yes, or it can't.
-    //
-    // The question to ask is *"is anything answering for this studio?"* — not
-    // "did a probe fail?". A browser-only visitor has no server to probe, and
-    // main's survey deliberately refuses to record a refusal it did not witness
-    // (#309: no apology on a first run that needed nothing). Waiting for
-    // `healthy === false` here would mean the offer is only ever shown to
-    // someone who had a model and lost it — never to the person this feature
-    // exists for. So an endpoint that is configured, or that is answering,
-    // settles it; an unmeasured nothing is still a nothing.
-    if (llmHealth.healthy === true || hasModelEndpoint(settings)) {
-      if (llmHealth.healthy === false) {
-        raise({ kind: "model-offline" });
-      } else {
-        resolve("model-offline");
-      }
-      resolve("edge-offer");
-      return;
+    // Same reason as the sidecar strip: the offline line says what still works.
+    if (llmHealth.healthy === false && online) {
+      raise({ kind: "model-offline" });
+    } else {
+      resolve("model-offline");
     }
-    let cancelled = false;
-    void (async () => {
-      // Past the guard above nothing is answering for this studio — measured
-      // down, or never measurable. A strip is not something a person typed
-      // into: read storage and decide after, instead of answering from what
-      // this tab last knew.
-      await edgeManager.sync();
-      const serving = edgeManager.canServe(settings, false);
-      const offer = serving ? null : await edgeManager.offerFor(settings, false);
-      if (cancelled) {
-        return;
-      }
-      if (serving) {
-        resolve("model-offline");
-        resolve("edge-offer");
-      } else if (offer) {
-        resolve("model-offline");
-        raise({
-          kind: "edge-offer",
-          body: `No model key, nothing sent to anyone else. ${offer.label} is about ${formatGB(offer.approxBytes)}, once — then your replies run in this tab.`,
-        });
-      } else {
-        resolve("edge-offer");
-        if (edgeManager.isBusy()) {
-          // Consent just arrived and the fetch is under way; the download
-          // strip tells that story better than "no model is reachable".
-          resolve("model-offline");
-        } else if (llmHealth.healthy === false) {
-          // A measured refusal. An unmeasured one is a browser with nothing to
-          // measure, and saying "no model is reachable" about it would blame
-          // the person's studio for a thing they never asked it to be.
-          raise({ kind: "model-offline" });
-        } else {
-          resolve("model-offline");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [llmHealth.healthy, settings, edgeRevision, raise, resolve]);
-
-  useEffect(() => {
-    const unsubscribe = edgeManager.addNoticeListener((notice) => {
-      if (notice.kind === "downloading") {
-        // A percent tick is this tab's engine working again, which is the fact
-        // that makes "that download didn't finish" no longer true.
-        resolve("edge-fetch-failed");
-        const percent = Math.round(notice.progress.percent * 100);
-        raise({
-          kind: "edge-downloading",
-          body: `Fetching ${tierById(notice.tier).label} (${percent}%) — this browser's next voice.`,
-        });
-        return;
-      }
-      // Only a notice about *this tab's* engine ends the download story. A
-      // `changed` from another tab says the disk moved, not that the fetch here
-      // stopped — and on a real connection the next percent tick may be a minute
-      // away, so clearing here would leave the strip that explains the wait gone
-      // while the wait continues.
-      if (notice.kind === "ready" || notice.kind === "unlocked" || notice.kind === "tier-freed") {
-        resolve("edge-downloading");
-        resolve("edge-fetch-failed");
-      }
-      if (notice.kind === "fetch-failed") {
-        // The fetch this tab started threw, so the narration has to stop
-        // claiming a download is coming and say what actually happened — with
-        // the same download on the button, because the consent question that
-        // asked for it will never be asked again.
-        resolve("edge-downloading");
-        raise({ kind: "edge-fetch-failed" });
-      }
-      if (notice.kind === "ready") {
-        raise({
-          kind: "edge-ready",
-          body: `${tierById(notice.tier).label} is answering in this tab now — free.`,
-        });
-      } else if (notice.kind === "unlocked") {
-        raise({
-          kind: "edge-unlocked",
-          body: `${tierById(notice.tier).label} is answering in this browser now — free.`,
-        });
-      }
-      setEdgeRevision((revision) => revision + 1);
-    });
-    return unsubscribe;
-  }, [raise, resolve]);
+  }, [llmHealth.healthy, online, raise, resolve]);
 
   return null;
 }
@@ -161,7 +82,7 @@ export function useBannerActionDispatcher(): {
   onAction: (action: BannerActionId) => void;
   onDismiss: (id: string) => void;
 } {
-  const { raise, dismiss } = useBanner();
+  const { dismiss } = useBanner();
   const {
     recheckConnections,
     openSetup,
@@ -184,36 +105,15 @@ export function useBannerActionDispatcher(): {
       case "open-jobmap":
         openPanel("jobmap");
         break;
-      case "enable-edge-model":
-        void edgeManager.grantAndStart().then(async (tier) => {
-          if (tier !== null) {
-            return;
-          }
-          // Nothing started here. Another tab may already be fetching it —
-          // in which case the model is arriving and a complaint would be a
-          // lie — or the moment was genuinely wrong. A download this tab
-          // started and lost is neither: the notice already raised the strip
-          // that says so, and this guess would sit next to it contradicting it.
-          if (edgeManager.lastFetchFailed()) {
-            return;
-          }
-          if ((await edgeManager.servedTier()) === null) {
-            raise({
-              kind: "error",
-              body: "That download didn't start here. Another tab may be fetching it, or this browser is waiting for a visible, idle moment off a Save Data connection.",
-            });
-          }
-        });
-        break;
-      case "decline-edge-model":
-        // Durable: the studio asks once, and Settings is where the answer
-        // can change. The consent notice re-runs the strip decision.
-        void edgeManager.decline();
-        break;
       case "install-update":
       case "restart":
         // The desktop updater is not wired to banners yet. Nothing is claimed
         // and nothing pretends to happen.
+        break;
+      case "reload-app":
+        // Take the waiting worker and reload into the new build. This is the one
+        // place an update activates, and only from a person's click.
+        reloadForUpdate();
         break;
     }
   }
@@ -223,6 +123,11 @@ export function useBannerActionDispatcher(): {
     // row: it must survive the next failed probe, or the strip would return.
     if (id === "sidecar-down") {
       dismissSidecarNotice();
+    }
+    // The update offer is once per page: dismissing it must not bring it back on
+    // the next render, and it must never loop.
+    if (id === "app-update-ready") {
+      dismissAppUpdate();
     }
     dismiss(id);
   }

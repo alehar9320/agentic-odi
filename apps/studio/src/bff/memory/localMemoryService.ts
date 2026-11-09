@@ -6,7 +6,6 @@ import type {
   Observation,
   ObservationKind,
   ObservationStatus,
-  ReplyProvenance,
 } from "../../types";
 import { notFound, validation } from "../errors";
 import { newId, nowIso } from "../id";
@@ -36,6 +35,8 @@ const MAX_TEXT = 2000;
 const MAX_CONTEXT_TEXT = 500;
 const MAX_CONTEXT_CHARS = 4000;
 const MAX_SUGGESTED_IN_CONTEXT = 10;
+/** How many threads the history list carries; the switcher UI (#408) owns paging. */
+const MAX_CONVERSATIONS = 20;
 
 function cleanText(text: string): string {
   const cleaned = text.trim();
@@ -158,23 +159,9 @@ export class LocalMemoryService {
   }
 
   async createConversation(title = ""): Promise<Conversation> {
-    return this.ensureConversation(newId(), title);
-  }
-
-  /**
-   * Hold a conversation this store never made — the id came from the server — so
-   * an answer produced here has somewhere to be recorded. An existing
-   * conversation is returned as it is, including its title: adopting an id is not
-   * a licence to rewrite what is already on disk.
-   */
-  async ensureConversation(id: string, title = ""): Promise<StoredConversation> {
-    const existing = await this.store.getConversation(id);
-    if (existing) {
-      return existing;
-    }
     const now = nowIso();
     const conversation: StoredConversation = {
-      id,
+      id: newId(),
       title: title.trim(),
       created_at: now,
       updated_at: now,
@@ -188,11 +175,12 @@ export class LocalMemoryService {
     return this.store.getConversation(id);
   }
 
-  /** The history list: every thread, most recent touch first, with its size. */
+  /** The recent threads, most recent touch first, with their size. */
   async listConversations(): Promise<ConversationSummary[]> {
     const conversations = await this.store.listConversations();
+    const recent = conversations.slice(0, MAX_CONVERSATIONS);
     return Promise.all(
-      conversations.map(async (conversation) => ({
+      recent.map(async (conversation) => ({
         ...conversation,
         turn_count: await this.store.countTurns(conversation.id),
       })),
@@ -237,7 +225,6 @@ export class LocalMemoryService {
     content: string,
     messageId?: string | null,
     parentId?: string | null,
-    provenance?: ReplyProvenance,
   ): Promise<ConversationTurn> {
     if (!TURN_ROLES.has(role)) {
       throw validation(`Unknown turn role: ${role}.`);
@@ -253,7 +240,6 @@ export class LocalMemoryService {
       created_at: nowIso(),
       message_id: messageId ?? null,
       parent_id: parentId ?? null,
-      ...(provenance ? { provenance } : {}),
     });
     const now = nowIso();
     await this.store.putConversation({

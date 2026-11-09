@@ -5,17 +5,11 @@ import { OnboardingProvider } from "../onboarding/OnboardingProvider";
 import { UpdateProvider, createUpdateService } from "../updater";
 import type { UpdateTransport } from "../updater/types";
 import { SettingsPanel } from "./SettingsPanel";
+import { STUDIO_VERSION } from "../lib/version";
 
 vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
-
-// The browser-model section fills itself in after a storage read, which would
-// put an async update outside every assertion in this file. It has its own
-// suite, and the axe sweep renders it inside this panel. It is mocked with a
-// marker rather than `null` so one case below can prove this panel still hosts
-// it — a section refactor that drops it should fail loudly, not quietly.
-vi.mock("./EdgeModelSection", () => ({ EdgeModelSection: () => "edge-model-section" }));
 
 import { useStudio } from "../state/StudioContext";
 import type { StudioContextValue } from "../state/StudioContext";
@@ -51,6 +45,8 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     refreshModels: vi.fn().mockResolvedValue(undefined),
     mcpReachable: false,
     pushToast: vi.fn(),
+    connectorsLoading: false,
+    presetsLoading: false,
     connectors: [{ name: "notion", kind: "mcp", enabled: true }],
     presets: [
       {
@@ -293,19 +289,6 @@ describe("SettingsPanel capabilities", () => {
   });
 });
 
-describe("SettingsPanel browser-model section", () => {
-  it("is mounted in the panel that replaced the flat connection list", () => {
-    // Merging main moved Settings into `settings/sections/*`. This is the
-    // cheap pin that says the browser-model controls came out of that move
-    // still reachable, rather than silently dropped on the cutting room floor.
-    vi.mocked(useStudio).mockReturnValue(stubContext());
-
-    renderPanel();
-
-    expect(screen.getByText("edge-model-section")).toBeInTheDocument();
-  });
-});
-
 describe("SettingsPanel about section", () => {
   it("reports the running version, build date, platform, and update status", async () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
@@ -341,6 +324,37 @@ describe("SettingsPanel about section", () => {
     expect(within(about).getByText(/macOS|Windows|Linux|Desktop/)).toBeInTheDocument();
     expect(within(about).getByText(aboutService.statusLine())).toBeInTheDocument();
   });
+
+  // #799: in a browser or installed PWA the updater has no version to report,
+  // so About used to render "—". It must show the build version instead, and
+  // never a dash.
+  it("shows the build version when the updater transport is unsupported", async () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    const browserService = createUpdateService({
+      transport: {
+        supported: () => false,
+        currentVersion: async () => "0.11.0",
+        check: async () => null,
+        relaunch: async () => undefined,
+      },
+      storage: null,
+      document: null,
+    });
+    render(
+      <UpdateProvider service={browserService}>
+        <OnboardingProvider enabled={false}>
+          <SettingsPanel />
+        </OnboardingProvider>
+      </UpdateProvider>,
+    );
+
+    const about = screen.getByRole("region", { name: "About" });
+    await waitFor(() => expect(browserService.getSnapshot().phase).not.toBe("checking"));
+
+    expect(within(about).getByText(`v${STUDIO_VERSION}`)).toBeInTheDocument();
+    expect(within(about).queryByText("—")).not.toBeInTheDocument();
+  });
 });
 
 describe("SettingsPanel connection survey", () => {
@@ -369,5 +383,49 @@ describe("SettingsPanel connection survey", () => {
     expect(await screen.findByText("unavailable")).toBeInTheDocument();
     expect(surveyConnections).toHaveBeenCalledOnce();
     expect(recheckConnections).not.toHaveBeenCalled();
+  });
+});
+
+describe("SettingsPanel section modules", () => {
+  it("composes the sections in order", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    const { container } = renderPanel();
+
+    // Context, Data, Model, Connections (bridge), Updates, About, Install.
+    expect(screen.getByText(/your context/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^data$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^model$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /studio bridge/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /software update/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("Your context")).toBeLessThan(text.indexOf("Data"));
+    expect(text.indexOf("Data")).toBeLessThan(text.indexOf("Model"));
+    expect(text.indexOf("Model")).toBeLessThan(text.indexOf("Studio bridge"));
+  });
+
+  it("keeps the Model section intact when the connector fetch fails", () => {
+    // #531: a broken connector fetch shows the Connections error and leaves the
+    // model controls beside it working, because each section owns its failure.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [],
+        connectorsError: {
+          code: "mcp_unreachable",
+          message: "The connector list is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+        models: ["local-tools-model"],
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
+    expect(screen.getByLabelText(/^model/i)).toHaveValue("m");
+    expect(screen.getByLabelText("Base URL")).toHaveValue("http://x");
   });
 });

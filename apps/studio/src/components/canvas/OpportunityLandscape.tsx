@@ -1,10 +1,18 @@
 import { useMemo, useRef, useState } from "react";
 
 import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
-import { formatOpportunityScore, isUnderserved } from "../../lib/odi";
+import {
+  formatOpportunityScore,
+  hasScore,
+  isUnderserved,
+  scoredAverage,
+  UNDERSERVED_THRESHOLD,
+} from "../../lib/odi";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { ShareAction } from "../ShareAction";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
 import { OutcomeCard } from "./OutcomeCard";
 
@@ -75,11 +83,8 @@ export function OpportunityLandscape() {
     return ids.size;
   }, [evidence]);
 
-  const avgOpportunity = useMemo(() => {
-    if (!outcomes.length) return 0;
-    const total = outcomes.reduce((acc, o) => acc + (o.opportunity_score ?? 0), 0);
-    return (total / outcomes.length).toFixed(1);
-  }, [outcomes]);
+  // The average counts stored scores only.
+  const averageScore = useMemo(() => scoredAverage(outcomes), [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
     return outcomes.filter((outcome) => {
@@ -96,6 +101,10 @@ export function OpportunityLandscape() {
     });
   }, [outcomes, underservedOnly, searchQuery]);
 
+  // One rule for every score on this canvas: compare the stored number, display the
+  // rounded one. The sort, the underserved filter and the average all read
+  // `opportunity_score` as stored, because two outcomes that both print "13.0" still have
+  // an order. Rounding happens once, where a score becomes text.
   const sortedOutcomes = useMemo(() => {
     return [...filteredOutcomes].sort(
       (a, b) => (b.opportunity_score ?? -Infinity) - (a.opportunity_score ?? -Infinity),
@@ -129,32 +138,45 @@ export function OpportunityLandscape() {
           </p>
         </div>
 
-        {/* View Mode Switcher */}
-        <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", padding: 3, borderRadius: 8, border: "1px solid var(--studio-border)" }}>
+        {/* The view switcher, and the actions that leave the screen — for a document, or a read-only link. */}
+        <div className="field__row">
+          <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", padding: 3, borderRadius: 8, border: "1px solid var(--studio-border)" }}>
+            <button
+              type="button"
+              className={`studio-button ${viewMode === "matrix" ? "studio-button--primary" : ""}`}
+              style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
+              onClick={() => setViewMode("matrix")}
+            >
+              📊 Matrix
+            </button>
+            <button
+              type="button"
+              className={`studio-button ${viewMode === "cards" ? "studio-button--primary" : ""}`}
+              style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
+              onClick={() => setViewMode("cards")}
+            >
+              🎴 Visual Cards
+            </button>
+            <button
+              type="button"
+              className={`studio-button ${viewMode === "table" ? "studio-button--primary" : ""}`}
+              style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
+              onClick={() => setViewMode("table")}
+            >
+              📋 Table View
+            </button>
+          </div>
+
           <button
             type="button"
-            className={`studio-button ${viewMode === "matrix" ? "studio-button--primary" : ""}`}
-            style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
-            onClick={() => setViewMode("matrix")}
+            className="button button--ghost"
+            onClick={() => openPanel("brief")}
+            disabled={!hasRecords}
+            title={hasRecords ? "The document a review reads" : "Nothing to brief yet"}
           >
-            📊 Matrix
+            Export brief
           </button>
-          <button
-            type="button"
-            className={`studio-button ${viewMode === "cards" ? "studio-button--primary" : ""}`}
-            style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
-            onClick={() => setViewMode("cards")}
-          >
-            🎴 Visual Cards
-          </button>
-          <button
-            type="button"
-            className={`studio-button ${viewMode === "table" ? "studio-button--primary" : ""}`}
-            style={{ padding: "4px 12px", fontSize: "0.8rem", borderRadius: 6, border: "none" }}
-            onClick={() => setViewMode("table")}
-          >
-            📋 Table View
-          </button>
+          <ShareAction />
         </div>
       </div>
 
@@ -212,7 +234,7 @@ export function OpportunityLandscape() {
             <div className="studio-metric__value">{jobs.length}</div>
           </div>
           <div className="studio-metric">
-            <div className="studio-metric__label">Underserved Targets (&gt;10)</div>
+            <div className="studio-metric__label">{`Underserved Targets (>${UNDERSERVED_THRESHOLD})`}</div>
             <div className="studio-metric__value" style={{ color: "var(--studio-amber)" }}>{underservedCount}</div>
             <div className="studio-metric__delta">High Value Innovation</div>
           </div>
@@ -222,7 +244,16 @@ export function OpportunityLandscape() {
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Avg Opportunity Score</div>
-            <div className="studio-metric__value">{avgOpportunity}</div>
+            <div className="studio-metric__value">
+              {averageScore.mean == null
+                ? "Not scored"
+                : formatOpportunityScore(averageScore.mean)}
+            </div>
+            {averageScore.mean == null ? null : (
+              <div className="studio-metric__delta">
+                {`${averageScore.scored} scored · ${averageScore.unscored} not scored`}
+              </div>
+            )}
           </div>
           <div className="studio-metric">
             <div className="studio-metric__label">Unique Customer Quotes</div>
@@ -284,7 +315,7 @@ export function OpportunityLandscape() {
           Capture an outcome to see it here.
         </p>
       ) : viewMode === "matrix" ? (
-        <OpportunityMatrixView
+        <OpportunityPlot
           outcomes={filteredOutcomes}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
@@ -356,7 +387,11 @@ interface MatrixViewProps {
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
-  sample: boolean;
+  /** The one outcome the tour points at, ringed apart from the rest. */
+  highlightedOutcomeId?: string | null;
+  sample?: boolean;
+  /** Drops the detail sidebar and stacks the plot, for a narrow container. */
+  compact?: boolean;
 }
 
 interface PlottedOutcome {
@@ -369,17 +404,51 @@ interface PlottedOutcome {
   cy: number;
 }
 
-function OpportunityMatrixView({
+// The matrix maps (satisfaction, importance) into the 500x360 viewBox. The
+// underserved boundary is `importance = 5 + satisfaction / 2`, derived from
+// `importance + max(importance - satisfaction, 0) > 10`; it runs from
+// (satisfaction 0, importance 5) to (satisfaction 10, importance 10).
+const PLOT_LEFT = 40;
+const PLOT_RIGHT = 480;
+const PLOT_TOP = 20;
+const PLOT_DATA_TOP = 40;
+const PLOT_DATA_BOTTOM = 320;
+const PLOT_WIDTH = PLOT_RIGHT - PLOT_LEFT;
+const PLOT_DATA_HEIGHT = PLOT_DATA_BOTTOM - PLOT_DATA_TOP;
+
+export function plotX(satisfaction: number): number {
+  return (satisfaction / 10) * PLOT_WIDTH + PLOT_LEFT;
+}
+
+export function plotY(importance: number): number {
+  return PLOT_DATA_BOTTOM - (importance / 10) * PLOT_DATA_HEIGHT;
+}
+
+// Underserved zone polygon: top-left, boundary-left, boundary-right, top-right.
+const underservedPolygonPoints = [
+  [PLOT_LEFT, PLOT_TOP],
+  [plotX(0), plotY(5)],
+  [plotX(10), plotY(10)],
+  [PLOT_RIGHT, PLOT_TOP],
+]
+  .map(([x, y]) => `${x},${y}`)
+  .join(" ");
+
+export function OpportunityPlot({
   outcomes,
   selectedOutcomeId,
   onSelectOutcome,
   onHoverOutcome,
   activeOutcome,
-  sample,
+  sample = false,
+  highlightedOutcomeId = null,
+  compact = false,
 }: MatrixViewProps) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
+  // The pulse is decoration; with reduce-motion the ring stays still.
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   const plotted: PlottedOutcome[] = outcomes.map((outcome) => {
     const importance = Math.min(Math.max(outcome.importance ?? 5, 0), 10);
@@ -392,8 +461,8 @@ function OpportunityMatrixView({
       score,
       underserved: isUnderserved(score),
       // Map (satisfaction, importance) into the 500x360 viewBox.
-      cx: (satisfaction / 10) * 440 + 40,
-      cy: 320 - (importance / 10) * 280,
+      cx: plotX(satisfaction),
+      cy: plotY(importance),
     };
   });
 
@@ -472,8 +541,12 @@ function OpportunityMatrixView({
 
   return (
     <div
-      className="opportunity-matrix"
-      style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}
+      className={`opportunity-matrix${compact ? " opportunity-matrix--compact" : ""}`}
+      style={{
+        display: "grid",
+        gridTemplateColumns: compact ? "1fr" : "1fr 320px",
+        gap: 16,
+      }}
     >
       {/* Interactive 2D Chart */}
       <div
@@ -519,17 +592,17 @@ function OpportunityMatrixView({
 
             {/* Grid lines */}
             {[0, 2, 4, 6, 8, 10].map((val) => {
-              const x = (val / 10) * 440 + 40;
-              const y = 320 - (val / 10) * 280;
+              const x = plotX(val);
+              const y = plotY(val);
               return (
                 <g key={val}>
                   {/* Vertical grid line */}
-                  <line x1={x} y1={20} x2={x} y2={320} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
+                  <line x1={x} y1={PLOT_TOP} x2={x} y2={PLOT_DATA_BOTTOM} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
                   <text x={x} y={338} fill="var(--studio-muted)" fontSize="10" textAnchor="middle">
                     {val}
                   </text>
                   {/* Horizontal grid line */}
-                  <line x1={40} y1={y} x2={480} y2={y} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
+                  <line x1={PLOT_LEFT} y1={y} x2={PLOT_RIGHT} y2={y} stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
                   <text x={30} y={y + 3} fill="var(--studio-muted)" fontSize="10" textAnchor="end">
                     {val}
                   </text>
@@ -540,7 +613,7 @@ function OpportunityMatrixView({
             {/* Underserved / High Opportunity Region Polygon (Imp + max(Imp - Sat, 0) > 10) */}
             {/* High importance, low satisfaction area top-left */}
             <polygon
-              points="40,20 280,20 480,220 480,320 40,320"
+              points={underservedPolygonPoints}
               fill="url(#underservedGlow)"
               stroke="rgba(251, 191, 36, 0.2)"
               strokeWidth="1"
@@ -576,18 +649,22 @@ function OpportunityMatrixView({
                       strokeWidth="1.5"
                       opacity="0.4"
                     >
-                      <animate
-                        attributeName="r"
-                        values={isSelected ? "12;18;12" : "8;14;8"}
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
-                      <animate
-                        attributeName="opacity"
-                        values="0.6;0.1;0.6"
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
+                      {!reducedMotion && (
+                        <>
+                          <animate
+                            attributeName="r"
+                            values={isSelected ? "12;18;12" : "8;14;8"}
+                            dur="3s"
+                            repeatCount="indefinite"
+                          />
+                          <animate
+                            attributeName="opacity"
+                            values="0.6;0.1;0.6"
+                            dur="3s"
+                            repeatCount="indefinite"
+                          />
+                        </>
+                      )}
                     </circle>
                   )}
 
@@ -636,7 +713,8 @@ function OpportunityMatrixView({
                   }
                 }}
                 type="button"
-                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}`}
+                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}${highlightedOutcomeId === id ? " matrix-node--highlighted" : ""}`}
+                data-highlighted={highlightedOutcomeId === id ? "true" : undefined}
                 style={{ left: `${(plot.cx / 500) * 100}%`, top: `${(plot.cy / 360) * 100}%` }}
                 tabIndex={id === rovingId ? 0 : -1}
                 aria-pressed={isSelected}
@@ -728,8 +806,8 @@ function OpportunityTableView({
         </thead>
         <tbody>
           {outcomes.map((outcome, idx) => {
-            const opp = outcome.opportunity_score ?? 0;
-            const underserved = isUnderserved(opp);
+            const scored = hasScore(outcome.opportunity_score);
+            const underserved = scored && isUnderserved(outcome.opportunity_score);
             const isSelected = selectedOutcomeId === outcome.id;
 
             return (
@@ -776,7 +854,7 @@ function OpportunityTableView({
                     color: underserved ? "var(--studio-amber)" : "inherit",
                   }}
                 >
-                  {opp.toFixed(1)}
+                  {scored ? formatOpportunityScore(outcome.opportunity_score) : "—"}
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span
@@ -784,10 +862,9 @@ function OpportunityTableView({
                     style={{
                       background: underserved ? "rgba(251, 191, 36, 0.15)" : "rgba(255,255,255,0.05)",
                       color: underserved ? "var(--studio-amber)" : "var(--studio-muted)",
-                      fontSize: "0.72rem",
                     }}
                   >
-                    {underserved ? "UNDERSERVED" : "NORMAL"}
+                    {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : "Not scored"}
                   </span>
                 </td>
               </tr>

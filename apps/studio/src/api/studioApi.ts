@@ -30,12 +30,14 @@ import type {
   Step,
   Strategy,
   StudioConfig,
+  SharedArtifactPayload,
+  ShareLink,
   StudioError,
-  TurnNode,
+  Study,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
-import { readEdgeTurns, recordEdgeTurn } from "../edge/transcript";
+import { applyPendingWrites } from "../bff/pending";
 
 /** A failure the sidecar reported, kept whole so the UI can show it. */
 export class StudioApiError extends Error {
@@ -86,7 +88,7 @@ function codeForStatus(status: number): string {
 }
 
 const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
-  mcp_unreachable: "The studio sidecar isn't reachable.",
+  mcp_unreachable: "The local Studio service isn't responding.",
   not_found: "That resource wasn't found.",
   validation: "The request was invalid.",
   conflict: "That conflicts with the current state.",
@@ -96,7 +98,7 @@ const MESSAGE_FOR_CODE: Partial<Record<string, string>> = {
 
 const SUGGESTION_FOR_CODE: Partial<Record<string, string>> = {
   mcp_unreachable:
-    "Start the studio sidecar with `python scripts/dev.py` (or `npm --prefix apps/studio run dev:full`), then click Recheck.",
+    "Start it with  uv run python scripts/dev.py  and try again.",
   not_found: "Check the identifier and try again.",
   validation: "Fix the input and try again.",
   conflict: "Reload and try again.",
@@ -135,7 +137,7 @@ export function asStudioError(error: unknown): StudioError {
   if (error instanceof TypeError || (error instanceof Error && /fetch failed|network error/i.test(error.message))) {
     return {
       code: "mcp_unreachable",
-      message: MESSAGE_FOR_CODE.mcp_unreachable ?? "The studio sidecar isn't reachable.",
+      message: MESSAGE_FOR_CODE.mcp_unreachable ?? "The local Studio service isn't responding.",
       suggestion: SUGGESTION_FOR_CODE.mcp_unreachable,
       retryable: RETRYABLE_FOR_CODE.mcp_unreachable ?? true,
     };
@@ -152,6 +154,22 @@ export function asStudioError(error: unknown): StudioError {
     message: "Something went wrong.",
     retryable: false,
   };
+}
+
+/** The per-install sidecar token, shared with the sidecar and the MCP server. */
+const STUDIO_TOKEN_KEY = "studio.token";
+
+export function getStudioToken(): string | null {
+  if (typeof localStorage === "undefined") {
+    return null;
+  }
+  return localStorage.getItem(STUDIO_TOKEN_KEY);
+}
+
+/** Headers attaching the bearer token to every sidecar call. */
+export function authHeaders(): HeadersInit {
+  const token = getStudioToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function studioError(response: Response): Promise<StudioApiError> {
@@ -192,7 +210,7 @@ async function studioError(response: Response): Promise<StudioApiError> {
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(apiUrl(path), {
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...authHeaders() },
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) {
@@ -206,7 +224,7 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method,
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -224,7 +242,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 async function deleteJson<T>(path: string): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method: "DELETE",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...authHeaders() },
   });
   if (!response.ok) {
     const error = await studioError(response);
@@ -249,6 +267,40 @@ async function withLocal<T>(
     const bff = await getStudioBff();
     return local(bff);
   }
+}
+
+/**
+ * A write that goes to the sidecar when it answers and to the local store, plus
+ * the outbox, when it does not.
+ *
+ * The returned record carries `pending: true` when the write was queued rather
+ * than acknowledged, so the caller can show a receipt that says where the change
+ * lives. A sidecar that answers with an application error (400/401/409) is a real
+ * failure and is rethrown untouched — the fallback is for a sidecar that is not
+ * there, not for one that refused.
+ */
+async function queuedWrite<T>(
+  sidecar: () => Promise<T>,
+  local: (bff: Awaited<ReturnType<typeof getStudioBff>>) => Promise<T>,
+): Promise<T> {
+  try {
+    return await sidecar();
+  } catch (error) {
+    if (!isTransportFailure(error)) {
+      throw error;
+    }
+    const bff = await getStudioBff();
+    const record = await local(bff);
+    // `pending` rides along on the record so the caller's receipt can say where
+    // the change lives; it is not part of the entity the sidecar returns.
+    return { ...record, pending: true } as T;
+  }
+}
+
+/** Overlay the writes still queued on this device onto a canvas read. */
+async function overlayPending(canvas: CanvasData): Promise<CanvasData> {
+  const bff = await getStudioBff();
+  return applyPendingWrites(canvas, await bff.listOutbox());
 }
 
 export async function fetchConfig(): Promise<StudioConfig> {
@@ -290,10 +342,13 @@ export function fetchChangelog(): Promise<ChangelogData> {
 }
 
 export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
-  return withLocal(
+  const canvas = await withLocal(
     () => getJson<CanvasData>(`/api/canvas?mcp_url=${encodeURIComponent(mcpUrl)}`),
     (bff) => bff.data.fetchCanvas(),
   );
+  // A queued write has not reached the sidecar, so a read that answered from it
+  // would erase the optimistic edit. Overlay the outbox on every read path.
+  return overlayPending(canvas);
 }
 
 export function healthMcp(mcpUrl: string): Promise<McpHealth> {
@@ -322,27 +377,50 @@ export function fetchModels(config: {
 }
 
 export function addStep(payload: AddStepPayload): Promise<Step> {
-  return postJson<Step>("/api/steps", payload);
+  return queuedWrite<Step>(
+    () => postJson<Step>("/api/steps", payload),
+    (bff) =>
+      bff.addStep({ job_id: payload.job_id, name: payload.name, order: payload.order }),
+  );
 }
 
 export function addOutcome(payload: AddOutcomePayload): Promise<Outcome> {
-  return postJson<Outcome>("/api/outcomes", payload);
+  return queuedWrite<Outcome>(
+    () => postJson<Outcome>("/api/outcomes", payload),
+    (bff) =>
+      bff.addOutcome({
+        job_id: payload.job_id,
+        statement: payload.statement,
+        importance: payload.importance,
+        satisfaction: payload.satisfaction,
+      }),
+  );
 }
 
 export function createJob(payload: CreateJobPayload): Promise<Job> {
-  return postJson<Job>("/api/jobs", payload);
+  return queuedWrite<Job>(
+    () => postJson<Job>("/api/jobs", payload),
+    (bff) => bff.createJob({ name: payload.name, description: payload.description }),
+  );
 }
 
 export function updateJob(
   jobId: string,
   payload: { name?: string; description?: string; mcp_url: string },
 ): Promise<Job> {
-  return sendJson<Job>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload);
+  return queuedWrite<Job>(
+    () => sendJson<Job>("PATCH", `/api/jobs/${encodeURIComponent(jobId)}`, payload),
+    (bff) => bff.updateJob(jobId, { name: payload.name, description: payload.description }),
+  );
 }
 
 export function deleteJob(jobId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/jobs/${encodeURIComponent(jobId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ deleted: string }>(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/jobs/${encodeURIComponent(jobId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteJob(jobId),
   );
 }
 
@@ -350,12 +428,19 @@ export function updateStep(
   stepId: string,
   payload: { name?: string; order?: number; mcp_url: string },
 ): Promise<Step> {
-  return sendJson<Step>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload);
+  return queuedWrite<Step>(
+    () => sendJson<Step>("PATCH", `/api/steps/${encodeURIComponent(stepId)}`, payload),
+    (bff) => bff.updateStep(stepId, { name: payload.name, order: payload.order }),
+  );
 }
 
 export function deleteStep(stepId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/steps/${encodeURIComponent(stepId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ deleted: string }>(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/steps/${encodeURIComponent(stepId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteStep(stepId),
   );
 }
 
@@ -363,16 +448,29 @@ export function updateOutcome(
   outcomeId: string,
   payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
 ): Promise<Outcome> {
-  return sendJson<Outcome>(
-    "PATCH",
-    `/api/outcomes/${encodeURIComponent(outcomeId)}`,
-    payload,
+  return queuedWrite<Outcome>(
+    () =>
+      sendJson<Outcome>(
+        "PATCH",
+        `/api/outcomes/${encodeURIComponent(outcomeId)}`,
+        payload,
+      ),
+    (bff) =>
+      bff.updateOutcome(outcomeId, {
+        statement: payload.statement,
+        importance: payload.importance,
+        satisfaction: payload.satisfaction,
+      }),
   );
 }
 
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {
-  return deleteJson<{ deleted: string }>(
-    `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ deleted: string }>(
+    () =>
+      deleteJson<{ deleted: string }>(
+        `/api/outcomes/${encodeURIComponent(outcomeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteOutcome(outcomeId),
   );
 }
 
@@ -433,7 +531,7 @@ export function addConnector(payload: AddConnectorPayload): Promise<ConnectorOpe
 export async function deleteConnector(name: string): Promise<ConnectorOperationResponse> {
   const response = await fetch(apiUrl(`/api/connectors/${encodeURIComponent(name)}`), {
     method: "DELETE",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...authHeaders() },
   });
   if (!response.ok) {
     const error = await studioError(response);
@@ -456,7 +554,11 @@ export async function streamChat(
   try {
     const response = await fetch(apiUrl("/api/chat"), {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        ...authHeaders(),
+      },
       body: JSON.stringify({
         ...request,
         messages: request.messages.reduce<{
@@ -563,6 +665,15 @@ export async function fetchSegments(mcpUrl: string, jobId?: string): Promise<Seg
   return getJson<Segment[]>(`/api/segments?${params.toString()}`);
 }
 
+/** The opened studies, or an empty list before any study has been opened. */
+export async function fetchStudies(mcpUrl: string, jobId?: string): Promise<Study[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Study[]>(`/api/studies?${params.toString()}`);
+}
+
 /** The recorded Stage 6 path, or null when no strategy has been proposed yet. */
 export async function fetchStrategy(mcpUrl: string): Promise<Strategy | null> {
   const params = new URLSearchParams({ mcp_url: mcpUrl });
@@ -655,160 +766,35 @@ export async function listConversations(): Promise<ConversationSummary[]> {
   );
 }
 
-/**
- * The thread to reopen when the page opens. Server-first, but an exchange this
- * browser streamed from its own model is in no server row, so it wins when it
- * is the more recent work — otherwise the person who used the browser model
- * reloads onto last week's thread and wonders where their answer went.
- */
-export async function fetchLatestConversation(): Promise<LatestConversation> {
-  const server = await withLocal(
+export function fetchLatestConversation(): Promise<LatestConversation> {
+  return withLocal(
     () => getJson<LatestConversation>("/api/conversations/latest"),
-    (bff) => bff.memory.latestConversation(),
+    async (bff) => bff.memory.latestConversation(),
   );
-  let mine: LatestConversation | null;
-  try {
-    mine = await browserAnsweredThread();
-  } catch {
-    return server;
-  }
-  if (!mine?.conversation) {
-    return server;
-  }
-  if (!server.conversation) {
-    return mine;
-  }
-  return touchedAfter(mine.conversation.updated_at, server.conversation.updated_at)
-    ? mine
-    : server;
-}
-
-/**
- * The newest thread this browser holds an answer for, if it holds one at all.
- * A local draft written while the server was out is not this claim: only the
- * reply the browser's own model produced is work the server cannot show.
- */
-async function browserAnsweredThread(): Promise<LatestConversation | null> {
-  const bff = await getStudioBff();
-  const latest = await bff.memory.latestConversation();
-  const { conversation } = latest;
-  if (!conversation) {
-    return null;
-  }
-  const recorded = await readEdgeTurns(bff.memory, conversation.id);
-  if (!recorded.some((turn) => turn.provenance === "edge")) {
-    return null;
-  }
-  return { ...latest, conversation };
-}
-
-/** Wall-clock order, because the two producers stamp their own format. */
-function touchedAfter(candidate: string, current: string): boolean {
-  return Date.parse(candidate) > Date.parse(current);
 }
 
 /** The whole branch tree, so a reload reopens the branch that was visible. */
 export async function fetchConversationTree(conversationId: string): Promise<ConversationTree> {
-  const tree = await withLocal(
+  return withLocal(
     () =>
       getJson<ConversationTree>(
         `/api/conversations/${encodeURIComponent(conversationId)}/tree`,
       ),
-    (bff) => localTree(bff, conversationId),
-  ).catch((failure: unknown) => {
-    // A server that has never seen this id is not a dead end for the person
-    // whose own browser wrote the thread: the browser's copy is the thread.
-    if (!(failure instanceof StudioApiError) || failure.status !== 404) {
-      throw failure;
-    }
-    return getStudioBff()
-      .then((bff) => localTree(bff, conversationId))
-      .catch(() => {
-        // Neither copy exists, which is the 404 the server said it was.
-        throw failure;
-      });
-  });
-  return withBrowserTurns(tree, conversationId);
-}
-
-/** This browser's copy of a thread, in the shape the server would have sent. */
-async function localTree(
-  bff: Awaited<ReturnType<typeof getStudioBff>>,
-  conversationId: string,
-): Promise<ConversationTree> {
-  const local = await bff.memory.conversationTree(conversationId);
-  return {
-    conversation: local.conversation,
-    messages: local.messages.map((turn) => ({
-      id: String(turn.message_id ?? turn.id),
-      parent_id: turn.parent_id ?? null,
-      role: turn.role,
-      content: turn.content,
-      created_at: turn.created_at,
-      ...(turn.provenance ? { provenance: turn.provenance } : {}),
-    })),
-    head_id: local.head_id,
-  };
-}
-
-/**
- * Turns this tab answered on its own are in no server row, so the server's tree
- * cannot show them. Read them from the browser's memory and merge; the person
- * who closed the tab and came back gets the thread they actually had.
- */
-async function withBrowserTurns(
-  tree: ConversationTree,
-  conversationId: string,
-): Promise<ConversationTree> {
-  let mine: TurnNode[];
-  try {
-    const bff = await getStudioBff();
-    mine = await readEdgeTurns(bff.memory, conversationId);
-  } catch {
-    // The server's thread is the one that must survive: a memory store that
-    // will not open costs the person their own drafts, nothing more.
-    return tree;
-  }
-  const known = new Set(tree.messages.map((turn) => turn.id));
-  const missing = mine.filter((turn) => !known.has(turn.id));
-  if (!missing.length) {
-    return tree;
-  }
-  // Recorded order is the thread order; two turns stamped in the same
-  // millisecond are normal when the model runs down the hall.
-  const tip = missing[missing.length - 1];
-  const head = tree.messages.find((turn) => turn.id === tree.head_id);
-  return {
-    ...tree,
-    messages: [...tree.messages, ...missing],
-    // A branch left open deliberately stays open; only a newer answer moves it.
-    head_id: head && !touchedAfter(tip.created_at, head.created_at) ? tree.head_id : tip.id,
-  };
-}
-
-/** One exchange this tab streamed, and the thread it was asked in — which a
- * first turn does not have yet. */
-export interface BrowserExchange {
-  conversationId: string | null;
-  question: { id: string; text: string; parentId: string | null };
-  answer: { id: string; text: string };
-}
-
-/**
- * Keep an exchange the browser answered for itself. No server ever saw it, so
- * this store is the only copy there is. Returns the conversation it landed in,
- * for a turn asked before the thread existed.
- */
-export async function recordBrowserTurn(exchange: BrowserExchange): Promise<string> {
-  const bff = await getStudioBff();
-  const conversationId =
-    exchange.conversationId ?? (await bff.memory.createConversation()).id;
-  await recordEdgeTurn(bff.memory, {
-    conversationId,
-    question: exchange.question,
-    answer: exchange.answer,
-  });
-  return conversationId;
+    async (bff) => {
+      const tree = await bff.memory.conversationTree(conversationId);
+      return {
+        conversation: tree.conversation,
+        messages: tree.messages.map((turn) => ({
+          id: String(turn.message_id ?? turn.id),
+          parent_id: turn.parent_id ?? null,
+          role: turn.role,
+          content: turn.content,
+          created_at: turn.created_at,
+        })),
+        head_id: tree.head_id,
+      };
+    },
+  );
 }
 
 /** Record which branch is visible. */
@@ -916,4 +902,57 @@ export function promoteEvidence(
     `/api/evidence/${encodeURIComponent(evidenceId)}/promote`,
     payload,
   );
+}
+
+
+/**
+ * The one artifact a share token names.
+ *
+ * Unlike every other read, this does not fall through to the browser BFF: a
+ * shared payload exists only where the token was minted, and there is no local
+ * copy to invent. A token the sidecar refuses is a real failure, not a reason to
+ * serve something else.
+ */
+export function fetchSharedArtifact(token: string): Promise<SharedArtifactPayload> {
+  return getJson<SharedArtifactPayload>(`/api/share/${encodeURIComponent(token)}`);
+}
+
+/**
+ * Mint a read-only link for one artifact. The returned token is shown once;
+ * the store keeps only its hash.
+ */
+export function createShareLink(payload: {
+  kind: SharedArtifactPayload["kind"];
+  expires_in_days?: number;
+  mcp_url?: string;
+}): Promise<ShareLink> {
+  return postJson<ShareLink>("/api/share", payload);
+}
+
+export interface StorageFacts {
+  kind: "sidecar" | "browser";
+  path?: string;
+  bytes?: number;
+  lastWrittenAt?: string;
+}
+
+export async function getStorageFacts(): Promise<StorageFacts> {
+  const bff = await getStudioBff();
+  const facts = await bff.storageFacts();
+  return {
+    kind: facts.engine === "indexeddb" ? "sidecar" : "browser",
+    path: facts.database ?? undefined,
+    bytes: facts.bytes === "unknown" ? undefined : facts.bytes,
+    lastWrittenAt: facts.lastWrite ?? undefined,
+  };
+}
+
+export async function exportWorkspace(): Promise<string> {
+  const bff = await getStudioBff();
+  return bff.exportWorkspace();
+}
+
+export async function importWorkspace(json: string): Promise<void> {
+  const bff = await getStudioBff();
+  await bff.importWorkspace(json);
 }

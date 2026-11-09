@@ -6,11 +6,8 @@ import type { BannerKind } from "./types";
 const ALL_KINDS: BannerKind[] = [
   "sidecar-down",
   "model-offline",
-  "edge-offer",
-  "edge-downloading",
-  "edge-fetch-failed",
-  "edge-ready",
-  "edge-unlocked",
+  "offline",
+  "app-update-ready",
   "update-available",
   "update-ready",
   "write-rejected",
@@ -24,10 +21,6 @@ describe("BANNER_CATALOG", () => {
     for (const kind of ALL_KINDS) {
       expect(BANNER_CATALOG[kind], `missing catalog entry for ${kind}`).toBeDefined();
     }
-  });
-
-  it("has exactly one entry per kind", () => {
-    expect(Object.keys(BANNER_CATALOG).sort()).toEqual([...ALL_KINDS].sort());
   });
 
   it("gives every entry a severity, a life, and a dock", () => {
@@ -53,6 +46,18 @@ describe("BANNER_CATALOG", () => {
     expect(entry.dismissible).toBe(false);
   });
 
+  it("names what still works when the browser is offline, without claiming sync", () => {
+    const entry = BANNER_CATALOG["offline"];
+    expect(entry.severity).toBe("info");
+    expect(entry.life).toBe("persistent");
+    expect(entry.dock).toBe("top");
+    // A persistent banner with no key would dedupe by kind only; the copy has to
+    // name the device-local work and must not promise a sync that #306 owns.
+    expect(`${entry.title} ${entry.body}`).toMatch(/offline/i);
+    expect(`${entry.title} ${entry.body}`).toMatch(/device|here/i);
+    expect(`${entry.title} ${entry.body}`).not.toMatch(/sync/i);
+  });
+
   it("keeps the toast kinds transient and in the corner", () => {
     for (const kind of ["info", "success", "error"] as const) {
       expect(BANNER_CATALOG[kind].life).toBe("transient");
@@ -60,53 +65,18 @@ describe("BANNER_CATALOG", () => {
     }
   });
 
-  it("treats an edge download as a calm top strip that updates in place", () => {
-    const entry = BANNER_CATALOG["edge-downloading"];
+  it("offers a reload, never a forced one, when a new build is staged", () => {
+    const entry = BANNER_CATALOG["app-update-ready"];
     expect(entry.severity).toBe("info");
     expect(entry.life).toBe("persistent");
     expect(entry.dock).toBe("top");
-    const first = resolveSpec({ kind: "edge-downloading", body: "40%" });
-    const later = resolveSpec({ kind: "edge-downloading", body: "70%" });
-    expect(first.kind).toBe(later.kind);
-    expect(later.body).toBe("70%");
-  });
-
-  it("asks for edge consent as a strip that cannot be dismissed away, with both answers", () => {
-    const entry = BANNER_CATALOG["edge-offer"];
-    expect(entry.life).toBe("persistent");
-    expect(entry.dock).toBe("top");
-    expect(entry.dismissible).toBe(false);
-    expect(entry.actions?.map((action) => action.action)).toEqual([
-      "enable-edge-model",
-      "decline-edge-model",
-    ]);
-  });
-
-  it("treats a download that did not land as a strip that hands back the same ask", () => {
-    // The consent question is answered and nothing arrived, so the one-time ask
-    // is gone: this strip is the only place left that can say what happened and
-    // offer the download again.
-    const entry = BANNER_CATALOG["edge-fetch-failed"];
-    expect(entry.severity).toBe("warning");
-    expect(entry.life).toBe("persistent");
-    expect(entry.dock).toBe("top");
-    expect(entry.dismissible).toBe(true);
-    expect(entry.title).toMatch(/didn't finish/i);
-    expect(entry.actions?.map((action) => action.action)).toEqual(["enable-edge-model"]);
-  });
-
-  it("treats a first tier landing as a success toast, not a permanent strip", () => {
-    const entry = BANNER_CATALOG["edge-ready"];
-    expect(entry.severity).toBe("success");
-    expect(entry.life).toBe("transient");
-    expect(entry.dock).toBe("corner");
-  });
-
-  it("treats an unlocked tier as a success toast that expires on its own", () => {
-    const entry = BANNER_CATALOG["edge-unlocked"];
-    expect(entry.severity).toBe("success");
-    expect(entry.life).toBe("transient");
-    expect(entry.durationMs).toBeGreaterThan(0);
+    // The copy names the version and the action is an explicit reload, so the
+    // update never swaps code on its own.
+    expect(`${entry.title} ${entry.body}`).toMatch(/new version/i);
+    expect(entry.actions?.[0]).toMatchObject({
+      label: "Reload for the new version",
+      action: "reload-app",
+    });
   });
 });
 

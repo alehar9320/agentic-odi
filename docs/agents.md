@@ -374,3 +374,10 @@ These are real limits of the current setup, not aspirations:
   — announcement on 2026-10-29.
 - Repository evidence: `gh api repos/alehar9320/agentic-odi/assignees`, issue
   labels, issue comments, and the branch list, all read on 2026-10-31.
+
+
+## Automated issue claims (canonical)
+
+Use the branch-based claim primitive documented in [agents_claim.md](agents_claim.md).  
+Pre-flight: `gh pr list --repo alehar9320/agentic-odi --state open --search '<issue> in:body,title'` and inspect the issue labels/comments.  
+Claims expire after 24 hours of inactivity with no open PR progress. Legacy labels `agent-claim/*`, `claimed/*` are retired for new claims.

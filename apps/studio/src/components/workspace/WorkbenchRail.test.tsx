@@ -26,6 +26,19 @@ vi.mock("../../state/StudioContext", () => ({
   useStudio: () => studio,
 }));
 
+const panels = vi.hoisted(() => ({ blankBlurbs: false }));
+
+vi.mock("./panels", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./panels")>();
+  return {
+    ...actual,
+    findPanel: (id: string) => {
+      const panel = actual.findPanel(id as never);
+      return panels.blankBlurbs ? { ...panel, blurb: "   " } : panel;
+    },
+  };
+});
+
 import { WorkbenchRail } from "./WorkbenchRail";
 
 function canvas(overrides: Partial<NonNullable<typeof studio.canvas>> = {}) {
@@ -46,6 +59,7 @@ describe("WorkbenchRail", () => {
     studio.activePanel = null;
     studio.openPanel.mockClear();
     studio.closePanel.mockClear();
+    panels.blankBlurbs = false;
   });
 
   it("stays out of the way until the thread has made something", () => {
@@ -65,6 +79,23 @@ describe("WorkbenchRail", () => {
     expect(screen.getByRole("button", { name: "Landscape, 2 opportunities" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Job map, 1 step" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Evidence, 1 signal" })).toBeInTheDocument();
+  });
+
+  it("takes focus when it is activated, so the lens it opens can give it back (#810)", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+    render(<WorkbenchRail />);
+
+    // The caret is somewhere else — on an empty stage, that is the composer.
+    const elsewhere = document.createElement("input");
+    document.body.append(elsewhere);
+    elsewhere.focus();
+
+    const chip = screen.getByRole("button", { name: "Landscape, 1 opportunity" });
+    fireEvent.click(chip);
+
+    expect(studio.openPanel).toHaveBeenCalledWith("landscape");
+    expect(chip).toHaveFocus();
+    elsewhere.remove();
   });
 
   it("shows what the agent has learned once it has a note", () => {
@@ -197,4 +228,43 @@ describe("WorkbenchRail", () => {
 
     expect(studio.closePanel).toHaveBeenCalled();
   });
+  it("says on hover what a chip opens (#696)", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+    render(<WorkbenchRail />);
+
+    const chip = screen.getByRole("button", { name: /^landscape/i });
+    fireEvent.mouseEnter(chip);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "Every outcome scored. Anything above 10 is underserved.",
+    );
+
+    fireEvent.mouseLeave(chip);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("says it on focus too, without changing the count in the name (#696)", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+    render(<WorkbenchRail />);
+
+    const chip = screen.getByRole("button", { name: "Landscape, 1 opportunity" });
+    fireEvent.focus(chip);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/every outcome scored/i);
+    expect(chip).toHaveAccessibleName("Landscape, 1 opportunity");
+
+    fireEvent.blur(chip);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("falls back to the chip's own label when the lens has no blurb (#696)", () => {
+    panels.blankBlurbs = true;
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+    render(<WorkbenchRail />);
+
+    fireEvent.mouseEnter(screen.getByRole("button", { name: /^landscape/i }));
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Landscape$/);
+  });
+
 });

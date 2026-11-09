@@ -61,6 +61,12 @@ class ToolName(str, Enum):
     LIST_PROPOSALS = "list_proposals"
     APPROVE_PROPOSAL = "approve_proposal"
     REJECT_PROPOSAL = "reject_proposal"
+    LINK_OUTCOME = "link_outcome"
+    UNLINK_OUTCOME = "unlink_outcome"
+    GET_OUTCOME_ALIGNMENTS = "get_outcome_alignments"
+    GET_TRACEABILITY_REPORT = "get_traceability_report"
+    OPEN_STUDY = "open_study"
+    LIST_STUDIES = "list_studies"
 
 
 class ToolEffect(str, Enum):
@@ -188,7 +194,10 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.ADD_OUTCOME.value: ToolSpec(
         name="add_outcome",
-        summary="Add a desired Outcome to a Job; a score must carry a claim_check.",
+        summary=(
+            "Add a desired Outcome to a Job; three questions and the person's answers "
+            "come before any score, and the score carries them as a claim_check."
+        ),
         effect=_derive_effect("add_outcome"),
         arguments=(
             "job_id",
@@ -537,6 +546,55 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("proposal_id",),
         returns="The rejected OutcomeProposal.",
         stage="2",
+    ),
+    ToolName.LINK_OUTCOME.value: ToolSpec(
+        name="link_outcome",
+        summary="Link an Outcome to the V2MOM method or measure it advances.",
+        effect=_derive_effect("link_outcome"),
+        arguments=("outcome_id", "field", "text"),
+        required=("outcome_id", "field", "text"),
+        returns="The updated Outcome, or a refusal naming the objectives that do exist.",
+        stage="6",
+    ),
+    ToolName.UNLINK_OUTCOME.value: ToolSpec(
+        name="unlink_outcome",
+        summary="Remove one V2MOM link from an Outcome.",
+        effect=_derive_effect("unlink_outcome"),
+        arguments=("outcome_id", "field", "key"),
+        required=("outcome_id", "field", "key"),
+        returns="The updated Outcome.",
+        stage="6",
+    ),
+    ToolName.GET_OUTCOME_ALIGNMENTS.value: ToolSpec(
+        name="get_outcome_alignments",
+        summary="List the V2MOM links recorded on Outcomes.",
+        effect=_derive_effect("get_outcome_alignments"),
+        arguments=("outcome_id",),
+        returns="A list of links, each naming the outcome, field, key, and text.",
+        stage="6",
+    ),
+    ToolName.GET_TRACEABILITY_REPORT.value: ToolSpec(
+        name="get_traceability_report",
+        summary="Report orphans, unfunded objectives, and links the vision dropped.",
+        effect=_derive_effect("get_traceability_report"),
+        arguments=(),
+        returns="The orphans, unfunded, and drift lists, or a note that no objectives exist.",
+        stage="6",
+    ),
+    ToolName.OPEN_STUDY.value: ToolSpec(
+        name="open_study",
+        summary="Open a named study pass over a Job at a given wave number.",
+        effect=_derive_effect("open_study"),
+        arguments=("job_id", "name", "wave", "method_notes"),
+        required=("job_id", "name", "wave"),
+        returns="The created Study, opened as planned.",
+    ),
+    ToolName.LIST_STUDIES.value: ToolSpec(
+        name="list_studies",
+        summary="List the studies opened for a Job.",
+        effect=_derive_effect("list_studies"),
+        arguments=("job_id",),
+        returns="A list of Studies. Empty until a study has been opened.",
     ),
 }
 

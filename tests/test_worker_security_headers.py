@@ -22,21 +22,11 @@ REQUIRED_HEADERS = {
 
 REQUIRED_CSP_DIRECTIVES = {
     "default-src 'self'",
-    # 'wasm-unsafe-eval' lets the edge model engine compile WebGPU shader
-    # modules; script-src stays locked to 'self' otherwise.
-    "script-src 'self' 'wasm-unsafe-eval'",
+    "script-src 'self'",
     "connect-src 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-}
-
-# The edge model engine's wasm and quantized-weight fetches must survive the
-# hosted CSP, so their origins are curated in the Worker.
-REQUIRED_EDGE_MODEL_ORIGINS = {
-    "https://huggingface.co",
-    "https://raw.githubusercontent.com",
-    "https://cdn.jsdelivr.net",
 }
 
 
@@ -64,17 +54,14 @@ def test_the_content_security_policy_covers_the_studio() -> None:
         assert directive in source, f"{directive} is missing from the CSP"
 
 
-def test_the_csp_lets_the_edge_model_fetch_its_weights() -> None:
-    source = _source()
-    for origin in REQUIRED_EDGE_MODEL_ORIGINS:
-        assert origin in source, f"{origin} is missing from connect-src"
-
-
 def test_every_response_path_applies_the_headers() -> None:
     source = _source()
-    # Assets, local capabilities, the configured-sidecar error, the proxy, and
-    # the unreachable error.
-    assert source.count("return secure(") == 5
+    # Assets, local capabilities, the configured-sidecar error, the proxy, the
+    # unreachable error, the two `/api/build` answers (the version, and the 405 for
+    # any other method), and the two `/api/deploy` answers (#612: the identity, and
+    # the 405 for any other method). The count is the point: a new return path has
+    # to be named here before it can ship unwrapped.
+    assert source.count("return secure(") == 9
     assert source.count("secure(\n        await fetch(") == 1
     assert "new Response(response.body, {" in source, (
         "the header helper must reuse the body stream so SSE keeps streaming"

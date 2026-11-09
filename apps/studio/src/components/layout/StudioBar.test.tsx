@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
   useUpdateSnapshot: vi.fn(),
@@ -15,8 +15,12 @@ import type { UpdateSnapshot } from "../../updater/types";
 import { StudioBar } from "./StudioBar";
 
 const stubContext = (overrides: Record<string, unknown> = {}) => ({
+  conversationId: null,
+  conversations: [],
   llmHealth: { healthy: true, message: "ok" },
   messages: [],
+  openConversation: vi.fn(),
+  refreshConversations: vi.fn(),
   unreadSignalCount: 0,
   openPanel: vi.fn(),
   pushToast: vi.fn(),
@@ -31,6 +35,8 @@ const stubSnapshot = (overrides: Partial<UpdateSnapshot> = {}): UpdateSnapshot =
   available: null,
   progress: null,
   lastCheckedAt: null,
+  lastSuccessfulCheckAt: null,
+  actions: [],
   installed: false,
   pendingInstall: false,
   error: null,
@@ -133,6 +139,45 @@ describe("StudioBar", () => {
     expect(
       screen.getByRole("button", { name: /model status: connecting\. health not checked yet\./i }),
     ).toBeInTheDocument();
+  });
+
+  it("says a local endpoint is not reachable from a hosted page", () => {
+    // #804: a hosted page cannot reach a private endpoint, so the bar says why.
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      get() {
+        return new Proxy(originalLocation, {
+          get(target, prop) {
+            if (prop === "hostname") return "studio.example.com";
+            return Reflect.get(target, prop);
+          },
+        });
+      },
+    });
+    try {
+      vi.mocked(useStudio).mockReturnValue(
+        stubContext({
+          llmHealth: { healthy: null, message: "" },
+          settings: {
+            base_url: "http://127.0.0.1:11434/v1",
+            api_key: "",
+            model_name: "qwen3:8b",
+            mcp_url: "",
+            theme: "dark",
+          },
+        }) as never,
+      );
+      render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+      expect(
+        screen.getByRole("button", {
+          name: /model status: connecting\. local endpoint, not reachable from this page/i,
+        }),
+      ).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "location", { value: originalLocation, configurable: true });
+    }
   });
 
   it("keeps the brand mark decorative and labels the home control in text", () => {
@@ -252,5 +297,438 @@ describe("StudioBar", () => {
     render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
 
     expect(screen.getByRole("button", { name: "Update ready" })).toBeInTheDocument();
+  });
+
+  it("lists recent conversations with their title and time when the history opens", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T10:00:00Z"));
+    const refreshConversations = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        refreshConversations,
+        conversationId: "c-2",
+        conversations: [
+          {
+            id: "c-2",
+            title: "Where does onboarding leak?",
+            created_at: "2026-10-22T09:00:00Z",
+            updated_at: "2026-10-22T09:59:30Z",
+            head_id: null,
+            turn_count: 4,
+          },
+          {
+            id: "c-1",
+            title: "Price the churn spike",
+            created_at: "2026-10-21T09:00:00Z",
+            updated_at: "2026-10-21T09:00:00Z",
+            head_id: null,
+            turn_count: 2,
+          },
+        ],
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(screen.queryByRole("menu", { name: "Recent conversations" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+
+    const menu = screen.getByRole("menu", { name: "Recent conversations" });
+    expect(refreshConversations).toHaveBeenCalledOnce();
+    expect(within(menu).getByText("Where does onboarding leak?")).toBeInTheDocument();
+    expect(within(menu).getByText("Price the churn spike")).toBeInTheDocument();
+    expect(within(menu).getByText(/Just now · 4 turns/)).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("marks the current conversation and loads another when one is chosen", () => {
+    const openConversation = vi.fn(async () => undefined);
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        openConversation,
+        conversationId: "c-2",
+        conversations: [
+          {
+            id: "c-2",
+            title: "Current thread",
+            created_at: "2026-10-22T09:00:00Z",
+            updated_at: "2026-10-22T09:00:00Z",
+            head_id: null,
+            turn_count: 1,
+          },
+          {
+            id: "c-1",
+            title: "An older thread",
+            created_at: "2026-10-21T09:00:00Z",
+            updated_at: "2026-10-21T09:00:00Z",
+            head_id: null,
+            turn_count: 3,
+          },
+        ],
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+
+    const current = screen.getByRole("menuitem", { name: /current thread/i });
+    expect(current).toHaveAttribute("aria-current", "true");
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /an older thread/i }));
+
+    expect(openConversation).toHaveBeenCalledWith("c-1");
+    // Choosing closes the list, so the thread is not hidden behind it.
+    expect(screen.queryByRole("menu", { name: "Recent conversations" })).toBeNull();
+  });
+
+  it("names an untitled thread rather than showing a blank row", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        conversationId: "c-1",
+        conversations: [
+          {
+            id: "c-1",
+            title: "",
+            created_at: "2026-10-22T09:00:00Z",
+            updated_at: "2026-10-22T09:00:00Z",
+            head_id: null,
+            turn_count: 0,
+          },
+        ],
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+
+    expect(screen.getByRole("menuitem", { name: /new conversation/i })).toBeInTheDocument();
+  });
+});
+
+describe("StudioBar new thread control (#319)", () => {
+  const originalMatchMedia = window.matchMedia;
+  let wide = true;
+
+  const transcript = [
+    { id: "t-1", parentId: null, role: "user", content: "Where do I start?" },
+    { id: "t-2", parentId: "t-1", role: "assistant", content: "Name the job." },
+  ];
+
+  beforeEach(() => {
+    wide = true;
+    vi.mocked(useUpdateSnapshot).mockReturnValue(stubSnapshot() as never);
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query === "(min-width: 720px)" && wide,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia,
+    });
+  });
+
+  function renderBar(overrides: Record<string, unknown> = {}) {
+    const onNew = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        streaming: false,
+        activePanel: null,
+        customizeOpen: false,
+        setupOpen: false,
+        ...overrides,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={onNew} onChangelog={() => {}} />);
+    return { onNew };
+  }
+
+  it("says the words New thread where there is room for them", () => {
+    const { onNew } = renderBar({ messages: transcript });
+
+    const control = screen.getByRole("button", { name: "Start a new thread" });
+    expect(control).toHaveTextContent("New thread");
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  it("keeps the name when the bar drops the words", () => {
+    wide = false;
+    renderBar({ messages: transcript });
+
+    const control = screen.getByRole("button", { name: "Start a new thread" });
+    expect(control).not.toHaveTextContent("New thread");
+  });
+
+  it("names in the tooltip what a new thread leaves alone", () => {
+    renderBar({ messages: transcript });
+
+    expect(screen.getByRole("button", { name: "Start a new thread" })).toHaveAttribute(
+      "title",
+      expect.stringContaining("Your jobs, outcomes, and evidence stay."),
+    );
+  });
+
+  it("disables the control and says the thread is already new", () => {
+    const { onNew } = renderBar({ messages: [] });
+
+    const control = screen.getByRole("button", { name: "Start a new thread" });
+    expect(control).toBeDisabled();
+    const describedBy = control.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy as string)).toHaveTextContent(
+      "This thread is already new.",
+    );
+
+    fireEvent.click(control);
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  it("stays live on an empty thread when a view is still open to leave", () => {
+    // The bar's plus is the documented way out of the first-run setup, so an
+    // empty transcript must not switch it off while setup is on screen.
+    renderBar({ messages: [], setupOpen: true });
+
+    expect(screen.getByRole("button", { name: "Start a new thread" })).toBeEnabled();
+  });
+
+  it("asks before discarding a reply that is still coming", () => {
+    const { onNew } = renderBar({ messages: transcript, streaming: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+
+    const ask = screen.getByRole("dialog", { name: /stop the reply and start a new thread/i });
+    expect(ask).toHaveTextContent("A reply is still coming. Stop it and start a new thread?");
+    expect(onNew).not.toHaveBeenCalled();
+    expect(ask).toHaveTextContent("Keep writing");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keep writing" }));
+  });
+
+  it("keeps the reply running when the person chooses Keep writing", () => {
+    const { onNew } = renderBar({ messages: transcript, streaming: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep writing" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  it("closes the ask on Escape without starting anything", () => {
+    const { onNew } = renderBar({ messages: transcript, streaming: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+    // Escape from wherever the focus sits inside the ask — which is the only
+    // place it is not trapping anyone.
+    fireEvent.keyDown(screen.getByRole("button", { name: "Keep writing" }), { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  it("stops the stream and starts the thread on the second choice", () => {
+    const { onNew } = renderBar({ messages: transcript, streaming: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stop and start" }));
+
+    expect(onNew).toHaveBeenCalledWith({ stop: true });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("starts the thread with one click when nothing is streaming", () => {
+    const { onNew } = renderBar({ messages: transcript });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new thread" }));
+
+    expect(onNew).toHaveBeenCalledTimes(1);
+    expect(onNew).not.toHaveBeenCalledWith({ stop: true });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+// Shared by the history tests: one thread, and a bar with its list open.
+const conversation = (id: string, title: string, updatedAt: string, turnCount: number) => ({
+  id,
+  title,
+  created_at: updatedAt,
+  updated_at: updatedAt,
+  head_id: null,
+  turn_count: turnCount,
+});
+
+function openHistory(overrides: Record<string, unknown>) {
+  vi.mocked(useStudio).mockReturnValue(stubContext(overrides) as never);
+  const view = render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+  return {
+    menu: screen.getByRole("menu", { name: "Recent conversations" }),
+    unmount: view.unmount,
+  };
+}
+
+describe("history opens on the thread in view (#694 D11)", () => {
+  it("opens on the thread in view, gliding unless motion is reduced", () => {
+    const scrollIntoView = vi.fn();
+    const received: Element[] = [];
+    const original = (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: function (this: Element, options: ScrollIntoViewOptions) {
+        received.push(this);
+        scrollIntoView(options);
+      },
+    });
+
+    const media = (matches: boolean) =>
+      vi.fn((query: string) => ({
+        matches: query.includes("prefers-reduced-motion") ? matches : false,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }));
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: media(true) });
+
+    try {
+      const conversations = [
+        conversation("c-2", "The thread on screen", new Date(2026, 9, 22, 9, 0).toISOString(), 2),
+        conversation("c-1", "An older thread", new Date(2026, 9, 20, 9, 0).toISOString(), 1),
+      ];
+
+      const reduced = openHistory({ conversationId: "c-2", conversations });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" });
+      expect(received[0]).toBe(
+        within(reduced.menu).getByRole("menuitem", { name: /the thread on screen/i }),
+      );
+
+      reduced.unmount();
+      scrollIntoView.mockClear();
+      received.length = 0;
+      Object.defineProperty(window, "matchMedia", { configurable: true, value: media(false) });
+
+      openHistory({ conversationId: "c-2", conversations });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+    } finally {
+      if (original === undefined) {
+        delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      } else {
+        Object.defineProperty(Element.prototype, "scrollIntoView", {
+          configurable: true,
+          value: original,
+        });
+      }
+      Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia });
+    }
+  });
+});
+
+describe("history says when and how much (#694 D12)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads when it happened and how many turns it holds", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    const { menu } = openHistory({
+      conversations: [
+        conversation("c-1", "Pricing the churn spike", new Date(2026, 9, 22, 8, 0).toISOString(), 6),
+      ],
+    });
+
+    expect(within(menu).getByText("2h ago · 6 turns")).toBeInTheDocument();
+  });
+
+  it("gives a thread with no turns no meta line at all", () => {
+    const { menu } = openHistory({
+      conversations: [
+        conversation("c-1", "A fresh thread", new Date(2026, 9, 22, 9, 0).toISOString(), 0),
+      ],
+    });
+
+    expect(within(menu).getByText("A fresh thread")).toBeInTheDocument();
+    expect(menu.querySelector(".bar__history-meta")).toBeNull();
+    expect(within(menu).queryByText(/turns?/)).toBeNull();
+  });
+});
+
+describe("history is grouped by day (#694 D13)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function groupingOf(row: Element): number {
+    let groups = 0;
+    for (let node = row.parentElement; node; node = node.parentElement) {
+      if (node.getAttribute("role") === "group") {
+        groups += 1;
+      }
+    }
+    return groups;
+  }
+
+  it("heads the list by day, in order, only where there are rows", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    openHistory({
+      conversations: [
+        conversation("c-3", "This morning", new Date(2026, 9, 22, 9, 0).toISOString(), 2),
+        conversation("c-2", "Last night", new Date(2026, 9, 21, 23, 0).toISOString(), 1),
+        conversation("c-1", "Last week", new Date(2026, 9, 15, 9, 0).toISOString(), 3),
+      ],
+    });
+
+    const headings = Array.from(document.querySelectorAll(".bar__history-day")).map(
+      (node) => node.textContent,
+    );
+    expect(headings).toEqual(["Today", "Yesterday", "Earlier"]);
+
+    expect(
+      within(screen.getByRole("group", { name: "Today" })).getAllByRole("menuitem"),
+    ).toHaveLength(1);
+    expect(
+      within(screen.getByRole("group", { name: "Yesterday" })).getAllByRole("menuitem"),
+    ).toHaveLength(1);
+
+    // A row sits under exactly one heading, never repeated under two.
+    for (const row of screen.getAllByRole("menuitem")) {
+      const group = row.closest('[role="group"]') as HTMLElement;
+      expect(group.querySelectorAll(".bar__history-day")).toHaveLength(1);
+      expect(groupingOf(row)).toBe(1);
+    }
+  });
+
+  it("leaves out a day with nothing in it", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    openHistory({
+      conversations: [
+        conversation("c-1", "This morning", new Date(2026, 9, 22, 9, 0).toISOString(), 1),
+      ],
+    });
+
+    expect(screen.getByRole("group", { name: "Today" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Yesterday" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Earlier" })).toBeNull();
   });
 });

@@ -20,11 +20,8 @@ export type BannerDock = "top" | "corner";
 export type BannerKind =
   | "sidecar-down"
   | "model-offline"
-  | "edge-offer"
-  | "edge-downloading"
-  | "edge-fetch-failed"
-  | "edge-ready"
-  | "edge-unlocked"
+  | "offline"
+  | "app-update-ready"
   | "update-available"
   | "update-ready"
   | "write-rejected"
@@ -40,8 +37,7 @@ export type BannerActionId =
   | "open-jobmap"
   | "install-update"
   | "restart"
-  | "enable-edge-model"
-  | "decline-edge-model";
+  | "reload-app";
 
 export interface BannerAction {
   label: string;
@@ -55,16 +51,13 @@ export interface BannerAction {
    * agent for something, written as the user would say it.
    */
   intent?: string;
-  tone: "primary" | "ghost";
   /**
-   * True when the click is an *answer the studio has to record* rather than a
-   * gesture. Radix closes a toast as soon as an action is pressed; for an
-   * answer, that would let the strip go quiet while the write is still in
-   * flight — and a person who reloads in that window gets asked again. A
-   * durable action leaves the banner's lifetime with the condition that raised
-   * it, so the strip disappears only once the answer is on disk.
+   * A one-off callback that closes over state the banner system must not know
+   * about — Undo restoring a transcript the store has already dropped. Used
+   * when there is no studio action and no message to send.
    */
-  durable?: boolean;
+  run?: () => void;
+  tone: "primary" | "ghost";
 }
 
 /** What a caller passes. Everything but `kind` may be omitted. */

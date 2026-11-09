@@ -58,17 +58,13 @@ export function BannerRow({
               key={action.label}
               altText={action.label}
               className={`banner__action banner__action--${action.tone}`}
-              onClick={(event) => {
-                // An answer worth recording outranks the toast's habit of
-                // closing itself on any action: the strip must not look answered
-                // before the studio has the answer.
-                if (action.durable) {
-                  event.preventDefault();
-                }
+              onClick={() => {
                 if (action.action) {
                   onAction(action.action);
                 } else if (action.intent) {
                   onIntent(action.intent);
+                } else {
+                  action.run?.();
                 }
               }}
             >

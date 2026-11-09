@@ -699,6 +699,26 @@ class LocalBackend(Backend):
         segments = self.service.list_segments(job_id=args.get("job_id"))
         return [segment.model_dump(mode="json") for segment in segments]
 
+    def _open_study(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, OdiError, job_not_found
+
+        try:
+            study = self.service.open_study(
+                job_id=args["job_id"],
+                name=args["name"],
+                wave=int(args["wave"]),
+                method_notes=args.get("method_notes"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id") or "")) from None
+        except OdiError as exc:
+            raise BackendError(str(exc)) from None
+        return study.model_dump(mode="json")
+
+    def _list_studies(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        studies = self.service.list_studies(job_id=args.get("job_id"))
+        return [study.model_dump(mode="json") for study in studies]
+
     def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
         strategy = self.service.get_strategy()
         return None if strategy is None else strategy.model_dump(mode="json")
@@ -712,6 +732,30 @@ class LocalBackend(Backend):
         except JobNotFoundError:
             raise BackendError(job_not_found(job_id or "")) from None
         return strategy.model_dump(mode="json")
+
+    def _link_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            outcome = self.service.link_outcome(args["outcome_id"], args["field"], args["text"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return outcome.model_dump(mode="json")
+
+    def _unlink_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            outcome = self.service.unlink_outcome(args["outcome_id"], args["field"], args["key"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return outcome.model_dump(mode="json")
+
+    def _get_outcome_alignments(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return self.service.list_alignments(args.get("outcome_id"))
+
+    def _get_traceability_report(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.traceability_report().as_dict()
 
 
 _LOCAL_HANDLERS = {
@@ -760,8 +804,14 @@ _LOCAL_HANDLERS = {
     "dismiss_signal": LocalBackend._dismiss_signal,
     "segment_market": LocalBackend._segment_market,
     "get_segments": LocalBackend._get_segments,
+    "open_study": LocalBackend._open_study,
+    "list_studies": LocalBackend._list_studies,
     "get_strategy": LocalBackend._get_strategy,
     "propose_strategy": LocalBackend._propose_strategy,
+    "link_outcome": LocalBackend._link_outcome,
+    "unlink_outcome": LocalBackend._unlink_outcome,
+    "get_outcome_alignments": LocalBackend._get_outcome_alignments,
+    "get_traceability_report": LocalBackend._get_traceability_report,
     "get_health": LocalBackend._get_health,
 }
 

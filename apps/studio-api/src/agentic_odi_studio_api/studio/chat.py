@@ -21,8 +21,9 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
 from typing import Any
 
-from agentic_odi_core import ModelRouter, ModelTier, ODIService, RoutingMode
+from agentic_odi_core import ModelRouter, ModelTier, ODIService, Outcome, RoutingMode
 from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
+from agentic_odi_core.funnel import FIRST_MESSAGE, count_milestone
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
@@ -51,6 +52,7 @@ from agentic_odi_studio_api.studio.schemas import (
     AttachmentRef,
     ChatMessage,
     ChatRequest,
+    FocusRef,
     StudioBrief,
 )
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
@@ -90,7 +92,7 @@ How to work:
 2. Mirror their words back, then offer a sharp hypothesis they can correct.
 3. When they give you context worth keeping — a career goal, a constraint, a stakeholder, a belief — call `remember` with the smallest useful observation. Do not ask permission first; the UI lets them confirm, edit, or dismiss it.
 4. Use ODI when it earns its keep: a job statement clarifies, a desired outcome sharpens, an opportunity score compares. Never lead with the framework or lecture about stages.
-5. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Above 10 means underserved.
+5. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Above 10 means underserved. Before either number, put three questions to the PM about the claim — four when it is broad — and record their replies as the answers; never answer your own question and count it. A skip with a reason is honest, a guess is not.
 6. When a surface carries the evidence better than a paragraph, call `render_ui` once, then write one short sentence. Never describe in prose what a card can already show.
 7. The conversation is the product: every surface you render lands in the thread the PM is already reading. Never tell them to open a panel, a tab, or a view to see something you can show inline.
 8. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
@@ -201,10 +203,14 @@ def _user_content(message: ChatMessage, attachments: list[AttachmentRef]) -> Any
     return [{"type": "text", "text": text}, *images]
 
 
-def _to_openai_messages(request: ChatRequest, memory_context: str = "") -> list[dict[str, Any]]:
+def _to_openai_messages(
+    request: ChatRequest, memory_context: str = "", focus_context: str = ""
+) -> list[dict[str, Any]]:
     system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
     if memory_context:
         system_prompt += "\n\n" + memory_context
+    if focus_context:
+        system_prompt += "\n\n" + focus_context
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     last_user = next((m for m in reversed(request.messages) if m.role == "user"), None)
     for message in request.messages:
@@ -402,11 +408,13 @@ def _persist_turn(
     message_id: str | None = None,
     parent_id: str | None = None,
     claims: list[Claim] | None = None,
+    request_id: str = "",
 ) -> int | None:
     """Record a turn and its claims, tolerating a duplicate retry.
 
     A retry that reuses a message id rewrites the same citation rows instead of
-    stacking new ones. A failure to remember never breaks the reply.
+    stacking new ones. A failure to remember never breaks the reply, but it is
+    logged: a turn the store lost is otherwise invisible.
     """
     if memory is None or conversation_id is None or not content.strip():
         return None
@@ -426,7 +434,15 @@ def _persist_turn(
         if claims:
             memory.add_citations(turn_id, claims)
         return turn_id
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # Deliberate degradation: the person keeps the reply they already read,
+        # and the request id here is what makes the missing turn findable.
+        log.warning(
+            "turn was not persisted (request_id=%s, role=%s, error=%s)",
+            request_id,
+            role,
+            type(exc).__name__,
+        )
         return None
 
 
@@ -482,6 +498,53 @@ def _local_evidence_resolver(
         return EvidenceSnapshot(id=record.id, name=record.name, source_name=record.source_name)
 
     return resolve
+
+
+def _outcome_scores(outcome: Outcome) -> str:
+    parts = []
+    if outcome.importance is not None:
+        parts.append(f"importance {outcome.importance:g}")
+    if outcome.satisfaction is not None:
+        parts.append(f"satisfaction {outcome.satisfaction:g}")
+    if outcome.opportunity_score is not None:
+        parts.append(f"opportunity {outcome.opportunity_score:g}")
+    return f" — {', '.join(parts)}" if parts else ""
+
+
+def _focus_description(focus: FocusRef, service: ODIService) -> str:
+    """The focused record as the store spells it, or nothing at all."""
+    if focus.kind == "job":
+        job = service.get_job(focus.id)
+        return "" if job is None else f'"{job.name}"'
+    if focus.kind == "step":
+        step = service.get_step(focus.id)
+        return "" if step is None else f'"{step.name}" (step {step.order} of the job map)'
+    if focus.kind == "outcome":
+        outcome = service.get_outcome(focus.id)
+        return "" if outcome is None else f'"{outcome.statement}"{_outcome_scores(outcome)}'
+    record = service.get_evidence(focus.id)
+    return "" if record is None else f'"{record.name}" from {record.source_name}'
+
+
+def _focus_context(focus: FocusRef | None, service: ODIService | None) -> str:
+    """Say what the person is looking at — using only the store's own words.
+
+    The browser sends a pointer, never a label, and an id this store does not
+    have earns no sentence: an unverified description would put words in the
+    record's mouth.
+    """
+    if focus is None or service is None:
+        return ""
+    try:
+        described = _focus_description(focus, service)
+    except Exception:  # noqa: BLE001 - the store is optional context
+        return ""
+    if not described:
+        return ""
+    return (
+        f"The user is looking at this {focus.kind} right now: {described} (id {focus.id}). "
+        "Answer about it unless they point somewhere else."
+    )
 
 
 def _message_payload(content: str, claims: list[Claim]) -> dict[str, Any]:
@@ -546,7 +609,15 @@ async def _turn_frames(
         if conversation is None:
             conversation = memory.create_conversation()
         conversation_id = conversation.id
-        _persist_turn(memory, conversation_id, "user", last_user, user_message_id, user_parent_id)
+        _persist_turn(
+            memory,
+            conversation_id,
+            "user",
+            last_user,
+            user_message_id,
+            user_parent_id,
+            request_id=request_id,
+        )
         updated = memory.get_conversation(conversation_id) or conversation
         yield frame("conversation", {"id": updated.id, "title": updated.title})
 
@@ -588,6 +659,7 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            request_id=request_id,
         )
         return
 
@@ -621,6 +693,7 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            request_id=request_id,
         )
         return
 
@@ -644,6 +717,8 @@ async def _turn_frames(
     llm_client = AsyncOpenAI(base_url=request.base_url, api_key=request.api_key, timeout=15.0)
     connector_service = service if service is not None else ConnectorService()
     memory_context = memory.memory_context() if memory is not None else ""
+    # What the person is looking at, re-read from the store before it is repeated.
+    focus_context = _focus_context(request.focus, local_service)
     # Every id the turn actually received, with the label that came with it.
     evidence = EvidenceIndex(resolver=_local_evidence_resolver(local_service))
 
@@ -664,7 +739,7 @@ async def _turn_frames(
             ) from exc
 
         openai_tools = _openai_tools(mcp_tools) + _local_tools(catalog)
-        messages: list[Any] = _to_openai_messages(request, memory_context)
+        messages: list[Any] = _to_openai_messages(request, memory_context, focus_context)
 
         spoken: list[str] = []
         ui_count = 0
@@ -732,6 +807,7 @@ async def _turn_frames(
                     assistant_message_id,
                     user_message_id,
                     claims,
+                    request_id=request_id,
                 )
                 yield frame("message", _message_payload(final, claims))
                 return
@@ -892,6 +968,7 @@ async def _turn_frames(
             assistant_message_id,
             user_message_id,
             claims,
+            request_id=request_id,
         )
         yield frame("message", _message_payload(content, claims))
 
@@ -958,6 +1035,12 @@ async def stream_chat(
             outcome=outcome,
             error_code=error_code,
         )
+        if outcome != "failed":
+            # A turn that reached an ending is the first message of this
+            # workspace's funnel. A partial or rounds-exhausted turn still
+            # counts: the person did get an answer, which is what the counter
+            # is for. Failed turns do not, and neither path writes twice.
+            count_milestone(local_service, FIRST_MESSAGE)
 
 
 __all__ = [
