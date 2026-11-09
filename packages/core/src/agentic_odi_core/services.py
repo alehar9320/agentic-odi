@@ -1319,7 +1319,7 @@ class ODIService:
         The refusal names the entries that do exist, because "unknown objective"
         with no list is a dead end for the caller.
         """
-        objectives = [item for item in objectives_from_v2mom(self.repo.get_v2mom())]
+        objectives = objectives_from_v2mom(self.repo.get_v2mom())
         available = [item for item in objectives if item.field == field]
         wanted = objective_key(field, text)
         for objective in available:

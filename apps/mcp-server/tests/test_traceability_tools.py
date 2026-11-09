@@ -26,10 +26,13 @@ def _payload(result: Any) -> Any:
     return json.loads(text[start:])
 
 
-async def _seed(client: Client, *, with_vision: bool = True) -> str:
-    if with_vision:
-        # The vision has no MCP write tool yet (#312 owns that surface).
-        mcp_server.service.save_v2mom(V2MOM(vision="Make onboarding painless", methods=[_METHOD]))
+def _seed_vision() -> None:
+    # The vision has no MCP write tool yet (#312 owns that surface), so the test
+    # seeds it through the same service the tools read.
+    mcp_server.service.save_v2mom(V2MOM(vision="Make onboarding painless", methods=[_METHOD]))
+
+
+async def _seed_outcome(client: Client) -> str:
     job = _payload(await client.call_tool("add_job", {"name": "Onboard a new engineer"}))
     outcome = _payload(
         await client.call_tool(
@@ -52,6 +55,7 @@ async def _seed(client: Client, *, with_vision: bool = True) -> str:
 
 @pytest.mark.asyncio
 async def test_an_empty_vision_says_there_is_nothing_to_check() -> None:
+    mcp_server.service.repo.v2mom.clear()
     async with Client(mcp) as client:
         report = _payload(await client.call_tool("get_traceability_report", {}))
 
@@ -61,8 +65,9 @@ async def test_an_empty_vision_says_there_is_nothing_to_check() -> None:
 
 @pytest.mark.asyncio
 async def test_linking_round_trips_and_the_report_counts_it() -> None:
+    _seed_vision()
     async with Client(mcp) as client:
-        outcome_id = await _seed(client)
+        outcome_id = await _seed_outcome(client)
         linked = _payload(
             await client.call_tool(
                 "link_outcome", {"outcome_id": outcome_id, "field": "method", "text": _METHOD}
@@ -78,8 +83,9 @@ async def test_linking_round_trips_and_the_report_counts_it() -> None:
 
 @pytest.mark.asyncio
 async def test_linking_unknown_text_is_refused_and_names_what_exists() -> None:
+    _seed_vision()
     async with Client(mcp) as client:
-        outcome_id = await _seed(client)
+        outcome_id = await _seed_outcome(client)
         refused = _text(
             await client.call_tool(
                 "link_outcome",
@@ -94,8 +100,9 @@ async def test_linking_unknown_text_is_refused_and_names_what_exists() -> None:
 
 @pytest.mark.asyncio
 async def test_unlinking_returns_the_outcome_to_an_orphan() -> None:
+    _seed_vision()
     async with Client(mcp) as client:
-        outcome_id = await _seed(client)
+        outcome_id = await _seed_outcome(client)
         linked = _payload(
             await client.call_tool(
                 "link_outcome", {"outcome_id": outcome_id, "field": "method", "text": _METHOD}
