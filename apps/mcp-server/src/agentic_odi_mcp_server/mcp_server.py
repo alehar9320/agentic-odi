@@ -2,14 +2,17 @@
 
 import argparse
 import asyncio
+import hmac
 import json
 import os
 import signal
 import sys
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
+import uvicorn
 from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
@@ -45,8 +48,70 @@ from agentic_odi_core import (
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
 )
+from agentic_odi_core.errors import ValidationError as OdiValidationError
+from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"  # nosec B105 - env var name, not a secret
+
+
+def _token_path() -> Path:
+    env = os.getenv(TOKEN_PATH_ENV)
+    if env:
+        return Path(env)
+    return Path.home() / ".config" / "agentic-odi" / "studio-token"
+
+
+def _configured_token() -> str:
+    """The token a studio has already minted, or "" when none has been.
+
+    ``_studio_token`` issues one; this only reports, so starting the server is
+    not itself the act of turning the gate on.
+    """
+    path = _token_path()
+    if path.is_file():
+        return path.read_text(encoding="utf-8").strip()
+    return ""
+
+
+def _studio_token() -> str:
+    """Issue (or return) the per-install sidecar token shared with the sidecar."""
+    path = _token_path()
+    if path.is_file():
+        existing = path.read_text(encoding="utf-8").strip()
+        if existing:
+            return existing
+    token = os.urandom(24).hex()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(token, encoding="utf-8")
+    return token
+
+
+class _AuthMiddleware:
+    """Require the per-install bearer token on the MCP HTTP endpoint."""
+
+    def __init__(self, app: ASGIApp, token: str) -> None:
+        self.app = app
+        self.token = token
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = dict(scope.get("headers", []))
+        auth = headers.get(b"authorization", b"").decode("latin-1")
+        expected = f"Bearer {self.token}"
+        if not auth or not hmac.compare_digest(auth, expected):
+            response = JSONResponse(
+                {"error": {"code": "unauthorized", "message": "Unauthorized"}},
+                status_code=401,
+            )
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
 
 _repo = build_repository()
 service = ODIService(_repo)
@@ -192,9 +257,12 @@ def add_outcome(
 ) -> str:
     """Add a desired Outcome to a Job.
 
-    A score needs the questions behind it. When you supply ``importance`` or
-    ``satisfaction`` you must also supply ``claim_check`` — the questions you
-    asked the customer and what came back::
+    A score needs the questions behind it. Put three questions to the person —
+    four when the claim is broad — before any number, and let them answer or skip
+    with a reason; never answer your own question and count it.
+
+    When you supply ``importance`` or ``satisfaction`` you must also supply
+    ``claim_check`` — the questions you asked and what came back::
 
         {
           "asked": ["How often does this happen?", "What do you do today?"],
@@ -210,9 +278,7 @@ def add_outcome(
     for score, name in ((importance, "importance"), (satisfaction, "satisfaction")):
         if score is not None and not (1.0 <= score <= 10.0):
             return _fail(
-                ValueOutOfRangeError(
-                    f"{name} must be between 1.0 and 10.0", field=name
-                ),
+                ValueOutOfRangeError(f"{name} must be between 1.0 and 10.0", field=name),
                 f"Error: {name} must be between 1.0 and 10.0",
             )
     scored = importance is not None or satisfaction is not None
@@ -382,9 +448,7 @@ def delete_customer_outcome(outcome_id: str) -> str:
 def compute_opportunity(importance: float, satisfaction: float) -> str:
     if not (1.0 <= importance <= 10.0) or not (1.0 <= satisfaction <= 10.0):
         return _fail(
-            ValueOutOfRangeError(
-                "importance and satisfaction must be between 1.0 and 10.0"
-            )
+            ValueOutOfRangeError("importance and satisfaction must be between 1.0 and 10.0")
         )
     score = compute_opportunity_score(importance, satisfaction)
     return f"Opportunity score: {score:.2f}"
@@ -886,6 +950,55 @@ def reject_proposal(proposal_id: str) -> str:
     return json.dumps(proposal.model_dump(mode="json"))
 
 
+@mcp.tool
+def link_outcome(outcome_id: str, field: str, text: str) -> str:
+    """Link an Outcome to the V2MOM method or measure it advances.
+
+    ``field`` is ``method`` or ``measure`` and ``text`` must match an entry the
+    vision currently holds. Unknown text is refused with the entries that do
+    exist, never guessed or fuzzy-matched.
+    """
+    try:
+        outcome = service.link_outcome(outcome_id, field, text)
+    except OutcomeNotFoundError as exc:
+        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
+    except OdiValidationError as exc:
+        return _fail(exc)
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
+    """Remove one V2MOM link from an Outcome.
+
+    ``key`` is the frozen content key the link was stored with; removing a link
+    that is not there changes nothing.
+    """
+    try:
+        outcome = service.unlink_outcome(outcome_id, field, key)
+    except OutcomeNotFoundError as exc:
+        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def get_outcome_alignments(outcome_id: str | None = None) -> str:
+    """List the V2MOM links recorded on Outcomes, optionally for one outcome."""
+    return json.dumps(service.list_alignments(outcome_id))
+
+
+@mcp.tool
+def get_traceability_report() -> str:
+    """Report orphans, unfunded objectives, and links the vision dropped.
+
+    Orphans are outcomes that advance nothing; unfunded objectives are V2MOM
+    methods and measures no outcome advances; drift is a link whose objective
+    text is no longer in the vision. Read-only, and with no objectives defined
+    it says so rather than returning three empty sections.
+    """
+    return json.dumps(service.traceability_report().as_dict())
+
+
 DEFAULT_PORT = 8000
 
 
@@ -974,7 +1087,13 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     validate_at_startup()
     setup_graceful_shutdown()
-    mcp.run(transport="http", port=resolve_port(args.port))
+    # Gate only a token a studio has already minted. Minting one here would 401
+    # every documented boot (smoke, `python -m agentic_odi_mcp_server`, the
+    # dev script) on a machine that has never paired a studio, which is the
+    # opposite of what those instructions promise.
+    token = _configured_token()
+    app = _AuthMiddleware(mcp.http_app(), token) if token else mcp.http_app()
+    uvicorn.run(app, host="127.0.0.1", port=resolve_port(args.port))
 
 
 def setup_graceful_shutdown() -> None:

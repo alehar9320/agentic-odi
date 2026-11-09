@@ -42,8 +42,9 @@ class StudioError(BaseModel):
     suggestion: str | None = None
     retryable: bool = False
     request_id: str | None = None
-    #: The input field that failed, when the failure names one. ``None`` means
-    #: the failure is not field-specific — show it on the whole form.
+    #: Which outcome field the failure belongs to, so the client can render it
+    #: beside the statement or rating the person actually mistyped. Absent when
+    #: the failure cannot be attributed to a single field.
     field: str | None = None
 
 

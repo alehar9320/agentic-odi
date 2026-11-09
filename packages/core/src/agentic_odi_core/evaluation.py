@@ -4,18 +4,23 @@ This module is also the evaluation harness: alongside the statement guard it
 holds the check that judges a *service* by the shared scoring fixture. A service
 that scores its outcomes with :func:`~agentic_odi_core.models.compute_opportunity_score`
 passes; one that computes its own arithmetic fails with the offending pair named.
+
+It also judges the interview behind a score: :func:`assert_asked_before_scoring`
+reads a transcript in the order it happened, so a number written before the
+questions reached the person is refused even when its claim check reads complete.
 """
 
 from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 from agentic_odi_core.errors import OdiError, ValidationError
-from agentic_odi_core.models import Outcome, compute_opportunity_score
+from agentic_odi_core.models import ClaimCheck, Outcome, compute_opportunity_score
 
 OpportunitySegment = Literal["underserved", "appropriate", "overserved", "unscored"]
 
@@ -270,4 +275,72 @@ def assert_outcome_scores_match(
         if reported != expected:
             raise OutcomeScoreMismatchError(
                 outcome.id, expected, reported, importance, satisfaction
+            )
+
+
+# -- The evaluation harness: judge an interview by its transcript --------------
+
+#: The questions that must reach the person before a number is written. The prompt
+#: asks for three or four; this is the floor, and it is what an evaluation case fails on.
+MIN_QUESTIONS_BEFORE_SCORING = 3
+
+
+@dataclass(frozen=True)
+class InterviewTurn:
+    """One turn of an interview, listed in the order it happened."""
+
+    speaker: Literal["customer", "agent"]
+    text: str
+    wrote_score: bool = False
+
+
+class ScoreBeforeQuestionsError(OdiError):
+    """A score was written that the interview behind it does not support.
+
+    The message names what is missing: how many questions were put before the
+    scoring turn, or the answer that no customer turn contains.
+    """
+
+
+def assert_asked_before_scoring(
+    transcript: Sequence[InterviewTurn],
+    check: ClaimCheck | None,
+) -> None:
+    """Judge a score by the turns that came before it.
+
+    A transcript with no scoring turn has nothing to judge: an outcome captured
+    without numbers is legal, and asking is what makes it scoreable later. Once a
+    turn writes a score, three things have to already be true — a claim check
+    exists, at least :data:`MIN_QUESTIONS_BEFORE_SCORING` questions were put by the
+    agent, and every answer the check records appears in a customer turn. Skipping
+    a question is allowed; a skip is simply absent from ``answers``.
+    """
+    scored_at = next(
+        (index for index, turn in enumerate(transcript) if turn.wrote_score),
+        None,
+    )
+    if scored_at is None:
+        return
+    if check is None:
+        raise ScoreBeforeQuestionsError(
+            f"Turn {scored_at} writes a score with no claim check; ask the questions, "
+            "then pass the answers with the number."
+        )
+    asked = sum(
+        1 for turn in transcript[:scored_at] if turn.speaker == "agent" and "?" in turn.text
+    )
+    if asked < MIN_QUESTIONS_BEFORE_SCORING:
+        raise ScoreBeforeQuestionsError(
+            f"Turn {scored_at} scores after {asked} of the three questions needed; ask "
+            "three or four of them and let the person answer before any number appears."
+        )
+    for answer in check.answers:
+        heard = any(
+            turn.speaker == "customer" and answer.strip().casefold() in turn.text.casefold()
+            for turn in transcript[:scored_at]
+        )
+        if not heard:
+            raise ScoreBeforeQuestionsError(
+                f"The answer {answer!r} is in no customer turn before the score; never "
+                "answer your own question and count it."
             )

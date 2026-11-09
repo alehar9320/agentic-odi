@@ -26,6 +26,7 @@ import {
   healthMcp,
   streamChat,
   asStudioError,
+  StudioApiError,
 } from "./studioApi";
 
 afterEach(() => {
@@ -486,25 +487,19 @@ describe("typed failures", () => {
 
     expect(problem.code).toBe("mcp_unreachable");
     expect(problem.retryable).toBe(true);
-    expect(problem.suggestion).toMatch(/sidecar/i);
-    expect(problem.message).toMatch(/reachable|not running|unreachable/i);
+    expect(problem.suggestion).toContain("uv run python scripts/dev.py");
+    expect(problem.message).toMatch(/local Studio service isn.t responding/);
   });
 
   it("classifies an empty 502 response as mcp_unreachable", async () => {
     mockFailure(502, {});
 
-    await expect(
-      addOutcome({
-        mcp_url: "u",
-        job_id: "JOB-402",
-        statement: "Minimize time",
-        importance: 5,
-        satisfaction: 3,
-      }),
-     ).rejects.toMatchObject({
-       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("sidecar") },
-     });
-   });
+    // A canvas write now falls back to the browser store, so the classification
+    // is checked on an endpoint that has no local answer.
+    await expect(healthMcp("http://mcp")).rejects.toMatchObject({
+      error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
+    });
+  });
 
    it("classifies an empty 404 response as not_found", async () => {
     mockFailure(404, {});
@@ -518,8 +513,62 @@ describe("typed failures", () => {
         satisfaction: 3,
       }),
     ).rejects.toMatchObject({ error: { code: "not_found" } });
-  });
-});
+   });
+
+   it("carries the optional field through from the server's error body", async () => {
+     mockFailure(422, {
+       error: {
+         code: "validation",
+         message: "Outcome statement does not match the ODI format.",
+         field: "statement",
+         suggestion: "Fix the input and try again.",
+         retryable: false,
+       },
+     });
+
+     let thrown: StudioApiError | null = null;
+     try {
+       await addOutcome({
+         mcp_url: "u",
+         job_id: "JOB-402",
+         statement: "fast",
+         importance: 8,
+         satisfaction: 3,
+       });
+     } catch (caught) {
+       thrown = caught as StudioApiError;
+     }
+     expect(thrown).not.toBeNull();
+     expect(thrown!.error.code).toBe("validation");
+     expect(thrown!.error.field).toBe("statement");
+   });
+
+   it("leaves field undefined when the server omits it", async () => {
+     mockFailure(422, {
+       error: {
+         code: "validation",
+         message: "Invalid input.",
+         suggestion: "Fix the input and try again.",
+         retryable: false,
+       },
+     });
+
+     let thrown: StudioApiError | null = null;
+     try {
+       await addOutcome({
+         mcp_url: "u",
+         job_id: "JOB-402",
+         statement: "fast",
+         importance: 8,
+         satisfaction: 3,
+       });
+     } catch (caught) {
+       thrown = caught as StudioApiError;
+     }
+     expect(thrown).not.toBeNull();
+     expect(thrown!.error.field).toBeUndefined();
+   });
+ });
 
 describe("signal inbox", () => {
   function mockStore(body: unknown): { url: string; method: string; body: string }[] {
@@ -576,5 +625,45 @@ describe("signal inbox", () => {
 
     expect(calls[0]?.url).toBe("/api/signals/sig-1/dismiss");
     expect(JSON.parse(calls[0]!.body)).toEqual({ mcp_url: "http://mcp" });
+  });
+});
+
+describe("auth", () => {
+  function captureFetch() {
+    const calls: RequestInit[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push(init ?? {});
+        return new Response(JSON.stringify({ defaults: {} }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    return calls;
+  }
+
+  it("attaches the bearer token to every fetch", async () => {
+    localStorage.setItem("studio.token", "test-token");
+    const calls = captureFetch();
+
+    await fetchConfig();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.headers).toMatchObject({
+      Authorization: "Bearer test-token",
+    });
+    localStorage.removeItem("studio.token");
+  });
+
+  it("sends no authorization header when there is no token", async () => {
+    localStorage.removeItem("studio.token");
+    const calls = captureFetch();
+
+    await fetchConfig();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.headers).not.toHaveProperty("Authorization");
   });
 });
