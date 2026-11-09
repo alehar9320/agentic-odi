@@ -135,7 +135,7 @@ by the presence of one handler.
 |---|---|---|---|---|
 | Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction capped at 20k chars, images capped at 5 MB, refusals explained. |
 | Drop and paste | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer follows the same accept rules as the input. |
-| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | this PR | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`, which scopes each chip to its own attachment; the extraction state, the refusal reason and the size ride inside `Root` as children, so the primitive shows more than a name. The sent-turn chip in `parts.tsx` still writes its own `attachment-chip` markup. |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`, which scopes each chip to its own attachment; the extraction state, the refusal reason and the size ride inside `Root` as children, so the primitive shows more than a name. The sent-turn chip in `parts.tsx` still writes its own `attachment-chip` markup, so this is a partial slice of #859. |
 
 ## Thread list
 
@@ -258,10 +258,10 @@ only the surface is missing.
 | Status | Rows |
 |---|---|
 | Adopted | 45 |
-| Partial | 9 |
+| Partial | 10 |
 | Planned | 14 |
 | Decision | 26 |
-| Rejected | 35 |
+| Rejected | 34 |
 | Total | 129 |
 
 Read it as: **52** of the library's 129 relevant capabilities already deliver

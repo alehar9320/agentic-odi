@@ -414,6 +414,7 @@ cites the issue or PR that landed it.
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
 | `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter; each chip is an `AttachmentPrimitive.Root`. | #238 |
 | `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works through the composer's own handlers with the same accept rules. | — |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`; extraction state, refusal reason and size ride inside `Root` as children, but the sent-turn chip in `parts.tsx` still writes its own markup. | — |
 | `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | The quote shows above the input and can be cleared before send. | #435 |
 | `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | The microphone, hidden where unsupported. | #433 |
 | `ComposerPrimitive.Queue` | Adopted | The pending lane rendered above the composer. | #410 |
