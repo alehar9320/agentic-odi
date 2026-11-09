@@ -456,7 +456,7 @@ cites the issue or PR that landed it.
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
 | `apps/studio/src/components/settings/SavedField.tsx` | A field that saves when it is left, states **Saved** in its section, and refuses an unusable value beside itself with the reason. |
-| `apps/studio/src/components/settings/sections/` | One module per Settings section — Model, Studio bridge, Data, Updates, About, Install — each reading its own source and reporting its own loading and error state. |
+| `apps/studio/src/components/settings/sections/` | One module per Settings section — Context, Data, Model, Studio bridge, Updates, About, Install — each reading its own source and reporting its own loading and error state. |
 | `apps/studio/src/components/settings/validation.ts` | What Settings accepts before it writes: a full http(s) URL, and a non-empty model name. |
 
 The sidecar remains the source of truth for what happened. Its additions are
