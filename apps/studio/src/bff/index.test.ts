@@ -12,6 +12,55 @@ function makeBff() {
   return new StudioBff(store);
 }
 
+describe("StudioBff queued writes (#523)", () => {
+  it("applies a job, step, and outcome locally and enqueues one record each", async () => {
+    const bff = makeBff();
+
+    const job = await bff.createJob({ name: "Get a service to production" });
+    const step = await bff.addStep({ job_id: job.id, name: "Ship", order: 1 });
+    const outcome = await bff.addOutcome({
+      job_id: job.id,
+      statement: "Minimize the time from merge to production",
+      importance: 9,
+      satisfaction: 3,
+    });
+
+    // The records are the caller's to show now.
+    expect(job.id).toBeTruthy();
+    expect(step.id).toBeTruthy();
+    expect(outcome.id).toBeTruthy();
+
+    const records = await bff.listOutbox();
+    expect(records).toHaveLength(3);
+    // Three writes land in the same millisecond, so the store's tie-break is the
+    // record id, not insertion order. Assert the set, not the order.
+    expect(records.map((record) => [record.kind, record.entity]).sort()).toEqual([
+      ["create", "job"],
+      ["create", "outcome"],
+      ["create", "step"],
+    ]);
+    expect(records.every((record) => record.state === "pending")).toBe(true);
+    expect(records.map((record) => record.local_id).sort()).toEqual(
+      [job.id, step.id, outcome.id].sort(),
+    );
+  });
+
+  it("queues an update and a delete of an existing record", async () => {
+    const bff = makeBff();
+    const job = await bff.createJob({ name: "Job" });
+    await bff.listOutbox();
+    await bff.store.clearOutbox();
+
+    await bff.updateJob(job.id, { name: "Renamed" });
+    await bff.deleteJob(job.id);
+
+    const records = await bff.listOutbox();
+    expect(records.map((record) => record.kind).sort()).toEqual(["delete", "update"]);
+    expect(records.every((record) => record.entity === "job")).toBe(true);
+    expect(records.every((record) => record.local_id === job.id)).toBe(true);
+  });
+});
+
 describe("StudioBff workspace export/import", () => {
   it("exports an empty workspace as JSON with version 1", async () => {
     const bff = makeBff();
