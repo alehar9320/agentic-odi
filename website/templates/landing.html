@@ -293,6 +293,20 @@
         {% endfor %}
       </div>
 
+      <div class="run__downloads" data-reveal>
+        <h3 class="run__label">Download the desktop app</h3>
+        <div class="run__badges">
+          {% for dl in landing.run.downloads %}
+          <a href="{{ dl.url }}" class="badge" aria-label="Download {{ dl.label }}">
+            <img
+              src="https://img.shields.io/badge/{{ dl.label }}-{{ dl.message }}-{{ dl.color }}?style=for-the-badge&amp;logo={{ dl.logo }}&amp;logoColor=white"
+              alt="{{ dl.label }}"
+            />
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+
       <div class="run__grid">
         <div>
           <h3 class="run__label">Point an MCP client at it</h3>
