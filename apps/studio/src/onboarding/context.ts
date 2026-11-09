@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 
-import type { OnboardingState, SkipReason } from "./machine";
+import type { GoalId } from "./content";
+import type { OnboardingState } from "./machine";
 
 /**
  * The wizard's public surface. Components outside the onboarding module only
@@ -10,18 +11,16 @@ export interface OnboardingController {
   enabled: boolean;
   open: boolean;
   state: OnboardingState;
-  /** Continue to the next scene. */
+  chooseGoal: (goal: GoalId) => void;
   advance: () => void;
-  /** Advance past one scene without leaving the tour. */
-  skipScene: () => void;
+  /** Advance past one step without leaving the tour. */
+  skipStep: () => void;
   back: () => void;
-  /** Finish the tour on the last scene. */
   complete: () => void;
-  /** Leave the tour, recording why. Defaults to a deliberate skip. */
-  skip: (reason?: SkipReason) => void;
+  skip: () => void;
   /** Open the tour, resuming stored progress unless it is already finished. */
   openTour: () => void;
-  /** Replay from the first scene. */
+  /** Replay from the first step. */
   restart: () => void;
 }
 

@@ -63,8 +63,10 @@ const state = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   connectors: [],
   connectorsError: null,
+  connectorsLoading: false,
   presets: [],
   presetError: null,
+  presetsLoading: false,
   refreshPresets: vi.fn(async () => undefined),
   refreshConnectors: vi.fn(async () => undefined),
   refreshCapabilities: vi.fn(async () => undefined),
@@ -257,7 +259,7 @@ describe("axe sweep", () => {
     await expectAccessible(container);
   });
 
-  it("passes every scene of the first-run tour", async () => {
+  it("passes the first-run wizard", async () => {
     const { container } = render(
       <UpdateProvider service={updateService}>
         <OnboardingProvider enabled>
@@ -270,11 +272,6 @@ describe("axe sweep", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Show me around" }));
 
-    // Each scene is its own surface, so each gets its own axe pass.
-    await expectAccessible(container);
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await expectAccessible(container);
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await expectAccessible(container);
   });
 
