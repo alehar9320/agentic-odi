@@ -17,23 +17,11 @@ const stub = vi.hoisted(() => {
   return {
     studio: {
       llmHealth: { healthy: true, message: "ok" },
-      // Written out rather than built by ../../test/connection: this object is
-      // created inside vi.hoisted, before any import has been initialised.
-      connection: {
-        model: { state: "live", checked_at: 1, message: "ok" },
-        liveness: {
-          state: "live",
-          checked_at: 1,
-          message: "The local Studio service is answering.",
-        },
-        mcp: { state: "live", checked_at: 1, message: "The MCP server is answering." },
-        consecutive_failures: 0,
-        next_check_at: null,
-      },
       messages: [
         { id: "t-1", role: "user", content: "I own activation." },
         { id: "t-2", role: "assistant", content: "Tell me more." },
       ],
+      sidecarReachable: true,
       streaming: false,
       unreadSignalCount: 0,
       openPanel: noop,

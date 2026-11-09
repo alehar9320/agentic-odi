@@ -1,14 +1,12 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ConnectionSnapshot, ProbeState } from "../state/connection";
-import { probeResult, snapshotOf } from "../test/connection";
 import { BannerBridge, useBannerActionDispatcher } from "./BannerBridge";
 import { BannerProvider, useBanner } from "./BannerProvider";
 import { BannerStack } from "./BannerStack";
 
 const studio = vi.hoisted(() => ({
-  connection: null as unknown as ConnectionSnapshot,
+  sidecarReachable: true as boolean | null,
   llmHealth: { healthy: true as boolean | null, message: "" },
   dismissedSidecarNotice: false,
   streaming: false,
@@ -18,21 +16,6 @@ const studio = vi.hoisted(() => ({
   openPanel: vi.fn(),
   ask: vi.fn(),
 }));
-
-/**
- * What the studio last heard about the sidecar process. The bridge reads the
- * snapshot, so this is the only lever a test needs for the strip.
- */
-const LIVENESS_MESSAGE: Record<ProbeState, string> = {
-  live: "The local Studio service is answering.",
-  degraded: "The local Studio service is answering with a degraded store.",
-  down: "The local Studio service is not answering.",
-  unknown: "Not checked yet.",
-};
-
-function answerLiveness(state: ProbeState): void {
-  studio.connection = snapshotOf({ liveness: probeResult(state, LIVENESS_MESSAGE[state]) });
-}
 
 const originalOnLine = Object.getOwnPropertyDescriptor(window.navigator, "onLine");
 
@@ -100,7 +83,7 @@ function renderShell() {
 
 describe("BannerBridge", () => {
   beforeEach(() => {
-    answerLiveness("live");
+    studio.sidecarReachable = true;
     studio.llmHealth = { healthy: true, message: "" };
     studio.dismissedSidecarNotice = false;
     studio.streaming = false;
@@ -117,7 +100,7 @@ describe("BannerBridge", () => {
   });
 
   it("raises nothing while the sidecar is reachable and the model is healthy", () => {
-    answerLiveness("live");
+    studio.sidecarReachable = true;
     studio.llmHealth = { healthy: true, message: "" };
     renderShell();
     expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
@@ -125,34 +108,27 @@ describe("BannerBridge", () => {
   });
 
   it("raises nothing while reachability is still unknown", () => {
-    answerLiveness("unknown");
+    studio.sidecarReachable = null;
     studio.llmHealth = { healthy: null, message: "" };
     renderShell();
     expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
   });
 
-  it("keeps the strip away when the process answers with a broken store", () => {
-    answerLiveness("degraded");
-    studio.llmHealth = { healthy: true, message: "" };
-    renderShell();
-    expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-  });
-
   it("raises a strip when the sidecar is down", () => {
-    answerLiveness("down");
+    studio.sidecarReachable = false;
     studio.llmHealth = { healthy: true, message: "" };
     renderShell();
     expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
   });
 
   it("clears the strip when the sidecar comes back", () => {
-    answerLiveness("down");
+    studio.sidecarReachable = false;
     studio.llmHealth = { healthy: true, message: "" };
     const { rerender } = renderShell();
     expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
 
-    answerLiveness("live");
+    studio.sidecarReachable = true;
     rerender(
       <BannerProvider>
         <BannerBridge />
@@ -163,7 +139,7 @@ describe("BannerBridge", () => {
   });
 
   it("does not raise the strip once the user dismissed it this session", () => {
-    answerLiveness("down");
+    studio.sidecarReachable = false;
     studio.dismissedSidecarNotice = true;
     studio.llmHealth = { healthy: true, message: "" };
     renderShell();
@@ -171,14 +147,14 @@ describe("BannerBridge", () => {
   });
 
   it("raises a working-by-hand strip when no model is reachable", () => {
-    answerLiveness("live");
+    studio.sidecarReachable = true;
     studio.llmHealth = { healthy: false, message: "no model" };
     renderShell();
     expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
   });
 
   it("rechecks the sidecar through the real dispatcher", () => {
-    answerLiveness("down");
+    studio.sidecarReachable = false;
     studio.llmHealth = { healthy: true, message: "" };
     studio.recheckConnections.mockClear();
     renderShell();
@@ -191,7 +167,7 @@ describe("BannerBridge", () => {
   });
 
   it("opens setup through the real dispatcher", () => {
-    answerLiveness("down");
+    studio.sidecarReachable = false;
     studio.llmHealth = { healthy: true, message: "" };
     studio.openSetup.mockClear();
     renderShell();
@@ -204,7 +180,7 @@ describe("BannerBridge", () => {
   });
 
   it("clears the strip from the store when the user dismisses it", () => {
-    answerLiveness("down");
+    studio.sidecarReachable = false;
     studio.dismissedSidecarNotice = false;
     studio.llmHealth = { healthy: true, message: "" };
     renderShell();
@@ -218,7 +194,7 @@ describe("BannerBridge", () => {
   });
 
   it("persists the sidecar dismissal, so the strip does not come back", () => {
-    answerLiveness("down");
+    studio.sidecarReachable = false;
     studio.dismissedSidecarNotice = false;
     studio.llmHealth = { healthy: true, message: "" };
     studio.dismissSidecarNotice.mockClear();
@@ -285,7 +261,7 @@ describe("BannerBridge", () => {
   it("keeps the offline line alone while the browser has no network", () => {
     // The sidecar strip's Recheck and Start actions could not succeed offline,
     // so it waits until the connection is back.
-    answerLiveness("down");
+    studio.sidecarReachable = false;
     renderShell();
     goOffline();
 

@@ -163,34 +163,6 @@ process to recover. Between stops, `AGENTIC_ODI_CHECKPOINT_SECONDS` (default
 
 The SPA sends `mcp_url` with every data request for compatibility. In `local` mode the sidecar ignores it; in `mcp` mode it is required for canvas and mutations.
 
-### The connection snapshot
-
-The studio keeps one `ConnectionSnapshot` (`apps/studio/src/state/connection.ts`)
-rather than a second opinion about the same probe:
-
-| Row | Question it answers | Endpoint |
-|---|---|---|
-| `liveness` | is the sidecar process answering? | `GET /health` |
-| `model` | can the configured model serve a turn? | `POST /api/health/llm` |
-| `mcp` | can the MCP server serve a tool? | `POST /api/health/mcp` |
-
-Each row is `{state, checked_at, message}` with `state` in `unknown`, `live`,
-`degraded`, or `down`. `degraded` is what keeps the two questions apart: a store
-that failed its integrity check still leaves the process alive, so `/health`
-answers `ok: true` with a `degraded` reason, the liveness row stays `live`, and
-the studio keeps working offline. Components ask through `isAlive`, `isReady`,
-`probeTone`, and the word tables instead of storing booleans, and a row nobody
-probed is `unknown` — which no table renders as a failure.
-
-Failure text is mapped client-side into one sentence per class: a rejected key,
-a timeout, a refused connection, an unreachable service. The provider's own
-string — `Error code: 401 …` from an SDK — never reaches the screen, not even
-as a tooltip or an accessible name.
-
-The split does not change how often the studio asks: the same 30-second poll
-re-probes all three rows, and `next_check_at` stays empty. Backoff and the
-breaker are the next slices (#535, #536).
-
 ### Connectors
 
 Connectors are the one path where data enters from outside the local store, and

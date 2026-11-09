@@ -27,8 +27,6 @@ import { createUpdateService, UpdateProvider } from "../updater";
 import type { UpdateTransport } from "../updater/types";
 import type { StudioBrief } from "../types";
 import { expectAccessible } from "./axe";
-import { probeResult, snapshotOf } from "./connection";
-
 
 const noop = () => {};
 
@@ -75,19 +73,20 @@ const state = vi.hoisted(() => ({
   addConnector: vi.fn(async () => ({ ok: true })),
   deleteConnector: vi.fn(async () => ({ ok: true })),
   openCustomize: vi.fn(),
+  sidecarReachable: true,
+  mcpReachable: true,
   capabilities: [],
   models: [],
   modelsLoading: false,
   modelsMessage: null,
   refreshModels: vi.fn(async () => undefined),
-  checkConnections: vi.fn(async () => state.connection),
-  surveyConnections: vi.fn(async () =>
-    snapshotOf({
-      liveness: probeResult("live", "The local Studio service is answering."),
-      mcp: probeResult("live", "The MCP server is answering."),
-      model: probeResult("live", "ok"),
-    }),
-  ),
+  checkConnections: vi.fn(async () => ({ llmHealthy: true })),
+  surveyConnections: vi.fn(async () => ({
+    sidecarReachable: true,
+    mcpReachable: true,
+    llmHealthy: true,
+    llmMessage: "ok",
+  })),
   recheckConnections: vi.fn(async () => undefined),
   // Chat
   messages: [] as unknown[],
@@ -112,15 +111,6 @@ const state = vi.hoisted(() => ({
   switchBranch: vi.fn(),
   respondToApproval: vi.fn(async () => undefined),
   llmHealth: { healthy: true, message: "ok" },
-  // Written out rather than built by ../test/connection: this object is created
-  // inside vi.hoisted, before any import has been initialised.
-  connection: {
-    model: { state: "live", checked_at: 1, message: "ok" },
-    liveness: { state: "live", checked_at: 1, message: "The local Studio service is answering." },
-    mcp: { state: "live", checked_at: 1, message: "The MCP server is answering." },
-    consecutive_failures: 0,
-    next_check_at: null,
-  },
   connectorSuggestions: [] as string[],
   dismissConnectorSuggestion: vi.fn(),
 }));

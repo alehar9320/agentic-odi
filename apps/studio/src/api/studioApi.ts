@@ -29,7 +29,6 @@ import type {
   Signal,
   Step,
   Strategy,
-  SidecarLiveness,
   StudioConfig,
   SharedArtifactPayload,
   ShareLink,
@@ -73,14 +72,8 @@ export function isTransportFailure(error: unknown): boolean {
   return false;
 }
 
-/**
- * How long a cheap sidecar request may hang before the caller stops waiting.
- *
- * Both users of this bound are probes whose answer the screen is built on: a
- * service that accepts the socket and says nothing must leave the caller to its
- * fallback, not hold the first paint.
- */
-const PROBE_TIMEOUT_MS = 1_200;
+/** How long the boot config request may hang before boot stops waiting on it. */
+const CONFIG_TIMEOUT_MS = 1_200;
 
 /** Map an HTTP status the sidecar/worker returned (with no body) to a code. */
 function codeForStatus(status: number): string {
@@ -315,7 +308,7 @@ export async function fetchConfig(): Promise<StudioConfig> {
   // connection and never answers must not hold the first screen. Bound it and
   // let the caller fall back to the defaults it already has.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), CONFIG_TIMEOUT_MS);
   try {
     const body = await getJson<{ defaults: StudioConfig }>("/api/config", controller.signal);
     return body.defaults;
@@ -368,35 +361,6 @@ export function healthLlm(config: {
   model: string;
 }): Promise<LlmHealth> {
   return postJson<LlmHealth>("/api/health/llm", config);
-}
-
-/**
- * Is the sidecar process up? Asked of the process itself, not of its config.
- *
- * `fetchConfig` was the old liveness probe, so a sidecar that was alive with a
- * dead model behind it answered like a sidecar that was not running at all.
- * This never throws: an outage is a measurement the bar can show, not an
- * exception the poll loop has to survive.
- */
-export async function healthSidecar(): Promise<SidecarLiveness> {
-  const checked_at = Date.now();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-  try {
-    const body = await getJson<{ status: string; reason?: string }>(
-      "/health",
-      controller.signal,
-    );
-    return {
-      ok: true,
-      degraded: body.status === "ok" ? null : { reason: body.reason ?? "degraded" },
-      checked_at,
-    };
-  } catch {
-    return { ok: false, degraded: null, checked_at };
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /**

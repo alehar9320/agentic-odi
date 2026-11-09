@@ -1,9 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
-import type { ConnectionSnapshot } from "../../state/connection";
-import { probeResult, snapshotOf } from "../../test/connection";
 import type { ChatMessage } from "../../types";
 import { ChatStage } from "./ChatStage";
 
@@ -29,7 +27,7 @@ const harness = vi.hoisted(() => ({
     canvas: null as unknown,
     brief: null as unknown,
     settings: { base_url: "http://llm", api_key: "k", model_name: "m", mcp_url: "http://mcp" },
-    connection: null as unknown as ConnectionSnapshot,
+    mcpReachable: true,
     llmHealth: { healthy: true, message: "ok" },
     connectorSuggestions: [] as string[],
     presets: [] as unknown[],
@@ -70,11 +68,6 @@ const FAILED_TURN: ChatMessage[] = [
 ];
 
 describe("ChatStage", () => {
-  beforeEach(() => {
-    // Nothing probed yet: the stage must not turn an absent answer into a failure.
-    harness.state.connection = snapshotOf({});
-  });
-
   afterEach(() => {
     harness.state.messages = [];
     harness.state.streaming = false;
@@ -478,42 +471,5 @@ describe("ChatStage", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(harness.state.openPanel).toHaveBeenCalledWith("brief");
-  });
-
-  it("reports a server it never probed as unprobed, not as offline", () => {
-    harness.state.pushNotice.mockClear();
-
-    render(
-      <StudioRuntimeProvider>
-        <ChatStage />
-      </StudioRuntimeProvider>,
-    );
-
-    const input = screen.getByRole("textbox");
-    fireEvent.change(input, { target: { value: "/status" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-
-    const notice = String(harness.state.pushNotice.mock.calls.at(-1)?.[0]);
-    expect(notice).toContain("MCP: not checked");
-  });
-
-  it("reports a server that answered as connected", () => {
-    harness.state.connection = snapshotOf({
-      mcp: probeResult("live", "The MCP server is answering."),
-    });
-    harness.state.pushNotice.mockClear();
-
-    render(
-      <StudioRuntimeProvider>
-        <ChatStage />
-      </StudioRuntimeProvider>,
-    );
-
-    const input = screen.getByRole("textbox");
-    fireEvent.change(input, { target: { value: "/status" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-
-    const notice = String(harness.state.pushNotice.mock.calls.at(-1)?.[0]);
-    expect(notice).toContain("MCP: connected");
   });
 });

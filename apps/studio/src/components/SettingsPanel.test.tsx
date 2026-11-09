@@ -13,8 +13,6 @@ vi.mock("../state/StudioContext", () => ({
 
 import { useStudio } from "../state/StudioContext";
 import type { StudioContextValue } from "../state/StudioContext";
-import { probeResult, snapshotOf } from "../test/connection";
-
 
 const transport: UpdateTransport = {
   supported: () => false,
@@ -41,11 +39,11 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     clearChat: vi.fn(),
     refreshCanvas: vi.fn().mockResolvedValue(undefined),
     llmHealth: { healthy: null, message: "" },
-    connection: snapshotOf({}),
     models: [] as string[],
     modelsLoading: false,
     modelsMessage: null as string | null,
     refreshModels: vi.fn().mockResolvedValue(undefined),
+    mcpReachable: false,
     pushToast: vi.fn(),
     connectorsLoading: false,
     presetsLoading: false,
@@ -70,13 +68,12 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     refreshPresets: vi.fn().mockResolvedValue(undefined),
     refreshCapabilities: vi.fn().mockResolvedValue(undefined),
-    surveyConnections: vi.fn().mockResolvedValue(
-      snapshotOf({
-        liveness: probeResult("live", "The local Studio service is answering."),
-        mcp: probeResult("down", "Not ready — no MCP server answered."),
-        model: probeResult("live", "ok"),
-      }),
-    ),
+    surveyConnections: vi.fn().mockResolvedValue({
+      sidecarReachable: true,
+      mcpReachable: false,
+      llmHealthy: true,
+      llmMessage: "ok",
+    }),
     capabilities: [],
     ...overrides,
   }) as unknown as StudioContextValue;
@@ -360,66 +357,23 @@ describe("SettingsPanel about section", () => {
   });
 });
 
-describe("SettingsPanel connection rows", () => {
-  const REJECTED_KEY =
-    "error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-abc'}}";
-
-  const rowNamed = (name: string): HTMLElement => {
-    const rows = screen.getAllByRole("listitem").filter((row) => {
-      const label = row.querySelector("span:nth-of-type(2")?.textContent;
-      return label === name;
-    });
-    return rows[0];
-  };
-
-  it("keeps the sidecar row green while the model row carries the refusal", async () => {
-    // The point of splitting liveness from readiness: a rejected key is one broken
-    // row. The process answered, so its row stays green and the model row says what
-    // the studio concluded — in its own words, not the provider's.
-    const measured = snapshotOf({
-      liveness: probeResult("live", "The local Studio service is answering."),
-      mcp: probeResult("live", "The MCP server is answering."),
-      model: probeResult("degraded", "Not ready — the endpoint rejected the key."),
-    });
-    vi.mocked(useStudio).mockReturnValue(
-      stubContext({
-        connection: measured,
-        surveyConnections: vi.fn().mockResolvedValue(measured),
-        llmHealth: { healthy: false, message: REJECTED_KEY },
-      }),
-    );
-
-    renderPanel();
-    await screen.findByText("Local FastMCP server");
-
-    const sidecar = rowNamed("Sidecar");
-    expect(sidecar.querySelector(".status-dot")?.className).toBe("status-dot");
-    expect(sidecar).toHaveTextContent("reachable");
-
-    const model = rowNamed("Model");
-    expect(model).toHaveTextContent("Not ready — the endpoint rejected the key.");
-    expect(model.textContent).not.toMatch(/401|sk-proj-abc/);
-    expect(model.querySelector(".status-dot")?.className).toContain("is-warn");
-  });
-});
-
 describe("SettingsPanel connection survey", () => {
   it("answers its own rows without telling the rest of the studio", async () => {
     // #309: opening a settings panel is a question about connections, not a request to
     // restyle the window. The measurement belongs to the panel; the recorder that can
     // raise "the sidecar isn't running" only runs when the person presses Recheck.
-    const surveyConnections = vi.fn().mockResolvedValue(
-      snapshotOf({
-        liveness: probeResult("down", "The local Studio service isn't responding."),
-        mcp: probeResult("down", "Not ready — no MCP server answered."),
-        model: probeResult("down", "Not ready — nothing is listening at that address."),
-      }),
-    );
+    const surveyConnections = vi.fn().mockResolvedValue({
+      sidecarReachable: false,
+      mcpReachable: false,
+      llmHealthy: false,
+      llmMessage: "connection refused",
+    });
     const recheckConnections = vi.fn().mockResolvedValue(undefined);
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
         surveyConnections,
         recheckConnections,
+        sidecarReachable: null,
         llmHealth: { healthy: null, message: "" },
       }),
     );

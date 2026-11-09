@@ -172,14 +172,6 @@ install, and the bounded in-session action log), `transport.test.ts` (Tauri boun
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
-Connection state is pinned at the module boundary as well as in the components
-that read it. `apps/studio/src/state/connection.test.ts` holds the two
-questions apart: a degraded store is alive but not ready, a row nobody probed is
-`unknown`, and the sentence mapping turns a 401, a timeout, and a refused
-connection into three different studio sentences. `src/api/studioApi.test.ts`
-proves the liveness probe asks `GET /health` and never reads `/api/config` to
-learn whether the process is up.
-
 The outbox drain guard in `apps/studio/src/bff/outbox.ts` is covered by
 `outbox.test.ts`, which races two drains twice: once with a `navigator.locks`
 stub and once with `navigator.locks` deleted so the lease row runs. Both assert

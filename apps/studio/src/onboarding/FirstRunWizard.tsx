@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
-import { isAlive, isAliveFlag, isReady, isReadyFlag } from "../state/connection";
 import { useStudio } from "../state/StudioContext";
 import { useOnboarding } from "./context";
 import { STEPS, goalById, type GoalId } from "./content";
@@ -26,7 +25,9 @@ export function FirstRunWizard() {
   const {
     settings,
     saveSettings,
-    connection,
+    sidecarReachable,
+    mcpReachable,
+    llmHealth,
     checkConnections,
     openPanel,
     openSetup,
@@ -67,7 +68,7 @@ export function FirstRunWizard() {
     if (!open || stepId !== "readiness") {
       return;
     }
-    if (connection.model.state !== "unknown" && connection.liveness.state !== "unknown") {
+    if (llmHealth.healthy !== null && sidecarReachable !== null) {
       return;
     }
     void checkConnections().catch(() => undefined);
@@ -75,8 +76,8 @@ export function FirstRunWizard() {
     open,
     stepId,
     checkConnections,
-    connection.model.state,
-    connection.liveness.state,
+    llmHealth.healthy,
+    sidecarReachable,
   ]);
 
   // Remember where focus came from, and give it back when the dialog closes.
@@ -170,7 +171,7 @@ export function FirstRunWizard() {
       const result = await checkConnections(next);
       setEdits({});
       setMessage(
-        isReady(result.model)
+        result.llmHealthy
           ? "The model answered. You are ready."
           : "No answer yet. The studio still works by hand.",
       );
@@ -187,7 +188,7 @@ export function FirstRunWizard() {
     try {
       const result = await checkConnections();
       const allAnswered =
-        isAlive(result.liveness) && isReady(result.mcp) && isReady(result.model);
+        result.sidecarReachable && result.mcpReachable && result.llmHealthy;
       setMessage(
         allAnswered ? "All instruments answered." : "Some instruments did not answer yet.",
       );
@@ -312,11 +313,11 @@ export function FirstRunWizard() {
           {stepId === "readiness" ? (
             <ReadinessStep
               status={{
-                sidecar: isAliveFlag(connection.liveness),
-                mcp: isReadyFlag(connection.mcp),
-                model: isReadyFlag(connection.model),
+                sidecar: sidecarReachable,
+                mcp: mcpReachable,
+                model: llmHealth.healthy,
               }}
-              modelMessage={connection.model.message}
+              modelMessage={llmHealth.message}
               draft={draft}
               onChange={(patch) => setEdits((prev) => ({ ...prev, ...patch }))}
               onSaveAndTest={() => void saveAndTest()}

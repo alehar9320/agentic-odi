@@ -247,19 +247,6 @@ export interface LlmHealth {
   message: string;
 }
 
-/**
- * Whether the sidecar process answered, and what it said about itself.
- *
- * `ok` is liveness only: a degraded store still proves the process is up, so
- * the answer must not be read as "the studio is dead".
- */
-export interface SidecarLiveness {
-  ok: boolean;
-  degraded: { reason: string } | null;
-  /** When the probe was taken, in epoch milliseconds. */
-  checked_at: number;
-}
-
 /** What the configured backend reports it can serve, and why it reported none. */
 export interface ModelList {
   models: string[];
