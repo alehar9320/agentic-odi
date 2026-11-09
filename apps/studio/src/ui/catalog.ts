@@ -364,6 +364,34 @@ export const CATALOG: readonly UiCatalogEntry[] = [
         items: { type: "string" },
         description: "The outcomes this segment rests on. Two is the floor: one is a hypothesis.",
       },
+      members: {
+        type: "array",
+        maxItems: 40,
+        description:
+          "The member outcomes, resolved for display. Optional and additive: the board builds it from the canvas so the card can show each member's statement and stored score. A member whose outcome is missing is dropped, never invented.",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "The outcome's id, as stored." },
+            statement: {
+              type: "string",
+              description: "The outcome's statement. Falls back to the id when none is stored.",
+            },
+            opportunityScore: {
+              type: "number",
+              description:
+                "The stored opportunity score, read as-is. Omit it when the outcome is unscored; never compute one here.",
+            },
+          },
+          required: ["id"],
+        },
+      },
+      missingMembers: {
+        type: "integer",
+        minimum: 0,
+        description:
+          "How many of `outcomeIds` resolved to no outcome on the canvas. Counted and reported, never rendered as an empty row.",
+      },
       rationale: { type: "string", description: "Why this verdict, naming the outcomes behind it." },
       unclustered: {
         type: "array",

@@ -11,6 +11,7 @@ import {
   fetchCanvas,
   fetchMemory,
   isTransportFailure,
+  listConversations,
   streamChat,
   updateJob,
   updateOutcome,
@@ -30,7 +31,7 @@ const bff = {
     updateOutcome: vi.fn(),
     deleteOutcome: vi.fn(),
   },
-  memory: { listObservations: vi.fn() },
+  memory: { listObservations: vi.fn(), listConversations: vi.fn() },
   chat: { stream: vi.fn() },
 };
 
@@ -73,6 +74,7 @@ beforeEach(() => {
     method.mockReset();
   }
   vi.mocked(bff.memory.listObservations).mockReset();
+  vi.mocked(bff.memory.listConversations).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
 });
 
@@ -380,5 +382,37 @@ describe("streamChat fallback", () => {
       streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {}),
     ).rejects.toThrow();
     expect(bff.chat.stream).not.toHaveBeenCalled();
+  });
+});
+
+describe("listConversations fallback", () => {
+  it("falls back to the local BFF when the sidecar returns 502", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
+    vi.mocked(bff.memory.listConversations).mockResolvedValueOnce([
+      {
+        id: "c-1",
+        title: "Activation model",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-02T00:00:00Z",
+        head_id: "m-2",
+        turn_count: 2,
+      },
+    ]);
+
+    const listed = await listConversations();
+
+    expect(listed.map((item) => [item.id, item.turn_count])).toEqual([["c-1", 2]]);
+    expect(bff.memory.listConversations).toHaveBeenCalled();
+  });
+
+  it("serves the sidecar list while the sidecar answers", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ conversations: [{ id: "c-2", title: "", created_at: "x", updated_at: "x", head_id: null, turn_count: 0 }] }),
+    );
+
+    const listed = await listConversations();
+
+    expect(listed.map((item) => item.id)).toEqual(["c-2"]);
+    expect(bff.memory.listConversations).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,53 @@
 
 Agentic ODI is a uv workspace with a single root `pyproject.toml` for shared tooling. Python distributions are imported by their stable `agentic_odi_*` package names; directory layout does not leak into imports.
 
+## The system at a glance
+
+Every process, the state it may reach, and the boundary that leaves the machine.
+The reach table behind it is [Trust boundaries](trust-boundaries.md); the arrows
+between workspace packages are the next section.
+
+```mermaid
+flowchart LR
+    subgraph machine["The user's machine"]
+        CLI["CLI: agentic-odi"]
+        SPA["Studio SPA: browser or Tauri webview"]
+        SHELL["Tauri shell: spawns the sidecar, self-updates"]
+        MCP["MCP server — :8000/mcp, loopback, unauthenticated"]
+        SIDECAR["Studio API sidecar — 127.0.0.1:8100, loopback, unauthenticated"]
+        ODI[("odi.db — event log + snapshots")]
+        MEM[("studio.db — conversations, PM memory")]
+        CFG[("~/.config/agentic-odi — LLM profile, connectors.json")]
+
+        CLI -->|local backend| ODI
+        CLI -->|"--backend mcp"| MCP
+        CLI --> CFG
+        MCP --> ODI
+        SPA -->|"/api/*, SSE"| SIDECAR
+        SHELL -.->|launches| SIDECAR
+        SHELL -.->|loads| SPA
+        SIDECAR --> ODI
+        SIDECAR --> MEM
+        SIDECAR -->|"backend=mcp"| MCP
+        SIDECAR --> CFG
+    end
+
+    subgraph outside["Crosses the trust boundary"]
+        LLM["OpenAI-compatible LLM"]
+        CONN["Connector endpoints: Notion, PostHog, Linear, GitHub, Exg"]
+        WORKER["Cloudflare Worker — static assets + /api/* tunnel"]
+        RELEASES["GitHub Releases — signed update artifacts"]
+    end
+
+    SIDECAR -->|chat completions| LLM
+    CLI -->|chat completions| LLM
+    SIDECAR -->|health, ingest| CONN
+    MCP -->|as an MCP client| CONN
+    WORKER -->|"forwards /api/* and Authorization, never authenticates"| SIDECAR
+    SPA -.->|hosted path| WORKER
+    SHELL -.->|verifies signature before staging| RELEASES
+```
+
 ## Layout
 
 ```text
@@ -23,16 +70,43 @@ packaging/        PyInstaller spec for the CLI binary
 
 ## Dependency Direction
 
-```text
-apps/cli ──────────────┐
-apps/mcp-server ───────┼──▶ packages/core
-apps/studio-api ───────┘         ▲
-                                 │
-apps/cli ──────────────▶ packages/connectors
+An arrow points from the importer to the imported.
+
+```mermaid
+graph BT
+    agentic_odi_core["packages/core — domain, ODIService, repositories, contract"]
+    agentic_odi_connectors["packages/connectors — MCP and REST connectors, catalog, ingest sink"]
+
+    agentic_odi_mcp_server["apps/mcp-server — FastMCP on :8000/mcp"]
+    agentic_odi_studio_api["apps/studio-api — Studio sidecar on 127.0.0.1:8100"]
+    agentic_odi_cli["apps/cli — Typer CLI, local or MCP backend"]
+
+    agentic_odi_mcp_server --> agentic_odi_core
+    agentic_odi_studio_api --> agentic_odi_core
+    agentic_odi_studio_api --> agentic_odi_connectors
+    agentic_odi_cli --> agentic_odi_core
+    agentic_odi_cli --> agentic_odi_connectors
 ```
 
+This picture is a contract, not an illustration. `tests/test_architecture.py`
+reads the arrows above and asserts they equal both the `[project] dependencies`
+each member declares and the imports the source actually contains, in both
+directions. Add a workspace dependency without drawing it, draw one that nothing
+imports, or import a package you never declared, and the suite names the edge and
+the file to edit. Node ids are import package names; the distribution name is the
+same with underscores replaced by hyphens.
+
+To see the boundary move rather than sit still, read the picture's history:
+`git log -p -- docs/architecture/README.md`. Every arrow that moved for a reason
+has an [ADR](adr/README.md) saying why, which is why the diagram lives in this
+file instead of a generated image — a change to a picture has to be reviewable as
+a change.
+
 - `packages/core` depends on no other workspace package.
-- `packages/connectors` depends on `core` only where it needs shared models.
+- `packages/connectors` also depends on no workspace package: it defines its own
+  `EvidenceDraft` rather than importing `core`'s `Evidence`. Whether that
+  separation is deliberate is an open question, recorded in
+  [the architecture critique](../superpowers/specs/2026-10-31-architecture-critique-design.md).
 - Every runnable app may depend on `core`; none of them imports another app.
 - The React SPA only talks to `apps/studio-api` over `/api`; it never calls MCP or the LLM directly.
 - The SPA's conversation runtime is assistant-ui, bound to the Studio's own
@@ -41,6 +115,33 @@ apps/cli ──────────────▶ packages/connectors
   directions, `StudioRuntime.tsx` wires the runtime callbacks, and
   `attachments.ts` extracts files in the browser. The library is presentation
   only — it holds no product state and makes no network calls of its own.
+
+## Inside `packages/core`
+
+`packages/core` is one distribution that holds four groups. It is large, and the
+temptation it creates is to split it. [ADR 0005](adr/0005-core-layers-and-the-contract-split.md)
+records why that is the wrong move today and what would make it the right one.
+What is worth doing now is naming the groups, so "edit core" means "edit the
+persistence group, which may not call the service door":
+
+| Group | Modules | Rule |
+|---|---|---|
+| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
+| **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `funnel.py`, `factory.py`, `integrity.py`, `recovery.py` | Stores what the other groups decide, and keeps the file it stores in readable — `integrity.py` gates a boot on a damaged store, `recovery.py` names the backup to restore, `funnel.py` appends the five onboarding counters to the same log and reads them back. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
+| **methodology** | `services.py`, `segmentation.py`, `strategy.py`, `router.py`, `messages.py`, `steve_jobs.py` | The ODI stages and the LLM path. `services.py` owns the service door every caller enters through; may import domain, persistence, and contract. |
+| **contract** | `contract.py`, `errors.py`, `remote.py`, `schema.py`, `connection.py`, `consent.py` | The MCP wire protocol, enforced against the live registry by `tests/contract/test_mcp_contract.py`. May be imported by anything; imports no persistence and no methodology. |
+
+`errors.py` is the exception hierarchy the whole package raises, so it is the one
+module any group may import.
+
+Two things this does not claim. It is not a package boundary — all four groups
+share the `agentic_odi_core` namespace, and moving a file is out of scope for the
+decision it documents. And only one row is machine-checked: the
+`grimp`-based graph above reads edges *between* workspace distributions, so an
+intra-core import like `sqlite_repository` reaching into `services` is invisible
+to it. That is why the persistence rule is an AST check in the same file, and why
+`test_every_core_module_is_in_exactly_one_group` exists — it fails when a new
+module belongs to no group, which is how the table above would rot.
 
 ## Persistence
 
@@ -107,13 +208,16 @@ Start here, then take the one that answers your question.
 | [Data flow](data-flow.md) | How a write and a read travel from the CLI, MCP, and Studio to storage and back. |
 | [The signal inbox](notifications.md) | The operational surface of signals: kinds, dedupe, budget, and how each client reads them. |
 | [Signals](signals.md) | The design behind signals: why they are events, what they must describe, and what they do not do. |
+| [The onboarding funnel](funnel.md) | The five local counters that say how far a first session got, why they ride the event log, and what they refuse to claim. |
 | [Evidence mapping](evidence-mapping.md) | How a connector record becomes an evidence draft, and how evidence is promoted. |
 | [Consent and approvals](consent.md) | What the conversational agent must ask before it writes, and what is not covered. |
 | [Trust boundaries](trust-boundaries.md) | What each process may reach, where credentials live, and what crosses the wire. |
 | [The generative UI protocol](ui-protocol.md) | The closed catalog, validation on both ends, limits, and the action model. |
 | [Studio banners](banners.md) | The Studio's unified notice system. |
+| [Reuse first](reuse.md) | The ladder an agent walks before writing new code, its bounds, and the ledger a copy-in must appear in. |
 | [Vendor alley](vendor.md) | What may be copied into `src/vendor`, and how the boundary is enforced. |
 | [Testing](testing.md) | Test layout, commands, and what each suite is responsible for. |
+| [Agent assignment](../agents.md) | Which agents can take an issue, how a claim is recorded, and what expires. |
 | [Decisions (ADRs)](adr/README.md) | Why the architecture looks the way it does. |
 
 ## Related
@@ -122,6 +226,9 @@ Start here, then take the one that answers your question.
 - [Studio banners](banners.md)
 - [Testing](testing.md)
 - [Decisions (ADRs)](adr/README.md) — why the architecture looks the way it does
+- [Architecture critique, 2026-10-31](../superpowers/specs/2026-10-31-architecture-critique-design.md)
+  — an outside read of the whole system: what is sound, what is at risk, and what
+  each finding costs to fix
 
 ## What this does not do
 

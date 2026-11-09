@@ -142,6 +142,7 @@ only when you intentionally need to stage a map before capturing outcomes.
 
 # Desired Outcomes
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4 --claim-check '{"asked": ["How long does setup take?"], "answers": ["About a day"]}'
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
@@ -153,10 +154,24 @@ agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
 agentic-odi summary <job-id> --top 3 --json
+
+# Onboarding funnel: launch, first message, first outcome, first score, return
+agentic-odi stats
+agentic-odi stats --json
+agentic-odi stats --reset --yes
 ```
 
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
 checks a statement against the ODI format rules before saving.
+
+A score must carry the questions behind it. `--claim-check` takes the JSON you
+collected — `asked`, `answers`, and `skips` (each skip needs a reason). Omit it
+and the score is recorded as unverified, saying no customer questions were
+asked, so a by-hand score is never mistaken for an interrogated one. The MCP
+`add_outcome` tool is stricter: it refuses a score with no `claim_check` at all,
+and a score with no numbers is always legal. Its description puts the interview
+first — three questions to the customer before any number, and their replies as
+the answers.
 
 Job names are validated by the core model: 3–64 characters drawn from letters,
 digits, spaces, underscores, and hyphens. Descriptions may be up to 500
@@ -166,6 +181,16 @@ and the Studio API returns a 422 with the same message.
 `summary` shows how many of the eight job-map phases the Job covers, which are
 still missing, and the underserved outcomes (score above 10) in descending
 order. `--top` caps that list; `--json` returns the same data for a script.
+
+`stats` reports the onboarding funnel: how many times the sidecar was launched,
+and whether this store has seen a first message, a first outcome, a first score,
+and a return session. Counts come from the same local event log as the records
+do, so nothing is uploaded anywhere and a counter that has not happened reads as
+zero rather than a guess. Each event carries a session id drawn fresh for the
+process, which is not the per-install device id. `--reset` appends a marker that
+puts the counters back to zero and leaves the underlying events in place; it asks
+first unless you pass `--yes`. With `--backend mcp` the command exits 1: that
+backend has no local log to count.
 
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
@@ -266,6 +291,25 @@ agentic-odi strategy show --json
 When no path has evidence, `strategy propose` exits non-zero and says what is
 missing rather than inventing a bet. Until one exists, `strategy show` prints
 "No strategy recorded" and points at `strategy propose`.
+
+## Studies and waves
+
+A study is one named pass over a job — its interviews, its outcomes, its dates.
+Opening the same study again is a new **wave**, not a second copy of the first, so
+"the market last quarter" and "the market this quarter" stay comparable. A study
+opens `planned`; the same `(job, name)` may not repeat a wave, which refuses an
+accidental re-run while leaving a deliberate later wave expressible.
+
+```bash
+agentic-odi studies open --job <job-id> --name "Invoice sweep" --wave 1
+agentic-odi studies open --job <job-id> --name "Invoice sweep" --wave 2 --method-notes "revisit after the price change"
+agentic-odi studies list
+agentic-odi studies list --job <job-id> --json
+```
+
+`studies list` is empty until a study has been opened. Outcomes carry an optional
+`study_id` scoping them to a study of their own job; a row that predates studies has
+none, and opening studies never invents one for it.
 
 ## Schema, scoring, and guidance
 
