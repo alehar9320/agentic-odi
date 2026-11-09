@@ -36,7 +36,11 @@ describe("ModelSection", () => {
 
   it("says why there is no catalog instead of pretending the list is empty", () => {
     const refreshModels = vi.fn().mockResolvedValue(undefined);
-    renderSection({ models: [], modelsMessage: "connection_error: connection refused", refreshModels });
+    renderSection({
+      models: [],
+      modelsMessage: "connection_error: connection refused",
+      refreshModels,
+    });
 
     expect(screen.getByLabelText(/^model/i)).not.toHaveAttribute("list");
     expect(screen.getByText(/connection refused/i)).toBeInTheDocument();

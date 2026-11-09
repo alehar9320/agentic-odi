@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { UpdateProvider, createUpdateService } from "../../updater";
+import { createUpdateService, UpdateProvider } from "../../updater";
 import type { UpdateTransport } from "../../updater/types";
 import { AboutSection } from "./sections/AboutSection";
 

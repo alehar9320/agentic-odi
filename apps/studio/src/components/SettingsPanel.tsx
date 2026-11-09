@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 
 import { useOnboarding } from "../onboarding/context";
-import { useStudio } from "../state/StudioContext";
-import type { ConnectionReport } from "../state/StudioContext";
+import { useStudio, type ConnectionReport } from "../state/StudioContext";
 import { AboutSection } from "./settings/sections/AboutSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
+import { ContextSection } from "./settings/sections/ContextSection";
 import { DataSection } from "./settings/sections/DataSection";
+import { InstallSection } from "./settings/sections/InstallSection";
 import { ModelSection } from "./settings/sections/ModelSection";
 import { UpdatesSection } from "./settings/sections/UpdatesSection";
 
@@ -53,6 +54,10 @@ export function SettingsPanel() {
   } = useStudio();
   const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
 
+  // Opening Settings is the person asking what is connected, which is the first moment
+  // a probe is owed to them. The answer is kept here, in the panel that asked: a passive
+  // read of a settings page must not restyle the window, because the hosted studio
+  // cannot reach a sidecar by design and its silence is not an outage to announce.
   const [survey, setSurvey] = useState<ConnectionReport | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +77,7 @@ export function SettingsPanel() {
 
   return (
     <div className="settings">
-      <DataSection
+      <ContextSection
         brief={brief}
         openSetup={openSetup}
         displayName={displayName}
@@ -81,6 +86,8 @@ export function SettingsPanel() {
         clearChat={clearChat}
         refreshCanvas={refreshCanvas}
       />
+
+      <DataSection sidecarReachable={sidecarReachable} />
 
       <ModelSection
         settings={settings}
@@ -114,6 +121,8 @@ export function SettingsPanel() {
       <UpdatesSection tourEnabled={tourEnabled} restartTour={restartTour} />
 
       <AboutSection settings={settings} capabilities={capabilities} />
+
+      <InstallSection />
     </div>
   );
 }

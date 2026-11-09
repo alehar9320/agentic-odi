@@ -1,0 +1,31 @@
+{
+  "name": "Living Studio",
+  "short_name": "ODI Studio",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0a0b0e",
+  "background_color": "#0a0b0e",
+  "description": "Opportunity Discovery Interface studio",
+  "icons": [
+    {
+      "src": "/odi-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/odi-mascot-256.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/odi-mascot-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

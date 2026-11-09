@@ -1,6 +1,7 @@
 import type { Capability } from "../../../bff/capabilities/registry";
 import type { ConnectorListItem, ConnectorPreset, StudioConfig, StudioError } from "../../../types";
 import { FailurePanel } from "../../FailurePanel";
+import { StatusDot } from "../../status/StatusDot";
 import { SavedField, SectionSaveLine } from "../SavedField";
 import { useSectionSaves } from "../saves";
 import { validateMcpUrl } from "../validation";
@@ -103,10 +104,8 @@ export function ConnectionsSection({
 
       <ul className="connection-list">
         <li>
-          <span
-            className={`status-dot${modelHealthy === false ? " is-warn" : ""}${
-              modelHealthy === null ? " is-unknown" : ""
-            }`}
+          <StatusDot
+            tone={modelHealthy === false ? "warn" : modelHealthy === null ? "unknown" : "ok"}
           />
           <span>Model</span>
           <span className="connection-list__value">
@@ -114,16 +113,20 @@ export function ConnectionsSection({
           </span>
         </li>
         <li>
-          <span
-            className={`status-dot${sidecarKnown === false ? " is-warn" : sidecarKnown === null ? " is-unknown" : ""}`}
+          <StatusDot
+            tone={sidecarKnown === false ? "warn" : sidecarKnown === null ? "unknown" : "ok"}
           />
           <span>Sidecar</span>
           <span className="connection-list__value">
-            {sidecarKnown === false ? "unavailable" : sidecarKnown === null ? "unknown" : "reachable"}
+            {sidecarKnown === false
+              ? "unavailable"
+              : sidecarKnown === null
+                ? "unknown"
+                : "reachable"}
           </span>
         </li>
         <li>
-          <span className={`status-dot${mcpKnown ? "" : " is-unknown"}`} />
+          <StatusDot tone={mcpKnown ? "ok" : "unknown"} />
           <span>Local FastMCP server</span>
           <span className="connection-list__value">{mcpKnown ? "connected" : "offline"}</span>
         </li>
@@ -137,9 +140,7 @@ export function ConnectionsSection({
       <ul className="connection-list">
         {capabilities.map((capability) => (
           <li key={capability.id}>
-            <span
-              className={`status-dot${capability.status === "available" ? "" : " is-warn"}`}
-            />
+            <StatusDot tone={capability.status === "available" ? "ok" : "warn"} />
             <span>{capability.label}</span>
             <span className="connection-list__value">
               {capability.status === "available" ? "available" : "unavailable"}
@@ -157,7 +158,7 @@ export function ConnectionsSection({
       ) : (
         <>
           <h3 className="settings__title">Connectors</h3>
-          <button type="button" className="button settings__manage" onClick={openCustomize}>
+          <button type="button" className="button settings__manage" onClick={() => openCustomize()}>
             Manage connectors
           </button>
           {connectorsLoading ? (
