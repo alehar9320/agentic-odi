@@ -38,10 +38,10 @@ export function StudioBar({
   const {
     conversationId,
     conversations,
+    deleteConversation,
     llmHealth,
     messages,
     openConversation,
-    renameConversation,
     refreshConversations,
     sidecarReachable,
     streaming,
@@ -66,12 +66,12 @@ export function StudioBar({
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
-  // Renaming is an edit of one row, never a second way to open it.
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const renamingRef = useRef<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState("");
-  const [titleInvalid, setTitleInvalid] = useState(false);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  // Deleting is a question, never a click: the confirm names the thread and opens
+  // on the choice that keeps it.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const deletingRef = useRef<string | null>(null);
+  const keepDeleteRef = useRef<HTMLButtonElement>(null);
   // An empty transcript is only nothing to lose when nothing is on screen to
   // leave: the plus is the documented way out of the first-run setup, and a
   // disabled control there would strand the person in it.
@@ -160,16 +160,14 @@ export function StudioBar({
     };
   }, [historyOpen]);
 
-  // The editor takes focus and selects the whole name, so typing replaces it and
-  // Escape puts it back without a second decision.
+  // An accidental Enter must not destroy a week of work, so the confirm opens on
+  // the choice that changes nothing.
   useEffect(() => {
-    if (!renamingId) {
+    if (!confirmingDeleteId) {
       return;
     }
-    const input = titleInputRef.current;
-    input?.focus();
-    input?.select();
-  }, [renamingId]);
+    keepDeleteRef.current?.focus();
+  }, [confirmingDeleteId]);
 
   function toggleHistory() {
     setHistoryOpen((open) => {
@@ -189,72 +187,32 @@ export function StudioBar({
     }
   }
 
-  function beginRename(targetId: string, title: string) {
-    setRenamingId(targetId);
-    renamingRef.current = targetId;
-    setDraftTitle(title);
-    setTitleInvalid(false);
+  function beginDelete(targetId: string) {
+    setConfirmingDeleteId(targetId);
   }
 
-  function cancelRename() {
-    renamingRef.current = null;
-    setRenamingId(null);
-    setDraftTitle("");
-    setTitleInvalid(false);
+  function cancelDelete() {
+    setConfirmingDeleteId(null);
   }
 
-  async function commitRename(targetId: string, previousTitle: string) {
-    // Enter, then the input's blur, would otherwise both commit one name.
-    if (renamingRef.current !== targetId) {
+  async function commitDelete(targetId: string) {
+    // One request per thread, however many times the button is pressed.
+    if (deletingRef.current) {
       return;
     }
-    const cleaned = draftTitle.trim();
-    if (!cleaned) {
-      // Refused in place, without a request: a nameless row is what this replaces.
-      setTitleInvalid(true);
-      titleInputRef.current?.focus();
-      return;
-    }
-    renamingRef.current = null;
-    setRenamingId(null);
-    setTitleInvalid(false);
-    setDraftTitle("");
-    // An unchanged name costs nothing — no request, no reordering.
-    if (cleaned === previousTitle.trim()) {
-      return;
-    }
+    deletingRef.current = targetId;
+    setDeletingId(targetId);
     try {
-      await renameConversation(targetId, cleaned);
+      await deleteConversation(targetId);
+      setConfirmingDeleteId(null);
     } catch {
-      pushToast("error", "I couldn't rename that conversation.");
+      // The row stays: a delete that failed must not look like one that worked.
+      pushToast("error", "I couldn't delete that conversation.");
+      setConfirmingDeleteId(null);
+    } finally {
+      deletingRef.current = null;
+      setDeletingId(null);
     }
-  }
-
-  function onTitleKeyDown(
-    event: ReactKeyboardEvent<HTMLInputElement>,
-    targetId: string,
-    previousTitle: string,
-  ) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      // The row is inside a menu: Enter belongs to the name, not to the row.
-      event.stopPropagation();
-      void commitRename(targetId, previousTitle);
-      return;
-    }
-    if (event.key === "Escape") {
-      // Cancels the rename, not the whole history list.
-      event.stopPropagation();
-      cancelRename();
-    }
-  }
-
-  function onTitleBlur(targetId: string, previousTitle: string) {
-    if (draftTitle.trim() === previousTitle.trim()) {
-      cancelRename();
-      return;
-    }
-    void commitRename(targetId, previousTitle);
   }
 
   function exportConversation() {
@@ -411,27 +369,47 @@ export function StudioBar({
               ) : (
                 conversations.map((conversation) => {
                   const current = conversation.id === conversationId;
-                  const stored = conversation.title.trim();
-                  const name = stored || "New conversation";
+                  const name = conversation.title.trim() || "New conversation";
                   return (
                     <div key={conversation.id} className="bar__history-row" role="none">
-                      {renamingId === conversation.id ? (
-                        <input
-                          ref={titleInputRef}
-                          className="bar__history-input"
-                          aria-label={`Name for ${name}`}
-                          placeholder="Name this thread"
-                          value={draftTitle}
-                          aria-invalid={titleInvalid || undefined}
-                          onChange={(event) => {
-                            setDraftTitle(event.target.value);
-                            setTitleInvalid(false);
+                      {confirmingDeleteId === conversation.id ? (
+                        <div
+                          className="bar__history-confirm"
+                          role="group"
+                          aria-label={`Delete ${name}`}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              // Cancels the question, not the whole history list.
+                              event.stopPropagation();
+                              cancelDelete();
+                            }
                           }}
-                          onKeyDown={(event) =>
-                            onTitleKeyDown(event, conversation.id, stored)
-                          }
-                          onBlur={() => onTitleBlur(conversation.id, stored)}
-                        />
+                        >
+                          <p className="bar__history-confirm-text">
+                            Delete <strong>{name}</strong> and its turns? This cannot be
+                            undone.
+                          </p>
+                          <div className="bar__history-confirm-actions">
+                            <button
+                              type="button"
+                              ref={keepDeleteRef}
+                              className="bar__history-keep"
+                              onClick={cancelDelete}
+                            >
+                              Keep it
+                            </button>
+                            <button
+                              type="button"
+                              className="bar__history-destroy"
+                              disabled={deletingId === conversation.id}
+                              onClick={() => void commitDelete(conversation.id)}
+                            >
+                              {deletingId === conversation.id
+                                ? "Deleting…"
+                                : "Delete thread"}
+                            </button>
+                          </div>
+                        </div>
                       ) : (
                         <>
                           <button
@@ -448,12 +426,12 @@ export function StudioBar({
                           </button>
                           <button
                             type="button"
-                            className="bar__history-rename"
-                            aria-label={`Rename ${name}`}
-                            title={`Rename ${name}`}
-                            onClick={() => beginRename(conversation.id, conversation.title)}
+                            className="bar__history-delete"
+                            aria-label={`Delete ${name}`}
+                            title={`Delete ${name}`}
+                            onClick={() => beginDelete(conversation.id)}
                           >
-                            <span aria-hidden="true">✎</span>
+                            <span aria-hidden="true">🗑</span>
                           </button>
                         </>
                       )}

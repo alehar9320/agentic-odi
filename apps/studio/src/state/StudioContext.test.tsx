@@ -5,7 +5,6 @@ import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
-import { getStudioBff } from "../bff/index";
 import {
   CountedStudio,
   expectRenderBudget,
@@ -16,7 +15,6 @@ import {
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
 import { StudioProvider, useStudio } from "./StudioContext";
-import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
 
 const CONVERSATION = {
   id: "c-1",
@@ -81,8 +79,8 @@ let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 let conversationCreates = 0;
-/** When true, the canvas/evidence write routes answer 503 with no structured error. */
-let writeFails = false;
+let deletedConversations: string[] = [];
+let deleteFails = false;
 
 // The follow-up queue (#410) needs a turn that stays in flight so later sends
 // actually line up behind it: /api/chat then returns a stream the test closes
@@ -128,31 +126,13 @@ function gatedChatResponse(
   );
 }
 
-/**
- * The canvas and evidence write routes. A read is a GET; a write is anything
- * else against one of these paths.
- */
-function isCanvasWrite(url: string, method: string | undefined): boolean {
-  if (method === undefined || method === "GET") {
-    return false;
-  }
-  return (
-    url === "/api/jobs" ||
-    url.startsWith("/api/jobs/") ||
-    url === "/api/steps" ||
-    url.startsWith("/api/steps/") ||
-    url === "/api/outcomes" ||
-    url.startsWith("/api/outcomes/") ||
-    url.startsWith("/api/evidence")
-  );
-}
-
 function route(
   input: RequestInfo | URL,
   init?: RequestInit,
   configFails = false,
 ): Response | Promise<Response> {
   const url = String(input);
+
   if (url === "/api/chat") {
     chatBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
     chatAttempts += 1;
@@ -229,12 +209,6 @@ function route(
     }
     return json({ jobs: [], steps: [], outcomes: [], source: "local", ...canvasRecords });
   }
-  if (writeFails && isCanvasWrite(url, init?.method)) {
-    return new Response(JSON.stringify({ detail: "Sidecar unreachable" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
   if (url === "/api/connectors/catalog") {
     catalogFetches += 1;
     return json([]);
@@ -286,19 +260,15 @@ function route(
     return json({ ok: true, id: url.split("/").pop() });
   }
   if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
-    const patch = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
-    headPatches.push(patch);
-    // The rename tests need the server's answer to carry the name they sent, and
-    // one name they can make fail on purpose.
-    if (patch.title === "__fail__") {
+    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    return json({ conversation: CONVERSATION });
+  }
+  if (init?.method === "DELETE" && url.startsWith("/api/conversations/")) {
+    deletedConversations.push(url.split("/").filter(Boolean).pop() ?? "");
+    if (deleteFails) {
       return json({ error: { code: "internal", message: "boom" } }, 500);
     }
-    return json({
-      conversation:
-        typeof patch.title === "string"
-          ? { ...CONVERSATION, title: patch.title }
-          : CONVERSATION,
-    });
+    return new Response(null, { status: 204 });
   }
   if (url === "/api/conversations/c-1/tree") {
     return json({
@@ -390,6 +360,8 @@ describe("StudioContext memory and resume", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -651,6 +623,8 @@ describe("StudioContext failures", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -941,206 +915,6 @@ describe("StudioContext first run in a browser with no server", () => {
   });
 });
 
-describe("StudioContext writes with no sidecar (#523)", () => {
-  beforeEach(async () => {
-    writeFails = true;
-    localStorage.clear();
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAttempts = 0;
-    chatAborts = false;
-    canvasFails = false;
-    bootCorrupt = false;
-    canvasRecords = {};
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
-    // Each test starts from an empty store: a leftover optimistic record from the
-    // previous test would be overlaid on this one's board.
-    const bff = await getStudioBff();
-    await bff.store.clearAll();
-  });
-
-  afterEach(() => {
-    writeFails = false;
-    vi.unstubAllGlobals();
-  });
-
-  it("saves an outcome on this device and says where it lives, never 'Error'", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.canvas).not.toBeNull());
-
-    let jobId = "";
-    await act(async () => {
-      jobId = (await result.current.createJob({ name: "Get a service to production" })) ?? "";
-    });
-    await act(async () => {
-      await result.current.addOutcome({
-        job_id: jobId,
-        statement: "Minimize the time from merge to production",
-        importance: 9,
-        satisfaction: 3,
-      });
-    });
-
-    // The outcome is on the board with its score, and the receipt says where the
-    // change lives instead of reporting a lost edit.
-    await waitFor(() =>
-      expect(
-        (result.current.canvas?.outcomes ?? []).map((outcome) => outcome.statement),
-      ).toContain("Minimize the time from merge to production"),
-    );
-    const messages = result.current.toasts.map((toast) => toast.message);
-    expect(messages).toContain("Saved on this device · will sync");
-    expect(messages.some((message) => message.startsWith("Error"))).toBe(false);
-    expect(messages.some((message) => message.startsWith("Could not"))).toBe(false);
-  });
-
-  it("marks the optimistic outcome pending", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.canvas).not.toBeNull());
-
-    let jobId = "";
-    await act(async () => {
-      jobId = (await result.current.createJob({ name: "Job" })) ?? "";
-    });
-    await act(async () => {
-      await result.current.addOutcome({
-        job_id: jobId,
-        statement: "Minimize the time",
-        importance: 8,
-        satisfaction: 3,
-      });
-    });
-
-    await waitFor(() => {
-      const outcome = (result.current.canvas?.outcomes ?? []).find(
-        (candidate) => candidate.statement === "Minimize the time",
-      );
-      expect(outcome?.pending).toBe(true);
-    });
-  });
-
-  it("keeps the pending outcome through a refresh that answers without it", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.canvas).not.toBeNull());
-
-    let jobId = "";
-    await act(async () => {
-      jobId = (await result.current.createJob({ name: "Job" })) ?? "";
-    });
-    await act(async () => {
-      await result.current.addOutcome({
-        job_id: jobId,
-        statement: "Minimize the time",
-        importance: 8,
-        satisfaction: 3,
-      });
-    });
-
-    // The sidecar answers a refresh with a canvas that predates the queued write.
-    await act(async () => {
-      await result.current.refreshCanvas();
-    });
-
-    const outcome = (result.current.canvas?.outcomes ?? []).find(
-      (candidate) => candidate.statement === "Minimize the time",
-    );
-    expect(outcome).toBeDefined();
-    expect(outcome?.pending).toBe(true);
-  });
-
-  it("rehydrates a queued write as pending after a reload", async () => {
-    const first = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(first.result.current.canvas).not.toBeNull());
-    let jobId = "";
-    await act(async () => {
-      jobId = (await first.result.current.createJob({ name: "Job" })) ?? "";
-    });
-    await act(async () => {
-      await first.result.current.addOutcome({
-        job_id: jobId,
-        statement: "Minimize the time",
-        importance: 8,
-        satisfaction: 3,
-      });
-    });
-    first.unmount();
-
-    // A reload: fresh providers, same IndexedDB. The write is still queued, so the
-    // board must show it pending rather than lose it.
-    const second = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => {
-      const outcome = (second.result.current.canvas?.outcomes ?? []).find(
-        (candidate) => candidate.statement === "Minimize the time",
-      );
-      expect(outcome?.pending).toBe(true);
-    });
-  });
-
-  it("reports the server acknowledgement, not a local save, when the sidecar answers", async () => {
-    writeFails = false;
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.canvas).not.toBeNull());
-
-    await act(async () => {
-      await result.current.addOutcome({
-        job_id: "JOB-1",
-        statement: "Minimize the time",
-        importance: 8,
-        satisfaction: 3,
-      });
-    });
-
-    expect(result.current.toasts.map((toast) => toast.message)).toContain(
-      "Outcome captured successfully!",
-    );
-    expect(result.current.toasts.map((toast) => toast.message)).not.toContain(
-      "Saved on this device · will sync",
-    );
-  });
-
-  it("still reports a sidecar's own refusal as an error", async () => {
-    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url === "/api/outcomes" && init?.method === "POST") {
-        return new Response(
-          JSON.stringify({
-            error: { code: "validation", message: "Not an ODI statement.", retryable: false },
-          }),
-          { status: 422, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      return route(input, init);
-    });
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.canvas).not.toBeNull());
-
-    let thrown: unknown = null;
-    await act(async () => {
-      try {
-        await result.current.addOutcome({
-          job_id: "JOB-1",
-          statement: "faster",
-          importance: 8,
-          satisfaction: 3,
-        });
-      } catch (error) {
-        thrown = error;
-      }
-    });
-    expect((thrown as Error)?.message).toBe("Not an ODI statement.");
-
-    // A refused write is a real failure: nothing was queued, so no receipt claims
-    // it was saved on this device.
-    expect(result.current.toasts.map((toast) => toast.message)).not.toContain(
-      "Saved on this device · will sync",
-    );
-    const bff = await getStudioBff();
-    expect(await bff.listOutbox()).toHaveLength(0);
-  });
-});
-
-
 describe("StudioContext on a desktop install whose model is down", () => {
   beforeEach(() => {
     llmUnhealthy = true;
@@ -1190,7 +964,7 @@ describe("StudioContext on a desktop install whose model is down", () => {
   });
 });
 
-describe("StudioContext probe scheduling", () => {
+describe("StudioContext health polling", () => {
   beforeEach(() => {
     localStorage.clear();
     chatBody = null;
@@ -1206,147 +980,28 @@ describe("StudioContext probe scheduling", () => {
   });
 
   afterEach(() => {
-    llmUnhealthy = false;
-    vi.restoreAllMocks();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
-  /** Drive `document.visibilityState`, which jsdom reports as a static getter. */
-  function driveVisibility(initial: DocumentVisibilityState = "visible") {
-    let state = initial;
-    const spy = vi
-      .spyOn(document, "visibilityState", "get")
-      .mockImplementation(() => state);
-    return {
-      hide() {
-        state = "hidden";
-      },
-      show() {
-        state = "visible";
-      },
-      restore() {
-        spy.mockRestore();
-      },
-    };
-  }
-
-  it("probes on a jittered cadence while the window is visible", async () => {
-    renderHook(() => useStudio(), { wrapper: StudioProvider });
+  it("re-probes the model every 30 seconds and when the window comes back", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
+      await Promise.resolve();
     });
-    const afterBoot = llmHealthFetches;
-    expect(afterBoot).toBeGreaterThan(0);
-
-    // The scheduler armed at mount for PROBE_BASE_MS ±20%, so from mount nothing
-    // fires before the shortest wait. The boot's own probe has already run.
-    const shortest = PROBE_BASE_MS * (1 - PROBE_JITTER);
-    const longest = PROBE_BASE_MS * (1 + PROBE_JITTER);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(shortest - 2_500 - 1_000);
-    });
-    expect(llmHealthFetches).toBe(afterBoot);
-
-    // ...and one has fired by the longest.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(longest - shortest + 2_000);
-    });
-    expect(llmHealthFetches).toBeGreaterThan(afterBoot);
-  });
-
-  it("makes no request at all while the window is hidden", async () => {
-    const visibility = driveVisibility("hidden");
-    renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    });
-    const afterBoot = llmHealthFetches;
+    const initial = llmHealthFetches;
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      vi.advanceTimersByTime(30_000);
     });
-    expect(llmHealthFetches).toBe(afterBoot);
-    visibility.restore();
-  });
+    expect(llmHealthFetches).toBeGreaterThan(initial);
 
-  it("probes once when the window comes back after the answer has gone stale", async () => {
-    const visibility = driveVisibility("visible");
-    renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    });
-
-    visibility.hide();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5 * 60_000);
-    });
-    const whileHidden = llmHealthFetches;
-
-    visibility.show();
+    const afterInterval = llmHealthFetches;
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    expect(llmHealthFetches).toBe(whileHidden + 1);
-    visibility.restore();
-  });
-
-  it("backs off when the model keeps refusing instead of hammering it", async () => {
-    llmUnhealthy = true;
-    renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    });
-    const start = llmHealthFetches;
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(10 * 60_000);
-    });
-    const refused = llmHealthFetches - start;
-    // Ten minutes at the base cadence is about twenty probes; the ladder asks
-    // fewer than a third of that, and jitter cannot move a count across that gap.
-    expect(refused).toBeGreaterThan(0);
-    expect(refused).toBeLessThan(8);
-  });
-
-  it("collapses a burst of endpoint edits into one debounced probe", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    });
-    const before = llmHealthFetches;
-
-    act(() => {
-      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8001/v1" });
-      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8002/v1" });
-      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8003/v1" });
-    });
-    // Typing a URL is many saves in a row; none of them probes yet.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(PROBE_SETTINGS_DEBOUNCE_MS - 1);
-    });
-    expect(llmHealthFetches).toBe(before);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1);
-    });
-    expect(llmHealthFetches).toBe(before + 1);
-  });
-
-  it("does not probe when an edit leaves the endpoints alone", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    });
-    const before = llmHealthFetches;
-
-    act(() => {
-      result.current.saveSettings({ ...result.current.settings, theme: "light" });
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(PROBE_SETTINGS_DEBOUNCE_MS + 1_000);
-    });
-    expect(llmHealthFetches).toBe(before);
+    expect(llmHealthFetches).toBeGreaterThan(afterInterval);
+    expect(result.current.llmHealth.healthy).toBe(true);
   });
 });
 
@@ -1487,6 +1142,8 @@ describe("StudioContext canvas state", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1524,6 +1181,8 @@ describe("StudioContext stopped turns", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1559,6 +1218,8 @@ describe("StudioContext write approval and branches", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1692,6 +1353,8 @@ describe("StudioContext startNewThread (#319)", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     conversationCreates = 0;
     vi.stubGlobal(
       "fetch",
@@ -2079,6 +1742,8 @@ describe("StudioContext agent focus", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    deletedConversations = [];
+    deleteFails = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
@@ -2188,50 +1853,51 @@ describe("StudioContext agent focus", () => {
     expect(result.current.focusedSubjectLabel).toBeNull();
   });
 
-  // Inside the main fixture on purpose: renaming needs the stubbed sidecar route
+  // Inside the main fixture on purpose: deleting needs the stubbed sidecar route
   // and the same freshly cleared IndexedDB every other conversation test uses.
-  describe("renaming a thread (#642)", () => {
-  it("shows the new name in the list without leaving the open thread", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.conversations.length).toBeGreaterThan(0));
-    const open = result.current.conversationId;
+  describe("deleting a thread (#643)", () => {
+    it("returns to the empty stage when the open thread is deleted", async () => {
+      const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+      await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+      expect(result.current.messages.length).toBeGreaterThan(0);
 
-    await act(async () => {
-      await result.current.renameConversation("c-1", "  Retention work  ");
+      await act(async () => {
+        await result.current.deleteConversation("c-1");
+      });
+
+      expect(deletedConversations).toEqual(["c-1"]);
+      expect(result.current.conversationId).toBeNull();
+      expect(result.current.messages).toEqual([]);
+      expect(result.current.conversations.map((item) => item.id)).not.toContain("c-1");
     });
 
-    const renamed = result.current.conversations.find((item) => item.id === "c-1");
-    expect(renamed?.title).toBe("Retention work");
-    // A name is not a door: the thread on screen is still the one that was open,
-    // and the request carried the name alone.
-    expect(result.current.conversationId).toBe(open);
-    expect(headPatches[headPatches.length - 1]).toEqual({ title: "Retention work" });
-  });
+    it("leaves the open thread alone when another one is deleted", async () => {
+      const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+      await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
-  it("puts the old name back when the rename is refused", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.conversations.length).toBeGreaterThan(0));
-    const before = result.current.conversations.find((item) => item.id === "c-1")?.title;
+      await act(async () => {
+        await result.current.deleteConversation("c-old");
+      });
 
-    await act(async () => {
-      await expect(result.current.renameConversation("c-1", "__fail__")).rejects.toThrow();
+      expect(result.current.conversationId).toBe("c-1");
+      expect(result.current.messages.length).toBeGreaterThan(0);
+      expect(result.current.conversations.map((item) => item.id)).not.toContain("c-old");
     });
 
-    // The optimistic name is withdrawn rather than left standing as a lie.
-    expect(result.current.conversations.find((item) => item.id === "c-1")?.title).toBe(before);
-  });
+    it("keeps the history and the transcript when the delete fails", async () => {
+      deleteFails = true;
+      const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+      await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
-  it("refuses a blank name before touching the list", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await waitFor(() => expect(result.current.conversations.length).toBeGreaterThan(0));
-    const patches = headPatches.length;
+      await act(async () => {
+        await expect(result.current.deleteConversation("c-1")).rejects.toThrow();
+      });
 
-    await act(async () => {
-      await expect(result.current.renameConversation("c-1", "   ")).rejects.toThrow(/name/i);
+      // Data intact is the whole point of the confirmation.
+      expect(result.current.conversationId).toBe("c-1");
+      expect(result.current.messages.length).toBeGreaterThan(0);
+      expect(result.current.conversations.map((item) => item.id)).toContain("c-1");
     });
-
-    expect(headPatches.length).toBe(patches);
-  });
   });
 });
 

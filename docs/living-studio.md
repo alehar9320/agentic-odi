@@ -280,7 +280,13 @@ nothing on screen can claim otherwise before the person has asked for something.
 - The **sidecar isn't running** strip is for the loss of a sidecar this session
   was talking to: the assistant paused and live data froze is only said when both
   are true. It offers **Recheck** and **Start the sidecar**, is dismissible for
-  the session, and clears itself the moment the sidecar answers.
+  the session, and clears itself the moment the sidecar answers. A studio that
+  never had one raises nothing.
+- **No model is not an error.** Without a model the studio still opens, still
+  reads and writes your canvas, and still answers — the turn is carried by the
+  browser and labelled for what it is. So no strip announces it: the capability
+  control is where you read what works here, and a blocked action explains itself
+  on the control you tried.
 - The canvas keeps showing the last thing it drew instead of going blank; a failed
   canvas is a failure panel with Retry, not an empty board. **Settings → About →
   Diagnostics** creates an opt-in, in-memory-only local bundle. It previews the

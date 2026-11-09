@@ -13,7 +13,6 @@ const studio = vi.hoisted(() => ({
   dismissSidecarNotice: vi.fn(),
   recheckConnections: vi.fn(),
   openSetup: vi.fn(),
-  openPanel: vi.fn(),
   ask: vi.fn(),
 }));
 
@@ -99,32 +98,39 @@ describe("BannerBridge", () => {
     }
   });
 
-  it("raises nothing while the sidecar is reachable and the model is healthy", () => {
+  it("raises nothing while the sidecar is reachable", () => {
     studio.sidecarReachable = true;
-    studio.llmHealth = { healthy: true, message: "" };
     renderShell();
     expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
   });
 
   it("raises nothing while reachability is still unknown", () => {
     studio.sidecarReachable = null;
-    studio.llmHealth = { healthy: null, message: "" };
     renderShell();
     expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
   });
 
-  it("raises a strip when the sidecar is down", () => {
+  it("raises nothing when no model is chosen, because that studio is working", () => {
+    // The supported state a first-time hosted visitor is actually in: local
+    // data, local memory, no model. It used to meet a "Working by hand" strip
+    // telling them the assistant was paused. A supported state needs no notice;
+    // the capability control says what works here, on request.
+    studio.sidecarReachable = null;
+    studio.llmHealth = { healthy: false, message: "no model" };
+    renderShell();
+
+    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(document.querySelector(".banner")).toBeNull();
+  });
+
+  it("raises a strip when the sidecar this session was using stops answering", () => {
     studio.sidecarReachable = false;
-    studio.llmHealth = { healthy: true, message: "" };
     renderShell();
     expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
   });
 
   it("clears the strip when the sidecar comes back", () => {
     studio.sidecarReachable = false;
-    studio.llmHealth = { healthy: true, message: "" };
     const { rerender } = renderShell();
     expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
 
@@ -141,21 +147,12 @@ describe("BannerBridge", () => {
   it("does not raise the strip once the user dismissed it this session", () => {
     studio.sidecarReachable = false;
     studio.dismissedSidecarNotice = true;
-    studio.llmHealth = { healthy: true, message: "" };
     renderShell();
     expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
   });
 
-  it("raises a working-by-hand strip when no model is reachable", () => {
-    studio.sidecarReachable = true;
-    studio.llmHealth = { healthy: false, message: "no model" };
-    renderShell();
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
-  });
-
   it("rechecks the sidecar through the real dispatcher", () => {
     studio.sidecarReachable = false;
-    studio.llmHealth = { healthy: true, message: "" };
     studio.recheckConnections.mockClear();
     renderShell();
 
@@ -168,7 +165,6 @@ describe("BannerBridge", () => {
 
   it("opens setup through the real dispatcher", () => {
     studio.sidecarReachable = false;
-    studio.llmHealth = { healthy: true, message: "" };
     studio.openSetup.mockClear();
     renderShell();
 
@@ -182,7 +178,6 @@ describe("BannerBridge", () => {
   it("clears the strip from the store when the user dismisses it", () => {
     studio.sidecarReachable = false;
     studio.dismissedSidecarNotice = false;
-    studio.llmHealth = { healthy: true, message: "" };
     renderShell();
     expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
 
@@ -196,7 +191,6 @@ describe("BannerBridge", () => {
   it("persists the sidecar dismissal, so the strip does not come back", () => {
     studio.sidecarReachable = false;
     studio.dismissedSidecarNotice = false;
-    studio.llmHealth = { healthy: true, message: "" };
     studio.dismissSidecarNotice.mockClear();
     renderShell();
 
@@ -234,28 +228,6 @@ describe("BannerBridge", () => {
     goOnline();
 
     expect(screen.queryByText(/you're offline/i)).not.toBeInTheDocument();
-  });
-
-  it("says offline rather than working-by-hand while the browser has no network", () => {
-    // One condition, one line: the offline strip already names what still works,
-    // so the model strip would only repeat it.
-    studio.llmHealth = { healthy: false, message: "no model" };
-    renderShell();
-    goOffline();
-
-    expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
-  });
-
-  it("brings back the working-by-hand line once the browser is back online", () => {
-    studio.llmHealth = { healthy: false, message: "no model" };
-    renderShell();
-    goOffline();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
-
-    goOnline();
-
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
   });
 
   it("keeps the offline line alone while the browser has no network", () => {

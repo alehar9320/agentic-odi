@@ -30,9 +30,12 @@ function Frame({ children }: { children: ReactNode }) {
   );
 }
 
-// One Chromatic snapshot per test. Four states prove every severity, both docks,
-// the multi-action layout, and the overflow affordance without spending the free
-// plan's snapshot budget.
+// One Chromatic snapshot per test. Four states prove the critical severity, a
+// top strip with actions, both docks, and the overflow affordance without
+// spending the free plan's snapshot budget. No catalog kind is a `warning` since
+// #507 deleted the last one ("Working by hand"); its styling stays for the next
+// real warning rather than being proved by a fixture for a condition that is not
+// one.
 it("renders a critical top strip with its actions", async () => {
   const screen = await render(
     <Frame>
@@ -44,15 +47,15 @@ it("renders a critical top strip with its actions", async () => {
   await expect.element(screen.getByRole("button", { name: "Recheck" })).toBeVisible();
 });
 
-it("renders the warning strip with every way to keep working", async () => {
+it("renders a top strip with its single action", async () => {
   const screen = await render(
     <Frame>
-      <BannerStack banners={[banner("model-offline")]} />
+      <BannerStack banners={[banner("update-available")]} />
     </Frame>,
   );
 
-  await expect.element(screen.getByText(/Working by hand/i)).toBeVisible();
-  await expect.element(screen.getByRole("button", { name: "Map the job" })).toBeVisible();
+  await expect.element(screen.getByText(/An update is ready to download/i)).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Install" })).toBeVisible();
 });
 
 it("stacks corner toasts for success, info, and error", async () => {
@@ -75,7 +78,7 @@ it("stacks corner toasts for success, info, and error", async () => {
 it("collapses the excess into an overflow count", async () => {
   const screen = await render(
     <Frame>
-      <BannerStack banners={[banner("sidecar-down")]} overflow={4} />
+      <BannerStack banners={[banner("offline")]} overflow={4} />
     </Frame>,
   );
 

@@ -5,7 +5,6 @@ import type { BannerKind } from "./types";
 
 const ALL_KINDS: BannerKind[] = [
   "sidecar-down",
-  "model-offline",
   "offline",
   "app-update-ready",
   "update-available",
@@ -23,6 +22,14 @@ describe("BANNER_CATALOG", () => {
     }
   });
 
+  it("has no banner for a supported state", () => {
+    // A studio with no model chosen is the product working: the turn is carried
+    // by the browser and labelled for what it is. The strip that said otherwise
+    // is gone (#507); this fails if it comes back. `sidecar-down` is not the
+    // same thing — it reports the loss of a sidecar this session was using.
+    expect(Object.keys(BANNER_CATALOG)).not.toContain("model-offline");
+  });
+
   it("gives every entry a severity, a life, and a dock", () => {
     for (const [kind, entry] of Object.entries(BANNER_CATALOG)) {
       expect(entry.severity, kind).toMatch(/^(info|success|warning|critical)$/);
@@ -31,23 +38,28 @@ describe("BANNER_CATALOG", () => {
     }
   });
 
-  it("treats the sidecar being down as a critical, persistent, top strip", () => {
-    const entry = BANNER_CATALOG["sidecar-down"];
+  it("treats a rejected write as a critical, persistent, top strip", () => {
+    const entry = BANNER_CATALOG["write-rejected"];
     expect(entry.severity).toBe("critical");
     expect(entry.life).toBe("persistent");
     expect(entry.dock).toBe("top");
     expect(entry.dismissible).toBe(true);
   });
 
-  it("treats a missing model as a warning strip that cannot be dismissed away", () => {
-    const entry = BANNER_CATALOG["model-offline"];
-    expect(entry.severity).toBe("warning");
+  it("treats a lost sidecar as a critical strip with a way back", () => {
+    const entry = BANNER_CATALOG["sidecar-down"];
+    expect(entry.severity).toBe("critical");
     expect(entry.life).toBe("persistent");
-    expect(entry.dismissible).toBe(false);
+    expect(entry.dock).toBe("top");
+    expect(entry.dismissible).toBe(true);
+    expect(entry.actions?.map((action) => action.action)).toEqual([
+      "recheck-sidecar",
+      "open-setup",
+    ]);
   });
 
   it("names what still works when the browser is offline, without claiming sync", () => {
-    const entry = BANNER_CATALOG["offline"];
+    const entry = BANNER_CATALOG.offline;
     expect(entry.severity).toBe("info");
     expect(entry.life).toBe("persistent");
     expect(entry.dock).toBe("top");
@@ -90,7 +102,7 @@ describe("severityWeight", () => {
 
 describe("resolveSpec", () => {
   it("fills the defaults from the kind", () => {
-    const resolved = resolveSpec({ kind: "sidecar-down" });
+    const resolved = resolveSpec({ kind: "write-rejected" });
     expect(resolved.severity).toBe("critical");
     expect(resolved.life).toBe("persistent");
     expect(resolved.dock).toBe("top");
