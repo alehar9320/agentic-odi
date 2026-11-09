@@ -1,80 +1,175 @@
-import type { StudioBrief } from "../../../types";
+import { useEffect, useState } from "react";
+
+import { useStudio } from "../../../state/StudioContext";
+import { getStorageFacts, exportWorkspace, importWorkspace } from "../../../api/studioApi";
+import { exportFilename } from "../../../lib/export";
 
 interface DataSectionProps {
-  brief: StudioBrief | null;
-  openSetup: () => void;
-  displayName: string;
-  setDisplayName: (name: string) => void;
-  closeSetup: () => void;
-  clearChat: () => void;
-  refreshCanvas: () => Promise<void>;
+  sidecarReachable: boolean | null;
 }
 
-/**
- * The person's own context and the two actions that start fresh: the job the
- * studio answers from, the name it greets them with, and the canvas sync.
- *
- * Every value here is local, so the section has nothing to load and nothing to
- * fail on its own.
- */
-export function DataSection({
-  brief,
-  openSetup,
-  displayName,
-  setDisplayName,
-  closeSetup,
-  clearChat,
-  refreshCanvas,
-}: DataSectionProps) {
+function formatBytes(bytes?: number): string {
+  if (bytes === undefined) {
+    return "—";
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatRelativeTime(dateString?: string): string {
+  if (!dateString) {
+    return "—";
+  }
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) {
+    return "just now";
+  }
+  if (diffMins < 60) {
+    return `${diffMins} min ago`;
+  }
+  if (diffHours < 24) {
+    return `${diffHours} h ago`;
+  }
+  return `${diffDays} d ago`;
+}
+
+export function DataSection({ sidecarReachable }: DataSectionProps) {
+  const { pushToast } = useStudio();
+  const [facts, setFacts] = useState<{
+    kind: "sidecar" | "browser";
+    path?: string;
+    bytes?: number;
+    lastWrittenAt?: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadFacts() {
+      try {
+        const data = await getStorageFacts();
+        if (!cancelled) {
+          setFacts(data);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load storage facts");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+    loadFacts();
+    return () => {
+      cancelled = true;
+    };
+  }, [sidecarReachable]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const json = await exportWorkspace();
+      const filename = exportFilename(new Date()).replace(".md", ".json");
+      const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      pushToast("success", `Exported ${filename}`);
+    } catch (err) {
+      pushToast("error", `Export failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setImporting(true);
+    try {
+      const text = await file.text();
+      await importWorkspace(text);
+      pushToast("success", "Imported workspace — reloading canvas");
+      window.location.reload();
+    } catch (err) {
+      pushToast("error", `Import failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setImporting(false);
+      event.target.value = "";
+    }
+  };
+
+  const storeLabel = facts?.kind === "sidecar" ? "On this device (sidecar)" : "In this browser";
+  const storePath = facts?.path ? ` · ${facts.path}` : "";
+  const storeSize = ` · ${formatBytes(facts?.bytes)}`;
+  const storeRecency = ` · last written ${formatRelativeTime(facts?.lastWrittenAt)}`;
+
   return (
     <div className="settings__section">
-      <div className="settings__context">
-        <div>
-          <p className="settings__context-label">Your context</p>
-          <p className="settings__context-value">
-            {brief?.job_statement
-              ? `${brief.product_name || "Your product"} — ${brief.job_statement}`
-              : "Not set yet. The studio starts every reply from this."}
-          </p>
-          {brief?.v2mom?.vision && (
-            <p className="settings__context-value">
-              <strong>Vision:</strong> {brief.v2mom.vision}
-            </p>
-          )}
-        </div>
-        <button type="button" className="button button--ghost" onClick={openSetup}>
-          {brief ? "Edit context" : "Set up context"}
-        </button>
-      </div>
+      <h2 className="settings__section-title">Data</h2>
+      <p className="settings__section-description">
+        Where your work lives and tools to move it.
+      </p>
 
-      <div className="field">
-        <label htmlFor="display-name">
-          Your name <span className="field__hint">optional — used in the greeting</span>
-        </label>
-        <input
-          id="display-name"
-          className="input"
-          value={displayName}
-          placeholder="Ada"
-          autoComplete="given-name"
-          onChange={(event) => setDisplayName(event.target.value)}
-        />
-      </div>
+      {loading && <p className="settings__loading">Loading storage facts…</p>}
+      {error && <p className="settings__error" role="alert">{error}</p>}
+
+      {!loading && !error && facts && (
+        <div className="settings__storage-facts">
+          <p className="settings__storage-summary">
+            {storeLabel}{storePath}{storeSize}{storeRecency}
+          </p>
+          <p className="settings__storage-exclusions">
+            This file does not contain uploads, connector tokens, or provider API keys.
+          </p>
+        </div>
+      )}
 
       <div className="settings__actions">
         <button
           type="button"
           className="button"
-          onClick={() => {
-            closeSetup();
-            clearChat();
-          }}
+          onClick={handleExport}
+          disabled={exporting || importing || loading || error !== null}
         >
-          Start a new conversation
+          {exporting ? "Exporting…" : "Export workspace"}
         </button>
-        <button type="button" className="button button--ghost" onClick={() => void refreshCanvas()}>
-          Sync canvas
-        </button>
+        <label className="button button--ghost" htmlFor="import-workspace">
+          {importing ? "Importing…" : "Import workspace"}
+          <input
+            id="import-workspace"
+            type="file"
+            accept=".json"
+            onChange={handleImport}
+            disabled={exporting || importing || loading || error !== null}
+            style={{ display: "none" }}
+          />
+        </label>
       </div>
     </div>
   );
