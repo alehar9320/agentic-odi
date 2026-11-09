@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
+import { formatClockTime } from "../../lib/relativeTime";
 import type { ChatMessage } from "../../types";
 import { catalogManifest } from "../../ui/catalog";
 import { parseUiSpec, type UiNode } from "../../ui/protocol";
@@ -13,7 +14,8 @@ const harness = vi.hoisted(() => ({
     streaming: false,
     thinkingPhase: null as string | null,
     toolActivity: [] as unknown[],
-    offlineReply: false,
+    offlineReplyFor: null as string | null,
+    openPanel: vi.fn<(panel: string) => void>(),
     canvas: null,
     regenerateFrom: vi.fn(),
     editFrom: vi.fn(),
@@ -64,6 +66,15 @@ function renderTurn(messages: ChatMessage[]) {
     </StudioRuntimeProvider>,
   );
 }
+
+// The clamp reads real layout, which jsdom does not compute. Each test that
+// stubs it registers the way back here, so no later test inherits a fake height.
+let restoreLayout: (() => void) | null = null;
+
+afterEach(() => {
+  restoreLayout?.();
+  restoreLayout = null;
+});
 
 describe("Conversation", () => {
   it("renders prose and surfaces in the agent's order", () => {
@@ -292,11 +303,18 @@ describe("Conversation", () => {
 });
 
 describe("Conversation offline context", () => {
-  it("marks a content-less offline turn as local guidance", () => {
-    harness.state.offlineReply = true;
+  it("names the provenance on the one reply that needs it and offers the fix", () => {
+    harness.state.offlineReplyFor = "m-2";
     const { container } = renderTurn([
       {
         id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "From the model.",
+        parts: [{ kind: "text", text: "From the model." }],
+      },
+      {
+        id: "m-2",
         parentId: null,
         role: "assistant",
         content: "",
@@ -304,9 +322,15 @@ describe("Conversation offline context", () => {
       },
     ]);
 
-    expect(screen.getByText("Local guidance")).toBeInTheDocument();
-    expect(container.querySelector(".message__tag")).not.toBeNull();
-    harness.state.offlineReply = false;
+    const chips = container.querySelectorAll("button.message__tag");
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent("Local draft, no model connected");
+
+    fireEvent.click(chips[0] as HTMLButtonElement);
+    expect(harness.state.openPanel).toHaveBeenCalledWith("settings");
+
+    harness.state.offlineReplyFor = null;
+    harness.state.openPanel.mockClear();
   });
 });
 
@@ -408,5 +432,141 @@ describe("Conversation failures", () => {
     fireEvent.click(retry);
 
     expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
+  });
+  it("clamps a pasted document behind a keyboard-reachable Show more (#696)", () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+      configurable: true,
+      get: () => 400,
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get: () => 128,
+    });
+    // Both stubs shadow jsdom's Element getters; deleting the own properties on
+    // HTMLElement.prototype puts the real measurement back for later tests.
+    restoreLayout = () => {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
+    };
+
+    const paste = Array.from({ length: 30 }, (_, index) => `Line ${index + 1} of a pasted doc`).join(
+      "\n",
+    );
+    renderTurn([{ id: "m-1", parentId: null, role: "user", content: paste }]);
+
+    const bubble = document.querySelector(".message__bubble") as HTMLElement;
+    expect(bubble).toHaveClass("is-clamped");
+
+    const more = screen.getByRole("button", { name: "Show more" });
+    expect(more).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(more);
+
+    expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(bubble).not.toHaveClass("is-clamped");
+    // Clamping is presentation: the whole message is still the message, so Copy
+    // (which reads the turn, not the bubble) copies all of it.
+    expect(bubble.textContent).toContain("Line 30 of a pasted doc");
+    expect(screen.getByRole("button", { name: "Copy message" })).toBeInTheDocument();
+
+  });
+
+  it("leaves a short message alone, with no control to expand (#696)", () => {
+    renderTurn([{ id: "m-1", parentId: null, role: "user", content: "Short question." }]);
+
+    expect(document.querySelector(".message__bubble")).not.toHaveClass("is-clamped");
+    expect(screen.queryByRole("button", { name: /show more/i })).toBeNull();
+  });
+
+});
+
+describe("transcript day dividers (#694 D14)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("puts one separator between calendar days and none inside a day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 9, 0));
+    try {
+      renderTurn([
+        {
+          id: "u-1",
+          parentId: null,
+          role: "user",
+          content: "Before midnight",
+          createdAt: new Date(2026, 9, 21, 23, 50).toISOString(),
+        },
+        {
+          id: "a-1",
+          parentId: "u-1",
+          role: "assistant",
+          content: "Still the same evening",
+          createdAt: new Date(2026, 9, 21, 23, 55).toISOString(),
+        },
+        {
+          id: "u-2",
+          parentId: "a-1",
+          role: "user",
+          content: "After midnight",
+          createdAt: new Date(2026, 9, 22, 0, 10).toISOString(),
+        },
+      ]);
+
+      const separators = screen.getAllByRole("separator");
+      expect(separators).toHaveLength(1);
+      expect(separators[0]).toHaveAttribute("aria-label", "Today");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("separates nothing when a thread stays inside one day", () => {
+    renderTurn([
+      {
+        id: "u-1",
+        parentId: null,
+        role: "user",
+        content: "Morning",
+        createdAt: new Date(2026, 8, 3, 9, 0).toISOString(),
+      },
+      {
+        id: "a-1",
+        parentId: "u-1",
+        role: "assistant",
+        content: "Afternoon",
+        createdAt: new Date(2026, 8, 3, 15, 0).toISOString(),
+      },
+    ]);
+
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+  });
+});
+
+describe("message timestamps (#694 D15)", () => {
+  it("keeps the exact time off the page until the message is asked for", () => {
+    const at = new Date(2026, 9, 22, 9, 30).toISOString();
+    const clock = formatClockTime(at);
+
+    renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "A question", createdAt: at },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer", createdAt: at },
+    ]);
+
+    const times = Array.from(document.querySelectorAll("time.message__time")) as HTMLTimeElement[];
+    expect(times).toHaveLength(2);
+    for (const time of times) {
+      expect(time).toHaveAttribute("datetime", at);
+      expect(time.textContent).toBe(clock);
+      // It lives with the actions, which the stylesheet only reveals on hover
+      // or focus, so it is never on the page at rest.
+      expect(time.closest(".message__actions")).not.toBeNull();
+    }
+
+    expect(screen.getByRole("group", { name: `Reply actions, ${clock}` })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: `Message actions, ${clock}` })).toBeInTheDocument();
   });
 });

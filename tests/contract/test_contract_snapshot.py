@@ -169,7 +169,7 @@ def _declared_pin() -> Snapshot:
             {
                 "name": "add_outcome",
                 "effect": "write",
-                "summary": "Add a desired Outcome to a Job.",
+                "summary": "Add a desired Outcome to a Job; three questions and the person's answers come before any score, and the score carries them as a claim_check.",
                 "arguments": [
                     "job_id",
                     "statement",
@@ -177,8 +177,9 @@ def _declared_pin() -> Snapshot:
                     "satisfaction",
                     "step_id",
                     "origin",
+                    "claim_check",
                 ],
-                "required": ["job_id", "statement", "importance", "satisfaction"],
+                "required": ["job_id", "statement"],
                 "returns": "The created Outcome.",
                 "stage": "2",
             },
@@ -192,6 +193,15 @@ def _declared_pin() -> Snapshot:
                 "stage": "3",
             },
             {
+                "name": "approve_proposal",
+                "effect": "write",
+                "summary": "Approve a proposal and write it as an Outcome.",
+                "arguments": ["proposal_id", "statement", "importance", "satisfaction"],
+                "required": ["proposal_id"],
+                "returns": "The created Outcome.",
+                "stage": "2",
+            },
+            {
                 "name": "cancel_scheduled_work",
                 "effect": "write",
                 "summary": "Cancel a scheduled work item.",
@@ -202,7 +212,7 @@ def _declared_pin() -> Snapshot:
             },
             {
                 "name": "compute_opportunity",
-                "effect": "write",
+                "effect": "read",
                 "summary": "Compute an ODI opportunity score from importance and satisfaction.",
                 "arguments": ["importance", "satisfaction"],
                 "required": ["importance", "satisfaction"],
@@ -265,7 +275,7 @@ def _declared_pin() -> Snapshot:
             },
             {
                 "name": "evaluate_outcome",
-                "effect": "write",
+                "effect": "read",
                 "summary": "Evaluate an outcome statement against ODI format rules.",
                 "arguments": ["statement", "job_id"],
                 "required": ["statement"],
@@ -372,6 +382,15 @@ def _declared_pin() -> Snapshot:
                 "stage": "2",
             },
             {
+                "name": "get_outcome_alignments",
+                "effect": "read",
+                "summary": "List the V2MOM links recorded on Outcomes.",
+                "arguments": ["outcome_id"],
+                "required": [],
+                "returns": "A list of links, each naming the outcome, field, key, and text.",
+                "stage": "6",
+            },
+            {
                 "name": "get_outcomes",
                 "effect": "read",
                 "summary": "List desired Outcomes for a Job.",
@@ -417,6 +436,24 @@ def _declared_pin() -> Snapshot:
                 "stage": "6",
             },
             {
+                "name": "get_traceability_report",
+                "effect": "read",
+                "summary": "Report orphans, unfunded objectives, and links the vision dropped.",
+                "arguments": [],
+                "required": [],
+                "returns": "The orphans, unfunded, and drift lists, or a note that no objectives exist.",
+                "stage": "6",
+            },
+            {
+                "name": "link_outcome",
+                "effect": "write",
+                "summary": "Link an Outcome to the V2MOM method or measure it advances.",
+                "arguments": ["outcome_id", "field", "text"],
+                "required": ["outcome_id", "field", "text"],
+                "returns": "The updated Outcome, or a refusal naming the objectives that do exist.",
+                "stage": "6",
+            },
+            {
                 "name": "list_customer_outcomes",
                 "effect": "read",
                 "summary": "List Customer Outcomes for a Job.",
@@ -433,6 +470,15 @@ def _declared_pin() -> Snapshot:
                 "required": [],
                 "returns": "A list of Evidence records.",
                 "stage": None,
+            },
+            {
+                "name": "list_proposals",
+                "effect": "read",
+                "summary": "List outcome proposals, optionally filtered by status.",
+                "arguments": ["status"],
+                "required": [],
+                "returns": "A list of OutcomeProposals.",
+                "stage": "2",
             },
             {
                 "name": "list_scheduled_work",
@@ -453,12 +499,30 @@ def _declared_pin() -> Snapshot:
                 "stage": None,
             },
             {
+                "name": "list_studies",
+                "effect": "read",
+                "summary": "List the studies opened for a Job.",
+                "arguments": ["job_id"],
+                "required": [],
+                "returns": "A list of Studies. Empty until a study has been opened.",
+                "stage": None,
+            },
+            {
                 "name": "mark_signal_read",
                 "effect": "write",
                 "summary": "Mark a signal as read so it stops counting toward the unread badge.",
                 "arguments": ["signal_id"],
                 "required": ["signal_id"],
                 "returns": "The updated Signal.",
+                "stage": None,
+            },
+            {
+                "name": "open_study",
+                "effect": "write",
+                "summary": "Open a named study pass over a Job at a given wave number.",
+                "arguments": ["job_id", "name", "wave", "method_notes"],
+                "required": ["job_id", "name", "wave"],
+                "returns": "The created Study, opened as planned.",
                 "stage": None,
             },
             {
@@ -479,6 +543,15 @@ def _declared_pin() -> Snapshot:
                 "stage": None,
             },
             {
+                "name": "propose_outcome",
+                "effect": "write",
+                "summary": "Propose a desired outcome mined from an evidence record.",
+                "arguments": ["evidence_id"],
+                "required": ["evidence_id"],
+                "returns": "An OutcomeProposal ready for human approval.",
+                "stage": "2",
+            },
+            {
                 "name": "propose_strategy",
                 "effect": "write",
                 "summary": "Recommend the one innovation path the segments support.",
@@ -486,6 +559,15 @@ def _declared_pin() -> Snapshot:
                 "required": [],
                 "returns": "The Strategy, including every path it beat and why.",
                 "stage": "6",
+            },
+            {
+                "name": "reject_proposal",
+                "effect": "write",
+                "summary": "Reject a proposal; nothing is written to the ODI store.",
+                "arguments": ["proposal_id"],
+                "required": ["proposal_id"],
+                "returns": "The rejected OutcomeProposal.",
+                "stage": "2",
             },
             {
                 "name": "schedule_work",
@@ -520,6 +602,15 @@ def _declared_pin() -> Snapshot:
                 "required": ["work_id"],
                 "returns": "The dispatched scheduled work item.",
                 "stage": None,
+            },
+            {
+                "name": "unlink_outcome",
+                "effect": "write",
+                "summary": "Remove one V2MOM link from an Outcome.",
+                "arguments": ["outcome_id", "field", "key"],
+                "required": ["outcome_id", "field", "key"],
+                "returns": "The updated Outcome.",
+                "stage": "6",
             },
             {
                 "name": "update_customer_outcome",
@@ -646,18 +737,31 @@ def _live_pin() -> Snapshot:
             "add_outcome": {
                 "additionalProperties": False,
                 "properties": {
-                    "importance": {"type": "number"},
+                    "claim_check": {
+                        "anyOf": [
+                            {"additionalProperties": True, "type": "object"},
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                    },
+                    "importance": {
+                        "anyOf": [{"type": "number"}, {"type": "null"}],
+                        "default": None,
+                    },
                     "job_id": {"type": "string"},
                     "origin": {
                         "default": "user",
                         "enum": ["user", "demo", "sample", "imported"],
                         "type": "string",
                     },
-                    "satisfaction": {"type": "number"},
+                    "satisfaction": {
+                        "anyOf": [{"type": "number"}, {"type": "null"}],
+                        "default": None,
+                    },
                     "statement": {"type": "string"},
                     "step_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None},
                 },
-                "required": ["job_id", "statement", "importance", "satisfaction"],
+                "required": ["job_id", "statement"],
                 "type": "object",
             },
             "add_step": {
@@ -694,6 +798,23 @@ def _live_pin() -> Snapshot:
                     },
                 },
                 "required": ["job_id", "name", "order"],
+                "type": "object",
+            },
+            "approve_proposal": {
+                "additionalProperties": False,
+                "properties": {
+                    "importance": {
+                        "anyOf": [{"type": "number"}, {"type": "null"}],
+                        "default": None,
+                    },
+                    "proposal_id": {"type": "string"},
+                    "satisfaction": {
+                        "anyOf": [{"type": "number"}, {"type": "null"}],
+                        "default": None,
+                    },
+                    "statement": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None},
+                },
+                "required": ["proposal_id"],
                 "type": "object",
             },
             "cancel_scheduled_work": {
@@ -811,6 +932,13 @@ def _live_pin() -> Snapshot:
                 "required": ["outcome_id"],
                 "type": "object",
             },
+            "get_outcome_alignments": {
+                "additionalProperties": False,
+                "properties": {
+                    "outcome_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None}
+                },
+                "type": "object",
+            },
             "get_outcomes": {
                 "additionalProperties": False,
                 "properties": {
@@ -843,6 +971,21 @@ def _live_pin() -> Snapshot:
                 "type": "object",
             },
             "get_strategy": {"additionalProperties": False, "properties": {}, "type": "object"},
+            "get_traceability_report": {
+                "additionalProperties": False,
+                "properties": {},
+                "type": "object",
+            },
+            "link_outcome": {
+                "additionalProperties": False,
+                "properties": {
+                    "field": {"type": "string"},
+                    "outcome_id": {"type": "string"},
+                    "text": {"type": "string"},
+                },
+                "required": ["outcome_id", "field", "text"],
+                "type": "object",
+            },
             "list_customer_outcomes": {
                 "additionalProperties": False,
                 "properties": {
@@ -866,6 +1009,13 @@ def _live_pin() -> Snapshot:
                 },
                 "type": "object",
             },
+            "list_proposals": {
+                "additionalProperties": False,
+                "properties": {
+                    "status": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None}
+                },
+                "type": "object",
+            },
             "list_scheduled_work": {
                 "additionalProperties": False,
                 "properties": {
@@ -882,10 +1032,31 @@ def _live_pin() -> Snapshot:
                 },
                 "type": "object",
             },
+            "list_studies": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None}
+                },
+                "type": "object",
+            },
             "mark_signal_read": {
                 "additionalProperties": False,
                 "properties": {"signal_id": {"type": "string"}},
                 "required": ["signal_id"],
+                "type": "object",
+            },
+            "open_study": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"type": "string"},
+                    "method_notes": {
+                        "anyOf": [{"type": "string"}, {"type": "null"}],
+                        "default": None,
+                    },
+                    "name": {"type": "string"},
+                    "wave": {"type": "integer"},
+                },
+                "required": ["job_id", "name", "wave"],
                 "type": "object",
             },
             "promote_evidence": {
@@ -908,11 +1079,23 @@ def _live_pin() -> Snapshot:
                 "required": ["evidence_id", "target"],
                 "type": "object",
             },
+            "propose_outcome": {
+                "additionalProperties": False,
+                "properties": {"evidence_id": {"type": "string"}},
+                "required": ["evidence_id"],
+                "type": "object",
+            },
             "propose_strategy": {
                 "additionalProperties": False,
                 "properties": {
                     "job_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None}
                 },
+                "type": "object",
+            },
+            "reject_proposal": {
+                "additionalProperties": False,
+                "properties": {"proposal_id": {"type": "string"}},
+                "required": ["proposal_id"],
                 "type": "object",
             },
             "schedule_work": {
@@ -946,6 +1129,16 @@ def _live_pin() -> Snapshot:
                 "additionalProperties": False,
                 "properties": {"work_id": {"type": "string"}},
                 "required": ["work_id"],
+                "type": "object",
+            },
+            "unlink_outcome": {
+                "additionalProperties": False,
+                "properties": {
+                    "field": {"type": "string"},
+                    "key": {"type": "string"},
+                    "outcome_id": {"type": "string"},
+                },
+                "required": ["outcome_id", "field", "key"],
                 "type": "object",
             },
             "update_customer_outcome": {
@@ -1415,7 +1608,105 @@ def _entity_pin() -> Snapshot:
                 "type": "object",
             },
             "Outcome": {
+                "$defs": {
+                    "ClaimCheck": {
+                        "description": """\
+The questions behind a score: what was asked, answered, or skipped.
+
+Two numbers are not provenance. A score that carries a claim check says
+which questions produced it — ``asked`` — and what came back: the
+``answers`` the person gave and the ``skips`` with a recorded reason.
+
+``verified`` is derived, never typed in: a check is verified when at least
+one question was answered by the person. A check of only skips is
+unverified, so an outcome built on an assumption says so instead of
+borrowing the confidence of a number.\
+""",
+                        "properties": {
+                            "answers": {
+                                "description": "The answers the person gave, in order",
+                                "items": {"type": "string"},
+                                "title": "Answers",
+                                "type": "array",
+                            },
+                            "asked": {
+                                "description": "The questions put to the person",
+                                "items": {"type": "string"},
+                                "title": "Asked",
+                                "type": "array",
+                            },
+                            "skips": {
+                                "description": "Questions skipped, each with a reason",
+                                "items": {"$ref": "#/$defs/ClaimSkip"},
+                                "title": "Skips",
+                                "type": "array",
+                            },
+                        },
+                        "title": "ClaimCheck",
+                        "type": "object",
+                    },
+                    "ClaimSkip": {
+                        "description": """\
+One question that went unanswered, and why it was skipped.
+
+A skip without a reason is not a skip, it is a missing answer, so
+``reason`` is required and must not be blank.\
+""",
+                        "properties": {
+                            "question": {
+                                "description": "The question that was not answered",
+                                "title": "Question",
+                                "type": "string",
+                            },
+                            "reason": {
+                                "description": "Why it was skipped; never blank",
+                                "title": "Reason",
+                                "type": "string",
+                            },
+                        },
+                        "required": ["question", "reason"],
+                        "title": "ClaimSkip",
+                        "type": "object",
+                    },
+                    "OutcomeAlignment": {
+                        "description": """\
+A claim that an Outcome advances one V2MOM objective.
+
+``field`` is ``method`` or ``measure``; ``key`` is the content key computed
+from ``field`` and ``text`` when the link was made; ``text`` is the
+canonical objective text then. Storing the key *and* the text means a
+reworded objective shows up as drift carrying the text the outcome was
+linked to, and the key is never re-derived under a later normalization rule.\
+""",
+                        "properties": {
+                            "field": {
+                                "description": "Which V2MOM list the objective lives in",
+                                "enum": ["method", "measure"],
+                                "title": "Field",
+                                "type": "string",
+                            },
+                            "key": {
+                                "description": "Frozen content key for the objective text",
+                                "title": "Key",
+                                "type": "string",
+                            },
+                            "text": {
+                                "description": "The objective text as it read when the link was made",
+                                "title": "Text",
+                                "type": "string",
+                            },
+                        },
+                        "required": ["field", "key", "text"],
+                        "title": "OutcomeAlignment",
+                        "type": "object",
+                    },
+                },
                 "properties": {
+                    "claim_check": {
+                        "anyOf": [{"$ref": "#/$defs/ClaimCheck"}, {"type": "null"}],
+                        "default": None,
+                        "description": "The questions that produced the score, and what came back",
+                    },
                     "id": {"title": "Id", "type": "string"},
                     "importance": {
                         "anyOf": [
@@ -1464,9 +1755,53 @@ def _entity_pin() -> Snapshot:
                         "description": "The ID of the specific Step, if applicable",
                         "title": "Step Id",
                     },
+                    "study_id": {
+                        "anyOf": [{"type": "string"}, {"type": "null"}],
+                        "default": None,
+                        "description": "The Study wave this outcome was measured in, or None for a row that predates studies",
+                        "title": "Study Id",
+                    },
+                    "trace": {
+                        "description": "The V2MOM methods and measures this outcome advances. Empty means the outcome is unlinked, which the traceability report calls an orphan.",
+                        "items": {"$ref": "#/$defs/OutcomeAlignment"},
+                        "title": "Trace",
+                        "type": "array",
+                    },
                 },
                 "required": ["job_id", "statement"],
                 "title": "Outcome",
+                "type": "object",
+            },
+            "OutcomeAlignment": {
+                "description": """\
+A claim that an Outcome advances one V2MOM objective.
+
+``field`` is ``method`` or ``measure``; ``key`` is the content key computed
+from ``field`` and ``text`` when the link was made; ``text`` is the
+canonical objective text then. Storing the key *and* the text means a
+reworded objective shows up as drift carrying the text the outcome was
+linked to, and the key is never re-derived under a later normalization rule.\
+""",
+                "properties": {
+                    "field": {
+                        "description": "Which V2MOM list the objective lives in",
+                        "enum": ["method", "measure"],
+                        "title": "Field",
+                        "type": "string",
+                    },
+                    "key": {
+                        "description": "Frozen content key for the objective text",
+                        "title": "Key",
+                        "type": "string",
+                    },
+                    "text": {
+                        "description": "The objective text as it read when the link was made",
+                        "title": "Text",
+                        "type": "string",
+                    },
+                },
+                "required": ["field", "key", "text"],
+                "title": "OutcomeAlignment",
                 "type": "object",
             },
             "ScheduledWork": {
@@ -1661,7 +1996,7 @@ from partial evidence. No demographic attribute appears here by design.\
                         "title": "Dismissed At",
                     },
                     "fingerprint": {
-                        "description": "sha256 of kind|subject_kind|subject_id|discriminator",
+                        "description": "sha256 of kind|subject_kind|subject_id|discriminator, plus source event id",
                         "title": "Fingerprint",
                         "type": "string",
                     },
@@ -1821,6 +2156,66 @@ A strategy without its rejections is a conclusion, not a recommendation, so
                 },
                 "required": ["kind", "thesis"],
                 "title": "Strategy",
+                "type": "object",
+            },
+            "Study": {
+                "$defs": {
+                    "StudyStatus": {
+                        "description": "Where a study is in its own life: opened, collecting, or closed.",
+                        "enum": ["planned", "fielding", "closed"],
+                        "title": "StudyStatus",
+                        "type": "string",
+                    }
+                },
+                "description": """\
+One named pass over a Job, and the wave number of that pass.
+
+A study is a container, not a measurement: it names a slice of research so a
+later wave can be compared with an earlier one. ``wave`` is unique per
+``(job_id, name)`` within the store — that guarantee needs to see the other
+rows, so it lives in the service, while the model owns the invariants it can
+check alone: a wave is a positive pass number, and ``closed_at`` appears if
+and only if the study is closed.\
+""",
+                "properties": {
+                    "closed_at": {
+                        "anyOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
+                        "default": None,
+                        "description": "Set once, when the study closes",
+                        "title": "Closed At",
+                    },
+                    "id": {"title": "Id", "type": "string"},
+                    "job_id": {
+                        "description": "The Job this study takes one pass over",
+                        "title": "Job Id",
+                        "type": "string",
+                    },
+                    "method_notes": {
+                        "anyOf": [{"type": "string"}, {"type": "null"}],
+                        "default": None,
+                        "description": "How this pass was run, so a later wave is comparable",
+                        "title": "Method Notes",
+                    },
+                    "name": {
+                        "description": "Human label for the study, e.g. 'reconciliation sweep'",
+                        "title": "Name",
+                        "type": "string",
+                    },
+                    "opened_at": {"format": "date-time", "title": "Opened At", "type": "string"},
+                    "status": {
+                        "$ref": "#/$defs/StudyStatus",
+                        "default": "planned",
+                        "description": "Where the study is in its life",
+                    },
+                    "wave": {
+                        "description": "1-based pass number within (job_id, name)",
+                        "minimum": 1,
+                        "title": "Wave",
+                        "type": "integer",
+                    },
+                },
+                "required": ["job_id", "name", "wave"],
+                "title": "Study",
                 "type": "object",
             },
             "V2MOM": {

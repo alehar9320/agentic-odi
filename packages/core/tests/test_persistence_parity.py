@@ -15,6 +15,7 @@ from typing import Any, get_args, get_origin, get_type_hints
 
 import pytest
 from agentic_odi_core.contract import TOOL_SPECS
+from agentic_odi_core.mapping import OutcomeProposal
 from agentic_odi_core.models import (
     V2MOM,
     BusinessValue,
@@ -32,6 +33,7 @@ from agentic_odi_core.models import (
     Step,
     Strategy,
     StrategyKind,
+    Study,
     ValueMetric,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
@@ -103,6 +105,26 @@ ENTITY_ROWS: dict[str, tuple[str, Any]] = {
             ),
         ),
     ),
+    "proposals": (
+        "add_proposal",
+        OutcomeProposal(
+            id="prop-1",
+            evidence_id="evd-1",
+            statement=STATEMENT,
+            direction=Direction.MINIMIZE,
+            confidence=0.6,
+            rationale="The customer named the delay twice.",
+            source_name="gong",
+        ),
+    ),
+    "studies": (
+        "add_study",
+        Study(id="study-1", job_id="job-1", name="Reconciliation sweep", wave=1),
+    ),
+    "v2mom": (
+        "add_v2mom",
+        V2MOM(vision="Approving invoices is never the bottleneck"),
+    ),
     "evidence": (
         "add_evidence",
         Evidence(
@@ -151,6 +173,16 @@ CREATED_BRANCH = re.compile(
 )
 
 
+#: The repository stores these rows for its own workflow rather than as
+#: published entities: a proposal is the review step's private record, so
+#: ``odi_schema()`` keeps it out on purpose.
+UNPUBLISHED_ENTITIES = {"OutcomeProposal"}
+
+#: Entities with no ``<ENTITY>_CREATED`` branch to replay: the workspace holds
+#: one V2MOM, written through ``V2MOM_UPDATED``, so there is no created event.
+UNREPLAYED_ENTITIES = {"v2mom"}
+
+
 def _store_entities() -> dict[str, tuple[str, type[Any]]]:
     """Map each entity dict name to ``(schema model name, model class)``."""
     return {
@@ -172,7 +204,7 @@ def test_every_stored_entity_has_a_published_schema() -> None:
     missing = sorted(
         model_name
         for model_name, _ in _store_entities().values()
-        if model_name not in _SCHEMA_MODELS
+        if model_name not in _SCHEMA_MODELS and model_name not in UNPUBLISHED_ENTITIES
     )
     assert not missing, f"{missing} is stored by the repository but missing from _SCHEMA_MODELS"
 
@@ -194,7 +226,7 @@ def test_event_replay_covers_every_entity_exactly_once() -> None:
     assert len(events) == len(set(events)), "two branches replay the same CREATED event"
 
     replayed = {attr for _, attr, _ in branches}
-    expected = set(_store_entities())
+    expected = set(_store_entities()) - UNREPLAYED_ENTITIES
     missing = sorted(expected - replayed)
     extra = sorted(replayed - expected)
     assert not missing and not extra, (
