@@ -11,7 +11,7 @@ import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { CHANGELOG_READ_EVENT, readReleaseVersions, unreadReleases } from "../../lib/changelogRead";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { isEndpointConfiguredForSettings, endpointReachability, isPrivateHost } from "../../lib/modelEndpoint";
-import { formatRelativeTime } from "../../lib/relativeTime";
+import { formatRelativeTime, groupByDay } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
@@ -69,6 +69,7 @@ export function StudioBar({
   const [unreadReleaseCount, setUnreadReleaseCount] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const wide = useMediaQuery("(min-width: 720px)");
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [askOpen, setAskOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
@@ -99,6 +100,7 @@ export function StudioBar({
     };
   }, []);
 
+  const activeHistoryRef = useRef<HTMLButtonElement>(null);
   // An empty transcript is only nothing to lose when nothing is on screen to
   // leave: the plus is the documented way out of the first-run setup, and a
   // disabled control there would strand the person in it.
@@ -164,6 +166,18 @@ export function StudioBar({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [historyOpen]);
+  // Opening the list lands on the thread already on screen: with forty in the
+  // list the one being read can be well below the fold, and hunting for it is
+  // work the app can do. Reduced motion gets the jump instead of the glide.
+  useEffect(() => {
+    if (!historyOpen) {
+      return;
+    }
+    const active = activeHistoryRef.current;
+    if (active && typeof active.scrollIntoView === "function") {
+      active.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+    }
+  }, [historyOpen, reduceMotion]);
 
   function toggleHistory() {
     setHistoryOpen((open) => {
@@ -363,26 +377,45 @@ export function StudioBar({
               {conversations.length === 0 ? (
                 <p className="bar__history-empty">No conversations yet.</p>
               ) : (
-                conversations.map((conversation) => {
-                  const current = conversation.id === conversationId;
-                  return (
-                    <button
-                      key={conversation.id}
-                      type="button"
-                      role="menuitem"
-                      className="bar__menu-item bar__history-item"
-                      aria-current={current ? "true" : undefined}
-                      onClick={() => selectConversation(conversation.id)}
-                    >
-                      <span className="bar__history-title">
-                        {conversation.title.trim() || "New conversation"}
-                      </span>
-                      <span className="bar__history-meta">
-                        {formatRelativeTime(conversation.updated_at)}
-                      </span>
-                    </button>
-                  );
-                })
+                groupByDay(conversations, (conversation) => conversation.updated_at).map((group) => (
+                  // The group carries the day in its accessible name; the line
+                  // above it is the same word made visible.
+                  <div
+                    key={group.section}
+                    className="bar__history-group"
+                    role="group"
+                    aria-label={group.label}
+                  >
+                    <p className="bar__history-day">{group.label}</p>
+                    {group.items.map((conversation) => {
+                      const current = conversation.id === conversationId;
+                      return (
+                        <button
+                          key={conversation.id}
+                          ref={current ? activeHistoryRef : undefined}
+                          type="button"
+                          role="menuitem"
+                          className="bar__menu-item bar__history-item"
+                          aria-current={current ? "true" : undefined}
+                          onClick={() => selectConversation(conversation.id)}
+                        >
+                          <span className="bar__history-title">
+                            {conversation.title.trim() || "New conversation"}
+                          </span>
+                          {/* A thread with no turns has nothing to count, so
+                              it says nothing rather than "0 turns". */}
+                          {conversation.turn_count > 0 ? (
+                            <span className="bar__history-meta">
+                              {formatRelativeTime(conversation.updated_at)} ·{" "}
+                              {conversation.turn_count}{" "}
+                              {conversation.turn_count === 1 ? "turn" : "turns"}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))
               )}
             </div>
           )}
