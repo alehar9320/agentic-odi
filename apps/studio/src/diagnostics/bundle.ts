@@ -21,7 +21,7 @@ export interface DiagnosticStream {
 
 export interface DiagnosticsBundleOptions {
   version: string;
-  versionSource: string;
+  versionSource: "build" | "desktop";
   build: string;
   platform: string;
   theme: string;

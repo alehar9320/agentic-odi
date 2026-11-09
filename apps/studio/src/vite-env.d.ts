@@ -3,7 +3,7 @@
 /** Build date (YYYY-MM-DD) injected by vite.config.ts at build time. */
 declare const __STUDIO_BUILD_DATE__: string;
 
-/** Build version baked in at build time from apps/studio/package.json. */
+/** Build version injected by vite.config.ts from apps/studio/package.json. */
 declare const __STUDIO_VERSION__: string;
 
 interface ImportMetaEnv {

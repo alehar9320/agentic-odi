@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
@@ -20,6 +21,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from agentic_odi_studio_api.studio.approvals import ApprovalRegistry
 from agentic_odi_studio_api.studio.connectors import ConnectorService
@@ -31,7 +33,9 @@ from agentic_odi_studio_api.studio.errors import (
 )
 from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.memory import StudioMemory
+from agentic_odi_studio_api.studio.paths import issue_token
 from agentic_odi_studio_api.studio.router import router as studio_router
+from agentic_odi_studio_api.studio.sharing import ShareService
 
 CORS_ORIGINS = [
     "tauri://localhost",
@@ -43,6 +47,40 @@ CORS_ORIGINS = [
 ]
 
 DEFAULT_BACKEND = "local"
+
+
+class _AuthMiddleware:
+    """Require a per-install bearer token on every ``/api`` route.
+
+    ``/health`` stays open for the deploy's readiness probe, and the static
+    shell assets are served unauthenticated.
+    """
+
+    def __init__(self, app: ASGIApp, token: str) -> None:
+        self.app = app
+        self.token = token
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        headers = dict(scope.get("headers", []))
+        auth = headers.get(b"authorization", b"").decode("latin-1")
+        if path == "/health" or path.startswith("/assets"):
+            await self.app(scope, receive, send)
+            return
+        if path.startswith("/api"):
+            expected = f"Bearer {self.token}"
+            if not auth or not hmac.compare_digest(auth, expected):
+                response = JSONResponse(
+                    {"error": {"code": "unauthorized", "message": "Unauthorized"}},
+                    status_code=401,
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
 
 #: Seconds of quiet between passive checkpoints. A passive checkpoint never
 #: waits on a reader, so it is safe to run on a timer; it keeps the write-ahead
@@ -95,6 +133,7 @@ def create_app(
     connectors: ConnectorService | None = None,
     memory: StudioMemory | None = None,
     marketplace: StudioMarketplace | None = None,
+    sharing: ShareService | None = None,
 ) -> FastAPI:
     # A damaged file must not reach the person as a traceback. The store is
     # gated on open; when it fails, the app still starts and answers with the
@@ -170,7 +209,10 @@ def create_app(
     app.state.marketplace = resolved_marketplace
     app.state.connectors = connectors or ConnectorService(marketplace=resolved_marketplace)
     app.state.memory = resolved_memory
+    app.state.sharing = sharing or ShareService(service, resolved_memory)
     app.state.approvals = approvals
+    app.state.studio_token = issue_token()
+    app.add_middleware(_AuthMiddleware, token=app.state.studio_token)
     app.state.boot_error = _boot_failure_error(boot_error) if boot_error else None
     app.state.db_integrity = "corrupt" if boot_error else getattr(repo, "integrity", "unknown")
 

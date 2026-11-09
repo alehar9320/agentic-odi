@@ -44,8 +44,8 @@ function AboutSection({
 }) {
   const service = useUpdateService();
   const snapshot = useUpdateSnapshot();
-  const label = versionLabel(snapshot.currentVersion);
   const platform = detectPlatform();
+  const label = versionLabel(snapshot.currentVersion);
   const [diagnosticsJson, setDiagnosticsJson] = useState<string | null>(null);
 
   async function prepareDiagnostics() {

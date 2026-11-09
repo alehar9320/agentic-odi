@@ -1,13 +1,16 @@
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 
 import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-const pkg = JSON.parse(
+// The build version is the single source of truth: read from package.json here
+// and baked in as a define so no component can carry a second literal that
+// drifts from the release manifest.
+const studioPackage = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
-);
+) as { version: string };
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -23,7 +26,7 @@ export default defineConfig({
   // date is baked in at build time. Applies to vitest transforms too.
   define: {
     __STUDIO_BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
-    __STUDIO_VERSION__: JSON.stringify(pkg.version),
+    __STUDIO_VERSION__: JSON.stringify(studioPackage.version),
   },
   server: {
     port: 5173,

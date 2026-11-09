@@ -5,8 +5,7 @@ import { OnboardingProvider } from "../onboarding/OnboardingProvider";
 import { UpdateProvider, createUpdateService } from "../updater";
 import type { UpdateTransport } from "../updater/types";
 import { SettingsPanel } from "./SettingsPanel";
-
-import pkg from "../../package.json";
+import { STUDIO_VERSION } from "../lib/version";
 
 vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
@@ -324,13 +323,35 @@ describe("SettingsPanel about section", () => {
     expect(within(about).getByText(aboutService.statusLine())).toBeInTheDocument();
   });
 
-  it("shows the package version instead of a placeholder when the updater is unavailable", () => {
+  // #799: in a browser or installed PWA the updater has no version to report,
+  // so About used to render "—". It must show the build version instead, and
+  // never a dash.
+  it("shows the build version when the updater transport is unsupported", async () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
-    renderPanel();
+
+    const browserService = createUpdateService({
+      transport: {
+        supported: () => false,
+        currentVersion: async () => "0.11.0",
+        check: async () => null,
+        relaunch: async () => undefined,
+      },
+      storage: null,
+      document: null,
+    });
+    render(
+      <UpdateProvider service={browserService}>
+        <OnboardingProvider enabled={false}>
+          <SettingsPanel />
+        </OnboardingProvider>
+      </UpdateProvider>,
+    );
 
     const about = screen.getByRole("region", { name: "About" });
-    expect(within(about).getByText(`v${pkg.version}`)).toBeInTheDocument();
-    expect(within(about).queryByText("—")).toBeNull();
+    await waitFor(() => expect(browserService.getSnapshot().phase).not.toBe("checking"));
+
+    expect(within(about).getByText(`v${STUDIO_VERSION}`)).toBeInTheDocument();
+    expect(within(about).queryByText("—")).not.toBeInTheDocument();
   });
 });
 
