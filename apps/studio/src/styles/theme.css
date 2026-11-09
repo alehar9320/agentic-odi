@@ -404,6 +404,22 @@ a {
   font-size: 0.72rem;
 }
 
+.bar__history-group + .bar__history-group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.bar__history-day {
+  margin: 0;
+  padding: 4px 10px 2px;
+  color: var(--faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+
 /* ------------------------------------------------------------------ */
 /* Conversation                                                       */
 /* ------------------------------------------------------------------ */
@@ -1437,6 +1453,51 @@ a {
 .message:focus-within .message__actions {
   opacity: 1;
 }
+
+/* The exact time is there for whoever asks for it: never on the page at rest,
+   one hover or one tab stop away otherwise. */
+.message__time {
+  align-self: center;
+  margin-right: 2px;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.message:hover .message__time,
+.message:focus-within .message__time {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message__time {
+    transition: none;
+  }
+}
+
+/* A rule across the log where the calendar day changes, and nowhere else. */
+.conversation__day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 4px;
+  color: var(--faint);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.conversation__day::before,
+.conversation__day::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-strong);
+  opacity: 0.5;
+}
+
 
 .quiet-action {
   display: inline-flex;
@@ -3292,6 +3353,11 @@ html.theme-fading *::after {
 
 .matrix-node--selected {
   box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.6);
+}
+
+/* The tour points at one sample outcome; the ring is on the node's own dot. */
+.matrix-node--highlighted {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
 }
 
 .pulsing-card {
@@ -5970,6 +6036,17 @@ details[open] summary {
   font-size: 10.5px;
 }
 
+/* A file whose bytes never became content: failed in place, not sent. */
+.attachment-chip--failed {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.attachment-chip__failure {
+  color: var(--red);
+  font-size: 10.5px;
+}
+
 .composer.is-dragging .composer__shell {
   border-color: rgba(139, 140, 248, 0.6);
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12), 0 14px 34px rgba(0, 0, 0, 0.3);
@@ -6022,6 +6099,28 @@ details[open] summary {
   top: 0;
   z-index: 900;
   padding: 8px 22px 0;
+}
+
+/* With nothing to show, the top strip must not leave a banner-shaped gap at the
+   top of the window. The viewport stays mounted — Radix keeps it registered so
+   the corner dock's toasts still portal into it — but it collapses to zero so
+   the chrome sits where it belongs. The overflow row rides along with the dock
+   that owns it, so it is not empty either. */
+.banner-dock--top.banner-dock--empty {
+  padding: 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* When there is no top banner, the chrome still wants a small, deliberate
+   breathing space against the window edge — not the banner strip's own
+   padding, which is sized to frame a notice. The bar is the first thing at
+   the top, and this is the only margin it pays. When a top banner is present
+   the strip's own padding already frames the chrome, so this margin does not
+   apply and the strip's behaviour is unchanged. */
+.studio-app:not(:has(.banner-dock--top:not(.banner-dock--empty))) > .bar {
+  margin-top: 4px;
 }
 
 .banner-dock--corner {
