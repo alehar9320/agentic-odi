@@ -71,7 +71,6 @@ class SQLiteRepository(Repository):
         self.strategies: dict[str, Strategy] = {}
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
-        self.strategies: dict[str, Strategy] = {}
         self.themes: dict[str, Theme] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):

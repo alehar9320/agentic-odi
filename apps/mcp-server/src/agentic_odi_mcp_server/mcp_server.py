@@ -1038,6 +1038,8 @@ def unassign_theme(outcome_ids: list[str], theme_id: str) -> str:
     except OdiError as exc:
         return _fail(exc)
     return json.dumps([outcome.model_dump(mode="json") for outcome in outcomes])
+
+
 @mcp.tool
 def link_outcome(outcome_id: str, field: str, text: str) -> str:
     """Link an Outcome to the V2MOM method or measure it advances.

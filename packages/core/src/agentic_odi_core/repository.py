@@ -131,7 +131,6 @@ class Repository(Protocol):
     strategies: dict[str, Strategy]
     v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
-    strategies: dict[str, Strategy]
     themes: dict[str, Theme]
 
     def add_job(self, job: Job) -> Job: ...
@@ -259,7 +258,6 @@ class InMemoryRepository:
         #: The store holds one vision; it is keyed by a fixed name rather than a
         #: generated id because a workspace has exactly one V2MOM.
         self.v2mom: dict[str, V2MOM] = {}
-        self.studies: dict[str, Study] = {}
         self._last_event_id = 0
 
     def last_event_id(self) -> int:
