@@ -45,6 +45,15 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     body: "The Studio still opens, and your canvas, conversations, and settings are on this device. Answers come from what is stored here until a connection is back.",
     dismissible: true,
   },
+  "app-update-ready": {
+    severity: "info",
+    life: "persistent",
+    dock: "top",
+    title: "A new version of the Studio is ready.",
+    body: "Reload to use it. Your conversation is saved on this device.",
+    dismissible: true,
+    actions: [{ label: "Reload for the new version", action: "reload-app", tone: "primary" }],
+  },
   "update-available": {
     severity: "info",
     life: "persistent",

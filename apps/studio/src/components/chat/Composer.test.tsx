@@ -79,6 +79,38 @@ describe("Composer connector suggestions", () => {
   });
 });
 
+describe("Composer keycap labels", () => {
+  const baseProps = {
+    value: "",
+    onChange: () => {},
+    onSubmit: () => {},
+    onCommand: () => {},
+    streaming: false,
+    onStop: () => {},
+    inputRef: createRef<HTMLTextAreaElement>(),
+  };
+
+  it.each([
+    ["Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15", "⌘K", "↵"],
+    ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Ctrl K", "Enter"],
+    ["Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36", "Ctrl K", "Enter"],
+  ])("draws the keys this machine actually has (%s)", (userAgent, focus, send) => {
+    vi.mocked(useStudio).mockReturnValue(stubContext({ connectorSuggestions: [] }));
+    const original = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", { value: userAgent, configurable: true });
+    try {
+      render(<Composer {...baseProps} />);
+
+      const hint = document.querySelector(".composer__hint") as HTMLElement;
+      const caps = Array.from(hint.querySelectorAll("kbd")).map((cap) => cap.textContent);
+      expect(caps).toContain(focus);
+      expect(caps).toContain(send);
+    } finally {
+      Object.defineProperty(navigator, "userAgent", { value: original, configurable: true });
+    }
+  });
+});
+
 describe("ThreadComposer attachment guidance", () => {
   it("describes supported files and the extraction limits on the attachment control", async () => {
     const { StudioRuntimeProvider } = await import("../../assistant/StudioRuntime");
@@ -194,7 +226,7 @@ describe("ThreadComposer attachments", () => {
     const file = new File(["png"], "screenshot.png", { type: "image/png" });
 
     fireEvent.paste(screen.getByRole("textbox", { name: "Message the studio" }), {
-      clipboardData: { files: [file] },
+      clipboardData: { files: [file], getData: () => "" },
     });
 
     expect(await screen.findByText("screenshot.png")).toBeInTheDocument();

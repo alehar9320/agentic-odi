@@ -16,9 +16,11 @@ from agentic_odi_core.remote import (
     tool_result_text,
 )
 from fastmcp import Client as McpClient
+from fastmcp.client.transports import StreamableHttpTransport
 from fastmcp.exceptions import ToolError
 
 from agentic_odi_studio_api.studio.errors import StudioHTTPError
+from agentic_odi_studio_api.studio.paths import load_token
 from agentic_odi_studio_api.studio.probes import is_endpoint_reachable
 from agentic_odi_studio_api.studio.seed import seed_payload
 
@@ -27,6 +29,13 @@ log = logging.getLogger(__name__)
 MCP_CALL_TIMEOUT = 3.0
 
 CanvasKind = Literal["live", "seed", "empty"]
+
+
+def _client(url: str) -> McpClient:
+    """The MCP client the server will accept: it gates every tool call."""
+    token = load_token()
+    headers = {"Authorization": f"Bearer {token}"} if token else None
+    return McpClient(StreamableHttpTransport(url=url, headers=headers))
 
 
 def _provenance(
@@ -87,7 +96,7 @@ async def fetch_canvas(mcp_url: str) -> dict[str, Any]:
         return {**_seed_canvas("mcp_unreachable"), "warnings": ["MCP endpoint unreachable"]}
 
     try:
-        mcp_client = McpClient(mcp_url)
+        mcp_client = _client(mcp_url)
         async with mcp_client:
             raw_jobs = await asyncio.wait_for(
                 mcp_client.call_tool(ToolName.GET_JOBS.value, {}), timeout=1.5
@@ -238,7 +247,7 @@ async def call_mcp_tool(mcp_url: str, tool: str, arguments: dict[str, Any]) -> s
         )
 
     try:
-        async with McpClient(mcp_url) as mcp_client:
+        async with _client(mcp_url) as mcp_client:
             result = await asyncio.wait_for(
                 mcp_client.call_tool(tool, arguments), timeout=MCP_CALL_TIMEOUT
             )
