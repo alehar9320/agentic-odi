@@ -1,12 +1,22 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The browser BFF is the first-run answer path, and it lives in IndexedDB.
 import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
-import { isAlive } from "./connection";
+import { getStudioBff } from "../bff/index";
+import {
+  CountedStudio,
+  expectRenderBudget,
+  getCounts,
+  resetCounts,
+  streamOfDeltas,
+  typeIntoComposer,
+} from "../test/renderCounts";
+import type { StudioContextValue } from "./StudioContext";
 import { StudioProvider, useStudio } from "./StudioContext";
+import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
 
 const CONVERSATION = {
   id: "c-1",
@@ -55,9 +65,6 @@ let canvasFails = false;
 /** Extra records the canvas route serves; empty keeps every other test as-is. */
 let canvasRecords: Record<string, unknown> = {};
 let bootCorrupt = false;
-/** What the sidecar reports when the model refuses; the SDK's own text is the point. */
-let llmHealthMessage: string | null = null;
-let healthFetches = 0;
 let chatAborts = false;
 let chatFailure: Error | null = null;
 let chatHangs = false;
@@ -74,6 +81,8 @@ let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 let conversationCreates = 0;
+/** When true, the canvas/evidence write routes answer 503 with no structured error. */
+let writeFails = false;
 
 // The follow-up queue (#410) needs a turn that stays in flight so later sends
 // actually line up behind it: /api/chat then returns a stream the test closes
@@ -119,13 +128,31 @@ function gatedChatResponse(
   );
 }
 
+/**
+ * The canvas and evidence write routes. A read is a GET; a write is anything
+ * else against one of these paths.
+ */
+function isCanvasWrite(url: string, method: string | undefined): boolean {
+  if (method === undefined || method === "GET") {
+    return false;
+  }
+  return (
+    url === "/api/jobs" ||
+    url.startsWith("/api/jobs/") ||
+    url === "/api/steps" ||
+    url.startsWith("/api/steps/") ||
+    url === "/api/outcomes" ||
+    url.startsWith("/api/outcomes/") ||
+    url.startsWith("/api/evidence")
+  );
+}
+
 function route(
   input: RequestInfo | URL,
   init?: RequestInit,
   configFails = false,
 ): Response | Promise<Response> {
   const url = String(input);
-
   if (url === "/api/chat") {
     chatBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
     chatAttempts += 1;
@@ -154,15 +181,6 @@ function route(
       return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
-  }
-  if (url === "/health") {
-    healthFetches += 1;
-    if (configFails) {
-      throw new TypeError("fetch failed");
-    }
-    return bootCorrupt
-      ? json({ status: "degraded", reason: "store_corrupt" })
-      : json({ status: "ok" });
   }
   if (url === "/api/config") {
     if (configHangs) {
@@ -210,6 +228,12 @@ function route(
       });
     }
     return json({ jobs: [], steps: [], outcomes: [], source: "local", ...canvasRecords });
+  }
+  if (writeFails && isCanvasWrite(url, init?.method)) {
+    return new Response(JSON.stringify({ detail: "Sidecar unreachable" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
   }
   if (url === "/api/connectors/catalog") {
     catalogFetches += 1;
@@ -327,7 +351,7 @@ function route(
     llmHealthFetches += 1;
     return json(
       llmUnhealthy
-        ? { healthy: false, message: llmHealthMessage ?? "connection refused" }
+        ? { healthy: false, message: "connection refused" }
         : { healthy: true, message: "ok" },
     );
   }
@@ -741,7 +765,7 @@ describe("StudioContext first run in a browser with no server", () => {
     // Boot completed: the person's own work is on screen, the shell is usable, and
     // the sidecar stays unknown because config never answered.
     expect(result.current.canvas).not.toBeNull();
-    expect(result.current.connection.liveness.state).toBe("unknown");
+    expect(result.current.sidecarReachable).toBeNull();
     expect(typeof result.current.sendMessage).toBe("function");
   });
 
@@ -759,7 +783,7 @@ describe("StudioContext first run in a browser with no server", () => {
     // The shell is up and usable, and the sidecar is still unknown.
     expect(typeof result.current.sendMessage).toBe("function");
     expect(result.current.settings).toBeDefined();
-    expect(result.current.connection.liveness.state).toBe("unknown");
+    expect(result.current.sidecarReachable).toBeNull();
   });
 
   it("answers the first message instead of refusing it", async () => {
@@ -796,12 +820,12 @@ describe("StudioContext first run in a browser with no server", () => {
     // The idle survey ran and found nothing — and a server that was never there
     // is not an outage, so the banner bridge still has nothing to raise.
     expect(llmHealthFetches).toBeGreaterThan(0);
-    expect(result.current.connection.liveness.state).toBe("unknown");
+    expect(result.current.sidecarReachable).toBeNull();
 
     await act(async () => {
       await result.current.recheckConnections();
     });
-    expect(result.current.connection.liveness.state).toBe("down");
+    expect(result.current.sidecarReachable).toBe(false);
   });
 
   it("gives up the survey when the person starts talking", async () => {
@@ -906,6 +930,206 @@ describe("StudioContext first run in a browser with no server", () => {
   });
 });
 
+describe("StudioContext writes with no sidecar (#523)", () => {
+  beforeEach(async () => {
+    writeFails = true;
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    canvasRecords = {};
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+    // Each test starts from an empty store: a leftover optimistic record from the
+    // previous test would be overlaid on this one's board.
+    const bff = await getStudioBff();
+    await bff.store.clearAll();
+  });
+
+  afterEach(() => {
+    writeFails = false;
+    vi.unstubAllGlobals();
+  });
+
+  it("saves an outcome on this device and says where it lives, never 'Error'", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let jobId = "";
+    await act(async () => {
+      jobId = (await result.current.createJob({ name: "Get a service to production" })) ?? "";
+    });
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time from merge to production",
+        importance: 9,
+        satisfaction: 3,
+      });
+    });
+
+    // The outcome is on the board with its score, and the receipt says where the
+    // change lives instead of reporting a lost edit.
+    await waitFor(() =>
+      expect(
+        (result.current.canvas?.outcomes ?? []).map((outcome) => outcome.statement),
+      ).toContain("Minimize the time from merge to production"),
+    );
+    const messages = result.current.toasts.map((toast) => toast.message);
+    expect(messages).toContain("Saved on this device · will sync");
+    expect(messages.some((message) => message.startsWith("Error"))).toBe(false);
+    expect(messages.some((message) => message.startsWith("Could not"))).toBe(false);
+  });
+
+  it("marks the optimistic outcome pending", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let jobId = "";
+    await act(async () => {
+      jobId = (await result.current.createJob({ name: "Job" })) ?? "";
+    });
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time",
+        importance: 8,
+        satisfaction: 3,
+      });
+    });
+
+    await waitFor(() => {
+      const outcome = (result.current.canvas?.outcomes ?? []).find(
+        (candidate) => candidate.statement === "Minimize the time",
+      );
+      expect(outcome?.pending).toBe(true);
+    });
+  });
+
+  it("keeps the pending outcome through a refresh that answers without it", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let jobId = "";
+    await act(async () => {
+      jobId = (await result.current.createJob({ name: "Job" })) ?? "";
+    });
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time",
+        importance: 8,
+        satisfaction: 3,
+      });
+    });
+
+    // The sidecar answers a refresh with a canvas that predates the queued write.
+    await act(async () => {
+      await result.current.refreshCanvas();
+    });
+
+    const outcome = (result.current.canvas?.outcomes ?? []).find(
+      (candidate) => candidate.statement === "Minimize the time",
+    );
+    expect(outcome).toBeDefined();
+    expect(outcome?.pending).toBe(true);
+  });
+
+  it("rehydrates a queued write as pending after a reload", async () => {
+    const first = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(first.result.current.canvas).not.toBeNull());
+    let jobId = "";
+    await act(async () => {
+      jobId = (await first.result.current.createJob({ name: "Job" })) ?? "";
+    });
+    await act(async () => {
+      await first.result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time",
+        importance: 8,
+        satisfaction: 3,
+      });
+    });
+    first.unmount();
+
+    // A reload: fresh providers, same IndexedDB. The write is still queued, so the
+    // board must show it pending rather than lose it.
+    const second = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => {
+      const outcome = (second.result.current.canvas?.outcomes ?? []).find(
+        (candidate) => candidate.statement === "Minimize the time",
+      );
+      expect(outcome?.pending).toBe(true);
+    });
+  });
+
+  it("reports the server acknowledgement, not a local save, when the sidecar answers", async () => {
+    writeFails = false;
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: "JOB-1",
+        statement: "Minimize the time",
+        importance: 8,
+        satisfaction: 3,
+      });
+    });
+
+    expect(result.current.toasts.map((toast) => toast.message)).toContain(
+      "Outcome captured successfully!",
+    );
+    expect(result.current.toasts.map((toast) => toast.message)).not.toContain(
+      "Saved on this device · will sync",
+    );
+  });
+
+  it("still reports a sidecar's own refusal as an error", async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/outcomes" && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            error: { code: "validation", message: "Not an ODI statement.", retryable: false },
+          }),
+          { status: 422, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return route(input, init);
+    });
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let thrown: unknown = null;
+    await act(async () => {
+      try {
+        await result.current.addOutcome({
+          job_id: "JOB-1",
+          statement: "faster",
+          importance: 8,
+          satisfaction: 3,
+        });
+      } catch (error) {
+        thrown = error;
+      }
+    });
+    expect((thrown as Error)?.message).toBe("Not an ODI statement.");
+
+    // A refused write is a real failure: nothing was queued, so no receipt claims
+    // it was saved on this device.
+    expect(result.current.toasts.map((toast) => toast.message)).not.toContain(
+      "Saved on this device · will sync",
+    );
+    const bff = await getStudioBff();
+    expect(await bff.listOutbox()).toHaveLength(0);
+  });
+});
+
+
 describe("StudioContext on a desktop install whose model is down", () => {
   beforeEach(() => {
     llmUnhealthy = true;
@@ -949,102 +1173,13 @@ describe("StudioContext on a desktop install whose model is down", () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
 
-    expect(isAlive(result.current.connection.liveness)).toBe(true);
+    expect(result.current.sidecarReachable).toBe(true);
     expect(result.current.llmHealth.healthy).toBe(false);
-    // The refusal is phrased by the studio, not quoted from the provider.
-    expect(result.current.llmHealth.message).toBe("Not ready — nothing is listening at that address.");
+    expect(result.current.llmHealth.message).toBe("connection refused");
   });
 });
 
-describe("StudioContext connection snapshot (#534)", () => {
-  const REJECTED_KEY =
-    "error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-abc'}}";
-
-  beforeEach(() => {
-    llmUnhealthy = true;
-    llmHealthMessage = REJECTED_KEY;
-    healthFetches = 0;
-    configHangs = false;
-    bootCorrupt = false;
-    localStorage.clear();
-    chatBody = null;
-    chatStream = null;
-    chatFailure = null;
-    chatAttempts = 0;
-    chatAborts = false;
-    canvasFails = false;
-    connectorFetches = 0;
-    llmHealthFetches = 0;
-    vi.useFakeTimers();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
-    );
-  });
-
-  afterEach(() => {
-    llmUnhealthy = false;
-    llmHealthMessage = null;
-    configHangs = false;
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-  });
-
-  it("holds a live process and a rejected key as two separate answers", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    });
-
-    expect(result.current.connection.liveness.state).toBe("live");
-    expect(result.current.connection.model.state).toBe("degraded");
-    expect(isAlive(result.current.connection.liveness)).toBe(true);
-    expect(result.current.llmHealth.healthy).toBe(false);
-    expect(result.current.llmHealth.message).toBe("Not ready — the endpoint rejected the key.");
-  });
-
-  it("asks the process itself whether it is up, not its configuration", async () => {
-    // The config request is what the old liveness probe waited on, so a laptop
-    // whose sidecar was alive but slow read as a dead application.
-    configHangs = true;
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    });
-
-    expect(healthFetches).toBeGreaterThan(0);
-    expect(result.current.connection.liveness.state).toBe("live");
-    expect(isAlive(result.current.connection.liveness)).toBe(true);
-  });
-
-  it("stamps each probe with the moment it answered", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    });
-
-    expect(typeof result.current.connection.model.checked_at).toBe("number");
-    expect(typeof result.current.connection.liveness.checked_at).toBe("number");
-    expect(result.current.connection.next_check_at).toBeNull();
-  });
-
-  it("keeps the snapshot as the only thing that stores the answer", async () => {
-    // A degraded store is the process answering badly: still alive, so the rest
-    // of the studio must not treat it as an outage.
-    llmUnhealthy = false;
-    llmHealthMessage = null;
-    bootCorrupt = true;
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    });
-
-    expect(result.current.connection.liveness.state).toBe("degraded");
-    expect(isAlive(result.current.connection.liveness)).toBe(true);
-  });
-});
-
-describe("StudioContext health polling", () => {
+describe("StudioContext probe scheduling", () => {
   beforeEach(() => {
     localStorage.clear();
     chatBody = null;
@@ -1060,28 +1195,147 @@ describe("StudioContext health polling", () => {
   });
 
   afterEach(() => {
+    llmUnhealthy = false;
+    vi.restoreAllMocks();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
-  it("re-probes the model every 30 seconds and when the window comes back", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+  /** Drive `document.visibilityState`, which jsdom reports as a static getter. */
+  function driveVisibility(initial: DocumentVisibilityState = "visible") {
+    let state = initial;
+    const spy = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockImplementation(() => state);
+    return {
+      hide() {
+        state = "hidden";
+      },
+      show() {
+        state = "visible";
+      },
+      restore() {
+        spy.mockRestore();
+      },
+    };
+  }
+
+  it("probes on a jittered cadence while the window is visible", async () => {
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(2_500);
     });
-    const initial = llmHealthFetches;
+    const afterBoot = llmHealthFetches;
+    expect(afterBoot).toBeGreaterThan(0);
+
+    // The scheduler armed at mount for PROBE_BASE_MS ±20%, so from mount nothing
+    // fires before the shortest wait. The boot's own probe has already run.
+    const shortest = PROBE_BASE_MS * (1 - PROBE_JITTER);
+    const longest = PROBE_BASE_MS * (1 + PROBE_JITTER);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(shortest - 2_500 - 1_000);
+    });
+    expect(llmHealthFetches).toBe(afterBoot);
+
+    // ...and one has fired by the longest.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(longest - shortest + 2_000);
+    });
+    expect(llmHealthFetches).toBeGreaterThan(afterBoot);
+  });
+
+  it("makes no request at all while the window is hidden", async () => {
+    const visibility = driveVisibility("hidden");
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const afterBoot = llmHealthFetches;
 
     await act(async () => {
-      vi.advanceTimersByTime(30_000);
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
     });
-    expect(llmHealthFetches).toBeGreaterThan(initial);
+    expect(llmHealthFetches).toBe(afterBoot);
+    visibility.restore();
+  });
 
-    const afterInterval = llmHealthFetches;
+  it("probes once when the window comes back after the answer has gone stale", async () => {
+    const visibility = driveVisibility("visible");
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    visibility.hide();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+    });
+    const whileHidden = llmHealthFetches;
+
+    visibility.show();
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    expect(llmHealthFetches).toBeGreaterThan(afterInterval);
-    expect(result.current.llmHealth.healthy).toBe(true);
+    expect(llmHealthFetches).toBe(whileHidden + 1);
+    visibility.restore();
+  });
+
+  it("backs off when the model keeps refusing instead of hammering it", async () => {
+    llmUnhealthy = true;
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const start = llmHealthFetches;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+    });
+    const refused = llmHealthFetches - start;
+    // Ten minutes at the base cadence is about twenty probes; the ladder asks
+    // fewer than a third of that, and jitter cannot move a count across that gap.
+    expect(refused).toBeGreaterThan(0);
+    expect(refused).toBeLessThan(8);
+  });
+
+  it("collapses a burst of endpoint edits into one debounced probe", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const before = llmHealthFetches;
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8001/v1" });
+      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8002/v1" });
+      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8003/v1" });
+    });
+    // Typing a URL is many saves in a row; none of them probes yet.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROBE_SETTINGS_DEBOUNCE_MS - 1);
+    });
+    expect(llmHealthFetches).toBe(before);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(llmHealthFetches).toBe(before + 1);
+  });
+
+  it("does not probe when an edit leaves the endpoints alone", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const before = llmHealthFetches;
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROBE_SETTINGS_DEBOUNCE_MS + 1_000);
+    });
+    expect(llmHealthFetches).toBe(before);
   });
 });
 
@@ -1156,6 +1410,43 @@ describe("StudioContext theme", () => {
 
     expect(document.documentElement.classList.contains("theme-light")).toBe(true);
     expect(JSON.parse(localStorage.getItem("studio.settings") ?? "{}").theme).toBe("light");
+  });
+
+  it("cross-fades a theme change and clears the class when it ends", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+
+    expect(document.documentElement.classList.contains("theme-fading")).toBe(true);
+    await waitFor(() =>
+      expect(document.documentElement.classList.contains("theme-fading")).toBe(false),
+    );
+  });
+
+  it("swaps the theme instantly when reduced motion is requested", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(document.documentElement.classList.contains("theme-fading")).toBe(false);
   });
 
   it("keeps the chosen theme across a remount", async () => {
@@ -1346,7 +1637,7 @@ describe("StudioContext boot failure", () => {
     expect(result.current.bootError?.code).toBe("store_corrupt");
     expect(result.current.bootError?.message).toContain("/home/me/.odi.db");
     // The sidecar answered, so it is reachable; the database is the problem.
-    expect(isAlive(result.current.connection.liveness)).toBe(true);
+    expect(result.current.sidecarReachable).toBe(true);
   });
 
   it("clears the failure page once a restored store answers cleanly", async () => {
@@ -1361,7 +1652,7 @@ describe("StudioContext boot failure", () => {
     });
 
     expect(result.current.bootError).toBeNull();
-    expect(isAlive(result.current.connection.liveness)).toBe(true);
+    expect(result.current.sidecarReachable).toBe(true);
   });
 });
 
@@ -1884,5 +2175,117 @@ describe("StudioContext agent focus", () => {
     // but the composer has no words to claim, so no chip may appear.
     expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "deleted-yesterday" });
     expect(result.current.focusedSubjectLabel).toBeNull();
+  });
+});
+
+describe("Studio render budget (#502)", () => {
+  // The boot fires a health probe, a canvas read, and a connector list, and
+  // their answers land whenever the microtask queue feels like it. A scenario
+  // that started before they did would be counting that race, not the
+  // interaction, so the stub below tracks how many calls are still open.
+  let inFlight = 0;
+
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAborts = false;
+    canvasFails = false;
+    canvasRecords = {};
+    bootCorrupt = false;
+    llmUnhealthy = false;
+    inFlight = 0;
+    resetCounts();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      inFlight += 1;
+      try {
+        return await route(input, init);
+      } finally {
+        inFlight -= 1;
+      }
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function countedStudio(): Promise<StudioContextValue> {
+    let studio: StudioContextValue | null = null;
+    render(<CountedStudio onStudio={(value) => { studio = value; }} />);
+    await waitFor(() => expect(studio).not.toBeNull());
+    // Let the boot's own answers arrive and commit before the count starts: a
+    // budget measures one interaction, and nothing else.
+    await act(async () => {
+      for (let tick = 0; tick < 10; tick += 1) {
+        await new Promise((settleTick) => { setTimeout(settleTick, 0); });
+      }
+    });
+    expect(inFlight, "the boot never went quiet").toBe(0);
+    resetCounts();
+    return studio as unknown as StudioContextValue;
+  }
+
+  it("counts each of the four pinned surfaces while a reply streams", async () => {
+    chatStream = streamOfDeltas(40);
+    const studio = await countedStudio();
+
+    await act(async () => {
+      await studio.sendMessage("hello");
+    });
+
+    expect(Object.keys(getCounts()).sort()).toEqual([
+      "banners",
+      "composer",
+      "landscape",
+      "rail",
+    ]);
+  });
+
+  // Baseline measured on 2026-11-05 at commit c403ba17: the commits each pinned
+  // surface makes for one interaction, counted from a boot that has gone quiet.
+  // Exact on purpose — the state splits (#503, #504, #505) may only lower a
+  // number here, and a rise has to be argued with, surface by surface.
+  //
+  // What they say: a keystroke renders the composer twice and nothing else; a
+  // streamed reply renders the composer five times and the rest of the screen
+  // twice; one health flip reaches every surface, and turns a single boolean
+  // into five renders of the banner area.
+  const STREAM_BUDGET = { banners: 2, composer: 5, landscape: 2, rail: 2 };
+  const TYPING_BUDGET = { banners: 0, composer: 40, landscape: 0, rail: 0 };
+  const HEALTH_BUDGET = { banners: 5, composer: 1, landscape: 1, rail: 1 };
+
+  it("streams forty deltas within its budget", async () => {
+    chatStream = streamOfDeltas(40);
+    const studio = await countedStudio();
+
+    await act(async () => {
+      await studio.sendMessage("hello");
+    });
+
+    expectRenderBudget(STREAM_BUDGET);
+  });
+
+  it("takes twenty keystrokes within its budget", async () => {
+    await countedStudio();
+    const input = screen.getByRole("textbox", { name: "Message the studio" });
+
+    await act(async () => {
+      typeIntoComposer(input as HTMLTextAreaElement, 20);
+    });
+
+    expectRenderBudget(TYPING_BUDGET);
+  });
+
+  it("answers one health poll turning unhealthy within its budget", async () => {
+    await countedStudio();
+    llmUnhealthy = true;
+
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expectRenderBudget(HEALTH_BUDGET);
   });
 });

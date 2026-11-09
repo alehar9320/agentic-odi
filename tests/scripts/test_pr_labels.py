@@ -91,6 +91,9 @@ def test_managed_labels_never_include_labels_another_job_owns():
     """The labels job must not remove the risk tier the risk job just applied."""
     assert not MANAGED_LABELS & {"safe to merge", "needs a look", "danger zone"}
     assert not MANAGED_LABELS & {"ready-for-merge", "merge-conflict"}
+    # The triage gate labels are owned by the pr-risk/triage job, never the
+    # labels job, so the two must not fight over them.
+    assert not MANAGED_LABELS & {"ready for human review", "needs human review", "deep dive"}
 
 
 def test_managed_labels_cover_every_axis_this_system_owns():

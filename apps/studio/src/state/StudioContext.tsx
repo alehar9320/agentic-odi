@@ -49,7 +49,6 @@ import {
   fetchUnreadSignalCount,
   healthLlm,
   healthMcp,
-  healthSidecar,
   listConversations as apiListConversations,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
@@ -69,20 +68,14 @@ import { textOf } from "../assistant/convert";
 import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
-import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
+import { deriveDeviceStatus, type DeviceStatus } from "./deviceStatus";
+import { isOnline } from "../lib/onlineStatus";
 import {
-  emptySnapshot,
-  isAlive,
-  isReady,
-  isReadyFlag,
-  livenessProbe,
-  mcpProbe,
-  modelProbe,
-  recordProbes,
-  withLiveness,
-  type ConnectionSnapshot,
-  type ProbeResult,
-} from "./connection";
+  PROBE_SETTINGS_DEBOUNCE_MS,
+  createProbeScheduler,
+  type ProbeScheduler,
+} from "./scheduleProbe";
+import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -249,16 +242,6 @@ const BRIEF_KEY = "studio.brief";
 const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const THESES_KEY = "studio.theses";
 
-/** The banner and the bar read the model row through this shape. `null` means "not measured yet". */
-type LlmHealthView = { healthy: boolean | null; message: string };
-
-function llmHealthView(model: ProbeResult): LlmHealthView {
-  return { healthy: isReadyFlag(model), message: model.message };
-}
-
-/** How often the studio re-probes the model and the MCP server. */
-const HEALTH_POLL_INTERVAL_MS = 30_000;
-
 /** How often a focused window re-reads the signal inbox from the store. */
 const SIGNAL_POLL_INTERVAL_MS = 60_000;
 
@@ -283,6 +266,17 @@ export const EMPTY_CONFIG: StudioConfig = {
 };
 
 export type ToastKind = "success" | "error" | "info";
+
+/**
+ * What the receipt says for a write that came back. A record the sidecar
+ * acknowledged reports the acknowledgement; a record still queued on this
+ * device says where the change lives instead of claiming it was saved to the
+ * studio. Only the sidecar's own acknowledgement earns the second message.
+ */
+export function writeReceipt(record: unknown, acknowledged: string): string {
+  const pending = (record as { pending?: boolean } | null | undefined)?.pending === true;
+  return pending ? "Saved on this device · will sync" : acknowledged;
+}
 
 export interface Toast {
   id: number;
@@ -326,6 +320,13 @@ export interface ToolActivity {
   preview?: string;
 }
 
+export interface ConnectionReport {
+  sidecarReachable: boolean;
+  mcpReachable: boolean;
+  llmHealthy: boolean;
+  llmMessage: string;
+}
+
 export interface StudioContextValue {
   settings: StudioConfig;
   saveSettings: (config: StudioConfig) => void;
@@ -345,15 +346,15 @@ export interface StudioContextValue {
   /** The failure behind `canvasState.kind === "error"`, if any. */
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
-  llmHealth: LlmHealthView;
-  /** What the three probes last answered, and when. The one place connection state lives. */
-  connection: ConnectionSnapshot;
+  llmHealth: { healthy: boolean | null; message: string };
   /** Model ids the configured endpoint publishes. Empty means "type one". */
   models: string[];
   modelsLoading: boolean;
   /** Why the endpoint would not list models, if it would not. */
   modelsMessage: string | null;
   refreshModels: (config?: { base_url: string; api_key: string }) => Promise<void>;
+  mcpReachable: boolean;
+  sidecarReachable: boolean | null;
   /**
    * A store that failed its integrity check on boot. When set, the Studio
    * shows the failure page instead of a half-empty board: the database is the
@@ -368,9 +369,9 @@ export interface StudioContextValue {
   recheckConnections: () => Promise<void>;
   dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
-  checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionSnapshot>;
+  checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   /** Measure the same three connections for one panel, without changing what the studio believes. */
-  surveyConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionSnapshot>;
+  surveyConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
   streaming: boolean;
   thinkingPhase: string | null;
@@ -466,10 +467,16 @@ export interface StudioContextValue {
   presets: ConnectorPreset[];
   /** The failure behind an unreachable connector catalog, if any. */
   presetError: StudioError | null;
+  /** True while the connector catalog is being (re)read. */
+  presetsLoading: boolean;
   /** The failure behind an unreachable connector list, if any. */
   connectorsError: StudioError | null;
+  /** True while the installed connector list is being (re)read. */
+  connectorsLoading: boolean;
   /** Probed availability of local and sidecar capabilities. */
   capabilities: Capability[];
+  /** One answer for what works here, derived from `capabilities`. */
+  deviceStatus: DeviceStatus;
   refreshConnectors: () => Promise<void>;
   refreshPresets: () => Promise<void>;
   refreshCapabilities: () => Promise<void>;
@@ -544,6 +551,19 @@ function loadSettings(): StudioConfig {
     /* ignore malformed cache */
   }
   return EMPTY_CONFIG;
+}
+
+/**
+ * Whether an edit moved what the studio talks to. The theme is stored beside the
+ * endpoints but is not one of them, so switching it must not trigger a probe.
+ */
+function settingsTargetsChanged(a: StudioConfig, b: StudioConfig): boolean {
+  return (
+    a.base_url !== b.base_url ||
+    a.api_key !== b.api_key ||
+    a.model_name !== b.model_name ||
+    a.mcp_url !== b.mcp_url
+  );
 }
 
 function loadFocusedSubject(): FocusSubject | null {
@@ -655,10 +675,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
   });
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
-  const [connection, setConnection] = useState<ConnectionSnapshot>(emptySnapshot);
+  const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
+    healthy: null,
+    message: "Health not checked yet.",
+  });
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
+  const [mcpReachable, setMcpReachable] = useState(false);
+  const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
   const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -674,8 +699,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
+  const [presetsLoading, setPresetsLoading] = useState(false);
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
+  const [connectorsLoading, setConnectorsLoading] = useState(false);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [capabilitiesCheckedAt, setCapabilitiesCheckedAt] = useState<string | null>(null);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
   const [serverSignals, setServerSignals] = useState<Signal[]>([]);
   const [unreadSignalCount, setUnreadSignalCount] = useState(0);
@@ -701,6 +729,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const liveTurnId = useRef<string | null>(null);
   /** The deferred connectivity probe, until the person speaks or the view unmounts. */
   const idleProbeRef = useRef<{ cancel: () => void } | null>(null);
+  /**
+   * The one thing that decides when the next probe runs. It reschedules itself
+   * from each result, so a refusal widens the gap and a wake does not stack a
+   * second timer on top of the first (#535).
+   */
+  const probeSchedulerRef = useRef<ProbeScheduler | null>(null);
+  /** What a scheduled probe should run, kept current without re-creating the timer. */
+  const probeNowRef = useRef<() => Promise<boolean>>(async () => false);
+  /** Runs the debounced probe a connection-setting edit earns. */
+  const settingsProbeRef = useRef<() => void>(() => {});
+  /** The pending settings edit, so a burst of keystrokes earns one probe. */
+  const settingsProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The last written settings, so an edit can be compared without a stale closure. */
+  const settingsRef = useRef(settings);
 
   const signals = useMemo(
     () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
@@ -908,17 +950,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const refreshConnectors = useCallback(async () => {
     setConnectorsError(null);
+    setConnectorsLoading(true);
     try {
       setConnectors(await fetchConnectors());
     } catch (error) {
       // A list that could not be fetched is not an empty list.
       setConnectorsError(asStudioError(error));
       setConnectors([]);
+    } finally {
+      setConnectorsLoading(false);
     }
   }, []);
 
   const refreshPresets = useCallback(async () => {
     setPresetError(null);
+    setPresetsLoading(true);
     try {
       setPresets(await fetchConnectorCatalog());
     } catch (error) {
@@ -926,12 +972,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       // panel says so instead of offering a select with nothing in it.
       setPresetError(asStudioError(error));
       setPresets([]);
+    } finally {
+      setPresetsLoading(false);
     }
   }, []);
 
   const refreshCapabilities = useCallback(async () => {
     try {
       setCapabilities(await capabilityRegistry.statuses(settings));
+      setCapabilitiesCheckedAt(new Date().toISOString());
     } catch {
       /* Capability probes are advisory; a probe failure leaves the list empty. */
       setCapabilities([]);
@@ -1079,14 +1128,42 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   // The theme lives on <html> so every surface, portal, and native control
   // follows one class instead of each component tracking its own copy.
+  const appliedTheme = useRef<StudioTheme | null>(null);
   useEffect(() => {
     const root = document.documentElement;
+    const previous = appliedTheme.current;
+    appliedTheme.current = theme;
     root.classList.toggle("theme-light", theme === "light");
     root.classList.toggle("theme-dark", theme === "dark");
     root.style.colorScheme = theme;
+
+    // Only a change the person made cross-fades; the first paint is already the
+    // right colour (see index.html). Reduced motion swaps instantly, and the
+    // stylesheet's own reduce rule shortens the fade if it somehow runs.
+    if (previous === null || previous === theme) {
+      return;
+    }
+    const reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      return;
+    }
+    root.classList.add("theme-fading");
+    const timer = window.setTimeout(() => root.classList.remove("theme-fading"), 140);
+    return () => {
+      window.clearTimeout(timer);
+      root.classList.remove("theme-fading");
+    };
   }, [theme]);
 
-  const saveSettings = useCallback((config: StudioConfig) => {
+  /**
+   * Write settings and persist them. This is the one place the store changes;
+   * a probe is scheduled by `saveSettings`, never here, so adopting the sidecar's
+   * boot defaults cannot look like a person editing an endpoint.
+   */
+  const writeSettings = useCallback((config: StudioConfig) => {
+    settingsRef.current = config;
     setSettings(config);
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
@@ -1094,6 +1171,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       /* storage unavailable */
     }
   }, []);
+
+  const saveSettings = useCallback(
+    (config: StudioConfig) => {
+      // Only an edit that changes what the studio talks to is worth a probe: a
+      // theme change is a settings change too, but nothing about a connection
+      // moved, so it earns nothing. The timer is debounced, so typing a URL —
+      // many saves in a row — earns one probe once the typing stops.
+      if (settingsTargetsChanged(settingsRef.current, config)) {
+        if (settingsProbeTimerRef.current !== null) {
+          clearTimeout(settingsProbeTimerRef.current);
+        }
+        settingsProbeTimerRef.current = setTimeout(() => {
+          settingsProbeTimerRef.current = null;
+          settingsProbeRef.current();
+        }, PROBE_SETTINGS_DEBOUNCE_MS);
+      }
+      writeSettings(config);
+    },
+    [writeSettings],
+  );
 
   const setDisplayName = useCallback((name: string) => {
     setDisplayNameState(name);
@@ -1135,14 +1232,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     ]);
   }, []);
 
-/**
- * An unrequested probe that could not reach the process retires a belief rather
- * than founding a new one: nobody asked, and a hosted studio has no sidecar to lose.
- */
-function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResult {
-  return previous.state === "unknown" ? previous : measured;
-}
-
   /**
    * Measure the sidecar, the MCP server, and the model without recording the result.
    *
@@ -1151,10 +1240,12 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
    * turn into a red strip across the window about a connection nobody was using.
    */
   const surveyConnections = useCallback(
-    async (override: Partial<StudioConfig> = {}): Promise<ConnectionSnapshot> => {
+    async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
       const target = { ...settings, ...override };
       const [sidecar, mcp, llm] = await Promise.all([
-        healthSidecar(),
+        fetchConfig()
+          .then(() => true)
+          .catch(() => false),
         healthMcp(target.mcp_url)
           .then((result) => result.reachable)
           .catch(() => false),
@@ -1163,23 +1254,23 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
           api_key: target.api_key,
           model: target.model_name,
         }).catch((error: unknown) => ({
-          healthy: false as const,
-          message: asStudioError(error).message || "The model did not answer.",
+          healthy: false,
+          message: (error as Error).message || "The model did not answer.",
         })),
       ]);
       void refreshCapabilities();
-      const checked_at = Date.now();
-      return recordProbes(emptySnapshot(), {
-        liveness: livenessProbe(sidecar),
-        mcp: mcpProbe(mcp, checked_at),
-        model: modelProbe(llm, checked_at),
-      });
+      return {
+        sidecarReachable: sidecar,
+        mcpReachable: mcp,
+        llmHealthy: llm.healthy,
+        llmMessage: llm.message,
+      };
     },
     [settings, refreshCapabilities],
   );
 
   /**
-   * Probe the sidecar, MCP server, and model, and let the studio act on it.
+   * Record a survey's answer, and let the studio act on it.
    *
    * `mode` decides what a negative answer is allowed to do. "evidence" — what a
    * person gets when they asked, by pressing Recheck or walking the setup — records
@@ -1193,38 +1284,65 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
    * appears on its own half a minute after the page loads blames their studio for
    * being offline when nothing they did needed it to be online.
    */
-  const checkConnections = useCallback(
-    async (
-      override: Partial<StudioConfig> = {},
-      mode: "evidence" | "recovery" = "evidence",
-    ): Promise<ConnectionSnapshot> => {
-      const report = await surveyConnections(override);
-      const sidecar = isAlive(report.liveness);
+  const applyReport = useCallback(
+    (report: ConnectionReport, mode: "evidence" | "recovery"): ConnectionReport => {
+      const sidecar = report.sidecarReachable;
+      const llm = { healthy: report.llmHealthy, message: report.llmMessage };
+
+      if (sidecar) {
+        setSidecarReachable(true);
+      } else if (mode === "evidence") {
+        setSidecarReachable(false);
+      } else {
+        setSidecarReachable((previous) => (previous === true ? false : previous));
+      }
+      setMcpReachable(report.mcpReachable);
       // A model that answers is always news. A model that does not is news only when
       // the sidecar took part in the check — the browser asks it to reach the model, so
       // a negative it reports is measured rather than guessed — or when we previously
       // believed the model was alive and it has since stopped. On a hosted first run the
       // sidecar is absent too, and its silence is not a message about the model.
-      const modelAnswers = (previous: ProbeResult) =>
-        isReady(report.model) || mode === "evidence" || sidecar
-          ? report.model
-          : previous.state === "live"
-            ? report.model
-            : previous;
-
-      setConnection((previous) =>
-        recordProbes(previous, {
-          liveness: sidecar || mode === "evidence" ? report.liveness : retireLiveness(previous.liveness, report.liveness),
-          mcp: report.mcp,
-          model: modelAnswers(previous.model),
-        }),
-      );
+      if (llm.healthy || mode === "evidence" || sidecar) {
+        setLlmHealth(llm);
+      } else {
+        setLlmHealth((previous) => (previous.healthy === true ? llm : previous));
+      }
       if (sidecar) {
         setDismissedSidecarNotice(false);
       }
       return report;
     },
-    [surveyConnections],
+    [],
+  );
+
+  /**
+   * The browser has no network. Both the process and the model are unreachable
+   * for a reason that is neither's fault, so the studio says so once and stops
+   * asking until the network returns (#535).
+   */
+  const applyOffline = useCallback(() => {
+    setSidecarReachable(false);
+    setMcpReachable(false);
+    setLlmHealth({ healthy: false, message: "No network" });
+  }, []);
+
+  /**
+   * Probe the sidecar, MCP server, and model, and let the studio act on it.
+   *
+   * A probe a person asked for — Recheck, the setup walk, a settings edit —
+   * restarts the cadence, because the endpoint they just changed is not the one
+   * that kept failing.
+   */
+  const checkConnections = useCallback(
+    async (
+      override: Partial<StudioConfig> = {},
+      mode: "evidence" | "recovery" = "evidence",
+    ): Promise<ConnectionReport> => {
+      const report = applyReport(await surveyConnections(override), mode);
+      probeSchedulerRef.current?.reset();
+      return report;
+    },
+    [surveyConnections, applyReport],
   );
 
   // Re-probe after the user acted on the sidecar notice (e.g. started the
@@ -1232,6 +1350,26 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const recheckConnections = useCallback(async () => {
     await checkConnections();
   }, [checkConnections]);
+
+  /**
+   * One scheduled probe: it records what it finds, and it reports back whether
+   * the endpoint answered so the scheduler can widen or reset the gap. It does
+   * not reset the cadence itself — only a person asking does that.
+   */
+  const scheduledProbe = useCallback(async (): Promise<boolean> => {
+    if (!isOnline()) {
+      applyOffline();
+      return false;
+    }
+    const report = applyReport(await surveyConnections({}), "recovery");
+    return report.llmHealthy;
+  }, [surveyConnections, applyReport, applyOffline]);
+
+  // Keep the scheduler pointed at the freshest probe without ever re-creating
+  // the timer: the ref is what the running scheduler reads on each tick.
+  useEffect(() => {
+    probeNowRef.current = scheduledProbe;
+  }, [scheduledProbe]);
 
   /**
    * Give up the probe scheduled at boot. A person who is already talking does not
@@ -1282,8 +1420,8 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
       try {
-        await apiAddStep({ ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Step added to Job Map!");
+        const step = await apiAddStep({ ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", writeReceipt(step, "Step added to Job Map!"));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Error adding step: ${(error as Error).message}`);
@@ -1295,9 +1433,11 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const addOutcome = useCallback(
     async (payload: Omit<AddOutcomePayload, "mcp_url">) => {
       // The form that asked for this shows the failure where the user typed
-      // it, so the error travels up instead of disappearing into a toast.
-      await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", "Outcome captured successfully!");
+      // it, so the error travels up instead of disappearing into a toast. A
+      // transport failure does not travel up: the write is queued locally and
+      // the receipt says where it lives.
+      const outcome = await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
+      pushToast("success", writeReceipt(outcome, "Outcome captured successfully!"));
       await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -1306,7 +1446,7 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
       const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", `Job created: ${payload.name}`);
+      pushToast("success", writeReceipt(job, `Job created: ${payload.name}`));
       await refreshCanvas();
       return job.id ?? null;
     },
@@ -1316,8 +1456,8 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const updateJob = useCallback(
     async (jobId: string, payload: { name?: string; description?: string }) => {
       try {
-        await apiUpdateJob(jobId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Job updated.");
+        const job = await apiUpdateJob(jobId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", writeReceipt(job, "Job updated."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the job: ${(error as Error).message}`);
@@ -1329,8 +1469,8 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const deleteJob = useCallback(
     async (jobId: string) => {
       try {
-        await apiDeleteJob(jobId, settings.mcp_url);
-        pushToast("success", "Job removed.");
+        const result = await apiDeleteJob(jobId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Job removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the job: ${(error as Error).message}`);
@@ -1342,8 +1482,8 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const updateStep = useCallback(
     async (stepId: string, payload: { name?: string; order?: number }) => {
       try {
-        await apiUpdateStep(stepId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Step updated.");
+        const step = await apiUpdateStep(stepId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", writeReceipt(step, "Step updated."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the step: ${(error as Error).message}`);
@@ -1355,8 +1495,8 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const deleteStep = useCallback(
     async (stepId: string) => {
       try {
-        await apiDeleteStep(stepId, settings.mcp_url);
-        pushToast("success", "Step removed.");
+        const result = await apiDeleteStep(stepId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Step removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the step: ${(error as Error).message}`);
@@ -1371,8 +1511,11 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
       payload: { statement?: string; importance?: number; satisfaction?: number },
     ) => {
       try {
-        await apiUpdateOutcome(outcomeId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Outcome updated.");
+        const outcome = await apiUpdateOutcome(outcomeId, {
+          ...payload,
+          mcp_url: settings.mcp_url,
+        });
+        pushToast("success", writeReceipt(outcome, "Outcome updated."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
@@ -1384,8 +1527,8 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const deleteOutcome = useCallback(
     async (outcomeId: string) => {
       try {
-        await apiDeleteOutcome(outcomeId, settings.mcp_url);
-        pushToast("success", "Outcome removed.");
+        const result = await apiDeleteOutcome(outcomeId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Outcome removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the outcome: ${(error as Error).message}`);
@@ -1397,8 +1540,8 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   const deleteEvidence = useCallback(
     async (evidenceId: string) => {
       try {
-        await apiDeleteEvidence(evidenceId, settings.mcp_url);
-        pushToast("success", "Evidence removed.");
+        const result = await apiDeleteEvidence(evidenceId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Evidence removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the evidence: ${(error as Error).message}`);
@@ -1420,8 +1563,11 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
       },
     ) => {
       // The form keeps the error beside the quote it came from.
-      await apiPromoteEvidence(evidenceId, { ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", `Promoted the evidence to a ${payload.target}.`);
+      const result = await apiPromoteEvidence(evidenceId, {
+        ...payload,
+        mcp_url: settings.mcp_url,
+      });
+      pushToast("success", writeReceipt(result, `Promoted the evidence to a ${payload.target}.`));
       await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -1625,11 +1771,15 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
       // Writing here is the proof the new thread was wanted: Undo is spent.
       commitNewThread();
 
+      // One clock for the turn: the question and the reply it opens carry the
+      // same moment, which is what the transcript dates them by.
+      const startedAt = new Date().toISOString();
       const userMessage: ChatMessage = existingUserMessage ?? {
         id: crypto.randomUUID(),
         parentId: base.length ? base[base.length - 1].id : null,
         role: "user",
         content: trimmed,
+        createdAt: startedAt,
         ...(attachments.length ? { attachments } : {}),
       };
       const assistantId = crypto.randomUUID();
@@ -1642,7 +1792,14 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
 
       setMessages([
         ...history,
-        { id: assistantId, parentId: userMessage.id, role: "assistant", content: "", parts: [] },
+        {
+          id: assistantId,
+          parentId: userMessage.id,
+          role: "assistant",
+          content: "",
+          parts: [],
+          createdAt: startedAt,
+        },
       ]);
       setStreaming(true);
       setThinkingPhase("health_check");
@@ -2302,24 +2459,15 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
     // damaged database is the one exception: the sidecar is up and telling us the
     // only copy is damaged, so the failure page replaces the shell rather than
     // letting the board look merely empty.
-    void healthSidecar().then((answer) => {
-      const liveness = livenessProbe(answer);
-      // Only a process that answered is news here: a hosted studio with no
-      // sidecar is the design working, and an unrequested probe must not raise
-      // an outage over it.
-      if (!cancelled && isAlive(liveness)) {
-        setConnection((previous) => withLiveness(previous, liveness));
-      }
-    });
-
     fetchConfig()
       .then((defaults) => {
         if (cancelled) {
           return;
         }
+        setSidecarReachable(true);
         setBootError(null);
         if (localStorage.getItem(SETTINGS_KEY) === null) {
-          saveSettings(defaults);
+          writeSettings(defaults);
         }
       })
       .catch((error) => {
@@ -2329,6 +2477,7 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
         const problem = asStudioError(error);
         if (problem.code === "store_corrupt") {
           setBootError(problem);
+          setSidecarReachable(true);
         }
       });
 
@@ -2362,24 +2511,70 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Health polling: the studio must notice that the model or the MCP server
-  // came back without a reload, so the bar leaves "Local mode" on its own.
-  // Recovery-only: this may retire a warning, never raise one.
+  // Probing on a schedule that respects the person (#535). One scheduler owns
+  // the timer: 30 s while the tab is visible, doubling to a five-minute cap on
+  // consecutive failures, and nothing at all while the tab is hidden. On return
+  // it probes once, but only if the last answer has gone stale. This may retire
+  // a warning, never raise one.
   useEffect(() => {
-    const poll = () => {
-      if (document.visibilityState === "visible") {
-        void checkConnections({}, "recovery");
-      }
-    };
-
-    const timer = window.setInterval(poll, HEALTH_POLL_INTERVAL_MS);
-    document.addEventListener("visibilitychange", poll);
-
+    const scheduler = createProbeScheduler({
+      probe: () => probeNowRef.current(),
+    });
+    probeSchedulerRef.current = scheduler;
+    scheduler.start();
     return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", poll);
+      scheduler.stop();
+      probeSchedulerRef.current = null;
     };
-  }, [checkConnections]);
+  }, []);
+
+  // A network that comes back is worth one probe; a network that goes away is
+  // worth one sentence and no further requests until it returns. The scheduler
+  // itself keeps running, so the timer resumes with the connection.
+  useEffect(() => {
+    const onOnline = () => {
+      probeSchedulerRef.current?.check();
+    };
+    const onOffline = () => {
+      applyOffline();
+    };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [applyOffline]);
+
+  // A settings edit that changes what the studio talks to is a person changing
+  // the endpoint, so it earns one probe — debounced, because typing a URL is
+  // many changes in a row, and restarting the cadence, because the endpoint
+  // that failed is not the one they just entered. The debounce timer lives on
+  // the ref and is scheduled by `saveSettings`, so a re-render that only swaps
+  // the probe's identity cannot cancel the probe it just promised.
+  useEffect(() => {
+    settingsProbeRef.current = () => {
+      if (!isOnline()) {
+        applyOffline();
+        return;
+      }
+      void surveyConnections({})
+        .then((report) => applyReport(report, "evidence"))
+        .then(() => probeSchedulerRef.current?.reset())
+        .catch(() => undefined);
+    };
+  }, [surveyConnections, applyReport, applyOffline]);
+
+  // Hand the pending settings probe back on unmount, and only on unmount.
+  useEffect(
+    () => () => {
+      if (settingsProbeTimerRef.current !== null) {
+        clearTimeout(settingsProbeTimerRef.current);
+        settingsProbeTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   // The inbox is server state, so it is re-read rather than remembered: every
   // minute the window is up, and the moment it comes back into focus.
@@ -2399,10 +2594,6 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
     };
   }, [refreshSignals]);
 
-  // The model row keeps one derived view because the banner and the bar predate
-  // the snapshot; everything else reads `connection` and the probe helpers.
-  const llmHealth = useMemo(() => llmHealthView(connection.model), [connection.model]);
-
   // The canvas is one state, not four booleans: an empty board and a failed
   // board must never look the same.
   const canvas = canvasState.data;
@@ -2412,19 +2603,21 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
   // Re-probe after the person restored a backup: a clean answer clears the boot
   // page and re-hydrates the studio in place.
   const recheckBoot = useCallback(async () => {
-    const liveness = livenessProbe(await healthSidecar());
-    setConnection((previous) => withLiveness(previous, liveness));
     try {
       const defaults = await fetchConfig();
+      setSidecarReachable(true);
       setBootError(null);
       if (localStorage.getItem(SETTINGS_KEY) === null) {
-        saveSettings(defaults);
+        writeSettings(defaults);
       }
     } catch (error) {
       const problem = asStudioError(error);
       if (problem.code === "store_corrupt") {
         setBootError(problem);
+        setSidecarReachable(true);
+        return;
       }
+      setSidecarReachable(false);
       return;
     }
     void refreshCapabilities();
@@ -2434,7 +2627,7 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
     void refreshFeatured();
     void refreshMemory();
   }, [
-    saveSettings,
+    writeSettings,
     refreshCapabilities,
     refreshCanvas,
     refreshConnectors,
@@ -2442,6 +2635,11 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
     refreshFeatured,
     refreshMemory,
   ]);
+
+  const deviceStatus = useMemo(
+    () => deriveDeviceStatus(capabilities, capabilitiesCheckedAt),
+    [capabilities, capabilitiesCheckedAt],
+  );
 
   const value = useMemo<StudioContextValue>(
     () => ({
@@ -2461,11 +2659,12 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
       canvasError,
       refreshCanvas,
       llmHealth,
-      connection,
       models,
       modelsLoading,
       modelsMessage,
       refreshModels,
+      mcpReachable,
+      sidecarReachable,
       bootError,
       recheckBoot,
       dismissedSidecarNotice,
@@ -2519,9 +2718,12 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
       dismissToast,
       connectors,
       connectorsError,
+      connectorsLoading,
       capabilities,
+      deviceStatus,
       presets,
       presetError,
+      presetsLoading,
       refreshConnectors,
       refreshPresets,
       refreshCapabilities,
@@ -2583,11 +2785,12 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
       canvasError,
       refreshCanvas,
       llmHealth,
-      connection,
       models,
       modelsLoading,
       modelsMessage,
       refreshModels,
+      mcpReachable,
+      sidecarReachable,
       bootError,
       recheckBoot,
       dismissedSidecarNotice,
@@ -2641,9 +2844,12 @@ function retireLiveness(previous: ProbeResult, measured: ProbeResult): ProbeResu
       dismissToast,
       connectors,
       connectorsError,
+      connectorsLoading,
       capabilities,
+      deviceStatus,
       presets,
       presetError,
+      presetsLoading,
       refreshConnectors,
       refreshPresets,
       refreshCapabilities,

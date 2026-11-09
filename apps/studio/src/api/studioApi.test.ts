@@ -582,18 +582,12 @@ describe("typed failures", () => {
   it("classifies an empty 502 response as mcp_unreachable", async () => {
     mockFailure(502, {});
 
-    await expect(
-      addOutcome({
-        mcp_url: "u",
-        job_id: "JOB-402",
-        statement: "Minimize time",
-        importance: 5,
-        satisfaction: 3,
-      }),
-     ).rejects.toMatchObject({
-       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
-     });
-   });
+    // A canvas write now falls back to the browser store, so the classification
+    // is checked on an endpoint that has no local answer.
+    await expect(healthMcp("http://mcp")).rejects.toMatchObject({
+      error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
+    });
+  });
 
    it("classifies an empty 404 response as not_found", async () => {
     mockFailure(404, {});
@@ -719,5 +713,45 @@ describe("signal inbox", () => {
 
     expect(calls[0]?.url).toBe("/api/signals/sig-1/dismiss");
     expect(JSON.parse(calls[0]!.body)).toEqual({ mcp_url: "http://mcp" });
+  });
+});
+
+describe("auth", () => {
+  function captureFetch() {
+    const calls: RequestInit[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push(init ?? {});
+        return new Response(JSON.stringify({ defaults: {} }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    return calls;
+  }
+
+  it("attaches the bearer token to every fetch", async () => {
+    localStorage.setItem("studio.token", "test-token");
+    const calls = captureFetch();
+
+    await fetchConfig();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.headers).toMatchObject({
+      Authorization: "Bearer test-token",
+    });
+    localStorage.removeItem("studio.token");
+  });
+
+  it("sends no authorization header when there is no token", async () => {
+    localStorage.removeItem("studio.token");
+    const calls = captureFetch();
+
+    await fetchConfig();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.headers).not.toHaveProperty("Authorization");
   });
 });

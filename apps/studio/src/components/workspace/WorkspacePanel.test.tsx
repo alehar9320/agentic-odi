@@ -115,6 +115,44 @@ describe("WorkspacePanel", () => {
     expect(studio.sendMessage).not.toHaveBeenCalled();
   });
 
+  it("moves focus into the lens and gives it back to the chip when it closes (#696)", () => {
+    const chip = document.createElement("button");
+    chip.textContent = "Landscape";
+    document.body.append(chip);
+    chip.focus();
+
+    const { rerender } = render(<WorkspacePanel />);
+
+    const heading = screen.getByRole("heading", { name: /opportunity landscape/i });
+    expect(heading).toHaveFocus();
+    expect(heading).toHaveAttribute("tabindex", "-1");
+
+    studio.activePanel = null;
+    rerender(<WorkspacePanel />);
+
+    expect(chip).toHaveFocus();
+    chip.remove();
+  });
+
+  it("remembers where a lens was scrolled and starts another at the top (#696)", () => {
+    const { rerender } = render(<WorkspacePanel />);
+    const landscape = document.querySelector(".lens__body") as HTMLDivElement;
+    landscape.scrollTop = 400;
+    fireEvent.scroll(landscape);
+
+    studio.activePanel = null;
+    rerender(<WorkspacePanel />);
+    studio.activePanel = "landscape";
+    rerender(<WorkspacePanel />);
+
+    expect((document.querySelector(".lens__body") as HTMLDivElement).scrollTop).toBe(400);
+
+    studio.activePanel = "jobmap";
+    rerender(<WorkspacePanel />);
+
+    expect((document.querySelector(".lens__body") as HTMLDivElement).scrollTop).toBe(0);
+  });
+
   it("renders nothing when no view is open", () => {
     studio.activePanel = null;
 

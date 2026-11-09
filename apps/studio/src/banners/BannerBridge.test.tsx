@@ -11,6 +11,7 @@ const studio = vi.hoisted(() => ({
   connection: null as unknown as ConnectionSnapshot,
   llmHealth: { healthy: true as boolean | null, message: "" },
   dismissedSidecarNotice: false,
+  streaming: false,
   dismissSidecarNotice: vi.fn(),
   recheckConnections: vi.fn(),
   openSetup: vi.fn(),
@@ -59,6 +60,20 @@ vi.mock("../state/StudioContext", () => ({
   useStudio: () => studio,
 }));
 
+/** The update handshake is mocked so a test can stage a build without a worker. */
+const swUpdate = vi.hoisted(() => ({
+  ready: false,
+  dismissed: false,
+  dismissAppUpdate: vi.fn(),
+  reloadForUpdate: vi.fn(),
+}));
+
+vi.mock("../lib/swUpdate", () => ({
+  useAppUpdate: () => ({ ready: swUpdate.ready, dismissed: swUpdate.dismissed }),
+  dismissAppUpdate: swUpdate.dismissAppUpdate,
+  reloadForUpdate: swUpdate.reloadForUpdate,
+}));
+
 /** The real shell wiring: bridge in, dispatcher out. */
 function Shell() {
   const { view } = useBanner();
@@ -88,6 +103,9 @@ describe("BannerBridge", () => {
     answerLiveness("live");
     studio.llmHealth = { healthy: true, message: "" };
     studio.dismissedSidecarNotice = false;
+    studio.streaming = false;
+    swUpdate.ready = false;
+    swUpdate.dismissed = false;
     setOnLine(true);
   });
 
@@ -277,5 +295,57 @@ describe("BannerBridge", () => {
     goOnline();
 
     expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
+  });
+
+  it("offers a reload once, never a forced one, when a new build is staged", () => {
+    swUpdate.ready = true;
+    renderShell();
+
+    expect(screen.getByText(/a new version of the studio is ready/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reload for the new version" })).toBeInTheDocument();
+  });
+
+  it("waits until a streamed turn ends before offering the reload", () => {
+    // Reloading under a streaming reply would drop it, so the offer waits.
+    studio.streaming = true;
+    swUpdate.ready = true;
+    const { rerender } = renderShell();
+    expect(screen.queryByText(/a new version of the studio is ready/i)).not.toBeInTheDocument();
+
+    studio.streaming = false;
+    rerender(
+      <BannerProvider>
+        <BannerBridge />
+        <Shell />
+      </BannerProvider>,
+    );
+    expect(screen.getByText(/a new version of the studio is ready/i)).toBeInTheDocument();
+  });
+
+  it("reloads only when the person asks", () => {
+    swUpdate.ready = true;
+    swUpdate.reloadForUpdate.mockClear();
+    renderShell();
+
+    expect(swUpdate.reloadForUpdate).not.toHaveBeenCalled();
+
+    act(() => {
+      screen.getByRole("button", { name: "Reload for the new version" }).click();
+    });
+
+    expect(swUpdate.reloadForUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the reload offer dismissed once the person hides it", () => {
+    swUpdate.ready = true;
+    swUpdate.dismissAppUpdate.mockClear();
+    renderShell();
+
+    act(() => {
+      screen.getByRole("button", { name: "Dismiss" }).click();
+    });
+
+    expect(swUpdate.dismissAppUpdate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/a new version of the studio is ready/i)).not.toBeInTheDocument();
   });
 });
