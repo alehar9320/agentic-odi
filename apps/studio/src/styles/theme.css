@@ -404,6 +404,22 @@ a {
   font-size: 0.72rem;
 }
 
+.bar__history-group + .bar__history-group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.bar__history-day {
+  margin: 0;
+  padding: 4px 10px 2px;
+  color: var(--faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+
 /* ------------------------------------------------------------------ */
 /* Conversation                                                       */
 /* ------------------------------------------------------------------ */
@@ -1437,6 +1453,51 @@ a {
 .message:focus-within .message__actions {
   opacity: 1;
 }
+
+/* The exact time is there for whoever asks for it: never on the page at rest,
+   one hover or one tab stop away otherwise. */
+.message__time {
+  align-self: center;
+  margin-right: 2px;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.message:hover .message__time,
+.message:focus-within .message__time {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message__time {
+    transition: none;
+  }
+}
+
+/* A rule across the log where the calendar day changes, and nowhere else. */
+.conversation__day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 4px;
+  color: var(--faint);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.conversation__day::before,
+.conversation__day::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-strong);
+  opacity: 0.5;
+}
+
 
 .quiet-action {
   display: inline-flex;
