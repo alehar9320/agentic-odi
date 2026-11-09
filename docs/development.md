@@ -296,11 +296,18 @@ cover, and every test runs from the repository root:
 
 ```bash
 uv run pytest                        # everything
+uv run pytest -n auto                # the same suite, across CPU workers
 uv run pytest apps/cli               # one app
 uv run pytest packages/core          # one package
 uv run pytest tests/contract         # cross-package contracts
 uv run pytest tests/scripts          # dev launcher
 ```
+
+`-n auto` is opt-in per invocation (pytest-xdist); it is not an `addopts`
+entry, so a small machine is never told to use more workers than it has. The
+suite is in-memory and each xdist worker is its own process, so the six
+`conftest.py` files' module-level state and `monkeypatch` fixtures stay
+isolated. CI's `test` job runs with `-n auto` and keeps every `--cov*` flag.
 
 The pre-PR procedure is not "run everything". It is the **default** tier in
 [`.agents/workflows/test.md`](../.agents/workflows/test.md): the fast tier,

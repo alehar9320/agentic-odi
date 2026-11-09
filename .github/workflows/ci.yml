@@ -128,6 +128,7 @@ jobs:
       - name: Pytest
         run: |
           uv run pytest \
+            -n auto \
             --cov=agentic_odi_cli \
             --cov=agentic_odi_connectors \
             --cov=agentic_odi_core \
