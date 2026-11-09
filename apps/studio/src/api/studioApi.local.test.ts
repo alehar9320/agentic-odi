@@ -1,33 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  StudioApiError,
-  addOutcome,
-  createJob,
-  deleteOutcome,
-  fetchCanvas,
-  fetchMemory,
-  isTransportFailure,
-  listConversations,
-  streamChat,
-  updateJob,
-} from "./studioApi";
+import { StudioApiError, addOutcome, addStep, createJob, fetchCanvas, fetchMemory, isTransportFailure, listConversations, streamChat } from "./studioApi";
+import type { OutboxRecord } from "../bff/store/types";
+
+const outbox: OutboxRecord[] = [];
 
 const bff = {
-  data: {
-    fetchCanvas: vi.fn(),
-    createJob: vi.fn(),
-    updateJob: vi.fn(),
-    deleteJob: vi.fn(),
-    addStep: vi.fn(),
-    updateStep: vi.fn(),
-    deleteStep: vi.fn(),
-    addOutcome: vi.fn(),
-    updateOutcome: vi.fn(),
-    deleteOutcome: vi.fn(),
-  },
+  data: { fetchCanvas: vi.fn() },
   memory: { listObservations: vi.fn(), listConversations: vi.fn() },
   chat: { stream: vi.fn() },
+  createJob: vi.fn(),
+  addStep: vi.fn(),
+  addOutcome: vi.fn(),
+  updateOutcome: vi.fn(),
+  deleteOutcome: vi.fn(),
+  listOutbox: vi.fn(async () => outbox),
 };
 
 vi.mock("../bff/index", () => ({
@@ -41,22 +28,42 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-/** What a dead reverse proxy returns: a status the client trusts, and no JSON. */
-function htmlResponse(status = 503): Response {
-  return new Response("Service Unavailable", {
-    status,
-    headers: { "Content-Type": "text/html" },
+/** A sidecar that is not there: a proxy that answers 503 with no structured error. */
+function offlineResponse(): Response {
+  return new Response(JSON.stringify({ detail: "Sidecar unreachable" }), {
+    status: 503,
+    headers: { "Content-Type": "application/json" },
   });
 }
 
+function outboxRecord(overrides: Partial<OutboxRecord>): OutboxRecord {
+  return {
+    id: "rec",
+    kind: "create",
+    entity: "job",
+    local_id: null,
+    server_id: null,
+    payload: {},
+    depends_on: [],
+    state: "pending",
+    attempts: 0,
+    last_error: null,
+    created_at: "2026-01-01T00:00:00.000Z",
+    acknowledged_at: null,
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
+  outbox.length = 0;
   vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
-  for (const method of Object.values(bff.data)) {
-    method.mockReset();
-  }
+  vi.mocked(bff.data.fetchCanvas).mockReset();
   vi.mocked(bff.memory.listObservations).mockReset();
   vi.mocked(bff.memory.listConversations).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
+  vi.mocked(bff.createJob).mockReset();
+  vi.mocked(bff.addStep).mockReset();
+  vi.mocked(bff.addOutcome).mockReset();
 });
 
 afterEach(() => {
@@ -74,18 +81,6 @@ describe("isTransportFailure", () => {
     expect(
       isTransportFailure(new StudioApiError({ code: "mcp_unreachable", message: "down", retryable: true }, 502, true)),
     ).toBe(false);
-  });
-
-  it("treats the hosted Worker's sidecar_unavailable answer as transport", () => {
-    expect(
-      isTransportFailure(
-        new StudioApiError(
-          { code: "sidecar_unavailable", message: "No sidecar.", retryable: false },
-          502,
-          true,
-        ),
-      ),
-    ).toBe(true);
   });
 
   it("treats network errors as transport", () => {
@@ -123,100 +118,6 @@ describe("fetchMemory fallback", () => {
 
     await fetchMemory();
     expect(bff.memory.listObservations).toHaveBeenCalled();
-  });
-});
-
-describe("canvas writes fall back to the browser store", () => {
-  it("creates the job locally and drops the sidecar's mcp_url", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
-    const job = { id: "job-1", name: "Get a service from commit to production", description: "" };
-    vi.mocked(bff.data.createJob).mockResolvedValueOnce(job);
-
-    await expect(
-      createJob({ name: "Get a service from commit to production", mcp_url: "http://mcp" }),
-    ).resolves.toEqual(job);
-    expect(bff.data.createJob).toHaveBeenCalledWith({
-      name: "Get a service from commit to production",
-    });
-  });
-
-  it("records the outcome locally when the proxy answers 503 HTML", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
-    const outcome = {
-      id: "out-1",
-      job_id: "job-1",
-      statement: "Minimize the time it takes to rotate secrets",
-      importance: 9,
-      satisfaction: 3,
-      opportunity_score: 15,
-    };
-    vi.mocked(bff.data.addOutcome).mockResolvedValueOnce(outcome);
-
-    await expect(
-      addOutcome({
-        job_id: "job-1",
-        statement: "Minimize the time it takes to rotate secrets",
-        importance: 9,
-        satisfaction: 3,
-        mcp_url: "http://mcp",
-      }),
-    ).resolves.toEqual(outcome);
-    expect(bff.data.addOutcome).toHaveBeenCalledWith({
-      job_id: "job-1",
-      statement: "Minimize the time it takes to rotate secrets",
-      importance: 9,
-      satisfaction: 3,
-    });
-  });
-
-  it("falls back when the hosted Worker says sidecar_unavailable", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      jsonResponse(
-        { error: { code: "sidecar_unavailable", message: "No sidecar.", retryable: false } },
-        502,
-      ),
-    );
-    vi.mocked(bff.data.updateJob).mockResolvedValueOnce({ id: "job-1", name: "Renamed" });
-
-    await updateJob("job-1", { name: "Renamed", mcp_url: "http://mcp" });
-    expect(bff.data.updateJob).toHaveBeenCalledWith("job-1", { name: "Renamed" });
-  });
-
-  it("deletes the outcome locally", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
-    vi.mocked(bff.data.deleteOutcome).mockResolvedValueOnce({ deleted: "out-1" });
-
-    await expect(deleteOutcome("out-1", "http://mcp")).resolves.toEqual({ deleted: "out-1" });
-    expect(bff.data.deleteOutcome).toHaveBeenCalledWith("out-1");
-  });
-
-  it("does not save a write the live sidecar rejected as invalid", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      jsonResponse({ error: { code: "validation", message: "Job name cannot be empty." } }, 422),
-    );
-
-    await expect(createJob({ name: "   ", mcp_url: "http://mcp" })).rejects.toThrow();
-    expect(bff.data.createJob).not.toHaveBeenCalled();
-  });
-
-  it("does not save a write when the sidecar cannot reach its MCP server", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      jsonResponse(
-        { error: { code: "mcp_unreachable", message: "The MCP server could not be reached.", retryable: true } },
-        502,
-      ),
-    );
-
-    await expect(
-      addOutcome({
-        job_id: "job-1",
-        statement: "Anything",
-        importance: 5,
-        satisfaction: 5,
-        mcp_url: "http://mcp",
-      }),
-    ).rejects.toThrow();
-    expect(bff.data.addOutcome).not.toHaveBeenCalled();
   });
 });
 
@@ -270,5 +171,172 @@ describe("listConversations fallback", () => {
 
     expect(listed.map((item) => item.id)).toEqual(["c-2"]);
     expect(bff.memory.listConversations).not.toHaveBeenCalled();
+  });
+});
+
+describe("queued writes with no sidecar", () => {
+  it("creates a job, a step, and an outcome locally and marks each pending", async () => {
+    // /api answers 503 with no structured error: the sidecar is not there. Every
+    // write must succeed locally and come back marked pending, never as a failure.
+    vi.mocked(fetch).mockResolvedValue(offlineResponse());
+    vi.mocked(bff.createJob).mockResolvedValue({ id: "j-1", name: "Job", description: "" });
+    vi.mocked(bff.addStep).mockResolvedValue({ id: "s-1", job_id: "j-1", name: "Step", order: 1 });
+    vi.mocked(bff.addOutcome).mockResolvedValue({
+      id: "o-1",
+      job_id: "j-1",
+      statement: "Minimize the time",
+      importance: 8,
+      satisfaction: 3,
+      opportunity_score: 13,
+    });
+
+    const job = await createJob({ name: "Job", mcp_url: "http://mcp" });
+    const step = await addStep({ mcp_url: "http://mcp", job_id: job.id, name: "Step", order: 1 });
+    const outcome = await addOutcome({
+      mcp_url: "http://mcp",
+      job_id: job.id,
+      statement: "Minimize the time",
+      importance: 8,
+      satisfaction: 3,
+    });
+
+    expect(job).toMatchObject({ id: "j-1", pending: true });
+    expect(step).toMatchObject({ id: "s-1", pending: true });
+    expect(outcome).toMatchObject({ id: "o-1", pending: true });
+    expect(bff.createJob).toHaveBeenCalledWith({ name: "Job", description: undefined });
+    expect(bff.addStep).toHaveBeenCalledWith({ job_id: "j-1", name: "Step", order: 1 });
+    expect(bff.addOutcome).toHaveBeenCalledWith({
+      job_id: "j-1",
+      statement: "Minimize the time",
+      importance: 8,
+      satisfaction: 3,
+    });
+  });
+
+  it("does not queue an application error from a live sidecar", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ error: { code: "validation", message: "bad", retryable: false } }, 422),
+    );
+
+    await expect(
+      addOutcome({
+        mcp_url: "http://mcp",
+        job_id: "j-1",
+        statement: "bad",
+        importance: 8,
+        satisfaction: 3,
+      }),
+    ).rejects.toThrow();
+
+    expect(bff.addOutcome).not.toHaveBeenCalled();
+  });
+
+  it("does not queue a sidecar 409 conflict", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ error: { code: "conflict", message: "changed", retryable: false } }, 409),
+    );
+
+    await expect(
+      addStep({ mcp_url: "http://mcp", job_id: "j-1", name: "Step", order: 1 }),
+    ).rejects.toThrow();
+
+    expect(bff.addStep).not.toHaveBeenCalled();
+  });
+
+  it("serves the sidecar's record, not the local one, while the sidecar answers", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ id: "server-o", statement: "From the sidecar" }));
+
+    const outcome = await addOutcome({
+      mcp_url: "http://mcp",
+      job_id: "j-1",
+      statement: "Minimize the time",
+      importance: 8,
+      satisfaction: 3,
+    });
+
+    expect(outcome).toMatchObject({ id: "server-o" });
+    expect((outcome as { pending?: boolean }).pending).toBeUndefined();
+    expect(bff.addOutcome).not.toHaveBeenCalled();
+  });
+});
+
+describe("canvas reads keep a queued write visible", () => {
+  it("overlays a pending outcome on a canvas the sidecar answered without it", async () => {
+    // The sidecar answers a refresh with a canvas that predates the queued write.
+    // The optimistic outcome must still be on the board, marked pending.
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ jobs: [], steps: [], outcomes: [], source: "mcp" }),
+    );
+    outbox.push(
+      outboxRecord({
+        kind: "create",
+        entity: "outcome",
+        local_id: "o-1",
+        payload: {
+          job_id: "j-1",
+          statement: "Minimize the time",
+          importance: 8,
+          satisfaction: 3,
+        },
+      }),
+    );
+
+    const canvas = await fetchCanvas("http://mcp");
+
+    const outcome = canvas.outcomes.find((item) => item.id === "o-1");
+    expect(outcome).toBeDefined();
+    expect(outcome?.pending).toBe(true);
+    expect(outcome?.opportunity_score).toBe(13);
+  });
+
+  it("marks a pending edit on a row the sidecar returned unmarked", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        jobs: [{ id: "j-1", name: "Job" }],
+        steps: [],
+        outcomes: [],
+        source: "mcp",
+      }),
+    );
+    outbox.push(outboxRecord({ kind: "update", entity: "job", local_id: "j-1", payload: {} }));
+
+    const canvas = await fetchCanvas("http://mcp");
+
+    expect(canvas.jobs.find((job) => job.id === "j-1")?.pending).toBe(true);
+  });
+
+  it("hides a row whose delete is still queued", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        jobs: [{ id: "j-1", name: "Job" }],
+        steps: [],
+        outcomes: [],
+        source: "mcp",
+      }),
+    );
+    outbox.push(outboxRecord({ kind: "delete", entity: "job", local_id: "j-1", payload: {} }));
+
+    const canvas = await fetchCanvas("http://mcp");
+
+    expect(canvas.jobs).toHaveLength(0);
+  });
+
+  it("leaves an acknowledged record off the overlay", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ jobs: [], steps: [], outcomes: [], source: "mcp" }),
+    );
+    outbox.push(
+      outboxRecord({
+        kind: "create",
+        entity: "outcome",
+        local_id: "o-1",
+        state: "acknowledged",
+        payload: { job_id: "j-1", statement: "x", importance: 8, satisfaction: 3 },
+      }),
+    );
+
+    const canvas = await fetchCanvas("http://mcp");
+
+    expect(canvas.outcomes).toHaveLength(0);
   });
 });

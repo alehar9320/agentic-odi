@@ -494,8 +494,8 @@ describe("typed failures", () => {
   it("classifies an empty 502 response as mcp_unreachable", async () => {
     mockFailure(502, {});
 
-    // A canvas write would now fall back to the browser store, so the
-    // classification is checked on an endpoint that has no local answer.
+    // A canvas write now falls back to the browser store, so the classification
+    // is checked on an endpoint that has no local answer.
     await expect(healthMcp("http://mcp")).rejects.toMatchObject({
       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
     });
