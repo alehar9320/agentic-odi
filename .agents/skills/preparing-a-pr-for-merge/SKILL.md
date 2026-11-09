@@ -34,6 +34,10 @@ Find the spec: the issue linked in the body, a `docs/superpowers/plans/` or
 `specs/` entry, or the `docs/roadmap.md` *In flight* line. No spec anywhere is
 itself the first defect — state that in the body instead of inventing one.
 
+Review comments are claims to verify, not gates to clear: turn each into a
+defect — file, line, expected, actual — fix the still-valid ones, and account
+for every one as fixed in this commit or deferred with a reason.
+
 ## Step 2 — make it mergeable
 
 Never work on the PR author's checkout:
@@ -42,6 +46,7 @@ Never work on the PR author's checkout:
 git fetch origin
 git worktree add ".worktrees/pr-<n>" "<headRefName>"
 cd ".worktrees/pr-<n>" && git rebase "origin/<base>"
+uv sync --all-packages --locked
 ```
 
 Resolve a conflict by understanding both intents. A conflict you cannot resolve
@@ -78,7 +83,7 @@ uv run ruff check . && uv run ruff format --check .
 uv run mypy apps brand packages
 uv run python scripts/doc_check.py
 uv run bandit -c pyproject.toml -r apps packages
-uv run pytest
+uv run pytest --cov   # --cov applies the 89% floor in pyproject.toml
 npm --prefix apps/studio run lint
 npm --prefix apps/studio run typecheck
 ```
