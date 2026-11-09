@@ -64,16 +64,31 @@ class StoreError(OdiError):
 
 
 class StoreCorrupt(StoreError):
-    """The SQLite store is damaged and cannot be safely read.
+    """The database failed its integrity check and must not be read or written.
 
-    ``path`` names the damaged file. ``rows`` holds up to 20 rows of
-    ``PRAGMA integrity_check`` output describing the corruption.
+    Raised at open when the store is damaged, so a caller can stop and tell the
+    person which file is damaged and where the last good copy is. The file is
+    never deleted, rewritten, or replaced with an empty one: a damaged store
+    fails reads rather than answering them with nothing.
     """
 
-    def __init__(self, message: str, path: str, rows: list[str]) -> None:
+    def __init__(
+        self,
+        path: str,
+        problems: list[str] | None = None,
+        *,
+        label: str = "Your database",
+        detail: str | None = None,
+    ) -> None:
         self.path = path
-        self.rows = rows
-        super().__init__(f"{message} (store: {path})")
+        self.problems = list(problems or [])
+        self.label = label
+        self.detail = detail
+        count = len(self.problems)
+        summary = f"{label} failed its integrity check: {path}"
+        if count:
+            summary = f"{summary} ({count} problem{'s' if count != 1 else ''} found)"
+        super().__init__(summary)
 
 
 class SerializationError(OdiError):
