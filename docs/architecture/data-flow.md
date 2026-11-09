@@ -87,6 +87,20 @@ and stops there. `APP_STORAGE_KEYS` and `APP_STORAGE_PREFIXES` are that
 inventory, and a test fails when a writer uses a `studio.*` or `agentic-odi.*`
 key that the inventory does not cover.
 
+## Runtime facts
+
+`apps/studio/src/bridge/runtime.ts` answers "which host am I in?" from one pure
+`detectRuntime(env)`, with `runtimeFacts()` as the only impure edge. The answer is
+`{host, install, originClass, apiTransport, offlineShell, platform, version,
+label}`: host is `desktop` (Tauri) or `browser`; install is `installed` or `tab`;
+origin class is `loopback` or `remote`; transport is `sidecar-direct` for the
+desktop app and `same-origin` for a page. `isInstalled()` and `isTauri()` feed it,
+and `isInstalled()` no longer depends on a pending install prompt.
+
+Settings → About and the diagnostics bundle (`app.runtime`) read the same facts,
+so they cannot disagree; the bundle carries no hostname or key. Host decides the
+API base only — nothing reads model availability from it.
+
 ## Write Paths
 
 ### Local CLI

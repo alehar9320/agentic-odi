@@ -299,6 +299,30 @@ Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 `{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
 …"}}` with `X-Request-ID` echoed for support.
 
+### Where the Studio is running
+
+The Studio can run in four places, and **Settings → About** says which one before
+anyone starts diagnosing. One module, `apps/studio/src/bridge/runtime.ts`, answers
+it; About and the diagnostics bundle read the same answer, so the two cannot
+disagree.
+
+| Host | Label | Reaches the sidecar | Offline shell |
+|---|---|---|---|
+| Installed desktop app (Tauri) | `Desktop app` | Directly, on the sidecar's own origin | as the shell provides |
+| Installed web app (PWA) | `Installed web app` | Same origin as the page | on when a service worker controls the page |
+| Browser tab on this device | `Browser tab` | Same origin; loopback | on when a service worker controls the page |
+| Browser tab on a host | `Browser tab` | Same origin; remote | on when a service worker controls the page |
+
+The **Runtime** row reads `Installed web app · on this device · offline shell on`
+and never a URL or a key. The same facts travel in the diagnostics bundle under
+`app.runtime` (`host`, `install`, `originClass`, `apiTransport`, `offlineShell`,
+`platform`), which still carries no hostname. Host decides the API base, not what
+the app can do: nothing here infers that a model is missing.
+
+Installing is offered only where it is meaningful — in a browser, and only while
+the app is not already its own window. The desktop app and an installed web app
+show no **Install** control, because neither can be installed again.
+
 ### When the database failed its check
 
 A store that is *reachable* but *damaged* is a different condition from a sidecar
