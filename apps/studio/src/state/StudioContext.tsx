@@ -1771,11 +1771,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       // Writing here is the proof the new thread was wanted: Undo is spent.
       commitNewThread();
 
+      // One clock for the turn: the question and the reply it opens carry the
+      // same moment, which is what the transcript dates them by.
+      const startedAt = new Date().toISOString();
       const userMessage: ChatMessage = existingUserMessage ?? {
         id: crypto.randomUUID(),
         parentId: base.length ? base[base.length - 1].id : null,
         role: "user",
         content: trimmed,
+        createdAt: startedAt,
         ...(attachments.length ? { attachments } : {}),
       };
       const assistantId = crypto.randomUUID();
@@ -1788,7 +1792,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
       setMessages([
         ...history,
-        { id: assistantId, parentId: userMessage.id, role: "assistant", content: "", parts: [] },
+        {
+          id: assistantId,
+          parentId: userMessage.id,
+          role: "assistant",
+          content: "",
+          parts: [],
+          createdAt: startedAt,
+        },
       ]);
       setStreaming(true);
       setThinkingPhase("health_check");
