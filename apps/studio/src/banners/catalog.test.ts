@@ -6,6 +6,7 @@ import type { BannerKind } from "./types";
 const ALL_KINDS: BannerKind[] = [
   "sidecar-down",
   "model-offline",
+  "offline",
   "update-available",
   "update-ready",
   "write-rejected",
@@ -42,6 +43,18 @@ describe("BANNER_CATALOG", () => {
     expect(entry.severity).toBe("warning");
     expect(entry.life).toBe("persistent");
     expect(entry.dismissible).toBe(false);
+  });
+
+  it("names what still works when the browser is offline, without claiming sync", () => {
+    const entry = BANNER_CATALOG["offline"];
+    expect(entry.severity).toBe("info");
+    expect(entry.life).toBe("persistent");
+    expect(entry.dock).toBe("top");
+    // A persistent banner with no key would dedupe by kind only; the copy has to
+    // name the device-local work and must not promise a sync that #306 owns.
+    expect(`${entry.title} ${entry.body}`).toMatch(/offline/i);
+    expect(`${entry.title} ${entry.body}`).toMatch(/device|here/i);
+    expect(`${entry.title} ${entry.body}`).not.toMatch(/sync/i);
   });
 
   it("keeps the toast kinds transient and in the corner", () => {

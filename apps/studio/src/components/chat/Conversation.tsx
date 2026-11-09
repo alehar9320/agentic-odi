@@ -7,7 +7,7 @@
  * added in exactly two files.
  */
 
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActionBarPrimitive,
@@ -38,6 +38,9 @@ import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon } from "../icons";
 import { Markdown } from "./Markdown";
+import { StallNotice } from "./StallNotice";
+import { WorkBlock } from "./WorkBlock";
+import { workGrouping } from "./workGrouping";
 
 const PHASE_LABEL: Record<string, string> = {
   health_check: "Waking the model",
@@ -53,12 +56,15 @@ function phaseLabel(phase: string | null): string {
 }
 
 function AssistantMessage() {
-  const { thinkingPhase, offlineReply, sendMessage } = useStudio();
+  const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
+  const id = useAuiState((state) => state.message.id);
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
+  const parts = useAuiState((state) => state.message.parts);
   const hasText = useAuiState((state) =>
     state.message.content.some((part) => part.type === "text" && part.text.trim().length > 0),
   );
+  const groupBy = useMemo(() => workGrouping(parts), [parts]);
   const error = useAuiState(
     (state) => state.message.metadata.custom?.error as StudioError | undefined,
   );
@@ -72,21 +78,62 @@ function AssistantMessage() {
     <article className="message message--assistant" aria-busy={running}>
       <AssistantAvatar />
       <div className="message__body">
-        {offlineReply ? <span className="message__tag">Local guidance</span> : null}
+        {/* Named on the reply it describes, never on every reply on screen, and
+            said once instead of warned about in a strip above the work. */}
+        {offlineReplyFor === id ? (
+          <button
+            type="button"
+            className="message__tag"
+            onClick={() => openPanel("settings")}
+          >
+            Local draft, no model connected
+          </button>
+        ) : null}
 
-        <MessagePrimitive.Parts
-          components={{
-            Text: TextPart,
-            Reasoning: ReasoningPart,
-            Source: SourcePart,
-            File: FilePart,
-            data: { by_name: { [SURFACE_PART]: SurfacePart, [CLAIMS_PART]: ClaimsPart } },
-            tools: { Fallback: ToolPart },
+        {/* One row for the work a turn did, and the answer on its own. The
+            grouping is ours rather than `ChainOfThoughtPrimitive` because that
+            primitive gathers every adjacent tool call into the group, including
+            a write that is still asking — and a question is not history. */}
+        <MessagePrimitive.GroupedParts groupBy={groupBy} indicator="never">
+          {({ part, children }) => {
+            switch (part.type) {
+              case "group-work":
+                return (
+                  <WorkBlock
+                    calls={part.indices.filter((index) => parts[index]?.type === "tool-call").length}
+                    running={running}
+                  >
+                    {children}
+                  </WorkBlock>
+                );
+              case "text":
+                return <TextPart />;
+              case "reasoning":
+                return <ReasoningPart />;
+              case "source":
+                return <SourcePart />;
+              case "file":
+                return <FilePart />;
+              case "data":
+                return part.name === SURFACE_PART ? (
+                  <SurfacePart />
+                ) : part.name === CLAIMS_PART ? (
+                  <ClaimsPart />
+                ) : null;
+              case "tool-call":
+                return <ToolPart {...part} />;
+              default:
+                return null;
+            }
           }}
-        />
+        </MessagePrimitive.GroupedParts>
 
         {running && !hasText ? <TypingPart label={phaseLabel(thinkingPhase)} /> : null}
         {running && hasText ? <span className="caret" aria-hidden="true" /> : null}
+
+        {/* Silence is not failure: a long tool call gets one honest line, and
+            a dropped run falls through to the failure panel instead. */}
+        <StallNotice />
 
         {error ? (
           <FailurePanel
@@ -149,12 +196,39 @@ function AssistantMessage() {
 
 function UserMessage() {
   const copied = useAuiState((state) => state.message.isCopied);
+  // A pasted document is a message, not the screen. The bubble starts clamped at
+  // eight lines; when the text fits, the clamp and its control disappear. Copy
+  // still reads the turn, so the whole message is what gets copied (#696).
+  const [clamped, setClamped] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const bubble = bubbleRef.current;
+    if (!bubble) {
+      return;
+    }
+    setClamped(bubble.scrollHeight > bubble.clientHeight + 1);
+  }, []);
 
   return (
     <article className="message message--user">
-      <div className="message__bubble">
+      <div
+        ref={bubbleRef}
+        className={`message__bubble${clamped && !expanded ? " is-clamped" : ""}`}
+      >
         <MessagePrimitive.Parts components={{ Text: TextPart }} />
       </div>
+      {clamped && (
+        <button
+          type="button"
+          className="quiet-action message__more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
       <MessagePrimitive.Attachments>
         {({ attachment }) => {
           // The turn owns the id; the prepared copy (if this session still has
@@ -165,7 +239,7 @@ function UserMessage() {
           const size = ready ? formatFileSize(ready.size) : "";
 
           return (
-            <span className="attachment-chip">
+            <span className="attachment-chip" data-aui-quote-selectable="false">
               {ready?.dataUrl ? (
                 <img className="attachment-chip__thumb" src={ready.dataUrl} alt="" />
               ) : null}
