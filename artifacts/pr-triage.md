@@ -5,7 +5,7 @@ Each state below is computed from the merged tree (`git merge-tree --write-tree 
 not from GitHub's cached `mergeable` field. A PR whose squash commit names it in main's history is listed
 as superseded, naming that commit.
 
-Counts: pushed-clean 10, clean-verified-ready 6, needs-human 7, superseded 63.
+Counts: pushed-clean 10, clean-verified-ready 6, needs-human 6, ordering-blocked 1, superseded 63. Every one of the 86 rows carries a state.
 
 | PR | head | state | evidence |
 |---|---|---|---|
