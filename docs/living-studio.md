@@ -422,6 +422,7 @@ cites the issue or PR that landed it.
 | `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Adopted | One lane row: its text, Run now, and a remove that drops only that message. | #410 |
 | `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | Quote, dictation, and queue state are read today — the follow-up lane is `composer.queue`; in-transit state arrives later. | — |
 | `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | The reply's own controls. | #238 |
+| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | Read a reply aloud and stop reading where the shell supports speech synthesis. | #432 |
 | `ActionBarPrimitive.ExportMarkdown` | Partial | Whole-conversation export is stronger than the per-reply primitive. | — |
 | `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | Alternative N of M, shown only when a branch exists. | #238 |
 | Attachment adapter (`AttachmentAdapter`) | Adopted | Browser-side extraction; nothing is stored server-side. | #238 |

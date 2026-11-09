@@ -1,13 +1,20 @@
 # The assistant-ui ledger
 
 The Studio runs on assistant-ui, and "we use assistant-ui" is not a coverage
-claim. This is. One hundred and twenty-nine relevant capabilities from
-`@assistant-ui/react@0.15.31` and `@assistant-ui/core@0.3.32` (read from the
-published type definitions, not from docs prose), each in exactly one state,
-each Adopted row citing the issue or PR that put it in a person's hands. The
-surface areas `@assistant-ui/vue`, `/ink`, `/native`, `cli`, and `cloud` are
-out of scope by platform, not by judgement: this is a React app with a local
-sidecar.
+claim. This is. Relevant capabilities from the installed assistant-ui surfaces
+this Studio can actually use, each in exactly one state, each Adopted row
+citing the issue or PR that put it in a person's hands. The counts are the
+tables below — the rows, not a hand-maintained summary — so they cannot drift
+from the ledger.
+
+This page audits the packages the Studio installs and the copy-in/template
+surfaces the library ships alongside them:
+`@assistant-ui/react@0.15.31`, `@assistant-ui/core@0.3.31` (read from the
+published type definitions and `apps/studio/package-lock.json`), and
+`@assistant-ui/react-markdown@0.14.24` (declared in `apps/studio/package.json`).
+The platform-only surfaces `@assistant-ui/vue`, `/ink`, `/native`, `cli`, and
+`cloud` are out of scope by platform, not by judgement: this is a React app
+with a local sidecar.
 
 **Counting rule.** A row is *Adopted* only when all four hold: a person can use
 the capability in the Studio today; the File cell names a file that exists; the
@@ -17,16 +24,21 @@ history); and a test names it. A row missing any of the four is *Partial*, and
 the Where / why cell says what is missing. A row is never Adopted because the
 dependency is installed. Deciding against something is a result: *Rejected*
 rows carry the reason so it is not re-litigated every quarter; *Decision* rows
-name the question that must be answered first.
+name the question that must be answered first. For elements and templates,
+*Decision* means "not examined as a vendor/copy-in choice yet" — it is not the
+same as declined.
 
 **Keeping this ledger true.** Closing a capability issue means editing its rows
 here in the same pull request: *Planned* → *Adopted*, with the file that now
 owns it and this PR's number in Delivered. Finding a capability we missed means
 adding a row before writing code — with a status; a row with no status is a
 wish. The projection in `docs/living-studio.md` (Adopted + Partial rows, in the
-person's words) must stay in step, which the check enforces.
+person's words) must stay in step, which the check enforces. `doc_check.py`
+also fails a Planned primitive row when the Studio already imports that named
+primitive, so a shipped control cannot quietly remain planned.
 
-Verified against the installed types; source of truth: this table.
+Verified against the installed types and installed packages; source of truth:
+this table.
 
 ## Runtime, store, and adapters
 
@@ -118,7 +130,7 @@ by the presence of one handler.
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
 | `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | The reply's own controls. |
-| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Planned | — | #412 | Read a reply aloud. |
+| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #432 | Read a reply aloud and stop reading. Wired through `apps/studio/src/assistant/speech.ts` and covered by `apps/studio/src/components/chat/Speech.test.tsx`. The control is absent where `speechSynthesis` is unsupported. |
 | `ActionBarPrimitive.FeedbackPositive` / `.FeedbackNegative` | Planned | — | #414 | Local-only rating. |
 | `ActionBarPrimitive.ExportMarkdown` | Partial | `apps/studio/src/lib/export.ts` | — | Whole-conversation Markdown export exists and also serialises generated surfaces. Adopting the primitive for one reply would produce a second, weaker export format. |
 | `ActionBarMorePrimitive` | Decision | — | — | An overflow menu earns its place only when the action row exceeds ~5 buttons; #412 and #414 add two. Revisit after both land. |
@@ -253,19 +265,82 @@ only the surface is missing.
 | `DevToolsHooks` / `DevToolsProviderApi` | Rejected | — | — | Developer surface, not a PM surface. `docs/` and the sidecar's diagnostics already cover the need. |
 | `webmcp` host/registration | Rejected | — | — | Would expose the Studio's actions to an external agent browser. Out of scope for a local-first app with approvals. |
 
+## `@assistant-ui/react-markdown`
+
+`@assistant-ui/react-markdown@0.14.24` is declared in
+`apps/studio/package.json` (lockfile: `apps/studio/package-lock.json`). The
+Studio does **not** import it today; `docs/architecture/reuse.md` names it as
+the canonical owner of markdown rendering, while current assistant prose uses
+the local subset in `apps/studio/src/lib/markdown.ts`. A row is *Decision*
+until the markdown child of #856 lands; installation alone is not adoption.
+
+| Capability | Status | File | Delivered | Where / why |
+|---|---|---|---|---|
+| `MarkdownTextPrimitive` | Decision | `apps/studio/src/lib/markdown.ts` | — | Not imported. The child of #856 decides whether this replaces the local markdown subset; evaluate `preprocess`, `remarkPlugins`, `rehypePlugins`, `components`, `componentsByLanguage`, `smooth`, and `defer` there. |
+| `memoizeMarkdownComponents` | Decision | — | — | Not imported; useful only with `MarkdownTextPrimitive`/component memoization. |
+| `useIsMarkdownCodeBlock` | Decision | — | — | Not imported; relevant to code-block rendering decisions under the markdown child of #856. |
+| `CodeHeader` | Decision | — | — | Not imported. A copy-in element decision, not an npm adoption by itself; see Elements below and `docs/architecture/vendor.md`. |
+| `SyntaxHighlighter` | Decision | — | — | Not imported. Evaluate highlighting/copy UI and bundle/security impact in the markdown child of #856 before adoption. |
+| `StreamdownTextPrimitive` | Decision | — | — | Not imported. Compare streaming-markdown behavior against the Studio's current part rendering before adopting a second markdown path. |
+| Security posture (`rehype-raw` absent, link allowlist) | Decision | `apps/studio/src/lib/markdown.ts` | — | No adoption yet. Any react-markdown adoption must keep raw HTML disabled (no `rehype-raw`) and enforce/keep a link allowlist consistent with Studio safety expectations. |
+
+## Elements (copy-in inventory)
+
+The library ships roughly 151 copy-in Elements (shadcn/Tailwind components over
+primitives such as `markdown-text`, `thread`, `composer`, `attachment`,
+`tool-fallback`, `threadlist-sidebar`, `quote`, and `reasoning`). Copying one in
+is a `src/vendor/` decision under `docs/architecture/vendor.md`, not a plain
+dependency bump: each copied file needs provenance/licence handling and, where
+applicable, a vendor ledger entry (`apps/studio/vendor.lock.json`). The honest
+default for an unexamined element is *Decision* with a named vendor question,
+not silence and not rejection.
+
+| Capability | Status | File | Delivered | Where / why |
+|---|---|---|---|---|
+| `markdown-text` | Decision | `apps/studio/src/lib/markdown.ts` | — | Not vendored/imported. Vendor question: would a copied markdown-text element replace the local markdown subset safely (no `rehype-raw`, link allowlist, streaming/claim behavior preserved)? |
+| `thread` | Decision | `apps/studio/src/components/chat/ChatStage.tsx` | — | Not vendored; Studio composes thread primitives directly. Vendor question: would copying the thread element reduce local layout work without losing Studio accessibility/viewport behavior? |
+| `composer` | Decision | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | Not vendored; composer is locally implemented. Vendor question: can a copied composer preserve attachment, quote, dictation, queue, and ODI-specific controls? |
+| `attachment` | Decision | `apps/studio/src/assistant/attachments.ts` | — | Not vendored. Vendor question: can a copied attachment element show extraction/refusal state and keep current accessibility/caps? |
+| `tool-fallback` | Decision | `apps/studio/src/assistant/parts.tsx` | — | Not vendored. Vendor question: would a copied tool-fallback preserve approval traces, result previews, and ODI-specific tool rendering? |
+| `threadlist-sidebar` | Decision | — | — | Not vendored/examined. Vendor question: does the sidebar element fit local-first thread state (#408/#409) and Studio navigation/layout constraints? |
+| `quote` | Decision | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | Not vendored. Vendor question: can a copied quote element preserve current quote metadata/attribution and transcript rendering? |
+| `reasoning` | Decision | `apps/studio/src/components/chat/Conversation.tsx` | — | Not vendored. Vendor question: can a copied reasoning element preserve disclosure timing, accessibility names, and “not persisted/counted as answer” behavior? |
+| Other copy-in Elements (remaining library set) | Decision | `apps/studio/src/vendor` | — | Not examined individually in this pass. Before copying any element, record provenance/licence and make the vendor/copy-in decision explicit under `docs/architecture/vendor.md`. |
+
+## Templates
+
+The library ships templates/examples including `default`, `minimal`, `cloud`,
+`cloud-clerk`, `cloud-harness`, `langgraph`, `mcp`, and `eve`. They are layout
+and integration starting points, not runtime dependencies. Copying template code
+is a vendor/copy-in decision (`docs/architecture/vendor.md`), and cloud
+runtimes/accounts remain out of scope for this local-first Studio.
+
+| Capability | Status | File | Delivered | Where / why |
+|---|---|---|---|---|
+| `default` | Decision | — | — | Not examined as a copy-in source. Vendor question: are any thread/layout patterns worth copying without importing cloud/runtime assumptions or replacing ODI-specific surfaces? |
+| `minimal` | Decision | — | — | Not examined as a copy-in source. Vendor question: would its smaller composition reduce Studio complexity, or omit required ODI controls (approvals, claims, lenses)? |
+| `cloud` | Rejected | — | — | Cloud runtime/account template. Local-first Studio has no account, no cloud thread sync, and no Assistant Cloud dependency. |
+| `cloud-clerk` | Rejected | — | — | Cloud auth/runtime template (Clerk). Conflicts with local-first, no-account Studio scope. |
+| `cloud-harness` | Rejected | — | — | Cloud harness/runtime template. Not compatible with the Studio’s local sidecar/MCP architecture. |
+| `langgraph` | Decision | — | — | Not examined as a copy-in source. Runtime/integration question: useful only if a LangGraph-backed surface is explicitly adopted; otherwise it is a different execution model. |
+| `mcp` | Decision | — | — | Not examined as a copy-in source. Integration question: may overlap with Studio MCP concerns, but copying template code is still a vendor decision and must not create a second authority beside the sidecar/MCP server. |
+| `eve` | Decision | — | — | Not examined as a copy-in source. Product/layout question: evaluate only as inspiration/copy-in candidates under vendor policy, not as a runtime dependency. |
+
+
+
 ## The count
 
 | Status | Rows |
 |---|---|
-| Adopted | 45 |
+| Adopted | 46 |
 | Partial | 9 |
-| Planned | 14 |
-| Decision | 26 |
-| Rejected | 35 |
-| Total | 129 |
+| Planned | 13 |
+| Decision | 47 |
+| Rejected | 38 |
+| Total | 153 |
 
-Read it as: **52** of the library's 129 relevant capabilities already deliver
-something a person can use, **20** more are carried by open issues, **26** rows
-wait on a named decision, and **31** are rejected with a reason. Every row is
-accounted for — that is the whole point of the page.
+The table above is computed from the rows in this file; there is no separate
+summary prose to drift. `scripts/doc_check.py` fails if the counts, the
+projection in `docs/living-studio.md`, or a Planned primitive row that the
+Studio already imports disagree with the source.
 

@@ -181,3 +181,57 @@ def test_the_repository_documentation_matches_the_code() -> None:
 
 def test_env_vars_are_not_invented_by_the_checker() -> None:
     assert documented_env_vars("`AGENTIC_ODI_DB` then `AGENTIC_ODI_DB`") == {"AGENTIC_ODI_DB"}
+
+from doc_check import LEDGER_SOURCE, ledger_errors
+
+
+def _ledger(root: Path, source: str, projection: str = "") -> list[str]:
+    return ledger_errors(source, projection or _projection(source), root=root, delivered=set())
+
+
+def _projection(source: str) -> str:
+    # Minimal projection that satisfies adopted/partial mirroring for focused tests.
+    return "#### What the runtime gives us, and what we did not take\n" + source
+
+
+def test_ledger_rejects_planned_row_when_studio_imports_named_primitive(tmp_path: Path) -> None:
+    # Regression for #857 / stale Speak row: code ships the primitive but the row stays Planned.
+    studio = tmp_path / "apps" / "studio" / "src" / "components" / "chat"
+    studio.mkdir(parents=True)
+    (studio / "Conversation.tsx").write_text(
+        'import { ActionBarPrimitive } from "@assistant-ui/react";\n'
+        "<ActionBarPrimitive.Speak />\n",
+        encoding="utf-8",
+    )
+    source = (
+        "# The assistant-ui ledger\n\n"
+        "## Action bar\n\n"
+        "| Capability | Status | File | Delivered | Where / why |\n"
+        "|---|---|---|---|---|\n"
+        "| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Planned | — | #412 | Read a reply aloud. |\n\n"
+        "## The count\n\n"
+        "| Status | Rows |\n|---|---|\n| Adopted | 0 |\n| Partial | 0 |\n| Planned | 1 |\n"
+        "| Decision | 0 |\n| Rejected | 0 |\n| Total | 1 |\n"
+    )
+
+    issues = ledger_errors(source, _projection(source), root=tmp_path, delivered=set())
+
+    assert any("primitive" in issue.lower() or "Speak" in issue for issue in issues)
+
+
+def test_ledger_accepts_planned_row_when_named_primitive_is_not_imported(tmp_path: Path) -> None:
+    (tmp_path / "apps" / "studio" / "src").mkdir(parents=True)
+    source = (
+        "# The assistant-ui ledger\n\n"
+        "## Action bar\n\n"
+        "| Capability | Status | File | Delivered | Where / why |\n"
+        "|---|---|---|---|---|\n"
+        "| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Planned | — | #412 | Read a reply aloud. |\n\n"
+        "## The count\n\n"
+        "| Status | Rows |\n|---|---|\n| Adopted | 0 |\n| Partial | 0 |\n| Planned | 1 |\n"
+        "| Decision | 0 |\n| Rejected | 0 |\n| Total | 1 |\n"
+    )
+
+    issues = ledger_errors(source, _projection(source), root=tmp_path, delivered=set())
+
+    assert not any("Speak" in issue and "planned" in issue.lower() for issue in issues)

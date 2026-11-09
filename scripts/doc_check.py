@@ -343,6 +343,38 @@ def _table_rows(lines: list[str]) -> list[list[str]]:
     return rows
 
 
+STUDIO_PRIMITIVE = re.compile(r"([A-Za-z]+Primitive)\.([A-Za-z]+)")
+
+
+def studio_source(root: Path = ROOT) -> str:
+    studio = root / "apps" / "studio" / "src"
+    if not studio.exists():
+        return ""
+    chunks: list[str] = []
+    for path in sorted(studio.rglob("*")):
+        if path.suffix in {".ts", ".tsx", ".js", ".jsx"}:
+            try:
+                chunks.append(path.read_text(encoding="utf-8"))
+            except OSError:
+                continue
+    return "\n".join(chunks)
+
+
+def planned_primitives(capability: str) -> list[str]:
+    tokens: list[str] = []
+    for base, member in STUDIO_PRIMITIVE.findall(capability):
+        tokens.append(f"{base}.{member}")
+    # Handle rows like `FooPrimitive.A / .B`.
+    first = STUDIO_PRIMITIVE.search(capability)
+    if first is not None:
+        base = first.group(1)
+        for member in re.findall(r"/\s*\.([A-Za-z]+)", capability):
+            token = f"{base}.{member}"
+            if token not in tokens:
+                tokens.append(token)
+    return tokens
+
+
 def ledger_errors(
     source: str,
     projection: str,
@@ -365,6 +397,7 @@ def ledger_errors(
         return ["ledger projection exists but the source section is missing"]
     if not has_projection:
         return ["the ledger exists but its Living Studio projection is missing"]
+    studio_code = studio_source(root)
 
     rows: list[tuple[str, str, str, str]] = []
     seen: set[str] = set()
@@ -400,6 +433,11 @@ def ledger_errors(
             elif delivered is not None and citation.group(1) in delivered:
                 issues.append(
                     f"planned row cites #{citation.group(1)}, which already merged: promote or reopen"
+                )
+            imported = [token for token in planned_primitives(capability) if token in studio_code]
+            if imported:
+                issues.append(
+                    f"planned row names a primitive the Studio already imports: {', '.join(imported)}"
                 )
         elif delivered_cell != LEDGER_DASH:
             issues.append(f"{status.lower()} row must not cite a delivery: {capability}")
