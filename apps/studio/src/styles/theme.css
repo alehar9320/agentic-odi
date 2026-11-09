@@ -6009,6 +6009,17 @@ details[open] summary {
   font-size: 10.5px;
 }
 
+/* A file whose bytes never became content: failed in place, not sent. */
+.attachment-chip--failed {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.attachment-chip__failure {
+  color: var(--red);
+  font-size: 10.5px;
+}
+
 .composer.is-dragging .composer__shell {
   border-color: rgba(139, 140, 248, 0.6);
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12), 0 14px 34px rgba(0, 0, 0, 0.3);
