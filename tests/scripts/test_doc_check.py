@@ -187,8 +187,7 @@ def test_env_vars_are_not_invented_by_the_checker() -> None:
 def test_a_planned_row_citing_an_installed_primitive_is_an_error(tmp_path: Path) -> None:
     (tmp_path / "apps" / "studio" / "src").mkdir(parents=True)
     (tmp_path / "apps" / "studio" / "src" / "Conversation.tsx").write_text(
-        "import { ActionBarPrimitive } from '@assistant-ui/react';"
-        "\n<ActionBarPrimitive.Speak />"
+        "import { ActionBarPrimitive } from '@assistant-ui/react';\n<ActionBarPrimitive.Speak />"
     )
     ledger = (
         "# The assistant-ui ledger\n\n"

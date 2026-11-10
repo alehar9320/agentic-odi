@@ -115,7 +115,7 @@ not adopt it yet, not a silence. A row becomes *Adopted* when prose renders thro
 | `CodeHeader` | Decision | — | — | Copy-language labels and the copy button. Not yet shipped on our code blocks. |
 | `SyntaxHighlighter` | Decision | — | — | Shiki-backed highlighting. Our code blocks are plain `<pre><code>`; syntax highlighting is not a Studio need today. |
 | `StreamdownTextPrimitive` | Decision | — | — | The streaming variant of `MarkdownTextPrimitive`. Deferred until prose rendering moves to the library. |
-| Security posture (no `rehype-raw`, link allowlist) | Decision | — | — | Enforced by the hand-rolled renderer rather than adopted from the library: `rehype-raw` is never loaded, and `renderSpans` admits only `https?://` and `mailto:` links. Revisit if prose rendering moves to `MarkdownTextPrimitive`, where this becomes an Adopted row with a file and a PR. |
+| Security posture (no `rehype-raw`, link allowlist) | Decision | — | — | Enforced by the hand-rolled renderer rather than adopted from the library: `rehype-raw` is never loaded, and `renderSpans` admits only `https?://` links and email addresses. Revisit if prose rendering moves to `MarkdownTextPrimitive`, where this becomes an Adopted row with a file and a PR. |
 
 ## Copy-in Elements
 

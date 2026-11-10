@@ -344,9 +344,7 @@ def _primitive_tokens(capability: str) -> list[str]:
     return tokens
 
 
-def planned_rows_cite_installed_primitives(
-    source: str, root: Path = ROOT
-) -> list[str]:
+def planned_rows_cite_installed_primitives(source: str, root: Path = ROOT) -> list[str]:
     """A *Planned* row may not name a primitive the code already imports.
 
     The merged-citation rule (``planned row cites #N, which already merged``)
@@ -358,9 +356,7 @@ def planned_rows_cite_installed_primitives(
     capability landed without a citation being updated.
     """
     files = sorted(root.glob(LEDGER_PRIMITIVE_SOURCE_GLOB))
-    contents = {
-        path.relative_to(root): path.read_text(encoding="utf-8") for path in files
-    }
+    contents = {path.relative_to(root): path.read_text(encoding="utf-8") for path in files}
     issues: list[str] = []
     for cells in _table_rows(_section_lines(source, LEDGER_HEADING)):
         if len(cells) != 5:
@@ -372,8 +368,7 @@ def planned_rows_cite_installed_primitives(
             for rel, text in contents.items():
                 if token in text:
                     issues.append(
-                        f"planned row cites an installed primitive: {capability} "
-                        f"({token} in {rel})"
+                        f"planned row cites an installed primitive: {capability} ({token} in {rel})"
                     )
                     break
             else:
@@ -577,9 +572,7 @@ def collect_issues(root: Path = ROOT, delivered: set[str] | None = None) -> list
     ]
     issues += [
         f"assistant-ui ledger: {issue}"
-        for issue in planned_rows_cite_installed_primitives(
-            docs.get(LEDGER_SOURCE, ""), root=root
-        )
+        for issue in planned_rows_cite_installed_primitives(docs.get(LEDGER_SOURCE, ""), root=root)
     ]
     return issues
 
