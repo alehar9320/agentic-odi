@@ -22,7 +22,7 @@ python -m agentic_odi_cli connectors catalog --json
 | Quantitative data & opportunity scoring (`quantitative-data`) | `posthog`, `amplitude`, `mixpanel` |
 | Market & competitive intelligence (`market-intelligence`) | `exa`, `tavily` |
 | Product strategy & backlog alignment (`strategy-alignment`) | `linear`, `github`, `jira`, `miro`, `figma` |
-| Strategy & knowledge management output (`knowledge-output`) | `context7`, `slack` |
+| Strategy & knowledge management output (`knowledge-output`) | `slack` |
 
 `docs/connectors-catalog.json` is the catalog as JSON, committed so a drift shows
 up in review. `packages/connectors/tests/test_catalog.py` fails when it stops

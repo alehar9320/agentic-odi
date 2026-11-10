@@ -214,21 +214,5 @@
     "docs": "https://docs.slack.dev/ai/",
     "tools": [],
     "is_recommended": false
-  },
-  {
-    "id": "context7",
-    "label": "Context7",
-    "area": "knowledge-output",
-    "summary": "Up-to-date library documentation for coding agents.",
-    "url": "https://mcp.context7.com/mcp/oauth",
-    "auth": "oauth",
-    "env_vars": [],
-    "headers": {},
-    "docs": "https://context7.com/docs/",
-    "tools": [
-      "resolve-library-id",
-      "query-docs"
-    ],
-    "is_recommended": false
   }
 ]

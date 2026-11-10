@@ -16,7 +16,6 @@ import {
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
 import { StudioProvider, useStudio } from "./StudioContext";
-import { useToasts } from "./notices/NoticesContext";
 import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
 
 const CONVERSATION = {
@@ -393,27 +392,13 @@ describe("StudioContext memory and resume", () => {
       JSON.stringify({ job_id: null, step_id: null, outcome_id: "O-9" }),
     );
 
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-9" });
   });
 
   it("remembers the subject the user navigates to", () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     act(() => {
       result.current.focusSubject("job", "JOB-7");
@@ -430,27 +415,13 @@ describe("StudioContext memory and resume", () => {
   it("starts clean when the stored session is unreadable", () => {
     localStorage.setItem(SESSION_KEY, "broken");
 
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     expect(result.current.focusedSubject).toBeNull();
   });
 
   it("sends the visible conversation path as model context", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.messages).toHaveLength(2));
 
     await act(async () => {
@@ -465,14 +436,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("regenerates an answer from its existing user turn without duplicating it", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.messages).toHaveLength(2));
 
     await act(async () => {
@@ -491,14 +455,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("edits a user turn by replacing it at its original parent", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.messages).toHaveLength(2));
 
     await act(async () => {
@@ -516,14 +473,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("serializes attachments with the sidecar's snake-case fields", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -551,14 +501,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("resumes the latest conversation and loads what it learned", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
     expect(result.current.messages.map((message) => message.content)).toEqual([
@@ -571,14 +514,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("loads the history list on boot, newest first", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.conversations).toHaveLength(2));
     expect(result.current.conversations.map((conversation) => conversation.id)).toEqual([
@@ -589,14 +525,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("opens a past conversation by loading its turns", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -611,14 +540,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("toasts after creating a job and recording an outcome", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -640,14 +562,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("confirms a connector was added", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -663,14 +578,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("persists a saved opportunity thesis", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -694,14 +602,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("sends the conversation id and applies memory events", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -715,14 +616,7 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("clears the thread and starts a fresh conversation", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => result.current.clearChat());
@@ -756,14 +650,7 @@ describe("StudioContext failures", () => {
   it("keeps the question and the failed turn when the stream reports an error", async () => {
     chatStream =
       'event: error\ndata: {"error":{"code":"mcp_unreachable","message":"MCP server unreachable","retryable":true,"request_id":"req-1"}}\n\n';
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -780,14 +667,7 @@ describe("StudioContext failures", () => {
 
   it("keeps the question when the request itself fails", async () => {
     chatFailure = new Error("network down");
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -801,14 +681,7 @@ describe("StudioContext failures", () => {
 
   it("reports a stream that ends without a message as an internal failure", async () => {
     chatStream = 'event: status\ndata: {"phase":"model"}\n\n';
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -822,14 +695,7 @@ describe("StudioContext failures", () => {
     chatStream =
       'event: connector\ndata: {"status":"error","error":"preset not found"}\n\n' +
       'event: message\ndata: {"content":"Sorry."}\n\n';
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
     const before = connectorFetches;
 
@@ -882,14 +748,7 @@ describe("StudioContext first run in a browser with no server", () => {
     // it go at 1,200 ms and carry on with the defaults it already has.
     configHangs = true;
     vi.useFakeTimers();
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     // Just before the bound the request is still ours to wait on.
     await act(async () => {
@@ -917,14 +776,7 @@ describe("StudioContext first run in a browser with no server", () => {
     // the config request alongside it and never a gate, and the off-screen reads
     // last — so nothing on the first screen waits on /api/config.
     configHangs = true;
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
     await waitFor(() => expect(result.current.memory).toHaveLength(1));
@@ -936,14 +788,7 @@ describe("StudioContext first run in a browser with no server", () => {
 
   it("answers the first message instead of refusing it", async () => {
     chatFailure = new TypeError("fetch failed");
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
 
     await act(async () => {
@@ -967,14 +812,7 @@ describe("StudioContext first run in a browser with no server", () => {
 
   it("calls nothing broken until the person asks", async () => {
     vi.useFakeTimers();
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -992,14 +830,7 @@ describe("StudioContext first run in a browser with no server", () => {
 
   it("gives up the survey when the person starts talking", async () => {
     vi.useFakeTimers();
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(500);
     });
@@ -1023,14 +854,7 @@ describe("StudioContext first run in a browser with no server", () => {
     // that is working exactly as designed.
     llmUnhealthy = true;
     vi.useFakeTimers();
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -1053,14 +877,7 @@ describe("StudioContext first run in a browser with no server", () => {
     vi.stubGlobal("requestIdleCallback", requestIdle);
     vi.stubGlobal("cancelIdleCallback", cancelIdle);
     vi.useFakeTimers();
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_000);
     });
@@ -1088,14 +905,7 @@ describe("StudioContext first run in a browser with no server", () => {
     vi.stubGlobal("requestIdleCallback", requestIdle);
     vi.stubGlobal("cancelIdleCallback", vi.fn());
     vi.useFakeTimers();
-    const { result, unmount } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
@@ -1145,14 +955,7 @@ describe("StudioContext writes with no sidecar (#523)", () => {
   });
 
   it("saves an outcome on this device and says where it lives, never 'Error'", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
 
     let jobId = "";
@@ -1182,14 +985,7 @@ describe("StudioContext writes with no sidecar (#523)", () => {
   });
 
   it("marks the optimistic outcome pending", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
 
     let jobId = "";
@@ -1214,14 +1010,7 @@ describe("StudioContext writes with no sidecar (#523)", () => {
   });
 
   it("keeps the pending outcome through a refresh that answers without it", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
 
     let jobId = "";
@@ -1250,14 +1039,7 @@ describe("StudioContext writes with no sidecar (#523)", () => {
   });
 
   it("rehydrates a queued write as pending after a reload", async () => {
-    const first = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const first = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(first.result.current.canvas).not.toBeNull());
     let jobId = "";
     await act(async () => {
@@ -1275,14 +1057,7 @@ describe("StudioContext writes with no sidecar (#523)", () => {
 
     // A reload: fresh providers, same IndexedDB. The write is still queued, so the
     // board must show it pending rather than lose it.
-    const second = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const second = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => {
       const outcome = (second.result.current.canvas?.outcomes ?? []).find(
         (candidate) => candidate.statement === "Minimize the time",
@@ -1293,14 +1068,7 @@ describe("StudioContext writes with no sidecar (#523)", () => {
 
   it("reports the server acknowledgement, not a local save, when the sidecar answers", async () => {
     writeFails = false;
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
 
     await act(async () => {
@@ -1333,14 +1101,7 @@ describe("StudioContext writes with no sidecar (#523)", () => {
       }
       return route(input, init);
     });
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
 
     let thrown: unknown = null;
@@ -1407,14 +1168,7 @@ describe("StudioContext on a desktop install whose model is down", () => {
       }),
     );
     vi.useFakeTimers();
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -1467,14 +1221,7 @@ describe("StudioContext probe scheduling", () => {
   }
 
   it("probes on a jittered cadence while the window is visible", async () => {
-    renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -1499,14 +1246,7 @@ describe("StudioContext probe scheduling", () => {
 
   it("makes no request at all while the window is hidden", async () => {
     const visibility = driveVisibility("hidden");
-    renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -1521,14 +1261,7 @@ describe("StudioContext probe scheduling", () => {
 
   it("probes once when the window comes back after the answer has gone stale", async () => {
     const visibility = driveVisibility("visible");
-    renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -1549,14 +1282,7 @@ describe("StudioContext probe scheduling", () => {
 
   it("backs off when the model keeps refusing instead of hammering it", async () => {
     llmUnhealthy = true;
-    renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -1573,14 +1299,7 @@ describe("StudioContext probe scheduling", () => {
   });
 
   it("collapses a burst of endpoint edits into one debounced probe", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -1604,14 +1323,7 @@ describe("StudioContext probe scheduling", () => {
   });
 
   it("does not probe when an edit leaves the endpoints alone", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -1644,14 +1356,7 @@ describe("StudioContext signal inbox", () => {
   });
 
   it("loads the inbox on boot and keeps polling while the window is visible", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await act(async () => {
       await Promise.resolve();
     });
@@ -1694,14 +1399,7 @@ describe("StudioContext theme", () => {
   });
 
   it("applies the stored theme and persists a change", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
@@ -1715,14 +1413,7 @@ describe("StudioContext theme", () => {
   });
 
   it("cross-fades a theme change and clears the class when it ends", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
 
     act(() => {
@@ -1747,14 +1438,7 @@ describe("StudioContext theme", () => {
       dispatchEvent: vi.fn(() => false),
     }));
 
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
 
     act(() => {
@@ -1767,27 +1451,13 @@ describe("StudioContext theme", () => {
 
   it("keeps the chosen theme across a remount", async () => {
     localStorage.setItem("studio.settings", JSON.stringify({ theme: "light" }));
-    const { unmount } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(document.documentElement.classList.contains("theme-light")).toBe(true));
 
     unmount();
     document.documentElement.className = "";
 
-    const second = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const second = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(second.result.current.settings.theme).toBe("light"));
     expect(document.documentElement.classList.contains("theme-light")).toBe(true);
   });
@@ -1815,14 +1485,7 @@ describe("StudioContext canvas state", () => {
 
   it("reports a failed canvas as an error state, not as an empty canvas", async () => {
     canvasFails = true;
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.canvasState.kind).toBe("error"));
     expect(result.current.canvasError?.code).toBe("mcp_unreachable");
@@ -1830,14 +1493,7 @@ describe("StudioContext canvas state", () => {
   });
 
   it("reports a canvas with no work as empty, not as ready", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.canvasState.kind).toBe("empty"));
     expect(result.current.canvasError).toBeNull();
@@ -1866,14 +1522,7 @@ describe("StudioContext stopped turns", () => {
 
   it("keeps the question but shows no failure when the user stops the turn", async () => {
     chatAborts = true;
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -1911,14 +1560,7 @@ describe("StudioContext write approval and branches", () => {
       'event: approval\ndata: {"id":"apv_1","tool_call_id":"call-1","name":"add_job","prompt":"Allow the assistant to add job?"}\n\n' +
       'event: message\ndata: {"content":"Added."}\n\n';
 
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -1938,14 +1580,7 @@ describe("StudioContext write approval and branches", () => {
   });
 
   it("asks the server for approval before any write", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -1957,14 +1592,7 @@ describe("StudioContext write approval and branches", () => {
   });
 
   it("persists the branch a person switched to", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -2002,14 +1630,7 @@ describe("StudioContext boot failure", () => {
   });
 
   it("surfaces a store-corrupt failure as bootError, not as a down sidecar", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.bootError).not.toBeNull());
 
@@ -2020,14 +1641,7 @@ describe("StudioContext boot failure", () => {
   });
 
   it("clears the failure page once a restored store answers cleanly", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
 
     await waitFor(() => expect(result.current.bootError).not.toBeNull());
 
@@ -2083,14 +1697,7 @@ describe("StudioContext startNewThread (#319)", () => {
   });
 
   async function booted() {
-    const harness = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const harness = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(harness.result.current.conversationId).toBe("c-1"));
     return harness;
   }
@@ -2281,14 +1888,7 @@ describe("StudioContext follow-up queue (#410)", () => {
   });
 
   async function openStudio() {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
     await waitFor(() => expect(result.current.queue).not.toBeNull());
     return result;
@@ -2479,14 +2079,7 @@ describe("StudioContext agent focus", () => {
   });
 
   it("sends the selected record as a pointer the sidecar can verify", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -2500,14 +2093,7 @@ describe("StudioContext agent focus", () => {
   });
 
   it("sends no focus when the screen has nothing selected", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -2518,14 +2104,7 @@ describe("StudioContext agent focus", () => {
   });
 
   it("does not point at a record the sidecar cannot read", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -2539,14 +2118,7 @@ describe("StudioContext agent focus", () => {
   });
 
   it("stops pointing at the screen once the person clears the focus", async () => {
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -2574,14 +2146,7 @@ describe("StudioContext agent focus", () => {
     canvasRecords = {
       outcomes: [{ id: "O-9", statement: "Reduce the time to reconcile a failed payment" }],
     };
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -2599,14 +2164,7 @@ describe("StudioContext agent focus", () => {
     canvasRecords = {
       outcomes: [{ id: "O-9", statement: "An outcome that is still on the board" }],
     };
-    const { result } = renderHook(
-      () => {
-        const studio = useStudio();
-        const toasts = useToasts();
-        return { ...studio, toasts };
-      },
-      { wrapper: StudioProvider },
-    );
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {

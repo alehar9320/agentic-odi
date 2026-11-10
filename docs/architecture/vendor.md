@@ -50,7 +50,6 @@ agreeing.
 | `clsx` | MIT | devDependencies | the class merger under `lib/utils.ts`, which every copy calls |
 | `radix-ui` | MIT | dependencies | `Slot`, the `asChild` primitive the button renders through |
 | `react` | MIT | dependencies | `React.ComponentProps` and the JSX the copies are written in |
-| `react-dom` | MIT | dependencies | `createPortal`, which the hover-card copy renders its content through |
 | `tailwind-merge` | MIT | devDependencies | resolves the class collisions two copies agree to disagree on |
 | `tailwindcss` | MIT | devDependencies | `index.css` imports its theme and utilities layers, scoped to this tree |
 

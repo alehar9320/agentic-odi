@@ -104,6 +104,7 @@ import type {
   StudioBrief,
   StudioConfig,
   StudioError,
+  StudioTheme,
   Thesis,
   ToolStatus,
   TurnNode,
@@ -111,13 +112,8 @@ import type {
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
+import { resolveTheme } from "../lib/theme";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
-import { SettingsProvider, useSettings, SETTINGS_KEY } from "./settings/SettingsContext";
-import {
-  NoticesProvider,
-  useNoticesActions,
-  type ToastKind,
-} from "./notices/NoticesContext";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -239,9 +235,11 @@ function readStudioError(raw: unknown): StudioError {
   return parsed;
 }
 
+const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
+const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const THESES_KEY = "studio.theses";
 
 /** How often a focused window re-reads the signal inbox from the store. */
@@ -260,9 +258,34 @@ const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = 
   strategy: "segments",
 };
 
+export const EMPTY_CONFIG: StudioConfig = {
+  base_url: "http://localhost:8001/v1",
+  api_key: "local",
+  model_name: "local-tools-model",
+  mcp_url: "http://localhost:8000/mcp",
+};
+
+export type ToastKind = "success" | "error" | "info";
+
+/**
+ * What the receipt says for a write that came back. A record the sidecar
+ * acknowledged reports the acknowledgement; a record still queued on this
+ * device says where the change lives instead of claiming it was saved to the
+ * studio. Only the sidecar's own acknowledgement earns the second message.
+ */
 export function writeReceipt(record: unknown, acknowledged: string): string {
   const pending = (record as { pending?: boolean } | null | undefined)?.pending === true;
   return pending ? "Saved on this device · will sync" : acknowledged;
+}
+
+export interface Toast {
+  id: number;
+  kind: ToastKind;
+  message: string;
+  /** One-off callback, for a toast that can hand back what it just took. */
+  action?: { label: string; run: () => void };
+  /** How long the toast stays up. Defaults to six seconds. */
+  durationMs?: number;
 }
 
 /**
@@ -433,6 +456,7 @@ export interface StudioContextValue {
   closePanel: () => void;
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
+  toasts: Toast[];
   pushToast: (
     kind: ToastKind,
     message: string,
@@ -517,6 +541,18 @@ export interface StudioContextValue {
 
 const StudioContext = createContext<StudioContextValue | null>(null);
 
+function loadSettings(): StudioConfig {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) {
+      return { ...EMPTY_CONFIG, ...(JSON.parse(raw) as Partial<StudioConfig>) };
+    }
+  } catch {
+    /* ignore malformed cache */
+  }
+  return EMPTY_CONFIG;
+}
+
 /**
  * Whether an edit moved what the studio talks to. The theme is stored beside the
  * endpoints but is not one of them, so switching it must not trigger a probe.
@@ -567,6 +603,14 @@ function loadCanvasCache(): CanvasData | null {
   return null;
 }
 
+function loadSidecarNoticeDismissed(): boolean {
+  try {
+    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function loadDisplayName(): string {
   try {
     return localStorage.getItem(DISPLAY_NAME_KEY) ?? "";
@@ -614,14 +658,12 @@ function loadTheses(): Thesis[] {
   return [];
 }
 
-function StudioProviderInner({ children }: { children: ReactNode }) {
-  const { settings, saveSettings: persistSettings } = useSettings();
-  const {
-    pushToast,
-    dismissToast,
-    setDismissedSidecarNotice,
-    dismissedSidecarNotice,
-  } = useNoticesActions();
+export function StudioProvider({ children }: { children: ReactNode }) {
+  const [settings, setSettings] = useState<StudioConfig>(loadSettings);
+  // The stored choice, or the operating system when there is none — the same
+  // resolution the inline bootstrap in index.html runs before React, so the
+  // class it painted and the class the app keeps are the same one.
+  const theme: StudioTheme = resolveTheme(settings.theme);
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   // The context conversation is never a gate. It opens from the stage, from a
@@ -643,6 +685,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
+  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -652,6 +695,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
   const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
@@ -679,6 +723,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [featuredError, setFeaturedError] = useState<StudioError | null>(null);
   const [connectorModalDismissed, setConnectorModalDismissed] = useState(false);
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
+  const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   /** The id of the newest turn on the wire; a steered cut-in takes it over (#410). */
   const liveTurnId = useRef<string | null>(null);
@@ -779,6 +824,35 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [refreshSignals, settings.mcp_url],
   );
 
+
+  const pushToast = useCallback(
+    (
+      kind: ToastKind,
+      message: string,
+      options?: { action?: { label: string; run: () => void }; durationMs?: number },
+    ) => {
+      const id = (toastId.current += 1);
+      setToasts((prev) => [
+        ...prev,
+        {
+          id,
+          kind,
+          message,
+          ...(options?.action ? { action: options.action } : {}),
+          ...(options?.durationMs ? { durationMs: options.durationMs } : {}),
+        },
+      ]);
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((toast) => toast.id !== id));
+      }, options?.durationMs ?? 6000);
+      return id;
+    },
+    [],
+  );
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   const threadSnapshot = useRef<ThreadSnapshot | null>(null);
 
@@ -1052,6 +1126,52 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // The theme lives on <html> so every surface, portal, and native control
+  // follows one class instead of each component tracking its own copy.
+  const appliedTheme = useRef<StudioTheme | null>(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = appliedTheme.current;
+    appliedTheme.current = theme;
+    root.classList.toggle("theme-light", theme === "light");
+    root.classList.toggle("theme-dark", theme === "dark");
+    root.style.colorScheme = theme;
+
+    // Only a change the person made cross-fades; the first paint is already the
+    // right colour (see index.html). Reduced motion swaps instantly, and the
+    // stylesheet's own reduce rule shortens the fade if it somehow runs.
+    if (previous === null || previous === theme) {
+      return;
+    }
+    const reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      return;
+    }
+    root.classList.add("theme-fading");
+    const timer = window.setTimeout(() => root.classList.remove("theme-fading"), 140);
+    return () => {
+      window.clearTimeout(timer);
+      root.classList.remove("theme-fading");
+    };
+  }, [theme]);
+
+  /**
+   * Write settings and persist them. This is the one place the store changes;
+   * a probe is scheduled by `saveSettings`, never here, so adopting the sidecar's
+   * boot defaults cannot look like a person editing an endpoint.
+   */
+  const writeSettings = useCallback((config: StudioConfig) => {
+    settingsRef.current = config;
+    setSettings(config);
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
   const saveSettings = useCallback(
     (config: StudioConfig) => {
       // Only an edit that changes what the studio talks to is worth a probe: a
@@ -1067,10 +1187,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           settingsProbeRef.current();
         }, PROBE_SETTINGS_DEBOUNCE_MS);
       }
-      settingsRef.current = config;
-      persistSettings(config);
+      writeSettings(config);
     },
-    [persistSettings],
+    [writeSettings],
   );
 
   const setDisplayName = useCallback((name: string) => {
@@ -1193,7 +1312,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       }
       return report;
     },
-    [setDismissedSidecarNotice],
+    [],
   );
 
   /**
@@ -1264,7 +1383,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
 
   const dismissSidecarNotice = useCallback(() => {
     setDismissedSidecarNotice(true);
-  }, [setDismissedSidecarNotice]);
+    try {
+      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   const refreshCanvas = useCallback(async () => {
     // The inbox is re-read alongside the board: every path that reaches this
@@ -2343,7 +2467,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         setSidecarReachable(true);
         setBootError(null);
         if (localStorage.getItem(SETTINGS_KEY) === null) {
-          saveSettings(defaults);
+          writeSettings(defaults);
         }
       })
       .catch((error) => {
@@ -2484,7 +2608,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       setSidecarReachable(true);
       setBootError(null);
       if (localStorage.getItem(SETTINGS_KEY) === null) {
-        saveSettings(defaults);
+        writeSettings(defaults);
       }
     } catch (error) {
       const problem = asStudioError(error);
@@ -2503,7 +2627,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     void refreshFeatured();
     void refreshMemory();
   }, [
-    saveSettings,
+    writeSettings,
     refreshCapabilities,
     refreshCanvas,
     refreshConnectors,
@@ -2589,6 +2713,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       openPanel,
       closePanel,
       ask,
+      toasts,
       pushToast,
       dismissToast,
       connectors,
@@ -2714,6 +2839,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       openPanel,
       closePanel,
       ask,
+      toasts,
       pushToast,
       dismissToast,
       connectors,
@@ -2771,16 +2897,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   );
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
-}
-
-export function StudioProvider({ children }: { children: ReactNode }) {
-  return (
-    <SettingsProvider>
-      <NoticesProvider>
-        <StudioProviderInner>{children}</StudioProviderInner>
-      </NoticesProvider>
-    </SettingsProvider>
-  );
 }
 
 export function useStudio(): StudioContextValue {

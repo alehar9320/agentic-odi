@@ -42,7 +42,7 @@ const acceptedTextExtensions = acceptedAttachmentTypes.filter((type) => type.sta
 const acceptedImageTypes = acceptedAttachmentTypes
   .filter((type) => type.startsWith("image/"))
   .map((type) => type.slice("image/".length).toUpperCase());
-const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*), Word documents (.docx), and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files up to ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")} characters, longer files are refused.`;
+const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*), Word documents (.docx), and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text and Word files up to ${MAX_ATTACHMENT_CHARS.toLocaleString()} characters.`;
 
 /** The local preview for an image before it is ever sent. */
 function AttachmentThumb({ file }: { file?: File }) {
@@ -85,12 +85,8 @@ function AttachmentRow({
         {attachments.length} of {MAX_ATTACHMENTS} files
       </p>
       {attachments.map((attachment, index) => {
-        const status = attachment.status;
-        const failed = status.type === "incomplete" && status.reason === "error";
-        const failureMessage =
-          status.type === "incomplete" && status.reason === "error" && status.message
-            ? status.message
-            : ATTACHMENT_READ_FAILURE;
+        const failed =
+          attachment.status.type === "incomplete" && attachment.status.reason === "error";
         const size = failed ? "" : formatFileSize(attachment.file?.size ?? 0);
         return (
           <span
@@ -102,7 +98,7 @@ function AttachmentRow({
             <span className="attachment-chip__meta">
               <span className="attachment-chip__name">{attachment.name}</span>
               {failed ? (
-                <span className="attachment-chip__failure">{failureMessage}</span>
+                <span className="attachment-chip__failure">{ATTACHMENT_READ_FAILURE}</span>
               ) : size ? (
                 <span className="attachment-chip__size">{size}</span>
               ) : null}

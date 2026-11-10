@@ -12,9 +12,7 @@ correct when none exists yet.
 from __future__ import annotations
 
 import os
-import shutil
-import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from agentic_odi_core.errors import StoreCorrupt
@@ -92,71 +90,3 @@ def corrupt_store_message(error: StoreCorrupt, *, backup: Path | None = None) ->
         f"{error.label} failed its integrity check: {error.path}. "
         f"{backup_line} The file has been left untouched — restore a backup before opening it again."
     )
-
-
-def _timestamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-
-
-def _integrity_ok(path: Path) -> bool:
-    """True when SQLite can open ``path`` and its integrity check passes.
-
-    A missing file is not a valid database: SQLite would otherwise create an
-    empty one and report ``ok``, which would let a restore clobber the live
-    store with nothing.
-    """
-    if not path.is_file():
-        return False
-    conn = sqlite3.connect(str(path))
-    try:
-        res = conn.execute("PRAGMA integrity_check").fetchone()
-    except sqlite3.DatabaseError:
-        return False
-    finally:
-        conn.close()
-    return bool(res) and str(res[0]).lower() == "ok"
-
-
-def backup_database(db_path: str, *, directory=None) -> Path:
-    """Write a verified snapshot of ``db_path`` using SQLite's online backup.
-
-    Returns the path of the new backup file. Raises if the source does not
-    exist or the snapshot fails its integrity check.
-    """
-    source = Path(db_path)
-    if not source.is_file():
-        raise FileNotFoundError(f"no database to back up: {source}")
-    folder = directory if directory is not None else backups_dir()
-    folder.mkdir(parents=True, exist_ok=True)
-    prefix = backup_prefix(db_path)
-    dest = folder / f"{prefix}-{_timestamp()}.db"
-    src = sqlite3.connect(str(source))
-    try:
-        dst = sqlite3.connect(str(dest))
-        try:
-            src.backup(dst)
-            dst.commit()
-        finally:
-            dst.close()
-    finally:
-        src.close()
-    if not _integrity_ok(dest):
-        try:
-            dest.unlink()
-        except OSError:
-            pass
-        raise RuntimeError("backup failed integrity check")
-    return dest
-
-
-def restore_database(backup_path, db_path: str) -> Path:
-    """Verify ``backup_path``, keep current db as ``<name>.pre-restore``, swap."""
-    bpath = Path(backup_path)
-    if not _integrity_ok(bpath):
-        raise ValueError(f"backup failed integrity check: {bpath}")
-    db = Path(db_path)
-    safety = db.with_suffix(db.suffix + ".pre-restore")
-    if db.exists():
-        shutil.copy2(db, safety)
-    shutil.copy2(bpath, db)
-    return safety

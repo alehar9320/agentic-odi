@@ -14,16 +14,6 @@ vi.mock("../state/StudioContext", () => ({
   useStudio: () => studio,
 }));
 
-vi.mock("../state/notices/NoticesContext", () => ({
-  useToasts: () => studio.toasts,
-  useNoticesActions: () => ({
-    pushToast: vi.fn(),
-    dismissToast: vi.fn(),
-    setDismissedSidecarNotice: vi.fn(),
-    dismissedSidecarNotice: false,
-  }),
-}));
-
 function shell() {
   return render(
     <BannerProvider>

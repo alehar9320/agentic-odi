@@ -230,16 +230,6 @@ PRESETS: tuple[ConnectorPreset, ...] = (
         auth="oauth",
         docs="https://docs.slack.dev/ai/",
     ),
-    ConnectorPreset(
-        id="context7",
-        label="Context7",
-        area="knowledge-output",
-        summary="Up-to-date library documentation for coding agents.",
-        url="https://mcp.context7.com/mcp/oauth",
-        auth="oauth",
-        docs="https://context7.com/docs/",
-        tools=["resolve-library-id", "query-docs"],
-    ),
 )
 
 
