@@ -28,13 +28,13 @@ const outcome = {
 };
 
 describe("OutcomeCard score preview", () => {
-  // The read-only card shows one decimal; the preview under "Adjust scores"
-  // showed two, so 16 read as "16.0" above and "16.00" below on the same card.
-  it("shows the adjusted opportunity score to one decimal", () => {
-    const { container } = render(<OutcomeCard outcome={outcome} />);
+  // Clicking "Adjust scores" now opens the ScorePopover modal instead of showing an inline preview
+  it("opens the ScorePopover when Adjust scores is clicked", () => {
+    render(<OutcomeCard outcome={outcome} />);
     fireEvent.click(screen.getByRole("button", { name: "Adjust scores" }));
 
-    expect(container.querySelector(".score-preview b")?.textContent).toBe("16.0");
+    // The ScorePopover modal should open
+    expect(screen.getByRole("dialog", { name: "Adjust Assumptions" })).toBeInTheDocument();
   });
 });
 
