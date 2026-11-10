@@ -6,9 +6,9 @@
   --bg-raised: #0e1014;
   --text: #f1f2f4;
   --muted: #a2a7b3;
-  --faint: #7d828c;
+  --faint: #8a909c;
   --accent: #8b8cf8;
-  --accent-strong: #6366f1;
+  --accent-strong: #5e5eed;
   --green: #4ade80;
   --amber: #f0b34a;
   --red: #f87171;
@@ -31,6 +31,7 @@
   --studio-surface: var(--surface);
   --studio-border: var(--line);
   --studio-radius: 12px;
+  --accent-contrast: #1a1a2e;
 }
 
 html.theme-dark {
@@ -44,16 +45,17 @@ html.theme-light {
   --bg-raised: #ffffff;
   --text: #15171c;
   --muted: #565d6b;
-  --faint: #687080;
-  --accent: #5b5bd6;
+  --faint: #555f6f;
+  --accent: #4a4ac8;
   --accent-strong: #4f46e5;
   --green: #15803d;
-  --amber: #b45309;
+  --amber: #9a4308;
   --red: #b91c1c;
   --line: rgba(15, 23, 42, 0.09);
   --line-strong: rgba(15, 23, 42, 0.18);
   --surface: rgba(15, 23, 42, 0.035);
   --surface-hover: rgba(15, 23, 42, 0.07);
+  --accent-contrast: #1a1a2e;
 }
 
 /* More contrast: muted text climbs one step, hairlines thicken, and the
@@ -4280,7 +4282,7 @@ html.theme-fading *::after {
 /* ------------------------------------------------------------------ */
 .pill-changelog {
   background: rgba(129, 140, 248, 0.18);
-  color: #a5b4fc;
+  color: var(--text);
   border: 1px solid rgba(129, 140, 248, 0.4);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -5097,6 +5099,7 @@ details[open] summary {
   padding: 12px 18px 16px;
   border-top: 1px solid var(--line);
   background: linear-gradient(to top, rgba(10, 11, 14, 0.9), transparent);
+  color: #e8e9ed;
 }
 
 .lens__note {
