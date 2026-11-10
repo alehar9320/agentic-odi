@@ -25,6 +25,7 @@ from agentic_odi_core.models import (
     Step,
     Strategy,
     Study,
+    Theme,
 )
 from agentic_odi_core.repository import (
     V2MOM_ID,
@@ -70,6 +71,7 @@ class SQLiteRepository(Repository):
         self.strategies: dict[str, Strategy] = {}
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
+        self.themes: dict[str, Theme] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
@@ -190,6 +192,33 @@ class SQLiteRepository(Repository):
             self.studies[p["id"]] = Study.model_validate(p)
         elif et == "STUDY_UPDATED":
             self._merge_updates(self.studies, p, Study)
+        elif et == "PROPOSAL_UPDATED":
+            self._merge_updates(self.proposals, p, OutcomeProposal)
+        elif et == "THEME_CREATED":
+            self.themes[p["id"]] = Theme.model_validate(p)
+        elif et == "THEME_UPDATED":
+            self._merge_updates(self.themes, p, Theme)
+        elif et == "THEME_DELETED":
+            self.themes.pop(p["id"], None)
+            for child_id in p.get("reparented", []):
+                child = self.themes.get(child_id)
+                if child is not None:
+                    self.themes[child_id] = child.model_copy(
+                        update={"parent_id": p.get("parent_id")}
+                    )
+            for stripped in list(self.outcomes.values()):
+                if p["id"] in stripped.theme_ids:
+                    self.outcomes[stripped.id] = stripped.model_copy(
+                        update={"theme_ids": [t for t in stripped.theme_ids if t != p["id"]]}
+                    )
+        elif et == "THEME_MEMBERSHIP_CHANGED":
+            member = self.outcomes.get(p["outcome_id"])
+            if member is not None:
+                remaining = [t for t in member.theme_ids if t not in p.get("removed", [])]
+                for theme_id in p.get("added", []):
+                    if theme_id not in remaining:
+                        remaining.append(theme_id)
+                self.outcomes[member.id] = member.model_copy(update={"theme_ids": remaining})
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -756,6 +785,88 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return new_segment
+
+    def add_theme(self, theme: Theme) -> Theme:
+        with self._lock:
+            self.store.append(
+                "THEME_CREATED",
+                theme.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return theme
+
+    def get_theme(self, theme_id: str) -> Theme | None:
+        with self._lock:
+            self._sync()
+            return self.themes.get(theme_id)
+
+    def list_themes(self, job_id: str | None = None) -> list[Theme]:
+        with self._lock:
+            self._sync()
+            items = list(self.themes.values())
+            if job_id is not None:
+                items = [theme for theme in items if theme.job_id in (job_id, None)]
+            return items
+
+    def update_theme(self, theme_id: str, updates: dict[str, Any]) -> Theme | None:
+        with self._lock:
+            self._sync()
+            theme = self.themes.get(theme_id)
+            if theme is None:
+                return None
+            current = theme.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_theme = theme.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "THEME_UPDATED",
+                {"id": theme_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_theme
+
+    def delete_theme(self, theme_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            theme = self.themes.get(theme_id)
+            if theme is None:
+                return False
+            reparented = [child.id for child in self.themes.values() if child.parent_id == theme_id]
+            self.store.append(
+                "THEME_DELETED",
+                {"id": theme_id, "parent_id": theme.parent_id, "reparented": reparented},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
+
+    def change_theme_membership(
+        self, outcome_id: str, added: list[str], removed: list[str]
+    ) -> Outcome | None:
+        with self._lock:
+            self._sync()
+            outcome = self.outcomes.get(outcome_id)
+            if outcome is None:
+                return None
+            current = [t for t in outcome.theme_ids if t not in removed]
+            for theme_id in added:
+                if theme_id not in current:
+                    current.append(theme_id)
+            self.store.append(
+                "THEME_MEMBERSHIP_CHANGED",
+                {"outcome_id": outcome_id, "added": added, "removed": removed},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return self.outcomes[outcome_id]
 
     def add_study(self, study: Study) -> Study:
         with self._lock:

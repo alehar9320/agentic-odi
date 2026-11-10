@@ -33,6 +33,7 @@ from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.strategy import strategy_app
 from agentic_odi_cli.studies import studies_app
 from agentic_odi_cli.survey import survey_app
+from agentic_odi_cli.themes import themes_app
 from agentic_odi_cli.top import register as register_top
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 

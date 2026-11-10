@@ -42,6 +42,7 @@ import type {
   ShareLink,
   StudioError,
   Study,
+  Theme,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -798,6 +799,14 @@ export async function fetchSegments(mcpUrl: string, jobId?: string): Promise<Seg
     params.set("job_id", jobId);
   }
   return getJson<Segment[]>(`/api/segments?${params.toString()}`);
+}
+
+export async function fetchThemes(mcpUrl: string, jobId?: string): Promise<Theme[]> {
+  const params = new URLSearchParams({ mcp_url: mcpUrl });
+  if (jobId) {
+    params.set("job_id", jobId);
+  }
+  return getJson<Theme[]>(`/api/themes?${params.toString()}`);
 }
 
 /** The opened studies, or an empty list before any study has been opened. */

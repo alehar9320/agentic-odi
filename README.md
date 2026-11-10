@@ -233,6 +233,7 @@ odi desired-outcomes list --job-id <id>
 odi studies open --job <id> --name "Invoice sweep" --wave 1   # one pass; re-running is a new wave
 odi segments run --job <id>          # Stage 5: who the scored outcomes point at
 odi strategy propose                 # Stage 6: the bet, and the paths it beat
+odi themes assign --theme <id> --outcome <id>  # file outcomes under a named theme
 odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal

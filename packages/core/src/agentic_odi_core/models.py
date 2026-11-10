@@ -252,6 +252,10 @@ class Outcome(BaseModel):
     interval_computed_at: str | None = Field(
         None, description="When the band was computed, for staleness (B3.2)"
     )
+    theme_ids: list[str] = Field(
+        default_factory=list,
+        description="The themes this outcome is filed under; empty until one is assigned",
+    )
 
     @model_validator(mode="after")
     def _count_requires_a_sample(self) -> Outcome:
