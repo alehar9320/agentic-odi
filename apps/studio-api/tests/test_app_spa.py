@@ -92,3 +92,37 @@ def test_main_runs_uvicorn_with_the_sidecar_factory(monkeypatch) -> None:
             {"factory": True, "host": "127.0.0.1", "port": 8100},
         )
     ]
+
+
+def test_served_shell_carries_a_content_security_policy(monkeypatch, tmp_path) -> None:
+    """The served HTML refuses inline script and remote code.
+
+    The desktop app carries its own policy in ``tauri.conf.json``; this is the
+    same string so the hosted shell cannot drift from the one the desktop
+    ships. The header travels on the HTML itself, so a browser that never runs
+    the bundle still sees the policy.
+    """
+    (tmp_path / "index.html").write_text("<html>studio</html>")
+    monkeypatch.setattr(app_module, "SPA_DIST", tmp_path)
+
+    response = _client().get("/some/deep/route")
+
+    assert response.status_code == 200
+    policy = response.headers["Content-Security-Policy"]
+    assert "default-src 'self'" in policy
+    assert "script-src 'self'" in policy
+    assert "unsafe-eval" not in policy
+    assert "script-src *" not in policy
+    # The served shell is the same policy the desktop ships.
+    assert policy == app_module.SERVED_CSP
+
+
+def test_api_routes_do_not_carry_the_shell_policy(monkeypatch, tmp_path) -> None:
+    """The CSP is a shell policy, not an API policy: data routes are untouched."""
+    (tmp_path / "index.html").write_text("<html>studio</html>")
+    monkeypatch.setattr(app_module, "SPA_DIST", tmp_path)
+
+    response = _client().get("/capabilities")
+
+    assert response.status_code == 200
+    assert "Content-Security-Policy" not in response.headers

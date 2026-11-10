@@ -37,6 +37,21 @@ from agentic_odi_studio_api.studio.paths import issue_token
 from agentic_odi_studio_api.studio.router import router as studio_router
 from agentic_odi_studio_api.studio.sharing import ShareService
 
+#: The served shell refuses inline script and remote code. The desktop app
+#: carries its own policy in ``tauri.conf.json``; this is the same string so the
+#: hosted shell cannot drift from the one the desktop ships. ``connect-src``
+#: keeps the wildcard because a person may point the MCP connector at any
+#: HTTPS endpoint; script-src stays narrow, which is where XSS actually wins.
+SERVED_CSP = (
+    "default-src 'self'; "
+    "connect-src ipc: http://ipc.localhost http://127.0.0.1:8100 https:; "
+    "font-src 'self' data:; "
+    "img-src 'self' data: blob:; "
+    "style-src 'self' 'unsafe-inline'; "
+    "script-src 'self'; "
+    "worker-src 'self' blob:"
+)
+
 CORS_ORIGINS = [
     "tauri://localhost",
     "http://tauri.localhost",
@@ -272,7 +287,12 @@ def create_app(
                 return FileResponse(candidate)
             index = SPA_DIST / "index.html"
             if index.is_file():
-                return FileResponse(index)
+                # The served shell refuses inline script and remote code. The
+                # header travels on the HTML itself so a browser that never
+                # runs the bundle still sees the policy.
+                response = FileResponse(index)
+                response.headers["Content-Security-Policy"] = SERVED_CSP
+                return response
             error = StudioError(
                 code=StudioErrorCode.NOT_FOUND,
                 message="Not Found",
