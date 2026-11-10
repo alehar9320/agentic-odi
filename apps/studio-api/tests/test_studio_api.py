@@ -645,9 +645,9 @@ def test_an_observation_carries_a_subject_and_can_be_filtered_by_it() -> None:
     )
     client.post("/api/memory/observations", json={"kind": "career", "text": "Owns activation."})
 
-    filtered = client.get(
-        "/api/memory/observations?subject_type=outcome&subject_id=O-12"
-    ).json()["observations"]
+    filtered = client.get("/api/memory/observations?subject_type=outcome&subject_id=O-12").json()[
+        "observations"
+    ]
     assert [item["text"] for item in filtered] == ["Activation is stuck."]
 
 

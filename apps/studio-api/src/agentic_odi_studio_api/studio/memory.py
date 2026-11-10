@@ -44,9 +44,7 @@ OBSERVATION_KINDS: frozenset[str] = frozenset(
 OBSERVATION_STATUSES: frozenset[str] = frozenset({"suggested", "confirmed", "dismissed"})
 #: What an observation may be about. An observation with no subject is legal:
 #: it is a note about the person or the work as a whole.
-OBSERVATION_SUBJECT_TYPES: frozenset[str] = frozenset(
-    {"job", "step", "outcome", "evidence"}
-)
+OBSERVATION_SUBJECT_TYPES: frozenset[str] = frozenset({"job", "step", "outcome", "evidence"})
 TURN_ROLES: frozenset[str] = frozenset({"user", "assistant", "system", "tool"})
 
 MAX_TEXT = 2_000

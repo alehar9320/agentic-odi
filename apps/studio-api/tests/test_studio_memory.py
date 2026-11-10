@@ -207,9 +207,7 @@ def test_subject_type_requires_an_id(memory: StudioMemory) -> None:
             "opportunity", "Activation is stuck.", subject_type="outcome", subject_id="  "
         )
     with pytest.raises(ValueError):
-        memory.add_observation(
-            "opportunity", "Activation is stuck.", subject_type="outcome"
-        )
+        memory.add_observation("opportunity", "Activation is stuck.", subject_type="outcome")
 
 
 def test_subject_id_requires_a_type(memory: StudioMemory) -> None:
