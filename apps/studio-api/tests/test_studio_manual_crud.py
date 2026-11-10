@@ -35,6 +35,51 @@ def test_missing_job_returns_404() -> None:
     assert response.status_code == 404
 
 
+def test_outcome_accepts_and_returns_sample_metadata() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+
+    created = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "importance_n": 40,
+            "satisfaction_n": 40,
+            "score_method": "survey",
+        },
+    )
+
+    assert created.status_code == 200
+    body = created.json()
+    assert body["score_method"] == "survey"
+    assert body["importance_n"] == 40
+    assert body["satisfaction_n"] == 40
+
+
+def test_outcome_defaults_to_an_estimate() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+
+    created = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time it takes to deploy when releasing",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    )
+
+    assert created.status_code == 200
+    assert created.json()["score_method"] == "estimate"
+    assert created.json()["importance_n"] is None
+
+
 def test_step_can_be_edited_and_removed() -> None:
     client = _client()
     job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
@@ -108,3 +153,185 @@ def test_out_of_range_scores_are_rejected() -> None:
     response = client.patch(f"/api/outcomes/{outcome_id}", json={"importance": 42})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "out_of_range"
+
+
+def test_outcome_history_records_each_accepted_change() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "note": "first pass",
+        },
+    ).json()
+
+    client.patch(
+        f"/api/outcomes/{outcome['id']}",
+        json={"satisfaction": 6.0, "note": "after the review"},
+    )
+
+    history = client.get(f"/api/outcomes/{outcome['id']}/history").json()["result"]
+
+    assert [row["satisfaction"] for row in history] == [4.0, 6.0]
+    assert [row["note"] for row in history] == ["first pass", "after the review"]
+    assert all(row["outcome_id"] == outcome["id"] for row in history)
+
+
+def test_outcome_delta_is_signed_from_the_baseline_snapshot() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+    client.patch(f"/api/outcomes/{outcome['id']}", json={"satisfaction": 6.0})
+
+    delta = client.get(f"/api/outcomes/{outcome['id']}/delta").json()["result"]
+
+    # Satisfaction rose by 2, so the opportunity score fell: the direction
+    # follows the opportunity sign, not the dimension that moved.
+    assert delta["satisfaction"] == 2.0
+    assert delta["direction"] == "down"
+
+
+def test_outcome_history_for_a_missing_outcome_is_404() -> None:
+    response = _client().get("/api/outcomes/does-not-exist/history")
+    assert response.status_code == 404
+
+
+def test_outcome_note_is_snapshot_metadata_not_a_record_field() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+
+    edited = client.patch(f"/api/outcomes/{outcome['id']}", json={"note": "why not"})
+
+    assert edited.status_code == 200
+    assert "note" not in edited.json()
+
+
+def test_outcome_interval_reports_no_band_for_an_estimate() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+
+    interval = client.get(f"/api/outcomes/{outcome['id']}/interval").json()["result"]
+
+    assert interval == {"outcome_id": outcome["id"], "band": None}
+
+
+def test_outcome_interval_reports_a_stored_band_and_provenance() -> None:
+    repo = InMemoryRepository()
+    client = TestClient(create_app(repo, backend="local"))
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+    # The Studio API has no survey-import route yet, so seed the band through
+    # the core service on the same repository the app reads from.
+    from agentic_odi_core import ODIService
+
+    rows = [
+        {
+            "outcome_id": outcome["id"],
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "respondent_id": f"r{i}",
+        }
+        for i in range(40)
+    ]
+    ODIService(repo).import_survey(rows)
+
+    band = client.get(f"/api/outcomes/{outcome['id']}/interval").json()["result"]["band"]
+
+    assert band["n"] == 40
+    assert band["stale"] is False
+    assert band["seed"] == 0
+
+
+def test_outcome_inputs_reports_no_inputs_for_an_estimate() -> None:
+    client = _client()
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+
+    inputs = client.get(f"/api/outcomes/{outcome['id']}/inputs").json()["result"]
+
+    assert inputs == {"outcome_id": outcome["id"], "inputs": None}
+
+
+def test_outcome_inputs_reports_the_retained_pairs_after_import() -> None:
+    repo = InMemoryRepository()
+    client = TestClient(create_app(repo, backend="local"))
+    job = client.post("/api/jobs", json={"name": "Ship a service"}).json()
+    outcome = client.post(
+        "/api/outcomes",
+        json={
+            "mcp_url": "",
+            "job_id": job["id"],
+            "statement": "Minimize the time to ship a release when the build is green",
+            "importance": 8.0,
+            "satisfaction": 4.0,
+        },
+    ).json()
+    from agentic_odi_core import ODIService
+
+    rows = [
+        {
+            "outcome_id": outcome["id"],
+            "importance": 8.0,
+            "satisfaction": 4.0,
+            "respondent_id": f"r{i}",
+        }
+        for i in range(3)
+    ]
+    ODIService(repo).import_survey(rows)
+
+    inputs = client.get(f"/api/outcomes/{outcome['id']}/inputs").json()["result"]["inputs"]
+
+    assert [item["importance"] for item in inputs] == [8.0, 8.0, 8.0]
+    assert [item["respondent_id"] for item in inputs] == ["r0", "r1", "r2"]
