@@ -28,6 +28,7 @@ from agentic_odi_core.mapping import (
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    V2MOM,
     BusinessValue,
     ClaimCheck,
     ClaimSkip,
@@ -38,6 +39,7 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
+    OutcomeAlignment,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -59,6 +61,13 @@ from agentic_odi_core.segmentation import (
     unclustered_outcomes,
 )
 from agentic_odi_core.strategy import propose_strategy as build_strategy
+from agentic_odi_core.traceability import (
+    Objective,
+    TraceabilityReport,
+    compute_traceability_report,
+    objective_key,
+    objectives_from_v2mom,
+)
 
 
 class JobNotFoundError(NotFoundError):
@@ -118,7 +127,15 @@ class EvidenceNotFoundError(NotFoundError, ValueError):
 
 
 class ValueOutOfRangeError(ValidationError):
-    pass
+    """A score fell outside the ODI range (1.0–10.0).
+
+    ``field`` names the field that was rejected, so the caller can show the
+    message next to it instead of on top of the whole form.
+    """
+
+    def __init__(self, message: str = "Value out of range.", field: str | None = None) -> None:
+        self.field = field
+        super().__init__(message)
 
 
 class SignalNotFoundError(NotFoundError):
@@ -429,9 +446,13 @@ class ODIService:
         importance = updates.get("importance", existing.importance)
         satisfaction = updates.get("satisfaction", existing.satisfaction)
         if importance is not None and not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "importance must be between 1.0 and 10.0", field="importance"
+            )
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "satisfaction must be between 1.0 and 10.0", field="satisfaction"
+            )
         require_outcome_statement(statement)
         if importance is not None and satisfaction is not None:
             updates = dict(updates)
@@ -523,7 +544,9 @@ class ODIService:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
         if not 1 <= order <= 8:
-            raise ValueOutOfRangeError("Step order must be between 1 and 8 (Ulwick's job map).")
+            raise ValueOutOfRangeError(
+                "Step order must be between 1 and 8 (Ulwick's job map).", field="order"
+            )
         existing_outcomes = self.repo.get_outcomes(job_id)
         existing_customer_outcomes = self.repo.list_customer_outcomes(job_id)
         if not existing_outcomes and not existing_customer_outcomes and not allow_empty_job_map:
@@ -568,9 +591,13 @@ class ODIService:
         if step_id is not None and self.repo.get_step(step_id) is None:
             raise StepNotFoundError(step_id)
         if importance is not None and not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "importance must be between 1.0 and 10.0", field="importance"
+            )
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "satisfaction must be between 1.0 and 10.0", field="satisfaction"
+            )
         if validate_statement:
             verdict = evaluate_outcome_statement(statement)
             if not verdict["valid"]:
@@ -1225,3 +1252,98 @@ class ODIService:
             discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
         )
         return saved
+
+    # -- Traceability: what an outcome advances ------------------------------
+
+    def save_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        """Persist the vision, values, methods, obstacles, and measures."""
+        return self.repo.add_v2mom(v2mom)
+
+    def get_v2mom(self) -> V2MOM | None:
+        """The stored vision and its lists, or ``None`` when none was captured."""
+        return self.repo.get_v2mom()
+
+    def link_outcome(self, outcome_id: str, field: str, text: str) -> Outcome:
+        """Record that an outcome advances one V2MOM method or measure.
+
+        The target must exist *now*: ``text`` is matched against the current
+        vision under ``field`` and unknown text is a validation error naming the
+        entries that do exist, never a fuzzy match. Linking the same pair twice
+        is idempotent.
+        """
+        outcome = self.repo.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        objective = self._resolve_objective(field, text)
+        alignment = OutcomeAlignment(field=field, key=objective.key, text=objective.text)
+        if any(
+            existing.field == alignment.field and existing.key == alignment.key
+            for existing in outcome.trace
+        ):
+            return outcome
+        # The repository event payload must stay JSON-serializable, so the link
+        # travels as its plain dict form rather than as the model.
+        trace = [*outcome.trace, alignment.model_dump(mode="json")]
+        updated = self.repo.update_outcome(outcome_id, {"trace": trace})
+        if updated is None:
+            raise OutcomeNotFoundError(outcome_id)
+        return updated
+
+    def unlink_outcome(self, outcome_id: str, field: str, key: str) -> Outcome:
+        """Remove one link from an outcome. Removing a link that is not there is a no-op."""
+        outcome = self.repo.get_outcome(outcome_id)
+        if outcome is None:
+            raise OutcomeNotFoundError(outcome_id)
+        remaining = [
+            alignment.model_dump(mode="json")
+            for alignment in outcome.trace
+            if not (alignment.field == field and alignment.key == key)
+        ]
+        updated = self.repo.update_outcome(outcome_id, {"trace": remaining})
+        if updated is None:
+            raise OutcomeNotFoundError(outcome_id)
+        return updated
+
+    def list_alignments(self, outcome_id: str | None = None) -> list[dict[str, str]]:
+        """Every recorded link, optionally for one outcome."""
+        outcomes = (
+            [self.repo.get_outcome(outcome_id)]
+            if outcome_id is not None
+            else list(self.repo.outcomes.values())
+        )
+        return [
+            {
+                "outcome_id": outcome.id,
+                "field": alignment.field,
+                "key": alignment.key,
+                "text": alignment.text,
+            }
+            for outcome in outcomes
+            if outcome is not None
+            for alignment in outcome.trace
+        ]
+
+    def traceability_report(self) -> TraceabilityReport:
+        """The three failures: orphans, unfunded objectives, and drift.
+
+        Read-only: it never repairs a link, and with no objectives defined it
+        says so rather than returning three empty sections.
+        """
+        return compute_traceability_report(self.repo.get_v2mom(), list(self.repo.outcomes.values()))
+
+    def _resolve_objective(self, field: str, text: str) -> Objective:
+        """Find the current objective named by ``text``, or refuse.
+
+        The refusal names the entries that do exist, because "unknown objective"
+        with no list is a dead end for the caller.
+        """
+        objectives = objectives_from_v2mom(self.repo.get_v2mom())
+        available = [item for item in objectives if item.field == field]
+        wanted = objective_key(field, text)
+        for objective in available:
+            if objective.key == wanted:
+                return objective
+        known = ", ".join(f'"{item.text}"' for item in available) or "none"
+        raise ValidationError(
+            f"No {field} in the vision matches {text!r}. Current {field}s: {known}."
+        )
