@@ -22,7 +22,7 @@ Follow this sequence when guiding a user through the ODI process:
 - **Unit of measure**: A measurable unit (time, cost, number, frequency, rate, percentage, steps, attempts).
 - **Object of control**: The thing being acted on (named after 'the').
 - **Contextual clarifier**: When it happens (when, while, before, after, during, if, as).
-- **Scores**: `importance` and `satisfaction` (1–10) are optional, but a score must carry its `claim_check`: the questions you asked the customer and what came back. Put three questions to the customer — four when the claim is broad — and wait for their replies before you write any number. An unscored outcome is legal; a bare number is not.
+- **Scores**: `importance` and `satisfaction` (1–10) are optional, but a score must carry its `claim_check`: the questions you asked the customer and what came back. Put three questions to the customer — four when the claim is broad — and wait for their replies before you write any number. An unscored outcome is legal; a bare number is not. A score comes only from a customer's own answers, so a missing one stays missing — no default, no midpoint, nothing computed in its place — and `opportunity_score` is `null` until both ratings exist.
 - **Expectation**: Qualitative interviews typically uncover 50–150 desired outcome statements.
 - **Tools to use**:
   - `add_outcome(job_id, statement, importance?, satisfaction?, claim_check?)` — Capture each desired outcome. When you set a score, pass `claim_check` with `asked`, `answers`, and `skips` (each skip needs a reason); ask the customer before scoring, never answer your own questions.
@@ -43,6 +43,7 @@ Follow this sequence when guiding a user through the ODI process:
 - **Formula**: Opportunity Score = importance + max(importance - satisfaction, 0)
 - **Scores > 10** indicate high innovation opportunity. Guide the user to focus efforts there.
 - **Scores ≤ 10** indicate appropriately served or overserved outcomes.
+- **Unscored** outcomes are neither. An outcome with no `importance` and `satisfaction` reads as unscored wherever it appears, and its `opportunity_score` is `null` — so it is excluded from both readings above. The next move is to ask the customer, never to supply the number.
 - **Tools to use**: `get_outcomes(job_id)` — Review opportunity_score field on each outcome. `compute_opportunity(importance, satisfaction)` — Calculate a score directly.
 
 ### Stage 5: Segment by Underserved Outcomes
@@ -53,6 +54,9 @@ Follow this sequence when guiding a user through the ODI process:
   scored outcomes by job and job-map step, so run it before answering 'who is this for?'.
 - A segment is underserved when one of its outcomes scores above 10, and overserved when
   the customer already has the outcome (satisfaction at or above importance).
+- A segment with even one unscored outcome carries no verdict. Calling a group
+  "appropriately served" requires every outcome in it to be rated by a customer, so an
+  unrated outcome leaves the segment unclassified rather than quietly middle.
 - An outcome that joins no cluster is reported as unclustered, never dropped or inflated
   into a segment.
 
@@ -115,15 +119,3 @@ def invalid_strategy_request(message: str) -> str:
     server failure.
     """
     return f"Invalid strategy request: {message}"
-
-
-def interview_not_found(interview_id: str | None) -> str:
-    return f"Interview not found: {interview_id}"
-
-
-def quote_not_found(quote_id: str | None) -> str:
-    return f"Quote not found: {quote_id}"
-
-
-def candidate_not_found(candidate_id: str | None) -> str:
-    return f"Outcome candidate not found: {candidate_id}"

@@ -37,18 +37,6 @@ class ToolName(str, Enum):
     GET_EVIDENCE = "get_evidence"
     LIST_EVIDENCE = "list_evidence"
     DELETE_EVIDENCE = "delete_evidence"
-    ADD_INTERVIEW = "add_interview"
-    GET_INTERVIEW = "get_interview"
-    LIST_INTERVIEWS = "list_interviews"
-    DELETE_INTERVIEW = "delete_interview"
-    ADD_QUOTE = "add_quote"
-    LIST_QUOTES = "list_quotes"
-    IMPORT_TRANSCRIPT = "import_transcript"
-    EXTRACT_CANDIDATES = "extract_candidates"
-    LIST_CANDIDATES = "list_candidates"
-    GET_CANDIDATE = "get_candidate"
-    UPDATE_CANDIDATE = "update_candidate"
-    DELETE_CANDIDATE = "delete_candidate"
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
@@ -73,6 +61,10 @@ class ToolName(str, Enum):
     LIST_PROPOSALS = "list_proposals"
     APPROVE_PROPOSAL = "approve_proposal"
     REJECT_PROPOSAL = "reject_proposal"
+    LINK_OUTCOME = "link_outcome"
+    UNLINK_OUTCOME = "unlink_outcome"
+    GET_OUTCOME_ALIGNMENTS = "get_outcome_alignments"
+    GET_TRACEABILITY_REPORT = "get_traceability_report"
     OPEN_STUDY = "open_study"
     LIST_STUDIES = "list_studies"
 
@@ -357,117 +349,6 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("evidence_id",),
         returns="The deleted Evidence ID.",
     ),
-    ToolName.ADD_INTERVIEW.value: ToolSpec(
-        name="add_interview",
-        summary="Record a research interview (who, when, the job it informs).",
-        effect=_derive_effect("add_interview"),
-        arguments=(
-            "title",
-            "participant_label",
-            "job_id",
-            "participant_role",
-            "conducted_at",
-            "source_kind",
-            "notes",
-        ),
-        required=("title", "participant_label"),
-        returns="The created Interview.",
-    ),
-    ToolName.GET_INTERVIEW.value: ToolSpec(
-        name="get_interview",
-        summary="Get a single Interview by ID.",
-        effect=_derive_effect("get_interview"),
-        arguments=("interview_id",),
-        required=("interview_id",),
-        returns="The Interview, or an error string if not found.",
-    ),
-    ToolName.LIST_INTERVIEWS.value: ToolSpec(
-        name="list_interviews",
-        summary="List interviews, optionally filtered by job.",
-        effect=_derive_effect("list_interviews"),
-        arguments=("job_id", "limit", "offset"),
-        returns="A list of Interviews.",
-    ),
-    ToolName.DELETE_INTERVIEW.value: ToolSpec(
-        name="delete_interview",
-        summary="Delete an Interview and its cascading quotes.",
-        effect=_derive_effect("delete_interview"),
-        arguments=("interview_id",),
-        required=("interview_id",),
-        returns="The deleted Interview ID.",
-    ),
-    ToolName.ADD_QUOTE.value: ToolSpec(
-        name="add_quote",
-        summary="Append a verbatim quote to an interview.",
-        effect=_derive_effect("add_quote"),
-        arguments=("interview_id", "text", "speaker", "start_ms", "end_ms"),
-        required=("interview_id", "text"),
-        returns="The created InterviewQuote.",
-    ),
-    ToolName.LIST_QUOTES.value: ToolSpec(
-        name="list_quotes",
-        summary="List an interview's quotes in ordinal order.",
-        effect=_derive_effect("list_quotes"),
-        arguments=("interview_id",),
-        required=("interview_id",),
-        returns="A list of InterviewQuotes ordered by ordinal.",
-    ),
-    ToolName.IMPORT_TRANSCRIPT.value: ToolSpec(
-        name="import_transcript",
-        summary="Parse a transcript and persist it as one interview with its quotes.",
-        effect=_derive_effect("import_transcript"),
-        arguments=(
-            "text",
-            "title",
-            "participant_label",
-            "filename",
-            "format",
-            "job_id",
-            "participant_role",
-            "conducted_at",
-        ),
-        required=("text", "title", "participant_label"),
-        returns="The created Interview and the number of quotes.",
-    ),
-    ToolName.EXTRACT_CANDIDATES.value: ToolSpec(
-        name="extract_candidates",
-        summary="Propose outcome candidates from one interview quote.",
-        effect=_derive_effect("extract_candidates"),
-        arguments=("quote_id", "stage_hint"),
-        required=("quote_id",),
-        returns="The newly stored OutcomeCandidates (valid ones proposed, invalid ones rejected).",
-    ),
-    ToolName.LIST_CANDIDATES.value: ToolSpec(
-        name="list_candidates",
-        summary="List outcome candidates, optionally filtered by interview or status.",
-        effect=_derive_effect("list_candidates"),
-        arguments=("interview_id", "status", "limit", "offset"),
-        returns="A list of OutcomeCandidates.",
-    ),
-    ToolName.GET_CANDIDATE.value: ToolSpec(
-        name="get_candidate",
-        summary="Get a single OutcomeCandidate by ID.",
-        effect=_derive_effect("get_candidate"),
-        arguments=("candidate_id",),
-        required=("candidate_id",),
-        returns="The OutcomeCandidate, or an error string if not found.",
-    ),
-    ToolName.UPDATE_CANDIDATE.value: ToolSpec(
-        name="update_candidate",
-        summary="Update an outcome candidate's review state or statement.",
-        effect=_derive_effect("update_candidate"),
-        arguments=("candidate_id", "status", "statement", "decision_reason"),
-        required=("candidate_id",),
-        returns="The updated OutcomeCandidate.",
-    ),
-    ToolName.DELETE_CANDIDATE.value: ToolSpec(
-        name="delete_candidate",
-        summary="Delete an OutcomeCandidate.",
-        effect=_derive_effect("delete_candidate"),
-        arguments=("candidate_id",),
-        required=("candidate_id",),
-        returns="The deleted candidate ID.",
-    ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         name="promote_evidence",
         summary="Promote evidence to a Job or an Outcome.",
@@ -665,6 +546,40 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("proposal_id",),
         returns="The rejected OutcomeProposal.",
         stage="2",
+    ),
+    ToolName.LINK_OUTCOME.value: ToolSpec(
+        name="link_outcome",
+        summary="Link an Outcome to the V2MOM method or measure it advances.",
+        effect=_derive_effect("link_outcome"),
+        arguments=("outcome_id", "field", "text"),
+        required=("outcome_id", "field", "text"),
+        returns="The updated Outcome, or a refusal naming the objectives that do exist.",
+        stage="6",
+    ),
+    ToolName.UNLINK_OUTCOME.value: ToolSpec(
+        name="unlink_outcome",
+        summary="Remove one V2MOM link from an Outcome.",
+        effect=_derive_effect("unlink_outcome"),
+        arguments=("outcome_id", "field", "key"),
+        required=("outcome_id", "field", "key"),
+        returns="The updated Outcome.",
+        stage="6",
+    ),
+    ToolName.GET_OUTCOME_ALIGNMENTS.value: ToolSpec(
+        name="get_outcome_alignments",
+        summary="List the V2MOM links recorded on Outcomes.",
+        effect=_derive_effect("get_outcome_alignments"),
+        arguments=("outcome_id",),
+        returns="A list of links, each naming the outcome, field, key, and text.",
+        stage="6",
+    ),
+    ToolName.GET_TRACEABILITY_REPORT.value: ToolSpec(
+        name="get_traceability_report",
+        summary="Report orphans, unfunded objectives, and links the vision dropped.",
+        effect=_derive_effect("get_traceability_report"),
+        arguments=(),
+        returns="The orphans, unfunded, and drift lists, or a note that no objectives exist.",
+        stage="6",
     ),
     ToolName.OPEN_STUDY.value: ToolSpec(
         name="open_study",

@@ -256,48 +256,6 @@ ones — an opportunity score crossing 10 upward — bypass that cap. Suppressed
 signals stay in the store and stay reachable by id.
 See [The Signal Inbox](architecture/notifications.md).
 
-## Interviews
-
-An interview records who took part, when, and the job it informs. Its quotes
-are the verbatim sentences the research is built from — the unit the Listen
-pillar works on.
-
-```bash
-# Record an interview
-agentic-odi interviews add \
-  --title "Ana — onboarding" --participant "Ana" \
-  --role "Ops lead" --job-id <job-id>
-
-# Read and delete
-agentic-odi interviews list --job-id <job-id>
-agentic-odi interviews list --json
-agentic-odi interviews get <interview-id>
-agentic-odi interviews quotes <interview-id>
-agentic-odi interviews delete <interview-id> --yes
-```
-
-### Import a transcript
-
-`interviews import` turns a transcript file into one interview plus its quotes
-in a single step. The format is detected from the extension and the content, or
-set with `--format md|txt|vtt|srt`. A malformed transcript is refused before
-anything is written, so a failure never leaves a half-imported interview.
-
-```bash
-agentic-odi interviews import session.vtt \
-  --title "Ana — onboarding" --participant "Ana" --job-id <job-id>
-cat session.vtt | agentic-odi interviews import - \
-  --title "Ana — onboarding" --participant "Ana"
-```
-
-In a cue file (`.vtt`/`.srt`) each cue becomes one quote with its start and end
-times; `<v Speaker>` voice tags become the quote's speaker. In markdown, each
-`**Speaker:**` block becomes one quote; wrapped lines fold into it. In plain
-text, each paragraph becomes one quote with no speaker.
-
-`participant_label` is free text such as `"Ana"` or `"Participant 3"` — never a
-real name, email, or company. Quotes are ordered by a service-assigned ordinal;
-deleting an interview removes its quotes and nothing else.
 ## Segments and the strategy (Stages 5 and 6)
 
 Segments are derived from scored outcomes, never from demographics: a segment is
@@ -352,24 +310,6 @@ agentic-odi studies list --job <job-id> --json
 `studies list` is empty until a study has been opened. Outcomes carry an optional
 `study_id` scoping them to a study of their own job; a row that predates studies has
 none, and opening studies never invents one for it.
-
-### Extract candidate outcomes
-
-`interviews extract` turns one quote into candidate desired-outcome statements.
-It never writes an Outcome: a valid proposal is stored `proposed`, and a
-proposal that fails the ODI statement check is stored `rejected` with the
-validator's reason, so a bad extractor is visible rather than silent. Running it
-again adds nothing and never resets a decision.
-
-```bash
-agentic-odi interviews extract <quote-id>
-agentic-odi candidates list --status proposed
-agentic-odi candidates list --interview-id <interview-id> --json
-agentic-odi candidates get <candidate-id>
-agentic-odi candidates delete <candidate-id> --yes
-```
-
-Deleting an interview removes its candidates along with its quotes.
 
 ## Schema, scoring, and guidance
 
