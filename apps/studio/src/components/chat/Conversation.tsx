@@ -11,6 +11,7 @@ import { createContext, useContext, useLayoutEffect, useMemo, useRef, useState }
 
 import {
   ActionBarPrimitive,
+  AttachmentPrimitive,
   AuiIf,
   BranchPickerPrimitive,
   ComposerPrimitive,
@@ -280,6 +281,28 @@ function AssistantMessage() {
   );
 }
 
+function SentAttachmentChip() {
+  const attachment = useAuiState((state) => state.attachment);
+  const ready = attachment.content
+    ?.map((part) => (part.type === "file" ? preparedAttachmentById(part.data) : null))
+    .find((candidate) => candidate !== null);
+  const size = ready ? formatFileSize(ready.size) : "";
+
+  return (
+    <AttachmentPrimitive.Root className="attachment-chip" data-aui-quote-selectable="false">
+      {ready?.dataUrl ? (
+        <img className="attachment-chip__thumb" src={ready.dataUrl} alt="" />
+      ) : (
+        <AttachmentPrimitive.unstable_Thumb className="attachment-chip__thumb" aria-hidden="true" />
+      )}
+      <span className="attachment-chip__meta">
+        <span className="attachment-chip__name"><AttachmentPrimitive.Name /></span>
+        {size ? <span className="attachment-chip__size">{size}</span> : null}
+      </span>
+    </AttachmentPrimitive.Root>
+  );
+}
+
 function UserMessage() {
   const copied = useAuiState((state) => state.message.isCopied);
   const stamp = useMessageStamp();
@@ -319,28 +342,14 @@ function UserMessage() {
           {expanded ? "Show less" : "Show more"}
         </button>
       )}
-      <MessagePrimitive.Attachments>
-        {({ attachment }) => {
-          // The turn owns the id; the prepared copy (if this session still has
-          // it) supplies the preview and size the composer showed.
-          const ready = attachment.content
-            ?.map((part) => (part.type === "file" ? preparedAttachmentById(part.data) : null))
-            .find((candidate) => candidate !== null);
-          const size = ready ? formatFileSize(ready.size) : "";
-
-          return (
-            <span className="attachment-chip" data-aui-quote-selectable="false">
-              {ready?.dataUrl ? (
-                <img className="attachment-chip__thumb" src={ready.dataUrl} alt="" />
-              ) : null}
-              <span className="attachment-chip__meta">
-                <span className="attachment-chip__name">{attachment.name}</span>
-                {size ? <span className="attachment-chip__size">{size}</span> : null}
-              </span>
-            </span>
-          );
+      <MessagePrimitive.Attachments
+        components={{
+          Image: () => <SentAttachmentChip />,
+          Document: () => <SentAttachmentChip />,
+          File: () => <SentAttachmentChip />,
+          Attachment: () => <SentAttachmentChip />,
         }}
-      </MessagePrimitive.Attachments>
+      />
       <ActionBarPrimitive.Root
         className="message__actions message__actions--user"
         role="group"

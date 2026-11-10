@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useAuiState, type ToolCallMessagePartProps } from "@assistant-ui/react";
+import { AttachmentPrimitive, useAuiState, type ToolCallMessagePartProps } from "@assistant-ui/react";
 
 import { formatFileSize, preparedAttachmentById } from "./attachments";
 import { CheckIcon, ChevronDownIcon, SparkIcon } from "../components/icons";
@@ -313,15 +313,17 @@ export function FilePart() {
   const size = prepared ? formatFileSize(prepared.size) : "";
 
   return (
-    <span className="attachment-chip" data-aui-quote-selectable="false">
+    <AttachmentPrimitive.Root className="attachment-chip" data-aui-quote-selectable="false">
       {prepared?.dataUrl ? (
         <img className="attachment-chip__thumb" src={prepared.dataUrl} alt="" />
-      ) : null}
+      ) : (
+        <AttachmentPrimitive.unstable_Thumb className="attachment-chip__thumb" aria-hidden="true" />
+      )}
       <span className="attachment-chip__meta">
-        <span className="attachment-chip__name">{file.filename ?? "Attachment"}</span>
+        <span className="attachment-chip__name"><AttachmentPrimitive.Name /></span>
         {size ? <span className="attachment-chip__size">{size}</span> : null}
       </span>
-    </span>
+    </AttachmentPrimitive.Root>
   );
 }
 

@@ -165,7 +165,7 @@ must not leave them so.
 |---|---|---|---|---|
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer's skeleton. |
 | `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | Bounded by `apps/studio/src/assistant/attachments.ts`. |
-| `ComposerPrimitive.AttachmentDropzone` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | Dropping works: the composer has its own `onDragOver`/`onDrop` with the same accept rules as `attachmentRejection`. Adopting the primitive would only relocate the same logic. |
+| `ComposerPrimitive.AttachmentDropzone` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | Wraps the composer shell; drag affordance is driven from the primitive’s `data-dragging` attribute. File acceptance/refusal still uses the Studio’s `attachmentRejection` rules. |
 | `ComposerPrimitive.Queue` | Adopted | `apps/studio/src/components/chat/QueueLane.tsx` | #410 | Renders the pending lane. |
 | `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #435 | Shows and clears the quote before send. |
 | `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | `apps/studio/src/assistant/dictation.ts` | #433 | Dictation, hidden where unsupported. |
@@ -197,7 +197,7 @@ must not leave them so.
 |---|---|---|---|---|
 | Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction refused above 20k chars (not shortened, #652), images capped at 5 MB, refusals explained. |
 | Drop and paste | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer follows the same accept rules as the input. |
-| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Rejected | — | — | The current chip shows extraction state and the reason a file was refused. The primitive would show a name and a thumbnail, which is less than the person needs. |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `.unstable_Thumb` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | Chips are composed from the primitives so removal and attachment context are library-owned, while extraction/refusal state, file size, and image preview remain rendered as children inside `Root`. |
 
 ## Thread list
 
@@ -320,10 +320,10 @@ only the surface is missing.
 | Status | Rows |
 |---|---|
 | Adopted | 47 |
-| Partial | 9 |
+| Partial | 10 |
 | Planned | 13 |
 | Decision | 42 |
-| Rejected | 44 |
+| Rejected | 43 |
 | Total | 155 |
 
 Read it as: **56** of the library's 155 relevant capabilities already deliver
