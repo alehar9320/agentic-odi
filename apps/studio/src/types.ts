@@ -5,8 +5,6 @@ export interface Job {
   id: string;
   name?: string;
   description?: string;
-  /** True while the write is queued locally and the sidecar has not acknowledged it. */
-  pending?: boolean;
 }
 
 export interface Step {
@@ -14,8 +12,6 @@ export interface Step {
   job_id?: string;
   name?: string;
   order?: number;
-  /** True while the write is queued locally and the sidecar has not acknowledged it. */
-  pending?: boolean;
 }
 
 /** A question put to the person that they did not answer, and why not. */
@@ -46,8 +42,6 @@ export interface Outcome {
   claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
-  /** True while the write is queued locally and the sidecar has not acknowledged it. */
-  pending?: boolean;
 }
 
 export interface Evidence {
@@ -354,12 +348,6 @@ export interface ChatMessage {
   error?: StudioError;
   /** The question this turn answered, kept so a failed turn can be retried. */
   retryText?: string;
-  /**
-   * When the turn was written, ISO 8601. Optional because a thread saved before
-   * this field existed replays without it: the transcript then shows no clock
-   * rather than an invented one.
-   */
-  createdAt?: string;
 }
 
 /**

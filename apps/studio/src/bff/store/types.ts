@@ -158,6 +158,8 @@ export interface LocalStore {
   getConversation(id: string): Promise<StoredConversation | undefined>;
   putConversation(conversation: StoredConversation): Promise<void>;
   setConversationHead(id: string, headId: string | null): Promise<StoredConversation>;
+  /** Remove one conversation and every turn that belongs to it. */
+  deleteConversation(id: string): Promise<void>;
   listTurns(conversationId: string): Promise<ConversationTurn[]>;
   /** How much a conversation holds, without reading every turn. */
   countTurns(conversationId: string): Promise<number>;

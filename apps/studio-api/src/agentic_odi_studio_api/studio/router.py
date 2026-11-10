@@ -88,7 +88,6 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationTreeResponse,
     CreateJobRequest,
     LatestConversationResponse,
-    LinkOutcomeRequest,
     LlmHealthRequest,
     LlmHealthResponse,
     LlmProxyRequest,
@@ -110,7 +109,6 @@ from agentic_odi_studio_api.studio.schemas import (
     SharedArtifactResponse,
     ShareMintResponse,
     SignalActionRequest,
-    TraceabilityReportResponse,
     TurnNode,
     UpdateConversationRequest,
     UpdateCustomerOutcomeRequest,
@@ -936,86 +934,6 @@ async def post_strategy_propose(
     return strategy.model_dump(mode="json")
 
 
-@router.get("/traceability", response_model=TraceabilityReportResponse)
-async def get_traceability(
-    request: Request,
-    mcp_url: str | None = Query(None),
-) -> dict[str, Any]:
-    """Orphans, unfunded objectives, and links the vision dropped.
-
-    Read-only. With no objectives defined the report carries
-    ``objectives_defined: false`` and a message, not three empty sections that
-    would read as a clean bill of health.
-    """
-    if _uses_mcp(request):
-        result = await call_mcp_tool(
-            _require_mcp_url(mcp_url or ""), ToolName.GET_TRACEABILITY_REPORT.value, {}
-        )
-        return _payload_from_text(result)
-    return _service(request).traceability_report().as_dict()
-
-
-@router.get("/alignments", response_model=list[dict[str, Any]])
-async def get_alignments(
-    request: Request,
-    outcome_id: str | None = Query(None),
-    mcp_url: str | None = Query(None),
-) -> list[dict[str, Any]]:
-    """The V2MOM links recorded on outcomes, optionally for one outcome."""
-    if _uses_mcp(request):
-        arguments: dict[str, Any] = {}
-        if outcome_id:
-            arguments["outcome_id"] = outcome_id
-        result = await call_mcp_tool(
-            _require_mcp_url(mcp_url or ""), ToolName.GET_OUTCOME_ALIGNMENTS.value, arguments
-        )
-        parsed = _json_or_raw(result)
-        return parsed if isinstance(parsed, list) else []
-    return _service(request).list_alignments(outcome_id)
-
-
-@router.post("/outcomes/{outcome_id}/alignments", response_model=dict[str, Any])
-async def post_outcome_alignment(
-    outcome_id: str, body: LinkOutcomeRequest, request: Request
-) -> dict[str, Any]:
-    """Link an outcome to one method or measure the vision currently holds."""
-    if _uses_mcp(request):
-        result = await call_mcp_tool(
-            _require_mcp_url(body.mcp_url),
-            ToolName.LINK_OUTCOME.value,
-            {"outcome_id": outcome_id, "field": body.field, "text": body.text},
-        )
-        return _payload_from_text(result)
-    try:
-        outcome = _service(request).link_outcome(outcome_id, body.field, body.text)
-    except Exception as exc:  # noqa: BLE001
-        raise _as_http_error(exc) from exc
-    return outcome.model_dump(mode="json")
-
-
-@router.delete("/outcomes/{outcome_id}/alignments/{field}/{key}", response_model=dict[str, Any])
-async def delete_outcome_alignment(
-    outcome_id: str,
-    field: str,
-    key: str,
-    request: Request,
-    mcp_url: str | None = Query(None),
-) -> dict[str, Any]:
-    """Remove one recorded link. Removing a link that is not there is a no-op."""
-    if _uses_mcp(request):
-        result = await call_mcp_tool(
-            _require_mcp_url(mcp_url or ""),
-            ToolName.UNLINK_OUTCOME.value,
-            {"outcome_id": outcome_id, "field": field, "key": key},
-        )
-        return _payload_from_text(result)
-    try:
-        outcome = _service(request).unlink_outcome(outcome_id, field, key)
-    except Exception as exc:  # noqa: BLE001
-        raise _as_http_error(exc) from exc
-    return outcome.model_dump(mode="json")
-
-
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:
     return {
         "job_id": body.job_id,
@@ -1323,6 +1241,24 @@ def patch_conversation(
             )
         ) from exc
     return ConversationResponse(conversation=conversation.to_dict())
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+def delete_conversation(conversation_id: str, request: Request) -> None:
+    """Delete one thread for good: it, its turns, and their citations.
+
+    A client asking twice gets a 404 the second time rather than a second success:
+    "already gone" and "I deleted it" are different answers.
+    """
+    try:
+        _memory(request).delete_conversation(conversation_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+            )
+        ) from exc
 
 
 @router.post("/approvals/{approval_id}", response_model=ApprovalDecisionResponse)

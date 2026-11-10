@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
 import { isEndpointConfiguredForSettings, endpointReachability, isPrivateHost } from "../../lib/modelEndpoint";
-import { formatRelativeTime, groupByDay } from "../../lib/relativeTime";
+import { formatRelativeTime } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
@@ -38,6 +38,7 @@ export function StudioBar({
   const {
     conversationId,
     conversations,
+    deleteConversation,
     llmHealth,
     messages,
     openConversation,
@@ -61,12 +62,16 @@ export function StudioBar({
   const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
-  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [askOpen, setAskOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
-  const activeHistoryRef = useRef<HTMLButtonElement>(null);
+  // Deleting is a question, never a click: the confirm names the thread and opens
+  // on the choice that keeps it.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const deletingRef = useRef<string | null>(null);
+  const keepDeleteRef = useRef<HTMLButtonElement>(null);
   // An empty transcript is only nothing to lose when nothing is on screen to
   // leave: the plus is the documented way out of the first-run setup, and a
   // disabled control there would strand the person in it.
@@ -154,18 +159,15 @@ export function StudioBar({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [historyOpen]);
-  // Opening the list lands on the thread already on screen: with forty in the
-  // list the one being read can be well below the fold, and hunting for it is
-  // work the app can do. Reduced motion gets the jump instead of the glide.
+
+  // An accidental Enter must not destroy a week of work, so the confirm opens on
+  // the choice that changes nothing.
   useEffect(() => {
-    if (!historyOpen) {
+    if (!confirmingDeleteId) {
       return;
     }
-    const active = activeHistoryRef.current;
-    if (active && typeof active.scrollIntoView === "function") {
-      active.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
-    }
-  }, [historyOpen, reduceMotion]);
+    keepDeleteRef.current?.focus();
+  }, [confirmingDeleteId]);
 
   function toggleHistory() {
     setHistoryOpen((open) => {
@@ -182,6 +184,34 @@ export function StudioBar({
       void openConversation(id).catch(() =>
         pushToast("error", "I couldn't open that conversation."),
       );
+    }
+  }
+
+  function beginDelete(targetId: string) {
+    setConfirmingDeleteId(targetId);
+  }
+
+  function cancelDelete() {
+    setConfirmingDeleteId(null);
+  }
+
+  async function commitDelete(targetId: string) {
+    // One request per thread, however many times the button is pressed.
+    if (deletingRef.current) {
+      return;
+    }
+    deletingRef.current = targetId;
+    setDeletingId(targetId);
+    try {
+      await deleteConversation(targetId);
+      setConfirmingDeleteId(null);
+    } catch {
+      // The row stays: a delete that failed must not look like one that worked.
+      pushToast("error", "I couldn't delete that conversation.");
+      setConfirmingDeleteId(null);
+    } finally {
+      deletingRef.current = null;
+      setDeletingId(null);
     }
   }
 
@@ -337,45 +367,77 @@ export function StudioBar({
               {conversations.length === 0 ? (
                 <p className="bar__history-empty">No conversations yet.</p>
               ) : (
-                groupByDay(conversations, (conversation) => conversation.updated_at).map((group) => (
-                  // The group carries the day in its accessible name; the line
-                  // above it is the same word made visible.
-                  <div
-                    key={group.section}
-                    className="bar__history-group"
-                    role="group"
-                    aria-label={group.label}
-                  >
-                    <p className="bar__history-day">{group.label}</p>
-                    {group.items.map((conversation) => {
-                      const current = conversation.id === conversationId;
-                      return (
-                        <button
-                          key={conversation.id}
-                          ref={current ? activeHistoryRef : undefined}
-                          type="button"
-                          role="menuitem"
-                          className="bar__menu-item bar__history-item"
-                          aria-current={current ? "true" : undefined}
-                          onClick={() => selectConversation(conversation.id)}
+                conversations.map((conversation) => {
+                  const current = conversation.id === conversationId;
+                  const name = conversation.title.trim() || "New conversation";
+                  return (
+                    <div key={conversation.id} className="bar__history-row" role="none">
+                      {confirmingDeleteId === conversation.id ? (
+                        <div
+                          className="bar__history-confirm"
+                          role="group"
+                          aria-label={`Delete ${name}`}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              // Cancels the question, not the whole history list.
+                              event.stopPropagation();
+                              cancelDelete();
+                            }
+                          }}
                         >
-                          <span className="bar__history-title">
-                            {conversation.title.trim() || "New conversation"}
-                          </span>
-                          {/* A thread with no turns has nothing to count, so
-                              it says nothing rather than "0 turns". */}
-                          {conversation.turn_count > 0 ? (
+                          <p className="bar__history-confirm-text">
+                            Delete <strong>{name}</strong> and its turns? This cannot be
+                            undone.
+                          </p>
+                          <div className="bar__history-confirm-actions">
+                            <button
+                              type="button"
+                              ref={keepDeleteRef}
+                              className="bar__history-keep"
+                              onClick={cancelDelete}
+                            >
+                              Keep it
+                            </button>
+                            <button
+                              type="button"
+                              className="bar__history-destroy"
+                              disabled={deletingId === conversation.id}
+                              onClick={() => void commitDelete(conversation.id)}
+                            >
+                              {deletingId === conversation.id
+                                ? "Deleting…"
+                                : "Delete thread"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="bar__menu-item bar__history-item"
+                            aria-current={current ? "true" : undefined}
+                            onClick={() => selectConversation(conversation.id)}
+                          >
+                            <span className="bar__history-title">{name}</span>
                             <span className="bar__history-meta">
-                              {formatRelativeTime(conversation.updated_at)} ·{" "}
-                              {conversation.turn_count}{" "}
-                              {conversation.turn_count === 1 ? "turn" : "turns"}
+                              {formatRelativeTime(conversation.updated_at)}
                             </span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))
+                          </button>
+                          <button
+                            type="button"
+                            className="bar__history-delete"
+                            aria-label={`Delete ${name}`}
+                            title={`Delete ${name}`}
+                            onClick={() => beginDelete(conversation.id)}
+                          >
+                            <span aria-hidden="true">🗑</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           )}

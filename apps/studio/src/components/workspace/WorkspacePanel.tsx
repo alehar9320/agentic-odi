@@ -39,20 +39,9 @@ export function WorkspacePanel() {
   // has to outlive the DOM to come back with it — per panel, never global (#696).
   const scrollByPanel = useRef(new Map<WorkspacePanelId, number>());
   const returnFocusRef = useRef<HTMLElement | null>(null);
-  // Which element had focus when the panel opened, so closing the lens can
-  // return focus there instead of stealing it for the composer (#696).
-  // Never capture a textbox (a textarea or a text-type input) as the return
-  // target — focus returning to a text field moves the caret, which is exactly
-  // what this guard prevents.
   // A lens opens from the rail, a canvas card, a banner, or a slash command,
   // and the composer is autofocused: "whatever held focus" is the composer, not
   // the control the person used. Remember that control instead (#692).
-  const isTextbox = (el: HTMLElement) =>
-    el.tagName === "TEXTAREA" ||
-    (el.tagName === "INPUT" &&
-      ["text", "search", "url", "tel", "email", "password", ""].includes(
-        (el as HTMLInputElement).type,
-      ));
   const openerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -86,17 +75,14 @@ export function WorkspacePanel() {
     if (isMobile) {
       return;
     }
-    if (!returnFocusRef.current) {
-      const opener = openerRef.current;
-      openerRef.current = null;
-      const active = document.activeElement;
-      returnFocusRef.current =
-        opener?.isConnected && opener !== headingRef.current
-          ? opener
-          : active instanceof HTMLElement && !isTextbox(active)
-          ? active
+    const opener = openerRef.current;
+    openerRef.current = null;
+    returnFocusRef.current =
+      opener?.isConnected && opener !== headingRef.current
+        ? opener
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
           : null;
-    }
     headingRef.current?.focus();
   }, [panelId, isMobile]);
 

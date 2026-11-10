@@ -199,6 +199,18 @@ export class MemoryLocalStore implements LocalStore {
     return next;
   }
 
+  async deleteConversation(id: string): Promise<void> {
+    if (!this.conversations.has(id)) {
+      throw new Error(`Conversation ${id} not found`);
+    }
+    this.conversations.delete(id);
+    for (let index = this.turns.length - 1; index >= 0; index -= 1) {
+      if (this.turns[index].conversation_id === id) {
+        this.turns.splice(index, 1);
+      }
+    }
+  }
+
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.turns
       .filter((turn) => turn.conversation_id === conversationId)

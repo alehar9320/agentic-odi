@@ -83,7 +83,9 @@ export function OpportunityLandscape() {
     return ids.size;
   }, [evidence]);
 
-  // The average counts stored scores only.
+  // The average counts stored scores only. Dividing by every outcome would
+  // read an unscored record as a zero and drag a strong landscape down; the
+  // caption names how many scored so the number can be explained from the screen.
   const averageScore = useMemo(() => scoredAverage(outcomes), [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
@@ -315,7 +317,7 @@ export function OpportunityLandscape() {
           Capture an outcome to see it here.
         </p>
       ) : viewMode === "matrix" ? (
-        <OpportunityPlot
+        <OpportunityMatrixView
           outcomes={filteredOutcomes}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
@@ -387,11 +389,7 @@ interface MatrixViewProps {
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
-  /** The one outcome the tour points at, ringed apart from the rest. */
-  highlightedOutcomeId?: string | null;
-  sample?: boolean;
-  /** Drops the detail sidebar and stacks the plot, for a narrow container. */
-  compact?: boolean;
+  sample: boolean;
 }
 
 interface PlottedOutcome {
@@ -434,15 +432,13 @@ const underservedPolygonPoints = [
   .map(([x, y]) => `${x},${y}`)
   .join(" ");
 
-export function OpportunityPlot({
+function OpportunityMatrixView({
   outcomes,
   selectedOutcomeId,
   onSelectOutcome,
   onHoverOutcome,
   activeOutcome,
-  sample = false,
-  highlightedOutcomeId = null,
-  compact = false,
+  sample,
 }: MatrixViewProps) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -541,12 +537,8 @@ export function OpportunityPlot({
 
   return (
     <div
-      className={`opportunity-matrix${compact ? " opportunity-matrix--compact" : ""}`}
-      style={{
-        display: "grid",
-        gridTemplateColumns: compact ? "1fr" : "1fr 320px",
-        gap: 16,
-      }}
+      className="opportunity-matrix"
+      style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}
     >
       {/* Interactive 2D Chart */}
       <div
@@ -713,8 +705,7 @@ export function OpportunityPlot({
                   }
                 }}
                 type="button"
-                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}${highlightedOutcomeId === id ? " matrix-node--highlighted" : ""}`}
-                data-highlighted={highlightedOutcomeId === id ? "true" : undefined}
+                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}`}
                 style={{ left: `${(plot.cx / 500) * 100}%`, top: `${(plot.cy / 360) * 100}%` }}
                 tabIndex={id === rovingId ? 0 : -1}
                 aria-pressed={isSelected}

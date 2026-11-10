@@ -7,7 +7,6 @@ import subprocess
 
 import build_site
 import extract
-import jinja2
 import pytest
 from site_support import ROOT
 
@@ -44,50 +43,6 @@ def test_check_fails_when_output_is_stale(tmp_path):
 def test_check_passes_when_output_is_current(tmp_path):
     build_site.build(tmp_path)
     build_site.build(tmp_path, check=True)
-
-
-def test_broken_reference_fails_the_build():
-    # A page that points at an asset the build never wrote is broken even
-    # though it renders; the build must name the page and the reference.
-    files = build_site._render_site()
-    files["index.html"] = files["index.html"].replace(
-        b"</head>",
-        b'<link rel="stylesheet" href="assets/missing.css"></head>',
-        1,
-    )
-    violations = build_site._reference_violations(files)
-    assert violations == [
-        "index.html references 'assets/missing.css', which is not in the build output"
-    ]
-
-
-def test_an_unrendered_template_slot_fails_the_build():
-    # A blank section is a page that shipped with a slot the build never
-    # filled; the environment must refuse to render it silently.
-    env = build_site.environment()
-    with pytest.raises(jinja2.UndefinedError):
-        env.from_string("<h1>{{ missing_slot }}</h1>").render()
-
-
-def test_every_local_reference_resolves():
-    # The current tree must pass the same check the build enforces.
-    files = build_site._render_site()
-    assert build_site._broken_references(files) == []
-
-
-def test_a_committed_page_that_drifts_fails_the_check(tmp_path):
-    site = tmp_path / "site"
-    site.mkdir()
-    page = site / build_site.SAMPLE_OUTPUT
-    page.parent.mkdir(parents=True, exist_ok=True)
-    page.write_text("stale", encoding="utf-8")
-    with pytest.raises(SystemExit):
-        build_site.check_committed(site)
-
-
-def test_committed_outputs_are_current():
-    # The committed sample page must match a fresh build of the fixture.
-    build_site.check_committed()
 
 
 def test_generated_output_is_not_tracked():

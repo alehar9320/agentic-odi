@@ -81,23 +81,6 @@ describe("WorkbenchRail", () => {
     expect(screen.getByRole("button", { name: "Evidence, 1 signal" })).toBeInTheDocument();
   });
 
-  it("takes focus when it is activated, so the lens it opens can give it back (#810)", () => {
-    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
-    render(<WorkbenchRail />);
-
-    // The caret is somewhere else — on an empty stage, that is the composer.
-    const elsewhere = document.createElement("input");
-    document.body.append(elsewhere);
-    elsewhere.focus();
-
-    const chip = screen.getByRole("button", { name: "Landscape, 1 opportunity" });
-    fireEvent.click(chip);
-
-    expect(studio.openPanel).toHaveBeenCalledWith("landscape");
-    expect(chip).toHaveFocus();
-    elsewhere.remove();
-  });
-
   it("shows what the agent has learned once it has a note", () => {
     studio.canvas = canvas();
     studio.memory = [

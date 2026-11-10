@@ -12,7 +12,6 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
   ATTACHMENT_ACCEPT,
-  ATTACHMENT_READ_FAILURE,
   MAX_ATTACHMENT_CHARS,
   MAX_ATTACHMENTS,
   MAX_IMAGE_BYTES,
@@ -93,11 +92,7 @@ function AttachmentRow({
             : ATTACHMENT_READ_FAILURE;
         const size = failed ? "" : formatFileSize(attachment.file?.size ?? 0);
         return (
-          <span
-            className={`attachment-chip${failed ? " attachment-chip--failed" : ""}`}
-            role="listitem"
-            key={attachment.id}
-          >
+          <span className="attachment-chip" role="listitem" key={attachment.id}>
             <AttachmentThumb file={attachment.file} />
             <span className="attachment-chip__meta">
               <span className="attachment-chip__name">{attachment.name}</span>
@@ -153,15 +148,6 @@ function ComposerBody({
   const paletteId = useId();
   const text = useAuiState((state) => state.composer.text);
   const running = useAuiState((state) => state.thread.isRunning);
-  // A file whose bytes never became content has to be dealt with before the
-  // turn goes out: sending anyway would hand the model a plausible name and
-  // nothing behind it.
-  const readBlocked = useAuiState((state) =>
-    state.composer.attachments.some(
-      (attachment) =>
-        attachment.status.type === "incomplete" && attachment.status.reason === "error",
-    ),
-  );
   const [highlight, setHighlight] = useState(0);
   // Remember which draft was dismissed, so typing again re-opens the palette
   // without an effect that writes state on every keystroke.
@@ -255,9 +241,7 @@ function ComposerBody({
       text.trim() !== ""
     ) {
       event.preventDefault();
-      if (!readBlocked) {
-        aui.composer.send({ steer: false });
-      }
+      aui.composer.send({ steer: false });
       return;
     }
 
@@ -352,14 +336,10 @@ function ComposerBody({
             if (files.length === 0) {
               return;
             }
-            const text = event.clipboardData?.getData?.("text/plain") ?? "";
-            if (text !== "") {
-              // Mixed payload: let the browser insert the text at the caret,
-              // and attach the files alongside it.
-              onFiles(files);
-              return;
+            const text = event.clipboardData?.getData("text/plain") ?? "";
+            if (text === "") {
+              event.preventDefault();
             }
-            event.preventDefault();
             onFiles(files);
           }}
         />
@@ -405,11 +385,7 @@ function ComposerBody({
               <StopIcon size={16} />
             </ComposerPrimitive.Cancel>
           ) : (
-            <ComposerPrimitive.Send
-              className="composer__send"
-              aria-label="Send message"
-              disabled={readBlocked}
-            >
+            <ComposerPrimitive.Send className="composer__send" aria-label="Send message">
               <ArrowUpIcon size={18} />
             </ComposerPrimitive.Send>
           )}

@@ -1,10 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ATTACHMENT_READ_FAILURE, MAX_ATTACHMENT_CHARS, tooLargeMessage } from "../../assistant/attachments";
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
 import type { StudioCommand } from "../../lib/commands";
-import { focusableWithin } from "../../lib/useFocusTrap";
 import type { StudioContextValue } from "../../state/StudioContext";
 import type { ChatMessage } from "../../types";
 import { ThreadComposer } from "./ThreadComposer";
