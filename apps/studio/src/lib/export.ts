@@ -404,8 +404,12 @@ export function briefFilename(exportedAt: Date = new Date()): string {
 }
 
 /** Hand a Markdown file to the browser's save dialog. */
-export function downloadMarkdown(markdown: string, filename: string): void {
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+export function downloadMarkdown(
+  markdown: string,
+  filename: string,
+  mime = "text/markdown;charset=utf-8",
+): void {
+  const blob = new Blob([markdown], { type: mime });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

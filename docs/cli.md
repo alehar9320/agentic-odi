@@ -154,6 +154,8 @@ agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+agentic-odi desired-outcomes value <outcome-id> --estimate 250000 --unit currency --basis market --source "Gartner 2025 plugin market report"
+agentic-odi desired-outcomes value <outcome-id>            # omit --estimate to clear the value
 
 Every outcome score carries its sample and method. `--importance-n` and
 `--satisfaction-n` record how many people stand behind each score, when known;
@@ -439,6 +441,202 @@ non-zero when the store is degraded, so it can gate a deployment.
 stage. `capabilities --json` emits the full machine-readable manifest.
 `capabilities tools` lists tool names only.
 
+## The factual case for a job
+
+```bash
+agentic-odi brief export --job-id JOB-1                # markdown to stdout
+agentic-odi brief export --job-id JOB-1 --format html  # standalone HTML document
+agentic-odi brief export --job-id JOB-1 --out case.md  # write a file, print its path
+agentic-odi brief export --job-id JOB-1 --narrate      # add a drafted, labelled argument
+```
+
+`brief export` renders the same deterministic case the Studio shows: the job,
+the decision under consideration, the underserved outcomes with their score,
+band, and sources, and the risks. Every numeral comes from a recorded
+measurement; a field nobody supplied renders `not measured`, never `0`. The
+`--format html` document inlines its own print styles, so it opens and prints
+with no app CSS and no network access. `--generated-at` stamps a fixed
+timestamp when you need byte-identical output.
+
+`--narrate` asks the configured model to draft the brief's argument and adds it
+in a block headed *Drafted — numbers from the table above*. The draft is only a
+proposal: every numeral in a surviving sentence is checked to exist in the
+brief and to belong to an outcome the sentence links, and a sentence that fails
+is dropped with its reason shown in the same block — so a draft that survives
+nothing still states why. `--no-narrate` — the default — invokes no model and is
+byte-identical to the factual brief. With no provider configured, `--narrate`
+still renders the factual brief and records in that block why nothing was
+drafted.
+
+## Record a decision
+
+```bash
+agentic-odi decide record --job-id JOB-1 \
+  --choose OUT-1 --choose OUT-2 \
+  --reject OUT-3="Already served by the support team." \
+  --rationale "The publishing path blocks every release." \
+  --decided-by dana
+```
+
+`decide record` persists what was chosen, what was rejected, and why. Each
+rejection is a repeated `--reject OUTCOME_ID=REASON` flag, so an id or reason
+that contains punctuation cannot be mistaken for the other. `--decided-at`
+defaults to now in UTC; `--confidence` is `low`, `medium`, or `high`. Pass
+`--supersedes DEC-ID` to replace an earlier decision: the predecessor stays
+readable and records the successor that superseded it. The same validation
+runs behind `POST /api/decisions`, so the CLI and the Studio cannot disagree
+about what a valid decision is.
+
+## Render the outcome roadmap
+
+```bash
+agentic-odi roadmap show --job-id JOB-1                # markdown to stdout
+agentic-odi roadmap show --job-id JOB-1 --horizon 4    # four quarters back
+agentic-odi roadmap show --job-id JOB-1 --today 2026-11-15
+agentic-odi roadmap show --job-id JOB-1 --json
+```
+
+`roadmap show` derives the roadmap from the job's recorded decisions: one entry
+per chosen outcome, grouped by the quarter of its decision date in UTC. It is a
+view, not a store — nothing is written. An outcome with no decision is excluded
+and counted, and the footer says how many were left out and why; a superseded
+decision contributes no rows. `--today` pins the window so the output is
+reproducible; `--horizon` sets how many quarters it spans. A baseline or target
+nobody measured prints `not measured`, never `0`.
+
+## Review a past decision
+
+```bash
+agentic-odi review show --decision-id DEC-1
+agentic-odi review show --decision-id DEC-1 --today 2027-01-30
+agentic-odi review show --decision-id DEC-1 --json
+```
+
+`review show` compares each outcome a decision chose against the latest score
+snapshot and prints one line per outcome: `improved`, `degraded`, `no change`,
+`no evidence`, or `orphaned`. It writes nothing. A missing measurement stays
+`no evidence`, never `no change`; an outcome that no longer exists is `orphaned`,
+never a crash. `--today` pins the comparison date so the day count and the
+verdicts are reproducible. The same projection backs `POST /api/decisions/review`
+and the Studio's decision-review card.
+
+## Assemble the decision memo
+
+```bash
+agentic-odi decide memo --decision-id DEC-1
+agentic-odi decide memo --decision-id DEC-1 --json
+agentic-odi decide memo --decision-id DEC-1 --format html --out memo.html
+agentic-odi decide memo --decision-id DEC-1 --narrate
+```
+
+`decide memo` assembles the one-page memo a product leader can sign from what is
+already recorded: the decision, why now, the evidence with its citations, the
+options rejected and why, what the chosen outcome is worth, how we will know it
+worked, and what we still do not know. Every number is copied from a record —
+the assembler reads no clock, opens no store and invokes no model, so the same
+records always render the same bytes. A section with nothing to say is omitted
+with a one-line reason (`No value estimate recorded`, `No bet recorded`), never
+placeholder prose and never a zero; a value's unit and source travel with the
+number. The same projection backs `POST /api/decisions/memo` and the MCP
+`render_memo` tool.
+
+The memo can leave the app. `--format html` wraps the same markdown in a
+standalone, printable document that inlines its own paper CSS, escapes hostile
+text and carries the export time (`--generated-at`, defaulting to now in UTC) and
+the store's schema version — the file opens offline and prints as it reads.
+`--out` writes it to a path instead of stdout and prints the path; an unwritable
+destination exits non-zero and leaves no artifact. `--narrate` adds one labelled
+framing paragraph drafted through the same narrator `odi brief export --narrate`
+uses: every numeral is checked to exist in the memo, a failing sentence is
+dropped and recorded, and `--no-narrate` — the default — is byte-identical to the
+factual memo. The memo is generated on read and never stored as a row.
+
+## Draft the stakeholder message
+
+```bash
+agentic-odi decide message --decision-id DEC-1
+agentic-odi decide message --decision-id DEC-1 --channel email --link "$MEMO_URL"
+agentic-odi decide message --decision-id DEC-1 --json
+```
+
+`decide message` cuts the memo to a short, pasteable message: what we found,
+what we are doing, what it is worth, the largest unknown, and a link. `--channel`
+sets a hard word budget (`slack` 120, `email` 200). The largest unknown and a
+supplied `--link` are never dropped for length — a budget that cannot fit them
+fails loudly rather than sending a message with its caveat removed. The `slack`
+variant carries no markdown heading, because a heading renders as a literal `#`
+there; the `email` variant adds a `Subject:`. `--copy` copies the body when a
+clipboard tool (`pbcopy`, `wl-copy`, `xclip`, `clip`) is present and prints it
+otherwise, so it never fails on a machine without one. `--verbose` reports which
+optional sentences were dropped to fit. It reads and writes nothing: the same
+projection backs `GET /api/decisions/{id}/message` and the MCP
+`render_stakeholder_message` tool.
+
+## Track a bet
+
+```bash
+agentic-odi bets add --decision-id DEC-1 --outcome-id OUT-1 \
+  --hypothesis "Auto-matching halves the weekly reconciliation time" \
+  --target 17 --measure-by 2026-04-01
+agentic-odi bets list --job-id JOB-1
+agentic-odi bets show --bet-id BET-1
+agentic-odi bets advance --bet-id BET-1 --status running
+agentic-odi bets advance --bet-id BET-1 --status measured --at 2026-04-02T00:00:00Z
+```
+
+`bets add` records an expectation and captures its baseline at creation — the
+outcome's current opportunity score, or the explicit `--baseline` — and stores
+it. The baseline is never recomputed from the live score, so the starting point
+cannot drift. The outcome must be one the decision chose. `bets advance` moves a
+bet through `planned → running → measured` (or `abandoned`); an illegal
+transition is refused by name. `--at` pins the transition timestamp.
+
+## Segments and strategy
+
+```bash
+agentic-odi segments add --job-id JOB-1 --name "Release engineers" \
+  --criterion "They own the publish step." \
+  --outcome-id OUT-1 --outcome-id OUT-2
+agentic-odi segments list --job-id JOB-1
+agentic-odi segments show --segment-id SEG-1
+agentic-odi segments delete --segment-id SEG-1
+
+agentic-odi segments suggest --job-id JOB-1
+agentic-odi segments accept --job-id JOB-1 --fingerprint <fingerprint>
+
+agentic-odi segments profile --segment-id SEG-1
+
+agentic-odi segments strategy --segment-id SEG-1 --kind differentiated \
+  --rationale "The publish path blocks every release." \
+  --expected-effect "Shorter publish time."
+agentic-odi segments strategies --segment-id SEG-1
+```
+
+A segment is a named group defined by the outcomes it cares about — never by
+demographics. Every member must belong to the job; a cross-job or missing member
+is refused before any write, and duplicate ids collapse to one. Deleting a
+segment never touches its outcomes.
+
+`segments suggest` derives candidates deterministically from the scores: groups
+that share an opportunity band and an importance decile, at least three members
+each. It **writes nothing**. `segments accept` is the only write, and it targets
+exactly the candidate you saw by its fingerprint; a fingerprint whose membership
+has changed is refused as stale rather than accepting a different group, and
+repeating an acceptance returns the same segment instead of a second one.
+
+`segments profile` reads a segment's servability with the underserved and
+overserved halves kept separate. An empty segment reports zeroed counts; a
+segment with no scored outcome reports the ratio as `not measured`, never `0`,
+and says why.
+
+`segments strategy` records one of `differentiated`, `disruptive`, or
+`new_market` with its rationale and expected effect. Each kind is refused unless
+the segment's data supports it — a differentiated strategy needs an underserved
+outcome, a disruptive one needs an overserved outcome — and the message names
+the missing condition. `new_market` is refused while alternatives evidence
+(`M2-07`) is absent, because an unchecked absence is not proof that no solution
+exists. A recorded strategy renders into the brief's decision section.
+
 ## Back up and restore
 
 `backup` writes a verified snapshot of the local SQLite store using SQLite's
@@ -477,7 +675,6 @@ evidence to one JSON file (`format: agentic-odi-export`, `version: 1`). Every
 record is the same `model_dump()` shape the MCP tools return, so each entry can
 be re-validated with the corresponding core Pydantic model. The default
 filename carries a UTC ISO 8601 timestamp (`YYYYMMDDTHHMMSSZ`).
-
 
 ## Inspect settings and feature flags
 

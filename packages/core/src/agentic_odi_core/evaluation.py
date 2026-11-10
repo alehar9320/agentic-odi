@@ -24,6 +24,11 @@ from agentic_odi_core.models import ClaimCheck, Outcome, compute_opportunity_sco
 
 OpportunitySegment = Literal["underserved", "appropriate", "overserved", "unscored"]
 
+#: How defensible a value estimate is. ``sized`` has a number and a real basis;
+#: ``thin`` has a number but rests on one person's guess; ``unsized`` has no
+#: number at all. A one-person guess is never presented as a measured value.
+ValueSize = Literal["sized", "thin", "unsized"]
+
 # Above 10 is underserved, exactly 10 is appropriately served, and below 10 is overserved.
 UNDERSERVED_SCORE = 10.0
 
@@ -79,6 +84,31 @@ def classify_opportunity(score: float | None) -> OpportunitySegment:
     if score == UNDERSERVED_SCORE:
         return "appropriate"
     return "overserved"
+
+
+def classify_value(outcome: Any) -> ValueSize:
+    """How defensible an outcome's value estimate is (W1/ALH-64).
+
+    Mirrors :func:`classify_confidence` so a one-person guess is never presented
+    as a measured value:
+
+    * ``unsized`` — no ``value_estimate``. Nothing to show; the brief omits the
+      section rather than printing a zero.
+    * ``thin`` — an estimate that rests on a single person's guess: ``value_n``
+      absent or one, with an ``estimate`` basis. A lone judgement is a hypothesis,
+      not a measurement.
+    * ``sized`` — a number with a defensible basis: a market/pilot source, or a
+      sample of more than one person.
+    """
+    if getattr(outcome, "value_estimate", None) is None:
+        return "unsized"
+    basis = getattr(outcome, "value_basis", "estimate")
+    sample = getattr(outcome, "value_n", None)
+    if basis in ("market", "pilot"):
+        return "sized"
+    if sample is not None and sample > 1:
+        return "sized"
+    return "thin"
 
 
 #: Which dimension triggered an advisory when the two samples differ.
