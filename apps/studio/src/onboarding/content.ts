@@ -1,15 +1,20 @@
-import type { WorkspacePanelId } from "../types";
-
 /**
- * The tour's copy and structure live here so the flow can be rewritten without
- * touching a component. Adding a goal is a data edit.
+ * The tour's scenes, as data.
+ *
+ * Three scenes on one sample brief, in the order a person rehearses the work:
+ * hear a quote, score what it implies, see where it lands. The copy lives here
+ * so the flow can be rewritten without touching a component.
  */
 
-export type GoalId =
-  | "have-opportunity"
-  | "boss-priority"
-  | "find-opportunity"
-  | "pressure-test";
+export type TourSceneId = "hear" | "score" | "place";
+
+export interface TourScene {
+  id: TourSceneId;
+  /** Short label for the scene dots and the dialog's eyebrow. */
+  label: string;
+  title: string;
+  lead: string;
+}
 
 export type GoalDestination =
   | { kind: "setup" }
@@ -35,38 +40,32 @@ export interface OnboardingStep {
   lead: string;
 }
 
-export const STEPS: OnboardingStep[] = [
+export const SCENES: TourScene[] = [
   {
-    id: "welcome",
-    label: "Welcome",
-    title: "What do you want to win?",
+    id: "hear",
+    label: "Hear it",
+    title: "What is this person trying to get done?",
     lead:
-      "You already have a sense of the opportunity. The studio helps you test it — " +
-      "against customers, the business, and what you can actually do next.",
+      "A customer said something. The job is the progress they are after, which is not " +
+      "the same as the words they used.",
   },
   {
-    id: "goal",
-    label: "Starting point",
-    title: "What's on your mind?",
-    lead: "Pick the one that sounds like your week. You can change direction any time by saying so.",
-  },
-  {
-    id: "readiness",
-    label: "Instruments",
-    title: "A quick look at your instruments.",
+    id: "score",
+    label: "Score it",
+    title: "Two numbers, one opportunity.",
     lead:
-      "The studio runs locally. The copilot needs an OpenAI-compatible model to " +
-      "answer; everything else works by hand.",
+      "Importance and satisfaction are the only inputs. The score is a sorting device, " +
+      "not a verdict.",
   },
   {
-    id: "land",
-    label: "Where it lands",
+    id: "place",
+    label: "Place it",
     title: "Where it lands.",
-    lead:
-      "The outcome you scored, on the landscape beside two others. Keep the sample " +
-      "to poke at, or start your own job.",
+    lead: "One outcome beside the others, and the evidence the loop is still missing.",
   },
 ];
+
+export const SCENE_COUNT = SCENES.length;
 
 export const GOALS: OnboardingGoal[] = [
   {
@@ -115,11 +114,10 @@ export const GOALS: OnboardingGoal[] = [
   },
 ];
 
-export const GOAL_STEP_INDEX = STEPS.findIndex((step) => step.id === "goal");
-
-export function goalById(id: GoalId | null): OnboardingGoal | null {
-  if (!id) {
-    return null;
+export function sceneById(id: TourSceneId): TourScene {
+  const scene = SCENES.find((entry) => entry.id === id);
+  if (!scene) {
+    throw new Error(`Unknown tour scene: ${id}`);
   }
-  return GOALS.find((goal) => goal.id === id) ?? null;
+  return scene;
 }

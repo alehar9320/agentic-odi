@@ -10,6 +10,7 @@ import {
   formatOpportunityScore,
   hasScore,
   isUnderserved,
+  opportunityArithmetic,
   opportunityPill,
   opportunityScore,
   scoredAverage,
@@ -101,6 +102,23 @@ describe("opportunityScore", () => {
   it("never subtracts when satisfaction exceeds importance", () => {
     expect(opportunityScore(4, 9)).toBeCloseTo(4, 5);
     expect(opportunityScore(8, 8)).toBeCloseTo(8, 5);
+  });
+});
+
+describe("opportunityArithmetic", () => {
+  it("names the gap and the total, so the number is never a bare result", () => {
+    expect(opportunityArithmetic(9, 3)).toBe("Importance 9, plus the 6-point gap, is 15.");
+  });
+
+  it("says there is no gap when satisfaction meets importance", () => {
+    expect(opportunityArithmetic(9, 9)).toBe("Importance 9, plus no gap, is 9.");
+    expect(opportunityArithmetic(4, 9)).toBe("Importance 4, plus no gap, is 4.");
+  });
+
+  it("keeps one decimal when a rating is not a whole number", () => {
+    expect(opportunityArithmetic(9.2, 3.1)).toBe(
+      "Importance 9.2, plus the 6.1-point gap, is 15.3.",
+    );
   });
 });
 

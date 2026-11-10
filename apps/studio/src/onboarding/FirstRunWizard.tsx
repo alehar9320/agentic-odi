@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef } from "react";
 
-import { useStudio } from "../state/StudioContext";
 import { useOnboarding } from "./context";
+import { SCENES } from "./content";
+import { LAST_SCENE_INDEX } from "./machine";
+import { TourSceneBody } from "./steps";
 import { STEPS, goalById, type GoalId } from "./content";
 import { LAST_STEP_INDEX, stepAt } from "./machine";
 import { LandScene } from "./LandScene";
@@ -19,9 +21,13 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
   'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/**
+ * The tour shell. Three scenes on one sample brief, behind a dialog that traps
+ * focus and restores it. Every scene shows its own skip controls, so leaving is
+ * never hidden in a footer, and Escape is the same one click.
+ */
 export function FirstRunWizard() {
-  const { enabled, open, state, chooseGoal, advance, skipStep, back, complete, skip } =
-    useOnboarding();
+  const { enabled, open, state, advance, skipScene, back, complete, skip, chooseGoal, skipStep } = useOnboarding();
   const {
     settings,
     saveSettings,
@@ -45,6 +51,10 @@ export function FirstRunWizard() {
   const openerRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const leadId = useId();
+
+  const sceneIndex = state.scene;
+  const scene = SCENES[sceneIndex];
+  const isLast = sceneIndex >= LAST_SCENE_INDEX;
 
   // The quick-connect fields start from the live config and only diverge once
   // the user edits them, so no effect has to copy state around.
@@ -112,19 +122,19 @@ export function FirstRunWizard() {
     function onWindowKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        skip();
+        skip("dismissed");
       }
     }
     window.addEventListener("keydown", onWindowKeyDown);
     return () => window.removeEventListener("keydown", onWindowKeyDown);
   }, [open, skip]);
 
-  // Each step announces itself by moving focus to its heading.
+  // Each scene announces itself by moving focus to its heading.
   useEffect(() => {
     if (open) {
       headingRef.current?.focus();
     }
-  }, [open, stepIndex]);
+  }, [open, sceneIndex]);
 
   const onKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Tab" || !panelRef.current) {
@@ -141,7 +151,7 @@ export function FirstRunWizard() {
     const active = document.activeElement;
     const inside = active instanceof HTMLElement && nodes.includes(active);
 
-    // The step heading holds the initial focus; a Tab from there must not
+    // The scene heading holds the initial focus; a Tab from there must not
     // escape the dialog either.
     if (!inside) {
       event.preventDefault();
@@ -273,20 +283,20 @@ export function FirstRunWizard() {
         onKeyDown={onKeyDown}
       >
         <header className="wizard-head">
-          <span className="wizard-wordmark">{step.label}</span>
+          <span className="wizard-wordmark">{scene.label}</span>
           <span className="wizard-count">
-            {stepIndex + 1} / {STEPS.length}
+            Scene {sceneIndex + 1} of {SCENES.length}
           </span>
         </header>
 
         <ol className="wizard-progress" aria-hidden="true">
-          {STEPS.map((entry, index) => (
+          {SCENES.map((entry, index) => (
             <li
               key={entry.id}
               className={
-                index < stepIndex
+                index < sceneIndex
                   ? "wizard-progress__item is-done"
-                  : index === stepIndex
+                  : index === sceneIndex
                     ? "wizard-progress__item is-current"
                     : "wizard-progress__item"
               }
@@ -295,15 +305,15 @@ export function FirstRunWizard() {
         </ol>
 
         <p className="sr-only">
-          Step {stepIndex + 1} of {STEPS.length}: {step.label}
+          Scene {sceneIndex + 1} of {SCENES.length}: {scene.label}
         </p>
 
-        <div className="wizard-body" key={stepId}>
+        <div className="wizard-body" key={scene.id}>
           <h2 className="wizard-title" id={titleId} ref={headingRef} tabIndex={-1}>
-            {step.title}
+            {scene.title}
           </h2>
           <p className="wizard-lead" id={leadId}>
-            {step.lead}
+            {scene.lead}
           </p>
 
           {stepId === "welcome" ? <WelcomeStep /> : null}
@@ -331,15 +341,17 @@ export function FirstRunWizard() {
 
         <footer className="wizard-footer">
           <div className="wizard-footer__skips">
-            {stepIndex < LAST_STEP_INDEX ? (
-              <>
-                <button type="button" className="wizard-text-button" onClick={skip}>
-                  Skip the tour
-                </button>
-                <button type="button" className="wizard-text-button" onClick={skipStep}>
-                  Skip this step
-                </button>
-              </>
+            <button
+              type="button"
+              className="wizard-text-button"
+              onClick={() => skip("not-now")}
+            >
+              Skip the tour
+            </button>
+            {!isLast ? (
+              <button type="button" className="wizard-text-button" onClick={skipScene}>
+                Skip this scene
+              </button>
             ) : null}
           </div>
           <div className="wizard-footer__actions">
