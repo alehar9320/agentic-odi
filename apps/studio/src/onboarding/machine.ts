@@ -1,4 +1,4 @@
-import { SCENES, type SceneId } from "./content";
+import { GOAL_STEP_INDEX, STEPS, type GoalId, type WizardStepId } from "./content";
 
 /**
  * Pure flow rules for the product tour. No React, no storage, no DOM — the
@@ -8,18 +8,15 @@ import { SCENES, type SceneId } from "./content";
  * provider; these functions only move through the flow once it is open.
  */
 
-export const ONBOARDING_VERSION = 2;
-export const LAST_SCENE_INDEX = SCENES.length - 1;
+export const ONBOARDING_VERSION = 1;
+export const LAST_STEP_INDEX = STEPS.length - 1;
 
 export type OnboardingStatus = "pending" | "active" | "done" | "skipped";
 
-/** Why a tour was left. A skip is terminal and keeps its reason. */
-export type SkipReason = "not-now" | "dismissed";
-
 export interface OnboardingState {
   status: OnboardingStatus;
-  scene: number;
-  reason: SkipReason | null;
+  step: number;
+  goal: GoalId | null;
   version: number;
 }
 
@@ -28,67 +25,67 @@ export function createOnboardingState(
 ): OnboardingState {
   return {
     status: "pending",
-    scene: 0,
-    reason: null,
+    step: 0,
+    goal: null,
     version: ONBOARDING_VERSION,
     ...overrides,
   };
 }
 
-export function clampScene(scene: number): number {
-  if (!Number.isFinite(scene)) {
+export function clampStep(step: number): number {
+  if (!Number.isFinite(step)) {
     return 0;
   }
-  return Math.min(LAST_SCENE_INDEX, Math.max(0, Math.trunc(scene)));
+  return Math.min(LAST_STEP_INDEX, Math.max(0, Math.trunc(step)));
 }
 
-export function sceneAt(scene: number): SceneId {
-  return SCENES[clampScene(scene)].id;
+export function stepAt(step: number): WizardStepId {
+  return STEPS[clampStep(step)].id;
 }
 
 export function isFinished(state: OnboardingState): boolean {
   return state.status === "done" || state.status === "skipped";
 }
 
-/** Replay: start from the top, forget how the last run ended. */
+/** Replay: start from the top, forget the previous choice. */
 export function startTour(state: OnboardingState): OnboardingState {
-  return { ...state, status: "active", scene: 0, reason: null };
+  return { ...state, status: "active", step: 0, goal: null };
 }
 
 export function advanceTour(state: OnboardingState): OnboardingState {
   if (isFinished(state)) {
     return state;
   }
-  return { ...state, status: "active", scene: clampScene(state.scene + 1) };
+  // The flow will not leave the starting-point step without a choice.
+  if (state.step === GOAL_STEP_INDEX && state.goal === null) {
+    return state;
+  }
+  return { ...state, status: "active", step: clampStep(state.step + 1) };
 }
 
-/** Move past one scene without leaving the tour; it never finishes the flow. */
-export function skipSceneTour(state: OnboardingState): OnboardingState {
+/** Move past one step without leaving the tour; it never finishes the flow. */
+export function skipStepTour(state: OnboardingState): OnboardingState {
   if (isFinished(state)) {
     return state;
   }
-  return { ...state, status: "active", scene: clampScene(state.scene + 1) };
+  return { ...state, status: "active", step: clampStep(state.step + 1) };
 }
 
 export function retreatTour(state: OnboardingState): OnboardingState {
   if (isFinished(state)) {
     return state;
   }
-  return { ...state, status: "active", scene: clampScene(state.scene - 1) };
+  return { ...state, status: "active", step: clampStep(state.step - 1) };
+}
+
+export function selectGoal(state: OnboardingState, goal: GoalId): OnboardingState {
+  return { ...state, goal };
 }
 
 export function finishTour(state: OnboardingState): OnboardingState {
-  return { ...state, status: "done", scene: LAST_SCENE_INDEX, reason: null };
+  return { ...state, status: "done", step: LAST_STEP_INDEX };
 }
 
-/**
- * Leave the tour for good. `skipped` is terminal and stores why, so the tour
- * does not nag again and a later reader can tell a deliberate exit from a
- * dismissal.
- */
-export function skipTour(
-  state: OnboardingState,
-  reason: SkipReason = "not-now",
-): OnboardingState {
-  return { ...state, status: "skipped", reason };
+export function skipTour(state: OnboardingState): OnboardingState {
+  return { ...state, status: "skipped" };
 }

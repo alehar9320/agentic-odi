@@ -1,25 +1,26 @@
 import { createContext, useContext } from "react";
 
-import type { OnboardingState, SkipReason } from "./machine";
+import type { GoalId } from "./content";
+import type { OnboardingState } from "./machine";
 
 /**
- * The tour's public surface. Components outside the onboarding module only
+ * The wizard's public surface. Components outside the onboarding module only
  * ever need `enabled` (to show a replay entry) and `restart`.
  */
 export interface OnboardingController {
   enabled: boolean;
   open: boolean;
   state: OnboardingState;
+  chooseGoal: (goal: GoalId) => void;
   advance: () => void;
-  /** Advance past one scene without leaving the tour. */
-  skipScene: () => void;
+  /** Advance past one step without leaving the tour. */
+  skipStep: () => void;
   back: () => void;
   complete: () => void;
-  /** Leave the tour for good, recording why. */
-  skip: (reason?: SkipReason) => void;
+  skip: () => void;
   /** Open the tour, resuming stored progress unless it is already finished. */
   openTour: () => void;
-  /** Replay from the first scene. */
+  /** Replay from the first step. */
   restart: () => void;
 }
 

@@ -2,17 +2,18 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 import { isFeatureEnabled } from "../features/flags";
 import { OnboardingContext, type OnboardingController } from "./context";
+import type { GoalId } from "./content";
 import {
   advanceTour,
   createOnboardingState,
   finishTour,
   isFinished,
   retreatTour,
-  skipSceneTour,
+  selectGoal,
+  skipStepTour,
   skipTour,
   startTour,
   type OnboardingState,
-  type SkipReason,
 } from "./machine";
 import { readOnboardingState, writeOnboardingState } from "./storage";
 
@@ -41,12 +42,16 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
     writeOnboardingState(state);
   }, [featureEnabled, open, state]);
 
+  const chooseGoal = useCallback((goal: GoalId) => {
+    setState((prev) => selectGoal(prev, goal));
+  }, []);
+
   const advance = useCallback(() => {
     setState(advanceTour);
   }, []);
 
-  const skipScene = useCallback(() => {
-    setState(skipSceneTour);
+  const skipStep = useCallback(() => {
+    setState(skipStepTour);
   }, []);
 
   const back = useCallback(() => {
@@ -58,8 +63,8 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
     setOpen(false);
   }, []);
 
-  const skip = useCallback((reason: SkipReason = "not-now") => {
-    setState((prev) => skipTour(prev, reason));
+  const skip = useCallback(() => {
+    setState(skipTour);
     setOpen(false);
   }, []);
 
@@ -72,7 +77,7 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
     setOpen(true);
   }, [featureEnabled]);
 
-  /** Replay from the first scene, forgetting how the last run ended. */
+  /** Replay from the first step, forgetting the previous choice. */
   const restart = useCallback(() => {
     if (!featureEnabled) {
       return;
@@ -86,8 +91,9 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
       enabled: featureEnabled,
       open,
       state,
+      chooseGoal,
       advance,
-      skipScene,
+      skipStep,
       back,
       complete,
       skip,
@@ -98,8 +104,9 @@ export function OnboardingProvider({ children, enabled }: OnboardingProviderProp
       featureEnabled,
       open,
       state,
+      chooseGoal,
       advance,
-      skipScene,
+      skipStep,
       back,
       complete,
       skip,

@@ -1,18 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { SCENES } from "./content";
 import {
-  LAST_SCENE_INDEX,
+  LAST_STEP_INDEX,
   advanceTour,
-  clampScene,
   createOnboardingState,
   finishTour,
-  isFinished,
   retreatTour,
-  sceneAt,
-  skipSceneTour,
-  skipTour,
+  selectGoal,
   startTour,
+  stepAt,
 } from "./machine";
 import {
   ONBOARDING_STORAGE_KEY,
@@ -39,81 +35,54 @@ function memoryStorage(seed: Record<string, string> = {}): OnboardingStorage & {
 }
 
 describe("onboarding machine", () => {
-  it("starts pending on the first scene with no reason", () => {
+  it("starts pending on the welcome step with no goal", () => {
     expect(createOnboardingState()).toEqual({
       status: "pending",
-      scene: 0,
-      reason: null,
-      version: 2,
+      step: 0,
+      goal: null,
+      version: 1,
     });
   });
 
-  it("has exactly three scenes in order", () => {
-    expect(SCENES.map((scene) => scene.id)).toEqual(["hear", "score", "place"]);
-    expect(LAST_SCENE_INDEX).toBe(2);
+  it("moves forward through the flow", () => {
+    const advanced = advanceTour(createOnboardingState());
+    expect(advanced.step).toBe(1);
+    expect(advanced.status).toBe("active");
+    expect(stepAt(advanced.step)).toBe("goal");
   });
 
-  it("walks forward, back, and resumes mid-scene from a stored position", () => {
-    const storage = memoryStorage();
-    let state = createOnboardingState();
+  it("will not leave the starting-point step without a choice", () => {
+    const onGoal = advanceTour(createOnboardingState());
+    expect(advanceTour(onGoal)).toEqual(onGoal);
 
-    state = advanceTour(state);
-    expect(state).toMatchObject({ status: "active", scene: 1 });
-    expect(sceneAt(state.scene)).toBe("score");
-
-    // Leaving mid-scene persists where it stopped.
-    writeOnboardingState(state, storage);
-    expect(readOnboardingState(storage)).toMatchObject({ status: "active", scene: 1 });
-
-    // Returning resumes at the same scene, not the first.
-    const resumed = readOnboardingState(storage);
-    expect(resumed && sceneAt(resumed.scene)).toBe("score");
-
-    expect(retreatTour(state).scene).toBe(0);
+    const chosen = selectGoal(onGoal, "find-opportunity");
+    expect(advanceTour(chosen).step).toBe(2);
   });
 
   it("clamps at both ends", () => {
-    expect(retreatTour(createOnboardingState()).scene).toBe(0);
-    const atEnd = { ...createOnboardingState(), scene: LAST_SCENE_INDEX };
-    expect(advanceTour(atEnd).scene).toBe(LAST_SCENE_INDEX);
-    expect(clampScene(9)).toBe(LAST_SCENE_INDEX);
-    expect(clampScene(-3)).toBe(0);
-    expect(clampScene(Number.NaN)).toBe(0);
-  });
-
-  it("skips one scene without ending the tour", () => {
-    const skipped = skipSceneTour(createOnboardingState());
-    expect(skipped).toMatchObject({ status: "active", scene: 1, reason: null });
-  });
-
-  it("records why the tour was skipped, and skipping is terminal", () => {
-    const skipped = skipTour(createOnboardingState(), "dismissed");
-    expect(skipped).toMatchObject({ status: "skipped", reason: "dismissed" });
-    expect(isFinished(skipped)).toBe(true);
-    // Nothing moves a skipped tour; it does not nag again.
-    expect(advanceTour(skipped)).toBe(skipped);
-    expect(retreatTour(skipped)).toBe(skipped);
-    expect(skipSceneTour(skipped)).toBe(skipped);
-  });
-
-  it("defaults the skip reason to not-now", () => {
-    expect(skipTour(createOnboardingState()).reason).toBe("not-now");
+    expect(retreatTour(createOnboardingState()).step).toBe(0);
+    const atEnd = {
+      ...createOnboardingState(),
+      step: LAST_STEP_INDEX,
+      goal: "have-opportunity" as const,
+    };
+    expect(advanceTour(atEnd).step).toBe(LAST_STEP_INDEX);
   });
 
   it("freezes finished tours", () => {
-    const done = finishTour({ ...createOnboardingState(), scene: 1 });
-    expect(done).toMatchObject({ status: "done", scene: LAST_SCENE_INDEX, reason: null });
+    const done = finishTour({ ...createOnboardingState(), step: 2, goal: "have-opportunity" });
+    expect(done).toMatchObject({ status: "done", step: LAST_STEP_INDEX });
     expect(advanceTour(done)).toBe(done);
     expect(retreatTour(done)).toBe(done);
   });
 
-  it("restarts from the top with no carried-over reason", () => {
-    const done = skipTour({ ...createOnboardingState(), scene: 2 }, "dismissed");
+  it("restarts from the top with no carried-over goal", () => {
+    const done = finishTour({ ...createOnboardingState(), goal: "have-opportunity" });
     expect(startTour(done)).toEqual({
       status: "active",
-      scene: 0,
-      reason: null,
-      version: 2,
+      step: 0,
+      goal: null,
+      version: 1,
     });
   });
 });
@@ -121,7 +90,7 @@ describe("onboarding machine", () => {
 describe("onboarding storage", () => {
   it("round-trips a state", () => {
     const storage = memoryStorage();
-    const state = finishTour({ ...createOnboardingState(), scene: 1 });
+    const state = finishTour({ ...createOnboardingState(), goal: "pressure-test", step: 3 });
 
     writeOnboardingState(state, storage);
     expect(readOnboardingState(storage)).toEqual(state);
@@ -137,27 +106,23 @@ describe("onboarding storage", () => {
   });
 
   it("ignores a record from another tour version", () => {
-    // The old four-step record reads as a first run rather than migrating.
     const storage = memoryStorage({
       [ONBOARDING_STORAGE_KEY]: JSON.stringify({
         status: "done",
         step: 3,
         goal: "have-opportunity",
-        version: 1,
+        version: 99,
       }),
     });
     expect(readOnboardingState(storage)).toBeNull();
   });
 
-  it("rejects unknown scenes, statuses, and reasons", () => {
+  it("rejects unknown steps, statuses, and goals", () => {
     const cases = [
-      { status: "done", scene: 9, reason: null, version: 2 },
-      { status: "sleeping", scene: 1, reason: null, version: 2 },
-      { status: "done", scene: 1, reason: "because", version: 2 },
-      // A reason only belongs to a skipped tour.
-      { status: "active", scene: 1, reason: "not-now", version: 2 },
-      // A skipped tour always records why, so one without a reason is malformed.
-      { status: "skipped", scene: 1, reason: null, version: 2 },
+      { status: "done", step: 9, goal: "have-opportunity", version: 1 },
+      { status: "sleeping", step: 1, goal: "have-opportunity", version: 1 },
+      { status: "done", step: 3, goal: "define-everything", version: 1 },
+      { status: "done", step: 2, goal: null, version: 1 },
     ];
     for (const record of cases) {
       const storage = memoryStorage({

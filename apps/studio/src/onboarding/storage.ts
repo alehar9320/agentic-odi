@@ -1,10 +1,9 @@
-import { SCENES } from "./content";
+import { GOALS, GOAL_STEP_INDEX, STEPS, type GoalId } from "./content";
 import {
   ONBOARDING_VERSION,
   createOnboardingState,
   type OnboardingState,
   type OnboardingStatus,
-  type SkipReason,
 } from "./machine";
 
 /**
@@ -17,7 +16,7 @@ export const ONBOARDING_STORAGE_KEY = "studio.onboarding";
 export type OnboardingStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 const STATUSES: OnboardingStatus[] = ["pending", "active", "done", "skipped"];
-const SKIP_REASONS: SkipReason[] = ["not-now", "dismissed"];
+const GOAL_IDS = new Set<string>(GOALS.map((goal) => goal.id));
 
 function browserStorage(): OnboardingStorage | null {
   if (typeof window === "undefined") {
@@ -28,6 +27,10 @@ function browserStorage(): OnboardingStorage | null {
   } catch {
     return null;
   }
+}
+
+function isGoalId(value: unknown): value is GoalId {
+  return typeof value === "string" && GOAL_IDS.has(value);
 }
 
 function parseState(raw: string): OnboardingState | null {
@@ -49,28 +52,25 @@ function parseState(raw: string): OnboardingState | null {
     return null;
   }
   if (
-    typeof candidate.scene !== "number" ||
-    !Number.isInteger(candidate.scene) ||
-    candidate.scene < 0 ||
-    candidate.scene >= SCENES.length
+    typeof candidate.step !== "number" ||
+    !Number.isInteger(candidate.step) ||
+    candidate.step < 0 ||
+    candidate.step >= STEPS.length
   ) {
     return null;
   }
-  // A reason belongs only to a skipped tour, and must be one we wrote.
-  if (candidate.reason !== null && !SKIP_REASONS.includes(candidate.reason as SkipReason)) {
+  if (candidate.goal !== null && !isGoalId(candidate.goal)) {
     return null;
   }
-  if (candidate.status === "skipped" && candidate.reason === null) {
-    return null;
-  }
-  if (candidate.status !== "skipped" && candidate.reason !== null) {
+  // Past the starting-point step, the tour always has a chosen goal.
+  if (candidate.step > GOAL_STEP_INDEX && !isGoalId(candidate.goal)) {
     return null;
   }
 
   return createOnboardingState({
     status: candidate.status as OnboardingStatus,
-    scene: candidate.scene,
-    reason: (candidate.reason as SkipReason | null) ?? null,
+    step: candidate.step,
+    goal: (candidate.goal as GoalId | null) ?? null,
   });
 }
 
@@ -114,3 +114,4 @@ export function clearOnboardingState(
     // Nothing to do.
   }
 }
+
