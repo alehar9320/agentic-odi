@@ -159,17 +159,17 @@ describe("FirstRunWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(stored()).toMatchObject({
+      status: "done",
+      step: 3,
+      goal: "find-opportunity",
+      version: 1,
+    }));
     expect(studio.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining("I need to find the next opportunity"),
     );
     expect(studio.openPanel).not.toHaveBeenCalled();
     expect(studio.openSetup).not.toHaveBeenCalled();
-    expect(stored()).toMatchObject({
-      status: "done",
-      step: 3,
-      goal: "find-opportunity",
-      version: 1,
-    });
   });
 
   it("lands on the outcome, then starts the conversation from the chosen door", async () => {
