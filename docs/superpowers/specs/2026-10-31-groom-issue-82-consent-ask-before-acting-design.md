@@ -40,6 +40,7 @@ class ProposalKind(StrEnum):
     OUTCOME = "outcome"
     MANDATE = "mandate"
 
+
 class ProposalState(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
@@ -49,26 +50,28 @@ class ProposalState(StrEnum):
     FAILED = "failed"
     EXPIRED = "expired"
 
+
 class Proposal(BaseModel):
     id: str
     kind: ProposalKind
-    title: str                       # one line, human-readable
-    rationale: str                   # why the agent wants this
+    title: str  # one line, human-readable
+    rationale: str  # why the agent wants this
     tool_name: str | None = None
     tool_args: dict = {}
-    payload: dict = {}               # structured payload for non-tool proposals
+    payload: dict = {}  # structured payload for non-tool proposals
     state: ProposalState = ProposalState.PENDING
     requires_approval: bool = True
     expires_at: datetime | None = None
     created_at: datetime
     decided_at: datetime | None = None
-    decided_by: str | None = None    # e.g. "local-user"
+    decided_by: str | None = None  # e.g. "local-user"
     execution_id: str | None = None
+
 
 class Execution(BaseModel):
     id: str
     proposal_id: str | None
-    actor: str                       # "agent" | "local-user" | "mandate:<id>"
+    actor: str  # "agent" | "local-user" | "mandate:<id>"
     request_id: str
     tool_name: str | None
     tool_args: dict
@@ -78,12 +81,13 @@ class Execution(BaseModel):
     finished_at: datetime
     error: str | None = None
 
+
 class Mandate(BaseModel):
     id: str
     name: str
     allowed_tools: list[str]
-    allowed_scope: dict              # e.g. {"connector": "github"}
-    max_executions: int              # default 50
+    allowed_scope: dict  # e.g. {"connector": "github"}
+    max_executions: int  # default 50
     executions_used: int = 0
     expires_at: datetime
     created_at: datetime
@@ -157,13 +161,25 @@ Restructure `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py:235-373` 
 Create `apps/studio-api/src/agentic_odi_studio_api/studio/consent.py`:
 
 ```python
-DEFAULT_AUTO_APPROVE_TOOLS = frozenset({
-    "get_jobs", "get_job", "get_job_map", "get_step", "get_outcomes",
-    "get_outcome", "get_customer_outcome", "list_customer_outcomes",
-    "list_evidence", "get_evidence", "compute_opportunity",
-    "evaluate_outcome", "get_odi_schema", "get_odi_framework_guidelines",
-    "get_capabilities",
-})
+DEFAULT_AUTO_APPROVE_TOOLS = frozenset(
+    {
+        "get_jobs",
+        "get_job",
+        "get_job_map",
+        "get_step",
+        "get_outcomes",
+        "get_outcome",
+        "get_customer_outcome",
+        "list_customer_outcomes",
+        "list_evidence",
+        "get_evidence",
+        "compute_opportunity",
+        "evaluate_outcome",
+        "get_odi_schema",
+        "get_odi_framework_guidelines",
+        "get_capabilities",
+    }
+)
 ```
 
 - Read-only tools are auto-approved. Derive the set from `packages/core/src/agentic_odi_core/contract.py` — any tool whose name starts with `get_`/`list_`/`compute_`/`evaluate_` is read-only. The explicit set pins the decision and makes it testable.
