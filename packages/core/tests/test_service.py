@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from agentic_odi_core.evaluation import classify_opportunity
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
@@ -21,6 +22,7 @@ from agentic_odi_core.services import (
     StepNotFoundError,
     ValueOutOfRangeError,
 )
+from agentic_odi_core.sqlite_repository import SQLiteRepository
 
 
 @pytest.fixture
@@ -500,3 +502,52 @@ def test_delete_outcome_unlinks_evidence(service: ODIService) -> None:
     stored = service.get_evidence(evidence.id)
     assert stored is not None
     assert stored.outcome_id is None
+
+
+def test_an_unscored_outcome_is_still_unscored_after_reopening_the_store(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    service = ODIService(SQLiteRepository(db_path=db))
+    job = service.add_job("Rotate a leaked secret")
+    captured = service.add_outcome(
+        job.id,
+        "Minimize the time it takes to rotate the secret when it leaks",
+    )
+
+    reopened = ODIService(SQLiteRepository(db_path=db))
+    outcome = reopened.get_outcome(captured.id)
+
+    assert outcome is not None
+    assert outcome.importance is None
+    assert outcome.satisfaction is None
+    assert outcome.opportunity_score is None
+    assert classify_opportunity(outcome.opportunity_score) == "unscored"
+
+
+def test_clearing_both_ratings_reads_the_same_as_never_having_scored(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    service = ODIService(SQLiteRepository(db_path=db))
+    job = service.add_job("Rotate a leaked secret")
+    never = service.add_outcome(
+        job.id,
+        "Minimize the number of missed values after rotation",
+    )
+    cleared = service.update_outcome(
+        service.add_outcome(
+            job.id,
+            "Minimize the time it takes to verify the new value when deploying",
+            importance=9.0,
+            satisfaction=2.0,
+        ).id,
+        {"importance": None, "satisfaction": None},
+    )
+
+    reopened = ODIService(SQLiteRepository(db_path=db))
+    for outcome_id in (never.id, cleared.id):
+        outcome = reopened.get_outcome(outcome_id)
+        assert outcome is not None
+        assert (outcome.importance, outcome.satisfaction, outcome.opportunity_score) == (
+            None,
+            None,
+            None,
+        )
+        assert classify_opportunity(outcome.opportunity_score) == "unscored"
