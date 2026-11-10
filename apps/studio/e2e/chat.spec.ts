@@ -40,7 +40,8 @@ test.describe("the conversation", () => {
     await sendMessage(page, "What is the weather tomorrow?");
 
     const reply = await lastReply(page);
-    expect(reply).toContain("Built-in assistant");
+    // The tag is styled as a badge, so the rendered text is uppercased.
+    expect(reply.toLowerCase()).toContain("built-in assistant");
     expect(reply).toContain("/capture — record an outcome");
   });
 
