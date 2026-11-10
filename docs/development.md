@@ -75,6 +75,13 @@ npm --prefix apps/studio run build       # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
+The build version is a single source of truth. `__STUDIO_VERSION__` is baked into
+the Vite build from `apps/studio/package.json` (`vite.config.ts`) and exposed
+through `src/lib/version.ts`; `src/lib/version.test.ts` fails if it drifts from
+`package.json` or `.release-please-manifest.json`. `Settings → About` renders it,
+and the diagnostics bundle records it together with its source (`build` or
+`desktop`).
+
 ### Visual tests
 
 `npm test` runs the jsdom suite and deliberately ignores `*.visual.test.tsx`.
@@ -304,6 +311,36 @@ The risk tier labels (`safe to merge`, `needs a look`, `danger zone`) and the
 merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
 workflows and are deliberately left alone. The workflow is silent: it updates
 labels only and never posts PR comments.
+
+### Tiered Automated Triage (shift-left filtering)
+
+The same risk workflow runs a third job, **triage**, which decides whether a
+human may open the diff. It enforces the project's shift-left rule:
+
+> **Humans should never read an unvetted AI PR.**
+
+A pull request is vetted -- and becomes eligible for a human reviewer -- only
+when it carries the `ready for human review` gate label. The triage job applies
+it deterministically (no LLM, no PR code executed) from the provenance, risk
+tier, and size labels the `labels` and `pr-risk` jobs just computed:
+
+| Author | Risk tier | Gate decision | What a human sees |
+|---|---|---|---|
+| Human | any | `ready for human review` | The diff is open for review immediately. |
+| Agent | `safe to merge` (≤ 20) | `ready for human review` | Automated vet complete; fast path to review. |
+| Agent | `safe to merge` + `size/XL` | `needs human review` | Size alone warrants a first reviewer pass. |
+| Agent | `needs a look` (21–50) | `needs human review` | Awaits an assigned reviewer before anyone reads the diff. |
+| Agent | `danger zone` (≥ 51) | `deep dive` | Blocking deep-dive review; never auto-merged. |
+
+The triage job owns the gate labels (`ready for human review`, `needs human
+review`, `deep dive`) and manages them idempotently on every run, so re-pushing
+a branch re-triages the pull request. It creates its own labels (the `labels`
+job manages a different set), runs only on non-fork pull requests, and never
+executes pull request code.
+
+```bash
+python3 scripts/pr_triage.py --labels labels.txt   # print the triage decision
+```
 
 ## Testing
 
