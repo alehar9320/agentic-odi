@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import cast
 
 import pytest
-
 from agentic_odi_core.briefing import (
     Briefing,
     BriefingItem,
+    BriefingItemKind,
     RunChange,
     RunResult,
     build_briefing,
@@ -15,7 +16,7 @@ from agentic_odi_core.briefing import (
 NOW = datetime(2026, 11, 10, 2, 0, tzinfo=timezone.utc)
 
 
-def _change(kind: str, text: str, record_id: str, record_kind: str) -> RunChange:
+def _change(kind: BriefingItemKind, text: str, record_id: str, record_kind: str) -> RunChange:
     return RunChange(kind=kind, text=text, record_id=record_id, record_kind=record_kind)
 
 
@@ -70,7 +71,12 @@ def test_a_line_that_is_just_an_id_is_rejected() -> None:
 
 def test_an_unknown_kind_is_rejected() -> None:
     with pytest.raises(ValueError, match="kind"):
-        BriefingItem(kind="removed", text="Something left.", record_id="x", record_kind="evidence")
+        BriefingItem(
+            kind=cast(BriefingItemKind, "removed"),
+            text="Something left.",
+            record_id="x",
+            record_kind="evidence",
+        )
 
 
 def test_a_briefing_needs_a_run() -> None:

@@ -8,9 +8,10 @@ describes. A run that changed nothing produces zero items — the honest
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Literal, Mapping, Sequence
+from typing import Any, Literal
 
 #: The three things a run can report. A change is added, changed, or failed.
 BriefingItemKind = Literal["added", "changed", "failed"]
@@ -62,7 +63,7 @@ class BriefingItem:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "BriefingItem":
+    def from_dict(cls, data: Mapping[str, Any]) -> BriefingItem:
         return cls(
             kind=data["kind"],
             text=data["text"],
@@ -96,7 +97,7 @@ class Briefing:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "Briefing":
+    def from_dict(cls, data: Mapping[str, Any]) -> Briefing:
         created_at = data["created_at"]
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at)

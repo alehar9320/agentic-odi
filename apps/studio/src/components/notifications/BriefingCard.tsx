@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { fetchLatestBriefing } from "../../api/studioApi";
 import { isBriefingDismissed, markBriefingDismissed } from "../../lib/briefingDismissed";
@@ -43,21 +43,27 @@ export function BriefingCard() {
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const latest = await fetchLatestBriefing();
-      setBriefing(latest);
-      setDismissed(latest ? isBriefingDismissed(latest.run_id) : false);
-    } catch {
-      // A briefing is a morning convenience, not a gate: a failed read shows
-      // nothing rather than an error the reader cannot act on.
-      setBriefing(null);
-    }
-  }, []);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    fetchLatestBriefing()
+      .then((latest) => {
+        if (cancelled) {
+          return;
+        }
+        setBriefing(latest);
+        setDismissed(latest ? isBriefingDismissed(latest.run_id) : false);
+      })
+      .catch(() => {
+        // A briefing is a morning convenience, not a gate: a failed read shows
+        // nothing rather than an error the reader cannot act on.
+        if (!cancelled) {
+          setBriefing(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (!briefing || dismissed) {
     return null;

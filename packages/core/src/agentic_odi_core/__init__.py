@@ -149,6 +149,11 @@ from agentic_odi_core.traceability import (
 )
 
 __all__ = [
+    "Briefing",
+    "BriefingItem",
+    "RunChange",
+    "RunResult",
+    "build_briefing",
     "ScheduledWork",
     "ScheduledWorkNotFoundError",
     "OutcomeScoreMismatchError",
