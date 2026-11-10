@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../../onboarding/OnboardingProvider";
 import { UpdateProvider, createUpdateService } from "../../updater";
@@ -47,9 +47,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     mcpReachable: false,
     pushToast: vi.fn(),
     connectors: [],
-    connectorsLoading: false,
     presets: [],
-    presetsLoading: false,
     addConnector: vi.fn().mockResolvedValue({ ok: true, name: "notion" }),
     deleteConnector: vi.fn().mockResolvedValue({ ok: true, name: "notion" }),
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
@@ -73,6 +71,15 @@ function renderPanel() {
       </OnboardingProvider>
     </UpdateProvider>,
   );
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+/** The index is the only door to a section; Model opens first. */
+function openSection(name: string) {
+  fireEvent.click(screen.getByRole("button", { name }));
 }
 
 describe("Settings saves per field", () => {
@@ -133,6 +140,7 @@ describe("Settings saves per field", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
 
     renderPanel();
+    openSection("Connections");
 
     const mcpUrl = screen.getByLabelText("MCP server URL");
     fireEvent.change(mcpUrl, { target: { value: "ftp://nope" } });
@@ -147,6 +155,7 @@ describe("Settings saves per field", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
 
     renderPanel();
+    openSection("Connections");
 
     const mcpUrl = screen.getByLabelText("MCP server URL");
     fireEvent.change(mcpUrl, { target: { value: "http://localhost:9000/mcp" } });
