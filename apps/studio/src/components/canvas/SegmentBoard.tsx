@@ -2,16 +2,59 @@ import { useEffect, useMemo, useState } from "react";
 
 import { asStudioError, proposeStrategy as apiProposeStrategy } from "../../api/studioApi";
 import { useStudio } from "../../state/StudioContext";
-import type { Segment, Strategy } from "../../types";
+import type { Outcome, Segment, Strategy } from "../../types";
 import type { UiNode } from "../../ui/protocol";
 import { UiRenderer } from "../../ui/UiRenderer";
 import { FailurePanel } from "../FailurePanel";
+
+/** One member of a segment, resolved against the canvas for display. */
+interface SegmentMember {
+  id: string;
+  statement: string;
+  /** The stored score, read as-is. Absent when the outcome carries none. */
+  opportunityScore?: number;
+}
+
+/**
+ * Resolve a segment's `outcome_ids` against the canvas. An id that names no
+ * outcome is dropped and counted — never rendered as an empty row, and never
+ * invented. The count is reported beside the list so the omission is visible.
+ */
+function resolveMembers(segment: Segment, outcomes: Outcome[]): {
+  members: SegmentMember[];
+  missing: number;
+} {
+  const byId = new Map<string, Outcome>();
+  for (const outcome of outcomes) {
+    if (outcome.id) {
+      byId.set(outcome.id, outcome);
+    }
+  }
+  const members: SegmentMember[] = [];
+  let missing = 0;
+  for (const id of segment.outcome_ids) {
+    const outcome = byId.get(id);
+    if (!outcome) {
+      missing += 1;
+      continue;
+    }
+    const member: SegmentMember = { id, statement: outcome.statement ?? id };
+    // Read the stored score; never compute one here. A missing score stays
+    // absent so the mean can exclude it rather than treat it as a zero.
+    if (typeof outcome.opportunity_score === "number" && Number.isFinite(outcome.opportunity_score)) {
+      member.opportunityScore = outcome.opportunity_score;
+    }
+    members.push(member);
+  }
+  return { members, missing };
+}
 
 /**
  * The cards the chat renders are the cards the lens renders: one catalog, one
  * renderer, so a segment never looks different depending on how you got there.
  */
-function segmentNode(segment: Segment): UiNode {
+function segmentNode(segment: Segment, outcomes: Outcome[]): UiNode {
+  const { members, missing } = resolveMembers(segment, outcomes);
   return {
     type: "segment-card",
     props: {
@@ -23,6 +66,8 @@ function segmentNode(segment: Segment): UiNode {
       verdict: segment.verdict ?? "unknown",
       confidence: segment.confidence,
       outcomeIds: segment.outcome_ids,
+      members,
+      missingMembers: missing,
       rationale: segment.rationale,
     },
     children: [],
@@ -112,8 +157,9 @@ export function SegmentBoard() {
     <section className="fade-in segments-board">
       {ordered.length === 0 ? (
         <div className="segments-board__empty">
+          <p className="empty-note">No segments yet — score outcomes to derive them.</p>
           <p className="empty-note">
-            No segments yet. A segment is a group of people plus the job they are doing, and it
+            A segment is a group of people plus the job they are doing, and it
             only exists once two or more scored outcomes cluster together — never from a
             demographic guess.
           </p>
@@ -124,7 +170,7 @@ export function SegmentBoard() {
       ) : (
         <div className="segments-board__list">
           {ordered.map((segment) => (
-            <UiRenderer key={segment.id} node={segmentNode(segment)} />
+            <UiRenderer key={segment.id} node={segmentNode(segment, outcomes)} />
           ))}
         </div>
       )}

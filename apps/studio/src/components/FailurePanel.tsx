@@ -10,13 +10,15 @@ export function FailurePanel({
   error,
   onRetry,
   retryText,
+  id,
 }: {
   error: StudioError;
   onRetry?: (text: string) => void;
   retryText?: string;
+  id?: string;
 }) {
   return (
-    <div className="failure" role="alert">
+    <div className="failure" role="alert" id={id}>
       <span className="failure__icon" aria-hidden="true">
         <AlertIcon size={16} />
       </span>

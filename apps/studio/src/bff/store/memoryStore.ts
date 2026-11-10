@@ -1,8 +1,11 @@
 import type { Observation } from "../../types";
 import { nowIso } from "../id";
 import {
+  byCreated,
   bySeq,
+  type DrainLease,
   type LocalStore,
+  type OutboxRecord,
   type StoredConversation,
   type StoredJob,
   type StoredOutcome,
@@ -22,6 +25,16 @@ export class MemoryLocalStore implements LocalStore {
   private readonly observations = new Map<string, Observation>();
   private readonly conversations = new Map<string, StoredConversation>();
   private readonly turns: StoredTurn[] = [];
+  private readonly outbox = new Map<string, OutboxRecord>();
+  private lease: DrainLease | null = null;
+
+  // A Map-backed store has no second connection to lose, so it never asks for a
+  // reload. The accessors exist to satisfy `LocalStore`.
+  readonly needsReload = false;
+
+  onVersionChange(): () => void {
+    return () => undefined;
+  }
 
   async nextSeq(): Promise<number> {
     this.seq += 1;
@@ -98,6 +111,62 @@ export class MemoryLocalStore implements LocalStore {
     this.observations.clear();
   }
 
+  async enqueueOutbox(record: OutboxRecord): Promise<void> {
+    this.outbox.set(record.id, record);
+  }
+
+  async getOutbox(id: string): Promise<OutboxRecord | undefined> {
+    return this.outbox.get(id);
+  }
+
+  async putOutbox(record: OutboxRecord): Promise<void> {
+    this.outbox.set(record.id, record);
+  }
+
+  async deleteOutbox(id: string): Promise<void> {
+    this.outbox.delete(id);
+  }
+
+  async listOutbox(): Promise<OutboxRecord[]> {
+    return [...this.outbox.values()].sort(byCreated);
+  }
+
+  async clearOutbox(): Promise<void> {
+    this.outbox.clear();
+  }
+
+  async claimDrainLease(
+    holder: string,
+    now: number,
+    ttlMs: number,
+  ): Promise<DrainLease | null> {
+    if (this.lease && this.lease.holder !== holder && this.lease.expires_at > now) {
+      return this.lease;
+    }
+    this.lease = { holder, expires_at: now + ttlMs };
+    return null;
+  }
+
+  async renewDrainLease(holder: string, now: number, ttlMs: number): Promise<boolean> {
+    if (!this.lease || this.lease.holder !== holder) {
+      return false;
+    }
+    this.lease = { holder, expires_at: now + ttlMs };
+    return true;
+  }
+
+  async releaseDrainLease(holder: string): Promise<boolean> {
+    if (!this.lease || this.lease.holder !== holder) {
+      return false;
+    }
+    this.lease = null;
+    return true;
+  }
+
+  async getDrainLease(): Promise<DrainLease | null> {
+    return this.lease;
+  }
+
   async listConversations(): Promise<StoredConversation[]> {
     return [...this.conversations.values()].sort((left, right) =>
       right.updated_at.localeCompare(left.updated_at),
@@ -134,6 +203,10 @@ export class MemoryLocalStore implements LocalStore {
     return this.turns
       .filter((turn) => turn.conversation_id === conversationId)
       .sort((left, right) => left.id - right.id);
+  }
+
+  async countTurns(conversationId: string): Promise<number> {
+    return this.turns.filter((turn) => turn.conversation_id === conversationId).length;
   }
 
   async appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn> {
@@ -215,6 +288,10 @@ export class MemoryLocalStore implements LocalStore {
     }
     this.turns.length = 0;
     this.turns.push(...snapshot.turns);
+    // A snapshot carries no queued intents, so importing drops them, matching
+    // the IndexedDB store's clearAll-then-restore.
+    this.outbox.clear();
+    this.lease = null;
     this.seq = Math.max(
       0,
       ...snapshot.jobs.map((job) => job.seq),
@@ -231,6 +308,8 @@ export class MemoryLocalStore implements LocalStore {
     this.observations.clear();
     this.conversations.clear();
     this.turns.length = 0;
+    this.outbox.clear();
+    this.lease = null;
     this.seq = 0;
     this.turnId = 0;
   }
