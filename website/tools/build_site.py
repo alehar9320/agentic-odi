@@ -4,8 +4,17 @@ The site is static: this script turns the repository's own sources — the
 Studio theme, the MCP tool contract, the connector catalog, the CLI registry,
 the ODI schema, and the guides under ``docs/`` — into HTML, CSS, and JS.
 
-Nothing here runs at request time. The output is committed to
-   Generated on demand and by CI at build time; never committed.
+Nothing here runs at request time. The output is generated on demand and by CI
+at build time, and is never committed.
+
+    uv run python website/tools/build_site.py --out _site       # write the site
+    uv run python website/tools/build_site.py --check           # verify committed pages
+    uv run python website/tools/build_site.py --check --out _site
+
+The build fails, naming the page and the reference, when a page's local
+``href``/``src`` does not resolve inside the output. ``--check`` writes nothing:
+it verifies the pages the repository tracks against a fresh build, or, with
+``--out``, compares that directory instead.
 """
 
 from __future__ import annotations
@@ -13,6 +22,7 @@ from __future__ import annotations
 import argparse
 import html as html_module
 import json
+import posixpath
 import re
 import shutil
 import sys
@@ -22,7 +32,7 @@ from typing import Any
 import build_sample
 import extract
 import markdown_render
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 ROOT = Path(__file__).resolve().parents[2]
 SITE = ROOT / "website"
@@ -34,6 +44,11 @@ OUT_DIR = SITE / "dist"
 # and served at /sample/ so the landing page's primary call to action points at
 # a page that keeps working when the API is down.
 SAMPLE_OUTPUT = "sample/index.html"
+
+# The generated pages the repository tracks, so a source edit that is not
+# regenerated can be caught. Everything else the build writes is published at
+# build time and never committed.
+COMMITTED_OUTPUTS = (SAMPLE_OUTPUT,)
 
 PAGES_URL = "https://alehar9320.github.io/agentic-odi/"
 
@@ -51,12 +66,19 @@ SITE_NAME = "Agentic ODI"
 
 
 def environment() -> Environment:
-    """The Jinja environment. Autoescape is on for every template."""
+    """The Jinja environment. Autoescape is on for every template.
+
+    Undefined variables are an error, not an empty string: a template slot that
+    nothing fills is a broken page, and it must fail the build rather than
+    render silently blank. ``StrictUndefined`` still honours an explicit
+    ``default`` filter, so a deliberately optional value keeps working.
+    """
     return Environment(
         loader=FileSystemLoader(TEMPLATES),
         autoescape=select_autoescape(["html", "xml"]),
         trim_blocks=True,
         lstrip_blocks=True,
+        undefined=StrictUndefined,
     )
 
 
@@ -509,13 +531,72 @@ def _tree(root: Path) -> dict[str, bytes]:
     }
 
 
-def build(out_dir: Path, *, check: bool = False) -> int:
-    """Render the site into ``out_dir``.
+# A local link or asset reference in generated HTML. Absolute URLs, fragments,
+# and non-fetching schemes are external by definition and are out of scope.
+_LOCAL_REFERENCE = re.compile(r"""(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)')""", re.IGNORECASE)
+_EXTERNAL_PREFIXES = ("http://", "https://", "//", "mailto:", "tel:", "data:", "javascript:")
 
-    With ``check=True`` nothing is written: ``out_dir`` is compared against a
-    fresh render and the process exits non-zero when they differ.
+
+def _is_external(reference: str) -> bool:
+    return reference.startswith(_EXTERNAL_PREFIXES) or reference.startswith("#")
+
+
+def _resolve_reference(page: str, reference: str) -> str | None:
+    """The output path a page's reference points at, or None when external.
+
+    Directory references resolve to their ``index.html``, exactly as a static
+    host would serve them.
     """
-    out_dir = Path(out_dir)
+    target = reference.split("#", 1)[0].split("?", 1)[0].strip()
+    if not target or _is_external(target):
+        return None
+    if target.startswith("/"):
+        resolved = posixpath.normpath(target).lstrip("/")
+    else:
+        base = posixpath.dirname(page)
+        resolved = (
+            posixpath.normpath(posixpath.join(base, target)) if base else posixpath.normpath(target)
+        )
+    if target.endswith("/"):
+        resolved = posixpath.normpath(posixpath.join(resolved, "index.html"))
+    return resolved
+
+
+def _broken_references(files: dict[str, bytes]) -> list[tuple[str, str]]:
+    """Every ``(page, reference)`` whose local target is not in the output.
+
+    A page that links to a stylesheet the build never wrote, or to a sibling
+    page that does not exist, is broken even though it renders. Naming the page
+    and the reference is what makes the failure actionable.
+    """
+    available = set(files)
+    broken: list[tuple[str, str]] = []
+    for name, data in sorted(files.items()):
+        if not name.endswith(".html"):
+            continue
+        page = data.decode("utf-8")
+        for match in _LOCAL_REFERENCE.finditer(page):
+            reference = match.group(1) or match.group(2) or ""
+            target = _resolve_reference(name, reference)
+            if target is None or target.startswith(".."):
+                if target is not None:
+                    broken.append((name, reference))
+                continue
+            if target not in available:
+                broken.append((name, reference))
+    return broken
+
+
+def _reference_violations(files: dict[str, bytes]) -> list[str]:
+    """The failure lines for every reference that does not resolve."""
+    return [
+        f"{page} references {reference!r}, which is not in the build output"
+        for page, reference in _broken_references(files)
+    ]
+
+
+def _render_site() -> dict[str, bytes]:
+    """Every file a fresh build produces, keyed by its path from the site root."""
     env = environment()
     rendered = _render_pages(env)
 
@@ -538,6 +619,29 @@ def build(out_dir: Path, *, check: bool = False) -> int:
     for asset in sorted(ASSETS.rglob("*")):
         if asset.is_file():
             files[f"assets/{asset.relative_to(ASSETS).as_posix()}"] = asset.read_bytes()
+    return files
+
+
+def _fail_on_broken_references(files: dict[str, bytes]) -> None:
+    violations = _reference_violations(files)
+    if violations:
+        print("The built site has broken references:", file=sys.stderr)
+        for line in violations:
+            print(f"  {line}", file=sys.stderr)
+        raise SystemExit(1)
+
+
+def build(out_dir: Path, *, check: bool = False) -> int:
+    """Render the site into ``out_dir``.
+
+    With ``check=True`` nothing is written: ``out_dir`` is compared against a
+    fresh render and the process exits non-zero when they differ. Every build
+    also refuses to emit a page whose local ``href``/``src`` does not resolve
+    inside the output.
+    """
+    out_dir = Path(out_dir)
+    files = _render_site()
+    _fail_on_broken_references(files)
 
     if check:
         committed = _tree(out_dir)
@@ -560,23 +664,62 @@ def build(out_dir: Path, *, check: bool = False) -> int:
     return len(files)
 
 
+def check_committed(site: Path = SITE) -> int:
+    """Fail when a committed generated page differs from a fresh build.
+
+    Only the pages the repository actually tracks are compared: the rest of the
+    site is written at build time and never committed, so it has nothing to
+    drift from. Editing a source without regenerating its page fails here, and
+    the message names the page to rebuild.
+    """
+    site = Path(site)
+    files = _render_site()
+    _fail_on_broken_references(files)
+
+    stale: list[str] = []
+    for name in COMMITTED_OUTPUTS:
+        committed = site / name
+        if not committed.is_file() or committed.read_bytes() != files.get(name):
+            stale.append(name)
+    if stale:
+        print("A committed page is out of date. Regenerate it:", file=sys.stderr)
+        for name in stale:
+            print(f"  {name}", file=sys.stderr)
+        raise SystemExit(1)
+    return len(files)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", type=Path, default=OUT_DIR, help="where to write the site")
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="where to write the site (default: website/dist)",
+    )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="fail if out_dir differs from a fresh build; write nothing",
+        help=(
+            "write nothing: fail on a broken local reference and on a generated "
+            "page that drifted from its source. With --out, compare that "
+            "directory against a fresh build instead of the committed pages."
+        ),
     )
     args = parser.parse_args(argv)
 
     if args.check:
-        count = build(args.out, check=True)
-        print(f"The built site is up to date ({count} files).")
+        if args.out is not None:
+            count = build(args.out, check=True)
+            print(f"The built site is up to date ({count} files).")
+        else:
+            count = check_committed()
+            print(f"The committed pages are up to date ({count} files built).")
         return 0
 
-    count = build(args.out)
-    print(f"Built {count} files into {args.out}")
+    out = args.out if args.out is not None else OUT_DIR
+    count = build(out)
+    print(f"Built {count} files into {out}")
     return 0
 
 
