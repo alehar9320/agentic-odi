@@ -17,6 +17,10 @@ describe("toThreadData", () => {
     expect(toThreadData([])).toEqual([]);
   });
 
+  it("returns an empty list when the store has not loaded a list yet", () => {
+    expect(toThreadData(undefined)).toEqual([]);
+  });
+
   it("maps one conversation with title, status, and custom updatedAt", () => {
     const [row] = toThreadData([conversation({ id: "c-1" })]);
     expect(row).toEqual({

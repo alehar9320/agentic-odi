@@ -13,9 +13,12 @@ import type { ExternalStoreThreadData } from "@assistant-ui/react";
 const UNTITLED = "New conversation";
 
 export function toThreadData(
-  conversations: ConversationSummary[],
+  conversations: ConversationSummary[] | undefined,
 ): ExternalStoreThreadData<"regular">[] {
-  return [...conversations]
+  // A store that has not loaded a list yet has no threads, not an error: the
+  // runtime is mounted before the first fetch answers, and tests mount it with
+  // a partial store.
+  return [...(conversations ?? [])]
     .sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))
     .map((conversation) => ({
       id: conversation.id,
