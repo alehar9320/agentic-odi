@@ -1000,7 +1000,7 @@ def link_outcome(outcome_id: str, field: str, text: str) -> str:
     exist, never guessed or fuzzy-matched.
     """
     try:
-        outcome = service.link_outcome(outcome_id, field, text)
+        outcome = _service().link_outcome(outcome_id, field, text)
     except OutcomeNotFoundError as exc:
         return _fail(exc, f"Error: Outcome {outcome_id} not found.")
     except OdiValidationError as exc:
@@ -1016,7 +1016,7 @@ def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
     that is not there changes nothing.
     """
     try:
-        outcome = service.unlink_outcome(outcome_id, field, key)
+        outcome = _service().unlink_outcome(outcome_id, field, key)
     except OutcomeNotFoundError as exc:
         return _fail(exc, f"Error: Outcome {outcome_id} not found.")
     return json.dumps(outcome.model_dump(mode="json"))
@@ -1025,7 +1025,7 @@ def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
 @mcp.tool
 def get_outcome_alignments(outcome_id: str | None = None) -> str:
     """List the V2MOM links recorded on Outcomes, optionally for one outcome."""
-    return json.dumps(service.list_alignments(outcome_id))
+    return json.dumps(_service().list_alignments(outcome_id))
 
 
 @mcp.tool
@@ -1037,7 +1037,7 @@ def get_traceability_report() -> str:
     text is no longer in the vision. Read-only, and with no objectives defined
     it says so rather than returning three empty sections.
     """
-    return json.dumps(service.traceability_report().as_dict())
+    return json.dumps(_service().traceability_report().as_dict())
 
 
 DEFAULT_PORT = 8000

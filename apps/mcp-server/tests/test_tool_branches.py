@@ -288,7 +288,12 @@ async def test_open_study_reports_a_missing_job_as_an_envelope(
 def test_main_builds_the_store_before_serving(mcp, monkeypatch) -> None:
     """The entry point is where the store is built (ADR 0006), before validation."""
     calls: list[object] = []
-    monkeypatch.setattr(server, "create_server", lambda: (calls.append("create"), mcp)[1])
+
+    def _create_server() -> object:
+        calls.append("create")
+        return mcp
+
+    monkeypatch.setattr(server, "create_server", _create_server)
     monkeypatch.setattr(server, "validate_at_startup", lambda *_: calls.append("validate"))
     monkeypatch.setattr(server, "setup_graceful_shutdown", lambda: None)
     monkeypatch.setattr(server.uvicorn, "run", lambda app, **kwargs: calls.append("run"))
