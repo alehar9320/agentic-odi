@@ -48,10 +48,17 @@ _DIRECTIONS = ("minimize", "maximize")
 class OutcomeStatementError(ValidationError):
     """Raised when a statement fails the ODI format check."""
 
-    def __init__(self, verdict: dict[str, Any]) -> None:
+    #: The field the statement belongs to. A desired outcome is always a
+    #: statement, so callers default to ``"statement"`` and let a subclass
+    #: narrow it — e.g. a customer outcome's ``business_statement``.
+    field: str = "statement"
+
+    def __init__(self, verdict: dict[str, Any], field: str | None = None) -> None:
         self.verdict = verdict
         self.issues = verdict["issues"]
         self.suggestions = verdict["suggestions"]
+        if field is not None:
+            self.field = field
         super().__init__(
             "Outcome statement does not match the ODI format: " + " ".join(self.issues)
         )
@@ -169,11 +176,17 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
     }
 
 
-def require_outcome_statement(statement: str) -> dict[str, Any]:
-    """Validate a statement and raise :class:`OutcomeStatementError` if invalid."""
+def require_outcome_statement(statement: str, field: str = "statement") -> dict[str, Any]:
+    """Validate a statement and raise :class:`OutcomeStatementError` if invalid.
+
+    ``field`` names the input that holds the statement — a desired outcome's
+    statement, a customer outcome's ``business_statement``, and so on. It
+    travels onto the exception so a form can show the message next to the
+    field that needs it instead of on top of the whole form.
+    """
     verdict = evaluate_outcome_statement(statement)
     if not verdict["valid"]:
-        raise OutcomeStatementError(verdict)
+        raise OutcomeStatementError(verdict, field=field)
     return verdict
 
 
