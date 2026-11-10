@@ -3,6 +3,12 @@ import json
 import pytest
 from agentic_odi_mcp_server import mcp
 from fastmcp import Client
+from mcp_failures import failure, sentence
+
+
+def _claim_check() -> dict:
+    """A minimal, honest claim check: a question and the answer it produced."""
+    return {"asked": ["How often does this happen?"], "answers": ["Every week"]}
 
 
 async def _new_job(client) -> str:
@@ -21,6 +27,7 @@ async def test_step_and_outcome_get_update_delete():
                 "statement": "Minimize the time it takes to deploy when releasing",
                 "importance": 8,
                 "satisfaction": 4,
+                "claim_check": _claim_check(),
             },
         )
         step = await client.call_tool("add_step", {"job_id": job_id, "name": "S", "order": 1})
@@ -39,6 +46,7 @@ async def test_step_and_outcome_get_update_delete():
                 "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8,
                 "satisfaction": 4,
+                "claim_check": _claim_check(),
             },
         )
         outcome_id = json.loads(out.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
@@ -117,6 +125,7 @@ async def test_update_outcome_out_of_range_returns_error_string():
                 "statement": "Minimize the time to ship a release when the build is green",
                 "importance": 8,
                 "satisfaction": 4,
+                "claim_check": _claim_check(),
             },
         )
         outcome_id = json.loads(out.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
@@ -138,8 +147,8 @@ async def test_evaluate_outcome_reports_a_missing_job_as_an_error_string():
         )
 
     text = res.content[0].text  # type: ignore[index]
-    assert text == "Job not found: missing"
-    assert "{" not in text
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Job not found: missing"
 
 
 @pytest.mark.asyncio
@@ -170,7 +179,8 @@ async def test_promote_evidence_reports_a_missing_evidence_id():
         )
 
     text = res.content[0].text  # type: ignore[index]
-    assert text.startswith("Error:")
+    assert failure(text).code.value == "not_found"
+    assert sentence(text).startswith("Error:")
     assert "EV-MISSING" in text
     assert "list_evidence" in text
 
@@ -194,60 +204,5 @@ async def test_promote_evidence_rejects_an_unknown_target():
         )
 
     text = res.content[0].text  # type: ignore[index]
-    assert text == "Error: Unknown promotion target: slide"
-
-
-@pytest.mark.asyncio
-async def test_segment_lifecycle_over_mcp():
-    """The MCP surface exposes segments and strategy with the same guardrails."""
-    async with Client(mcp) as client:
-        job_id = await _new_job(client)
-        out = await client.call_tool(
-            "add_outcome",
-            {
-                "job_id": job_id,
-                "statement": "Minimize the time it takes to publish a plugin when a release is ready",
-                "importance": 9,
-                "satisfaction": 3,
-            },
-        )
-        outcome_id = json.loads(out.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
-
-        created = await client.call_tool(
-            "add_segment",
-            {
-                "job_id": job_id,
-                "name": "Release engineers",
-                "criterion": "They own the publish step.",
-                "outcome_ids": [outcome_id],
-            },
-        )
-        segment_id = json.loads(created.content[0].text.split(": ", 1)[1])["id"]  # type: ignore[index]
-
-        profile = await client.call_tool("get_segment_profile", {"segment_id": segment_id})
-        payload = json.loads(profile.content[0].text)  # type: ignore[index]
-        assert payload["total_members"] == 1
-
-        # An underserved member can carry a differentiated strategy.
-        chosen = await client.call_tool(
-            "choose_strategy",
-            {
-                "segment_id": segment_id,
-                "kind": "differentiated",
-                "rationale": "The gap is real.",
-                "expected_effect": "Shorter publish time.",
-            },
-        )
-        assert "Strategy recorded" in chosen.content[0].text  # type: ignore[index]
-
-        listed = await client.call_tool("list_strategies", {"segment_id": segment_id})
-        assert len(json.loads(listed.content[0].text)) == 1  # type: ignore[index]
-
-        deleted = await client.call_tool("delete_segment", {"segment_id": segment_id})
-        assert "Segment deleted" in deleted.content[0].text  # type: ignore[index]
-        assert (
-            json.loads(  # type: ignore[index]
-                (await client.call_tool("list_segments", {"job_id": job_id})).content[0].text
-            )
-            == []
-        )
+    assert failure(text).code.value == "validation"
+    assert sentence(text) == "Error: Unknown promotion target: slide"

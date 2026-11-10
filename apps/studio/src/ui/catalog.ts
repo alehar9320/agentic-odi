@@ -328,297 +328,118 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     ["title", "bet", "rationale"],
   ),
   entry(
-    "decision-memo",
+    "segment-card",
     "leaf",
-    "The one-page decision memo, ready to leave the app. Shows the same markdown `odi decide memo` renders and offers one download. The file is written from the payload alone, so it carries no live view; a missing measurement is `not measured`, never a zero. Render it once, then one sentence — never restate in prose what the card shows.",
+    "One outcome-based segment (Stage 5): the people, the job they are doing, and the verdict their scored outcomes support. Never a demographic grouping.",
     {
-      title: { type: "string" },
-      markdown: {
+      id: { type: "string" },
+      name: {
         type: "string",
-        description: "The memo body, exactly as the projection rendered it.",
+        description: 'Composed from the evidence: "<the people>, <the step they are stuck on>".',
       },
-      html: {
+      people: {
         type: "string",
-        description:
-          "The standalone printable document, when the server rendered one. The download uses this; the card still shows the markdown.",
+        description: "The group in their own words when those words are on record.",
       },
-      source: {
-        type: "string",
-        description: "What the export names as its origin, e.g. \"decision DEC-1\".",
-      },
-      generated_at: {
-        type: "string",
-        description: "Supplied export timestamp; the client never reads its own clock.",
-      },
-      schema_version: {
-        type: "integer",
-        minimum: 0,
-        description: "The store's schema version stamped on the export.",
-      },
-      filename: {
-        type: "string",
-        description: "Suggested download filename. Defaults to the decision id.",
-      },
-      drafted: {
+      peopleInferred: {
         type: "boolean",
-        description: "True when a labelled, model-written framing block is included.",
+        description: "True when `people` was derived from the outcomes rather than supplied.",
       },
-    },
-    ["markdown"],
-  ),
-  entry(
-    "outcome-compare",
-    "leaf",
-    "Two or three outcomes on the same axes, one row per metric and one column per outcome, so a choice is visible instead of argued. Use when comparing bets; never name a winner.",
-    {
-      title: { type: "string" },
-      columns: {
+      jobStatement: { type: "string", description: "The functional job this segment is doing." },
+      verdict: {
+        enum: ["underserved", "overserved", "appropriately_served", "unknown"],
+        description:
+          '"unknown" when any outcome is unscored — an unclassifiable segment is reported, not guessed.',
+      },
+      confidence: {
+        type: "number",
+        minimum: 0,
+        maximum: 1,
+        description: "How much evidence stands behind the verdict. Never shown apart from it.",
+      },
+      outcomeIds: {
         type: "array",
         minItems: 2,
-        maxItems: 3,
-        description: "One entry per outcome, in the order they should read. Ids are opaque labels.",
+        maxItems: 40,
         items: { type: "string" },
+        description: "The outcomes this segment rests on. Two is the floor: one is a hypothesis.",
       },
-      rows: {
+      members: {
         type: "array",
-        minItems: 1,
-        items: {
-          type: "object",
-          properties: {
-            metric: { type: "string", description: "The axis, e.g. \"score\" or \"sample_size\"." },
-            label: { type: "string", description: "The human-readable axis name." },
-            cells: {
-              type: "array",
-              items: {
-                type: "string",
-                description: "One cell per column. A missing measurement is the literal \"not measured\".",
-              },
-            },
-          },
-          required: ["label", "cells"],
-        },
-      },
-    },
-    ["columns", "rows"],
-  ),
-  entry(
-    "opportunity-brief",
-    "leaf",
-    "The factual review case for one job: the decision, the underserved outcomes with their score, band, sample and quote, and the sources. Render it once, then one sentence — never describe in prose what the card shows.",
-    {
-      title: { type: "string" },
-      job: { type: "string", description: "The job-to-be-done the case is for." },
-      decision: {
-        type: "string",
-        description: "The decision being considered. Omit it when none is recorded.",
-      },
-      outcomes: {
-        type: "array",
-        minItems: 0,
-        maxItems: 12,
-        items: {
-          type: "object",
-          properties: {
-            statement: { type: "string" },
-            score: { type: "number", minimum: 0, maximum: 20 },
-            band: { enum: ["underserved", "appropriate", "overserved", "unscored"] },
-            n: { type: "integer", minimum: 0, description: "Sample size, when measured." },
-            method: { type: "string", description: "How the score was measured." },
-            quote: { type: "string", description: "A verbatim customer signal, when captured." },
-            source: { type: "string", description: "Where the measurement came from." },
-          },
-          required: ["statement"],
-        },
-      },
-      evidence_count: { type: "integer", minimum: 0 },
-      generated_at: {
-        type: "string",
-        description: "Supplied generation timestamp; the client never reads its own clock.",
-      },
-    },
-    ["title", "job", "outcomes"],
-  ),
-  entry(
-    "roadmap",
-    "leaf",
-    "The outcome roadmap derived from recorded decisions: one row per chosen outcome, grouped by the quarter of its decision date. Shows the excluded count and why. Render it once, then one sentence — never restate in prose what the card shows.",
-    {
-      title: { type: "string" },
-      entries: {
-        type: "array",
-        minItems: 0,
         maxItems: 40,
+        description:
+          "The member outcomes, resolved for display. Optional and additive: the board builds it from the canvas so the card can show each member's statement and stored score. A member whose outcome is missing is dropped, never invented.",
         items: {
           type: "object",
           properties: {
-            period: { type: "string", description: "The quarter, e.g. \"2026-Q4\"." },
-            outcome_id: { type: "string" },
-            statement: { type: "string", description: "The outcome statement, not a feature name." },
-            decision_id: { type: "string", description: "The decision this row traces back to." },
-            baseline: {
-              type: "number",
-              description:
-                "The measurement at decision time. Omit it when nobody measured one; the card shows \"not measured\".",
-            },
-            target: {
-              type: "number",
-              description:
-                "The number we intend to reach. Omit it when nobody set one; the card shows \"not measured\".",
-            },
-          },
-          required: ["period", "statement", "decision_id"],
-        },
-      },
-      undecided_count: {
-        type: "integer",
-        minimum: 0,
-        description: "Outcomes with no decision, excluded from the roadmap.",
-      },
-      horizon_excluded_count: { type: "integer", minimum: 0 },
-      superseded_excluded_count: { type: "integer", minimum: 0 },
-      exclusion_note: {
-        type: "string",
-        description: "One line naming what was left out and why. Always present.",
-      },
-    },
-    ["entries", "exclusion_note"],
-  ),
-  entry(
-    "decision-review",
-    "leaf",
-    "A past decision re-examined against today's numbers: how long ago it was made and, per chosen outcome, what moved. Each outcome reads improved, degraded, no change, no evidence, or orphaned. Render it once, then one sentence — never restate in prose what the card shows.",
-    {
-      title: { type: "string" },
-      decided_at: { type: "string", description: "When the decision was recorded." },
-      days_elapsed: {
-        type: "integer",
-        minimum: 0,
-        description: "Days between the decision and the supplied today.",
-      },
-      stale: {
-        type: "boolean",
-        description: "True when the decision is older than a quarter. Never a reason to hide it.",
-      },
-      summary: {
-        type: "string",
-        description: "One line naming how many outcomes moved and how many could not be measured.",
-      },
-      outcomes: {
-        type: "array",
-        minItems: 0,
-        maxItems: 40,
-        items: {
-          type: "object",
-          properties: {
-            outcome_id: { type: "string" },
+            id: { type: "string", description: "The outcome's id, as stored." },
             statement: {
               type: "string",
-              description: "The outcome statement. Omit it when the outcome was deleted.",
+              description: "The outcome's statement. Falls back to the id when none is stored.",
             },
-            state: {
-              enum: ["improved", "degraded", "no change", "no_evidence", "orphaned"],
-              description:
-                "A missing measurement is \"no_evidence\"; a deleted outcome is \"orphaned\". Neither is a change.",
-            },
-            satisfaction_change: {
+            opportunityScore: {
               type: "number",
               description:
-                "The signed satisfaction delta. Omit it when either snapshot lacked the metric; the card shows \"not measured\".",
+                "The stored opportunity score, read as-is. Omit it when the outcome is unscored; never compute one here.",
             },
-            importance_change: { type: "number" },
-            opportunity_change: { type: "number" },
           },
-          required: ["outcome_id", "state"],
+          required: ["id"],
         },
+      },
+      missingMembers: {
+        type: "integer",
+        minimum: 0,
+        description:
+          "How many of `outcomeIds` resolved to no outcome on the canvas. Counted and reported, never rendered as an empty row.",
+      },
+      rationale: { type: "string", description: "Why this verdict, naming the outcomes behind it." },
+      unclustered: {
+        type: "array",
+        maxItems: 40,
+        items: { type: "string" },
+        description: "Outcome ids that joined no segment. Shown as their own group, never dropped.",
       },
     },
-    ["outcomes"],
+    ["id", "name", "people", "jobStatement", "verdict", "confidence", "rationale"],
   ),
   entry(
-    "bet",
+    "strategy-card",
     "leaf",
-    "A recorded expectation: the hypothesis, the outcome it targets, the baseline captured at creation, the target, and the date to look. Render it once, then one sentence — never restate in prose what the card shows.",
+    "The one innovation path the segments support (Stage 6), with every path it beat and why.",
     {
-      title: { type: "string" },
-      hypothesis: { type: "string", description: "What we expect to happen, in plain words." },
-      outcome_id: { type: "string", description: "The outcome the bet targets." },
-      baseline: {
-        type: "number",
-        description:
-          "The measurement captured when the bet was created. It is stored, never recomputed from the live score.",
+      id: { type: "string" },
+      kind: {
+        enum: ["differentiated", "disruptive", "new_market"],
+        description: "Improve for an underserved segment, undercut an overserved one, or serve a job nobody serves.",
       },
-      target: { type: "number", description: "The number we intend to reach." },
-      measure_by: { type: "string", description: "The date we will look at the number." },
-      status: {
-        enum: ["planned", "running", "measured", "abandoned"],
-        description: "Where the bet is in its life. measured and abandoned are terminal.",
-      },
-    },
-    ["hypothesis", "baseline", "target", "measure_by", "status"],
-  ),
-  entry(
-    "segment-profile",
-    "leaf",
-    "A segment's servability: how many members are measured, the underserved and overserved counts kept apart, and the top outcome on each side. A ratio of nothing renders as not measured, never zero. Render it once, then one sentence — never restate in prose what the card shows.",
-    {
-      title: { type: "string", description: "The segment's name." },
-      total_members: { type: "number", description: "How many outcomes the segment holds." },
-      measured_count: {
-        type: "number",
-        description: "Members with a measured score. The rest are unscored or missing.",
-      },
-      unscored_count: {
-        type: "number",
-        description: "Members whose scores exist but have no measured basis.",
-      },
-      missing_count: {
-        type: "number",
-        description: "Members whose outcome no longer exists. Named, never silently dropped.",
-      },
-      underserved_count: { type: "number" },
-      appropriate_count: { type: "number" },
-      overserved_count: { type: "number" },
-      measured_ratio: {
-        type: "number",
-        description:
-          "The measured share of the segment. Omitted or null when nothing is measured — never zero, because we did not look.",
-      },
-      top_underserved: {
-        type: "array",
-        description: "The strongest underserved outcomes, most severe first.",
-        items: {
-          type: "object",
-          properties: {
-            outcome_id: { type: "string" },
-            statement: { type: "string" },
-            score: { type: "number" },
-            band: { enum: ["underserved", "appropriate", "overserved", "unscored"] },
-          },
-        },
-      },
-      top_overserved: {
-        type: "array",
-        description: "The strongest overserved outcomes, most severe first.",
-        items: {
-          type: "object",
-          properties: {
-            outcome_id: { type: "string" },
-            statement: { type: "string" },
-            score: { type: "number" },
-            band: { enum: ["underserved", "appropriate", "overserved", "unscored"] },
-          },
-        },
-      },
-      strategy: {
+      segmentId: { type: "string", description: "The segment this bet is aimed at, when there is one." },
+      thesis: {
         type: "string",
-        description: "The recorded strategy for this segment, if one has been chosen.",
+        description: "Why this path, from the evidence — it names the outcomes, not a hunch.",
       },
-      gaps: {
+      bets: {
         type: "array",
-        description: "What is missing or unscored, stated in words rather than hidden.",
+        maxItems: 6,
+        items: { type: "string" },
+        description: "The concrete moves proposed.",
+      },
+      rejected: {
+        type: "array",
+        minItems: 2,
+        maxItems: 2,
+        description:
+          "One entry per path not chosen, with the reason. A strategy without these is a conclusion, not a recommendation.",
+        items: {
+          type: "object",
+          properties: {
+            kind: { enum: ["differentiated", "disruptive", "new_market"] },
+            why: { type: "string" },
+          },
+          required: ["kind", "why"],
+        },
       },
     },
-    ["total_members", "measured_count", "underserved_count", "overserved_count"],
+    ["kind", "thesis", "rejected"],
   ),
 ];
 

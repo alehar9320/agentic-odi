@@ -3,6 +3,10 @@
 This module deliberately does not import the ODI store. It produces transport
 records shaped for ``core.Evidence``; the CLI (or any caller) owns persistence,
 so connector plumbing never leaks into the ODI repository.
+
+The draft is a transport shape, not a second domain model: it is kept equal to
+``Evidence`` by ``packages/connectors/tests/test_evidence_equivalence.py``, which
+is the only place allowed to read both.
 """
 
 from __future__ import annotations
@@ -29,6 +33,9 @@ class EvidenceDraft(BaseModel):
     job_id: str | None = None
     step_id: str | None = None
     outcome_id: str | None = None
+    discriminator: str | None = Field(
+        None, description="Stable key of the source record (call id, page id, message ts)"
+    )
 
 
 def validate_evidence_draft(draft: EvidenceDraft | dict[str, Any]) -> EvidenceDraft:
@@ -87,4 +94,5 @@ def _draft_from_record(
         job_id=job_id,
         step_id=step_id,
         outcome_id=outcome_id,
+        discriminator=record.id,
     )

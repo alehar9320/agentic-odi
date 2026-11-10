@@ -1,9 +1,12 @@
+import type { RecordKind } from "./lib/records";
 import type { UiCatalogManifest, UiNode } from "./ui/protocol";
 
 export interface Job {
   id: string;
   name?: string;
   description?: string;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
 }
 
 export interface Step {
@@ -11,6 +14,26 @@ export interface Step {
   job_id?: string;
   name?: string;
   order?: number;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
+}
+
+/** A question put to the person that they did not answer, and why not. */
+export interface ClaimSkip {
+  question: string;
+  reason?: string;
+}
+
+/**
+ * The questions behind a score. `verified` arrives derived from the core model —
+ * a check is verified when at least one question was answered — so a card must
+ * read it rather than compare the lists itself.
+ */
+export interface ClaimCheck {
+  asked?: string[];
+  answers?: string[];
+  skips?: ClaimSkip[];
+  verified?: boolean;
 }
 
 export interface Outcome {
@@ -20,11 +43,11 @@ export interface Outcome {
   importance?: number | null;
   satisfaction?: number | null;
   opportunity_score?: number | null;
-  importance_n?: number | null;
-  satisfaction_n?: number | null;
-  score_method?: ScoreMethod;
+  claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
 }
 
 export interface Evidence {
@@ -41,147 +64,6 @@ export interface Evidence {
   outcome_id?: string | null;
 }
 
-export interface DecisionRejection {
-  outcome_id: string;
-  reason: string;
-}
-
-/** A recorded choice: what was chosen, what was rejected, and why. */
-export interface Decision {
-  id: string;
-  job_id: string;
-  chosen_outcome_ids: string[];
-  rejected: DecisionRejection[];
-  rationale: string;
-  decided_by: string;
-  decided_at: string;
-  confidence: "low" | "medium" | "high";
-  superseded_at?: string | null;
-  superseded_by?: string | null;
-}
-
-export type ScoreMethod = "estimate" | "survey" | "import";
-
-/** One accepted score state, captured on every score-mutating path (B6). */
-export interface ScoreSnapshot {
-  id: string;
-  outcome_id: string;
-  at: string;
-  importance: number | null;
-  satisfaction: number | null;
-  opportunity_score: number | null;
-  importance_n: number | null;
-  satisfaction_n: number | null;
-  score_method: ScoreMethod;
-  note?: string | null;
-}
-
-/** The signed change for an outcome. A missing metric is null, never 0. */
-export interface OutcomeDelta {
-  importance: number | null;
-  satisfaction: number | null;
-  opportunity: number | null;
-  direction: "improved" | "degraded" | "no_evidence";
-}
-
-export type OutcomeReviewState =
-  | "improved"
-  | "degraded"
-  | "no change"
-  | "no_evidence"
-  | "orphaned";
-
-export interface OutcomeReview {
-  outcome_id: string;
-  statement: string | null;
-  state: OutcomeReviewState;
-  satisfaction_change: number | null;
-  importance_change: number | null;
-  opportunity_change: number | null;
-}
-
-/** A past decision re-examined against today's numbers (C8). */
-export interface DecisionReview {
-  decision_id: string;
-  job_id: string;
-  decided_at: string;
-  days_elapsed: number;
-  stale: boolean;
-  summary: string;
-  outcomes: OutcomeReview[];
-}
-
-export type BetStatus = "planned" | "running" | "measured" | "abandoned";
-
-/** A recorded expectation, with its baseline captured at creation (E1). */
-export interface Bet {
-  id: string;
-  decision_id: string;
-  outcome_id: string;
-  hypothesis: string;
-  baseline: number;
-  target: number;
-  measure_by: string;
-  status: BetStatus;
-  measured_at?: string | null;
-}
-
-export type SegmentOrigin = "manual" | "candidate";
-export type StrategyKind = "differentiated" | "disruptive" | "new_market";
-export type OpportunityBand = "underserved" | "appropriate" | "overserved" | "unscored";
-
-/** A named group of outcomes that share a job step or a service level (D1–D3). */
-export interface Segment {
-  id: string;
-  job_id: string;
-  name: string;
-  criterion: string;
-  outcome_ids: string[];
-  notes?: string | null;
-  origin: SegmentOrigin;
-  created_at: string;
-}
-
-/** One member of a segment profile, carrying its own measured band. */
-export interface SegmentOutcome {
-  outcome_id: string;
-  statement: string;
-  score: number | null;
-  band: OpportunityBand;
-}
-
-/**
- * A segment's servability. ``measured_ratio`` is ``null`` when nothing is
- * measured — never ``0`` — so "we did not look" cannot read as "we looked and
- * found none". ``gaps`` names what is missing rather than hiding it.
- */
-export interface SegmentProfile {
-  segment_id: string;
-  segment_name: string;
-  total_members: number;
-  measured_count: number;
-  unscored_count: number;
-  missing_count: number;
-  underserved_count: number;
-  appropriate_count: number;
-  overserved_count: number;
-  top_underserved: SegmentOutcome[];
-  top_overserved: SegmentOutcome[];
-  measured_ratio: number | null;
-  gaps: string[];
-}
-
-/** A decision about how to serve a segment, with its rationale (D4). */
-export interface Strategy {
-  id: string;
-  segment_id: string;
-  kind: StrategyKind;
-  rationale: string;
-  expected_effect: string;
-  chosen_at: string;
-  superseded_by?: string | null;
-}
-
 export interface Thesis {
   id: string;
   outcome_id: string;
@@ -191,6 +73,72 @@ export interface Thesis {
   satisfaction: number | null;
   opportunity_score: number | null;
   rationale: string;
+  created_at: string;
+}
+
+export type SegmentVerdict = "underserved" | "overserved" | "appropriately_served";
+
+/**
+ * Stage 5's segment: a group of people and the job they are doing, scoped to a
+ * job and evidenced by outcomes. `verdict` is null when an outcome in the group
+ * has no score — the studio reports that as "not enough signal" rather than
+ * guessing. No demographic field exists here by design.
+ *
+ * `people_inferred` is the provenance of the group itself: true when `people`
+ * was derived from the outcomes rather than supplied, which the board words as
+ * a candidate segment. The `basis` field (#475) will name the derivation more
+ * precisely; it is deliberately not added here.
+ */
+export interface Segment {
+  id: string;
+  job_id?: string | null;
+  name: string;
+  people: string;
+  people_inferred?: boolean;
+  job_statement: string;
+  outcome_ids: string[];
+  verdict?: SegmentVerdict | null;
+  rationale: string;
+  confidence: number;
+  created_at: string;
+}
+
+/**
+ * A study is one named pass over a job. `wave` is the pass number, from 1:
+ * opening the same study again is a new wave, not a second copy. `closed_at` is
+ * set only once the study is closed, and `method_notes` is the researcher's own
+ * account of how the pass was run, when they have given it.
+ */
+export type StudyStatus = "planned" | "fielding" | "closed";
+
+export interface Study {
+  id: string;
+  job_id: string;
+  name: string;
+  wave: number;
+  status: StudyStatus;
+  opened_at: string;
+  closed_at?: string | null;
+  method_notes?: string | null;
+}
+
+export type StrategyKind = "differentiated" | "disruptive" | "new_market";
+export interface RejectedPath {
+  kind: StrategyKind;
+  why: string;
+}
+
+/**
+ * Stage 6's recommendation. `rejected` carries a path for every kind that was
+ * not chosen: a strategy without its rejections is a conclusion.
+ */
+export interface Strategy {
+  id: string;
+  kind: StrategyKind;
+  segment_id?: string | null;
+  thesis: string;
+  bets: string[];
+  rejected: RejectedPath[];
   created_at: string;
 }
 
@@ -249,6 +197,39 @@ export interface StudioError {
   suggestion?: string | null;
   retryable: boolean;
   request_id?: string | null;
+  //: Which outcome field the failure belongs to, so the form can render it
+  //: beside the statement or rating the person mistyped. Absent when the
+  //: failure cannot be attributed to a single field.
+  field?: "statement" | "importance" | "satisfaction" | null;
+}
+
+/** The one artifact a shared link carries. More kinds are additive. */
+export type SharedArtifactKind = "landscape" | "vision";
+
+/**
+ * The scoped payload a share token returns: exactly one artifact, its own
+ * evidence, and the expiry. It never carries the canvas, memory, conversations,
+ * connector settings, or the brief — the page renders only what is here.
+ */
+export interface SharedArtifactPayload {
+  kind: SharedArtifactKind;
+  expires_at: string;
+  generated_at: string;
+  source: "local" | "mcp" | "seed";
+  /** The job context a landscape names; absent for a vision. */
+  jobs?: Job[];
+  outcomes?: Outcome[];
+  evidence?: Evidence[];
+  /** The person's own words, when the artifact is a vision. */
+  vision?: string;
+}
+
+/** What a mint call returns: the raw token is shown once and never again. */
+export interface ShareLink {
+  id: string;
+  token: string;
+  url: string;
+  expires_at: string;
 }
 
 export type StudioTheme = "light" | "dark";
@@ -373,6 +354,12 @@ export interface ChatMessage {
   error?: StudioError;
   /** The question this turn answered, kept so a failed turn can be retried. */
   retryText?: string;
+  /**
+   * When the turn was written, ISO 8601. Optional because a thread saved before
+   * this field existed replays without it: the transcript then shows no clock
+   * rather than an invented one.
+   */
+  createdAt?: string;
 }
 
 /**
@@ -397,6 +384,12 @@ export interface StudioBrief {
   target_user: string;
   job_statement: string;
   core_problem: string;
+  /** The person's own part in the work, from the first-run introduction. */
+  role?: string;
+  /** The team around them, when they named one. */
+  team?: string;
+  /** What they already have to work from: calls, tickets, threads. */
+  evidence_at_hand?: string[];
   job_id?: string;
   v2mom?: V2Mom;
 }
@@ -406,8 +399,11 @@ export interface StudioBrief {
  * stage; a lens makes room for itself and never replaces the thread.
  */
 export type WorkspacePanelId =
+  | "records"
   | "landscape"
+  | "brief"
   | "jobmap"
+  | "segments"
   | "evidence"
   | "capture"
   | "memory"
@@ -425,7 +421,9 @@ export type SignalKind =
   | "opportunity_crossed"
   | "evidence_ingested"
   | "evidence_promoted"
-  | "job_map_completed";
+  | "job_map_completed"
+  | "segment_identified"
+  | "strategy_proposed";
 
 export type SignalSeverity = "info" | "notice" | "urgent";
 
@@ -435,7 +433,26 @@ export type SignalSubjectKind =
   | "outcome"
   | "evidence"
   | "connector"
-  | "agent_work";
+  | "agent_work"
+  | "segment"
+  | "strategy";
+
+/** A selected record on screen, whatever kind it is. */
+export interface FocusSubject {
+  kind: SignalSubjectKind;
+  id: string;
+}
+
+/**
+ * A record the sidecar can read back from its own store.
+ *
+ * The kinds are the ones `lib/records.ts` already enumerates: a pointer may
+ * only name a record the store is able to show.
+ */
+export type FocusPointer = {
+  kind: RecordKind;
+  id: string;
+};
 
 export interface Signal {
   id: string;
@@ -470,6 +487,8 @@ export interface ChatStreamRequest {
   approvals?: boolean;
   /** The id this client is streaming the reply under. */
   assistant_id?: string | null;
+  /** The record the person has selected, as a pointer and nothing more. */
+  focus?: FocusPointer | null;
 }
 
 /** One turn in a persisted conversation, as the branch tree exposes it. */
@@ -520,6 +539,11 @@ export interface Conversation {
   updated_at: string;
   /** The visible branch head turn, when the conversation has branches. */
   head_id?: string | null;
+}
+
+/** A conversation as the history list shows it: enough to name it and size it. */
+export interface ConversationSummary extends Conversation {
+  turn_count: number;
 }
 
 export interface ConversationTurn {

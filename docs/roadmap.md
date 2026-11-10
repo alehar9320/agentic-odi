@@ -7,35 +7,6 @@ it is merged; the link is the proof.
 
 ## Shipped
 
-- [x] **A drafted argument that cannot invent a number**: `odi brief export
-  --narrate` asks the model to draft the brief's argument, and every numeral in
-  a surviving sentence is checked to exist in the brief and to belong to an
-  outcome the sentence links; a failing sentence is dropped with its reason. The
-  drafted block is always labelled, `--no-narrate` is byte-identical to the
-  factual brief, and a missing provider still renders the facts.
-- [x] **The decision memo writes itself**: `odi decide memo` assembles the
-  one-page case from what is already recorded — the decision, why now, the
-  evidence with its citations, the options rejected and why, what the chosen
-  outcome is worth, how we will know it worked, and what we still do not know.
-  It reads no clock and invokes no model, so the same records render the same
-  bytes; a missing section is omitted with a one-line reason, never a zero. The
-  same projection backs `POST /api/decisions/memo` and the MCP `render_memo`
-  tool.
-- [x] **The memo leaves the app**: `odi decide memo --format html --out memo.html`
-  writes a standalone, printable document that inlines its own paper CSS, escapes
-  hostile text and carries the export time and the store's schema version.
-  `--narrate` adds one labelled framing paragraph through the brief's narrator
-  and its numeral guarantee; `--no-narrate` stays byte-identical to the factual
-  memo. The `decision-memo` card shows the same markdown with one keyboard
-  download action, and `POST /api/decisions/memo?format=html` returns the same
-  document the CLI writes.
-- [x] **The stakeholder message writes itself**: `odi decide message` cuts the
-  memo to a short, pasteable message within a channel's word budget (`slack` 120,
-  `email` 200) — what we found, what we are doing, what it is worth, the largest
-  unknown, and a link. The largest unknown and a supplied link are never dropped
-  for length; a budget that cannot fit them fails loudly. It reads and writes
-  nothing, and the same projection backs `GET /api/decisions/{id}/message` and the
-  MCP `render_stakeholder_message` tool.
 - [x] **One tool contract, exposed** — `ToolName` / `TOOL_SPECS` in `packages/core` are the single source of truth, and `get_capabilities` describes the surface from it ([PR #263](https://github.com/alehar9320/agentic-odi/pull/263)).
 - [x] **Generated capability manifest** — the CLI, MCP server, and Studio read the same capability manifest, and the CLI's local handlers are checked for parity ([PR #272](https://github.com/alehar9320/agentic-odi/pull/272)).
 - [x] **ODI write contract on every path** — every write path validates Job, Step, and Outcome rules instead of trusting the caller ([PR #270](https://github.com/alehar9320/agentic-odi/pull/270)).
@@ -55,8 +26,7 @@ it is merged; the link is the proof.
 - [x] **Tool spec validation on MCP startup** — the server refuses to serve a malformed registry ([PR #288](https://github.com/alehar9320/agentic-odi/pull/288)).
 - [x] **Keyboard navigation for the feed and job map** — phase cards, step rows, and both dialogs are operable without a mouse ([PR #297](https://github.com/alehar9320/agentic-odi/pull/297)).
 - [x] **`odi data export`** — back the ODI state up as JSON ([PR #293](https://github.com/alehar9320/agentic-odi/pull/293)).
-- [x] **Decide, then close the loop** — record a decision with its rejected options, derive and render the outcome roadmap, review a past decision against today's numbers, and track a bet from its captured baseline to measured ([PR #357](https://github.com/alehar9320/agentic-odi/pull/357)).
-- [x] **Segments and strategy** — define a segment by the outcomes it cares about, derive candidate groups deterministically, profile a segment's underserved and overserved halves, and record a strategy only when its evidence precondition holds ([PR #357](https://github.com/alehar9320/agentic-odi/pull/357)).
+- [x] **Conversational first-run introduction** — the agent speaks first in five short turns and returns an editable brief, replacing the setup form ([PR #362](https://github.com/alehar9320/agentic-odi/pull/362)).
 - [x] **`odi connectors list-presets`** — discover and copy a preset from the terminal ([PR #290](https://github.com/alehar9320/agentic-odi/pull/290)).
 
 ## In flight
@@ -65,7 +35,11 @@ Open pull requests that change a capability this milestone cares about. Each
 links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
-- [ ] **Resume the last job, step, or outcome after a reload** — the Studio keeps its place in browser storage ([PR #299](https://github.com/alehar9320/agentic-odi/pull/299)).
+- [ ] **A study, and the waves inside it** — a named pass over a job with a unique wave per `(job, name)`; outcomes scope to a study of their own job, and legacy rows keep belonging to no study (this change).
+- [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
+- [ ] **The database checks itself on boot and closes cleanly** — a bounded `PRAGMA quick_check` at open, a `store_corrupt` failure page that names the file and the last backup and never touches the damaged file, a WAL checkpoint on idle and on clean shutdown, and a SIGTERM stop that leaves no `-wal` behind ([#598](https://github.com/alehar9320/agentic-odi/issues/598), part of [#348](https://github.com/alehar9320/agentic-odi/issues/348)).
+- [ ] **Agents reuse before they write** — the cost-ordered ladder and its bounds in `docs/architecture/reuse.md`, the behaviour skill in `.agents/skills/reuse-first/`, the Studio vendor ledger that `docs/architecture/vendor.md` promised but never had, and an advisory `Reuses:` check in `scripts/pr_guards.py body-truth`. The eight duplicates the audit named stay open as ordinary refactoring, one pull request each ([PR #602](https://github.com/alehar9320/agentic-odi/pull/602)).
+- [ ] **The landing page points at the sample** — the site's primary call to action opens a committed, read-only sample workspace generated from a fixture, labelled a sample on every row and rendering with no network ([PR #469](https://github.com/alehar9320/agentic-odi/pull/469)).
 - [ ] **Rate-limit the ingest sink** — a token bucket sheds a high-volume batch instead of exhausting memory ([PR #298](https://github.com/alehar9320/agentic-odi/pull/298)).
 - [ ] **Job validation at the model level** — name and description constraints live in `packages/core` ([PR #296](https://github.com/alehar9320/agentic-odi/pull/296)).
 - [ ] **MCP connection limits** — timeout and pool settings so a hanging connection is bounded ([PR #294](https://github.com/alehar9320/agentic-odi/pull/294)).
@@ -75,6 +49,13 @@ counted as done.
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
+- [ ] **Outcome-based segments and the strategy they imply** — the scored outcomes group into segments, and the recorded path names the ones it beat ([PR #367](https://github.com/alehar9320/agentic-odi/pull/367)).
+- [ ] **A vendor tree that cannot rot into app code** — copied markup lives in `src/vendor`, with lint and a resolving test on its imports ([PR #417](https://github.com/alehar9320/agentic-odi/pull/417)).
+- [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
+- [ ] **Evidence becomes outcome proposals** — a stored record is mined into a scored, approvable desired outcome, and only a human approval writes it ([PR #438](https://github.com/alehar9320/agentic-odi/pull/438)).
+- [ ] **Evidence from a file at the terminal** — `evidence add --file` reads text (or stdin) on the Studio's attachment cap ([PR #415](https://github.com/alehar9320/agentic-odi/pull/415)).
+- [ ] **A traceability report: orphans, unfunded, drift** — an outcome names the V2MOM method or measure it advances, the link is refused if the target does not exist, and a read-only report names the orphans, the unfunded objectives, and the links the vision dropped (issue [#591](https://github.com/alehar9320/agentic-odi/issues/591)).
+- [ ] **Every conversation in one list, with its turn count** — `GET /api/conversations` returns each stored conversation newest-first with its turns, so the Studio can show a switcher ([PR #451](https://github.com/alehar9320/agentic-odi/pull/451)).
 
 ## Next
 

@@ -13,44 +13,36 @@ from pydantic import BaseModel
 
 from agentic_odi_core.models import (
     V2MOM,
-    Bet,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
-    Decision,
     Evidence,
     Job,
     Outcome,
+    OutcomeAlignment,
     ScheduledWork,
-    ScoreSnapshot,
     Segment,
     Step,
     Strategy,
+    Study,
     ValueMetric,
 )
-
-#: The version of the canonical entity schema. It is stamped on exported
-#: artifacts (M3-11.2/ALH-171) so a file says which shape it was read from. It
-#: is a code-owned constant, not a measurement: bump it when a persisted field's
-#: meaning changes.
-SCHEMA_VERSION = 1
 
 _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "Job": Job,
     "Step": Step,
     "Outcome": Outcome,
+    "OutcomeAlignment": OutcomeAlignment,
     "ValueMetric": ValueMetric,
     "CustomerValue": CustomerValue,
     "BusinessValue": BusinessValue,
     "CustomerOutcome": CustomerOutcome,
-    "Decision": Decision,
     "Evidence": Evidence,
-    "ScoreSnapshot": ScoreSnapshot,
-    "Bet": Bet,
-    "V2MOM": V2MOM,
-    "ScheduledWork": ScheduledWork,
     "Segment": Segment,
     "Strategy": Strategy,
+    "Study": Study,
+    "V2MOM": V2MOM,
+    "ScheduledWork": ScheduledWork,
 }
 
 

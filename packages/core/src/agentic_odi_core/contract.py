@@ -38,31 +38,6 @@ class ToolName(str, Enum):
     LIST_EVIDENCE = "list_evidence"
     DELETE_EVIDENCE = "delete_evidence"
     PROMOTE_EVIDENCE = "promote_evidence"
-    COMPARE_OUTCOMES = "compare_outcomes"
-    SET_OUTCOME_VALUE = "set_outcome_value"
-    GET_ROADMAP = "get_roadmap"
-    RECORD_DECISION = "record_decision"
-    GET_DECISION = "get_decision"
-    LIST_DECISIONS = "list_decisions"
-    REVIEW_DECISION = "review_decision"
-    RENDER_MEMO = "render_memo"
-    RENDER_STAKEHOLDER_MESSAGE = "render_stakeholder_message"
-    GET_OUTCOME_HISTORY = "get_outcome_history"
-    GET_OUTCOME_DELTA = "get_outcome_delta"
-    RECORD_BET = "record_bet"
-    GET_BET = "get_bet"
-    LIST_BETS = "list_bets"
-    ADVANCE_BET = "advance_bet"
-    ADD_SEGMENT = "add_segment"
-    GET_SEGMENT = "get_segment"
-    LIST_SEGMENTS = "list_segments"
-    DELETE_SEGMENT = "delete_segment"
-    SUGGEST_SEGMENTS = "suggest_segments"
-    ACCEPT_SEGMENT_CANDIDATE = "accept_segment_candidate"
-    GET_SEGMENT_PROFILE = "get_segment_profile"
-    CHOOSE_STRATEGY = "choose_strategy"
-    GET_STRATEGY = "get_strategy"
-    LIST_STRATEGIES = "list_strategies"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
     COMPUTE_OPPORTUNITY = "compute_opportunity"
@@ -78,6 +53,20 @@ class ToolName(str, Enum):
     LIST_SCHEDULED_WORK = "list_scheduled_work"
     CANCEL_SCHEDULED_WORK = "cancel_scheduled_work"
     TRIGGER_SCHEDULED_WORK = "trigger_scheduled_work"
+    SEGMENT_MARKET = "segment_market"
+    GET_SEGMENTS = "get_segments"
+    GET_STRATEGY = "get_strategy"
+    PROPOSE_STRATEGY = "propose_strategy"
+    PROPOSE_OUTCOME = "propose_outcome"
+    LIST_PROPOSALS = "list_proposals"
+    APPROVE_PROPOSAL = "approve_proposal"
+    REJECT_PROPOSAL = "reject_proposal"
+    LINK_OUTCOME = "link_outcome"
+    UNLINK_OUTCOME = "unlink_outcome"
+    GET_OUTCOME_ALIGNMENTS = "get_outcome_alignments"
+    GET_TRACEABILITY_REPORT = "get_traceability_report"
+    OPEN_STUDY = "open_study"
+    LIST_STUDIES = "list_studies"
 
 
 class ToolEffect(str, Enum):
@@ -104,11 +93,9 @@ class ToolSpec:
 def _derive_effect(name: str) -> ToolEffect:
     """Derive a tool's effect from its name.
 
-    get_*/list_*/render_* → READ, delete_* → DESTRUCTIVE, everything else → WRITE.
-    A renderer projects what is already recorded and writes nothing, so it is
-    read-only by the same rule that governs a getter.
+    get_*/list_* → READ, delete_* → DESTRUCTIVE, everything else → WRITE.
     """
-    if name.startswith(("get_", "list_", "render_")):
+    if name.startswith(("get_", "list_")):
         return ToolEffect.READ
     if name.startswith("delete_"):
         return ToolEffect.DESTRUCTIVE
@@ -207,7 +194,10 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.ADD_OUTCOME.value: ToolSpec(
         name="add_outcome",
-        summary="Add a desired Outcome to a Job.",
+        summary=(
+            "Add a desired Outcome to a Job; three questions and the person's answers "
+            "come before any score, and the score carries them as a claim_check."
+        ),
         effect=_derive_effect("add_outcome"),
         arguments=(
             "job_id",
@@ -215,11 +205,9 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "importance",
             "satisfaction",
             "step_id",
-            "importance_n",
-            "satisfaction_n",
-            "score_method",
+            "claim_check",
         ),
-        required=("job_id", "statement", "importance", "satisfaction"),
+        required=("job_id", "statement"),
         returns="The created Outcome.",
         stage="2",
     ),
@@ -245,18 +233,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="update_outcome",
         summary="Update an Outcome's statement or scores.",
         effect=_derive_effect("update_outcome"),
-        arguments=(
-            "outcome_id",
-            "statement",
-            "importance",
-            "satisfaction",
-            "step_id",
-            "importance_n",
-            "satisfaction_n",
-            "score_method",
-            "at",
-            "note",
-        ),
+        arguments=("outcome_id", "statement", "importance", "satisfaction", "step_id"),
         required=("outcome_id",),
         returns="The updated Outcome.",
         stage="2",
@@ -391,337 +368,11 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.EVALUATE_OUTCOME.value: ToolSpec(
         name="evaluate_outcome",
         summary="Evaluate an outcome statement against ODI format rules.",
-        effect=_derive_effect("evaluate_outcome"),
+        effect=ToolEffect.READ,
         arguments=("statement", "job_id"),
         required=("statement",),
         returns="A verdict with coded issues and suggestions.",
         stage="2",
-    ),
-    ToolName.COMPARE_OUTCOMES.value: ToolSpec(
-        name="compare_outcomes",
-        summary=(
-            "Align two or three outcomes on the same axes: one row per metric, "
-            "one column per outcome. Never names a winner."
-        ),
-        effect=_derive_effect("compare_outcomes"),
-        arguments=("outcome_ids",),
-        required=("outcome_ids",),
-        returns=(
-            "Aligned rows over the given column order. A metric nobody measured "
-            "renders 'not measured'; a real 0 stays 0."
-        ),
-        stage="6",
-    ),
-    ToolName.SET_OUTCOME_VALUE.value: ToolSpec(
-        name="set_outcome_value",
-        summary=(
-            "Record what an outcome is worth, with its unit and its basis. A "
-            "market or pilot estimate requires a source; a cleared estimate "
-            "clears its companions."
-        ),
-        effect=_derive_effect("set_outcome_value"),
-        arguments=("outcome_id", "estimate", "unit", "basis", "n", "source"),
-        required=("outcome_id", "estimate"),
-        returns=(
-            "The updated Outcome. An outcome with no estimate is 'unsized'; "
-            "value is never derived from the opportunity score."
-        ),
-        stage="6",
-    ),
-    ToolName.GET_ROADMAP.value: ToolSpec(
-        name="get_roadmap",
-        summary=(
-            "Derive a job's outcome roadmap from its recorded decisions: one "
-            "entry per chosen outcome, grouped by the quarter its decision was "
-            "made. Undecided outcomes are excluded and counted."
-        ),
-        effect=_derive_effect("get_roadmap"),
-        arguments=("job_id", "horizon", "today"),
-        required=("job_id",),
-        returns=(
-            "The roadmap entries in date order plus the excluded count and its "
-            "reason. A baseline nobody measured renders 'not measured'."
-        ),
-        stage="6",
-    ),
-    ToolName.RECORD_DECISION.value: ToolSpec(
-        name="record_decision",
-        summary="Record a decision: what was chosen, what was rejected, and why.",
-        effect=_derive_effect("record_decision"),
-        arguments=(
-            "job_id",
-            "chosen_outcome_ids",
-            "rationale",
-            "decided_by",
-            "decided_at",
-            "rejected",
-            "confidence",
-            "supersedes",
-        ),
-        required=(
-            "job_id",
-            "chosen_outcome_ids",
-            "rationale",
-            "decided_by",
-            "decided_at",
-        ),
-        returns="The recorded Decision, with a superseded predecessor kept readable.",
-        stage="6",
-    ),
-    ToolName.GET_DECISION.value: ToolSpec(
-        name="get_decision",
-        summary="Get a single recorded decision by ID.",
-        effect=_derive_effect("get_decision"),
-        arguments=("decision_id",),
-        required=("decision_id",),
-        returns="The Decision, or an error string if not found.",
-        stage="6",
-    ),
-    ToolName.LIST_DECISIONS.value: ToolSpec(
-        name="list_decisions",
-        summary="List a job's decision history, oldest first.",
-        effect=_derive_effect("list_decisions"),
-        arguments=("job_id", "limit", "offset"),
-        required=("job_id",),
-        returns="An ordered list of Decisions, including superseded ones.",
-        stage="6",
-    ),
-    ToolName.REVIEW_DECISION.value: ToolSpec(
-        name="review_decision",
-        summary=(
-            "Re-examine a past decision against today's numbers. Each chosen "
-            "outcome is improved, degraded, no change, no evidence, or orphaned."
-        ),
-        effect=_derive_effect("review_decision"),
-        arguments=("decision_id", "today"),
-        required=("decision_id", "today"),
-        returns=(
-            "The review: days elapsed and, per chosen outcome, its state. A "
-            "missing measurement is 'no evidence', never 'no change'."
-        ),
-        stage="6",
-    ),
-    ToolName.RENDER_MEMO.value: ToolSpec(
-        name="render_memo",
-        summary=(
-            "Assemble the decision memo from what is already recorded: the "
-            "decision, why now, the evidence with citations, the rejected "
-            "options, the value, the success criteria and bet, and the holes."
-        ),
-        effect=ToolEffect.READ,
-        arguments=("decision_id",),
-        required=("decision_id",),
-        returns=(
-            "The rendered memo markdown. A missing section is omitted with a "
-            "one-line reason; no number is invented and none is rendered as zero."
-        ),
-        stage="6",
-    ),
-    ToolName.RENDER_STAKEHOLDER_MESSAGE.value: ToolSpec(
-        name="render_stakeholder_message",
-        summary=(
-            "Cut a decision's memo to a short, pasteable stakeholder message "
-            "within a channel's word budget: what we found, what we are doing, "
-            "what it is worth, the largest unknown, and a link."
-        ),
-        effect=ToolEffect.READ,
-        arguments=("decision_id", "channel", "link"),
-        required=("decision_id",),
-        returns=(
-            "The message body and word count. The largest unknown is never "
-            "dropped; a budget that cannot fit it fails rather than omitting it."
-        ),
-        stage="6",
-    ),
-    ToolName.GET_OUTCOME_HISTORY.value: ToolSpec(
-        name="get_outcome_history",
-        summary="Every recorded score snapshot for an outcome, oldest first.",
-        effect=_derive_effect("get_outcome_history"),
-        arguments=("outcome_id",),
-        required=("outcome_id",),
-        returns="The snapshots in chronological order; empty when nothing is recorded.",
-        stage="6",
-    ),
-    ToolName.GET_OUTCOME_DELTA.value: ToolSpec(
-        name="get_outcome_delta",
-        summary=(
-            "The signed change for an outcome between the nearest snapshot at or "
-            "before 'since' (or the earliest) and the latest."
-        ),
-        effect=_derive_effect("get_outcome_delta"),
-        arguments=("outcome_id", "since"),
-        required=("outcome_id",),
-        returns=(
-            "Signed importance, satisfaction and opportunity deltas plus a "
-            "direction. A metric nobody measured is null, never 0."
-        ),
-        stage="6",
-    ),
-    ToolName.RECORD_BET.value: ToolSpec(
-        name="record_bet",
-        summary=(
-            "Record a bet: a hypothesis with a baseline captured at creation, a "
-            "target, and a date to look at the number."
-        ),
-        effect=_derive_effect("record_bet"),
-        arguments=(
-            "decision_id",
-            "outcome_id",
-            "hypothesis",
-            "target",
-            "measure_by",
-            "baseline",
-        ),
-        required=("decision_id", "outcome_id", "hypothesis", "target", "measure_by"),
-        returns="The created Bet, with its baseline stored rather than recomputed.",
-        stage="6",
-    ),
-    ToolName.GET_BET.value: ToolSpec(
-        name="get_bet",
-        summary="Get a single bet by ID.",
-        effect=_derive_effect("get_bet"),
-        arguments=("bet_id",),
-        required=("bet_id",),
-        returns="The Bet, or an error string if not found.",
-        stage="6",
-    ),
-    ToolName.LIST_BETS.value: ToolSpec(
-        name="list_bets",
-        summary="List bets, filtered by job or decision.",
-        effect=_derive_effect("list_bets"),
-        arguments=("job_id", "decision_id", "limit", "offset"),
-        required=(),
-        returns="The bets in creation order.",
-        stage="6",
-    ),
-    ToolName.ADVANCE_BET.value: ToolSpec(
-        name="advance_bet",
-        summary=(
-            "Move a bet to a new status. planned -> running -> measured, or "
-            "planned -> abandoned. An illegal transition is refused and names "
-            "the legal ones."
-        ),
-        effect=_derive_effect("advance_bet"),
-        arguments=("bet_id", "status", "at"),
-        required=("bet_id", "status"),
-        returns="The updated Bet.",
-        stage="6",
-    ),
-    ToolName.ADD_SEGMENT.value: ToolSpec(
-        name="add_segment",
-        summary=(
-            "Create a segment: a named group of a job's outcomes defined by the "
-            "outcomes it cares about. No demographic fields exist, by design."
-        ),
-        effect=_derive_effect("add_segment"),
-        arguments=("job_id", "name", "criterion", "outcome_ids", "notes", "origin"),
-        required=("job_id", "name", "criterion", "outcome_ids"),
-        returns=(
-            "The created Segment. A member that is missing or belongs to another "
-            "job is refused before any write."
-        ),
-        stage="6",
-    ),
-    ToolName.GET_SEGMENT.value: ToolSpec(
-        name="get_segment",
-        summary="Get a single segment by ID.",
-        effect=_derive_effect("get_segment"),
-        arguments=("segment_id",),
-        required=("segment_id",),
-        returns="The Segment, or an error string if not found.",
-        stage="6",
-    ),
-    ToolName.LIST_SEGMENTS.value: ToolSpec(
-        name="list_segments",
-        summary="List segments, optionally filtered by job.",
-        effect=_derive_effect("list_segments"),
-        arguments=("job_id", "limit", "offset"),
-        required=(),
-        returns="The segments in creation order.",
-        stage="6",
-    ),
-    ToolName.DELETE_SEGMENT.value: ToolSpec(
-        name="delete_segment",
-        summary=(
-            "Delete a segment. Outcomes are never touched — only the lens on them is removed."
-        ),
-        effect=_derive_effect("delete_segment"),
-        arguments=("segment_id",),
-        required=("segment_id",),
-        returns="Nothing on success; an error string if not found.",
-        stage="6",
-    ),
-    ToolName.SUGGEST_SEGMENTS.value: ToolSpec(
-        name="suggest_segments",
-        summary=(
-            "Propose segment candidates from the scores: deterministic groups over "
-            "band and importance decile. Persists nothing."
-        ),
-        effect=_derive_effect("suggest_segments"),
-        arguments=("job_id",),
-        required=("job_id",),
-        returns=(
-            "The candidates with their member outcomes and a stable fingerprint, "
-            "or a reason no group clears the bar. Writes nothing."
-        ),
-        stage="6",
-    ),
-    ToolName.ACCEPT_SEGMENT_CANDIDATE.value: ToolSpec(
-        name="accept_segment_candidate",
-        summary=(
-            "Accept a suggested candidate into a segment, matched by its stable "
-            "fingerprint. A stale fingerprint is refused; a repeat accept is "
-            "idempotent."
-        ),
-        effect=_derive_effect("accept_segment_candidate"),
-        arguments=("job_id", "fingerprint", "name", "criterion"),
-        required=("job_id", "fingerprint"),
-        returns="The created (or already-created) Segment.",
-        stage="6",
-    ),
-    ToolName.GET_SEGMENT_PROFILE.value: ToolSpec(
-        name="get_segment_profile",
-        summary=(
-            "Read a segment's servability: counts and the top underserved and "
-            "overserved outcomes, kept separate. A ratio of nothing is null, "
-            "never 0."
-        ),
-        effect=_derive_effect("get_segment_profile"),
-        arguments=("segment_id",),
-        required=("segment_id",),
-        returns="The segment profile, including any missing members as gaps.",
-        stage="6",
-    ),
-    ToolName.CHOOSE_STRATEGY.value: ToolSpec(
-        name="choose_strategy",
-        summary=(
-            "Record a strategy for a segment. Each kind has a guardrail that names "
-            "the missing condition; new-market is refused while alternatives "
-            "evidence is absent."
-        ),
-        effect=_derive_effect("choose_strategy"),
-        arguments=("segment_id", "kind", "rationale", "expected_effect", "chosen_at"),
-        required=("segment_id", "kind", "rationale", "expected_effect"),
-        returns="The recorded Strategy, or an error naming the unmet condition.",
-        stage="6",
-    ),
-    ToolName.GET_STRATEGY.value: ToolSpec(
-        name="get_strategy",
-        summary="Get a single strategy by ID.",
-        effect=_derive_effect("get_strategy"),
-        arguments=("strategy_id",),
-        required=("strategy_id",),
-        returns="The Strategy, or an error string if not found.",
-        stage="6",
-    ),
-    ToolName.LIST_STRATEGIES.value: ToolSpec(
-        name="list_strategies",
-        summary="List strategies, optionally filtered by segment.",
-        effect=_derive_effect("list_strategies"),
-        arguments=("segment_id", "limit", "offset"),
-        required=(),
-        returns="The strategies in creation order.",
-        stage="6",
     ),
     ToolName.GET_ODI_SCHEMA.value: ToolSpec(
         name="get_odi_schema",
@@ -733,7 +384,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.COMPUTE_OPPORTUNITY.value: ToolSpec(
         name="compute_opportunity",
         summary="Compute an ODI opportunity score from importance and satisfaction.",
-        effect=_derive_effect("compute_opportunity"),
+        effect=ToolEffect.READ,
         arguments=("importance", "satisfaction"),
         required=("importance", "satisfaction"),
         returns="The opportunity score as a float.",
@@ -829,6 +480,122 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("work_id",),
         returns="The dispatched scheduled work item.",
     ),
+    ToolName.SEGMENT_MARKET.value: ToolSpec(
+        name="segment_market",
+        summary="Cluster the scored outcomes into outcome-based segments.",
+        effect=_derive_effect("segment_market"),
+        arguments=("job_id", "people"),
+        returns="The segments the outcomes clustered into, with verdict and confidence.",
+        stage="5",
+    ),
+    ToolName.GET_SEGMENTS.value: ToolSpec(
+        name="get_segments",
+        summary="List the segments the market was divided into.",
+        effect=_derive_effect("get_segments"),
+        arguments=("job_id",),
+        returns="A list of Segments. Empty until segment_market has run.",
+        stage="5",
+    ),
+    ToolName.GET_STRATEGY.value: ToolSpec(
+        name="get_strategy",
+        summary="Get the most recently recorded innovation strategy.",
+        effect=_derive_effect("get_strategy"),
+        arguments=(),
+        returns="The Strategy with its rejected alternatives, or null if none was recorded.",
+        stage="6",
+    ),
+    ToolName.PROPOSE_STRATEGY.value: ToolSpec(
+        name="propose_strategy",
+        summary="Recommend the one innovation path the segments support.",
+        effect=_derive_effect("propose_strategy"),
+        arguments=("job_id",),
+        returns="The Strategy, including every path it beat and why.",
+        stage="6",
+    ),
+    ToolName.PROPOSE_OUTCOME.value: ToolSpec(
+        name="propose_outcome",
+        summary="Propose a desired outcome mined from an evidence record.",
+        effect=_derive_effect("propose_outcome"),
+        arguments=("evidence_id",),
+        required=("evidence_id",),
+        returns="An OutcomeProposal ready for human approval.",
+        stage="2",
+    ),
+    ToolName.LIST_PROPOSALS.value: ToolSpec(
+        name="list_proposals",
+        summary="List outcome proposals, optionally filtered by status.",
+        effect=_derive_effect("list_proposals"),
+        arguments=("status",),
+        returns="A list of OutcomeProposals.",
+        stage="2",
+    ),
+    ToolName.APPROVE_PROPOSAL.value: ToolSpec(
+        name="approve_proposal",
+        summary="Approve a proposal and write it as an Outcome.",
+        effect=_derive_effect("approve_proposal"),
+        arguments=("proposal_id", "statement", "importance", "satisfaction"),
+        required=("proposal_id",),
+        returns="The created Outcome.",
+        stage="2",
+    ),
+    ToolName.REJECT_PROPOSAL.value: ToolSpec(
+        name="reject_proposal",
+        summary="Reject a proposal; nothing is written to the ODI store.",
+        effect=_derive_effect("reject_proposal"),
+        arguments=("proposal_id",),
+        required=("proposal_id",),
+        returns="The rejected OutcomeProposal.",
+        stage="2",
+    ),
+    ToolName.LINK_OUTCOME.value: ToolSpec(
+        name="link_outcome",
+        summary="Link an Outcome to the V2MOM method or measure it advances.",
+        effect=_derive_effect("link_outcome"),
+        arguments=("outcome_id", "field", "text"),
+        required=("outcome_id", "field", "text"),
+        returns="The updated Outcome, or a refusal naming the objectives that do exist.",
+        stage="6",
+    ),
+    ToolName.UNLINK_OUTCOME.value: ToolSpec(
+        name="unlink_outcome",
+        summary="Remove one V2MOM link from an Outcome.",
+        effect=_derive_effect("unlink_outcome"),
+        arguments=("outcome_id", "field", "key"),
+        required=("outcome_id", "field", "key"),
+        returns="The updated Outcome.",
+        stage="6",
+    ),
+    ToolName.GET_OUTCOME_ALIGNMENTS.value: ToolSpec(
+        name="get_outcome_alignments",
+        summary="List the V2MOM links recorded on Outcomes.",
+        effect=_derive_effect("get_outcome_alignments"),
+        arguments=("outcome_id",),
+        returns="A list of links, each naming the outcome, field, key, and text.",
+        stage="6",
+    ),
+    ToolName.GET_TRACEABILITY_REPORT.value: ToolSpec(
+        name="get_traceability_report",
+        summary="Report orphans, unfunded objectives, and links the vision dropped.",
+        effect=_derive_effect("get_traceability_report"),
+        arguments=(),
+        returns="The orphans, unfunded, and drift lists, or a note that no objectives exist.",
+        stage="6",
+    ),
+    ToolName.OPEN_STUDY.value: ToolSpec(
+        name="open_study",
+        summary="Open a named study pass over a Job at a given wave number.",
+        effect=_derive_effect("open_study"),
+        arguments=("job_id", "name", "wave", "method_notes"),
+        required=("job_id", "name", "wave"),
+        returns="The created Study, opened as planned.",
+    ),
+    ToolName.LIST_STUDIES.value: ToolSpec(
+        name="list_studies",
+        summary="List the studies opened for a Job.",
+        effect=_derive_effect("list_studies"),
+        arguments=("job_id",),
+        returns="A list of Studies. Empty until a study has been opened.",
+    ),
 }
 
 TOOL_NAMES: tuple[str, ...] = tuple(TOOL_SPECS)
@@ -838,6 +605,7 @@ _STAGE_NAMES: dict[str | None, str] = {
     "2": "Stage 2: Capture Desired Outcomes",
     "3": "Stage 3: Build the Job Map",
     "4": "Stage 4: Calculate Opportunity Scores",
+    "5": "Stage 5: Segment by Underserved Outcomes",
     "6": "Stage 6: Formulate the Innovation Strategy",
     None: "Supporting Tools",
 }
@@ -848,7 +616,7 @@ _EFFECT_ORDER: tuple[ToolEffect, ...] = (
     ToolEffect.DESTRUCTIVE,
 )
 
-_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", "6", None)
+_STAGE_ORDER: tuple[str | None, ...] = ("1", "2", "3", "4", "5", "6", None)
 
 
 def capability_manifest() -> dict:

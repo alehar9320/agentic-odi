@@ -127,19 +127,62 @@ class Step(BaseModel):
     )
 
 
-ScoreMethod = Literal["estimate", "survey", "import"]
+#: The V2MOM lists an outcome may advance. The vision is a statement, values
+#: are principles, and obstacles are risks, so none of them is a target.
+ObjectiveField = Literal["method", "measure"]
 
-#: What a value estimate counts. The unit is not decoration: ``250000`` currency
-#: and ``250000`` hours are different claims, and a reader who cannot see the
-#: unit cannot tell which was made.
-ValueUnit = Literal["currency", "users", "accounts", "hours"]
 
-#: Where a value estimate came from. ``estimate`` is a judgement; ``market`` and
-#: ``pilot`` are the two bases that require a named source (W1/ALH-64), because a
-#: number attributed to a market or a pilot has to say which one.
-ValueBasis = Literal["estimate", "market", "pilot"]
+class OutcomeAlignment(BaseModel):
+    """A claim that an Outcome advances one V2MOM objective.
 
-MAX_VALUE_SOURCE = 200
+    ``field`` is ``method`` or ``measure``; ``key`` is the content key computed
+    from ``field`` and ``text`` when the link was made; ``text`` is the
+    canonical objective text then. Storing the key *and* the text means a
+    reworded objective shows up as drift carrying the text the outcome was
+    linked to, and the key is never re-derived under a later normalization rule.
+    """
+
+    field: ObjectiveField = Field(..., description="Which V2MOM list the objective lives in")
+    key: str = Field(..., description="Frozen content key for the objective text")
+    text: str = Field(..., description="The objective text as it read when the link was made")
+
+
+class ClaimSkip(BaseModel):
+    """One question that went unanswered, and why it was skipped.
+
+    A skip without a reason is not a skip, it is a missing answer, so
+    ``reason`` is required and must not be blank.
+    """
+
+    question: str = Field(..., description="The question that was not answered")
+    reason: str = Field(..., description="Why it was skipped; never blank")
+
+
+class ClaimCheck(BaseModel):
+    """The questions behind a score: what was asked, answered, or skipped.
+
+    Two numbers are not provenance. A score that carries a claim check says
+    which questions produced it — ``asked`` — and what came back: the
+    ``answers`` the person gave and the ``skips`` with a recorded reason.
+
+    ``verified`` is derived, never typed in: a check is verified when at least
+    one question was answered by the person. A check of only skips is
+    unverified, so an outcome built on an assumption says so instead of
+    borrowing the confidence of a number.
+    """
+
+    asked: list[str] = Field(default_factory=list, description="The questions put to the person")
+    answers: list[str] = Field(
+        default_factory=list, description="The answers the person gave, in order"
+    )
+    skips: list[ClaimSkip] = Field(
+        default_factory=list, description="Questions skipped, each with a reason"
+    )
+
+    @computed_field
+    @property
+    def verified(self) -> bool:
+        return bool(self.answers)
 
 
 class Outcome(BaseModel):
@@ -158,60 +201,20 @@ class Outcome(BaseModel):
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
     )
-    # Sample size and method (B1/ALH-24). ``None`` is honest: nobody recorded a
-    # count. An estimate may not claim a sample, so a count above one requires a
-    # non-estimate method — asserted below rather than defaulted to 1.
-    importance_n: int | None = Field(None, ge=1, description="People behind the importance score")
-    satisfaction_n: int | None = Field(
-        None, ge=1, description="People behind the satisfaction score"
+    trace: list[OutcomeAlignment] = Field(
+        default_factory=list,
+        description=(
+            "The V2MOM methods and measures this outcome advances. Empty means "
+            "the outcome is unlinked, which the traceability report calls an orphan."
+        ),
     )
-    score_method: ScoreMethod = Field(
-        "estimate", description="How the scores were obtained: estimate, survey, or import"
+    claim_check: ClaimCheck | None = Field(
+        None, description="The questions that produced the score, and what came back"
     )
-    # A recorded judgement with its basis (W1/ALH-64). ``None`` means nobody
-    # estimated a value — rendered as ``unsized``, never as a zero. The estimate
-    # never derives from the opportunity score and is never summed across
-    # outcomes: overlapping estimates would double-count and nobody would notice.
-    value_estimate: float | None = Field(
-        None, ge=0.0, description="A defensible value estimate, never derived from the score"
+    study_id: str | None = Field(
+        None,
+        description="The Study wave this outcome was measured in, or None for a row that predates studies",
     )
-    value_unit: ValueUnit | None = Field(
-        None, description="What the estimate counts: currency, users, accounts, or hours"
-    )
-    value_basis: ValueBasis = Field(
-        "estimate", description="Where the estimate came from: estimate, market, or pilot"
-    )
-    value_n: int | None = Field(None, ge=1, description="People behind the value estimate")
-    value_source: str | None = Field(
-        None, max_length=MAX_VALUE_SOURCE, description="Where a market/pilot estimate came from"
-    )
-
-    @model_validator(mode="after")
-    def _sample_requires_a_method(self) -> Outcome:
-        counts = [n for n in (self.importance_n, self.satisfaction_n) if n is not None]
-        if any(n > 1 for n in counts) and self.score_method == "estimate":
-            raise ValueError(
-                "A sample size above one requires a non-estimate score_method "
-                "(survey or import); an estimate cannot have asked anyone."
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _sourced_basis_requires_a_source(self) -> Outcome:
-        """A market or pilot estimate must name its source.
-
-        An estimate with no basis is the most common way an ODI readout gets
-        discredited in a room; a *sourced* basis with no source is worse, because
-        the number looks attributable when it is not.
-        """
-        if self.value_basis in ("market", "pilot"):
-            source = (self.value_source or "").strip()
-            if not source:
-                raise ValueError(
-                    f"A value_basis of {self.value_basis!r} requires a value_source "
-                    "naming where the estimate came from."
-                )
-        return self
 
 
 class ValueMetric(BaseModel):
@@ -282,6 +285,9 @@ class CustomerOutcome(BaseModel):
     step_id: str | None = Field(
         default=None, description="The ID of the specific Step, if applicable"
     )
+    quote_id: str | None = Field(
+        default=None, description="The Evidence record this outcome was promoted from"
+    )
     customer_value: CustomerValue
     business_value: BusinessValue
 
@@ -291,194 +297,106 @@ class CustomerOutcome(BaseModel):
         return self.customer_value.opportunity_score
 
 
-class DecisionConfidence(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-
-
-class Rejection(BaseModel):
-    """An option a decision considered and rejected, with its reason.
-
-    The reason is required and non-empty: a rejection without a reason cannot be
-    steelmanned later, and keeping the rejected options is the point.
-    """
-
-    outcome_id: str = Field(..., description="The rejected Outcome's ID")
-    reason: str = Field(..., min_length=1, description="Why this option was not chosen")
-
-
-class Decision(BaseModel):
-    """A recorded choice: what was chosen, what was rejected, and why.
-
-    A newer decision supersedes an older one rather than overwriting it, so the
-    argument that was lost stays readable. ``superseded_at``/``superseded_by``
-    are set on the predecessor when a successor is recorded.
-    """
-
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    job_id: str = Field(..., description="The Job this decision belongs to")
-    chosen_outcome_ids: list[str] = Field(
-        ..., min_length=1, description="Outcome IDs the decision chose"
-    )
-    rejected: list[Rejection] = Field(default_factory=list)
-    rationale: str = Field(..., min_length=1, description="Why this choice was made")
-    decided_by: str = Field(
-        ..., min_length=1, description="Who recorded the decision (attribution, not authentication)"
-    )
-    decided_at: str = Field(..., description="ISO-8601 timestamp, supplied at write time")
-    confidence: DecisionConfidence = Field(DecisionConfidence.MEDIUM)
-    superseded_at: str | None = Field(None, description="When a later decision replaced this one")
-    superseded_by: str | None = Field(
-        None, description="The ID of the decision that replaced this one"
-    )
-
-
-MAX_SNAPSHOT_NOTE = 500
-
-
-class ScoreSnapshot(BaseModel):
-    """An append-only record of an outcome's accepted score state (B6/ALH-29).
-
-    Written by one helper on every score-mutating path, so "did it move?" is a
-    subtraction rather than a memory test. The snapshot stores the score *and*
-    its sample/method companions: a history of bare numbers cannot answer
-    whether the evidence changed or the estimate did.
-    """
-
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    outcome_id: str = Field(..., description="The Outcome this snapshot records")
-    at: str = Field(..., description="ISO-8601 timestamp, supplied at write time")
-    importance: float | None = Field(None, description="Importance score at this moment")
-    satisfaction: float | None = Field(None, description="Satisfaction score at this moment")
-    opportunity_score: float | None = Field(None, description="Derived opportunity score")
-    importance_n: int | None = Field(None, description="Sample size behind importance")
-    satisfaction_n: int | None = Field(None, description="Sample size behind satisfaction")
-    score_method: ScoreMethod = Field("estimate", description="How the scores were obtained")
-    note: str | None = Field(
-        None,
-        max_length=MAX_SNAPSHOT_NOTE,
-        description="Optional reason for the change, at most 500 characters",
-    )
-
-
-class BetStatus(str, Enum):
-    """A bet's lifecycle. ``measured`` and ``abandoned`` are terminal."""
+class StudyStatus(str, Enum):
+    """Where a study is in its own life: opened, collecting, or closed."""
 
     PLANNED = "planned"
-    RUNNING = "running"
-    MEASURED = "measured"
-    ABANDONED = "abandoned"
+    FIELDING = "fielding"
+    CLOSED = "closed"
 
 
-#: Legal transitions. ``planned`` starts a bet; ``running`` is it underway;
-#: ``measured`` is it answered; ``abandoned`` is it dropped. A terminal state
-#: has no successors, so an illegal transition can name the legal ones.
-BET_TRANSITIONS: dict[BetStatus, tuple[BetStatus, ...]] = {
-    BetStatus.PLANNED: (BetStatus.RUNNING, BetStatus.ABANDONED),
-    BetStatus.RUNNING: (BetStatus.MEASURED,),
-    BetStatus.MEASURED: (),
-    BetStatus.ABANDONED: (),
-}
+class Study(BaseModel):
+    """One named pass over a Job, and the wave number of that pass.
 
-#: Terminal states, derived so they cannot drift from ``BET_TRANSITIONS``.
-TERMINAL_BET_STATUSES: frozenset[BetStatus] = frozenset(
-    status for status, successors in BET_TRANSITIONS.items() if not successors
-)
-
-
-class Bet(BaseModel):
-    """A recorded expectation: a hypothesis with a baseline that cannot drift.
-
-    ``baseline`` is captured at creation and stored, never recomputed, because
-    the whole point of a bet is that its starting point does not move with the
-    score. ``measure_by`` is a date, not a datetime: a bet is looked at on a day.
+    A study is a container, not a measurement: it names a slice of research so a
+    later wave can be compared with an earlier one. ``wave`` is unique per
+    ``(job_id, name)`` within the store — that guarantee needs to see the other
+    rows, so it lives in the service, while the model owns the invariants it can
+    check alone: a wave is a positive pass number, and ``closed_at`` appears if
+    and only if the study is closed.
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    decision_id: str = Field(..., description="The Decision this bet follows from")
-    outcome_id: str = Field(..., description="The Outcome this bet targets")
-    hypothesis: str = Field(..., min_length=1, description="What we expect to happen")
-    baseline: float = Field(..., description="The score captured at creation, never recomputed")
-    target: float = Field(..., description="The score we expect to reach")
-    measure_by: str = Field(..., description="ISO-8601 date we will look at the number")
-    status: BetStatus = Field(BetStatus.PLANNED)
-    measured_at: str | None = Field(None, description="ISO-8601 timestamp when measured")
-
-    def next_statuses(self) -> tuple[BetStatus, ...]:
-        """The legal successors of the current status, or ``()`` when terminal."""
-        return BET_TRANSITIONS[self.status]
-
-    def is_terminal(self) -> bool:
-        return self.status in TERMINAL_BET_STATUSES
-
-
-class SegmentOrigin(str, Enum):
-    """Where a segment came from: a person typed it, or a person accepted a candidate."""
-
-    MANUAL = "manual"
-    CANDIDATE = "candidate"
-
-
-class Segment(BaseModel):
-    """A named group defined by the outcomes it cares about (D1/ALH-40).
-
-    Never by demographics: outcome-based segmentation is the method's actual
-    claim, and a demographics column would make the feature wrong rather than
-    merely incomplete. ``outcome_ids`` is the stored membership, so a segment
-    means the same thing next quarter; ``criterion`` is free text saying *why*
-    the group is coherent. The members are the definition — not a filter
-    re-evaluated on read.
-
-    ``origin`` records whether a person typed the segment or accepted a derived
-    candidate (D2.2/ALH-161); a hand-made and an accepted segment differ only
-    here, so both stay ordinary segments.
-    """
-
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    job_id: str = Field(..., description="The Job this segment's members belong to")
-    name: str = Field(..., min_length=1, description="The segment's name")
-    criterion: str = Field(
-        ..., min_length=1, description="Why this group is coherent — free text, never a filter"
+    job_id: str = Field(..., description="The Job this study takes one pass over")
+    name: str = Field(..., description="Human label for the study, e.g. 'reconciliation sweep'")
+    wave: int = Field(..., ge=1, description="1-based pass number within (job_id, name)")
+    status: StudyStatus = Field(StudyStatus.PLANNED, description="Where the study is in its life")
+    opened_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    closed_at: datetime | None = Field(None, description="Set once, when the study closes")
+    method_notes: str | None = Field(
+        None, description="How this pass was run, so a later wave is comparable"
     )
-    outcome_ids: list[str] = Field(
-        ..., min_length=1, description="The member Outcome IDs that define the segment"
-    )
-    notes: str | None = Field(None, description="Optional free-text notes")
-    origin: SegmentOrigin = Field(
-        SegmentOrigin.MANUAL, description="manual, or candidate when accepted from a proposal"
-    )
-    candidate_fingerprint: str | None = Field(
-        None, description="The accepted candidate's stable fingerprint, when origin is candidate"
-    )
+
+    @model_validator(mode="after")
+    def _closure_matches_status(self) -> Study:
+        if self.status is StudyStatus.CLOSED and self.closed_at is None:
+            raise ValueError("A closed study must carry a closed_at")
+        if self.status is not StudyStatus.CLOSED and self.closed_at is not None:
+            raise ValueError("Only a closed study may carry a closed_at")
+        return self
+
+
+class SegmentVerdict(str, Enum):
+    """Stage 5's verdict on a group of people, computed from their outcomes."""
+
+    UNDERSERVED = "underserved"
+    OVERSERVED = "overserved"
+    APPROPRIATELY_SERVED = "appropriately_served"
 
 
 class StrategyKind(str, Enum):
-    """The three ODI strategy paths (D4/ALH-43). There is no fourth."""
+    """Stage 6's three strategic paths."""
 
     DIFFERENTIATED = "differentiated"
     DISRUPTIVE = "disruptive"
     NEW_MARKET = "new_market"
 
 
-class Strategy(BaseModel):
-    """A recorded strategy for a segment, with the reasoning and expected effect.
+class Segment(BaseModel):
+    """A group of people plus the functional job they are trying to do.
 
-    The kind is stored with the rationale so the choice is not a slogan: the
-    guardrail in ``services.choose_strategy`` refuses a kind whose data
-    precondition the segment's profile does not meet.
+    The unit of analysis is the outcome: ``outcome_ids`` is the evidence, and
+    ``verdict`` is derived from it, never typed in. ``verdict`` is ``None`` when
+    an outcome in the group has no score, because a segment cannot be classified
+    from partial evidence. No demographic attribute appears here by design.
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    segment_id: str = Field(..., description="The Segment this strategy is for")
-    kind: StrategyKind = Field(..., description="differentiated, disruptive, or new_market")
-    rationale: str = Field(
-        ..., min_length=1, description="Why this strategy, in the caller's words"
+    job_id: str | None = Field(None, description="The Job this segment is scoped to")
+    name: str = Field(..., description='Human label, e.g. "Platform engineers, secrets rotation"')
+    people: str = Field(..., description="The group, in the person's words when they are recorded")
+    people_inferred: bool = Field(
+        False,
+        description="True when `people` was derived from the outcomes, not supplied",
     )
-    chosen_at: str = Field(..., description="ISO-8601 timestamp, supplied at write time")
-    expected_effect: str = Field(
-        ..., min_length=1, description="What the caller expects this to change"
+    job_statement: str = Field(..., description="The functional job in their words")
+    outcome_ids: list[str] = Field(
+        default_factory=list, description="The evidence for this segment"
     )
+    verdict: SegmentVerdict | None = Field(
+        None, description="Derived from the outcomes; None means not enough signal"
+    )
+    rationale: str = Field(..., description="Why this verdict, naming the outcomes behind it")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="How much evidence supports this")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Strategy(BaseModel):
+    """One recommended innovation path, with the paths it beat recorded.
+
+    A strategy without its rejections is a conclusion, not a recommendation, so
+    ``rejected`` carries one entry for every kind that was not chosen.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kind: StrategyKind
+    segment_id: str | None = Field(None, description="The segment this bet is aimed at")
+    thesis: str = Field(..., description="One paragraph: why this path, from the evidence")
+    bets: list[str] = Field(default_factory=list, description="The proposed moves")
+    rejected: list[dict[str, Any]] = Field(
+        default_factory=list, description='[{"kind": "disruptive", "why": "..."}]'
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class SignalKind(str, Enum):
@@ -490,6 +408,8 @@ class SignalKind(str, Enum):
     EVIDENCE_PROMOTED = "evidence_promoted"
     JOB_ADDED = "job_added"
     JOB_MAP_COMPLETED = "job_map_completed"
+    SEGMENT_IDENTIFIED = "segment_identified"
+    STRATEGY_PROPOSED = "strategy_proposed"
 
 
 SignalSeverity = Literal["info", "notice", "urgent"]
@@ -503,7 +423,10 @@ class Signal(BaseModel):
     title: str = Field(..., max_length=120, description="One line, at most 120 characters")
     detail: str | None = None
     subject_kind: (
-        Literal["job", "step", "outcome", "evidence", "connector", "agent_work"] | None
+        Literal[
+            "job", "step", "outcome", "evidence", "connector", "agent_work", "segment", "strategy"
+        ]
+        | None
     ) = None
     subject_id: str | None = None
     severity: SignalSeverity = "info"
@@ -513,7 +436,8 @@ class Signal(BaseModel):
     #: True when the attention budget withheld this signal from the feed.
     suppressed: bool = False
     fingerprint: str = Field(
-        ..., description="sha256 of kind|subject_kind|subject_id|discriminator"
+        ...,
+        description="sha256 of kind|subject_kind|subject_id|discriminator, plus source event id",
     )
 
 

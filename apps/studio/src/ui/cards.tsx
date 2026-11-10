@@ -1,13 +1,16 @@
 import {
+  formatMemberMean,
   formatOpportunityScore,
   isUnderserved,
   opportunityScore,
+  segmentBasisLine,
+  summarizeMemberScores,
 } from "../lib/odi";
+import { useStudio } from "../state/StudioContext";
 import { readActions } from "./actions";
 import { ActionRow, MeterBar, ScorePill, type NodeProps } from "./primitives";
 import { num, str, type Tone } from "./props";
 import { Markdown } from "../components/chat/Markdown";
-import { downloadMarkdown } from "../lib/export";
 
 /* ------------------------------------------------------------------ */
 /* Shared readers                                                      */
@@ -25,6 +28,44 @@ function stringList(value: unknown): string[] {
 
 function recordList(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.map(record) : [];
+}
+
+/** One member outcome as the board resolved it: id, statement, stored score. */
+interface SegmentMember {
+  id: string;
+  statement: string;
+  opportunityScore: number | null;
+}
+
+/**
+ * Read the resolved member list defensively. The catalog guarantees the shape;
+ * this keeps a hand-built node from crashing the card. A missing score stays
+ * `null` — it is never coerced to a number here.
+ */
+function memberList(value: unknown): SegmentMember[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const members: SegmentMember[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const candidate = entry as Record<string, unknown>;
+    if (typeof candidate.id !== "string" || candidate.id === "") {
+      continue;
+    }
+    const score = candidate.opportunityScore;
+    members.push({
+      id: candidate.id,
+      statement:
+        typeof candidate.statement === "string" && candidate.statement !== ""
+          ? candidate.statement
+          : candidate.id,
+      opportunityScore: typeof score === "number" && Number.isFinite(score) ? score : null,
+    });
+  }
+  return members;
 }
 
 function scoreOf(source: Record<string, unknown>): number | null {
@@ -427,276 +468,141 @@ export function DecisionRecord({ node }: NodeProps) {
 }
 
 /* ------------------------------------------------------------------ */
-/* decision-memo                                                       */
+/* segment-card                                                        */
 /* ------------------------------------------------------------------ */
 
-export function DecisionMemo({ node }: NodeProps) {
-  const title = str(node.props, "title");
-  const markdown = str(node.props, "markdown");
-  const html = str(node.props, "html");
-  const source = str(node.props, "source");
-  const generatedAt = str(node.props, "generated_at");
-  const schemaVersion =
-    typeof node.props.schema_version === "number" ? node.props.schema_version : null;
-  const drafted = node.props.drafted === true;
-  const fallback = html ? "decision-memo.html" : "decision-memo.md";
-  const filename = str(node.props, "filename") || fallback;
-  const downloadBody = html || markdown;
+const VERDICT_LABEL: Record<string, string> = {
+  underserved: "Underserved",
+  overserved: "Overserved",
+  appropriately_served: "Appropriately served",
+  unknown: "Not enough signal",
+};
 
-  const meta: string[] = [];
-  if (source) {
-    meta.push(`Source: ${source}`);
-  }
-  if (generatedAt) {
-    meta.push(`Generated ${generatedAt}`);
-  }
-  if (schemaVersion != null) {
-    meta.push(`Schema v${schemaVersion}`);
+const VERDICT_TONE: Record<string, Tone> = {
+  underserved: "warning",
+  overserved: "info",
+  appropriately_served: "positive",
+  unknown: "neutral",
+};
+
+function formatConfidence(confidence: number): string {
+  return `${Math.round(confidence * 100)}%`;
+}
+
+export function SegmentCard({ node }: NodeProps) {
+  const id = str(node.props, "id", "Segment");
+  const name = str(node.props, "name", id);
+  const people = str(node.props, "people");
+  const jobStatement = str(node.props, "jobStatement");
+  const rationale = str(node.props, "rationale");
+  const verdict = str(node.props, "verdict", "unknown");
+  const confidence = num(node.props, "confidence", 0);
+  const outcomeIds = stringList(node.props.outcomeIds);
+  const unclustered = stringList(node.props.unclustered);
+  const inferred = node.props.peopleInferred === true;
+  const members = memberList(node.props.members);
+  const missingMembers = num(node.props, "missingMembers", 0);
+  const scoreSummary = summarizeMemberScores(members.map((member) => member.opportunityScore));
+  const { focusSubject, openPanel } = useStudio();
+
+  function openMember(outcomeId: string) {
+    // The same focus path the landscape's own table uses, then the lens that
+    // shows it. The board keeps its place: reopening the segments lens draws it
+    // from the store, unchanged.
+    focusSubject("outcome", outcomeId);
+    openPanel("landscape");
   }
 
   return (
-    <article className="ui-card ui-card--memo" aria-label={title || "Decision memo"}>
+    <article className="ui-card ui-card--segment" aria-label={`Segment: ${name}`}>
       <header className="ui-card__head">
-        <span className="ui-card__id">Decision memo</span>
-        {drafted ? <ScorePill tone="info">Includes drafted framing</ScorePill> : null}
-      </header>
-
-      {title ? <h4 className="ui-card__title">{title}</h4> : null}
-
-      {meta.length > 0 ? <p className="ui-memo__meta">{meta.join(" · ")}</p> : null}
-
-      {markdown ? (
-        <div className="ui-memo__body">
-          <Markdown source={markdown} />
-        </div>
-      ) : (
-        <p className="ui-memo__empty">Nothing to export yet — no memo was assembled.</p>
-      )}
-
-      <div className="ui-memo__actions">
-        <button
-          type="button"
-          className="ui-action ui-action--primary"
-          disabled={!downloadBody}
-          onClick={() =>
-            downloadMarkdown(
-              downloadBody,
-              filename,
-              html ? "text/html;charset=utf-8" : "text/markdown;charset=utf-8",
-            )
-          }
-        >
-          Download memo
-        </button>
-      </div>
-
-      <ActionRow actions={readActions(node.props)} />
-    </article>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* outcome-compare                                                     */
-/* ------------------------------------------------------------------ */
-
-function compareCell(value: unknown): { text: string; measured: boolean } {
-  const text = typeof value === "string" ? value : value == null ? "" : String(value);
-  return { text, measured: text !== "not measured" };
-}
-
-export function OutcomeCompare({ node }: NodeProps) {
-  const title = str(node.props, "title");
-  const columns = stringList(node.props.columns);
-  const rows = recordList(node.props.rows).map((row) => ({
-    label: str(row, "label"),
-    cells: (Array.isArray(row.cells) ? row.cells : []).map(compareCell),
-  }));
-
-  return (
-    <article className="ui-card ui-card--compare" aria-label={title || "Comparison"}>
-      {title ? <h4 className="ui-card__title">{title}</h4> : null}
-
-      {rows.length > 0 && columns.length > 0 ? (
-        <div className="ui-table-wrap">
-          <table className="ui-table ui-table--compare">
-            <thead>
-              <tr>
-                <th scope="col">Axis</th>
-                {columns.map((column, index) => (
-                  <th scope="col" key={`${column}-${index}`}>
-                    {column}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={`${row.label}-${index}`}>
-                  <th scope="row">{row.label}</th>
-                  {row.cells.map((cell, cellIndex) => (
-                    <td key={cellIndex} className={cell.measured ? undefined : "ui-table__missing"}>
-                      {cell.text || "—"}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="ui-brief__empty">Nothing to compare yet — pick two outcomes.</p>
-      )}
-
-      <ActionRow actions={readActions(node.props)} />
-    </article>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* opportunity-brief                                                   */
-/* ------------------------------------------------------------------ */
-
-const NOT_MEASURED = "not measured";
-
-/** A band label for a score, or `not measured` when none was supplied. */
-function briefBand(band: string, score: number | null): string {
-  if (score == null) {
-    return NOT_MEASURED;
-  }
-  const label = band || (isUnderserved(score) ? "underserved" : "overserved");
-  return `${label} · ${formatOpportunityScore(score)}`;
-}
-
-function BriefOutcomeRow({ item }: { item: Record<string, unknown> }) {
-  const statement = str(item, "statement");
-  const band = str(item, "band");
-  const score = typeof item.score === "number" && Number.isFinite(item.score) ? item.score : null;
-  const n = typeof item.n === "number" && Number.isFinite(item.n) ? item.n : null;
-  const method = str(item, "method");
-  const quote = str(item, "quote");
-  const source = str(item, "source");
-
-  return (
-    <li className="ui-brief__outcome">
-      <p className="ui-brief__statement">{statement}</p>
-      <div className="ui-brief__meta">
-        <ScorePill tone={score == null ? "neutral" : isUnderserved(score) ? "warning" : "positive"}>
-          {briefBand(band, score)}
+        <span className="ui-card__id">{id}</span>
+        <span className="ui-caption">Segment</span>
+        {/* A verdict is never shown apart from the confidence behind it. */}
+        <ScorePill tone={VERDICT_TONE[verdict] ?? "neutral"}>
+          {`${VERDICT_LABEL[verdict] ?? verdict} · ${formatConfidence(confidence)} confidence`}
         </ScorePill>
-        <span className="ui-brief__sample">Sample: {n == null ? NOT_MEASURED : n}</span>
-        {method ? <span className="ui-brief__method">Method: {method}</span> : null}
-      </div>
-      {quote ? <blockquote className="ui-brief__quote">“{quote}”</blockquote> : null}
-      {source ? <p className="ui-brief__source">Source: {source}</p> : null}
-    </li>
-  );
-}
-
-export function OpportunityBrief({ node }: NodeProps) {
-  const title = str(node.props, "title");
-  const job = str(node.props, "job");
-  const decision = str(node.props, "decision");
-  const generatedAt = str(node.props, "generated_at");
-  const evidenceCount =
-    typeof node.props.evidence_count === "number" ? node.props.evidence_count : null;
-  const outcomes = recordList(node.props.outcomes);
-
-  return (
-    <article className="ui-card ui-card--brief" aria-label={title || "Opportunity brief"}>
-      <header className="ui-card__head">
-        <span className="ui-card__id">The case</span>
-        {evidenceCount != null ? (
-          <span className="ui-brief__evidence">{evidenceCount} evidence records</span>
-        ) : null}
       </header>
 
-      <h4 className="ui-card__title">{title}</h4>
-      <p className="ui-brief__job">{job}</p>
+      <h4 className="ui-card__title">{name}</h4>
 
-      {decision ? (
-        <div className="ui-brief__decision">
-          <span className="ui-brief__decision-label">The decision we are considering</span>
-          <p>{decision}</p>
+      <dl className="ui-fields">
+        <div className="ui-field">
+          <dt>Who</dt>
+          <dd>
+            {people}
+            {inferred ? <span className="ui-caption"> — inferred from the outcomes</span> : null}
+          </dd>
+        </div>
+        {jobStatement ? (
+          <div className="ui-field">
+            <dt>Job</dt>
+            <dd>{jobStatement}</dd>
+          </div>
+        ) : null}
+        <div className="ui-field">
+          <dt>Evidence</dt>
+          <dd>{`${outcomeIds.length} outcomes: ${outcomeIds.join(", ") || "none"}`}</dd>
+        </div>
+        {rationale ? (
+          <div className="ui-field">
+            <dt>Why this verdict</dt>
+            <dd>
+              <Markdown source={rationale} />
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+
+      {members.length > 0 ? (
+        <div className="ui-members">
+          <p className="ui-members__label">Member outcomes</p>
+          <ul className="ui-members__list">
+            {members.map((member) => (
+              <li key={member.id}>
+                <button
+                  type="button"
+                  className="ui-member"
+                  onClick={() => openMember(member.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      // Handle the activation ourselves and stop the native
+                      // click, so Enter fires exactly one focus, not two.
+                      event.preventDefault();
+                      openMember(member.id);
+                    }
+                  }}
+                  aria-label={`Open ${member.id}: ${member.statement}`}
+                >
+                  <span className="ui-member__id">{member.id}</span>
+                  <span className="ui-member__statement">{member.statement}</span>
+                  <span
+                    className={`ui-member__score${
+                      isUnderserved(member.opportunityScore) ? " ui-member__score--underserved" : ""
+                    }`}
+                  >
+                    {formatOpportunityScore(member.opportunityScore)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="ui-members__mean">{formatMemberMean(scoreSummary)}</p>
+          {missingMembers > 0 ? (
+            <p className="ui-caption">
+              {`${missingMembers} member outcome(s) are not on the canvas and are not shown.`}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
-      {outcomes.length > 0 ? (
-        <ul className="ui-brief__outcomes">
-          {outcomes.map((item, index) => (
-            <BriefOutcomeRow key={`${str(item, "statement")}-${index}`} item={item} />
-          ))}
-        </ul>
-      ) : (
-        <p className="ui-brief__empty">No scored outcomes yet — nothing to show here.</p>
-      )}
+      {/* The group's provenance is never left implicit: an inferred group is a
+          candidate, not a researched market. */}
+      <p className="ui-basis">{segmentBasisLine(inferred)}</p>
 
-      {generatedAt ? <p className="ui-brief__generated">Generated {generatedAt}</p> : null}
-
-      <ActionRow actions={readActions(node.props)} />
-    </article>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* roadmap                                                             */
-/* ------------------------------------------------------------------ */
-
-function RoadmapMeasurement({ label, value }: { label: string; value: unknown }) {
-  const measured = typeof value === "number" && Number.isFinite(value);
-  return (
-    <span className="ui-roadmap__measure">
-      {label}: {measured ? formatOpportunityScore(value) : NOT_MEASURED}
-    </span>
-  );
-}
-
-export function Roadmap({ node }: NodeProps) {
-  const title = str(node.props, "title");
-  const entries = recordList(node.props.entries);
-  const exclusionNote = str(node.props, "exclusion_note");
-  const undecidedCount =
-    typeof node.props.undecided_count === "number" ? node.props.undecided_count : null;
-
-  const rows = entries.map((entry, index) => {
-    const period = str(entry, "period");
-    return {
-      entry,
-      index,
-      period,
-      showPeriod: period !== (index > 0 ? str(entries[index - 1], "period") : null),
-    };
-  });
-
-  return (
-    <article className="ui-card ui-card--roadmap" aria-label={title || "Outcome roadmap"}>
-      {title ? <h4 className="ui-card__title">{title}</h4> : null}
-
-      {entries.length > 0 ? (
-        <ol className="ui-roadmap" aria-label="Roadmap entries">
-          {rows.map(({ entry, index, period, showPeriod }) => {
-            const statement = str(entry, "statement");
-            const decisionId = str(entry, "decision_id");
-            return (
-              <li className="ui-roadmap__entry" key={`${decisionId}-${statement}-${index}`}>
-                {showPeriod ? <span className="ui-roadmap__period">{period}</span> : null}
-                <p className="ui-roadmap__statement">{statement}</p>
-                <div className="ui-roadmap__meta">
-                  <RoadmapMeasurement label="Baseline" value={entry.baseline} />
-                  <RoadmapMeasurement label="Target" value={entry.target} />
-                  <span className="ui-roadmap__decision">Decision: {decisionId}</span>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      ) : (
-        <p className="ui-brief__empty">No decisions yet.</p>
-      )}
-
-      {exclusionNote ? (
-        <p className="ui-roadmap__exclusions">
-          {undecidedCount != null ? `${undecidedCount} undecided · ` : ""}
-          {exclusionNote}
+      {unclustered.length > 0 ? (
+        <p className="ui-caption">
+          {`Unclustered — too few outcomes to be a market: ${unclustered.join(", ")}`}
         </p>
       ) : null}
 
@@ -706,218 +612,68 @@ export function Roadmap({ node }: NodeProps) {
 }
 
 /* ------------------------------------------------------------------ */
-/* decision-review                                                     */
+/* strategy-card                                                       */
 /* ------------------------------------------------------------------ */
 
-const REVIEW_TONE: Record<string, Tone> = {
-  improved: "positive",
-  degraded: "warning",
-  "no change": "neutral",
-  no_evidence: "neutral",
-  orphaned: "critical",
+const KIND_LABEL: Record<string, string> = {
+  differentiated: "Differentiated",
+  disruptive: "Disruptive",
+  new_market: "New-Market",
 };
 
-/** A signed change with its sign, or `not measured` when a snapshot lacked it. */
-function reviewChange(value: unknown): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return NOT_MEASURED;
-  }
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${formatOpportunityScore(value)}`;
-}
-
-function ReviewOutcomeRow({ item }: { item: Record<string, unknown> }) {
-  const statement = str(item, "statement");
-  const state = str(item, "state");
-  return (
-    <li className="ui-review__outcome">
-      <div className="ui-review__head">
-        <p className="ui-review__statement">{statement || str(item, "outcome_id")}</p>
-        <ScorePill tone={REVIEW_TONE[state] ?? "neutral"}>{state || "no_evidence"}</ScorePill>
-      </div>
-      <div className="ui-review__meta">
-        <span>Satisfaction: {reviewChange(item.satisfaction_change)}</span>
-        <span>Importance: {reviewChange(item.importance_change)}</span>
-        <span>Opportunity: {reviewChange(item.opportunity_change)}</span>
-      </div>
-    </li>
-  );
-}
-
-export function DecisionReview({ node }: NodeProps) {
-  const title = str(node.props, "title");
-  const summary = str(node.props, "summary");
-  const decidedAt = str(node.props, "decided_at");
-  const daysElapsed =
-    typeof node.props.days_elapsed === "number" ? node.props.days_elapsed : null;
-  const outcomes = recordList(node.props.outcomes);
-
-  return (
-    <article className="ui-card ui-card--review" aria-label={title || "Decision review"}>
-      <header className="ui-card__head">
-        <span className="ui-card__id">Decision review</span>
-        {daysElapsed != null ? (
-          <span className="ui-review__elapsed">{daysElapsed} days ago</span>
-        ) : null}
-      </header>
-
-      {title ? <h4 className="ui-card__title">{title}</h4> : null}
-      {decidedAt ? <p className="ui-review__decided">Decided {decidedAt}</p> : null}
-      {summary ? <p className="ui-review__summary">{summary}</p> : null}
-
-      {outcomes.length > 0 ? (
-        <ul className="ui-review__outcomes">
-          {outcomes.map((item, index) => (
-            <ReviewOutcomeRow key={`${str(item, "outcome_id")}-${index}`} item={item} />
-          ))}
-        </ul>
-      ) : (
-        <p className="ui-brief__empty">This decision chose no outcomes yet.</p>
-      )}
-
-      <ActionRow actions={readActions(node.props)} />
-    </article>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* bet                                                                 */
-/* ------------------------------------------------------------------ */
-
-const BET_TONE: Record<string, Tone> = {
-  planned: "neutral",
-  running: "info",
-  measured: "positive",
-  abandoned: "critical",
+const KIND_TONE: Record<string, Tone> = {
+  differentiated: "warning",
+  disruptive: "info",
+  new_market: "positive",
 };
 
-/** A measurement with no sign, or `not measured` when none was supplied. */
-function measurement(value: unknown): string {
-  return typeof value === "number" && Number.isFinite(value)
-    ? formatOpportunityScore(value)
-    : NOT_MEASURED;
-}
-
-export function Bet({ node }: NodeProps) {
-  const title = str(node.props, "title");
-  const hypothesis = str(node.props, "hypothesis");
-  const outcomeId = str(node.props, "outcome_id");
-  const measureBy = str(node.props, "measure_by");
-  const status = str(node.props, "status");
+export function StrategyCard({ node }: NodeProps) {
+  const kind = str(node.props, "kind");
+  const thesis = str(node.props, "thesis");
+  const segmentId = str(node.props, "segmentId");
+  const bets = stringList(node.props.bets);
+  const rejected = recordList(node.props.rejected);
 
   return (
-    <article className="ui-card ui-card--bet" aria-label={title || "Bet"}>
+    <article className="ui-card ui-card--strategy" aria-label={`${KIND_LABEL[kind] ?? kind} strategy`}>
       <header className="ui-card__head">
-        <span className="ui-card__id">Bet</span>
-        {status ? <ScorePill tone={BET_TONE[status] ?? "neutral"}>{status}</ScorePill> : null}
+        <span className="ui-card__id">Innovation strategy</span>
+        <ScorePill tone={KIND_TONE[kind] ?? "neutral"}>{KIND_LABEL[kind] ?? kind}</ScorePill>
+        {segmentId ? <span className="ui-caption">for {segmentId}</span> : null}
       </header>
 
-      {title ? <h4 className="ui-card__title">{title}</h4> : null}
-      <p className="ui-bet__hypothesis">{hypothesis}</p>
+      <p className="ui-card__statement">
+        <Markdown source={thesis} />
+      </p>
 
-      <dl className="ui-fields">
-        <div className="ui-field">
-          <dt>Baseline</dt>
-          <dd>{measurement(node.props.baseline)}</dd>
-        </div>
-        <div className="ui-field">
-          <dt>Target</dt>
-          <dd>{measurement(node.props.target)}</dd>
-        </div>
-        <div className="ui-field">
-          <dt>Measure by</dt>
-          <dd>{measureBy || NOT_MEASURED}</dd>
-        </div>
-        {outcomeId ? (
-          <div className="ui-field">
-            <dt>Serves</dt>
-            <dd>{outcomeId}</dd>
-          </div>
-        ) : null}
-      </dl>
-
-      <ActionRow actions={readActions(node.props)} />
-    </article>
-  );
-}
-
-const BAND_TONE: Record<string, Tone> = {
-  underserved: "warning",
-  appropriate: "positive",
-  overserved: "critical",
-  unscored: "neutral",
-};
-
-export function SegmentProfile({ node }: NodeProps) {
-  const title = str(node.props, "title");
-  const strategy = str(node.props, "strategy");
-  const gaps = stringList(node.props.gaps);
-  const total = num(node.props, "total_members", 0);
-  const measured = num(node.props, "measured_count", 0);
-  const ratio = typeof node.props.measured_ratio === "number" ? node.props.measured_ratio : null;
-
-  return (
-    <article className="ui-card ui-card--segment-profile" aria-label={title || "Segment profile"}>
-      <header className="ui-card__head">
-        <span className="ui-card__id">Segment</span>
-        {title ? <h4 className="ui-card__title">{title}</h4> : null}
-      </header>
-
-      <dl className="ui-fields">
-        <div className="ui-field">
-          <dt>Members</dt>
-          <dd>{total}</dd>
-        </div>
-        <div className="ui-field">
-          <dt>Measured</dt>
-          <dd>
-            {measured}
-            {ratio == null ? ` · ${NOT_MEASURED}` : ` · ${Math.round(ratio * 100)}%`}
-          </dd>
-        </div>
-        <div className="ui-field">
-          <dt>Underserved</dt>
-          <dd>{num(node.props, "underserved_count", 0)}</dd>
-        </div>
-        <div className="ui-field">
-          <dt>Overserved</dt>
-          <dd>{num(node.props, "overserved_count", 0)}</dd>
-        </div>
-      </dl>
-
-      {(["top_underserved", "top_overserved"] as const).map((key) => {
-        const entries = recordList(node.props[key]);
-        if (entries.length === 0) {
-          return null;
-        }
-        return (
-          <div className="ui-segment__group" key={key}>
-            <h5 className="ui-segment__legend">
-              {key === "top_underserved" ? "Most underserved" : "Most overserved"}
-            </h5>
-            <ul className="ui-segment__list">
-              {entries.map((entry, index) => (
-                <li key={`${key}-${index}`}>
-                  <span>{str(entry, "statement") || str(entry, "outcome_id")}</span>
-                  <ScorePill tone={BAND_TONE[str(entry, "band")] ?? "neutral"}>
-                    {measurement(entry.score)}
-                  </ScorePill>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
-
-      {strategy ? <p className="ui-segment__strategy">{strategy}</p> : null}
-
-      {gaps.length > 0 ? (
-        <ul className="ui-segment__gaps">
-          {gaps.map((gap, index) => (
-            <li key={`gap-${index}`}>{gap}</li>
+      {bets.length > 0 ? (
+        <ul className="ui-bets">
+          {bets.map((bet, index) => (
+            <li className="ui-bets__item" key={`${index}-${bet.slice(0, 12)}`}>
+              {bet}
+            </li>
           ))}
         </ul>
       ) : null}
+
+      {/* The paths this one beat: a recommendation without them is a conclusion. */}
+      <div className="ui-rejected">
+        <div className="ui-rejected__label">Paths this beat</div>
+        {rejected.length === 0 ? (
+          <p className="ui-rejected__why">
+            No rejected paths recorded — this is a conclusion, not a recommendation.
+          </p>
+        ) : null}
+        {rejected.map((item, index) => {
+          const rejectedKind = str(item, "kind");
+          return (
+            <div className="ui-rejected__row" key={`${index}-${rejectedKind}`}>
+              <span className="ui-rejected__kind">{KIND_LABEL[rejectedKind] ?? rejectedKind}</span>
+              <span className="ui-rejected__why">{str(item, "why")}</span>
+            </div>
+          );
+        })}
+      </div>
 
       <ActionRow actions={readActions(node.props)} />
     </article>

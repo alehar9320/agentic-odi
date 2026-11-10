@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from agentic_odi_core.evaluation import classify_opportunity
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
@@ -21,6 +22,7 @@ from agentic_odi_core.services import (
     StepNotFoundError,
     ValueOutOfRangeError,
 )
+from agentic_odi_core.sqlite_repository import SQLiteRepository
 
 
 @pytest.fixture
@@ -378,8 +380,9 @@ def test_evidence_delete_and_promote(service: ODIService) -> None:
     assert isinstance(outcome, Outcome)
     assert outcome.statement == "Minimize the time to review a quote when feedback arrives"
     assert outcome.opportunity_score == 12.0
-    with pytest.raises(ValueError):
-        service.promote_evidence(evidence.id, "outcome")
+    #: Promotion is idempotent: re-promoting returns the same outcome, and the
+    #: evidence now links back to it instead of being promoted twice.
+    assert service.promote_evidence(evidence.id, "outcome").id == outcome.id
     with pytest.raises(ValueError):
         service.promote_evidence(evidence.id, "solution")
 
@@ -388,3 +391,150 @@ def test_evidence_delete_and_promote(service: ODIService) -> None:
         service.delete_evidence(evidence.id)
     with pytest.raises(EvidenceNotFoundError):
         service.promote_evidence(evidence.id, "job")
+
+
+def test_add_evidence_deduplicates_by_fingerprint(service: ODIService) -> None:
+    job = service.add_job("Job")
+    first = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+    )
+    second = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+    )
+    #: Same quote imported twice resolves to the one evidence record.
+    assert second.id == first.id
+    assert service.list_evidence(job_id=job.id) == [first]
+
+
+def test_add_evidence_different_content_is_not_deduplicated(service: ODIService) -> None:
+    job = service.add_job("Job")
+    first = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+    )
+    second = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Different hours",
+        job_id=job.id,
+    )
+    assert second.id != first.id
+    assert len(service.list_evidence(job_id=job.id)) == 2
+
+
+def test_promote_evidence_is_idempotent_and_links_back(service: ODIService) -> None:
+    job = service.add_job("Job")
+    evidence = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+    )
+    outcome = service.promote_evidence(
+        evidence.id,
+        "outcome",
+        job_id=job.id,
+        statement="Minimize the time to rotate secrets when deploying",
+        importance=8.0,
+        satisfaction=4.0,
+    )
+    #: The evidence row now points back at the outcome.
+    linked = service.get_evidence(evidence.id)
+    assert linked is not None
+    assert linked.outcome_id == outcome.id
+    #: Re-promoting the same evidence returns the existing outcome, not a copy.
+    again = service.promote_evidence(
+        evidence.id,
+        "outcome",
+        job_id=job.id,
+        statement="Minimize the time to rotate secrets when deploying",
+        importance=8.0,
+        satisfaction=4.0,
+    )
+    assert again.id == outcome.id
+    assert service.get_outcomes(job.id) == [outcome]
+
+
+def test_delete_outcome_unlinks_evidence(service: ODIService) -> None:
+    job = service.add_job("Job")
+    outcome = service.add_outcome(
+        job.id,
+        "Minimize the time to review a quote when feedback arrives",
+        importance=5.0,
+        satisfaction=5.0,
+    )
+    evidence = service.add_evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="quote",
+        content="Lost hours",
+        job_id=job.id,
+        outcome_id=outcome.id,
+    )
+    service.delete_outcome(outcome.id)
+    #: Evidence survives the outcome's removal; the link is nulled.
+    stored = service.get_evidence(evidence.id)
+    assert stored is not None
+    assert stored.outcome_id is None
+
+
+def test_an_unscored_outcome_is_still_unscored_after_reopening_the_store(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    service = ODIService(SQLiteRepository(db_path=db))
+    job = service.add_job("Rotate a leaked secret")
+    captured = service.add_outcome(
+        job.id,
+        "Minimize the time it takes to rotate the secret when it leaks",
+    )
+
+    reopened = ODIService(SQLiteRepository(db_path=db))
+    outcome = reopened.get_outcome(captured.id)
+
+    assert outcome is not None
+    assert outcome.importance is None
+    assert outcome.satisfaction is None
+    assert outcome.opportunity_score is None
+    assert classify_opportunity(outcome.opportunity_score) == "unscored"
+
+
+def test_clearing_both_ratings_reads_the_same_as_never_having_scored(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    service = ODIService(SQLiteRepository(db_path=db))
+    job = service.add_job("Rotate a leaked secret")
+    never = service.add_outcome(
+        job.id,
+        "Minimize the number of missed values after rotation",
+    )
+    cleared = service.update_outcome(
+        service.add_outcome(
+            job.id,
+            "Minimize the time it takes to verify the new value when deploying",
+            importance=9.0,
+            satisfaction=2.0,
+        ).id,
+        {"importance": None, "satisfaction": None},
+    )
+
+    reopened = ODIService(SQLiteRepository(db_path=db))
+    for outcome_id in (never.id, cleared.id):
+        outcome = reopened.get_outcome(outcome_id)
+        assert outcome is not None
+        assert (outcome.importance, outcome.satisfaction, outcome.opportunity_score) == (
+            None,
+            None,
+            None,
+        )
+        assert classify_opportunity(outcome.opportunity_score) == "unscored"
