@@ -10,6 +10,7 @@ from typing import Any, Protocol, TypeVar
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    V2MOM,
     Alternative,
     AlternativeLink,
     CustomerOutcome,
@@ -27,6 +28,10 @@ from agentic_odi_core.models import (
 )
 
 _Item = TypeVar("_Item")
+
+#: A workspace has exactly one V2MOM, and the model carries no id, so the store
+#: keys it by this constant rather than a generated one.
+V2MOM_ID = "v2mom"
 
 
 def rank_outcomes(outcomes: list[Outcome], by: str = "opportunity_score") -> list[Outcome]:
@@ -145,6 +150,7 @@ class Repository(Protocol):
     survey_input_sets: dict[str, SurveyInputSet]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
 
     def add_job(self, job: Job) -> Job: ...
@@ -266,6 +272,10 @@ class Repository(Protocol):
     def close(self) -> None: ...
     def health(self) -> bool: ...
 
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM: ...
+
+    def get_v2mom(self) -> V2MOM | None: ...
+
 
 class InMemoryRepository:
     def __init__(self) -> None:
@@ -283,6 +293,9 @@ class InMemoryRepository:
         self.survey_input_sets: dict[str, SurveyInputSet] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        #: The store holds one vision, keyed by a fixed name rather than a
+        #: generated id because a workspace has exactly one V2MOM.
+        self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
         self._last_event_id = 0
 
@@ -829,6 +842,13 @@ class InMemoryRepository:
         self.strategies[strategy_id] = new_strategy
         return new_strategy
 
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        self.v2mom[V2MOM_ID] = v2mom
+        return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        return next(iter(self.v2mom.values()), None)
+
     def clear(self) -> None:
         #: The event-sourced store empties its log and restarts numbering, so the
         #: counter starts over with it.
@@ -846,6 +866,7 @@ class InMemoryRepository:
         self.survey_input_sets.clear()
         self.segments.clear()
         self.strategies.clear()
+        self.v2mom.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

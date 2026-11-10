@@ -110,7 +110,7 @@
     "/api/stats/reset": {
       "post": {
         "summary": "Reset Stats",
-        "description": "Start the measurement over and return the counters as they now stand.\n\nA reset appends a marker; the events it supersedes stay in the log. The\nasking happens in whatever surface calls this — a click that erases a\nmeasurement should not be the kind that fires straight away.",
+        "description": "Start the measurement over and return the counters as they now stand.\n\nA reset appends a marker; the events it supersedes stay in the log. The\nasking happens in whatever surface calls this \u2014 a click that erases a\nmeasurement should not be the kind that fires straight away.",
         "operationId": "reset_stats_api_stats_reset_post",
         "responses": {
           "200": {
@@ -191,16 +191,29 @@
     "/api/health/llm": {
       "post": {
         "summary": "Post Llm Health",
+        "description": "Probe the configured LLM endpoint, cached per (endpoint, model).\n\nConcurrent tabs within the TTL cause a single upstream probe. ``?fresh=true``\nbypasses the cache so a user-initiated \"check now\" is never stale.",
         "operationId": "post_llm_health_api_health_llm_post",
+        "parameters": [
+          {
+            "name": "fresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Fresh"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LlmHealthRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -208,9 +221,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Post Llm Health Api Health Llm Post"
+                  "$ref": "#/components/schemas/LlmHealthResponse"
                 }
               }
             }
@@ -3911,6 +3922,394 @@
           }
         }
       }
+    },
+    "/api/share": {
+      "get": {
+        "summary": "List Shares",
+        "description": "The owner's links, without tokens: id, artifact, and the key dates.",
+        "operationId": "list_shares_api_share_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Shares Api Share Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Mint Share",
+        "description": "Mint a scoped, expiring, read-only link for one artifact.\n\nThe raw token is returned exactly once; only its hash is stored. Creation\nhappens through this route only, so the token is never minted by a page.",
+        "operationId": "mint_share_api_share_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MintShareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareMintResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/{share_id}": {
+      "delete": {
+        "summary": "Revoke Share",
+        "description": "Revoke a link. Effective immediately, and idempotent.",
+        "operationId": "revoke_share_api_share__share_id__delete",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Share Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Revoke Share Api Share  Share Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/{token}": {
+      "get": {
+        "summary": "Read Shared",
+        "description": "Read exactly the one artifact a token names, and its own evidence.\n\nA malformed, unknown, expired, or revoked token is the same ``404``; the\nresponse never says which. There is no list and no canvas here.",
+        "operationId": "read_shared_api_share__token__get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedArtifactResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/traceability": {
+      "get": {
+        "summary": "Get Traceability",
+        "description": "Orphans, unfunded objectives, and links the vision dropped.\n\nRead-only. With no objectives defined the report carries\n``objectives_defined: false`` and a message, not three empty sections that\nwould read as a clean bill of health.",
+        "operationId": "get_traceability_api_traceability_get",
+        "parameters": [
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceabilityReportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alignments": {
+      "get": {
+        "summary": "Get Alignments",
+        "description": "The V2MOM links recorded on outcomes, optionally for one outcome.",
+        "operationId": "get_alignments_api_alignments_get",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Alignments Api Alignments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/alignments": {
+      "post": {
+        "summary": "Post Outcome Alignment",
+        "description": "Link an outcome to one method or measure the vision currently holds.",
+        "operationId": "post_outcome_alignment_api_outcomes__outcome_id__alignments_post",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkOutcomeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Post Outcome Alignment Api Outcomes  Outcome Id  Alignments Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/{outcome_id}/alignments/{field}/{key}": {
+      "delete": {
+        "summary": "Delete Outcome Alignment",
+        "description": "Remove one recorded link. Removing a link that is not there is a no-op.",
+        "operationId": "delete_outcome_alignment_api_outcomes__outcome_id__alignments__field___key__delete",
+        "parameters": [
+          {
+            "name": "outcome_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Outcome Id"
+            }
+          },
+          {
+            "name": "field",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Field"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "mcp_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mcp Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Outcome Alignment Api Outcomes  Outcome Id  Alignments  Field   Key  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5232,6 +5631,35 @@
         ],
         "title": "LinkAlternativeRequest"
       },
+      "LinkOutcomeRequest": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "method",
+              "measure"
+            ],
+            "title": "Field"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "text"
+        ],
+        "title": "LinkOutcomeRequest",
+        "description": "Link an outcome to one V2MOM method or measure.\n\n``text`` must match an entry the vision currently holds; unknown text is\nrefused rather than guessed."
+      },
       "LlmHealthRequest": {
         "properties": {
           "base_url": {
@@ -5254,6 +5682,34 @@
           "base_url"
         ],
         "title": "LlmHealthRequest"
+      },
+      "LlmHealthResponse": {
+        "properties": {
+          "healthy": {
+            "type": "boolean",
+            "title": "Healthy"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "checked_at": {
+            "type": "string",
+            "title": "Checked At"
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached"
+          }
+        },
+        "type": "object",
+        "required": [
+          "healthy",
+          "message",
+          "checked_at",
+          "cached"
+        ],
+        "title": "LlmHealthResponse"
       },
       "LlmProxyMessage": {
         "properties": {
@@ -6066,6 +6522,65 @@
         "type": "object",
         "title": "StudioBrief",
         "description": "The user's context, captured during first-run onboarding."
+      },
+      "TraceabilityReportResponse": {
+        "properties": {
+          "objectives_defined": {
+            "type": "boolean",
+            "title": "Objectives Defined"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "orphans": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Orphans"
+          },
+          "unfunded": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Unfunded"
+          },
+          "drift": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Drift"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "objectives_defined"
+        ],
+        "title": "TraceabilityReportResponse",
+        "description": "The three failures: orphans, unfunded objectives, and drift."
       },
       "TurnModel": {
         "properties": {

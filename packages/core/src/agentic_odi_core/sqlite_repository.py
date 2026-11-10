@@ -15,6 +15,7 @@ from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    V2MOM,
     Alternative,
     AlternativeLink,
     CustomerOutcome,
@@ -29,9 +30,9 @@ from agentic_odi_core.models import (
     Strategy,
     Study,
     SurveyInputSet,
-    compute_opportunity_score,
 )
 from agentic_odi_core.repository import (
+    V2MOM_ID,
     Repository,
     compute_evidence_fingerprint,
     page,
@@ -59,12 +60,10 @@ class SQLiteRepository(Repository):
         self._device_id = device_id or os.environ.get("AGENTIC_ODI_DEVICE_ID", DEFAULT_DEVICE)
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
-        self._backfilled = False
         self._legacy_method_ids: set[str] = set()
         self._method_backfilled_ids: set[str] = set()
         self._load_snapshot()
         self._backfill_outcome_method()
-        self._backfill_legacy_outcomes()
 
     def _load_snapshot(self) -> None:
         self.jobs: dict[str, Job] = {}
@@ -81,6 +80,7 @@ class SQLiteRepository(Repository):
         self.survey_input_sets: dict[str, SurveyInputSet] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
         self._last_event_id = 0
         self._legacy_method_ids = set()
@@ -109,44 +109,6 @@ class SQLiteRepository(Repository):
                 device_id=self._device_id,
             )
         self._sync()
-
-    def _backfill_legacy_outcomes(self) -> None:
-        """One-time migration: backfill null scores on legacy outcomes.
-
-        Assigns importance=5.0, satisfaction=5.0 to any outcome missing either
-        score, records an OUTCOME_BACKFILLED event per outcome, and marks the
-        repository as backfilled so reloads do not repeat the migration.
-        """
-        if self._backfilled:
-            return
-        needs_backfill = [
-            o for o in self.outcomes.values() if o.importance is None or o.satisfaction is None
-        ]
-        if not needs_backfill:
-            self._backfilled = True
-            return
-        for outcome in needs_backfill:
-            updates: dict[str, Any] = {}
-            importance = outcome.importance
-            if importance is None:
-                importance = 5.0
-                updates["importance"] = importance
-            satisfaction = outcome.satisfaction
-            if satisfaction is None:
-                satisfaction = 5.0
-                updates["satisfaction"] = satisfaction
-            updates["opportunity_score"] = compute_opportunity_score(
-                importance,
-                satisfaction,
-            )
-            self.store.append(
-                "OUTCOME_BACKFILLED",
-                {"id": outcome.id, "updates": updates},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-        self._sync()
-        self._backfilled = True
 
     def _sync(self) -> None:
         # Only the events appended since the last apply. Reading the whole log
@@ -294,6 +256,8 @@ class SQLiteRepository(Repository):
             self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
         elif et == "PROPOSAL_UPDATED":
             self._merge_updates(self.proposals, p, OutcomeProposal)
+        elif et == "V2MOM_UPDATED":
+            self.v2mom[V2MOM_ID] = V2MOM.model_validate(p)
         elif et == "STUDY_CREATED":
             self.studies[p["id"]] = Study.model_validate(p)
         elif et == "STUDY_UPDATED":
@@ -1163,3 +1127,19 @@ class SQLiteRepository(Repository):
             except sqlite3.Error:
                 return False
             return True
+
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        with self._lock:
+            self.store.append(
+                "V2MOM_UPDATED",
+                v2mom.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        with self._lock:
+            self._sync()
+            return next(iter(self.v2mom.values()), None)
