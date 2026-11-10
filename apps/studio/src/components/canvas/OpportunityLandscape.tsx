@@ -83,9 +83,7 @@ export function OpportunityLandscape() {
     return ids.size;
   }, [evidence]);
 
-// The average counts stored scores only. Dividing by every outcome would
-  // read an unscored record as a zero and drag a strong landscape down; the
-  // caption names how many scored so the number can be explained from the screen.
+  // The average counts stored scores only.
   const averageScore = useMemo(() => scoredAverage(outcomes), [outcomes]);
 
   const filteredOutcomes = useMemo(() => {
@@ -247,7 +245,7 @@ export function OpportunityLandscape() {
           <div className="studio-metric">
             <div className="studio-metric__label">Avg Opportunity Score</div>
             <div className="studio-metric__value">
-{averageScore.mean == null
+              {averageScore.mean == null
                 ? "Not scored"
                 : formatOpportunityScore(averageScore.mean)}
             </div>
@@ -317,7 +315,7 @@ export function OpportunityLandscape() {
           Capture an outcome to see it here.
         </p>
       ) : viewMode === "matrix" ? (
-        <OpportunityMatrixView
+        <OpportunityPlot
           outcomes={filteredOutcomes}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
@@ -389,7 +387,11 @@ interface MatrixViewProps {
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
-  sample: boolean;
+  /** The one outcome the tour points at, ringed apart from the rest. */
+  highlightedOutcomeId?: string | null;
+  sample?: boolean;
+  /** Drops the detail sidebar and stacks the plot, for a narrow container. */
+  compact?: boolean;
 }
 
 interface PlottedOutcome {
@@ -432,13 +434,15 @@ const underservedPolygonPoints = [
   .map(([x, y]) => `${x},${y}`)
   .join(" ");
 
-function OpportunityMatrixView({
+export function OpportunityPlot({
   outcomes,
   selectedOutcomeId,
   onSelectOutcome,
   onHoverOutcome,
   activeOutcome,
-  sample,
+  sample = false,
+  highlightedOutcomeId = null,
+  compact = false,
 }: MatrixViewProps) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -537,8 +541,12 @@ function OpportunityMatrixView({
 
   return (
     <div
-      className="opportunity-matrix"
-      style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}
+      className={`opportunity-matrix${compact ? " opportunity-matrix--compact" : ""}`}
+      style={{
+        display: "grid",
+        gridTemplateColumns: compact ? "1fr" : "1fr 320px",
+        gap: 16,
+      }}
     >
       {/* Interactive 2D Chart */}
       <div
@@ -705,7 +713,8 @@ function OpportunityMatrixView({
                   }
                 }}
                 type="button"
-                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}`}
+                className={`matrix-node${isSelected ? " matrix-node--selected" : ""}${highlightedOutcomeId === id ? " matrix-node--highlighted" : ""}`}
+                data-highlighted={highlightedOutcomeId === id ? "true" : undefined}
                 style={{ left: `${(plot.cx / 500) * 100}%`, top: `${(plot.cy / 360) * 100}%` }}
                 tabIndex={id === rovingId ? 0 : -1}
                 aria-pressed={isSelected}
