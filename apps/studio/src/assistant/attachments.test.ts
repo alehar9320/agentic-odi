@@ -15,6 +15,7 @@ import {
   formatFileSize,
   isTextLike,
   prepareAttachment,
+  tooLargeMessage,
 } from "./attachments";
 
 function fileOf(name: string, type: string, size = 10): File {
@@ -161,6 +162,83 @@ describe("an unreadable file", () => {
   });
 });
 
+
+/**
+ * A text file whose bytes are actually readable, with the exact character count
+ * the caller asks for. Unlike `fileOf`, `.text()` returns real content.
+ */
+function textFileOf(name: string, text: string): File {
+  return new File([text], name, { type: "text/markdown" });
+}
+
+describe("an over-limit text file", () => {
+  it("is refused rather than silently shortened, naming the file and the limit", async () => {
+    const failure = await prepareAttachment(
+      textFileOf("interview.md", "a".repeat(MAX_ATTACHMENT_CHARS + 5)),
+    ).catch((error) => error);
+
+    expect(failure).toBeInstanceOf(AttachmentReadError);
+    expect((failure as AttachmentReadError).name).toBe("interview.md");
+    expect((failure as AttachmentReadError).code).toBe("too_large");
+    expect((failure as AttachmentReadError).message).toBe(tooLargeMessage("interview.md"));
+    expect((failure as AttachmentReadError).message).toContain("20,000");
+  });
+
+  it("keeps the whole file when it is exactly at the limit", async () => {
+    const text = "a".repeat(MAX_ATTACHMENT_CHARS);
+    const prepared = await prepareAttachment(textFileOf("notes.md", text));
+    expect(prepared.text).toBe(text);
+    expect(prepared.text).toHaveLength(MAX_ATTACHMENT_CHARS);
+  });
+
+  it("hands the composer a failed chip that explains the limit, not a shortened file", async () => {
+    const states = await addedStates(
+      createAttachmentAdapter(),
+      textFileOf("interview.md", "a".repeat(MAX_ATTACHMENT_CHARS + 1)),
+    );
+
+    expect(states).toHaveLength(1);
+    expect(states[0]).toMatchObject({
+      name: "interview.md",
+      status: {
+        type: "incomplete",
+        reason: "error",
+        message: tooLargeMessage("interview.md"),
+      },
+    });
+  });
+});
+
+// The client counts UTF-16 code units (`String.length`); the sidecar counts
+// code points (`len()` on a Python `str`). For BMP text — including this file,
+// whose every character is one unit in both — the two agree, so a file at the
+// limit reaches the sidecar whole. They diverge only for astral characters
+// (an emoji is two UTF-16 units but one code point): a file of 20,000 emoji is
+// refused here as 40,000 units even though the sidecar would accept it. The
+// client is the stricter of the two, so nothing that passes the client is cut
+// by the sidecar; neither limit is changed to paper over the difference.
+describe("the client and sidecar character caps", () => {
+  it("agree for BMP text at the shared limit", () => {
+    const bmp = "a".repeat(MAX_ATTACHMENT_CHARS);
+    expect(bmp.length).toBe(MAX_ATTACHMENT_CHARS);
+    expect([...bmp].length).toBe(MAX_ATTACHMENT_CHARS);
+  });
+
+  it("counts an astral character as two units on the client, one code point on the sidecar", () => {
+    const emoji = "🎯";
+    expect(emoji.length).toBe(2);
+    expect([...emoji].length).toBe(1);
+  });
+
+  it("accepts a 20,000-unit file that carries an emoji, because the client is the stricter count", async () => {
+    const text = "a".repeat(MAX_ATTACHMENT_CHARS - 2) + "🎯";
+    expect(text.length).toBe(MAX_ATTACHMENT_CHARS);
+    expect([...text].length).toBeLessThan(MAX_ATTACHMENT_CHARS);
+
+    const prepared = await prepareAttachment(textFileOf("notes.md", text));
+    expect(prepared.text).toBe(text);
+  });
+});
 
 describe("formatFileSize", () => {
   it("reads at a human scale", () => {
