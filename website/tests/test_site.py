@@ -509,8 +509,14 @@ def test_page_weights_are_within_budget(page: str):
     # The page budget is a soft ceiling: individual pages are coverage records
     # (ledgers, entity docs, schema references), not decoration, so the ceiling
     # moves with legitimate content growth rather than trimming reference
-    # material. The Development page now exceeds 100 KB: the assistant-ui ledger
-    # (issue #429) contributes 129 rows, and the Study entity plus its two
-    # tools (open_study, list_studies) and the outcome-proposal tools add the
-    # rest. Bump the ceiling to keep the page green while the content stays.
-    assert size <= 110 * 1024, f"{page}: {size} bytes"
+    # material. The MCP reference was the long pole: every tool's argument table
+    # and the whole ODI schema live on that one page, so it grows with each
+    # paginated list tool and each entity we add. The V2MOM entity, the
+    # scheduled-work tools, the signal tools, the score-history tool, the
+    # ScoreSnapshot entity, the survey-import plan/commit tools, the
+    # Alternative/AlternativeLink entities and the four Stage 5 and 6 tools
+    # (segment_market, get_segments, get_strategy, propose_strategy) together
+    # bring that page close to the ceiling below. The assistant-ui ledger
+    # (issue #429) puts 129 rows on the Development page, and the Study entity
+    # with its two tools adds the last few KB to the MCP reference page.
+    assert size <= 124 * 1024, f"{page}: {size} bytes"
