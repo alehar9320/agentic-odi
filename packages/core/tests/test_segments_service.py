@@ -277,7 +277,9 @@ def test_a_segment_derived_before_the_stamp_existed_reads_as_stale() -> None:
         "Minimize the time it takes to rotate the secret when it leaks",
         "Minimize the number of missed values after rotation",
     ):
-        service.add_outcome(job.id, statement=statement, importance=9, satisfaction=2, step_id=step.id)
+        service.add_outcome(
+            job.id, statement=statement, importance=9, satisfaction=2, step_id=step.id
+        )
     segment = service.save_segment(_segment(job.id, [o.id for o in service.get_outcomes(job.id)]))
 
     assert segment.computed_at_event_id is None
@@ -319,5 +321,6 @@ def test_a_strategy_goes_stale_when_an_outcome_is_rescored(
 
     service.update_outcome(service.get_outcomes(job_id)[0].id, {"satisfaction": 8})
 
-    assert service.get_strategy() is not None
-    assert service.get_strategy().stale is True
+    stale_strategy = service.get_strategy()
+    assert stale_strategy is not None
+    assert stale_strategy.stale is True

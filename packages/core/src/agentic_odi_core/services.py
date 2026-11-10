@@ -7,7 +7,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import ValidationError as PydanticValidationError
 
@@ -69,6 +69,9 @@ from agentic_odi_core.traceability import (
     objective_key,
     objectives_from_v2mom,
 )
+
+#: The two artifacts that carry a derivation stamp and a read-time ``stale`` flag.
+_Artifact = TypeVar("_Artifact", Segment, Strategy)
 
 
 class JobNotFoundError(NotFoundError):
@@ -1131,7 +1134,9 @@ class ODIService:
         ]
 
     def list_segments(self, job_id: str | None = None) -> list[Segment]:
-        return [self._label_freshness(segment) for segment in self.repo.list_segments(job_id=job_id)]
+        return [
+            self._label_freshness(segment) for segment in self.repo.list_segments(job_id=job_id)
+        ]
 
     def get_segment(self, segment_id: str) -> Segment:
         segment = self.repo.get_segment(segment_id)
@@ -1139,7 +1144,7 @@ class ODIService:
             raise SegmentNotFoundError(segment_id, "run segment_market to produce segments")
         return self._label_freshness(segment)
 
-    def _label_freshness(self, artifact: Segment | Strategy) -> Segment | Strategy:
+    def _label_freshness(self, artifact: _Artifact) -> _Artifact:
         """Stamp the read-time ``stale`` flag: derived, never written back.
 
         The store revision the artifact was derived from is compared against the
