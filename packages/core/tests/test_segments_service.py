@@ -209,3 +209,26 @@ def test_segments_and_strategy_reach_the_signals_feed(seeded: tuple[ODIService, 
         if signal.kind.value == "segment_identified"
     )
     assert underserved.severity == "notice"
+
+
+def test_an_unscored_outcome_leaves_its_segment_without_a_verdict() -> None:
+    service = ODIService(InMemoryRepository())
+    job = service.add_job("Rotate a leaked secret")
+    step = service.add_step(job.id, "Gather the current values", order=1, allow_empty_job_map=True)
+    service.add_outcome(
+        job.id,
+        statement="Minimize the time it takes to rotate the secret when it leaks",
+        importance=9,
+        satisfaction=2,
+        step_id=step.id,
+    )
+    service.add_outcome(
+        job.id,
+        statement="Minimize the number of missed values after rotation",
+        step_id=step.id,
+    )
+
+    segments = service.segment_market()
+
+    assert len(segments) == 1
+    assert segments[0].verdict is None
