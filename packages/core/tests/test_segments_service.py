@@ -232,3 +232,92 @@ def test_an_unscored_outcome_leaves_its_segment_without_a_verdict() -> None:
 
     assert len(segments) == 1
     assert segments[0].verdict is None
+
+
+def test_a_freshly_derived_segment_reads_as_current(
+    seeded: tuple[ODIService, str],
+) -> None:
+    service, _ = seeded
+
+    segment = service.segment_market()[0]
+
+    assert segment.computed_at_event_id is not None
+    assert segment.stale is False
+
+
+def test_a_segment_goes_stale_when_an_outcome_is_rescored(
+    seeded: tuple[ODIService, str],
+) -> None:
+    service, job_id = seeded
+    segment = service.segment_market()[0]
+
+    service.update_outcome(service.get_outcomes(job_id)[0].id, {"satisfaction": 8})
+
+    assert service.get_segment(segment.id).stale is True
+
+
+def test_re_deriving_from_the_current_store_reads_as_current_again(
+    seeded: tuple[ODIService, str],
+) -> None:
+    service, job_id = seeded
+    service.segment_market()
+    service.update_outcome(service.get_outcomes(job_id)[0].id, {"satisfaction": 8})
+
+    re_derived = service.segment_market()[0]
+
+    assert re_derived.stale is False
+
+
+def test_a_segment_derived_before_the_stamp_existed_reads_as_stale() -> None:
+    """An unstamped artifact is unknown, and unknown must not read as current."""
+    service = ODIService(InMemoryRepository())
+    job = service.add_job("Rotate a leaked secret")
+    step = service.add_step(job.id, "Gather the current values", order=1, allow_empty_job_map=True)
+    for statement in (
+        "Minimize the time it takes to rotate the secret when it leaks",
+        "Minimize the number of missed values after rotation",
+    ):
+        service.add_outcome(job.id, statement=statement, importance=9, satisfaction=2, step_id=step.id)
+    segment = service.save_segment(_segment(job.id, [o.id for o in service.get_outcomes(job.id)]))
+
+    assert segment.computed_at_event_id is None
+    assert segment.stale is True
+
+
+def test_staleness_is_never_written_back_to_the_store(
+    seeded: tuple[ODIService, str],
+) -> None:
+    service, job_id = seeded
+    segment = service.segment_market()[0]
+
+    service.update_outcome(service.get_outcomes(job_id)[0].id, {"satisfaction": 8})
+    assert service.get_segment(segment.id).stale is True
+
+    stored = service.repo.get_segment(segment.id)
+    assert stored is not None
+    assert stored.stale is None
+
+
+def test_a_freshly_proposed_strategy_reads_as_current(
+    seeded: tuple[ODIService, str],
+) -> None:
+    service, _ = seeded
+    service.segment_market()
+
+    strategy = service.propose_strategy()
+
+    assert strategy.computed_at_event_id is not None
+    assert strategy.stale is False
+
+
+def test_a_strategy_goes_stale_when_an_outcome_is_rescored(
+    seeded: tuple[ODIService, str],
+) -> None:
+    service, job_id = seeded
+    service.segment_market()
+    service.propose_strategy()
+
+    service.update_outcome(service.get_outcomes(job_id)[0].id, {"satisfaction": 8})
+
+    assert service.get_strategy() is not None
+    assert service.get_strategy().stale is True
