@@ -128,7 +128,15 @@ class EvidenceNotFoundError(NotFoundError, ValueError):
 
 
 class ValueOutOfRangeError(ValidationError):
-    pass
+    """A score fell outside the ODI range (1.0–10.0).
+
+    ``field`` names the field that was rejected, so the caller can show the
+    message next to it instead of on top of the whole form.
+    """
+
+    def __init__(self, message: str = "Value out of range.", field: str | None = None) -> None:
+        self.field = field
+        super().__init__(message)
 
 
 class SignalNotFoundError(NotFoundError):
@@ -447,9 +455,13 @@ class ODIService:
         importance = updates.get("importance", existing.importance)
         satisfaction = updates.get("satisfaction", existing.satisfaction)
         if importance is not None and not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "importance must be between 1.0 and 10.0", field="importance"
+            )
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "satisfaction must be between 1.0 and 10.0", field="satisfaction"
+            )
         require_outcome_statement(statement)
         if importance is not None and satisfaction is not None:
             updates = dict(updates)
@@ -552,7 +564,9 @@ class ODIService:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
         if not 1 <= order <= 8:
-            raise ValueOutOfRangeError("Step order must be between 1 and 8 (Ulwick's job map).")
+            raise ValueOutOfRangeError(
+                "Step order must be between 1 and 8 (Ulwick's job map).", field="order"
+            )
         existing_outcomes = self.repo.get_outcomes(job_id)
         existing_customer_outcomes = self.repo.list_customer_outcomes(job_id)
         if not existing_outcomes and not existing_customer_outcomes and not allow_empty_job_map:
@@ -597,9 +611,13 @@ class ODIService:
         if step_id is not None and self.repo.get_step(step_id) is None:
             raise StepNotFoundError(step_id)
         if importance is not None and not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "importance must be between 1.0 and 10.0", field="importance"
+            )
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "satisfaction must be between 1.0 and 10.0", field="satisfaction"
+            )
         if validate_statement:
             verdict = evaluate_outcome_statement(statement)
             if not verdict["valid"]:

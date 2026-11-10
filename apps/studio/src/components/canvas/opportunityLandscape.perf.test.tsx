@@ -41,6 +41,8 @@ const harness = vi.hoisted(() => ({
     deleteThesis: vi.fn(),
     focusedSubject: null,
     focusSubject: vi.fn(),
+    canvasCached: false,
+    settings: { mcp_url: "" },
   },
 }));
 

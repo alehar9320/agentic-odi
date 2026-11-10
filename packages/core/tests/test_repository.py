@@ -8,6 +8,7 @@ from agentic_odi_core.models import (
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
+    Decision,
     Direction,
     Evidence,
     Job,
@@ -16,7 +17,7 @@ from agentic_odi_core.models import (
     SignalKind,
     Step,
 )
-from agentic_odi_core.repository import InMemoryRepository
+from agentic_odi_core.repository import InMemoryRepository, rank_outcomes
 
 
 def _customer_outcome(outcome_id: str, job_id: str = "job-1") -> CustomerOutcome:
@@ -175,6 +176,37 @@ def test_delete_step_cascades_its_outcomes():
     assert repo.get_outcome("o2") is not None
 
 
+def test_update_keeps_the_entity_id():
+    """An update must not re-mint the id.
+
+    ``model_dump(exclude_unset=True)`` omits an id the caller never passed, so
+    re-validating the merged dump would mint a fresh uuid and silently orphan
+    every reference to the entity (a superseded decision, a job's steps).
+    """
+    repo = _repo_with_graph()
+    assert repo.update_job("j1", {"name": "Renamed"}).id == "j1"  # type: ignore[union-attr]
+    assert repo.update_step("s1", {"name": "Renamed"}).id == "s1"  # type: ignore[union-attr]
+    assert repo.update_outcome("o1", {"statement": "Max y"}).id == "o1"  # type: ignore[union-attr]
+
+    co = _customer_outcome("co1", job_id="j1")
+    repo.add_customer_outcome(co)
+    updated_co = repo.update_customer_outcome("co1", {"step_id": "s1"})
+    assert updated_co is not None and updated_co.id == "co1"
+
+    decision = Decision(
+        id="d1",
+        job_id="j1",
+        chosen_outcome_ids=["o1"],
+        rationale="Chosen.",
+        decided_by="alex",
+        decided_at="2026-01-01T00:00:00Z",
+    )
+    repo.add_decision(decision)
+    updated = repo.update_decision("d1", {"superseded_by": "d2"})
+    assert updated is not None and updated.id == "d1"
+    assert repo.get_decision("d1").superseded_by == "d2"  # type: ignore[union-attr]
+
+
 def test_update_step_and_update_outcome_merge_or_return_none():
     repo = _repo_with_graph()
     updated_step = repo.update_step("s1", {"name": "Renamed step"})
@@ -280,6 +312,40 @@ def test_reload_is_safe_on_an_empty_repository() -> None:
     repo.reload()
     repo.reload()
     assert repo.list_jobs() == []
+
+
+def test_rank_outcomes_puts_unscored_last_not_at_zero() -> None:
+    """An unscored outcome is unknown, not a zero.
+
+    Sorting an absent score as 0.0 would place it below a genuinely low
+    opportunity and present a gap as a measurement, so the rank must keep
+    unknown scores after every scored one.
+    """
+    scored_low = Outcome(
+        id="o-low",
+        job_id="job-1",
+        statement="Minimize the wait when a build fails",
+        importance=1.0,
+        satisfaction=1.0,
+        opportunity_score=1.0,
+    )
+    scored_high = Outcome(
+        id="o-high",
+        job_id="job-1",
+        statement="Minimize the time to onboard when joining",
+        importance=9.0,
+        satisfaction=1.0,
+        opportunity_score=17.0,
+    )
+    unscored = Outcome(
+        id="o-none",
+        job_id="job-1",
+        statement="Minimize the noise when a deploy breaks",
+    )
+
+    ranked = rank_outcomes([unscored, scored_low, scored_high])
+
+    assert [outcome.id for outcome in ranked] == ["o-high", "o-low", "o-none"]
 
 
 def test_last_event_id_is_zero_before_any_write() -> None:

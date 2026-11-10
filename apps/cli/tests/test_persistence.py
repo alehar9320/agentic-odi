@@ -80,3 +80,28 @@ def test_every_entity_type_survives_reopen(tmp_path):
     evidence = repo.list_evidence(job_id=job_id)[0]
     assert evidence.step_id == step_id
     assert evidence.outcome_id == outcome["id"]
+
+    segment = backend.call(
+        "add_segment",
+        {
+            "job_id": job_id,
+            "name": "Release engineers",
+            "criterion": "They own the publish step.",
+            "outcome_ids": [outcome["id"]],
+        },
+    )
+    strategy = backend.call(
+        "choose_strategy",
+        {
+            "segment_id": segment["id"],
+            "kind": "differentiated",
+            "rationale": "The publish path blocks every release.",
+            "expected_effect": "Shorter publish time.",
+        },
+    )
+
+    reopened = SQLiteRepository(db_path=db)
+    stored_segment = reopened.get_segment(segment["id"])
+    assert stored_segment is not None and stored_segment.outcome_ids == [outcome["id"]]
+    stored_strategy = reopened.get_strategy(strategy["id"])
+    assert stored_strategy is not None and stored_strategy.segment_id == segment["id"]
