@@ -343,7 +343,32 @@ non-zero when the store is degraded, so it can gate a deployment.
 stage. `capabilities --json` emits the full machine-readable manifest.
 `capabilities tools` lists tool names only.
 
-## Back up and export
+## Back up and restore
+
+`backup` writes a verified snapshot of the local SQLite store using SQLite's
+online backup, then re-opens the copy and runs `integrity_check` before it
+counts. A snapshot that fails the check is deleted and the command exits
+non-zero, so a corrupt file is never presented as a backup.
+
+```bash
+agentic-odi backup                     # ~/.agentic-odi/backups/odi-<UTC>.db
+agentic-odi backup --db ~/.agentic-odi/odi.db
+```
+
+`restore` verifies the snapshot before it touches anything. A snapshot that
+fails `integrity_check` changes nothing and says why. A good one keeps the
+current database as `<name>.pre-restore` and only then replaces it, so a
+restore can never silently destroy the file it is replacing.
+
+```bash
+agentic-odi restore ~/.agentic-odi/backups/odi-20260101T000000Z.db
+agentic-odi restore <file> --db ~/.agentic-odi/odi.db
+```
+
+Backups live beside the store by default (`~/.agentic-odi/backups`); set
+`AGENTIC_ODI_BACKUP_DIR` to keep them somewhere else.
+
+## Export
 
 ```bash
 agentic-odi data-export                        # ./odi-export-<timestamp>.json
