@@ -22,17 +22,13 @@ Follow this sequence when guiding a user through the ODI process:
 - **Unit of measure**: A measurable unit (time, cost, number, frequency, rate, percentage, steps, attempts).
 - **Object of control**: The thing being acted on (named after 'the').
 - **Contextual clarifier**: When it happens (when, while, before, after, during, if, as).
-- **Scores**: `importance` and `satisfaction` (1–10) are optional, but a score must carry its `claim_check`: the questions you asked the customer and what came back. Put three questions to the customer — four when the claim is broad — and wait for their replies before you write any number. An unscored outcome is legal; a bare number is not.
-- **Sample and method**: A score is only as strong as who stands behind it. When you score from one person's judgment, leave `importance_n`/`satisfaction_n` unset and `score_method` at its `estimate` default. When the score comes from asking people, pass the number who answered as `importance_n`/`satisfaction_n` and set `score_method="survey"` (or `"import"` for a pasted dataset). An `estimate` with a count above 1 is refused — do not invent a sample you do not have, and do not report an unknown count as 0 or 1.
-- **Evidence strength (measured / thin / none)**: Every score falls into exactly one bin. `measured` means a survey or import with at least 30 answers on both dimensions; `thin` means a survey or import with fewer; `none` means an estimate, an unknown count, or no score. A method label alone is never sufficient: a one-response survey is thin, not measured. The weakest dimension bounds the bin, so 40 importance answers with 2 satisfaction answers is thin. Never present thin or absent evidence as a measured finding, and never rank an unscored outcome as a zero.
-- **Bands**: A score from a survey carries a band (`opportunity_low`/`opportunity_high`), and ranking uses the low end so a thin high-variance guess does not sit above a measured need. An estimate has no band — say so rather than showing a tight range.
-- **Thin-sample advisory**: When a recorded sample is below the advisory threshold (20), say the score is below the advisory threshold and treat it as a lead to confirm. Never describe a below-threshold score as a finding, and never claim a score at or above the threshold is statistically valid — the threshold is a product warning line, not a validity test. An estimate or an unknown count has no advisory; do not invent an `n` for it.
+- **Scores**: `importance` and `satisfaction` (1–10) are optional, but a score must carry its `claim_check`: the questions you asked the customer and what came back. Put three questions to the customer — four when the claim is broad — and wait for their replies before you write any number. An unscored outcome is legal; a bare number is not. A score comes only from a customer's own answers, so a missing one stays missing — no default, no midpoint, nothing computed in its place — and `opportunity_score` is `null` until both ratings exist.
 - **Expectation**: Qualitative interviews typically uncover 50–150 desired outcome statements.
 - **Tools to use**:
-  - `add_outcome(job_id, statement, importance?, satisfaction?, claim_check?, importance_n?, satisfaction_n?, score_method?)` — Capture each desired outcome. When you set a score, pass `claim_check` with `asked`, `answers`, and `skips` (each skip needs a reason); when the score comes from people, also pass the sample and the method. Ask the customer before scoring, never answer your own questions.
-  - `get_outcomes(job_id)` — Review all outcomes captured for a Job, including `score_method` and the counts.
+  - `add_outcome(job_id, statement, importance?, satisfaction?, claim_check?)` — Capture each desired outcome. When you set a score, pass `claim_check` with `asked`, `answers`, and `skips` (each skip needs a reason); ask the customer before scoring, never answer your own questions.
+  - `get_outcomes(job_id)` — Review all outcomes captured for a Job.
   - `evaluate_outcome(statement, job_id?)` — **Pre-write check**: run this before `add_outcome` to confirm the statement matches the ODI format. It returns coded issues and suggestions for any failure.
-  - `update_outcome(outcome_id, ...)` — Correct a statement, scores, or sample metadata; the same whole-record validation applies.
+  - `update_outcome(outcome_id, ...)` — Correct a statement or scores; the same validation applies.
 
 ### Stage 3: Build the Job Map
 - **When**: After key outcomes are captured. Never build a map on a job with zero outcomes — outcomes are what give the steps their meaning.
@@ -47,6 +43,7 @@ Follow this sequence when guiding a user through the ODI process:
 - **Formula**: Opportunity Score = importance + max(importance - satisfaction, 0)
 - **Scores > 10** indicate high innovation opportunity. Guide the user to focus efforts there.
 - **Scores ≤ 10** indicate appropriately served or overserved outcomes.
+- **Unscored** outcomes are neither. An outcome with no `importance` and `satisfaction` reads as unscored wherever it appears, and its `opportunity_score` is `null` — so it is excluded from both readings above. The next move is to ask the customer, never to supply the number.
 - **Tools to use**: `get_outcomes(job_id)` — Review opportunity_score field on each outcome. `compute_opportunity(importance, satisfaction)` — Calculate a score directly.
 
 ### Stage 5: Segment by Underserved Outcomes
@@ -57,6 +54,9 @@ Follow this sequence when guiding a user through the ODI process:
   scored outcomes by job and job-map step, so run it before answering 'who is this for?'.
 - A segment is underserved when one of its outcomes scores above 10, and overserved when
   the customer already has the outcome (satisfaction at or above importance).
+- A segment with even one unscored outcome carries no verdict. Calling a group
+  "appropriately served" requires every outcome in it to be rated by a customer, so an
+  unrated outcome leaves the segment unclassified rather than quietly middle.
 - An outcome that joins no cluster is reported as unclustered, never dropped or inflated
   into a segment.
 
@@ -87,10 +87,6 @@ def job_not_found(job_id: str) -> str:
 
 def customer_outcome_not_found(outcome_id: str) -> str:
     return f"Customer outcome not found: {outcome_id}"
-
-
-def alternative_not_found(alternative_id: str) -> str:
-    return f"Alternative not found: {alternative_id}"
 
 
 def step_not_found(step_id: str | None) -> str:

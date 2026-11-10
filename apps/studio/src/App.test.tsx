@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import { fetchConfig, healthLlm } from "./api/studioApi";
+import { PROBE_BASE_MS, PROBE_JITTER } from "./state/scheduleProbe";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -133,7 +134,11 @@ beforeEach(() => {
   // The old five-field panel is the subject of its own suite below.
   window.localStorage.setItem("studio.flags.firstRunIntro", "off");
   window.localStorage.setItem("studio.brief", JSON.stringify(BRIEF));
+  // Reset before the default, so a `*Once` answer left over from a test that
+  // did not consume it cannot leak into this one.
+  vi.mocked(fetchConfig).mockReset();
   vi.mocked(fetchConfig).mockResolvedValue(SIDECAR_CONFIG);
+  vi.mocked(healthLlm).mockReset();
   vi.mocked(healthLlm).mockResolvedValue({
     healthy: true,
     message: "LLM backend is reachable.",
@@ -344,7 +349,7 @@ describe("studio shell", () => {
 
   it("is still quiet after the deferred probe and the health poll have run", async () => {
     // The probes are deferred, not cancelled: two seconds after the paint the studio
-    // measures what it can reach, and every thirty seconds after that. On a hosted page
+    // measures what it can reach, and on a widening cadence after that. On a hosted page
     // with no sidecar every one of those measurements is a refusal, and none of them is
     // a strip across the top of the window.
     vi.mocked(fetchConfig).mockRejectedValue(new Error("no sidecar"));
@@ -374,8 +379,10 @@ describe("studio shell", () => {
       expect(document.querySelectorAll(".banner")).toHaveLength(0);
 
       vi.mocked(fetchConfig).mockRejectedValue(new Error("the sidecar went away"));
+      // The next probe lands within one base cadence ±20%, so advance past the
+      // longest wait the jitter can produce, not the nominal thirty seconds.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(31_000);
+        await vi.advanceTimersByTimeAsync(PROBE_BASE_MS * (1 + PROBE_JITTER) + 5_000);
       });
 
       const banners = document.querySelectorAll(".banner");
@@ -506,7 +513,7 @@ describe("first-run tour", () => {
       await screen.findByText("A quick look at your instruments."),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Make it real" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
@@ -526,7 +533,7 @@ describe("first-run tour", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByText("A quick look at your instruments.");
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Find my next opportunity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 
     expect(
       await screen.findByText(/I need to find the next opportunity worth chasing/),

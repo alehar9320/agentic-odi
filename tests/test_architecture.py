@@ -199,15 +199,7 @@ CORE = ROOT / "packages/core/src/agentic_odi_core"
 # fall behind the document it describes. ``__init__.py`` is excluded: it
 # re-exports the whole package and would belong to all four.
 CORE_LAYERS: dict[str, tuple[str, ...]] = {
-    "domain": (
-        "models",
-        "evaluation",
-        "mapping",
-        "corpus",
-        "alternatives",
-        "stats",
-        "schedule",
-    ),
+    "domain": ("models", "evaluation", "mapping", "corpus", "schedule", "traceability"),
     "persistence": (
         "repository",
         "sqlite_repository",
@@ -218,16 +210,7 @@ CORE_LAYERS: dict[str, tuple[str, ...]] = {
         "integrity",
         "recovery",
     ),
-    "methodology": (
-        "services",
-        "segmentation",
-        "strategy",
-        "router",
-        "messages",
-        "steve_jobs",
-        "survey",
-        "trust",
-    ),
+    "methodology": ("services", "segmentation", "strategy", "router", "messages", "steve_jobs"),
     "contract": ("contract", "errors", "remote", "schema", "connection", "consent"),
 }
 
