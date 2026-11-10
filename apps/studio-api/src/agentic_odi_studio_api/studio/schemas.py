@@ -62,8 +62,13 @@ class AddOutcomeRequest(BaseModel):
     importance: float | None = Field(default=None, ge=1.0, le=10.0)
     satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
     #: The questions behind the score. Required when either score is set; a
-    #: score without it is refused by the MCP tool.
+    #: score without it is refused by the MCP tool, and the by-hand HTTP path
+    #: records it as an unverified check rather than an interrogated one.
     claim_check: ClaimCheck | None = None
+    importance_n: int | None = Field(default=None, ge=1)
+    satisfaction_n: int | None = Field(default=None, ge=1)
+    score_method: Literal["estimate", "survey", "import"] = "estimate"
+    note: str | None = Field(default=None, max_length=500)
 
 
 class CreateJobRequest(BaseModel):
@@ -90,6 +95,10 @@ class UpdateOutcomeRequest(BaseModel):
     statement: str | None = None
     importance: float | None = None
     satisfaction: float | None = None
+    importance_n: int | None = Field(default=None, ge=1)
+    satisfaction_n: int | None = Field(default=None, ge=1)
+    score_method: Literal["estimate", "survey", "import"] | None = None
+    note: str | None = Field(default=None, max_length=500)
     mcp_url: str = ""
 
 
@@ -162,6 +171,23 @@ class UpdateCustomerOutcomeRequest(BaseModel):
     customer_value: CustomerValue | None = None
     business_value: BusinessValue | None = None
     step_id: str | None = None
+
+
+class AddAlternativeRequest(BaseModel):
+    mcp_url: str = ""
+    job_id: str
+    name: str
+    kind: str
+    notes: str | None = None
+    source_kind: str = "manual"
+
+
+class LinkAlternativeRequest(BaseModel):
+    mcp_url: str = ""
+    alternative_id: str
+    adequacy: float
+    usage_n: int | None = None
+    note: str | None = None
 
 
 class StudioBrief(BaseModel):
