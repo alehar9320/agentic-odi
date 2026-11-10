@@ -38,9 +38,20 @@ function Dock({
   onAction: (action: BannerActionId) => void;
   onIntent: (intent: string) => void;
 }) {
+  // The top dock is a page strip that only exists when there is a strip to
+  // hold. With nothing to show it collapses through CSS (see
+  // `.banner-dock--top.banner-dock--empty`), so the empty viewport never
+  // leaves a banner-shaped gap at the top of the window. The viewport stays
+  // registered with Radix either way, which is what the corner dock's toasts
+  // portal into. The overflow row rides along with the dock that owns it.
+  const empty = dock === "top" && banners.length === 0 && overflow === 0;
+
   return (
     <Toast.Provider swipeDirection="right">
-      <Toast.Viewport className={`banner-dock banner-dock--${dock}`} label={label}>
+      <Toast.Viewport
+        className={`banner-dock banner-dock--${dock}${empty ? " banner-dock--empty" : ""}`}
+        label={label}
+      >
         {banners.map((banner) => (
           <BannerRow
             key={banner.id}
@@ -63,6 +74,11 @@ function Dock({
 /**
  * Both docks, one model. `top` banners are page strips that hold the layout
  * still; `corner` banners float bottom-right.
+ *
+ * Both docks always mount. The top dock collapses to nothing through CSS when
+ * it has nothing to show (see `.banner-dock--top`), so the empty strip never
+ * leaves a banner-shaped gap at the top of the window — and the viewport stays
+ * registered with Radix, which is what the corner dock's toasts portal into.
  */
 export function BannerStack(props: BannerStackProps) {
   const context = useBannerOptional();

@@ -239,6 +239,7 @@ class LocalBackend(Backend):
 
     def _add_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import (
+            ClaimCheckError,
             JobNotFoundError,
             StepNotFoundError,
             ValueOutOfRangeError,
@@ -247,6 +248,7 @@ class LocalBackend(Backend):
         )
 
         step_id = args.get("step_id")
+        claim_check = args.get("claim_check")
         try:
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
@@ -254,6 +256,7 @@ class LocalBackend(Backend):
                 importance=float(args["importance"]),
                 satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
+                claim_check=claim_check,
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -261,6 +264,8 @@ class LocalBackend(Backend):
             raise BackendError(step_not_found(step_id)) from None
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
+        except ClaimCheckError as exc:
+            raise BackendError(str(exc)) from exc
         return outcome.model_dump()
 
     def _get_outcomes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -505,6 +510,42 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return artifact.model_dump()
 
+    def _propose_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import EvidenceNotFoundError, evidence_not_found
+
+        evidence_id = args["evidence_id"]
+        try:
+            proposal = self.service.propose_outcome_from_evidence(evidence_id)
+        except EvidenceNotFoundError as exc:
+            raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None
+        return proposal.model_dump()
+
+    def _list_proposals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import ProposalStatus
+
+        status = args.get("status")
+        try:
+            proposal_status = ProposalStatus(status) if status is not None else None
+        except ValueError:
+            raise BackendError(
+                f"Invalid proposal status '{status}'. Use proposed, approved, rejected, or edited."
+            ) from None
+        proposals = self.service.list_proposals(status=proposal_status)
+        return [proposal.model_dump() for proposal in proposals]
+
+    def _approve_proposal(self, args: dict[str, Any]) -> dict[str, Any]:
+        outcome = self.service.approve_proposal(
+            args["proposal_id"],
+            statement=args.get("statement"),
+            importance=args.get("importance"),
+            satisfaction=args.get("satisfaction"),
+        )
+        return outcome.model_dump()
+
+    def _reject_proposal(self, args: dict[str, Any]) -> dict[str, Any]:
+        proposal = self.service.reject_proposal(args["proposal_id"])
+        return proposal.model_dump()
+
     def _schedule_work(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import JobNotFoundError, job_not_found
 
@@ -564,185 +605,6 @@ class LocalBackend(Backend):
         from agentic_odi_core import odi_schema
 
         return odi_schema()
-
-    def _add_interview(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import JobNotFoundError, job_not_found
-
-        try:
-            interview = self.service.add_interview(
-                title=args["title"],
-                participant_label=args["participant_label"],
-                job_id=args.get("job_id"),
-                participant_role=args.get("participant_role"),
-                conducted_at=args.get("conducted_at"),
-                source_kind=args.get("source_kind", "manual"),
-                notes=args.get("notes"),
-            )
-        except JobNotFoundError:
-            raise BackendError(job_not_found(args.get("job_id") or "")) from None
-        return interview.model_dump()
-
-    def _get_interview(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import interview_not_found
-
-        interview = self.service.get_interview(args["interview_id"])
-        if interview is None:
-            raise BackendError(interview_not_found(args["interview_id"]))
-        return interview.model_dump()
-
-    def _list_interviews(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        items = self.service.list_interviews(
-            job_id=args.get("job_id"),
-            limit=args.get("limit"),
-            offset=args.get("offset", 0),
-        )
-        return [item.model_dump() for item in items]
-
-    def _delete_interview(self, args: dict[str, Any]) -> str:
-        from agentic_odi_core import InterviewNotFoundError, interview_not_found
-
-        interview_id = args["interview_id"]
-        try:
-            self.service.delete_interview(interview_id)
-        except InterviewNotFoundError:
-            raise BackendError(interview_not_found(interview_id)) from None
-        return interview_id
-
-    def _add_quote(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import InterviewNotFoundError, interview_not_found
-
-        try:
-            quote = self.service.add_quote(
-                interview_id=args["interview_id"],
-                text=args["text"],
-                speaker=args.get("speaker"),
-                start_ms=args.get("start_ms"),
-                end_ms=args.get("end_ms"),
-            )
-        except InterviewNotFoundError:
-            raise BackendError(interview_not_found(args["interview_id"])) from None
-        return quote.model_dump()
-
-    def _list_quotes(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        items = self.service.list_quotes(args["interview_id"])
-        return [item.model_dump() for item in items]
-
-    def _import_transcript(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import JobNotFoundError, job_not_found
-        from agentic_odi_core.transcript import TranscriptFormatError
-
-        display = args.get("display_name") or args.get("filename") or "stdin"
-        try:
-            interview, quotes = self.service.import_transcript(
-                args["text"],
-                title=args["title"],
-                participant_label=args["participant_label"],
-                filename=args.get("filename"),
-                fmt=args.get("format"),
-                job_id=args.get("job_id"),
-                participant_role=args.get("participant_role"),
-                conducted_at=args.get("conducted_at"),
-            )
-        except JobNotFoundError:
-            raise BackendError(job_not_found(args.get("job_id") or "")) from None
-        except TranscriptFormatError as exc:
-            raise BackendError(f"{display}: {exc}") from None
-        except ValueError as exc:
-            raise BackendError(f"{display}: {exc}") from None
-        return {"interview": interview.model_dump(), "quote_count": len(quotes)}
-
-    def _extract_candidates(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        from agentic_odi_core import (
-            InterviewNotFoundError,
-            QuoteNotFoundError,
-            interview_not_found,
-            quote_not_found,
-        )
-        from agentic_odi_core.extraction import FixtureExtractor
-
-        try:
-            candidates = self.service.extract_candidates(
-                args["quote_id"], FixtureExtractor(), args.get("stage_hint")
-            )
-        except QuoteNotFoundError:
-            raise BackendError(quote_not_found(args["quote_id"])) from None
-        except InterviewNotFoundError as exc:
-            raise BackendError(interview_not_found(exc.interview_id)) from None
-        return [candidate.model_dump(mode="json") for candidate in candidates]
-
-    def _get_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import candidate_not_found
-
-        candidate = self.service.get_candidate(args["candidate_id"])
-        if candidate is None:
-            raise BackendError(candidate_not_found(args["candidate_id"]))
-        return candidate.model_dump(mode="json")
-
-    def _list_candidates(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        from agentic_odi_core import CandidateStatus
-
-        raw_status = args.get("status")
-        status = CandidateStatus(raw_status) if raw_status is not None else None
-        items = self.service.list_candidates(
-            interview_id=args.get("interview_id"),
-            status=status,
-            limit=args.get("limit"),
-            offset=args.get("offset", 0),
-        )
-        return [item.model_dump(mode="json") for item in items]
-
-    def _update_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import CandidateNotFoundError, CandidateStatus, candidate_not_found
-
-        updates: dict[str, Any] = {}
-        if args.get("status") is not None:
-            updates["status"] = CandidateStatus(args["status"])
-        if args.get("statement") is not None:
-            updates["statement"] = args["statement"]
-        if args.get("decision_reason") is not None:
-            updates["decision_reason"] = args["decision_reason"]
-        try:
-            candidate = self.service.update_candidate(args["candidate_id"], updates)
-        except CandidateNotFoundError:
-            raise BackendError(candidate_not_found(args["candidate_id"])) from None
-        return candidate.model_dump(mode="json")
-
-    def _delete_candidate(self, args: dict[str, Any]) -> str:
-        from agentic_odi_core import CandidateNotFoundError, candidate_not_found
-
-        try:
-            self.service.delete_candidate(args["candidate_id"])
-        except CandidateNotFoundError:
-            raise BackendError(candidate_not_found(args["candidate_id"])) from None
-        return args["candidate_id"]
-
-    def _accept_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import CandidateNotFoundError, candidate_not_found
-
-        try:
-            candidate, outcome, evidence = self.service.accept_candidate(
-                args["candidate_id"],
-                importance=args["importance"],
-                satisfaction=args["satisfaction"],
-                statement=args.get("statement"),
-                step_id=args.get("step_id"),
-            )
-        except CandidateNotFoundError:
-            raise BackendError(candidate_not_found(args["candidate_id"])) from None
-        return {
-            "candidate": candidate.model_dump(mode="json"),
-            "outcome": outcome.model_dump(mode="json"),
-            "evidence": evidence.model_dump(mode="json"),
-        }
-
-    def _reject_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import CandidateNotFoundError, candidate_not_found
-
-        try:
-            candidate = self.service.reject_candidate(args["candidate_id"], reason=args["reason"])
-        except CandidateNotFoundError:
-            raise BackendError(candidate_not_found(args["candidate_id"])) from None
-        return candidate.model_dump(mode="json")
 
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
@@ -837,6 +699,26 @@ class LocalBackend(Backend):
         segments = self.service.list_segments(job_id=args.get("job_id"))
         return [segment.model_dump(mode="json") for segment in segments]
 
+    def _open_study(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import JobNotFoundError, OdiError, job_not_found
+
+        try:
+            study = self.service.open_study(
+                job_id=args["job_id"],
+                name=args["name"],
+                wave=int(args["wave"]),
+                method_notes=args.get("method_notes"),
+            )
+        except JobNotFoundError:
+            raise BackendError(job_not_found(args.get("job_id") or "")) from None
+        except OdiError as exc:
+            raise BackendError(str(exc)) from None
+        return study.model_dump(mode="json")
+
+    def _list_studies(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        studies = self.service.list_studies(job_id=args.get("job_id"))
+        return [study.model_dump(mode="json") for study in studies]
+
     def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
         strategy = self.service.get_strategy()
         return None if strategy is None else strategy.model_dump(mode="json")
@@ -850,6 +732,30 @@ class LocalBackend(Backend):
         except JobNotFoundError:
             raise BackendError(job_not_found(job_id or "")) from None
         return strategy.model_dump(mode="json")
+
+    def _link_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            outcome = self.service.link_outcome(args["outcome_id"], args["field"], args["text"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return outcome.model_dump(mode="json")
+
+    def _unlink_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            outcome = self.service.unlink_outcome(args["outcome_id"], args["field"], args["key"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return outcome.model_dump(mode="json")
+
+    def _get_outcome_alignments(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return self.service.list_alignments(args.get("outcome_id"))
+
+    def _get_traceability_report(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.traceability_report().as_dict()
 
 
 _LOCAL_HANDLERS = {
@@ -877,21 +783,11 @@ _LOCAL_HANDLERS = {
     "get_evidence": LocalBackend._get_evidence,
     "list_evidence": LocalBackend._list_evidence,
     "delete_evidence": LocalBackend._delete_evidence,
-    "add_interview": LocalBackend._add_interview,
-    "get_interview": LocalBackend._get_interview,
-    "list_interviews": LocalBackend._list_interviews,
-    "delete_interview": LocalBackend._delete_interview,
-    "add_quote": LocalBackend._add_quote,
-    "list_quotes": LocalBackend._list_quotes,
-    "import_transcript": LocalBackend._import_transcript,
-    "extract_candidates": LocalBackend._extract_candidates,
-    "get_candidate": LocalBackend._get_candidate,
-    "list_candidates": LocalBackend._list_candidates,
-    "update_candidate": LocalBackend._update_candidate,
-    "delete_candidate": LocalBackend._delete_candidate,
-    "accept_candidate": LocalBackend._accept_candidate,
-    "reject_candidate": LocalBackend._reject_candidate,
     "promote_evidence": LocalBackend._promote_evidence,
+    "propose_outcome": LocalBackend._propose_outcome,
+    "list_proposals": LocalBackend._list_proposals,
+    "approve_proposal": LocalBackend._approve_proposal,
+    "reject_proposal": LocalBackend._reject_proposal,
     "schedule_work": LocalBackend._schedule_work,
     "get_scheduled_work": LocalBackend._get_scheduled_work,
     "list_scheduled_work": LocalBackend._list_scheduled_work,
@@ -908,8 +804,14 @@ _LOCAL_HANDLERS = {
     "dismiss_signal": LocalBackend._dismiss_signal,
     "segment_market": LocalBackend._segment_market,
     "get_segments": LocalBackend._get_segments,
+    "open_study": LocalBackend._open_study,
+    "list_studies": LocalBackend._list_studies,
     "get_strategy": LocalBackend._get_strategy,
     "propose_strategy": LocalBackend._propose_strategy,
+    "link_outcome": LocalBackend._link_outcome,
+    "unlink_outcome": LocalBackend._unlink_outcome,
+    "get_outcome_alignments": LocalBackend._get_outcome_alignments,
+    "get_traceability_report": LocalBackend._get_traceability_report,
     "get_health": LocalBackend._get_health,
 }
 

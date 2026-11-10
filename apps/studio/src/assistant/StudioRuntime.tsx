@@ -21,6 +21,8 @@ import type { ChatMessage } from "../types";
 import { createAttachmentAdapter, preparedAttachments } from "./attachments";
 import { textOf, toThreadMessageLike } from "./convert";
 import { createDictationAdapter } from "./dictation";
+import { textWithQuote, type ComposerQuote } from "./quote";
+import { createSpeechAdapter } from "./speech";
 
 export interface StudioSuggestion {
   title: string;
@@ -140,11 +142,15 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
     switchBranch,
     respondToApproval,
     stopStreaming,
+    queue,
   } = useStudio();
 
   const attachments = useMemo(() => createAttachmentAdapter(), []);
   // Null where speech recognition is missing, so the composer shows no mic.
   const dictation = useMemo(() => createDictationAdapter(), []);
+  // Null in a shell without Web Speech, so no Speak control is ever rendered
+  // where it could only throw.
+  const speech = useMemo(() => createSpeechAdapter(), []);
   const jobCount = canvas?.jobs.length ?? 0;
   const outcomeCount = canvas?.outcomes.length ?? 0;
   const suggestions = useMemo(
@@ -157,9 +163,22 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
     messages,
     convertMessage: toThreadMessageLike,
     suggestions,
-    adapters: { attachments, ...(dictation ? { dictation } : {}) },
+    // #410: with a queue attached, a composer send during a run lands in the
+    // lane instead of hitting a wall, and the lane drains in order.
+    queue: queue ?? undefined,
+    adapters: {
+      attachments,
+      ...(dictation ? { dictation } : {}),
+      ...(speech ? { speech } : {}),
+    },
     onNew: async (message) => {
-      await sendMessage(textOf(message), preparedAttachments(message.attachments));
+      // assistant-ui attaches the composer quote as message metadata. The turn
+      // carries it as a blockquote so the sidecar's stored text keeps it.
+      const quote = (message.metadata?.custom as { quote?: ComposerQuote } | undefined)?.quote;
+      await sendMessage(
+        textWithQuote(textOf(message), quote),
+        preparedAttachments(message.attachments),
+      );
     },
     onEdit: async (message) => {
       await editFrom(message.sourceId, textOf(message), preparedAttachments(message.attachments));

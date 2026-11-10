@@ -1,4 +1,10 @@
+import { authHeaders } from "../../api/studioApi";
 import { apiUrl } from "../../bridge/desktopBridge";
+import {
+  endpointReachability,
+  isEndpointConfiguredForSettings,
+  isPrivateHost,
+} from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
 
 export type CapabilityId =
@@ -24,7 +30,7 @@ export interface CapabilityProbe {
   id: CapabilityId;
   label: string;
   description: string;
-  check(settings: StudioConfig): Promise<boolean>;
+  check(settings: StudioConfig): Promise<{ ok: boolean; reason?: string }>;
 }
 
 const localStatuses: Record<CapabilityId, Capability> = {
@@ -89,15 +95,6 @@ function isBrowserModelAvailable(): boolean {
   return Boolean(ai && typeof ai.languageModel === "function");
 }
 
-function isEndpointConfigured(settings: StudioConfig): boolean {
-  return Boolean(
-    settings.base_url &&
-      settings.api_key &&
-      settings.model_name &&
-      settings.base_url !== "http://localhost:8001/v1",
-  );
-}
-
 /** Probe a same-origin sidecar route. In the browser this is the Worker
  * origin; in Tauri it is the local sidecar at 127.0.0.1:8100. When
  * `capabilityId` is given the route is expected to return a capabilities
@@ -107,6 +104,7 @@ function isEndpointConfigured(settings: StudioConfig): boolean {
 async function probeSidecar(path: string, capabilityId?: CapabilityId): Promise<boolean> {
   try {
     const response = await fetch(apiUrl(path), {
+      headers: authHeaders(),
       signal: AbortSignal.timeout(2000),
     });
     if (!response.ok) {
@@ -130,37 +128,58 @@ export class CapabilityRegistry {
       id: "browser-model",
       label: localStatuses["browser-model"].label,
       description: localStatuses["browser-model"].description,
-      check: async () => isBrowserModelAvailable(),
+      check: async () => ({ ok: isBrowserModelAvailable() }),
     },
     {
       id: "endpoint-model",
       label: localStatuses["endpoint-model"].label,
       description: localStatuses["endpoint-model"].description,
-      check: async (settings) => isEndpointConfigured(settings),
+      check: async (settings) => {
+        if (!isEndpointConfiguredForSettings(settings)) {
+          return { ok: false };
+        }
+        const originClass = isPrivateHost(window.location.hostname) ? "device" : "hosted";
+        const reachability = endpointReachability(
+          {
+            base_url: settings.base_url,
+            api_key: settings.api_key,
+            model: settings.model_name,
+          },
+          { originClass },
+        );
+        if (reachability === "device-only") {
+          return {
+            ok: false,
+            reason:
+              "This endpoint is on your machine. A hosted page cannot reach it; use the desktop app or open the Studio on this device.",
+          };
+        }
+        return { ok: true };
+      },
     },
     {
       id: "sidecar-llm",
       label: localStatuses["sidecar-llm"].label,
       description: localStatuses["sidecar-llm"].description,
-      check: async () => probeSidecar("/api/capabilities", "sidecar-llm"),
+      check: async () => ({ ok: await probeSidecar("/api/capabilities", "sidecar-llm") }),
     },
     {
       id: "sidecar-connectors",
       label: localStatuses["sidecar-connectors"].label,
       description: localStatuses["sidecar-connectors"].description,
-      check: async () => probeSidecar("/api/connectors"),
+      check: async () => ({ ok: await probeSidecar("/api/connectors") }),
     },
     {
       id: "sidecar-mcp",
       label: localStatuses["sidecar-mcp"].label,
       description: localStatuses["sidecar-mcp"].description,
-      check: async () => probeSidecar("/api/health/mcp"),
+      check: async () => ({ ok: await probeSidecar("/api/health/mcp") }),
     },
     {
       id: "sidecar-import",
       label: localStatuses["sidecar-import"].label,
       description: localStatuses["sidecar-import"].description,
-      check: async () => probeSidecar("/api/capabilities", "sidecar-import"),
+      check: async () => ({ ok: await probeSidecar("/api/capabilities", "sidecar-import") }),
     },
   ];
 
@@ -170,7 +189,9 @@ export class CapabilityRegistry {
         let ok: boolean;
         let reason: string | undefined;
         try {
-          ok = await probe.check(settings);
+          const result = await probe.check(settings);
+          ok = result.ok;
+          reason = result.reason;
         } catch (error) {
           ok = false;
           reason = error instanceof Error ? error.message : "Probe failed.";

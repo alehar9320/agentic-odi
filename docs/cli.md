@@ -142,6 +142,7 @@ only when you intentionally need to stage a map before capturing outcomes.
 
 # Desired Outcomes
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4 --claim-check '{"asked": ["How long does setup take?"], "answers": ["About a day"]}'
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
@@ -153,10 +154,24 @@ agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
 agentic-odi summary <job-id> --top 3 --json
+
+# Onboarding funnel: launch, first message, first outcome, first score, return
+agentic-odi stats
+agentic-odi stats --json
+agentic-odi stats --reset --yes
 ```
 
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
 checks a statement against the ODI format rules before saving.
+
+A score must carry the questions behind it. `--claim-check` takes the JSON you
+collected — `asked`, `answers`, and `skips` (each skip needs a reason). Omit it
+and the score is recorded as unverified, saying no customer questions were
+asked, so a by-hand score is never mistaken for an interrogated one. The MCP
+`add_outcome` tool is stricter: it refuses a score with no `claim_check` at all,
+and a score with no numbers is always legal. Its description puts the interview
+first — three questions to the customer before any number, and their replies as
+the answers.
 
 Job names are validated by the core model: 3–64 characters drawn from letters,
 digits, spaces, underscores, and hyphens. Descriptions may be up to 500
@@ -166,6 +181,16 @@ and the Studio API returns a 422 with the same message.
 `summary` shows how many of the eight job-map phases the Job covers, which are
 still missing, and the underserved outcomes (score above 10) in descending
 order. `--top` caps that list; `--json` returns the same data for a script.
+
+`stats` reports the onboarding funnel: how many times the sidecar was launched,
+and whether this store has seen a first message, a first outcome, a first score,
+and a return session. Counts come from the same local event log as the records
+do, so nothing is uploaded anywhere and a counter that has not happened reads as
+zero rather than a guess. Each event carries a session id drawn fresh for the
+process, which is not the per-install device id. `--reset` appends a marker that
+puts the counters back to zero and leaves the underlying events in place; it asks
+first unless you pass `--yes`. With `--backend mcp` the command exits 1: that
+backend has no local log to count.
 
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
@@ -185,6 +210,13 @@ agentic-odi evidence add \
   --content "Setup takes two days for every new engineer" \
   --job-id <job-id>
 
+# ...or from a text file (or '-' for stdin), on the same cap the Studio uses
+agentic-odi evidence add \
+  --source-name "interview" --name "Support lead" \
+  --file quote.md
+cat quote.txt | agentic-odi evidence add \
+  --source-name "interview" --name "Support lead" --file -
+
 # Read and delete
 agentic-odi evidence list --job-id <job-id>
 agentic-odi evidence list --job-id <job-id> --json
@@ -195,6 +227,11 @@ agentic-odi evidence delete <evidence-id> --yes
 agentic-odi evidence promote <evidence-id> --to job
 agentic-odi evidence promote <evidence-id> --to outcome --job-id <job-id>
 ```
+
+`--file` reads `.txt`, `.md`, `.markdown`, `.vtt`, and `.srt`, and takes exactly
+one of `--content` or `--file`. A file longer than 20,000 characters is truncated
+and the kept amount is reported. `.pdf` and `.docx` are refused: attach them in
+the Studio, which extracts their text.
 
 `connectors ingest --job-id <job-id>` maps every evidence-bearing record in the
 ingested batch into evidence in one step.
@@ -255,93 +292,24 @@ When no path has evidence, `strategy propose` exits non-zero and says what is
 missing rather than inventing a bet. Until one exists, `strategy show` prints
 "No strategy recorded" and points at `strategy propose`.
 
-## Interviews
+## Studies and waves
 
-An interview records who took part, when, and the job it informs. Its quotes
-are the verbatim sentences the research is built from — the unit the Listen
-pillar works on.
-
-```bash
-# Record an interview
-agentic-odi interviews add \
-  --title "Ana — onboarding" --participant "Ana" \
-  --role "Ops lead" --job-id <job-id>
-
-# Read and delete
-agentic-odi interviews list --job-id <job-id>
-agentic-odi interviews list --json
-agentic-odi interviews get <interview-id>
-agentic-odi interviews quotes <interview-id>
-agentic-odi interviews delete <interview-id> --yes
-```
-
-### Import a transcript
-
-`interviews import` turns a transcript file into one interview plus its quotes
-in a single step. The format is detected from the extension and the content, or
-set with `--format md|txt|vtt|srt`. A malformed transcript is refused before
-anything is written, so a failure never leaves a half-imported interview.
+A study is one named pass over a job — its interviews, its outcomes, its dates.
+Opening the same study again is a new **wave**, not a second copy of the first, so
+"the market last quarter" and "the market this quarter" stay comparable. A study
+opens `planned`; the same `(job, name)` may not repeat a wave, which refuses an
+accidental re-run while leaving a deliberate later wave expressible.
 
 ```bash
-agentic-odi interviews import session.vtt \
-  --title "Ana — onboarding" --participant "Ana" --job-id <job-id>
-cat session.vtt | agentic-odi interviews import - \
-  --title "Ana — onboarding" --participant "Ana"
+agentic-odi studies open --job <job-id> --name "Invoice sweep" --wave 1
+agentic-odi studies open --job <job-id> --name "Invoice sweep" --wave 2 --method-notes "revisit after the price change"
+agentic-odi studies list
+agentic-odi studies list --job <job-id> --json
 ```
 
-In a cue file (`.vtt`/`.srt`) each cue becomes one quote with its start and end
-times; `<v Speaker>` voice tags become the quote's speaker. In markdown, each
-`**Speaker:**` block becomes one quote; wrapped lines fold into it. In plain
-text, each paragraph becomes one quote with no speaker.
-
-`participant_label` is free text such as `"Ana"` or `"Participant 3"` — never a
-real name, email, or company. Quotes are ordered by a service-assigned ordinal;
-deleting an interview removes its quotes and nothing else.
-
-### Extract candidate outcomes
-
-`interviews extract` turns one quote into candidate desired-outcome statements.
-It never writes an Outcome: a valid proposal is stored `proposed`, and a
-proposal that fails the ODI statement check is stored `rejected` with the
-validator's reason, so a bad extractor is visible rather than silent. Running it
-again adds nothing and never resets a decision.
-
-```bash
-agentic-odi interviews extract <quote-id>
-agentic-odi candidates list --status proposed
-agentic-odi candidates list --interview-id <interview-id> --json
-agentic-odi candidates get <candidate-id>
-agentic-odi candidates accept <candidate-id> --importance 8 --satisfaction 3
-agentic-odi candidates reject <candidate-id> --reason "not a real need"
-agentic-odi candidates delete <candidate-id> --yes
-```
-
-Deleting an interview removes its candidates along with its quotes.
-
-### Accept or reject a candidate
-
-`candidates accept` turns one proposed candidate into exactly one Outcome. The
-statement is validated before anything is written; the verbatim quote is then
-stored as an `Evidence` row with `source_kind="interview"` and
-`raw={interview_id, quote_id}`, so the number travels with the sentence that
-produced it. Accepting twice returns the first outcome — a retry never
-duplicates the outcome or its evidence.
-
-The interview must be linked to a job (`interviews add --job-id`) so the new
-outcome has somewhere to live; an unlinked interview is refused rather than
-guessed at. Pass `--statement` to edit the wording first, and `--step-id` to
-place the outcome on a job-map step.
-
-`candidates reject` keeps the candidate and requires a nonblank `--reason`, so
-a decision is defensible later. Rejecting an accepted candidate is refused: it
-would orphan the outcome the acceptance produced.
-
-```bash
-agentic-odi candidates accept <candidate-id> --importance 8 --satisfaction 3
-agentic-odi candidates accept <candidate-id> --statement "Minimize the time to onboard" \
-  --importance 8 --satisfaction 3 --json
-agentic-odi candidates reject <candidate-id> --reason "covered by another outcome"
-```
+`studies list` is empty until a study has been opened. Outcomes carry an optional
+`study_id` scoping them to a study of their own job; a row that predates studies has
+none, and opening studies never invents one for it.
 
 ## Schema, scoring, and guidance
 

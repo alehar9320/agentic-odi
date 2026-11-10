@@ -4,6 +4,7 @@ import {
   bannerView,
   canRestartNow,
   describeCheckedAt,
+  formatActionTime,
   initialSnapshot,
   progressPercent,
   reduce,
@@ -188,6 +189,69 @@ describe("reduce", () => {
   });
 });
 
+describe("check honesty", () => {
+  it("moves lastSuccessfulCheckAt only when the server answered", () => {
+    const checked = reduce(initialSnapshot(), {
+      type: "check-none",
+      currentVersion: "0.12.0",
+      at: NOW,
+    });
+    expect(checked.lastSuccessfulCheckAt).toBe(NOW);
+
+    const failed = reduce(checked, {
+      type: "failed",
+      message: "Couldn't reach the update server.",
+      at: NOW + 60_000,
+    });
+    expect(failed.lastCheckedAt).toBe(NOW + 60_000);
+    expect(failed.lastSuccessfulCheckAt).toBe(NOW);
+  });
+
+  it("says it could not check, and names the last check that worked", () => {
+    const checked = reduce(initialSnapshot(), {
+      type: "check-none",
+      currentVersion: "0.12.0",
+      at: NOW - 2 * 3_600_000,
+    });
+    const failed = reduce(checked, {
+      type: "failed",
+      message: "Couldn't reach the update server.",
+      at: NOW,
+    });
+
+    expect(statusLine(failed, NOW)).toBe(
+      "Couldn't reach the update server. Last successful check was 2 hours ago.",
+    );
+  });
+
+  it("admits when it has never reached the server", () => {
+    const failed = reduce(initialSnapshot(), {
+      type: "failed",
+      message: "Couldn't reach the update server.",
+      at: NOW,
+    });
+
+    expect(statusLine(failed, NOW)).toMatch(/not reached the server yet/i);
+  });
+
+  it("keeps a known update's failure message alone", () => {
+    const failed = reduce(found(), {
+      type: "failed",
+      message: "Signature mismatch",
+      at: NOW,
+    });
+
+    expect(statusLine(failed, NOW)).toBe("Signature mismatch");
+  });
+});
+
+describe("formatActionTime", () => {
+  it("renders a clock time a person can read", () => {
+    expect(formatActionTime(NOW)).toMatch(/^\d{2}:\d{2}$/);
+    expect(formatActionTime(NOW + 6 * 3_600_000)).not.toBe(formatActionTime(NOW));
+  });
+});
+
 describe("bannerView", () => {
   it("stays silent while a background check fails", () => {
     const next = reduce(initialSnapshot(), { type: "failed", message: "offline", at: NOW });
@@ -263,11 +327,11 @@ describe("statusLine", () => {
       received: 3,
       total: 4,
     });
-    expect(statusLine(next, NOW)).toBe("Downloading Living Studio 0.12.0 — 75%");
+    expect(statusLine(next, NOW)).toBe("Downloading version 0.12.0 — 75%");
   });
 
   it("reports a staged update and the restart", () => {
-    expect(statusLine(ready(), NOW)).toBe("Living Studio 0.12.0 is ready. Restart to finish.");
+    expect(statusLine(ready(), NOW)).toBe("Version 0.12.0 is ready. Restart to finish.");
   });
 
   it("explains a pending Windows install", () => {
