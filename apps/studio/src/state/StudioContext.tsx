@@ -99,7 +99,6 @@ import type {
   StudioBrief,
   StudioConfig,
   StudioError,
-  StudioTheme,
   Thesis,
   ToolStatus,
   TurnNode,
@@ -107,8 +106,13 @@ import type {
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
-import { resolveTheme } from "../lib/theme";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
+import { SettingsProvider, useSettings, SETTINGS_KEY, EMPTY_CONFIG } from "./settings/SettingsContext";
+import {
+  NoticesProvider,
+  useNoticesActions,
+  type ToastKind,
+} from "./notices/NoticesContext";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -230,11 +234,9 @@ function readStudioError(raw: unknown): StudioError {
   return parsed;
 }
 
-const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
-const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const THESES_KEY = "studio.theses";
 
 /** How often the studio re-probes the model and the MCP server. */
@@ -256,12 +258,10 @@ const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = 
   strategy: "segments",
 };
 
-export const EMPTY_CONFIG: StudioConfig = {
-  base_url: "http://localhost:8001/v1",
-  api_key: "local",
-  model_name: "local-tools-model",
-  mcp_url: "http://localhost:8000/mcp",
-};
+export function writeReceipt(record: unknown, acknowledged: string): string {
+  const pending = (record as { pending?: boolean } | null | undefined)?.pending === true;
+  return pending ? "Saved on this device · will sync" : acknowledged;
+}
 
 export type ToastKind = "success" | "error" | "info";
 
@@ -448,7 +448,6 @@ export interface StudioContextValue {
   closePanel: () => void;
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
-  toasts: Toast[];
   pushToast: (
     kind: ToastKind,
     message: string,
@@ -541,6 +540,20 @@ function loadSettings(): StudioConfig {
   return EMPTY_CONFIG;
 }
 
+/**
+ * Whether an edit moved what the studio talks to. The theme is stored beside the
+ * endpoints but is not one of them, so switching it must not trigger a probe.
+ */
+function settingsTargetsChanged(a: StudioConfig, b: StudioConfig): boolean {
+  return (
+    a.base_url !== b.base_url ||
+    a.api_key !== b.api_key ||
+    a.model_name !== b.model_name ||
+    a.mcp_url !== b.mcp_url
+  );
+}
+}
+
 function loadFocusedSubject(): FocusSubject | null {
   const session = loadSession();
   if (!session) {
@@ -576,14 +589,6 @@ function loadCanvasCache(): CanvasData | null {
     /* ignore malformed cache */
   }
   return null;
-}
-
-function loadSidecarNoticeDismissed(): boolean {
-  try {
-    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
 }
 
 function loadDisplayName(): string {
@@ -633,12 +638,14 @@ function loadTheses(): Thesis[] {
   return [];
 }
 
-export function StudioProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<StudioConfig>(loadSettings);
-  // The stored choice, or the operating system when there is none — the same
-  // resolution the inline bootstrap in index.html runs before React, so the
-  // class it painted and the class the app keeps are the same one.
-  const theme: StudioTheme = resolveTheme(settings.theme);
+function StudioProviderInner({ children }: { children: ReactNode }) {
+  const { settings, saveSettings: persistSettings } = useSettings();
+  const {
+    pushToast,
+    dismissToast,
+    setDismissedSidecarNotice,
+    dismissedSidecarNotice,
+  } = useNoticesActions();
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   // The context conversation is never a gate. It opens from the stage, from a
@@ -660,7 +667,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
-  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -670,7 +676,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
   const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
@@ -696,7 +701,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [featuredError, setFeaturedError] = useState<StudioError | null>(null);
   const [connectorModalDismissed, setConnectorModalDismissed] = useState(false);
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
-  const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   /** The id of the newest turn on the wire; a steered cut-in takes it over (#410). */
   const liveTurnId = useRef<string | null>(null);
@@ -783,35 +787,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [refreshSignals, settings.mcp_url],
   );
 
-
-  const pushToast = useCallback(
-    (
-      kind: ToastKind,
-      message: string,
-      options?: { action?: { label: string; run: () => void }; durationMs?: number },
-    ) => {
-      const id = (toastId.current += 1);
-      setToasts((prev) => [
-        ...prev,
-        {
-          id,
-          kind,
-          message,
-          ...(options?.action ? { action: options.action } : {}),
-          ...(options?.durationMs ? { durationMs: options.durationMs } : {}),
-        },
-      ]);
-      window.setTimeout(() => {
-        setToasts((prev) => prev.filter((toast) => toast.id !== id));
-      }, options?.durationMs ?? 6000);
-      return id;
-    },
-    [],
-  );
-
-  const dismissToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
 
   const threadSnapshot = useRef<ThreadSnapshot | null>(null);
 
@@ -1079,7 +1054,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // The theme lives on <html> so every surface, portal, and native control
+// The theme lives on <html> so every surface, portal, and native control
   // follows one class instead of each component tracking its own copy.
   const appliedTheme = useRef<StudioTheme | null>(null);
   useEffect(() => {
@@ -1110,14 +1085,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
   }, [theme]);
 
-  const saveSettings = useCallback((config: StudioConfig) => {
-    setSettings(config);
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
+  const saveSettings = useCallback(
+    (config: StudioConfig) => {
+      // Only an edit that changes what the studio talks to is worth a probe: a
+      // theme change is a settings change too, but nothing about a connection
+      // moved, so it earns nothing. The timer is debounced, so typing a URL —
+      // many saves in a row — earns one probe once the typing stops.
+      if (settingsTargetsChanged(settingsRef.current, config)) {
+        if (settingsProbeTimerRef.current !== null) {
+          clearTimeout(settingsProbeTimerRef.current);
+        }
+        settingsProbeTimerRef.current = setTimeout(() => {
+          settingsProbeTimerRef.current = null;
+          settingsProbeRef.current();
+        }, PROBE_SETTINGS_DEBOUNCE_MS);
+      }
+      settingsRef.current = config;
+      persistSettings(config);
+    },
+    [persistSettings],
+  );
 
   const setDisplayName = useCallback((name: string) => {
     setDisplayNameState(name);
@@ -1243,7 +1230,38 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
       return report;
     },
-    [surveyConnections],
+    [setDismissedSidecarNotice],
+  );
+
+  /**
+   * The browser has no network. Both the process and the model are unreachable
+   * for a reason that is neither's fault, so the studio says so once and stops
+   * asking until the network returns (#535).
+   */
+  const applyOffline = useCallback(() => {
+    setSidecarReachable(false);
+    setMcpReachable(false);
+    setLlmHealth({ healthy: false, message: "No network" });
+  }, []);
+
+  /**
+   * Probe the sidecar, MCP server, and model, and let the studio act on it.
+   *
+   * A probe a person asked for — Recheck, the setup walk, a settings edit —
+   * restarts the cadence, because the endpoint they just changed is not the one
+   * that kept failing.
+   */
+  const checkConnections = useCallback(
+    async (
+      override: Partial<StudioConfig> = {},
+      mode: "evidence" | "recovery" = "evidence",
+    ): Promise<ConnectionReport> => {
+      const report = applyReport(await surveyConnections(override), mode);
+      probeSchedulerRef.current?.reset();
+      return report;
+    },
+    [surveyConnections, applyReport],
+  );
   );
 
   // Re-probe after the user acted on the sidecar notice (e.g. started the
@@ -1264,12 +1282,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const dismissSidecarNotice = useCallback(() => {
     setDismissedSidecarNotice(true);
-    try {
-      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
+  }, [setDismissedSidecarNotice]);
 
   const refreshCanvas = useCallback(async () => {
     // The inbox is re-read alongside the board: every path that reaches this
@@ -2562,7 +2575,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       openPanel,
       closePanel,
       ask,
-      toasts,
       pushToast,
       dismissToast,
       connectors,
@@ -2687,7 +2699,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       openPanel,
       closePanel,
       ask,
-      toasts,
       pushToast,
       dismissToast,
       connectors,
@@ -2743,6 +2754,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
+}
+
+export function StudioProvider({ children }: { children: ReactNode }) {
+  return (
+    <SettingsProvider>
+      <NoticesProvider>
+        <StudioProviderInner>{children}</StudioProviderInner>
+      </NoticesProvider>
+    </SettingsProvider>
+  );
 }
 
 export function useStudio(): StudioContextValue {
