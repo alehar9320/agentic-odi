@@ -26,7 +26,6 @@ import typer
 
 if TYPE_CHECKING:
     from agentic_odi_core import ODIService
-    from agentic_odi_core.models import ObservationStatus
 
 # Kept as literals so importing the CLI does not pull in the core package
 # (``agentic-odi --version`` must stay lightweight). ``tests/contract`` asserts
@@ -659,52 +658,6 @@ class LocalBackend(Backend):
             raise BackendError(_VALUE_RANGE_ERROR)
         return compute_opportunity_score(importance, satisfaction)
 
-    def _list_conversations(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        items = self.service.list_conversations(
-            limit=args.get("limit"), offset=args.get("offset") or 0
-        )
-        return [item.model_dump() for item in items]
-
-    def _get_conversation(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import ConversationNotFoundError, conversation_not_found
-
-        conversation_id = args["conversation_id"]
-        try:
-            conversation = self.service.get_conversation(conversation_id)
-        except ConversationNotFoundError:
-            raise BackendError(conversation_not_found(conversation_id)) from None
-        messages = self.service.conversation_thread(
-            conversation_id, limit=args.get("message_limit") or 200
-        )
-        return {
-            "conversation": conversation.model_dump(),
-            "messages": [message.model_dump() for message in messages],
-        }
-
-    def _list_observations(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        items = self.service.list_observations(
-            status=args.get("status"), limit=args.get("limit"), offset=args.get("offset") or 0
-        )
-        return [item.model_dump() for item in items]
-
-    def _confirm_observation(self, args: dict[str, Any]) -> dict[str, Any]:
-        return self._set_observation_status(args, "confirmed")
-
-    def _dismiss_observation(self, args: dict[str, Any]) -> dict[str, Any]:
-        return self._set_observation_status(args, "dismissed")
-
-    def _set_observation_status(
-        self, args: dict[str, Any], status: ObservationStatus
-    ) -> dict[str, Any]:
-        from agentic_odi_core import ObservationNotFoundError, observation_not_found
-
-        observation_id = args["observation_id"]
-        try:
-            observation = self.service.set_observation_status(observation_id, status)
-        except ObservationNotFoundError:
-            raise BackendError(observation_not_found(observation_id)) from None
-        return observation.model_dump()
-
     def _list_signals(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         signals = self.service.list_signals(
             unread_only=bool(args.get("unread_only", False)),
@@ -780,6 +733,30 @@ class LocalBackend(Backend):
             raise BackendError(job_not_found(job_id or "")) from None
         return strategy.model_dump(mode="json")
 
+    def _link_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            outcome = self.service.link_outcome(args["outcome_id"], args["field"], args["text"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return outcome.model_dump(mode="json")
+
+    def _unlink_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            outcome = self.service.unlink_outcome(args["outcome_id"], args["field"], args["key"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return outcome.model_dump(mode="json")
+
+    def _get_outcome_alignments(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return self.service.list_alignments(args.get("outcome_id"))
+
+    def _get_traceability_report(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.traceability_report().as_dict()
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -822,11 +799,6 @@ _LOCAL_HANDLERS = {
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,
     "get_capabilities_manifest": LocalBackend._get_capabilities_manifest,
-    "list_conversations": LocalBackend._list_conversations,
-    "get_conversation": LocalBackend._get_conversation,
-    "list_observations": LocalBackend._list_observations,
-    "confirm_observation": LocalBackend._confirm_observation,
-    "dismiss_observation": LocalBackend._dismiss_observation,
     "list_signals": LocalBackend._list_signals,
     "mark_signal_read": LocalBackend._mark_signal_read,
     "dismiss_signal": LocalBackend._dismiss_signal,
@@ -836,6 +808,10 @@ _LOCAL_HANDLERS = {
     "list_studies": LocalBackend._list_studies,
     "get_strategy": LocalBackend._get_strategy,
     "propose_strategy": LocalBackend._propose_strategy,
+    "link_outcome": LocalBackend._link_outcome,
+    "unlink_outcome": LocalBackend._unlink_outcome,
+    "get_outcome_alignments": LocalBackend._get_outcome_alignments,
+    "get_traceability_report": LocalBackend._get_traceability_report,
     "get_health": LocalBackend._get_health,
 }
 
@@ -901,8 +877,6 @@ _LIST_TOOLS = frozenset(
         "get_outcomes",
         "list_customer_outcomes",
         "list_evidence",
-        "list_conversations",
-        "list_observations",
         "list_signals",
         "list_scheduled_work",
         "segment_market",

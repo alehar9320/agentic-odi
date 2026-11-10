@@ -18,14 +18,12 @@ from agentic_odi_core import (
     ODI_FRAMEWORK_GUIDELINES,
     TOOL_SPECS,
     ClaimCheckError,
-    ConversationNotFoundError,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
     JobStage,
-    ObservationNotFoundError,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
@@ -50,6 +48,7 @@ from agentic_odi_core import (
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
 )
+from agentic_odi_core.errors import ValidationError as OdiValidationError
 from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
@@ -174,14 +173,6 @@ def _outcome_not_found(outcome_id: str | None) -> str:
     return _fail(
         OutcomeNotFoundError(str(outcome_id)), f"Error: Outcome with ID {outcome_id} not found."
     )
-
-
-def _conversation_not_found(conversation_id: str) -> str:
-    return f"Error: Conversation with ID {conversation_id} not found."
-
-
-def _observation_not_found(observation_id: str) -> str:
-    return f"Error: Observation with ID {observation_id} not found."
 
 
 def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
@@ -782,64 +773,6 @@ def get_odi_schema() -> str:
 
 
 @mcp.tool
-def list_conversations(limit: int | None = None, offset: int = 0) -> str:
-    """List stored conversations, most recently active first."""
-    items = service.list_conversations(limit=limit, offset=offset)
-    return json.dumps([item.model_dump(mode="json") for item in items])
-
-
-@mcp.tool
-def get_conversation(conversation_id: str, message_limit: int = 200) -> str:
-    """Read one conversation with its messages, oldest first.
-
-    ``message_limit`` keeps the most recent turns, which is what resuming a
-    thread needs; a stored UI surface arrives in the message's ``parts``.
-    """
-    try:
-        conversation = service.get_conversation(conversation_id)
-    except ConversationNotFoundError:
-        return _conversation_not_found(conversation_id)
-    messages = service.conversation_thread(conversation_id, limit=message_limit)
-    return json.dumps(
-        {
-            "conversation": conversation.model_dump(mode="json"),
-            "messages": [message.model_dump(mode="json") for message in messages],
-        }
-    )
-
-
-@mcp.tool
-def list_observations(status: str | None = None, limit: int | None = None, offset: int = 0) -> str:
-    """List what the agent learned, newest first, optionally filtered by status."""
-    items = service.list_observations(status=status, limit=limit, offset=offset)
-    return json.dumps([item.model_dump(mode="json") for item in items])
-
-
-@mcp.tool
-def confirm_observation(observation_id: str) -> str:
-    """Confirm an observation, which is how a fact earns a place in future prompts."""
-    try:
-        observation = service.set_observation_status(observation_id, "confirmed")
-    except ObservationNotFoundError:
-        return _observation_not_found(observation_id)
-    except (OdiError, ValueError) as exc:
-        return _fail(exc)
-    return f"Observation confirmed: {observation.model_dump_json()}"
-
-
-@mcp.tool
-def dismiss_observation(observation_id: str) -> str:
-    """Dismiss an observation; a dismissed one never re-enters a prompt."""
-    try:
-        observation = service.set_observation_status(observation_id, "dismissed")
-    except ObservationNotFoundError:
-        return _observation_not_found(observation_id)
-    except (OdiError, ValueError) as exc:
-        return _fail(exc)
-    return f"Observation dismissed: {observation.model_dump_json()}"
-
-
-@mcp.tool
 def list_signals(unread_only: bool = False, limit: int = 50) -> str:
     """List recorded signals, newest first; ``unread_only`` trims to the badge."""
     signals = service.list_signals(unread_only=unread_only, limit=limit)
@@ -1014,6 +947,55 @@ def reject_proposal(proposal_id: str) -> str:
     except ValidationError as exc:
         return _fail(exc)
     return json.dumps(proposal.model_dump(mode="json"))
+
+
+@mcp.tool
+def link_outcome(outcome_id: str, field: str, text: str) -> str:
+    """Link an Outcome to the V2MOM method or measure it advances.
+
+    ``field`` is ``method`` or ``measure`` and ``text`` must match an entry the
+    vision currently holds. Unknown text is refused with the entries that do
+    exist, never guessed or fuzzy-matched.
+    """
+    try:
+        outcome = service.link_outcome(outcome_id, field, text)
+    except OutcomeNotFoundError as exc:
+        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
+    except OdiValidationError as exc:
+        return _fail(exc)
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
+    """Remove one V2MOM link from an Outcome.
+
+    ``key`` is the frozen content key the link was stored with; removing a link
+    that is not there changes nothing.
+    """
+    try:
+        outcome = service.unlink_outcome(outcome_id, field, key)
+    except OutcomeNotFoundError as exc:
+        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def get_outcome_alignments(outcome_id: str | None = None) -> str:
+    """List the V2MOM links recorded on Outcomes, optionally for one outcome."""
+    return json.dumps(service.list_alignments(outcome_id))
+
+
+@mcp.tool
+def get_traceability_report() -> str:
+    """Report orphans, unfunded objectives, and links the vision dropped.
+
+    Orphans are outcomes that advance nothing; unfunded objectives are V2MOM
+    methods and measures no outcome advances; drift is a link whose objective
+    text is no longer in the vision. Read-only, and with no objectives defined
+    it says so rather than returning three empty sections.
+    """
+    return json.dumps(service.traceability_report().as_dict())
 
 
 DEFAULT_PORT = 8000

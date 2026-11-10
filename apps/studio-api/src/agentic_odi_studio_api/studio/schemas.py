@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
-from agentic_odi_core.models import V2MOM, JobStage
+from agentic_odi_core.models import JobStage
 from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
@@ -109,6 +108,43 @@ class ProposeStrategyRequest(BaseModel):
 
     job_id: str | None = None
     mcp_url: str = ""
+
+
+class V2MOM(BaseModel):
+    """The domain's V2MOM artifact: Vision, Values, Methods, Obstacles, Measures.
+
+    Only ``vision`` is captured today, by the context conversation; the other
+    four fields have no input path yet and arrive empty.
+    """
+
+    vision: str = ""
+    values: list[str] = Field(default_factory=list)
+    methods: list[str] = Field(default_factory=list)
+    obstacles: list[str] = Field(default_factory=list)
+    measures: list[str] = Field(default_factory=list)
+
+
+class LinkOutcomeRequest(BaseModel):
+    """Link an outcome to one V2MOM method or measure.
+
+    ``text`` must match an entry the vision currently holds; unknown text is
+    refused rather than guessed.
+    """
+
+    field: Literal["method", "measure"]
+    text: str = Field(min_length=1)
+    mcp_url: str = ""
+
+
+class TraceabilityReportResponse(BaseModel):
+    """The three failures: orphans, unfunded objectives, and drift."""
+
+    objectives_defined: bool
+    message: str | None = None
+    orphans: list[str] = Field(default_factory=list)
+    unfunded: list[dict[str, str]] = Field(default_factory=list)
+    drift: list[dict[str, str]] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
 
 
 class AddCustomerOutcomeRequest(BaseModel):
@@ -261,41 +297,26 @@ class ConnectorOperationResponse(BaseModel):
     name: str
 
 
-ObservationCategory = Literal[
+ObservationKind = Literal[
     "career",
     "opportunity",
     "business",
-    "customer",
-    "constraint",
-    "decision",
     "stakeholder",
+    "constraint",
     "evidence",
     "preference",
-    "other",
 ]
-ObservationStatus = Literal["proposed", "confirmed", "dismissed"]
-
-#: The same limit the domain entity carries: a memory note is one sentence.
-MAX_OBSERVATION_TEXT = 300
+ObservationStatus = Literal["suggested", "confirmed", "dismissed"]
 
 
 class ObservationModel(BaseModel):
-    """One remembered fact.
-
-    ``kind`` is what the store records; ``category`` is the same value under the
-    name this screen has always shown, so both clients read what they expect.
-    """
-
     id: str
-    conversation_id: str | None = None
-    text: str
     kind: str
-    category: str
-    status: str
+    text: str
     data: dict[str, Any] = Field(default_factory=dict)
+    status: str
     confidence: float
     source_turn: int | None = None
-    source_message_id: str | None = None
     created_at: str
     updated_at: str
 
@@ -309,22 +330,15 @@ class ObservationResponse(BaseModel):
 
 
 class ObservationCreateRequest(BaseModel):
-    """A note to remember, named either way, with text the caller stands behind."""
-
-    kind: str | None = None
-    category: ObservationCategory | None = None
-    text: str = Field(min_length=1, max_length=MAX_OBSERVATION_TEXT)
+    kind: ObservationKind
+    text: str = Field(min_length=1, max_length=2000)
     data: dict[str, Any] | None = None
     confidence: float = Field(default=0.6, ge=0, le=1)
     confirmed: bool = False
-    conversation_id: str | None = None
-
-    def resolved_kind(self) -> str:
-        return self.kind or self.category or "other"
 
 
 class ObservationUpdateRequest(BaseModel):
-    text: str | None = Field(default=None, min_length=1, max_length=MAX_OBSERVATION_TEXT)
+    text: str | None = Field(default=None, min_length=1, max_length=2000)
     status: ObservationStatus | None = None
     data: dict[str, Any] | None = None
     confidence: float | None = Field(default=None, ge=0, le=1)
@@ -332,21 +346,15 @@ class ObservationUpdateRequest(BaseModel):
 
 class ConversationModel(BaseModel):
     id: str
-    title: str | None = None
+    title: str
     created_at: str
     updated_at: str
     head_id: str | None = None
-    archived: bool = False
 
 
-class ConversationSummaryModel(BaseModel):
-    """Metadata plus a count: the switcher never needs a turn body."""
+class ConversationSummaryModel(ConversationModel):
+    """A conversation in the history list: its metadata plus how much is in it."""
 
-    id: str
-    title: str = ""
-    created_at: datetime
-    updated_at: datetime
-    head_id: str | None = None
     turn_count: int = 0
 
 
@@ -377,15 +385,13 @@ class ClaimOut(BaseModel):
 
 
 class TurnModel(BaseModel):
-    id: str
+    id: int
     conversation_id: str
     role: str
     content: str
     created_at: str
+    message_id: str | None = None
     parent_id: str | None = None
-    #: The ordered surfaces the client renders, so a reload is not a plainer
-    #: version of the thread it replaced.
-    parts: list[dict[str, Any]] = Field(default_factory=list)
     claims: list[ClaimOut] = Field(default_factory=list)
 
 
@@ -402,7 +408,6 @@ class TurnNode(BaseModel):
     role: str
     content: str
     created_at: str
-    parts: list[dict[str, Any]] = Field(default_factory=list)
     claims: list[ClaimOut] = Field(default_factory=list)
 
 
@@ -412,33 +417,9 @@ class ConversationTreeResponse(BaseModel):
     head_id: str | None = None
 
 
-class MessageListResponse(BaseModel):
-    messages: list[TurnNode] = Field(default_factory=list)
-
-
-class ConversationMessagesResponse(BaseModel):
-    conversation: ConversationModel
-    messages: list[TurnNode] = Field(default_factory=list)
-
-
-class AppendMessageRequest(BaseModel):
-    """A turn the client appends itself, keyed by its own id."""
-
-    role: Literal["user", "assistant", "tool", "system"]
-    content: str = ""
-    parts: list[dict[str, Any]] = Field(default_factory=list)
-    id: str | None = None
-    parent_id: str | None = None
-
-
-class MessageResponse(BaseModel):
-    message: TurnModel
-
-
 class UpdateConversationRequest(BaseModel):
     head_id: str | None = None
     title: str | None = Field(default=None, max_length=200)
-    archived: bool | None = None
 
 
 class LlmProxyMessage(BaseModel):
@@ -465,49 +446,6 @@ class CapabilityItem(BaseModel):
 
 class CapabilitiesResponse(BaseModel):
     capabilities: list[CapabilityItem]
-
-
-class BriefModel(BaseModel):
-    """The stored brief: one per workspace, readable by the CLI and MCP too."""
-
-    id: str = "brief"
-    product_name: str = ""
-    product_url: str = ""
-    target_user: str = ""
-    job_statement: str = ""
-    core_problem: str = ""
-    v2mom: V2MOM | None = None
-    updated_at: str = ""
-
-
-class BriefResponse(BaseModel):
-    brief: BriefModel | None = None
-
-
-class BriefUpdateRequest(BaseModel):
-    product_name: str = ""
-    product_url: str = ""
-    target_user: str = ""
-    job_statement: str = ""
-    core_problem: str = ""
-    v2mom: V2MOM | None = None
-
-
-class SettingsUpdateRequest(BaseModel):
-    """Model endpoint settings. The key is written here and never read back."""
-
-    base_url: str = ""
-    model: str = ""
-    mcp_url: str = ""
-    api_key: str | None = None
-
-
-class SettingsResponse(BaseModel):
-    base_url: str = ""
-    model: str = ""
-    mcp_url: str = ""
-    has_api_key: bool = False
-    masked: str = ""
 
 
 class ScheduleWorkRequest(BaseModel):

@@ -61,7 +61,6 @@ from agentic_odi_studio_api.studio.memory import (
     ConversationNotFoundError,
     ObservationNotFoundError,
     StudioMemory,
-    Turn,
 )
 from agentic_odi_studio_api.studio.probes import (
     defaults,
@@ -75,12 +74,9 @@ from agentic_odi_studio_api.studio.schemas import (
     AddEvidenceRequest,
     AddOutcomeRequest,
     AddStepRequest,
-    AppendMessageRequest,
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
     ApproveProposalRequest,
-    BriefResponse,
-    BriefUpdateRequest,
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
@@ -88,19 +84,17 @@ from agentic_odi_studio_api.studio.schemas import (
     ConnectorListItem,
     ConnectorOperationResponse,
     ConversationListResponse,
-    ConversationMessagesResponse,
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
     LatestConversationResponse,
+    LinkOutcomeRequest,
     LlmHealthRequest,
     LlmHealthResponse,
     LlmProxyRequest,
     MarketplaceListingOut,
     MarketplaceSearchResponse,
     McpHealthRequest,
-    MessageListResponse,
-    MessageResponse,
     MintShareRequest,
     ModelListRequest,
     ObservationCreateRequest,
@@ -113,12 +107,10 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeStrategyRequest,
     RejectProposalRequest,
     ScheduleWorkRequest,
-    SettingsResponse,
-    SettingsUpdateRequest,
     SharedArtifactResponse,
     ShareMintResponse,
     SignalActionRequest,
-    TurnModel,
+    TraceabilityReportResponse,
     TurnNode,
     UpdateConversationRequest,
     UpdateCustomerOutcomeRequest,
@@ -126,7 +118,6 @@ from agentic_odi_studio_api.studio.schemas import (
     UpdateOutcomeRequest,
     UpdateStepRequest,
 )
-from agentic_odi_studio_api.studio.settings import StudioSettings
 from agentic_odi_studio_api.studio.sharing import (
     ShareError,
     ShareNotFoundError,
@@ -256,58 +247,13 @@ def _memory(request: Request) -> StudioMemory:
     return request.app.state.memory
 
 
-def _settings(request: Request) -> StudioSettings:
-    return request.app.state.settings
-
-
-def _not_found(message: str) -> StudioHTTPError:
-    return StudioHTTPError(
-        StudioError(
-            code=StudioErrorCode.NOT_FOUND,
-            message=message,
-            suggestion="Check the identifier and try again.",
-        )
-    )
-
-
-def _turn_node(turn: Turn, memory: Any) -> TurnNode:
-    """One turn as the branch tree needs it, parts and all."""
-    return TurnNode(
-        id=turn.message_id or f"turn-{turn.id}",
-        parent_id=turn.parent_id,
-        role=turn.role,
-        content=turn.content,
-        created_at=turn.created_at,
-        parts=list(turn.parts),
-        claims=[ClaimOut(**claim.to_dict()) for claim in memory.claims_for_turn(turn)],
-    )
-
-
-def _turn_model(turn: Turn, memory: Any) -> TurnModel:
-    return TurnModel(
-        id=turn.message_id or f"turn-{turn.id}",
-        conversation_id=turn.conversation_id,
-        role=turn.role,
-        content=turn.content,
-        created_at=turn.created_at,
-        parent_id=turn.parent_id,
-        parts=list(turn.parts),
-        claims=[ClaimOut(**claim.to_dict()) for claim in memory.claims_for_turn(turn)],
-    )
-
-
 def _approvals(request: Request) -> ApprovalRegistry:
     return request.app.state.approvals
 
 
 @router.get("/config")
 def get_config() -> dict:
-    """Environment defaults for the browser, minus the provider key.
-
-    The SPA never needs the secret to ask the sidecar for a completion, and it
-    must not learn it from here: ``/api/settings`` hands back a mask instead.
-    """
-    return {"defaults": {**defaults(), "api_key": ""}}
+    return {"defaults": defaults()}
 
 
 @router.get("/diagnostics")
@@ -413,11 +359,9 @@ async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) ->
 
 
 @router.post("/models")
-async def post_models(body: ModelListRequest, request: Request) -> dict:
+async def post_models(body: ModelListRequest) -> dict:
     """The model ids this backend serves, for the composer's model picker."""
-    models, error = await list_models(
-        body.base_url, _settings(request).resolve_api_key(body.api_key)
-    )
+    models, error = await list_models(body.base_url, body.api_key)
     return {"models": models, "error": error}
 
 
@@ -992,6 +936,86 @@ async def post_strategy_propose(
     return strategy.model_dump(mode="json")
 
 
+@router.get("/traceability", response_model=TraceabilityReportResponse)
+async def get_traceability(
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Orphans, unfunded objectives, and links the vision dropped.
+
+    Read-only. With no objectives defined the report carries
+    ``objectives_defined: false`` and a message, not three empty sections that
+    would read as a clean bill of health.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_TRACEABILITY_REPORT.value, {}
+        )
+        return _payload_from_text(result)
+    return _service(request).traceability_report().as_dict()
+
+
+@router.get("/alignments", response_model=list[dict[str, Any]])
+async def get_alignments(
+    request: Request,
+    outcome_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The V2MOM links recorded on outcomes, optionally for one outcome."""
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if outcome_id:
+            arguments["outcome_id"] = outcome_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_OUTCOME_ALIGNMENTS.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return _service(request).list_alignments(outcome_id)
+
+
+@router.post("/outcomes/{outcome_id}/alignments", response_model=dict[str, Any])
+async def post_outcome_alignment(
+    outcome_id: str, body: LinkOutcomeRequest, request: Request
+) -> dict[str, Any]:
+    """Link an outcome to one method or measure the vision currently holds."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.LINK_OUTCOME.value,
+            {"outcome_id": outcome_id, "field": body.field, "text": body.text},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).link_outcome(outcome_id, body.field, body.text)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
+
+
+@router.delete("/outcomes/{outcome_id}/alignments/{field}/{key}", response_model=dict[str, Any])
+async def delete_outcome_alignment(
+    outcome_id: str,
+    field: str,
+    key: str,
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Remove one recorded link. Removing a link that is not there is a no-op."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.UNLINK_OUTCOME.value,
+            {"outcome_id": outcome_id, "field": field, "key": key},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).unlink_outcome(outcome_id, field, key)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
+
+
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:
     return {
         "job_id": body.job_id,
@@ -1136,31 +1160,23 @@ async def get_evidence(
     return {"ok": True, "result": record.model_dump(mode="json")}
 
 
-@router.get("/observations", response_model=ObservationListResponse)
 @router.get("/memory/observations", response_model=ObservationListResponse)
-def list_observations(
-    request: Request, status: str | None = Query(None)
-) -> ObservationListResponse:
-    """Newest first. A dismissed observation is only listed when asked for."""
-    observations = _memory(request).list_observations(include_dismissed=status == "dismissed")
-    if status:
-        # Filter on what the client will read, not the stored spelling.
-        observations = [item for item in observations if item.to_dict()["status"] == status]
-    return ObservationListResponse(observations=[item.to_dict() for item in observations])
+def list_observations(request: Request) -> ObservationListResponse:
+    observations = _memory(request).list_observations()
+    return ObservationListResponse(
+        observations=[observation.to_dict() for observation in observations]
+    )
 
 
-@router.post("/observations", response_model=ObservationResponse)
 @router.post("/memory/observations", response_model=ObservationResponse)
 def create_observation(body: ObservationCreateRequest, request: Request) -> ObservationResponse:
-    """A person-confirmed note arrives confirmed; the agent can only propose."""
     try:
         observation = _memory(request).add_observation(
-            kind=body.resolved_kind(),
+            kind=body.kind,
             text=body.text,
             data=body.data,
             status="confirmed" if body.confirmed else "suggested",
             confidence=body.confidence,
-            conversation_id=body.conversation_id,
         )
     except ValueError as exc:
         raise StudioHTTPError(
@@ -1169,7 +1185,6 @@ def create_observation(body: ObservationCreateRequest, request: Request) -> Obse
     return ObservationResponse(observation=observation.to_dict())
 
 
-@router.patch("/observations/{observation_id}", response_model=ObservationResponse)
 @router.patch("/memory/observations/{observation_id}", response_model=ObservationResponse)
 def update_observation(
     observation_id: str, body: ObservationUpdateRequest, request: Request
@@ -1183,7 +1198,13 @@ def update_observation(
             confidence=body.confidence,
         )
     except ObservationNotFoundError as exc:
-        raise _not_found(str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=str(exc),
+                suggestion="Check the identifier and try again.",
+            )
+        ) from exc
     except ValueError as exc:
         raise StudioHTTPError(
             StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
@@ -1191,13 +1212,18 @@ def update_observation(
     return ObservationResponse(observation=observation.to_dict())
 
 
-@router.delete("/observations/{observation_id}")
 @router.delete("/memory/observations/{observation_id}")
 def delete_observation(observation_id: str, request: Request) -> dict:
     try:
         _memory(request).delete_observation(observation_id)
     except ObservationNotFoundError as exc:
-        raise _not_found(str(exc)) from exc
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=str(exc),
+                suggestion="Check the identifier and try again.",
+            )
+        ) from exc
     return {"ok": True}
 
 
@@ -1207,31 +1233,6 @@ def clear_memory(request: Request) -> dict:
     return {"ok": True}
 
 
-@router.get("/brief", response_model=BriefResponse)
-def get_brief(request: Request) -> BriefResponse:
-    brief = _memory(request).get_brief()
-    return BriefResponse(brief=None if brief is None else brief.model_dump(mode="json"))
-
-
-@router.put("/brief", response_model=BriefResponse)
-def put_brief(body: BriefUpdateRequest, request: Request) -> BriefResponse:
-    """The store holds the brief; ``localStorage`` is only the SPA's cache."""
-    brief = _memory(request).save_brief(body.model_dump())
-    return BriefResponse(brief=brief.model_dump(mode="json"))
-
-
-@router.get("/settings", response_model=SettingsResponse)
-def get_settings(request: Request) -> SettingsResponse:
-    """What the SPA may read back: the endpoint, and no secret."""
-    return SettingsResponse(**_settings(request).redacted())
-
-
-@router.post("/settings", response_model=SettingsResponse)
-def put_settings(body: SettingsUpdateRequest, request: Request) -> SettingsResponse:
-    _settings(request).update(body.model_dump())
-    return get_settings(request)
-
-
 @router.get("/conversations/latest", response_model=LatestConversationResponse)
 def latest_conversation(request: Request) -> LatestConversationResponse:
     memory = _memory(request)
@@ -1239,37 +1240,30 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
     if conversation is None:
         return LatestConversationResponse(conversation=None, turns=[])
     turns = memory.list_turns(conversation.id)
+    for turn in turns:
+        turn.claims = memory.claims_for_turn(turn)
     return LatestConversationResponse(
         conversation=conversation.to_dict(),
-        turns=[_turn_model(turn, memory) for turn in turns],
+        turns=[turn.to_dict() for turn in turns],
     )
 
 
 @router.get("/conversations", response_model=ConversationListResponse)
-def list_conversations(
-    request: Request, limit: int = Query(default=20, ge=1, le=200)
-) -> ConversationListResponse:
-    """Newest first, archived included: the switcher decides what to show."""
-    conversations = _memory(request).list_conversations(limit=limit)
-    return ConversationListResponse(conversations=[item.to_dict() for item in conversations])
+def list_conversations(request: Request) -> ConversationListResponse:
+    """The history a switcher lists: at most 20 threads, most recent touch first.
+
+    Titles come from the first question, so the list names each thread without
+    carrying a single turn body.
+    """
+    conversations = _memory(request).list_conversations()
+    return ConversationListResponse(
+        conversations=[conversation.to_dict() for conversation in conversations]
+    )
 
 
 @router.post("/conversations", response_model=ConversationResponse)
 def create_conversation(request: Request) -> ConversationResponse:
-    conversation = _memory(request).create_conversation()
-    return ConversationResponse(conversation=conversation.to_dict())
-
-
-@router.get("/conversations/{conversation_id}", response_model=ConversationMessagesResponse)
-def get_conversation(conversation_id: str, request: Request) -> ConversationMessagesResponse:
-    memory = _memory(request)
-    conversation = memory.get_conversation(conversation_id)
-    if conversation is None:
-        raise _not_found(f"Conversation {conversation_id} not found")
-    return ConversationMessagesResponse(
-        conversation=conversation.to_dict(),
-        messages=[_turn_node(turn, memory) for turn in memory.list_turns(conversation_id)],
-    )
+    return ConversationResponse(conversation=_memory(request).create_conversation().to_dict())
 
 
 @router.get("/conversations/{conversation_id}/tree", response_model=ConversationTreeResponse)
@@ -1278,93 +1272,57 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
     memory = _memory(request)
     conversation = memory.get_conversation(conversation_id)
     if conversation is None:
-        raise _not_found(f"Conversation {conversation_id} not found")
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+            )
+        )
     turns = memory.conversation_tree(conversation_id)
     return ConversationTreeResponse(
         conversation=conversation.to_dict(),
-        messages=[_turn_node(turn, memory) for turn in turns if turn.role in {"user", "assistant"}],
-        head_id=conversation.head_id or (turns[-1].id if turns else None),
-    )
-
-
-@router.get("/conversations/{conversation_id}/messages", response_model=MessageListResponse)
-def conversation_messages(
-    conversation_id: str,
-    request: Request,
-    limit: int = Query(default=200, ge=1, le=2_000),
-) -> MessageListResponse:
-    memory = _memory(request)
-    if memory.get_conversation(conversation_id) is None:
-        raise _not_found(f"Conversation {conversation_id} not found")
-    return MessageListResponse(
-        messages=[_turn_node(turn, memory) for turn in memory.list_turns(conversation_id)[:limit]]
-    )
-
-
-@router.post("/conversations/{conversation_id}/messages", response_model=MessageResponse)
-def append_message(
-    conversation_id: str, body: AppendMessageRequest, request: Request
-) -> MessageResponse:
-    """Append a turn the client holds, keyed by the client's own message id."""
-    memory = _memory(request)
-    if memory.get_conversation(conversation_id) is None:
-        raise _not_found(f"Conversation {conversation_id} not found")
-    already = [turn.message_id for turn in memory.list_turns(conversation_id)]
-    if body.id and body.id in already:
-        return MessageResponse(
-            message=_turn_model(
-                next(t for t in memory.list_turns(conversation_id) if t.message_id == body.id),
-                memory,
+        messages=[
+            TurnNode(
+                id=turn.message_id or f"turn-{turn.id}",
+                parent_id=turn.parent_id,
+                role=turn.role,
+                content=turn.content,
+                created_at=turn.created_at,
+                claims=[ClaimOut(**claim.to_dict()) for claim in turn.claims],
             )
-        )
-    try:
-        message = memory.append_turn(
-            conversation_id,
-            body.role,
-            body.content,
-            body.id,
-            body.parent_id,
-            body.parts,
-        )
-    except ValueError as exc:
-        raise StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
-        ) from exc
-    stored = next(turn for turn in memory.list_turns(conversation_id) if turn.id == message)
-    return MessageResponse(message=_turn_model(stored, memory))
+            for turn in turns
+            if turn.role in {"user", "assistant"}
+        ],
+        head_id=conversation.head_id or (turns[-1].message_id if turns else None),
+    )
 
 
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
 def patch_conversation(
     conversation_id: str, body: UpdateConversationRequest, request: Request
 ) -> ConversationResponse:
-    """Rename, archive, or record the visible branch — only the fields sent."""
+    """Record the visible branch, or rename the thread."""
     memory = _memory(request)
     try:
         if body.title is not None:
             memory.update_title(conversation_id, body.title)
         # A rename must not clear the selected branch; only touch the head when
         # the caller actually sent one.
-        if body.archived is not None:
-            memory.set_archived(conversation_id, body.archived)
         if "head_id" in body.model_fields_set:
-            memory.set_head(conversation_id, body.head_id)
-        conversation = memory.get_conversation(conversation_id)
+            conversation = memory.set_head(conversation_id, body.head_id)
+        else:
+            found = memory.get_conversation(conversation_id)
+            if found is None:
+                raise ConversationNotFoundError(conversation_id)
+            conversation = found
     except ConversationNotFoundError as exc:
-        raise _not_found(str(exc)) from exc
-    if conversation is None:
-        raise _not_found(f"Conversation {conversation_id} not found")
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+            )
+        ) from exc
     return ConversationResponse(conversation=conversation.to_dict())
-
-
-@router.delete("/conversations/{conversation_id}")
-def delete_conversation(conversation_id: str, request: Request) -> dict:
-    """The one way history is destroyed, and the SPA asks before calling it."""
-    try:
-        _memory(request).delete_conversation(conversation_id)
-    except ConversationNotFoundError as exc:
-        raise _not_found(str(exc)) from exc
-    return {"deleted": conversation_id}
 
 
 @router.post("/approvals/{approval_id}", response_model=ApprovalDecisionResponse)
@@ -1393,9 +1351,6 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
     # server minted), never one the body claims, so the id in the frames, the
     # header, and the log line are always the same one.
     request_id = request_id_for(request)
-    # A client that stopped sending the secret is not a client with no key: the
-    # sidecar owns it, and the SPA never reads it back.
-    body = body.model_copy(update={"api_key": _settings(request).resolve_api_key(body.api_key)})
     return StreamingResponse(
         stream_chat(
             body,
