@@ -22,10 +22,12 @@ from agentic_odi_core.integrity import (
 )
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.recovery import (
+    backup_database,
     backup_prefix,
     corrupt_store_message,
     format_backup_time,
     latest_backup,
+    restore_database,
 )
 from agentic_odi_core.repository import InMemoryRepository
 from agentic_odi_core.sqlite_repository import SQLiteRepository
@@ -372,3 +374,75 @@ def test_the_message_is_actionable_when_no_backup_exists(tmp_path) -> None:
 
     assert "No backup exists yet." in message
     assert str(tmp_path / "odi.db") in message
+
+
+# -- backup and restore (issue #599) ---------------------------------------
+
+
+def _make_database(path) -> None:
+    conn = sqlite3.connect(str(path))
+    try:
+        conn.execute("CREATE TABLE t (x INTEGER)")
+        conn.execute("INSERT INTO t VALUES (1)")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _rows(path) -> list[tuple[int]]:
+    conn = sqlite3.connect(str(path))
+    try:
+        return conn.execute("SELECT x FROM t").fetchall()
+    finally:
+        conn.close()
+
+
+def test_backup_database_writes_a_verified_snapshot(tmp_path) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+
+    backup = backup_database(str(db), directory=tmp_path / "backups")
+
+    assert backup.exists()
+    assert backup.name.startswith("odi-")
+    assert backup.suffix == ".db"
+    # The snapshot is a real, intact copy of the data, not an empty file.
+    assert _rows(backup) == [(1,)]
+    conn = sqlite3.connect(str(backup))
+    try:
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    finally:
+        conn.close()
+
+
+def test_restore_keeps_the_previous_file_as_pre_restore(tmp_path) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    backup = backup_database(str(db), directory=tmp_path / "backups")
+    # Change the live file after the snapshot so the swap is observable.
+    conn = sqlite3.connect(str(db))
+    try:
+        conn.execute("INSERT INTO t VALUES (2)")
+        conn.commit()
+    finally:
+        conn.close()
+
+    safety = restore_database(backup, str(db))
+
+    assert safety.name == "odi.db.pre-restore"
+    assert _rows(safety) == [(1,), (2,)]  # the file that was there is kept
+    assert _rows(db) == [(1,)]  # the snapshot is now live
+
+
+def test_restore_refuses_a_corrupt_snapshot_and_changes_nothing(tmp_path) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    broken = tmp_path / "odi-20260101T000000Z.db"
+    broken.write_bytes(b"not a database")
+
+    with pytest.raises(ValueError, match="integrity check"):
+        restore_database(broken, str(db))
+
+    # The live file is untouched and no safety copy was written.
+    assert _rows(db) == [(1,)]
+    assert not (tmp_path / "odi.db.pre-restore").exists()
