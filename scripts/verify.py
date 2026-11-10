@@ -121,6 +121,14 @@ def map_files_to_targets(files: list[str]) -> dict[str, set[str]]:
             targets["brand"] = True
             mapped = True
             continue
+
+        # Markdown and agent-facing docs are covered by the documentation drift
+        # test and the root suite. A docs-only PR must still be verifiable, and
+        # handing .md paths to ruff would fail for the wrong reason.
+        if path.startswith(("docs/", ".agents/")) or path.endswith(".md"):
+            targets["tests_root"] = True
+            mapped = True
+            continue
         if path == "pyproject.toml" or path == "uv.lock" or path.startswith(".github/"):
             # affects everything - map to all packages for --changed to be safe
             for member in WORKSPACE_MEMBERS:
@@ -155,10 +163,12 @@ def verify_changed(base: str = "origin/main", head: str = "HEAD") -> int:
         return 1
 
     failed = False
-    # Ruff on touched paths
-    if files:
+    # Ruff on touched paths (it only understands Python, so a docs-only diff
+    # must not be handed to it)
+    python_files = [f for f in files if f.endswith((".py", ".pyi"))]
+    if python_files:
         print("[1/2] ruff (touched paths)")
-        code, _ = run_cmd(["uv", "run", "ruff", "check"] + files)
+        code, _ = run_cmd(["uv", "run", "ruff", "check"] + python_files)
         if code != 0:
             failed = True
         print()
@@ -220,9 +230,10 @@ def verify_default(base: str = "origin/main", head: str = "HEAD") -> int:
         return 1
 
     failed = False
-    if files:
+    python_files = [f for f in files if f.endswith((".py", ".pyi"))]
+    if python_files:
         print("[1/4] ruff (touched paths)")
-        code, _ = run_cmd(["uv", "run", "ruff", "check"] + files)
+        code, _ = run_cmd(["uv", "run", "ruff", "check"] + python_files)
         if code != 0:
             failed = True
         print()

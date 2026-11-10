@@ -25,3 +25,15 @@ def test_map_files_to_targets_mixed():
 def test_map_files_to_targets_unmapped_raises_error_case():
     targets = verify.map_files_to_targets(["Makefile"])
     assert targets["unmapped"] == {"Makefile"}
+
+
+def test_map_files_to_targets_docs_are_mapped():
+    targets = verify.map_files_to_targets(["docs/architecture/testing.md", "AGENTS.md"])
+    assert targets["unmapped"] == set()
+    assert targets["tests_root"] is True
+
+
+def test_map_files_to_targets_agent_docs_are_mapped():
+    targets = verify.map_files_to_targets([".agents/workflows/test.md"])
+    assert targets["unmapped"] == set()
+    assert targets["tests_root"] is True
