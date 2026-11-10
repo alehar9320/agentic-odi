@@ -322,12 +322,9 @@ describe("Conversation offline context", () => {
       },
     ]);
 
-    const chips = container.querySelectorAll("button.message__tag");
+    const chips = container.querySelectorAll("span.message__tag");
     expect(chips).toHaveLength(1);
-    expect(chips[0]).toHaveTextContent("Local draft, no model connected");
-
-    fireEvent.click(chips[0] as HTMLButtonElement);
-    expect(harness.state.openPanel).toHaveBeenCalledWith("settings");
+    expect(chips[0]).toHaveTextContent("Built-in assistant");
 
     harness.state.offlineReplyFor = null;
     harness.state.openPanel.mockClear();
