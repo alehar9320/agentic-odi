@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from agentic_odi_core.briefing import Briefing
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
@@ -66,6 +67,7 @@ class SQLiteRepository(Repository):
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.briefings: dict[str, Briefing] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
         self.v2mom: dict[str, V2MOM] = {}
@@ -172,6 +174,9 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.signals, p, Signal)
         elif et == "SIGNAL_DISMISSED":
             self._merge_updates(self.signals, p, Signal)
+        elif et == "BRIEFING_WRITTEN":
+            briefing = Briefing.from_dict(p)
+            self.briefings[briefing.run_id] = briefing
         elif et == "SEGMENT_CREATED":
             self.segments[p["id"]] = Segment.model_validate(p)
         elif et == "SEGMENT_UPDATED":
@@ -711,6 +716,29 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_briefing(self, briefing: Briefing) -> Briefing:
+        with self._lock:
+            self.store.append(
+                "BRIEFING_WRITTEN",
+                briefing.to_dict(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return briefing
+
+    def get_latest_briefing(self) -> Briefing | None:
+        with self._lock:
+            self._sync()
+            if not self.briefings:
+                return None
+            return max(self.briefings.values(), key=lambda item: item.created_at)
+
+    def list_briefings(self) -> list[Briefing]:
+        with self._lock:
+            self._sync()
+            return sorted(self.briefings.values(), key=lambda item: item.created_at)
 
     def add_segment(self, segment: Segment) -> Segment:
         with self._lock:

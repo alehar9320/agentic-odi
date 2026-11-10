@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
+from agentic_odi_core.briefing import Briefing
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
@@ -200,6 +201,9 @@ class Repository(Protocol):
     ) -> list[ScheduledWork]: ...
     def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
     def delete_scheduled_work(self, work_id: str) -> bool: ...
+    def add_briefing(self, briefing: Briefing) -> Briefing: ...
+    def get_latest_briefing(self) -> Briefing | None: ...
+    def list_briefings(self) -> list[Briefing]: ...
     def add_segment(self, segment: Segment) -> Segment: ...
     def get_segment(self, segment_id: str) -> Segment | None: ...
     def list_segments(self, job_id: str | None = None) -> list[Segment]: ...
@@ -241,6 +245,9 @@ class InMemoryRepository:
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        #: Keyed by run id: a rerun of the same run replaces its own briefing
+        #: instead of leaving two behind.
+        self.briefings: dict[str, Briefing] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
         #: The store holds one vision; it is keyed by a fixed name rather than a
@@ -611,6 +618,19 @@ class InMemoryRepository:
             return True
         return False
 
+    def add_briefing(self, briefing: Briefing) -> Briefing:
+        self._append_event()
+        self.briefings[briefing.run_id] = briefing
+        return briefing
+
+    def get_latest_briefing(self) -> Briefing | None:
+        if not self.briefings:
+            return None
+        return max(self.briefings.values(), key=lambda item: item.created_at)
+
+    def list_briefings(self) -> list[Briefing]:
+        return sorted(self.briefings.values(), key=lambda item: item.created_at)
+
     def add_segment(self, segment: Segment) -> Segment:
         self._append_event()
         self.segments[segment.id] = segment
@@ -704,6 +724,7 @@ class InMemoryRepository:
         self.customer_outcomes.clear()
         self.evidence.clear()
         self.signals.clear()
+        self.briefings.clear()
         self.segments.clear()
         self.strategies.clear()
         self.v2mom.clear()

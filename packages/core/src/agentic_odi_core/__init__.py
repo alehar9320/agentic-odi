@@ -8,6 +8,13 @@ Pydantic's identically named class. Import it from
 ``agentic_odi_core.errors`` instead.
 """
 
+from agentic_odi_core.briefing import (
+    Briefing,
+    BriefingItem,
+    RunChange,
+    RunResult,
+    build_briefing,
+)
 from agentic_odi_core.connection import MCPConnectionConfig
 from agentic_odi_core.contract import (
     TOOL_NAMES,

@@ -11,6 +11,7 @@ from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
 
+from agentic_odi_core.briefing import Briefing, RunChange, RunResult, build_briefing
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
@@ -1102,6 +1103,36 @@ class ODIService:
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
         return updated
+
+    def complete_scheduled_work(
+        self, work_id: str, changes: list[RunChange] | None = None
+    ) -> Briefing:
+        """Mark a run finished and write the briefing a person reads in the morning.
+
+        This is the completion point: it flips the run to ``completed`` and
+        stores exactly one briefing for that run. A rerun of the same work id
+        replaces its own briefing instead of leaving two behind, and a run that
+        produced no structured changes stores an honestly empty briefing rather
+        than inventing a line.
+        """
+        from datetime import datetime, timezone
+
+        work = self.repo.get_scheduled_work(work_id)
+        if work is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        now = datetime.now(timezone.utc)
+        updated = self.repo.update_scheduled_work(
+            work_id, {"status": ScheduledWorkStatus.COMPLETED, "last_run_at": now.isoformat()}
+        )
+        if updated is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        result = RunResult(run_id=work_id, changes=tuple(changes or ()), created_at=now)
+        briefing = build_briefing(result)
+        self.repo.add_briefing(briefing)
+        return briefing
+
+    def get_latest_briefing(self) -> Briefing | None:
+        return self.repo.get_latest_briefing()
 
     # -- Stage 5: outcome-based segments -------------------------------------
 

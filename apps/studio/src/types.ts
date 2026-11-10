@@ -711,3 +711,21 @@ export interface ScheduledWork {
   last_run_at?: string | null;
   result_summary?: string | null;
 }
+
+/** One briefing line: a short sentence plus the record it points at. */
+export interface BriefingItem {
+  kind: "added" | "changed" | "failed";
+  text: string;
+  record_id: string;
+  record_kind: string;
+}
+
+/**
+ * The latest finished run's briefing. An empty `items` list is a real briefing:
+ * the run finished and changed nothing.
+ */
+export interface Briefing {
+  run_id: string;
+  created_at: string;
+  items: BriefingItem[];
+}

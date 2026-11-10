@@ -109,6 +109,10 @@ per-platform archives with SHA-256 checksums for a manual download. See
   event log and read by the CLI, any MCP client, and the Studio's bell.
   Nothing is invented, and the feed is deduped and budgeted so it stays
   worth opening.
+- **A morning briefing.** A finished run leaves one readable briefing — what
+  changed, and what needs a decision — under "Since you were away". Each line
+  links to the record it describes, and a run that changed nothing says so
+  rather than inventing a line.
 - **A check on whether onboarding works.** Five counters — launch, first message,
   first outcome, first score, return session — are appended to the same local
   event log as the records and read back by `agentic-odi stats`. The numbers never
