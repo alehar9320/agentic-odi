@@ -56,6 +56,16 @@ _BUSINESS_VALUE_FIELDS = {
 }
 
 
+def _score(args: dict[str, Any], name: str) -> float | None:
+    """One score cell: absent or null stays absent, never a zero.
+
+    An outcome captured before anyone scored it is legal, and a row of a spreadsheet
+    that names only importance must not be turned into ``0`` for the other column.
+    """
+    value = args.get(name)
+    return None if value is None else float(value)
+
+
 class BackendError(Exception):
     """A user-facing failure: not found, invalid input, or unreachable server.
 
@@ -253,8 +263,8 @@ class LocalBackend(Backend):
             outcome = self.service.add_outcome(
                 job_id=args["job_id"],
                 statement=args["statement"],
-                importance=float(args["importance"]),
-                satisfaction=float(args["satisfaction"]),
+                importance=_score(args, "importance"),
+                satisfaction=_score(args, "satisfaction"),
                 step_id=step_id,
                 claim_check=claim_check,
             )
@@ -803,6 +813,30 @@ class LocalBackend(Backend):
             raise BackendError(job_not_found(job_id or "")) from None
         return strategy.model_dump(mode="json")
 
+    def _link_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            outcome = self.service.link_outcome(args["outcome_id"], args["field"], args["text"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return outcome.model_dump(mode="json")
+
+    def _unlink_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+
+        try:
+            outcome = self.service.unlink_outcome(args["outcome_id"], args["field"], args["key"])
+        except OutcomeNotFoundError:
+            raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        return outcome.model_dump(mode="json")
+
+    def _get_outcome_alignments(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        return self.service.list_alignments(args.get("outcome_id"))
+
+    def _get_traceability_report(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.service.traceability_report().as_dict()
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -863,6 +897,10 @@ _LOCAL_HANDLERS = {
     "search_outcomes": LocalBackend._search_outcomes,
     "bulk_update_outcomes": LocalBackend._bulk_update_outcomes,
     "undo_bulk": LocalBackend._undo_bulk,
+    "link_outcome": LocalBackend._link_outcome,
+    "unlink_outcome": LocalBackend._unlink_outcome,
+    "get_outcome_alignments": LocalBackend._get_outcome_alignments,
+    "get_traceability_report": LocalBackend._get_traceability_report,
     "get_health": LocalBackend._get_health,
 }
 

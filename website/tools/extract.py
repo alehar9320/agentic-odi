@@ -40,9 +40,25 @@ def read_tokens(studio_theme: Path) -> dict[str, str]:
 
 
 def read_easings(studio_theme: Path) -> dict[str, str]:
-    """The Studio theme's second ``:root`` block: the motion easings."""
+    """Every motion easing the Studio declares, wherever its ``:root`` blocks sit.
+
+    The theme no longer keeps its easings at a fixed index: a light-mode block
+    and a ``prefers-contrast`` block sit inside media queries and match the same
+    ``:root`` pattern. Find the easings by name so adding a block cannot move
+    them out from under this reader.
+    """
     css = studio_theme.read_text(encoding="utf-8")
-    return {name: value.strip() for name, value in _TOKEN.findall(_root_block(css, 1))}
+    easings: dict[str, str] = {}
+    index = 0
+    while True:
+        try:
+            block = _root_block(css, index)
+        except ValueError:
+            return easings
+        for name, value in _TOKEN.findall(block):
+            if name.startswith("--ease"):
+                easings[name] = value.strip()
+        index += 1
 
 
 def read_odi_formula(core_models: Path) -> str:

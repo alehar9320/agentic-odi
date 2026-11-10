@@ -63,6 +63,8 @@ export function BannerRow({
                   onAction(action.action);
                 } else if (action.intent) {
                   onIntent(action.intent);
+                } else {
+                  action.run?.();
                 }
               }}
             >

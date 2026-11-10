@@ -86,6 +86,48 @@
         }
       }
     },
+    "/api/stats": {
+      "get": {
+        "summary": "Get Stats",
+        "description": "The onboarding funnel, counted from this machine's own event log.\n\nEvery counter is always named, and one that has not happened answers with a\nzero and no timestamps rather than an invented history. Nothing leaves the\nmachine: these numbers come from the same store the records do.",
+        "operationId": "get_stats_api_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Stats Api Stats Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats/reset": {
+      "post": {
+        "summary": "Reset Stats",
+        "description": "Start the measurement over and return the counters as they now stand.\n\nA reset appends a marker; the events it supersedes stay in the log. The\nasking happens in whatever surface calls this — a click that erases a\nmeasurement should not be the kind that fires straight away.",
+        "operationId": "reset_stats_api_stats_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Reset Stats Api Stats Reset Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/changelog": {
       "get": {
         "summary": "Get Changelog Route",
@@ -597,7 +639,7 @@
       },
       "post": {
         "summary": "Post Job",
-        "description": "Create a Job \u2014 works with the model offline because it is manual.",
+        "description": "Create a Job — works with the model offline because it is manual.",
         "operationId": "post_job_api_jobs_post",
         "requestBody": {
           "required": true,
@@ -1300,6 +1342,47 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Undo Bulk Outcomes Api Api Outcomes Bulk Undo Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/outcomes/import": {
+      "post": {
+        "summary": "Import Outcomes Api",
+        "description": "Import a spreadsheet of desired Outcomes into one Job.\n\nThe body is ``ImportReport``'s own dictionary \u2014 ``created`` with a line number\nand an outcome id per row, ``refused`` with the service's own sentence per bad\nrow, the theme names that matched nothing or matched two, the columns read and\nignored, and ``aborted`` when the server stopped answering \u2014 so the Studio\nshows what the terminal shows. A bad row is a 200 with a reason; a bad request\n(no file, an unknown job) is the 422 or 404 every other outcome route gives.",
+        "operationId": "import_outcomes_api_api_outcomes_import_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_outcomes_api_api_outcomes_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Import Outcomes Api Api Outcomes Import Post"
                 }
               }
             }
@@ -3942,6 +4025,35 @@
         "title": "AttachmentRef",
         "description": "One file the user attached to a turn.\n\nNothing is stored server-side: an attachment is part of the message. Text is\nextracted by the client because only the client has the file; images arrive\nas data URLs for backends that accept them."
       },
+      "Body_import_outcomes_api_api_outcomes_import_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "job_id"
+        ],
+        "title": "Body_import_outcomes_api_api_outcomes_import_post"
+      },
       "BulkQuery": {
         "properties": {
           "text": {
@@ -4366,6 +4478,16 @@
               }
             ],
             "title": "Assistant Id"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FocusRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4405,7 +4527,7 @@
         },
         "type": "object",
         "title": "ClaimCheck",
-        "description": "The questions behind a score: what was asked, answered, or skipped.\n\nTwo numbers are not provenance. A score that carries a claim check says\nwhich questions produced it \u2014 ``asked`` \u2014 and what came back: the\n``answers`` the person gave and the ``skips`` with a recorded reason.\n\n``verified`` is derived, never typed in: a check is verified when at least\none question was answered by the person. A check of only skips is\nunverified, so an outcome built on an assumption says so instead of\nborrowing the confidence of a number."
+        "description": "The questions behind a score: what was asked, answered, or skipped.\n\nTwo numbers are not provenance. A score that carries a claim check says\nwhich questions produced it — ``asked`` — and what came back: the\n``answers`` the person gave and the ``skips`` with a recorded reason.\n\n``verified`` is derived, never typed in: a check is verified when at least\none question was answered by the person. A check of only skips is\nunverified, so an outcome built on an assumption says so instead of\nborrowing the confidence of a number."
       },
       "ClaimCitationOut": {
         "properties": {
@@ -4772,6 +4894,34 @@
         ],
         "title": "Direction"
       },
+      "FocusRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "job",
+              "step",
+              "outcome",
+              "evidence"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "FocusRef",
+        "description": "Which record the person is looking at, as a pointer and nothing more.\n\nThe client names the id; only the store has the words. Extra keys are\nrejected so a browser cannot slip its own label into the prompt."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -5131,6 +5281,44 @@
           "mcp_url"
         ],
         "title": "McpHealthRequest"
+      },
+      "MintShareRequest": {
+        "properties": {
+          "artifact_kind": {
+            "type": "string",
+            "enum": [
+              "outcome",
+              "segment",
+              "strategy"
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Artifact Id"
+          },
+          "ttl_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 30.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_kind",
+          "artifact_id"
+        ],
+        "title": "MintShareRequest",
+        "description": "Mint one scoped, expiring, read-only link for one artifact."
       },
       "ModelListRequest": {
         "properties": {
@@ -5532,6 +5720,63 @@
         ],
         "title": "ScheduleWorkRequest"
       },
+      "ShareMintResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "token",
+          "url",
+          "expires_at"
+        ],
+        "title": "ShareMintResponse",
+        "description": "The one time the raw token is shown. Only its hash is stored."
+      },
+      "SharedArtifactResponse": {
+        "properties": {
+          "artifact_kind": {
+            "type": "string",
+            "title": "Artifact Kind"
+          },
+          "artifact": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Artifact"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_kind",
+          "artifact"
+        ],
+        "title": "SharedArtifactResponse",
+        "description": "Exactly the named artifact and its own evidence. Nothing else."
+      },
       "SignalActionRequest": {
         "properties": {
           "mcp_url": {
@@ -5785,7 +6030,7 @@
         },
         "type": "object",
         "title": "UpdateCustomerOutcomeRequest",
-        "description": "Both values are replaced wholesale \u2014 a partial score would be ambiguous."
+        "description": "Both values are replaced wholesale — a partial score would be ambiguous."
       },
       "UpdateJobRequest": {
         "properties": {

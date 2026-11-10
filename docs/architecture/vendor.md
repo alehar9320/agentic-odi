@@ -23,13 +23,43 @@ The rule in one line: **copied markup, depended-on behaviour.**
    edits: <what>`; `apps/studio/vendor.lock.json` records the same facts per
    path plus an integrity handle, so the licence is auditable and the copy is
    re-fetchable. A registry item has no commit, which is why the handle is a
-   hash of the fetched artefact rather than a revision that does not exist.
+   hash of the fetched artefact rather than a revision that does not exist. Each
+   section of the ledger is sorted by path, so the diff of a refresh shows what
+   changed instead of a reordering.
 4. **One surface per pull request, 400 changed lines maximum.** A 2,000-line
    drop of a UI kit is unauditable and unmaintainable. Copy the one component
    the current issue needs.
 5. **A re-copy diff must be possible.** Local drift is allowed only when the
    header says what drifted, in its `local edits:` note. An unmarked edit means
    the next copy-in either loses the fix or pretends the file never changed.
+
+## The dependencies the alley needs
+
+Rule 1 sends behaviour to `package.json` and keeps only presentation in
+`src/vendor`, so the packages a copy imports are part of this audit even though
+nobody copied their source. A dependency of a copy carries the same two
+obligations as the copy: a licence we may ship, and a declaration in
+`apps/studio/package.json`. This table is the ledger for them, and
+`tests/scripts/test_vendor_policy.py` fails when the three lists — what the tree
+imports, what this table names, and what `package.json` declares — stop
+agreeing.
+
+| Package | Licence | Declared in | Why the alley needs it |
+|---|---|---|---|
+| `class-variance-authority` | MIT | devDependencies | the variant table the copied button is built from |
+| `clsx` | MIT | devDependencies | the class merger under `lib/utils.ts`, which every copy calls |
+| `radix-ui` | MIT | dependencies | `Slot`, the `asChild` primitive the button renders through |
+| `react` | MIT | dependencies | `React.ComponentProps` and the JSX the copies are written in |
+| `react-dom` | MIT | dependencies | `createPortal`, which the hover-card copy renders its content through |
+| `tailwind-merge` | MIT | devDependencies | resolves the class collisions two copies agree to disagree on |
+| `tailwindcss` | MIT | devDependencies | `index.css` imports its theme and utilities layers, scoped to this tree |
+
+The class-merger trio sits in `devDependencies` because that is where
+`npx shadcn init` put it: the Studio SPA is bundled by Vite, so nothing is
+installed on a target machine from this file and the section does not change the
+artefact that ships. The table records the section as it is rather than moving
+the packages, because a ledger that describes the tree as it should be is not a
+ledger.
 
 ## How the rules are enforced
 
@@ -51,6 +81,24 @@ authored file in the tree must appear exactly once in `apps/studio/vendor.lock.j
 a copied file's header must split into the parts the lock records, and a first-party
 file must carry no header. An undocumented copy-in fails `npm test` rather than
 waiting for a reviewer to notice the file has no source.
+
+Rule three has a second gate, outside the tree, in
+`tests/scripts/test_vendor_policy.py` (`scripts/vendor_policy.py`). It runs in the
+`test` job, which executes the whole `tests/` tree, so no workflow change was needed.
+Two things there are invisible to a test that lives inside `src/vendor` and one of
+them is invisible to any test in JavaScript:
+
+- a licence id with a valid shape is not necessarily one whose terms we ship, so
+  every licence in the lock and in the dependency table is checked against a closed
+  SPDX allowlist — `MIT`, `Apache-2.0`, `BSD-2-Clause`, `ISC`, `0BSD`;
+- the alley's dependencies are outside the directory that gate reads. Comparing
+  what the copies import against the table above and against
+  `apps/studio/package.json` is the only way a copy that quietly starts depending on
+  something, or a table row for a package no copy uses any more, becomes a failure
+  instead of a note in review.
+
+The parity assertions overlap on purpose, for the reason rule two already gives: a
+gate that can be disabled by a widened glob or a skipped job is one gate, not two.
 
 The wider question — when to copy at all, and what to check before adding a
 dependency — is `docs/architecture/reuse.md`.

@@ -143,6 +143,17 @@ async def test_add_outcome_requires_both_scores():
 
 
 @pytest.mark.asyncio
+async def test_add_outcome_description_puts_three_questions_before_the_score():
+    #: The docstring below the tool is what the model reads before it decides to
+    #: call it, so the interview requirement has to be in it, not only in the gate.
+    async with Client(mcp) as client:
+        tool = {item.name: item for item in await client.list_tools()}["add_outcome"]
+
+    assert "three questions" in tool.description
+    assert "never answer your own question" in tool.description
+
+
+@pytest.mark.asyncio
 async def test_add_outcome_refuses_a_score_without_a_claim_check():
     async with Client(mcp) as client:
         create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
@@ -330,9 +341,10 @@ async def test_a_refused_score_range_carries_the_range_code():
         payload = _failure_payload(res.content[0].text)
 
         assert payload["error"]["code"] == "out_of_range"
-        assert (
-            payload["message"] == "Error: importance and satisfaction must be between 1.0 and 10.0"
-        )
+        # The score that was out of range is named, so a client can show the
+        # message next to the field that needs it instead of on top of the form.
+        assert payload["error"]["field"] == "importance"
+        assert payload["message"] == "Error: importance must be between 1.0 and 10.0"
 
 
 @pytest.mark.asyncio

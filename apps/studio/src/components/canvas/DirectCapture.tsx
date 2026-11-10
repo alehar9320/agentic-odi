@@ -9,6 +9,26 @@ import { FailurePanel } from "../FailurePanel";
 /** Which field the failure belongs to, so the message lands next to it. */
 type FailureField = "statement" | "range" | "form";
 
+/**
+ * Where to show a failure. The server names the field when it knows one, so a
+ * field-specific failure lands next to the field that needs it; otherwise we
+ * fall back to the code-based heuristic and, failing that, the whole form —
+ * the best guess we have for a failure that predates the field or came from a
+ * peer that only sends text.
+ */
+function fieldForError(error: StudioError): FailureField {
+  if (error.field === "importance" || error.field === "satisfaction") {
+    return "range";
+  }
+  if (error.field === "statement" || error.field === "business_statement") {
+    return "statement";
+  }
+  if (error.code === "out_of_range") {
+    return "range";
+  }
+  return "form";
+}
+
 export function DirectCapture() {
   const { canvas, addOutcome, createJob } = useStudio();
   const jobs = canvas?.jobs ?? [];
@@ -71,11 +91,10 @@ export function DirectCapture() {
       setStatement("");
     } catch (error) {
       const problem = asStudioError(error);
-      // A rejected score belongs to the score fields; anything else belongs to
-      // the statement the user wrote.
-      const field: FailureField =
-        problem.code === "out_of_range" || problem.code === "validation" ? "range" : "statement";
-      setFailure({ error: problem, field });
+      // A fielded error lands beside the input it names; an out-of-range score
+      // keeps today's behaviour and lands on the score fields; anything else
+      // goes to form level.
+      setFailure({ error: problem, field: fieldForError(problem) });
     } finally {
       setBusy(false);
     }
@@ -120,7 +139,11 @@ export function DirectCapture() {
             id="dc-statement"
             className="input"
             placeholder="Minimize the time it takes to…"
-            aria-describedby="dc-statement-hint"
+            aria-describedby={
+              failure?.field === "statement"
+                ? "dc-statement-hint dc-statement-error"
+                : "dc-statement-hint"
+            }
             value={statement}
             onChange={(event) => setStatement(event.target.value)}
           />
@@ -129,7 +152,7 @@ export function DirectCapture() {
             it acts on, and the context. For example: “Minimize the time it takes to …”
           </p>
           {failure?.field === "statement" ? (
-            <FailurePanel error={failure.error} />
+            <FailurePanel id="dc-statement-error" error={failure.error} />
           ) : null}
         </div>
 
@@ -160,13 +183,17 @@ export function DirectCapture() {
             max={10}
             step={0.1}
             value={satisfaction}
-            aria-describedby="dc-satisfaction-hint"
+            aria-describedby={
+              failure?.field === "range" ? "dc-satisfaction-hint dc-range-error" : "dc-satisfaction-hint"
+            }
             onChange={(event) => setSatisfaction(Number(event.target.value))}
           />
           <p className="field__hint" id="dc-satisfaction-hint">
             How well it is met today, from 1 (not at all) to 10 (completely), in steps of 0.1.
           </p>
-          {failure?.field === "range" ? <FailurePanel error={failure.error} /> : null}
+          {failure?.field === "range" ? (
+            <FailurePanel id="dc-range-error" error={failure.error} />
+          ) : null}
         </div>
 
         <p className="score-preview" aria-describedby="dc-score-hint">

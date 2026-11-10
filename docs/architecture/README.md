@@ -126,8 +126,8 @@ persistence group, which may not call the service door":
 
 | Group | Modules | Rule |
 |---|---|---|
-| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py`, `bulk.py` | The vocabulary: what a job, an outcome, a segment, a score, a bulk change *is*. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
-| **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `factory.py`, `integrity.py`, `recovery.py`, `query.py` | Stores what the other groups decide, keeps the file it stores in readable — `integrity.py` gates a boot on a damaged store, `recovery.py` names the backup to restore — and reads it back narrowed. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
+| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py`, `bulk.py`, `schedule.py`, `traceability.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. `traceability.py` reads the links an outcome carries and reports the three failures — orphans, unfunded objectives, drift. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
+| **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `funnel.py`, `query.py`, `factory.py`, `integrity.py`, `recovery.py` | Stores what the other groups decide, and keeps the file it stores in readable — `integrity.py` gates a boot on a damaged store, `recovery.py` names the backup to restore, `funnel.py` appends the five onboarding counters to the same log and reads them back. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
 | **methodology** | `services.py`, `segmentation.py`, `strategy.py`, `router.py`, `messages.py`, `steve_jobs.py` | The ODI stages and the LLM path. `services.py` owns the service door every caller enters through; may import domain, persistence, and contract. |
 | **contract** | `contract.py`, `errors.py`, `remote.py`, `schema.py`, `connection.py`, `consent.py` | The MCP wire protocol, enforced against the live registry by `tests/contract/test_mcp_contract.py`. May be imported by anything; imports no persistence and no methodology. |
 
@@ -208,6 +208,7 @@ Start here, then take the one that answers your question.
 | [Data flow](data-flow.md) | How a write and a read travel from the CLI, MCP, and Studio to storage and back. |
 | [The signal inbox](notifications.md) | The operational surface of signals: kinds, dedupe, budget, and how each client reads them. |
 | [Signals](signals.md) | The design behind signals: why they are events, what they must describe, and what they do not do. |
+| [The onboarding funnel](funnel.md) | The five local counters that say how far a first session got, why they ride the event log, and what they refuse to claim. |
 | [Evidence mapping](evidence-mapping.md) | How a connector record becomes an evidence draft, and how evidence is promoted. |
 | [Consent and approvals](consent.md) | What the conversational agent must ask before it writes, and what is not covered. |
 | [Trust boundaries](trust-boundaries.md) | What each process may reach, where credentials live, and what crosses the wire. |

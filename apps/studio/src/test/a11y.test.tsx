@@ -12,6 +12,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../assistant/StudioRuntime";
+import { BriefLens } from "../components/brief/BriefLens";
 import { CatchUpFeed } from "../components/notifications/CatchUpFeed";
 import { BulkChangeBar } from "../components/canvas/BulkChangeBar";
 import { BulkChangeDialog } from "../components/canvas/BulkChangeDialog";
@@ -27,6 +28,7 @@ import { useOnboarding } from "../onboarding/context";
 import { createUpdateService, UpdateProvider } from "../updater";
 import type { UpdateTransport } from "../updater/types";
 import type { BulkReport } from "../types";
+import type { StudioBrief } from "../types";
 import { expectAccessible } from "./axe";
 
 const noop = () => {};
@@ -64,8 +66,10 @@ const state = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   connectors: [],
   connectorsError: null,
+  connectorsLoading: false,
   presets: [],
   presetError: null,
+  presetsLoading: false,
   refreshPresets: vi.fn(async () => undefined),
   refreshConnectors: vi.fn(async () => undefined),
   refreshCapabilities: vi.fn(async () => undefined),
@@ -165,6 +169,14 @@ const signal = {
   fingerprint: "fp-1",
 };
 
+const setupBrief: StudioBrief = {
+  product_name: "Shipwell",
+  target_user: "Release engineers",
+  job_statement: "Ship a hotfix without breaking the rollout",
+  core_problem: "Deploys take a day",
+  v2mom: { vision: "Every team ships the same afternoon it decides to." },
+};
+
 /** A surface rendered as the only page so landmark rules judge it fairly. */
 function Surface({ children }: { children: React.ReactNode }) {
   return (
@@ -195,6 +207,8 @@ function TourOpener() {
 beforeEach(() => {
   localStorage.clear();
   state.canvasState = { kind: "ready", data: canvasData };
+  state.canvas = null;
+  state.brief = null;
   state.signals = [signal];
   state.unreadSignalCount = 1;
 });
@@ -354,6 +368,29 @@ describe("axe sweep", () => {
   });
 
   it("passes the chat stage", async () => {
+    // A settled run row (folded), the same row opened, and a write still
+    // asking — the three states the transcript can show at once.
+    state.messages = [
+      {
+        id: "a-1",
+        parentId: null,
+        role: "assistant",
+        content: "Two jobs, one bet.",
+        parts: [
+          { kind: "reasoning", text: "Weighing the scored outcomes." },
+          { kind: "tool", id: "c-1", name: "list_jobs", status: "ok" },
+          { kind: "tool", id: "c-2", name: "get_outcomes", status: "ok" },
+          { kind: "text", text: "Two jobs, one bet." },
+          {
+            kind: "tool",
+            id: "c-3",
+            name: "add_job",
+            status: "running",
+            approval: { id: "ap-1", prompt: "Add the retention job?" },
+          },
+        ],
+      },
+    ];
     const { container } = renderWithUpdates(
       <Surface>
         <StudioRuntimeProvider>
@@ -363,6 +400,11 @@ describe("axe sweep", () => {
     );
 
     await expectAccessible(container);
+
+    fireEvent.click(container.querySelector(".work-block__trigger") as HTMLElement);
+    await expectAccessible(container);
+
+    state.messages = [];
   });
 
   it("passes the changelog dialog", async () => {
@@ -373,6 +415,22 @@ describe("axe sweep", () => {
     );
 
     await waitFor(() => expect(container.querySelector(".changelog-modal__loading")).toBeNull());
+    await expectAccessible(container);
+  });
+
+  it("passes the decision brief", async () => {
+    // A board with outcomes and no captured records, which is the shape the
+    // document is hardest on: a real decision to read, next to sections that
+    // have to say plainly that they hold nothing.
+    state.canvas = { ...canvasData, source: "local" };
+    state.brief = setupBrief;
+
+    const { container } = renderWithUpdates(
+      <Surface>
+        <BriefLens />
+      </Surface>,
+    );
+
     await expectAccessible(container);
   });
 });

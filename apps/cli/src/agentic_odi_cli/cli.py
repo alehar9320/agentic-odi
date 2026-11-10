@@ -23,7 +23,7 @@ from agentic_odi_cli.jobs import jobs_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
-from agentic_odi_cli.render import render_job_summary
+from agentic_odi_cli.render import render_funnel_summary, render_job_summary
 from agentic_odi_cli.schedule import schedule_app
 from agentic_odi_cli.segments import segments_app
 from agentic_odi_cli.settings import settings_app
@@ -287,6 +287,7 @@ def evaluate_cmd(
 def guidelines_cmd() -> None:
     """Print the ODI framework guidelines."""
     typer.echo(run_tool("get_odi_framework_guidelines", {}))
+    typer.echo("\nThe same method as a practitioner works it, stage by stage: docs/method.md.")
 
 
 capabilities_app = typer.Typer(name="capabilities", help="Inspect the assistant's tool surface.")
@@ -342,6 +343,44 @@ def summary(
             as_json=json_output,
         )
     )
+
+
+@app.command(name="stats")
+def stats_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    reset: bool = typer.Option(False, "--reset", help="Start the measurement over."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Answer the confirmation yes."),
+) -> None:
+    """Print the onboarding funnel this machine counted, and the step between each pair.
+
+    Five counters — launch, first message, first outcome, first score, return —
+    read from the same event log as the records. Nothing here reaches the
+    network. The reset appends a marker; the events it supersedes stay in the log.
+    """
+    from agentic_odi_core.funnel import adjacent_conversions, count_reset, read_counts
+    from agentic_odi_core.sqlite_repository import SQLiteRepository
+
+    if context.selected_backend() == "mcp":
+        typer.echo(
+            "The funnel is counted in the local event log, which the mcp backend does not have. "
+            "Run this with --backend local (or --backend auto)."
+        )
+        raise typer.Exit(code=1)
+
+    if reset and not yes:
+        typer.confirm(
+            "Restart the funnel measurement? The counters go to zero and the events stay.",
+            abort=True,
+        )
+
+    repository = SQLiteRepository(db_path=context.config().db_path)
+    try:
+        if reset:
+            count_reset(repository)
+        counts = read_counts(repository)
+        typer.echo(render_funnel_summary(counts, adjacent_conversions(counts), as_json=json_output))
+    finally:
+        repository.close()
 
 
 @app.command(name="version")
@@ -577,6 +616,47 @@ def update_cmd(
     typer.echo(f"Updated to v{target}")
     if now:
         _reexec_current()
+
+
+@app.command("backup")
+def backup_cmd(
+    db_path: str | None = typer.Option(  # noqa: B008
+        None, "--db", help="Database to snapshot (default: the local store)."
+    ),
+) -> None:
+    """Write a verified snapshot of the local database."""
+    from agentic_odi_core.recovery import backup_database
+
+    path = db_path or context.config().db_path or _default_db_path()
+    try:
+        out = backup_database(path)
+    except (OSError, RuntimeError) as exc:
+        typer.echo(f"Backup failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Backup written: {out}")
+
+
+@app.command("restore")
+def restore_cmd(
+    backup_file: str = typer.Argument(..., help="Snapshot to restore from."),
+    db_path: str | None = typer.Option(  # noqa: B008
+        None, "--db", help="Database to replace (default: the local store)."
+    ),
+) -> None:
+    """Restore a verified backup, keeping the current file as .pre-restore."""
+    from agentic_odi_core.recovery import restore_database
+
+    path = db_path or context.config().db_path or _default_db_path()
+    try:
+        safety = restore_database(backup_file, path)
+    except (OSError, ValueError) as exc:
+        typer.echo(f"Restore failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Restored. Previous file kept as {safety}")
+
+
+def _default_db_path() -> str:
+    return os.path.expanduser("~/.agentic-odi/odi.db")
 
 
 if __name__ == "__main__":

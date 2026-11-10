@@ -149,6 +149,8 @@ agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
 agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
+agentic-odi desired-outcomes import outcomes.csv --job-id <job-id> --dry-run
+agentic-odi desired-outcomes import outcomes.csv --job-id <job-id>
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
 agentic-odi desired-outcomes search --job-id <job-id> --text "three days"
 agentic-odi desired-outcomes search --theme <theme-id> --stage execute --confidence scored
@@ -162,6 +164,11 @@ agentic-odi desired-outcomes undo <token>
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
 agentic-odi summary <job-id> --top 3 --json
+
+# Onboarding funnel: launch, first message, first outcome, first score, return
+agentic-odi stats
+agentic-odi stats --json
+agentic-odi stats --reset --yes
 ```
 
 `--importance` and `--satisfaction` (1–10) are now required on `add`. `evaluate`
@@ -172,7 +179,9 @@ collected — `asked`, `answers`, and `skips` (each skip needs a reason). Omit i
 and the score is recorded as unverified, saying no customer questions were
 asked, so a by-hand score is never mistaken for an interrogated one. The MCP
 `add_outcome` tool is stricter: it refuses a score with no `claim_check` at all,
-and a score with no numbers is always legal.
+and a score with no numbers is always legal. Its description puts the interview
+first — three questions to the customer before any number, and their replies as
+the answers.
 
 Job names are validated by the core model: 3–64 characters drawn from letters,
 digits, spaces, underscores, and hyphens. Descriptions may be up to 500
@@ -219,6 +228,33 @@ that run is spent. Themes and stages are written through the same single-item pa
 `themes assign` and `desired-outcomes update` use, so the event log reads like the
 hand edits it replaces. The API and Studio surfaces for the same operation are the
 sibling issue.
+
+`import` files a spreadsheet of outcomes against one job, which is `export` run
+backwards: a library exported, edited in a spreadsheet, and brought back lands on
+the same rows it left. The header names the columns; it is read case-insensitively
+and with spaces trimmed, and an unknown column is reported as ignored rather than
+dropped in silence.
+
+| Column | Reads as |
+| --- | --- |
+| `statement` | the outcome statement. `outcome` and `need` are accepted for the same column; two of them that disagree refuse that row |
+| `importance`, `satisfaction` | the 1–10 scores. A row may carry neither; a value outside the band refuses the row |
+| `theme` | a theme's exact name, matched against this job's themes and the workspace-wide ones |
+| `stage` | a job-map stage — a row is filed on the job's one step in that stage |
+| `step_id` | the step to file the row on, which wins over `stage` |
+| `job_id` | compared, never obeyed: the target is `--job-id`. A row naming another job is refused and both ids are named, so a file exported from one job cannot quietly relocate another job's research |
+| `id`, `opportunity_score`, `importance_n`, `satisfaction_n` | read and ignored, and said so: a new outcome gets its own id, opportunity is computed from the two scores, and no field on an outcome holds a count |
+
+Rows are written one at a time through the same `add_outcome` path as
+`desired-outcomes add`, so a row the CLI would refuse is refused here too — with
+its line number in the file and the sentence the single-row command would print —
+while the rest still land. A row that carries scores is recorded as a by-hand
+score, because a spreadsheet is not an interview. A theme name that matches no
+theme, or matches two, leaves its rows created unfiled and says which lines, since
+guessing what a research file meant is how a library gets quietly wrong.
+`--dry-run` writes nothing and prints the same report a real run would, minus the
+ids. An import has no undo token: a write run prints the ids it created, and
+`desired-outcomes delete` takes them back one at a time.
 
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
@@ -386,7 +422,32 @@ non-zero when the store is degraded, so it can gate a deployment.
 stage. `capabilities --json` emits the full machine-readable manifest.
 `capabilities tools` lists tool names only.
 
-## Back up and export
+## Back up and restore
+
+`backup` writes a verified snapshot of the local SQLite store using SQLite's
+online backup, then re-opens the copy and runs `integrity_check` before it
+counts. A snapshot that fails the check is deleted and the command exits
+non-zero, so a corrupt file is never presented as a backup.
+
+```bash
+agentic-odi backup                     # ~/.agentic-odi/backups/odi-<UTC>.db
+agentic-odi backup --db ~/.agentic-odi/odi.db
+```
+
+`restore` verifies the snapshot before it touches anything. A snapshot that
+fails `integrity_check` changes nothing and says why. A good one keeps the
+current database as `<name>.pre-restore` and only then replaces it, so a
+restore can never silently destroy the file it is replacing.
+
+```bash
+agentic-odi restore ~/.agentic-odi/backups/odi-20260101T000000Z.db
+agentic-odi restore <file> --db ~/.agentic-odi/odi.db
+```
+
+Backups live beside the store by default (`~/.agentic-odi/backups`); set
+`AGENTIC_ODI_BACKUP_DIR` to keep them somewhere else.
+
+## Export
 
 ```bash
 agentic-odi data-export                        # ./odi-export-<timestamp>.json
