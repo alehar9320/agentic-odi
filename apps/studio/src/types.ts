@@ -354,12 +354,6 @@ export interface ChatMessage {
   error?: StudioError;
   /** The question this turn answered, kept so a failed turn can be retried. */
   retryText?: string;
-  /**
-   * When the turn was written, ISO 8601. Optional because a thread saved before
-   * this field existed replays without it: the transcript then shows no clock
-   * rather than an invented one.
-   */
-  createdAt?: string;
 }
 
 /**

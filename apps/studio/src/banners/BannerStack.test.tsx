@@ -109,6 +109,31 @@ describe("BannerStack", () => {
     expect(screen.getByText(/2 more/i)).toBeInTheDocument();
   });
 
+  it("mounts no top dock when it has nothing to show", () => {
+    render(
+      <BannerStack
+        banners={[banner({ id: "toast-1", kind: "success", title: "Saved.", body: "", dock: "corner" })]}
+        overflow={0}
+        onDismiss={() => {}}
+        onIntent={() => {}}
+      />,
+    );
+    expect(document.querySelector(".banner-dock--top")).toBeNull();
+    expect(document.querySelector(".banner-dock--corner")).not.toBeNull();
+  });
+
+  it("keeps the top dock when only the overflow row is left to show", () => {
+    render(
+      <BannerStack
+        banners={[banner({ id: "toast-1", kind: "success", title: "Saved.", body: "", dock: "corner" })]}
+        overflow={2}
+        onDismiss={() => {}}
+        onIntent={() => {}}
+      />,
+    );
+    expect(screen.getByText(/2 more/i)).toBeInTheDocument();
+  });
+
   it("hides the dismiss control for a banner that is not dismissible", () => {
     render(
       <BannerStack
@@ -119,62 +144,6 @@ describe("BannerStack", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: /dismiss/i })).not.toBeInTheDocument();
-  });
-
-  it("collapses the top dock when there is nothing for it to show", () => {
-    render(
-      <BannerStack
-        banners={[]}
-        overflow={0}
-        onDismiss={() => {}}
-        onIntent={() => {}}
-      />,
-    );
-    expect(document.querySelector(".banner-dock--top")).not.toBeNull();
-    expect(document.querySelector(".banner-dock--top")).toHaveClass(
-      "banner-dock--empty",
-    );
-    // The corner dock is a floating stack: it never collapses.
-    expect(document.querySelector(".banner-dock--corner")).not.toBeNull();
-    expect(document.querySelector(".banner-dock--corner")).not.toHaveClass(
-      "banner-dock--empty",
-    );
-  });
-
-  it("collapses the top dock when only corner banners are raised", () => {
-    render(
-      <BannerStack
-        banners={[banner({ id: "toast-1", dock: "corner" })]}
-        overflow={0}
-        onDismiss={() => {}}
-        onIntent={() => {}}
-      />,
-    );
-    expect(document.querySelector(".banner-dock--top")).toHaveClass(
-      "banner-dock--empty",
-    );
-    expect(document.querySelector(".banner-dock--corner")).not.toHaveClass(
-      "banner-dock--empty",
-    );
-  });
-
-  it("keeps the top dock open when a top banner is raised", () => {
-    render(
-      <BannerStack banners={[banner()]} overflow={0} onDismiss={() => {}} onIntent={() => {}} />,
-    );
-    expect(document.querySelector(".banner-dock--top")).not.toHaveClass(
-      "banner-dock--empty",
-    );
-  });
-
-  it("keeps the top dock open for the overflow row even with no visible banners", () => {
-    render(
-      <BannerStack banners={[]} overflow={3} onDismiss={() => {}} onIntent={() => {}} />,
-    );
-    expect(document.querySelector(".banner-dock--top")).not.toHaveClass(
-      "banner-dock--empty",
-    );
-    expect(screen.getByText(/\+3 more notices/i)).toBeInTheDocument();
   });
 });
 

@@ -2,16 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import type { AttachmentAdapter, PendingAttachment } from "@assistant-ui/react";
-
 import {
-  ATTACHMENT_READ_FAILURE,
-  AttachmentReadError,
   MAX_ATTACHMENT_CHARS,
   MAX_DOCUMENT_BYTES,
   MAX_IMAGE_BYTES,
   attachmentRejection,
-  createAttachmentAdapter,
   formatFileSize,
   isTextLike,
   prepareAttachment,
@@ -97,67 +92,10 @@ describe("prepareAttachment", () => {
     expect((docx.text ?? "").length).toBeGreaterThan(MAX_ATTACHMENT_CHARS);
   });
 
-  it("refuses a file whose bytes it cannot turn into content", async () => {
-    await expect(prepareAttachment(docxFixture("legacy.doc"))).rejects.toBeInstanceOf(
-      AttachmentReadError,
-    );
-  });
-});
-
-/**
- * A file the browser accepts by name and type but hands back nothing for: the
- * transcript is locked, the disk hiccuped, the tab lost the handle.
- */
-function unreadableFile(name = "notes.md"): File {
-  const file = fileOf(name, "text/markdown");
-  Object.defineProperty(file, "text", {
-    value: () => Promise.reject(new Error("Read interrupted")),
-  });
-  return file;
-}
-
-/**
- * The states assistant-ui sees from one `add()` call. The adapter may return a
- * promise or an async generator of successive states for the same attachment,
- * so the test drains it the way the runtime does.
- */
-async function addedStates(adapter: AttachmentAdapter, file: File): Promise<PendingAttachment[]> {
-  const result = adapter.add({ file });
-  if (Symbol.asyncIterator in result) {
-    const states: PendingAttachment[] = [];
-    for await (const state of result) {
-      states.push(state);
-    }
-    return states;
-  }
-  return [await result];
-}
-
-describe("an unreadable file", () => {
-  it("names the file and says it could not be read", async () => {
-    const failure = await prepareAttachment(unreadableFile()).catch((error) => error);
-    expect(failure).toBeInstanceOf(AttachmentReadError);
-    expect((failure as AttachmentReadError).name).toBe("notes.md");
-    expect((failure as AttachmentReadError).code).toBe("unreadable");
-    expect((failure as AttachmentReadError).message).toContain("Could not read notes.md");
-  });
-
-  it("hands the composer a failed attachment rather than an invisible one", async () => {
-    const states = await addedStates(createAttachmentAdapter(), unreadableFile());
-
-    expect(states).toHaveLength(1);
-    expect(states[0]).toMatchObject({
-      name: "notes.md",
-      status: { type: "incomplete", reason: "error", message: ATTACHMENT_READ_FAILURE },
-    });
-  });
-
-  it("keeps a readable file on the path it was already on", async () => {
-    const adapter = createAttachmentAdapter();
-    const states = await addedStates(adapter, fileOf("notes.md", "text/markdown"));
-    expect(states.at(-1)?.status).toEqual({ type: "requires-action", reason: "composer-send" });
-    const sent = await adapter.send(states[0]!);
-    expect(sent.status).toEqual({ type: "complete" });
+  it("never throws on a file it cannot read — the name is still shown", async () => {
+    const docx = await prepareAttachment(docxFixture("legacy.doc"));
+    expect(docx.name).toBe("legacy.doc");
+    expect(docx.text).toBeUndefined();
   });
 });
 

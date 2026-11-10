@@ -928,31 +928,3 @@ export function createShareLink(payload: {
 }): Promise<ShareLink> {
   return postJson<ShareLink>("/api/share", payload);
 }
-
-export interface StorageFacts {
-  kind: "sidecar" | "browser";
-  path?: string;
-  bytes?: number;
-  lastWrittenAt?: string;
-}
-
-export async function getStorageFacts(): Promise<StorageFacts> {
-  const bff = await getStudioBff();
-  const facts = await bff.storageFacts();
-  return {
-    kind: facts.engine === "indexeddb" ? "sidecar" : "browser",
-    path: facts.database ?? undefined,
-    bytes: facts.bytes === "unknown" ? undefined : facts.bytes,
-    lastWrittenAt: facts.lastWrite ?? undefined,
-  };
-}
-
-export async function exportWorkspace(): Promise<string> {
-  const bff = await getStudioBff();
-  return bff.exportWorkspace();
-}
-
-export async function importWorkspace(json: string): Promise<void> {
-  const bff = await getStudioBff();
-  await bff.importWorkspace(json);
-}

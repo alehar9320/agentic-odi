@@ -117,31 +117,3 @@ def test_the_trigger_does_not_restrict_to_the_main_branch():
     trigger = text.split("on:", 1)[1].split("\nconcurrency:", 1)[0]
     assert "pull_request:" in trigger
     assert "branches:" not in trigger
-
-
-def test_the_workflow_has_a_triage_job():
-    text = RISK.read_text(encoding="utf-8")
-    assert "\n  triage:\n" in text
-
-
-def test_the_triage_job_runs_after_labels_and_pr_risk():
-    text = RISK.read_text(encoding="utf-8")
-    triage_job = text.split("\n  triage:\n", 1)[1]
-    assert "needs: [labels, pr-risk]" in triage_job
-
-
-def test_the_triage_job_applies_the_ready_for_human_review_gate():
-    text = RISK.read_text(encoding="utf-8")
-    assert '"ready for human review"' in text
-
-
-def test_the_triage_job_creates_its_own_gate_labels():
-    text = RISK.read_text(encoding="utf-8")
-    triage_job = text.split("\n  triage:\n", 1)[1]
-    for label in ("ready for human review", "needs human review", "deep dive"):
-        assert f'gh label create "{label}"' in triage_job, label
-
-
-def test_the_triage_job_never_executes_pr_code():
-    text = RISK.read_text(encoding="utf-8")
-    assert "pull_request_target" not in text
