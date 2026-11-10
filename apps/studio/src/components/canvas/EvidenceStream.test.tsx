@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StudioContextValue } from "../../state/StudioContext";
-import type { Evidence } from "../../types";
+import type { CanvasData, Evidence, StudioError } from "../../types";
 import { EvidenceStream } from "./EvidenceStream";
 
 vi.mock("../../state/StudioContext", () => ({
@@ -40,22 +40,38 @@ const evidence: Evidence[] = [
 
 const openPanel = vi.fn();
 
+const failure: StudioError = {
+  code: "mcp_unreachable",
+  message: "The sidecar could not reach the MCP server.",
+  suggestion: "Start the server and retry.",
+  retryable: true,
+};
+
+// A workspace with jobs, and one with nothing but evidence — the second is the
+// shape that makes the canvas's global `empty` kind say the wrong thing here.
+const canvasWith = (items: Evidence[]): CanvasData => ({
+  jobs: [
+    { id: "j1", name: "Ship safely" },
+    { id: "j2", name: "Recover fast" },
+  ],
+  steps: [],
+  outcomes: [],
+  evidence: items,
+  source: "local",
+});
+
+const evidenceOnlyCanvas = (items: Evidence[]): CanvasData => ({
+  jobs: [],
+  steps: [],
+  outcomes: [],
+  evidence: items,
+  source: "local",
+});
+
 function renderWith(items: Evidence[] = evidence, overrides: Partial<StudioContextValue> = {}) {
   vi.mocked(useStudio).mockReturnValue({
     openPanel,
-    canvasState: {
-      kind: "ready",
-      data: {
-        jobs: [
-          { id: "j1", name: "Ship safely" },
-          { id: "j2", name: "Recover fast" },
-        ],
-        steps: [],
-        outcomes: [],
-        evidence: items,
-        source: "local",
-      },
-    },
+    canvasState: { kind: "ready", data: canvasWith(items) },
     promoteEvidence: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as unknown as StudioContextValue);
@@ -96,6 +112,57 @@ describe("EvidenceStream", () => {
     expect(openPanel).toHaveBeenCalledWith("settings");
   });
 
+  it("says the list is loading rather than empty while the canvas is in flight", () => {
+    renderWith(undefined, { canvasState: { kind: "loading", data: null } });
+
+    expect(screen.queryByText(/No evidence captured yet/)).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent(/loading evidence/i);
+    expect(screen.queryByRole("listitem")).toBeNull();
+  });
+
+  it("shows the failure and a retry instead of claiming nothing was captured", () => {
+    const refreshCanvas = vi.fn().mockResolvedValue(undefined);
+    renderWith(undefined, {
+      canvasState: { kind: "error", error: failure, data: null },
+      refreshCanvas,
+    });
+
+    expect(screen.queryByText(/No evidence captured yet/)).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent(/could not reach the MCP server/);
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    expect(refreshCanvas).toHaveBeenCalled();
+  });
+
+  it("keeps the saved rows and names the failure over them", () => {
+    renderWith(undefined, {
+      canvasState: { kind: "error", error: failure, data: canvasWith(evidence) },
+      canvasCached: true,
+    });
+
+    expect(screen.getByRole("listitem", { name: /Call with Ada/ })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/could not reach the MCP server/);
+    expect(screen.getByText(/Saved copy on this device/)).toBeInTheDocument();
+    expect(screen.queryByText(/No evidence captured yet/)).toBeNull();
+  });
+
+  it("draws evidence the canvas calls globally empty", () => {
+    renderWith(undefined, {
+      canvasState: { kind: "empty", data: evidenceOnlyCanvas([evidence[0]]) },
+    });
+
+    expect(screen.getByRole("listitem", { name: /Call with Ada/ })).toBeInTheDocument();
+    expect(screen.queryByText(/No evidence captured yet/)).toBeNull();
+  });
+
+  it("still offers the empty state to a load that genuinely found nothing", () => {
+    renderWith(undefined, {
+      canvasState: { kind: "empty", data: evidenceOnlyCanvas([]) },
+    });
+
+    expect(screen.getByText(/No evidence captured yet/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /connect a source/i })).toBeInTheDocument();
+  });
+
   it("reorders with the keyboard and remembers the order", () => {
     renderWith();
 
@@ -109,6 +176,37 @@ describe("EvidenceStream", () => {
       "e1",
       "e3",
     ]);
+  });
+
+  it("leaves arrow keys to the controls inside an open form", () => {
+    renderWith();
+    fireEvent.click(screen.getByRole("button", { name: /Turn Call with Ada into an outcome/ }));
+
+    for (const control of [
+      screen.getByLabelText("Job"),
+      screen.getByLabelText("Desired outcome"),
+      screen.getByLabelText(/^Importance/),
+      screen.getByLabelText(/^Current satisfaction/),
+    ]) {
+      for (const key of ["ArrowUp", "ArrowDown"]) {
+        // fireEvent returns false once the handler has called preventDefault.
+        expect(fireEvent.keyDown(control, { key })).toBe(true);
+      }
+    }
+
+    expect(labels()).toEqual(["Call with Ada", "Slack thread", "Support ticket"]);
+    expect(localStorage.getItem("agentic-odi.evidence-order")).toBeNull();
+  });
+
+  it("reorders the row itself while its form is open", () => {
+    renderWith();
+    fireEvent.click(screen.getByRole("button", { name: /Turn Call with Ada into an outcome/ }));
+
+    fireEvent.keyDown(screen.getByRole("listitem", { name: /Call with Ada/ }), {
+      key: "ArrowDown",
+    });
+
+    expect(labels()).toEqual(["Slack thread", "Call with Ada", "Support ticket"]);
   });
 
   it("reorders by dragging one record onto another", () => {

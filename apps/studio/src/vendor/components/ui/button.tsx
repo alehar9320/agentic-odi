@@ -1,8 +1,6 @@
-// Copied from the shadcn registry by `npx shadcn@latest add button` (issue #385).
-// Registry: ui.shadcn.com, MIT licensed.
-// One edit after the copy: the registry item imports its class merger from the "cn"
-// package, while this tree standardises on the local helper, so the import is
-// "@/lib/utils" (src/vendor/lib/utils.ts). Refresh with the CLI, then restore that line.
+// vendored: https://ui.shadcn.com/r/styles/new-york-v4/button.json — MIT — retrieved 2026-10-31 by `npx shadcn@latest add button` (issue #385) — local edits: the class-merger import moves from the "cn" package to "@/lib/utils" (src/vendor/lib/utils.ts); this header is ours.
+// Ledger entry: apps/studio/vendor.lock.json. Refresh with the CLI, then restore
+// that import line; src/vendor/ledger.test.ts fails if the two drift apart.
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"

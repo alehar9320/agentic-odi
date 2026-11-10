@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="error-page">
           <div className="error-page__card" role="alert">
-            <p className="hero__eyebrow">Living Studio</p>
+            <p className="hero__eyebrow">Something went wrong</p>
             <h1 className="error-page__title">Something broke on the way to the canvas.</h1>
             <p className="hero__sub">{this.state.error.message}</p>
             <button type="button" className="button" onClick={() => window.location.reload()}>

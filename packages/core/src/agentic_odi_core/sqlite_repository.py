@@ -12,23 +12,22 @@ from pydantic import BaseModel, ValidationError
 
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
+from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
-    CandidateStatus,
+    V2MOM,
     CustomerOutcome,
     Evidence,
-    Interview,
-    InterviewQuote,
     Job,
     Outcome,
-    OutcomeCandidate,
     ScheduledWork,
     Segment,
     Signal,
     Step,
     Strategy,
-    compute_opportunity_score,
+    Study,
 )
 from agentic_odi_core.repository import (
+    V2MOM_ID,
     Repository,
     compute_evidence_fingerprint,
     page,
@@ -49,75 +48,41 @@ class SQLiteRepository(Repository):
             db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
+        self.db_path = db_path
         self._workspace_id = workspace_id or os.environ.get(
             "AGENTIC_ODI_WORKSPACE", DEFAULT_WORKSPACE
         )
         self._device_id = device_id or os.environ.get("AGENTIC_ODI_DEVICE_ID", DEFAULT_DEVICE)
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
-        self._backfilled = False
         self._load_snapshot()
-        self._backfill_legacy_outcomes()
 
     def _load_snapshot(self) -> None:
         self.jobs: dict[str, Job] = {}
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
+        self.proposals: dict[str, OutcomeProposal] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
-        self.interviews: dict[str, Interview] = {}
-        self.quotes: dict[str, InterviewQuote] = {}
-        self.candidates: dict[str, OutcomeCandidate] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.v2mom: dict[str, V2MOM] = {}
+        self.studies: dict[str, Study] = {}
         self._last_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
 
-    def _backfill_legacy_outcomes(self) -> None:
-        """One-time migration: backfill null scores on legacy outcomes.
-
-        Assigns importance=5.0, satisfaction=5.0 to any outcome missing either
-        score, records an OUTCOME_BACKFILLED event per outcome, and marks the
-        repository as backfilled so reloads do not repeat the migration.
-        """
-        if self._backfilled:
-            return
-        needs_backfill = [
-            o for o in self.outcomes.values() if o.importance is None or o.satisfaction is None
-        ]
-        if not needs_backfill:
-            self._backfilled = True
-            return
-        for outcome in needs_backfill:
-            updates: dict[str, Any] = {}
-            importance = outcome.importance
-            if importance is None:
-                importance = 5.0
-                updates["importance"] = importance
-            satisfaction = outcome.satisfaction
-            if satisfaction is None:
-                satisfaction = 5.0
-                updates["satisfaction"] = satisfaction
-            updates["opportunity_score"] = compute_opportunity_score(
-                importance,
-                satisfaction,
-            )
-            self.store.append(
-                "OUTCOME_BACKFILLED",
-                {"id": outcome.id, "updates": updates},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-        self._sync()
-        self._backfilled = True
-
     def _sync(self) -> None:
-        for ev in self.store.get_stream(workspace_id=self._workspace_id):
-            if ev["id"] > self._last_event_id:
-                self._apply_event(ev)
+        # Only the events appended since the last apply. Reading the whole log
+        # here made every repository read O(all events): a canvas assembly over
+        # a 1,500-outcome store re-parsed 200k rows instead of 3k. ``after_id``
+        # is a covering range scan on the rowid, which is the append order.
+        for ev in self.store.get_stream(
+            workspace_id=self._workspace_id, after_id=self._last_event_id
+        ):
+            self._apply_event(ev)
 
     def _apply_event(self, ev: Event) -> None:
         et = ev["type"]
@@ -132,12 +97,6 @@ class SQLiteRepository(Repository):
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
-        elif et == "INTERVIEW_CREATED":
-            self.interviews[p["id"]] = Interview.model_validate(p)
-        elif et == "QUOTE_CREATED":
-            self.quotes[p["id"]] = InterviewQuote.model_validate(p)
-        elif et == "CANDIDATE_CREATED":
-            self.candidates[p["id"]] = OutcomeCandidate.model_validate(p)
         elif et == "JOB_UPDATED":
             self._merge_updates(self.jobs, p, Job)
         elif et == "STEP_UPDATED":
@@ -146,10 +105,6 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.outcomes, p, Outcome)
         elif et == "CUSTOMER_OUTCOME_UPDATED":
             self._merge_updates(self.customer_outcomes, p, CustomerOutcome)
-        elif et == "INTERVIEW_UPDATED":
-            self._merge_updates(self.interviews, p, Interview)
-        elif et == "CANDIDATE_UPDATED":
-            self._merge_updates(self.candidates, p, OutcomeCandidate)
         elif et == "JOB_DELETED":
             job_id = p["id"]
             self.jobs.pop(job_id, None)
@@ -175,14 +130,6 @@ class SQLiteRepository(Repository):
                     current = record.model_dump(exclude_unset=True)
                     current.update(updates)
                     self.evidence[key] = Evidence.model_validate(current)
-            for key in [k for k, v in self.interviews.items() if v.job_id == job_id]:
-                del self.interviews[key]
-                for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
-                    del self.quotes[quote_key]
-                for candidate_key in [
-                    c for c, v in self.candidates.items() if v.interview_id == key
-                ]:
-                    del self.candidates[candidate_key]
         elif et == "STEP_DELETED":
             step_id = p["id"]
             self.steps.pop(step_id, None)
@@ -217,26 +164,6 @@ class SQLiteRepository(Repository):
         elif et == "SCHEDULED_WORK_DELETED":
             self.scheduled_work.pop(p["id"], None)
 
-        elif et == "INTERVIEW_DELETED":
-            interview_id = p["id"]
-            self.interviews.pop(interview_id, None)
-            # Replay must reproduce the cascade: prefer the recorded ids, but
-            # fall back to the live mapping for events written before the ids
-            # were recorded, so an old log still converges.
-            cascade = p.get("cascaded_quote_ids")
-            if cascade is None:
-                cascade = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
-            for quote_id in cascade:
-                self.quotes.pop(quote_id, None)
-            candidate_cascade = p.get("cascaded_candidate_ids")
-            if candidate_cascade is None:
-                candidate_cascade = [
-                    c for c, v in self.candidates.items() if v.interview_id == interview_id
-                ]
-            for candidate_id in candidate_cascade:
-                self.candidates.pop(candidate_id, None)
-        elif et == "CANDIDATE_DELETED":
-            self.candidates.pop(p["id"], None)
         elif et == "CUSTOMER_OUTCOME_DELETED":
             self.customer_outcomes.pop(p["id"], None)
         elif et == "SIGNAL_CREATED":
@@ -253,6 +180,16 @@ class SQLiteRepository(Repository):
             self.strategies[p["id"]] = Strategy.model_validate(p)
         elif et == "STRATEGY_UPDATED":
             self._merge_updates(self.strategies, p, Strategy)
+        elif et == "PROPOSAL_CREATED":
+            self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
+        elif et == "PROPOSAL_UPDATED":
+            self._merge_updates(self.proposals, p, OutcomeProposal)
+        elif et == "V2MOM_UPDATED":
+            self.v2mom[V2MOM_ID] = V2MOM.model_validate(p)
+        elif et == "STUDY_CREATED":
+            self.studies[p["id"]] = Study.model_validate(p)
+        elif et == "STUDY_UPDATED":
+            self._merge_updates(self.studies, p, Study)
         self._last_event_id = max(self._last_event_id, ev["id"])
 
     @staticmethod
@@ -260,12 +197,18 @@ class SQLiteRepository(Repository):
         entity = entities.get(p["id"])
         if entity is None:
             return
-        current = entity.model_dump(exclude_unset=True)
+        current = entity.model_dump(mode="json", exclude_unset=True)
         current.update(p.get("updates", {}))
         try:
             entities[p["id"]] = model.model_validate(current)
         except ValidationError:
             pass
+
+    def last_event_id(self) -> int:
+        """Rowid of the event most recently applied, 0 before any write."""
+        with self._lock:
+            self._sync()
+            return self._last_event_id
 
     def add_job(self, job: Job) -> Job:
         with self._lock:
@@ -375,6 +318,53 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return True
+
+    def list_steps(self, limit: int | None = None, offset: int = 0) -> list[Step]:
+        with self._lock:
+            self._sync()
+            return page(list(self.steps.values()), limit, offset)
+
+    def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal:
+        with self._lock:
+            self.store.append(
+                "PROPOSAL_CREATED",
+                proposal.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return proposal
+
+    def get_proposal(self, proposal_id: str) -> OutcomeProposal | None:
+        with self._lock:
+            self._sync()
+            return self.proposals.get(proposal_id)
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
+        with self._lock:
+            self._sync()
+            props = list(self.proposals.values())
+            if status is not None:
+                props = [p for p in props if p.status == status]
+            return props
+
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None:
+        with self._lock:
+            self._sync()
+            proposal = self.proposals.get(proposal_id)
+            if not proposal:
+                return None
+            current = proposal.model_dump(mode="json", exclude_unset=True)
+            current.update(updates)
+            new_proposal = OutcomeProposal.model_validate(current)
+            self.store.append(
+                "PROPOSAL_UPDATED",
+                {"id": proposal_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_proposal
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
         with self._lock:
@@ -767,6 +757,51 @@ class SQLiteRepository(Repository):
             self._sync()
             return new_segment
 
+    def add_study(self, study: Study) -> Study:
+        with self._lock:
+            self.store.append(
+                "STUDY_CREATED",
+                study.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return study
+
+    def get_study(self, study_id: str) -> Study | None:
+        with self._lock:
+            self._sync()
+            return self.studies.get(study_id)
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        with self._lock:
+            self._sync()
+            items = list(self.studies.values())
+            if job_id is not None:
+                items = [study for study in items if study.job_id == job_id]
+            return items
+
+    def update_study(self, study_id: str, updates: dict[str, Any]) -> Study | None:
+        with self._lock:
+            self._sync()
+            study = self.studies.get(study_id)
+            if study is None:
+                return None
+            current = study.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_study = study.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "STUDY_UPDATED",
+                {"id": study_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_study
+
     def add_strategy(self, strategy: Strategy) -> Strategy:
         with self._lock:
             self.store.append(
@@ -812,165 +847,21 @@ class SQLiteRepository(Repository):
             self._sync()
             return new_strategy
 
-    def add_interview(self, interview: Interview) -> Interview:
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
         with self._lock:
             self.store.append(
-                "INTERVIEW_CREATED",
-                interview.model_dump(),
+                "V2MOM_UPDATED",
+                v2mom.model_dump(mode="json"),
                 workspace_id=self._workspace_id,
                 device_id=self._device_id,
             )
             self._sync()
-            return interview
+            return v2mom
 
-    def get_interview(self, interview_id: str) -> Interview | None:
+    def get_v2mom(self) -> V2MOM | None:
         with self._lock:
             self._sync()
-            return self.interviews.get(interview_id)
-
-    def list_interviews(
-        self,
-        job_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[Interview]:
-        with self._lock:
-            self._sync()
-            if job_id is None:
-                items = list(self.interviews.values())
-            else:
-                items = [i for i in self.interviews.values() if i.job_id == job_id]
-            return page(items, limit, offset)
-
-    def update_interview(self, interview_id: str, updates: dict) -> Interview | None:
-        with self._lock:
-            self._sync()
-            interview = self.interviews.get(interview_id)
-            if not interview:
-                return None
-            current = interview.model_dump(exclude_unset=True)
-            current.update(updates)
-            new_interview = interview.model_validate(current)
-            self.store.append(
-                "INTERVIEW_UPDATED",
-                {"id": interview_id, "updates": updates},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return new_interview
-
-    def delete_interview(self, interview_id: str) -> list[str]:
-        with self._lock:
-            self._sync()
-            if interview_id not in self.interviews:
-                return []
-            cascaded = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
-            cascaded_candidates = [
-                c for c, v in self.candidates.items() if v.interview_id == interview_id
-            ]
-            self.store.append(
-                "INTERVIEW_DELETED",
-                {
-                    "id": interview_id,
-                    "cascaded_quote_ids": cascaded,
-                    "cascaded_candidate_ids": cascaded_candidates,
-                },
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return cascaded
-
-    def add_quote(self, quote: InterviewQuote) -> InterviewQuote:
-        with self._lock:
-            self.store.append(
-                "QUOTE_CREATED",
-                quote.model_dump(),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return quote
-
-    def get_quote(self, quote_id: str) -> InterviewQuote | None:
-        with self._lock:
-            self._sync()
-            return self.quotes.get(quote_id)
-
-    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
-        with self._lock:
-            self._sync()
-            items = [q for q in self.quotes.values() if q.interview_id == interview_id]
-            return sorted(items, key=lambda q: q.ordinal)
-
-    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
-        with self._lock:
-            self.store.append(
-                "CANDIDATE_CREATED",
-                candidate.model_dump(mode="json"),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return candidate
-
-    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
-        with self._lock:
-            self._sync()
-            return self.candidates.get(candidate_id)
-
-    def list_candidates(
-        self,
-        interview_id: str | None = None,
-        status: CandidateStatus | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[OutcomeCandidate]:
-        with self._lock:
-            self._sync()
-            items = list(self.candidates.values())
-            if interview_id is not None:
-                items = [c for c in items if c.interview_id == interview_id]
-            if status is not None:
-                items = [c for c in items if c.status == status]
-            return page(items, limit, offset)
-
-    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None:
-        with self._lock:
-            self._sync()
-            candidate = self.candidates.get(candidate_id)
-            if not candidate:
-                return None
-            current = candidate.model_dump(exclude_unset=True)
-            current.update(updates)
-            new_candidate = candidate.model_validate(current)
-            serialised = {
-                key: value.value if isinstance(value, CandidateStatus) else value
-                for key, value in updates.items()
-            }
-            self.store.append(
-                "CANDIDATE_UPDATED",
-                {"id": candidate_id, "updates": serialised},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return new_candidate
-
-    def delete_candidate(self, candidate_id: str) -> bool:
-        with self._lock:
-            self._sync()
-            if candidate_id in self.candidates:
-                self.store.append(
-                    "CANDIDATE_DELETED",
-                    {"id": candidate_id},
-                    workspace_id=self._workspace_id,
-                    device_id=self._device_id,
-                )
-                self._sync()
-                return True
-            return False
+            return next(iter(self.v2mom.values()), None)
 
     def clear(self) -> None:
         with self._lock:
@@ -985,6 +876,16 @@ class SQLiteRepository(Repository):
         """Flush any open transaction in the event store to disk."""
         with self._lock:
             self.store.commit()
+
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """Fold the write-ahead log back into the database file."""
+        with self._lock:
+            self.store.checkpoint(mode)
+
+    @property
+    def integrity(self) -> str:
+        """The boot check result: ``ok`` or ``deferred``."""
+        return self.store.integrity.status
 
     def close(self) -> None:
         """Close the event store and let SQLite clean up its journal files."""
