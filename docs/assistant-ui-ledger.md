@@ -206,15 +206,15 @@ only the surface is missing.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| `adapters.threadList` | Planned | — | #408 | `threads`, `threadId`, `isLoading`, `onSwitchToThread`, `onSwitchToNewThread`. |
+| `adapters.threadList` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #858 | `threads`, `threadId`, `isLoading`, `onSwitchToThread`, `onSwitchToNewThread`. |
 | `ExternalStoreThreadData` fields | Planned | — | #408 | `status`, `id`, `title`, `custom` — there are no timestamp fields. Ordering data must ride in `custom`. |
-| `ThreadListPrimitive.Root` / `.New` / `.Items` / `.ItemByIndex` | Planned | — | #408 | The switcher. |
+| `ThreadListPrimitive.Root` / `.New` / `.Items` / `.ItemByIndex` | Adopted | `apps/studio/src/components/history/ThreadList.tsx` | #858 | The switcher. |
 | `ThreadListPrimitive.LoadMore` / `threads.hasMore` | Decision | — | — | The external-store adapter has no paging hook; `hasMore`/`isLoadingMore` are populated by the remote runtimes we rejected. Cap the fetch server-side and offer Show all, or adopt the remote runtime. |
-| `ThreadListItemPrimitive.Root` / `.Trigger` / `.Title` | Planned | — | #408 | One row, keyboard reachable. |
-| `ThreadListItemPrimitive.Delete` | Planned | — | #409 | Confirmed delete, turns and all. |
+| `ThreadListItemPrimitive.Root` / `.Trigger` / `.Title` | Adopted | `apps/studio/src/components/history/ThreadList.tsx` | #858 | One row, keyboard reachable. |
+| `ThreadListItemPrimitive.Delete` | Adopted | `apps/studio/src/components/history/ThreadList.tsx` | #858 | Confirmed delete, turns and all. |
 | `ThreadListItemPrimitive.Archive` / `.Unarchive` | Decision | — | — | Needs an `archived_at` migration and an `archivedThreads` feed. Build only if real lists pass ~20 threads. |
-| `ThreadListItemMorePrimitive` (`Root`/`Trigger`/`Content`/`Item`/`Separator`) | Planned | — | #409 | One keyboard-navigable menu instead of hover buttons. |
-| `threads.item().rename()` / `.updateCustom()` | Planned | — | #409 | Inline rename and per-row metadata (`updatedAt` cannot live on `ExternalStoreThreadData`, so it rides in `custom`). |
+| `ThreadListItemMorePrimitive` (`Root`/`Trigger`/`Content`/`Item`/`Separator`) | Adopted | `apps/studio/src/components/history/ThreadList.tsx` | #858 | One keyboard-navigable menu instead of hover buttons. |
+| `threads.item().rename()` / `.updateCustom()` | Adopted | `apps/studio/src/components/history/ThreadList.tsx` | #858 | Inline rename and per-row metadata (`updatedAt` cannot live on `ExternalStoreThreadData`, so it rides in `custom`). |
 | `threads.item().generateTitle()` | Rejected | — | — | Needs a model adapter the Studio does not have, and the sidecar already derives a title from the first turn. A client-side title would be a second authority. |
 
 ## Queue
@@ -319,9 +319,9 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 47 |
+| Adopted | 53 |
 | Partial | 9 |
-| Planned | 13 |
+| Planned | 7 |
 | Decision | 42 |
 | Rejected | 44 |
 | Total | 155 |
