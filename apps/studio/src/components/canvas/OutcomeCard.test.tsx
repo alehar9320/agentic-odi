@@ -34,7 +34,8 @@ describe("OutcomeCard score preview", () => {
     const { container } = render(<OutcomeCard outcome={outcome} />);
     fireEvent.click(screen.getByRole("button", { name: "Adjust scores" }));
 
-    expect(container.querySelector(".score-preview b")?.textContent).toBe("16.0");
+    // The ScorePopover shows the formula with the computed score
+    expect(container.querySelector(".score-popover__result")?.textContent).toBe("16.0");
   });
 });
 
