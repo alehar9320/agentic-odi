@@ -254,6 +254,7 @@ def add_outcome(
     satisfaction: float | None = None,
     step_id: str | None = None,
     claim_check: dict[str, Any] | None = None,
+    objectives: list[dict[str, str]] | None = None,
 ) -> str:
     """Add a desired Outcome to a Job.
 
@@ -272,6 +273,11 @@ def add_outcome(
 
     Each skip needs a reason. To record an outcome before you have asked, omit
     both scores: an unscored outcome is legal, a bare number is not.
+
+    ``objectives`` names the V2MOM methods and measures this outcome advances,
+    each as ``{"field": "method" | "measure", "text": "<objective text>"}``. The
+    text must match an entry the vision holds now; an unknown one is refused with
+    the entries that do exist. Omit it (or pass ``[]``) for an unlinked outcome.
     """
     if service.get_job(job_id) is None:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
@@ -298,6 +304,7 @@ def add_outcome(
             satisfaction=satisfaction,
             step_id=step_id,
             claim_check=claim_check,
+            objectives=objectives,
         )
     except JobNotFoundError:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
@@ -306,6 +313,8 @@ def add_outcome(
     except ValueOutOfRangeError as exc:
         return _fail(exc, "Error: importance and satisfaction must be between 1.0 and 10.0")
     except ClaimCheckError as exc:
+        return _fail(exc)
+    except OdiValidationError as exc:
         return _fail(exc)
     except OutcomeStatementError as exc:
         return _fail(exc)
@@ -545,6 +554,7 @@ def update_outcome(
     importance: float | None = None,
     satisfaction: float | None = None,
     step_id: str | None = None,
+    objectives: list[dict[str, str]] | None = None,
 ) -> str:
     updates: dict = {}
     if statement is not None:
@@ -555,11 +565,15 @@ def update_outcome(
         updates["satisfaction"] = satisfaction
     if step_id is not None:
         updates["step_id"] = step_id
+    if objectives is not None:
+        updates["objectives"] = objectives
     try:
         updated = service.update_outcome(outcome_id, updates)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     except OutcomeStatementError as exc:
+        return _fail(exc)
+    except OdiValidationError as exc:
         return _fail(exc)
     except ValueOutOfRangeError as exc:
         return _fail(exc, "Error: importance and satisfaction must be between 1.0 and 10.0")

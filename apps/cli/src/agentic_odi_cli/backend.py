@@ -246,6 +246,7 @@ class LocalBackend(Backend):
             job_not_found,
             step_not_found,
         )
+        from agentic_odi_core.errors import ValidationError
 
         step_id = args.get("step_id")
         claim_check = args.get("claim_check")
@@ -257,6 +258,7 @@ class LocalBackend(Backend):
                 satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
                 claim_check=claim_check,
+                objectives=args.get("objectives"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -265,6 +267,8 @@ class LocalBackend(Backend):
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
         except ClaimCheckError as exc:
+            raise BackendError(str(exc)) from exc
+        except ValidationError as exc:
             raise BackendError(str(exc)) from exc
         return outcome.model_dump()
 
@@ -293,10 +297,11 @@ class LocalBackend(Backend):
 
     def _update_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import OutcomeNotFoundError, ValueOutOfRangeError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
 
         updates: dict[str, Any] = {
             key: args[key]
-            for key in ("statement", "importance", "satisfaction", "step_id")
+            for key in ("statement", "importance", "satisfaction", "step_id", "objectives")
             if key in args
         }
         try:
@@ -305,6 +310,8 @@ class LocalBackend(Backend):
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from exc
         return outcome.model_dump()
 
     def _delete_outcome(self, args: dict[str, Any]) -> str:
