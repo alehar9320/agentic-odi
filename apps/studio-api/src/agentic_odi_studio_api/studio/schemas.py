@@ -124,6 +124,29 @@ class V2MOM(BaseModel):
     measures: list[str] = Field(default_factory=list)
 
 
+class LinkOutcomeRequest(BaseModel):
+    """Link an outcome to one V2MOM method or measure.
+
+    ``text`` must match an entry the vision currently holds; unknown text is
+    refused rather than guessed.
+    """
+
+    field: Literal["method", "measure"]
+    text: str = Field(min_length=1)
+    mcp_url: str = ""
+
+
+class TraceabilityReportResponse(BaseModel):
+    """The three failures: orphans, unfunded objectives, and drift."""
+
+    objectives_defined: bool
+    message: str | None = None
+    orphans: list[str] = Field(default_factory=list)
+    unfunded: list[dict[str, str]] = Field(default_factory=list)
+    drift: list[dict[str, str]] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+
+
 class AddCustomerOutcomeRequest(BaseModel):
     mcp_url: str = ""
     job_id: str
@@ -504,3 +527,29 @@ class ProposalOut(BaseModel):
     source_name: str
     status: str
     created_at: str
+
+
+class MintShareRequest(BaseModel):
+    """Mint one scoped, expiring, read-only link for one artifact."""
+
+    artifact_kind: Literal["outcome", "segment", "strategy"]
+    artifact_id: str = Field(min_length=1)
+    #: Days until the link expires. Omitted means 7; the range is 1–30.
+    ttl_days: int | None = Field(default=None, ge=1, le=30)
+
+
+class ShareMintResponse(BaseModel):
+    """The one time the raw token is shown. Only its hash is stored."""
+
+    id: str
+    token: str
+    url: str
+    expires_at: str
+
+
+class SharedArtifactResponse(BaseModel):
+    """Exactly the named artifact and its own evidence. Nothing else."""
+
+    artifact_kind: str
+    artifact: dict[str, Any]
+    evidence: list[dict[str, Any]] = Field(default_factory=list)

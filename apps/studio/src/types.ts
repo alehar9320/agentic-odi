@@ -5,6 +5,8 @@ export interface Job {
   id: string;
   name?: string;
   description?: string;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
 }
 
 export interface Step {
@@ -12,6 +14,8 @@ export interface Step {
   job_id?: string;
   name?: string;
   order?: number;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
 }
 
 /** A question put to the person that they did not answer, and why not. */
@@ -42,6 +46,8 @@ export interface Outcome {
   claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
 }
 
 export interface Evidence {
@@ -191,10 +197,39 @@ export interface StudioError {
   suggestion?: string | null;
   retryable: boolean;
   request_id?: string | null;
-  //: Which outcome field the failure belongs to, so the form can render it
-  //: beside the statement or rating the person mistyped. Absent when the
-  //: failure cannot be attributed to a single field.
-  field?: "statement" | "importance" | "satisfaction" | null;
+  /** The input field that failed, when the failure names one. Omitted when the
+   * failure is not field-specific — a client can tell "no field" from "the
+   * field is the whole form" rather than guessing at a default. */
+  field?: string | null;
+}
+
+/** The one artifact a shared link carries. More kinds are additive. */
+export type SharedArtifactKind = "landscape" | "vision";
+
+/**
+ * The scoped payload a share token returns: exactly one artifact, its own
+ * evidence, and the expiry. It never carries the canvas, memory, conversations,
+ * connector settings, or the brief — the page renders only what is here.
+ */
+export interface SharedArtifactPayload {
+  kind: SharedArtifactKind;
+  expires_at: string;
+  generated_at: string;
+  source: "local" | "mcp" | "seed";
+  /** The job context a landscape names; absent for a vision. */
+  jobs?: Job[];
+  outcomes?: Outcome[];
+  evidence?: Evidence[];
+  /** The person's own words, when the artifact is a vision. */
+  vision?: string;
+}
+
+/** What a mint call returns: the raw token is shown once and never again. */
+export interface ShareLink {
+  id: string;
+  token: string;
+  url: string;
+  expires_at: string;
 }
 
 export type StudioTheme = "light" | "dark";
@@ -319,6 +354,12 @@ export interface ChatMessage {
   error?: StudioError;
   /** The question this turn answered, kept so a failed turn can be retried. */
   retryText?: string;
+  /**
+   * When the turn was written, ISO 8601. Optional because a thread saved before
+   * this field existed replays without it: the transcript then shows no clock
+   * rather than an invented one.
+   */
+  createdAt?: string;
 }
 
 /**

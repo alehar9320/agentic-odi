@@ -88,12 +88,14 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationTreeResponse,
     CreateJobRequest,
     LatestConversationResponse,
+    LinkOutcomeRequest,
     LlmHealthRequest,
     LlmHealthResponse,
     LlmProxyRequest,
     MarketplaceListingOut,
     MarketplaceSearchResponse,
     McpHealthRequest,
+    MintShareRequest,
     ModelListRequest,
     ObservationCreateRequest,
     ObservationListResponse,
@@ -105,13 +107,22 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeStrategyRequest,
     RejectProposalRequest,
     ScheduleWorkRequest,
+    SharedArtifactResponse,
+    ShareMintResponse,
     SignalActionRequest,
+    TraceabilityReportResponse,
     TurnNode,
     UpdateConversationRequest,
     UpdateCustomerOutcomeRequest,
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
+)
+from agentic_odi_studio_api.studio.sharing import (
+    ShareError,
+    ShareNotFoundError,
+    ShareService,
+    UnknownArtifactError,
 )
 
 router = APIRouter(prefix="/api")
@@ -172,7 +183,7 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         )
     if isinstance(exc, OutcomeStatementError):
         return StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field="statement"),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field=exc.field),
             status_code=422,
         )
     if isinstance(
@@ -201,7 +212,7 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             StudioError(
                 code=StudioErrorCode.OUT_OF_RANGE,
                 message=str(exc),
-                field=_outcome_field(str(exc)),
+                field=exc.field or _outcome_field(str(exc)),
             ),
             status_code=422,
         )
@@ -923,6 +934,86 @@ async def post_strategy_propose(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return strategy.model_dump(mode="json")
+
+
+@router.get("/traceability", response_model=TraceabilityReportResponse)
+async def get_traceability(
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Orphans, unfunded objectives, and links the vision dropped.
+
+    Read-only. With no objectives defined the report carries
+    ``objectives_defined: false`` and a message, not three empty sections that
+    would read as a clean bill of health.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_TRACEABILITY_REPORT.value, {}
+        )
+        return _payload_from_text(result)
+    return _service(request).traceability_report().as_dict()
+
+
+@router.get("/alignments", response_model=list[dict[str, Any]])
+async def get_alignments(
+    request: Request,
+    outcome_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The V2MOM links recorded on outcomes, optionally for one outcome."""
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if outcome_id:
+            arguments["outcome_id"] = outcome_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_OUTCOME_ALIGNMENTS.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return _service(request).list_alignments(outcome_id)
+
+
+@router.post("/outcomes/{outcome_id}/alignments", response_model=dict[str, Any])
+async def post_outcome_alignment(
+    outcome_id: str, body: LinkOutcomeRequest, request: Request
+) -> dict[str, Any]:
+    """Link an outcome to one method or measure the vision currently holds."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.LINK_OUTCOME.value,
+            {"outcome_id": outcome_id, "field": body.field, "text": body.text},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).link_outcome(outcome_id, body.field, body.text)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
+
+
+@router.delete("/outcomes/{outcome_id}/alignments/{field}/{key}", response_model=dict[str, Any])
+async def delete_outcome_alignment(
+    outcome_id: str,
+    field: str,
+    key: str,
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Remove one recorded link. Removing a link that is not there is a no-op."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.UNLINK_OUTCOME.value,
+            {"outcome_id": outcome_id, "field": field, "key": key},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).unlink_outcome(outcome_id, field, key)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
 
 
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:
@@ -1662,7 +1753,7 @@ async def approve_proposal_api(
         )
     except InvalidOutcomeStatementError as exc:
         raise StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field=exc.field),
             status_code=422,
         ) from exc
     except Exception as exc:  # noqa: BLE001
@@ -1690,3 +1781,73 @@ async def reject_proposal_api(
         "ok": True,
         "result": _proposal_out(proposal).model_dump(mode="json"),
     }
+
+
+# -- sharing (issue #549) ------------------------------------------------------
+
+
+def _sharing(request: Request) -> ShareService:
+    return request.app.state.sharing
+
+
+def _share_not_found() -> StudioHTTPError:
+    """One body for every dead token, so a probe cannot tell them apart."""
+    return StudioHTTPError(
+        StudioError(
+            code=StudioErrorCode.NOT_FOUND,
+            message="This link is not available. It may have expired or been revoked.",
+        ),
+        status_code=404,
+    )
+
+
+@router.post("/share", response_model=ShareMintResponse)
+def mint_share(body: MintShareRequest, request: Request) -> ShareMintResponse:
+    """Mint a scoped, expiring, read-only link for one artifact.
+
+    The raw token is returned exactly once; only its hash is stored. Creation
+    happens through this route only, so the token is never minted by a page.
+    """
+    try:
+        minted = _sharing(request).mint(body.artifact_kind, body.artifact_id, body.ttl_days)
+    except UnknownArtifactError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)),
+            status_code=404,
+        ) from exc
+    except ShareError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
+            status_code=422,
+        ) from exc
+    return ShareMintResponse(**minted.to_dict())
+
+
+@router.get("/share", response_model=list[dict[str, Any]])
+def list_shares(request: Request) -> list[dict[str, Any]]:
+    """The owner's links, without tokens: id, artifact, and the key dates."""
+    return [share.to_dict() for share in _sharing(request).list_shares()]
+
+
+@router.delete("/share/{share_id}")
+def revoke_share(share_id: str, request: Request) -> dict[str, bool]:
+    """Revoke a link. Effective immediately, and idempotent."""
+    try:
+        _sharing(request).revoke(share_id)
+    except ShareNotFoundError as exc:
+        raise _share_not_found() from exc
+    return {"ok": True}
+
+
+@router.get("/share/{token}", response_model=SharedArtifactResponse)
+def read_shared(token: str, request: Request) -> SharedArtifactResponse:
+    """Read exactly the one artifact a token names, and its own evidence.
+
+    A malformed, unknown, expired, or revoked token is the same ``404``; the
+    response never says which. There is no list and no canvas here.
+    """
+    try:
+        payload = _sharing(request).read(token)
+    except ShareNotFoundError as exc:
+        raise _share_not_found() from exc
+    return SharedArtifactResponse(**payload)

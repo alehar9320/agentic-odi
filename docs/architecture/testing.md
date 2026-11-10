@@ -1,7 +1,7 @@
 # Testing
 
 ## Tiers (pre-PR)
-See [`.agents/workflows/test.md`](../../.agents/workflows/test.md): 
+See [`.agents/workflows/test.md`](../../.agents/workflows/test.md):
 - `--changed` — PR bar (fast gate on touched files)
 - `--default` — adds `mypy` and `vitest` for touched areas
 - `--full` — CI's responsibility (full matrix)
@@ -11,6 +11,10 @@ uv run python scripts/verify.py --changed
 uv run python scripts/verify.py --default
 uv run python scripts/verify.py --full
 ```
+
+The full tier is CI's responsibility and is not asked of anyone before they
+open a pull request. The commands below are the manual equivalent of the
+default tier.
 
 ## Commands (reference)
 
@@ -163,8 +167,9 @@ cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && 
 ```
 
 The self-updater lives in `apps/studio/src/updater/` and is covered by vitest:
-`machine.test.ts` (state transitions), `service.test.ts` (scheduling,
-download, and install), `transport.test.ts` (Tauri boundary), and the
+`machine.test.ts` (state transitions, including the failed-check status line
+naming the last *successful* check), `service.test.ts` (scheduling, download,
+install, and the bounded in-session action log), `transport.test.ts` (Tauri boundary), and the
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 

@@ -302,11 +302,79 @@ def readme_code_overview_paths(readme: str) -> list[str]:
 
 # --- assistant-ui ledger ------------------------------------------------------
 
-LEDGER_HEADING = "## The assistant-ui ledger"
+LEDGER_HEADING = "# The assistant-ui ledger"
+LEDGER_SOURCE = "docs/assistant-ui-ledger.md"
 LEDGER_PROJECTION_HEADING = "#### What the runtime gives us, and what we did not take"
 LEDGER_STATUSES = {"Adopted", "Partial", "Planned", "Decision", "Rejected"}
 LEDGER_CITATION = re.compile(r"#(\d+)")
 LEDGER_DASH = "—"
+# The tree that actually imports the primitives. Docs prose is excluded on
+# purpose: a mention in living-studio.md is not an adoption.
+LEDGER_PRIMITIVE_SOURCE_GLOB = "apps/studio/src/**/*.ts*"
+
+
+def _primitive_tokens(capability: str) -> list[str]:
+    """The literal primitive names a ledger row is about.
+
+    A row like ``ActionBarPrimitive.Speak / .StopSpeaking`` is about two
+    primitives; ``threads.item().rename() / .updateCustom()`` is about two
+    state hooks. Splitting on `` / `` and stripping trailing punctuation is
+    enough, because every token in the ledger is a code span or a dotted path.
+
+    Only tokens that are unambiguous primitive references are returned. A bare
+    member name such as ``.Title`` or ``.Delete`` is dropped: those words occur
+    all over the tree in unrelated code, and matching them would cry wolf. The
+    library names every primitive with a ``Primitive`` suffix or a dotted path
+    (``thread.canResume``, ``adapters.threadList``), and every unstable hook
+    with an ``unstable_`` prefix — so a token is kept only when it contains
+    ``Primitive``, contains a ``.`` that is not a leading dot, or starts with
+    ``unstable_``.
+    """
+    tokens: list[str] = []
+    for part in capability.split(" / "):
+        token = part.strip().strip("`").rstrip(")").strip()
+        if not token:
+            continue
+        if (
+            "Primitive" in token
+            or ("." in token and not token.startswith("."))
+            or token.startswith("unstable_")
+        ):
+            tokens.append(token)
+    return tokens
+
+
+def planned_rows_cite_installed_primitives(source: str, root: Path = ROOT) -> list[str]:
+    """A *Planned* row may not name a primitive the code already imports.
+
+    The merged-citation rule (``planned row cites #N, which already merged``)
+    needs git history to know what shipped, so on a shallow checkout it is
+    skipped and a green docs job proves nothing about staleness. This rule has
+    no such dependency: it reads the tree, so it runs everywhere — including a
+    checkout with no history and a restricted agent sandbox — and it catches
+    the case the citation rule misses, where a row stayed *Planned* after the
+    capability landed without a citation being updated.
+    """
+    files = sorted(root.glob(LEDGER_PRIMITIVE_SOURCE_GLOB))
+    contents = {path.relative_to(root): path.read_text(encoding="utf-8") for path in files}
+    issues: list[str] = []
+    for cells in _table_rows(_section_lines(source, LEDGER_HEADING)):
+        if len(cells) != 5:
+            continue
+        capability, status, *_ = cells
+        if status != "Planned":
+            continue
+        for token in _primitive_tokens(capability):
+            for rel, text in contents.items():
+                if token in text:
+                    issues.append(
+                        f"planned row cites an installed primitive: {capability} ({token} in {rel})"
+                    )
+                    break
+            else:
+                continue
+            break
+    return issues
 
 
 def _section_lines(text: str, heading: str) -> list[str]:
@@ -348,7 +416,7 @@ def ledger_errors(
     root: Path = ROOT,
     delivered: set[str] | None = None,
 ) -> list[str]:
-    """Check the assistant-ui ledger in docs/development.md and its projection.
+    """Check the assistant-ui ledger page and its Living Studio projection.
 
     ``delivered`` is the set of issue/PR numbers this repository's history
     proves merged. It is only supplied by the command-line entry point, which
@@ -496,11 +564,15 @@ def collect_issues(root: Path = ROOT, delivered: set[str] | None = None) -> list
     issues += [
         f"assistant-ui ledger: {issue}"
         for issue in ledger_errors(
-            docs.get("docs/development.md", ""),
+            docs.get(LEDGER_SOURCE, ""),
             docs.get("docs/living-studio.md", ""),
             root=root,
             delivered=delivered,
         )
+    ]
+    issues += [
+        f"assistant-ui ledger: {issue}"
+        for issue in planned_rows_cite_installed_primitives(docs.get(LEDGER_SOURCE, ""), root=root)
     ]
     return issues
 

@@ -245,6 +245,11 @@ approval prompts beside it.
   `docs/development.md`, in the same change.
 
 ### 6. Testing Strategy (FastMCP)
+- **Tiers, not a mandate**: before opening a pull request, run the **default**
+  tier in `.agents/workflows/test.md` — that is the bar. The fast tier is a
+  quick answer on the changed slice; the full tier is CI's job and nobody is
+  asked to run it locally. See `.agents/workflows/test.md` and
+  `docs/architecture/testing.md`.
 - **First-Class Documentation**: Treat tests as living documentation that demonstrate how features work while protecting against regressions.
 - **Testing & Verification**: Follow the test tiers in `.agents/workflows/test.md` — run `uv run python scripts/verify.py --changed` as the bar for opening a PR; `--default` before asking for merge review; `--full` is CI's responsibility. Tests must be fast (< 1s) and self-contained. Use `@pytest.mark.integration` or `@pytest.mark.client_process` for slower, integration, or resource-dependent tests.
 - **Structure**: This repo is a uv workspace. Mirror each project's code structure in its own `tests/` directory (e.g., `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` -> `apps/mcp-server/tests/test_server_tools.py`, `packages/connectors/src/agentic_odi_connectors/mcp/connector.py` -> `packages/connectors/tests/test_mcp_connector.py`).
