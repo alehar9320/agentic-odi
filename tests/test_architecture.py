@@ -207,6 +207,7 @@ CORE_LAYERS: dict[str, tuple[str, ...]] = {
         "alternatives",
         "stats",
         "schedule",
+        "traceability",
     ),
     "persistence": (
         "repository",
