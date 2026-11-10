@@ -4,11 +4,15 @@
  * The client owns this because only the client has the bytes: the sidecar
  * receives extracted text (or a data URL for an image), never a file handle.
  * Extraction is bounded so one large attachment cannot crowd out the
- * conversation, and it is silent about failure — a file we cannot read is shown
- * as a name, not dressed up as content.
+ * conversation, and a file whose bytes never became content is reported as a
+ * failed attachment before the turn is sent rather than as an empty one.
  */
 
-import type { AttachmentAdapter, CompleteAttachment, PendingAttachment } from "@assistant-ui/react";
+import type {
+  AttachmentAdapter,
+  CompleteAttachment,
+  PendingAttachment,
+} from "@assistant-ui/react";
 
 import type { ChatAttachment } from "../types";
 import { MAX_EXTRACTED_CHARS, MAX_DOCUMENT_BYTES } from "./extract/common";
@@ -31,6 +35,14 @@ export { MAX_DOCUMENT_BYTES } from "./extract/common";
 
 /** A single image, bounded so a data URL cannot bloat the request. */
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** What a chip says when the bytes never became content. */
+export const ATTACHMENT_READ_FAILURE = "Could not read this file";
+
+/** What a chip says when a text file is longer than the per-file cap. */
+export function tooLargeMessage(fileName: string): string {
+  return `${fileName} is larger than the ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")}-character limit`;
+}
 
 export const ATTACHMENT_ACCEPT = [
   "text/*",
@@ -121,8 +133,32 @@ function readAsDataUrl(file: File): Promise<string> {
 }
 
 /**
- * Prepare one file for a turn. Never throws: an unreadable file becomes a
- * name-only attachment so the user can still see what they attached.
+ * A file the studio was handed but could not turn into content.
+ *
+ * `name` carries the file's name so a chip can say which file failed without
+ * reaching for the original.
+ */
+export class AttachmentReadError extends Error {
+  readonly code: "unreadable" | "too_large";
+
+  constructor(fileName: string, code: "unreadable" | "too_large" = "unreadable") {
+    super(
+      code === "too_large" ? tooLargeMessage(fileName) : `Could not read ${fileName}.`,
+    );
+    this.name = fileName;
+    this.code = code;
+  }
+}
+
+/**
+ * Prepare one file for a turn.
+ *
+ * Throws `AttachmentReadError` when the bytes do not become content: a name-only
+ * attachment would promise a file the model never receives. A text file longer
+ * than the per-file cap is refused rather than silently shortened, because the
+ * person would otherwise send an interview transcript believing all of it
+ * arrived. `.docx` is capped with the cut announced in the extracted text, the
+ * same contract the document formats share.
  */
 export async function prepareAttachment(file: File): Promise<ChatAttachment> {
   const base: ChatAttachment = {
@@ -142,34 +178,62 @@ export async function prepareAttachment(file: File): Promise<ChatAttachment> {
     }
     if (isTextLike(file.name, base.contentType)) {
       const text = await file.text();
-      return { ...base, text: text.slice(0, MAX_ATTACHMENT_CHARS) };
+      if (text.length > MAX_ATTACHMENT_CHARS) {
+        throw new AttachmentReadError(base.name, "too_large");
+      }
+      return { ...base, text };
     }
-  } catch {
-    /* a file we cannot read is still an attachment the user chose */
+  } catch (error) {
+    if (error instanceof AttachmentReadError) {
+      throw error;
+    }
+    throw new AttachmentReadError(base.name);
   }
 
-  return base;
+  throw new AttachmentReadError(base.name);
 }
 
 /**
  * The adapter the runtime uses for `ComposerPrimitive.Attachments`.
  *
- * Prepared attachments are kept by id so `onNew` can hand the turn the same
- * extraction the composer showed.
+ * The file is read when it is added, not when the turn is sent, so a file that
+ * cannot be read shows as a failed chip instead of an empty attachment. `add` is
+ * a generator because that is the form assistant-ui drains into one chip whose
+ * status can change; the extraction is cached by the attachment id, so `send`
+ * never reads the file a second time.
  */
 export function createAttachmentAdapter(): AttachmentAdapter {
   return {
     accept: ATTACHMENT_ACCEPT,
 
-    async add({ file }): Promise<PendingAttachment> {
-      return {
-        id: crypto.randomUUID(),
+    async *add({ file }): AsyncGenerator<PendingAttachment, void> {
+      const id = crypto.randomUUID();
+      const chip = (status: PendingAttachment["status"]): PendingAttachment => ({
+        id,
         type: isImageLike(file.type) ? "image" : file.type ? "document" : "file",
         name: file.name,
         contentType: file.type || "application/octet-stream",
         file,
-        status: { type: "requires-action", reason: "composer-send" },
-      };
+        status,
+      });
+
+      try {
+        ATTACHMENTS.set(id, await prepareAttachment(file));
+      } catch (error) {
+        if (!(error instanceof AttachmentReadError)) {
+          throw error;
+        }
+        // The chip carries the reason, so an oversized text file says which
+        // file and which limit rather than the generic read failure.
+        yield chip({
+          type: "incomplete",
+          reason: "error",
+          message: error.code === "too_large" ? error.message : ATTACHMENT_READ_FAILURE,
+        });
+        return;
+      }
+
+      yield chip({ type: "requires-action", reason: "composer-send" });
     },
 
     async remove(): Promise<void> {
@@ -177,15 +241,16 @@ export function createAttachmentAdapter(): AttachmentAdapter {
     },
 
     async send(attachment): Promise<CompleteAttachment> {
-      const file = attachment.file;
-      const ready = file
-        ? await prepareAttachment(file)
-        : {
-            id: attachment.id,
-            name: attachment.name,
-            contentType: attachment.contentType ?? "application/octet-stream",
-            size: 0,
-          };
+      const ready =
+        ATTACHMENTS.get(attachment.id) ??
+        (attachment.file
+          ? await prepareAttachment(attachment.file)
+          : {
+              id: attachment.id,
+              name: attachment.name,
+              contentType: attachment.contentType ?? "application/octet-stream",
+              size: 0,
+            });
       ATTACHMENTS.set(attachment.id, ready);
       return {
         ...attachment,

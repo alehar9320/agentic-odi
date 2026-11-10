@@ -16,6 +16,7 @@
     "boundary.ts": "The vendor boundary as data — written here.",
     "components/assistant/README.md": "Reserved for the second copied surface; empty of code by design.",
     "components/ui/README.md": "Policy summary for this directory.",
+    "components/ui/hover-card.tsx": "Hover-card primitive: a focusable trigger reveals portal content on hover, focus, or Enter/Space; closes on Escape returning focus to the trigger and on blur. Authored locally for the claim-citation surface; no upstream artefact was fetched.",
     "index.css": "Tailwind v4 scoped to this tree only; the `source(none)` and `@source` reasoning is ours, not the registry's.",
     "lib/utils.ts": "Three-line class merger over clsx and tailwind-merge. Not a copy-in: no provenance header arrived with it and it imports only declared npm packages."
   }
