@@ -20,6 +20,7 @@ import {
 } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 import { StatusDot } from "../status/StatusDot";
+import { ActivityCentre } from "../activity/ActivityCentre";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -59,6 +60,7 @@ export function StudioBar({
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -409,6 +411,16 @@ export function StudioBar({
 
         <button
           type="button"
+          className="icon-button"
+          aria-label="Activity centre"
+          title="Activity centre"
+          onClick={() => setActivityOpen((open) => !open)}
+        >
+          <HistoryIcon size={17} />
+        </button>
+
+        <button
+          type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
           aria-label={`Model status: ${status}. ${statusDetail}`}
@@ -479,6 +491,8 @@ export function StudioBar({
           ? `${unreadSignalCount} new ${unreadSignalCount === 1 ? "notification" : "notifications"}`
           : ""}
       </p>
+
+      <ActivityCentre isOpen={activityOpen} onClose={() => setActivityOpen(false)} />
     </header>
   );
 }

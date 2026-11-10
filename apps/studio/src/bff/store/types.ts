@@ -174,8 +174,29 @@ export interface LocalStore {
   restore(snapshot: WorkspaceSnapshot): Promise<void>;
   clearAll(): Promise<void>;
   close(): void;
+
+  // Notices
+  listNotices(): Promise<StoredNotice[]>;
+  putNotice(notice: StoredNotice): Promise<void>;
+  deleteNotice(id: string): Promise<void>;
+  clearNotices(): Promise<void>;
 }
 
 export function bySeq<T extends { seq: number }>(left: T, right: T): number {
   return left.seq - right.seq;
 }
+
+export type NoticeSeverity = "info" | "success" | "warning" | "critical";
+
+export interface StoredNotice {
+  id: string;
+  severity: NoticeSeverity;
+  title: string;
+  detail: string;
+  context: string | null;
+  at: string;
+  dismissed: boolean;
+}
+
+export const MAX_NOTICES = 200;
+export const DEDUPE_WINDOW_MS = 60_000;

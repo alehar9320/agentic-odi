@@ -1,7 +1,7 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import { newId, nowIso } from "./id";
 import type { CanvasData, ChangelogData, Job, Observation, Outcome, Step } from "../types";
-import type { LocalStore, OutboxEntity, OutboxKind, OutboxRecord } from "./store/types";
+import type { LocalStore, OutboxEntity, OutboxKind, OutboxRecord, StoredNotice } from "./store/types";
 import { authHeaders } from "../api/studioApi";
 import type { WorkspaceSnapshot } from "./store/types";
 import { openLocalStore } from "./store/openStore";
@@ -52,6 +52,22 @@ export class StudioBff {
   /** Storage facts for the local store. */
   async storageFacts(): Promise<Awaited<ReturnType<typeof storageFacts>>> {
     return storageFacts(this.store);
+  }
+
+  async listNotices(): Promise<StoredNotice[]> {
+    return this.store.listNotices();
+  }
+
+  async putNotice(notice: StoredNotice): Promise<void> {
+    return this.store.putNotice(notice);
+  }
+
+  async deleteNotice(id: string): Promise<void> {
+    return this.store.deleteNotice(id);
+  }
+
+  async clearNotices(): Promise<void> {
+    return this.store.clearNotices();
   }
 
   private async enqueue(input: QueuedWriteInput): Promise<OutboxRecord> {
