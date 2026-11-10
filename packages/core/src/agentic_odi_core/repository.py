@@ -9,10 +9,9 @@ from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    V2MOM,
     CustomerOutcome,
     Evidence,
-    Interview,
-    InterviewQuote,
     Job,
     Outcome,
     ScheduledWork,
@@ -24,6 +23,10 @@ from agentic_odi_core.models import (
 )
 
 _Item = TypeVar("_Item")
+
+#: A workspace has exactly one V2MOM, and the model carries no id, so the store
+#: keys it by this constant rather than a generated one.
+V2MOM_ID = "v2mom"
 
 
 def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
@@ -125,9 +128,8 @@ class Repository(Protocol):
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
-    interviews: dict[str, Interview]
-    quotes: dict[str, InterviewQuote]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -210,23 +212,12 @@ class Repository(Protocol):
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
-    def add_interview(self, interview: Interview) -> Interview: ...
-    def get_interview(self, interview_id: str) -> Interview | None: ...
-    def list_interviews(
-        self,
-        job_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[Interview]: ...
-    def update_interview(self, interview_id: str, updates: dict) -> Interview | None: ...
-    def delete_interview(self, interview_id: str) -> list[str]: ...
-    def add_quote(self, quote: InterviewQuote) -> InterviewQuote: ...
-    def get_quote(self, quote_id: str) -> InterviewQuote | None: ...
-    def list_quotes(self, interview_id: str) -> list[InterviewQuote]: ...
     def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal: ...
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
     def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
     def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None: ...
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM: ...
+    def get_v2mom(self) -> V2MOM | None: ...
 
     def last_event_id(self) -> int: ...
 
@@ -252,9 +243,10 @@ class InMemoryRepository:
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        #: The store holds one vision; it is keyed by a fixed name rather than a
+        #: generated id because a workspace has exactly one V2MOM.
+        self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
-        self.interviews: dict[str, Interview] = {}
-        self.quotes: dict[str, InterviewQuote] = {}
         self._last_event_id = 0
 
     def last_event_id(self) -> int:
@@ -306,10 +298,6 @@ class InMemoryRepository:
             del self.outcomes[key]
         for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
             del self.customer_outcomes[key]
-        for key in [k for k, v in self.interviews.items() if v.job_id == job_id]:
-            del self.interviews[key]
-            for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
-                del self.quotes[quote_key]
         #: Do not destroy research evidence: unlink references to the removed
         #: job, its steps and its outcomes instead of deleting the rows.
         for key, ev in list(self.evidence.items()):
@@ -698,55 +686,12 @@ class InMemoryRepository:
         self.strategies[strategy_id] = new_strategy
         return new_strategy
 
-    def add_interview(self, interview: Interview) -> Interview:
-        self.interviews[interview.id] = interview
-        return interview
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        self.v2mom[V2MOM_ID] = v2mom
+        return v2mom
 
-    def get_interview(self, interview_id: str) -> Interview | None:
-        return self.interviews.get(interview_id)
-
-    def list_interviews(
-        self,
-        job_id: str | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[Interview]:
-        if job_id is None:
-            items = list(self.interviews.values())
-        else:
-            items = [i for i in self.interviews.values() if i.job_id == job_id]
-        return page(items, limit, offset)
-
-    def update_interview(self, interview_id: str, updates: dict) -> Interview | None:
-        interview = self.interviews.get(interview_id)
-        if not interview:
-            return None
-        current = interview.model_dump(exclude_unset=True)
-        current.update(updates)
-        new_interview = interview.model_validate(current)
-        self.interviews[interview_id] = new_interview
-        return new_interview
-
-    def delete_interview(self, interview_id: str) -> list[str]:
-        """Delete an interview and cascade its quotes; return the removed quote ids."""
-        if interview_id not in self.interviews:
-            return []
-        del self.interviews[interview_id]
-        removed = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
-        for quote_id in removed:
-            del self.quotes[quote_id]
-        return removed
-
-    def add_quote(self, quote: InterviewQuote) -> InterviewQuote:
-        self.quotes[quote.id] = quote
-        return quote
-
-    def get_quote(self, quote_id: str) -> InterviewQuote | None:
-        return self.quotes.get(quote_id)
-
-    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
-        items = [q for q in self.quotes.values() if q.interview_id == interview_id]
-        return sorted(items, key=lambda q: q.ordinal)
+    def get_v2mom(self) -> V2MOM | None:
+        return next(iter(self.v2mom.values()), None)
 
     def clear(self) -> None:
         #: The event-sourced store empties its log and restarts numbering, so the
@@ -761,8 +706,7 @@ class InMemoryRepository:
         self.signals.clear()
         self.segments.clear()
         self.strategies.clear()
-        self.interviews.clear()
-        self.quotes.clear()
+        self.v2mom.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

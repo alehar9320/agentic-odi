@@ -21,7 +21,6 @@ from agentic_odi_core import (
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
-    InterviewNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
     JobStage,
@@ -49,6 +48,7 @@ from agentic_odi_core import (
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
 )
+from agentic_odi_core.errors import ValidationError as OdiValidationError
 from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
@@ -180,12 +180,6 @@ def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
     if hint:
         message = f"{message} {hint}"
     return _fail(EvidenceNotFoundError(evidence_id, hint), message)
-
-
-def _interview_not_found(interview_id: str) -> str:
-    return _fail(
-        InterviewNotFoundError(interview_id), f"Error: Interview with ID {interview_id} not found."
-    )
 
 
 @mcp.prompt
@@ -657,137 +651,6 @@ def delete_evidence(evidence_id: str) -> str:
 
 
 @mcp.tool
-def add_interview(
-    title: str,
-    participant_label: str,
-    job_id: str | None = None,
-    participant_role: str | None = None,
-    conducted_at: str | None = None,
-    source_kind: str = "manual",
-    notes: str | None = None,
-) -> str:
-    """Record a research interview: who took part, when, and the job it informs.
-
-    ``participant_label`` is a free-text label such as ``"Ana"`` or
-    ``"Participant 3"`` — never a real name, email, or company.
-    """
-    try:
-        interview = service.add_interview(
-            title=title,
-            participant_label=participant_label,
-            job_id=job_id,
-            participant_role=participant_role,
-            conducted_at=conducted_at,
-            source_kind=source_kind,
-            notes=notes,
-        )
-    except JobNotFoundError:
-        return job_not_found(job_id or "")
-    except (OdiError, ValueError) as exc:
-        return _fail(exc)
-    return f"Interview created successfully: {interview.model_dump_json()}"
-
-
-@mcp.tool
-def get_interview(interview_id: str) -> str:
-    interview = service.get_interview(interview_id)
-    if interview is None:
-        return _interview_not_found(interview_id)
-    return interview.model_dump_json()
-
-
-@mcp.tool
-def list_interviews(
-    job_id: str | None = None,
-    limit: int | None = None,
-    offset: int = 0,
-) -> str:
-    """List interviews, optionally filtered by job, one page at a time."""
-    items = service.list_interviews(job_id=job_id, limit=limit, offset=offset)
-    return json.dumps([item.model_dump() for item in items])
-
-
-@mcp.tool
-def delete_interview(interview_id: str) -> str:
-    """Delete an interview and the quotes it recorded."""
-    try:
-        service.delete_interview(interview_id)
-    except InterviewNotFoundError:
-        return _interview_not_found(interview_id)
-    return f"Interview deleted successfully: {interview_id}"
-
-
-@mcp.tool
-def add_quote(
-    interview_id: str,
-    text: str,
-    speaker: str | None = None,
-    start_ms: int | None = None,
-    end_ms: int | None = None,
-) -> str:
-    """Append a verbatim quote to an interview; the service assigns its ordinal."""
-    try:
-        quote = service.add_quote(
-            interview_id=interview_id,
-            text=text,
-            speaker=speaker,
-            start_ms=start_ms,
-            end_ms=end_ms,
-        )
-    except InterviewNotFoundError:
-        return _interview_not_found(interview_id)
-    except (OdiError, ValueError) as exc:
-        return _fail(exc)
-    return f"Quote created successfully: {quote.model_dump_json()}"
-
-
-@mcp.tool
-def list_quotes(interview_id: str) -> str:
-    """List an interview's quotes in ordinal order."""
-    items = service.list_quotes(interview_id)
-    return json.dumps([item.model_dump() for item in items])
-
-
-@mcp.tool
-def import_transcript(
-    text: str,
-    title: str,
-    participant_label: str,
-    filename: str | None = None,
-    format: str | None = None,
-    job_id: str | None = None,
-    participant_role: str | None = None,
-    conducted_at: str | None = None,
-) -> str:
-    """Parse a transcript and persist it as one interview with its quotes.
-
-    ``format`` is one of ``md``, ``txt``, ``vtt``, or ``srt``; omit it to detect
-    from ``filename`` and the content. A malformed transcript is refused before
-    anything is written, so a failure leaves no partial interview.
-    """
-    from agentic_odi_core.transcript import TranscriptFormatError
-
-    try:
-        interview, quotes = service.import_transcript(
-            text,
-            title=title,
-            participant_label=participant_label,
-            filename=filename,
-            fmt=format,
-            job_id=job_id,
-            participant_role=participant_role,
-            conducted_at=conducted_at,
-        )
-    except JobNotFoundError:
-        return job_not_found(job_id or "")
-    except TranscriptFormatError as exc:
-        return _fail(exc)
-    except (OdiError, ValueError) as exc:
-        return _fail(exc)
-    return json.dumps({"interview": interview.model_dump(), "quote_count": len(quotes)})
-
-
-@mcp.tool
 def promote_evidence(
     evidence_id: str,
     target: str,
@@ -1084,6 +947,55 @@ def reject_proposal(proposal_id: str) -> str:
     except ValidationError as exc:
         return _fail(exc)
     return json.dumps(proposal.model_dump(mode="json"))
+
+
+@mcp.tool
+def link_outcome(outcome_id: str, field: str, text: str) -> str:
+    """Link an Outcome to the V2MOM method or measure it advances.
+
+    ``field`` is ``method`` or ``measure`` and ``text`` must match an entry the
+    vision currently holds. Unknown text is refused with the entries that do
+    exist, never guessed or fuzzy-matched.
+    """
+    try:
+        outcome = service.link_outcome(outcome_id, field, text)
+    except OutcomeNotFoundError as exc:
+        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
+    except OdiValidationError as exc:
+        return _fail(exc)
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
+    """Remove one V2MOM link from an Outcome.
+
+    ``key`` is the frozen content key the link was stored with; removing a link
+    that is not there changes nothing.
+    """
+    try:
+        outcome = service.unlink_outcome(outcome_id, field, key)
+    except OutcomeNotFoundError as exc:
+        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def get_outcome_alignments(outcome_id: str | None = None) -> str:
+    """List the V2MOM links recorded on Outcomes, optionally for one outcome."""
+    return json.dumps(service.list_alignments(outcome_id))
+
+
+@mcp.tool
+def get_traceability_report() -> str:
+    """Report orphans, unfunded objectives, and links the vision dropped.
+
+    Orphans are outcomes that advance nothing; unfunded objectives are V2MOM
+    methods and measures no outcome advances; drift is a link whose objective
+    text is no longer in the vision. Read-only, and with no objectives defined
+    it says so rather than returning three empty sections.
+    """
+    return json.dumps(service.traceability_report().as_dict())
 
 
 DEFAULT_PORT = 8000
