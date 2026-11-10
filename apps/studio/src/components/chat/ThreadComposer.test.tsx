@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { ATTACHMENT_READ_FAILURE } from "../../assistant/attachments";
+import { ATTACHMENT_READ_FAILURE, MAX_ATTACHMENT_CHARS, tooLargeMessage } from "../../assistant/attachments";
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
 import type { StudioCommand } from "../../lib/commands";
 import { focusableWithin } from "../../lib/useFocusTrap";
@@ -500,5 +500,64 @@ describe("ThreadComposer unreadable attachments", () => {
     ];
     expect(text).toBe("Read these");
     expect(attachments.map((attachment) => attachment.name)).toEqual(["good.md"]);
+  });
+});
+
+/**
+ * A text file long enough to exceed the per-file character cap, so the adapter
+ * refuses it instead of quietly shortening what the model would receive.
+ */
+function oversizedFile(name: string): File {
+  return new File(["a".repeat(MAX_ATTACHMENT_CHARS + 5)], name, { type: "text/markdown" });
+}
+
+describe("ThreadComposer oversized attachments", () => {
+  it("names the file and the limit on the chip instead of pretending it was sent", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [oversizedFile("interview.md")]);
+
+    const failure = await screen.findByText(tooLargeMessage("interview.md"));
+    const chip = failure.closest(".attachment-chip");
+    expect(chip).toHaveTextContent("interview.md");
+    expect(chip).toHaveTextContent("20,000");
+  });
+
+  it("keeps the draft and the readable file beside an oversized one", async () => {
+    const { root, input } = composerWithFiles();
+    fireEvent.change(input, { target: { value: "a draft in progress" } });
+
+    dropFiles(root, [readableFile("good.md"), oversizedFile("interview.md")]);
+    await screen.findByText(tooLargeMessage("interview.md"));
+
+    expect(screen.getByText("good.md")).toBeInTheDocument();
+    expect(input.value).toBe("a draft in progress");
+  });
+
+  it("leaves the chip reachable by keyboard and lets the remove control clear it", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [oversizedFile("interview.md")]);
+
+    const remove = await screen.findByRole("button", { name: "Remove interview.md" });
+    expect(focusableWithin(root)).toContain(remove);
+
+    fireEvent.click(remove);
+
+    await waitFor(() => expect(screen.queryByText(tooLargeMessage("interview.md"))).toBeNull());
+  });
+
+  it("holds the turn back while an oversized file is attached", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const { root, input } = composerWithFiles({ sendMessage });
+
+    dropFiles(root, [oversizedFile("interview.md")]);
+    await screen.findByText(tooLargeMessage("interview.md"));
+
+    fireEvent.change(input, { target: { value: "Read this" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
   });
 });
