@@ -334,6 +334,12 @@ def test_declared_contract_is_pinned() -> None:
                 "required": ["outcome_id"],
                 "stage": "2",
             },
+            "get_outcome_alignments": {
+                "arguments": ["outcome_id"],
+                "effect": "read",
+                "required": [],
+                "stage": "6",
+            },
             "get_outcomes": {
                 "arguments": ["job_id", "limit", "offset", "sort", "step_id"],
                 "effect": "read",
@@ -359,6 +365,18 @@ def test_declared_contract_is_pinned() -> None:
                 "stage": "3",
             },
             "get_strategy": {"arguments": [], "effect": "read", "required": [], "stage": "6"},
+            "get_traceability_report": {
+                "arguments": [],
+                "effect": "read",
+                "required": [],
+                "stage": "6",
+            },
+            "link_outcome": {
+                "arguments": ["field", "outcome_id", "text"],
+                "effect": "write",
+                "required": ["field", "outcome_id", "text"],
+                "stage": "6",
+            },
             "list_customer_outcomes": {
                 "arguments": ["job_id", "limit", "offset"],
                 "effect": "read",
@@ -463,6 +481,12 @@ def test_declared_contract_is_pinned() -> None:
                 "effect": "write",
                 "required": ["work_id"],
                 "stage": None,
+            },
+            "unlink_outcome": {
+                "arguments": ["field", "key", "outcome_id"],
+                "effect": "write",
+                "required": ["field", "key", "outcome_id"],
+                "stage": "6",
             },
             "update_customer_outcome": {
                 "arguments": [
@@ -751,6 +775,13 @@ def test_live_registry_is_pinned() -> None:
                 "required": ["outcome_id"],
                 "type": "object",
             },
+            "get_outcome_alignments": {
+                "additionalProperties": False,
+                "properties": {
+                    "outcome_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None}
+                },
+                "type": "object",
+            },
             "get_outcomes": {
                 "additionalProperties": False,
                 "properties": {
@@ -783,6 +814,21 @@ def test_live_registry_is_pinned() -> None:
                 "type": "object",
             },
             "get_strategy": {"additionalProperties": False, "properties": {}, "type": "object"},
+            "get_traceability_report": {
+                "additionalProperties": False,
+                "properties": {},
+                "type": "object",
+            },
+            "link_outcome": {
+                "additionalProperties": False,
+                "properties": {
+                    "field": {"type": "string"},
+                    "outcome_id": {"type": "string"},
+                    "text": {"type": "string"},
+                },
+                "required": ["field", "outcome_id", "text"],
+                "type": "object",
+            },
             "list_customer_outcomes": {
                 "additionalProperties": False,
                 "properties": {
@@ -926,6 +972,16 @@ def test_live_registry_is_pinned() -> None:
                 "additionalProperties": False,
                 "properties": {"work_id": {"type": "string"}},
                 "required": ["work_id"],
+                "type": "object",
+            },
+            "unlink_outcome": {
+                "additionalProperties": False,
+                "properties": {
+                    "field": {"type": "string"},
+                    "key": {"type": "string"},
+                    "outcome_id": {"type": "string"},
+                },
+                "required": ["field", "key", "outcome_id"],
                 "type": "object",
             },
             "update_customer_outcome": {
@@ -1264,6 +1320,15 @@ def test_entity_schema_is_pinned() -> None:
                         "required": ["question", "reason"],
                         "type": "object",
                     },
+                    "OutcomeAlignment": {
+                        "properties": {
+                            "field": {"enum": ["measure", "method"], "type": "string"},
+                            "key": {"type": "string"},
+                            "text": {"type": "string"},
+                        },
+                        "required": ["field", "key", "text"],
+                        "type": "object",
+                    },
                 },
                 "properties": {
                     "claim_check": {
@@ -1293,8 +1358,18 @@ def test_entity_schema_is_pinned() -> None:
                     "statement": {"type": "string"},
                     "step_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None},
                     "study_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None},
+                    "trace": {"items": {"$ref": "#/$defs/OutcomeAlignment"}, "type": "array"},
                 },
                 "required": ["job_id", "statement"],
+                "type": "object",
+            },
+            "OutcomeAlignment": {
+                "properties": {
+                    "field": {"enum": ["measure", "method"], "type": "string"},
+                    "key": {"type": "string"},
+                    "text": {"type": "string"},
+                },
+                "required": ["field", "key", "text"],
                 "type": "object",
             },
             "ScheduledWork": {
