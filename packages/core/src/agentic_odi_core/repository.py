@@ -9,15 +9,11 @@ from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
-    BetRecord,
-    CandidateStatus,
+    V2MOM,
     CustomerOutcome,
-    DecisionRecord,
     Evidence,
     Job,
-    MeasurementRecord,
     Outcome,
-    OutcomeCandidate,
     ScheduledWork,
     Segment,
     Signal,
@@ -27,6 +23,10 @@ from agentic_odi_core.models import (
 )
 
 _Item = TypeVar("_Item")
+
+#: A workspace has exactly one V2MOM, and the model carries no id, so the store
+#: keys it by this constant rather than a generated one.
+V2MOM_ID = "v2mom"
 
 
 def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
@@ -124,14 +124,11 @@ class Repository(Protocol):
     proposals: dict[str, OutcomeProposal]
     customer_outcomes: dict[str, CustomerOutcome]
     evidence: dict[str, Evidence]
-    candidates: dict[str, OutcomeCandidate]
-    decisions: dict[str, DecisionRecord]
-    bets: dict[str, BetRecord]
-    measurements: dict[str, MeasurementRecord]
     signals: dict[str, Signal]
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
 
     def add_job(self, job: Job) -> Job: ...
@@ -190,32 +187,6 @@ class Repository(Protocol):
         offset: int = 0,
     ) -> list[Evidence]: ...
     def delete_evidence(self, evidence_id: str) -> bool: ...
-    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate: ...
-    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None: ...
-    def list_candidates(
-        self,
-        quote_id: str | None = None,
-        job_id: str | None = None,
-        status: CandidateStatus | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[OutcomeCandidate]: ...
-    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None: ...
-    def add_decision(self, decision: DecisionRecord) -> DecisionRecord: ...
-    def get_decision(self, decision_id: str) -> DecisionRecord | None: ...
-    def list_decisions(
-        self, subject_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[DecisionRecord]: ...
-    def add_bet(self, bet: BetRecord) -> BetRecord: ...
-    def get_bet(self, bet_id: str) -> BetRecord | None: ...
-    def list_bets(
-        self, decision_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[BetRecord]: ...
-    def add_measurement(self, measurement: MeasurementRecord) -> MeasurementRecord: ...
-    def get_measurement(self, measurement_id: str) -> MeasurementRecord | None: ...
-    def list_measurements(
-        self, bet_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[MeasurementRecord]: ...
     def add_signal(self, signal: Signal) -> Signal: ...
     def get_signal(self, signal_id: str) -> Signal | None: ...
     def list_signals(self, unread_only: bool = False, limit: int = 50) -> list[Signal]: ...
@@ -245,6 +216,8 @@ class Repository(Protocol):
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
     def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
     def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None: ...
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM: ...
+    def get_v2mom(self) -> V2MOM | None: ...
 
     def last_event_id(self) -> int: ...
 
@@ -266,14 +239,13 @@ class InMemoryRepository:
         self.proposals: dict[str, OutcomeProposal] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
-        self.candidates: dict[str, OutcomeCandidate] = {}
-        self.decisions: dict[str, DecisionRecord] = {}
-        self.bets: dict[str, BetRecord] = {}
-        self.measurements: dict[str, MeasurementRecord] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        #: The store holds one vision; it is keyed by a fixed name rather than a
+        #: generated id because a workspace has exactly one V2MOM.
+        self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
         self._last_event_id = 0
 
@@ -528,88 +500,6 @@ class InMemoryRepository:
             return True
         return False
 
-    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
-        self.candidates[candidate.id] = candidate
-        return candidate
-
-    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
-        return self.candidates.get(candidate_id)
-
-    def list_candidates(
-        self,
-        quote_id: str | None = None,
-        job_id: str | None = None,
-        status: CandidateStatus | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> list[OutcomeCandidate]:
-        items = list(self.candidates.values())
-        if quote_id is not None:
-            items = [c for c in items if c.quote_id == quote_id]
-        if job_id is not None:
-            items = [c for c in items if c.job_id == job_id]
-        if status is not None:
-            items = [c for c in items if c.status is status]
-        return page(items, limit, offset)
-
-    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None:
-        candidate = self.candidates.get(candidate_id)
-        if not candidate:
-            return None
-        # A full dump, not ``exclude_unset``: the id is generated by a factory and
-        # would otherwise be dropped and regenerated, silently re-keying the
-        # candidate out from under the caller that just decided it.
-        current = candidate.model_dump()
-        current.update(updates)
-        new_candidate = candidate.model_validate(current)
-        self.candidates[candidate_id] = new_candidate
-        return new_candidate
-
-    def add_decision(self, decision: DecisionRecord) -> DecisionRecord:
-        self.decisions[decision.id] = decision
-        return decision
-
-    def get_decision(self, decision_id: str) -> DecisionRecord | None:
-        return self.decisions.get(decision_id)
-
-    def list_decisions(
-        self, subject_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[DecisionRecord]:
-        items = list(self.decisions.values())
-        if subject_id is not None:
-            items = [d for d in items if d.subject_id == subject_id]
-        return page(items, limit, offset)
-
-    def add_bet(self, bet: BetRecord) -> BetRecord:
-        self.bets[bet.id] = bet
-        return bet
-
-    def get_bet(self, bet_id: str) -> BetRecord | None:
-        return self.bets.get(bet_id)
-
-    def list_bets(
-        self, decision_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[BetRecord]:
-        items = list(self.bets.values())
-        if decision_id is not None:
-            items = [b for b in items if b.decision_id == decision_id]
-        return page(items, limit, offset)
-
-    def add_measurement(self, measurement: MeasurementRecord) -> MeasurementRecord:
-        self.measurements[measurement.id] = measurement
-        return measurement
-
-    def get_measurement(self, measurement_id: str) -> MeasurementRecord | None:
-        return self.measurements.get(measurement_id)
-
-    def list_measurements(
-        self, bet_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[MeasurementRecord]:
-        items = list(self.measurements.values())
-        if bet_id is not None:
-            items = [m for m in items if m.bet_id == bet_id]
-        return page(items, limit, offset)
-
     def get_evidence_by_fingerprint(
         self,
         source_kind: str,
@@ -796,6 +686,13 @@ class InMemoryRepository:
         self.strategies[strategy_id] = new_strategy
         return new_strategy
 
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        self.v2mom[V2MOM_ID] = v2mom
+        return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        return next(iter(self.v2mom.values()), None)
+
     def clear(self) -> None:
         #: The event-sourced store empties its log and restarts numbering, so the
         #: counter starts over with it.
@@ -806,13 +703,10 @@ class InMemoryRepository:
         self.outcomes.clear()
         self.customer_outcomes.clear()
         self.evidence.clear()
-        self.candidates.clear()
-        self.decisions.clear()
-        self.bets.clear()
-        self.measurements.clear()
         self.signals.clear()
         self.segments.clear()
         self.strategies.clear()
+        self.v2mom.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""
