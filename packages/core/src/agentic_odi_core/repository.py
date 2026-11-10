@@ -9,6 +9,7 @@ from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    V2MOM,
     CustomerOutcome,
     Evidence,
     Interview,
@@ -24,6 +25,10 @@ from agentic_odi_core.models import (
 )
 
 _Item = TypeVar("_Item")
+
+#: A workspace has exactly one V2MOM, and the model carries no id, so the store
+#: keys it by this constant rather than a generated one.
+V2MOM_ID = "v2mom"
 
 
 def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
@@ -125,6 +130,7 @@ class Repository(Protocol):
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
     interviews: dict[str, Interview]
     quotes: dict[str, InterviewQuote]
@@ -227,6 +233,8 @@ class Repository(Protocol):
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
     def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
     def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None: ...
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM: ...
+    def get_v2mom(self) -> V2MOM | None: ...
 
     def last_event_id(self) -> int: ...
 
@@ -252,6 +260,9 @@ class InMemoryRepository:
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        #: The store holds one vision; it is keyed by a fixed name rather than a
+        #: generated id because a workspace has exactly one V2MOM.
+        self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
         self.interviews: dict[str, Interview] = {}
         self.quotes: dict[str, InterviewQuote] = {}
@@ -748,6 +759,13 @@ class InMemoryRepository:
         items = [q for q in self.quotes.values() if q.interview_id == interview_id]
         return sorted(items, key=lambda q: q.ordinal)
 
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        self.v2mom[V2MOM_ID] = v2mom
+        return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        return next(iter(self.v2mom.values()), None)
+
     def clear(self) -> None:
         #: The event-sourced store empties its log and restarts numbering, so the
         #: counter starts over with it.
@@ -763,6 +781,8 @@ class InMemoryRepository:
         self.strategies.clear()
         self.interviews.clear()
         self.quotes.clear()
+
+        self.v2mom.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""
