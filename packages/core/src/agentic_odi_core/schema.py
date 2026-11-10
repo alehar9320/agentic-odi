@@ -19,9 +19,15 @@ from agentic_odi_core.models import (
     CustomerOutcome,
     CustomerValue,
     Evidence,
+    Interview,
+    InterviewQuote,
     Job,
     Outcome,
+<<<<<<< HEAD
     OutcomeAlignment,
+=======
+    OutcomeCandidate,
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     ScheduledWork,
     ScoreSnapshot,
     Segment,
@@ -49,8 +55,14 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "Study": Study,
     "V2MOM": V2MOM,
     "ScheduledWork": ScheduledWork,
+<<<<<<< HEAD
     "ScoreSnapshot": ScoreSnapshot,
     "SurveyInputSet": SurveyInputSet,
+=======
+    "Interview": Interview,
+    "InterviewQuote": InterviewQuote,
+    "OutcomeCandidate": OutcomeCandidate,
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
 }
 
 

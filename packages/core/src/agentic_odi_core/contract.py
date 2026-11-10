@@ -54,6 +54,22 @@ class ToolName(str, Enum):
     GET_EVIDENCE = "get_evidence"
     LIST_EVIDENCE = "list_evidence"
     DELETE_EVIDENCE = "delete_evidence"
+    ADD_INTERVIEW = "add_interview"
+    GET_INTERVIEW = "get_interview"
+    LIST_INTERVIEWS = "list_interviews"
+    DELETE_INTERVIEW = "delete_interview"
+    ADD_QUOTE = "add_quote"
+    LIST_QUOTES = "list_quotes"
+    IMPORT_TRANSCRIPT = "import_transcript"
+    EXTRACT_CANDIDATES = "extract_candidates"
+    LIST_CANDIDATES = "list_candidates"
+    GET_CANDIDATE = "get_candidate"
+    UPDATE_CANDIDATE = "update_candidate"
+    DELETE_CANDIDATE = "delete_candidate"
+    ACCEPT_CANDIDATE = "accept_candidate"
+    REJECT_CANDIDATE = "reject_candidate"
+    SUGGEST_DUPLICATE_CANDIDATES = "suggest_duplicate_candidates"
+    MERGE_CANDIDATES = "merge_candidates"
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
@@ -110,9 +126,12 @@ class ToolSpec:
 def _derive_effect(name: str) -> ToolEffect:
     """Derive a tool's effect from its name.
 
-    get_*/list_* → READ, delete_* → DESTRUCTIVE, everything else → WRITE.
+    get_*/list_*/suggest_* → READ, delete_* → DESTRUCTIVE, everything else → WRITE.
+
+    ``suggest_*`` is READ because duplicate suggestions never write: a person
+    still chooses the merge target.
     """
-    if name.startswith(("get_", "list_")):
+    if name.startswith(("get_", "list_", "suggest_")):
         return ToolEffect.READ
     if name.startswith("delete_"):
         return ToolEffect.DESTRUCTIVE
@@ -531,6 +550,148 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("evidence_id",),
         required=("evidence_id",),
         returns="The deleted Evidence ID.",
+    ),
+    ToolName.ADD_INTERVIEW.value: ToolSpec(
+        name="add_interview",
+        summary="Record a research interview (who, when, the job it informs).",
+        effect=_derive_effect("add_interview"),
+        arguments=(
+            "title",
+            "participant_label",
+            "job_id",
+            "participant_role",
+            "conducted_at",
+            "source_kind",
+            "notes",
+        ),
+        required=("title", "participant_label"),
+        returns="The created Interview.",
+    ),
+    ToolName.GET_INTERVIEW.value: ToolSpec(
+        name="get_interview",
+        summary="Get a single Interview by ID.",
+        effect=_derive_effect("get_interview"),
+        arguments=("interview_id",),
+        required=("interview_id",),
+        returns="The Interview, or an error string if not found.",
+    ),
+    ToolName.LIST_INTERVIEWS.value: ToolSpec(
+        name="list_interviews",
+        summary="List interviews, optionally filtered by job.",
+        effect=_derive_effect("list_interviews"),
+        arguments=("job_id", "limit", "offset"),
+        returns="A list of Interviews.",
+    ),
+    ToolName.DELETE_INTERVIEW.value: ToolSpec(
+        name="delete_interview",
+        summary="Delete an Interview and its cascading quotes.",
+        effect=_derive_effect("delete_interview"),
+        arguments=("interview_id",),
+        required=("interview_id",),
+        returns="The deleted Interview ID.",
+    ),
+    ToolName.ADD_QUOTE.value: ToolSpec(
+        name="add_quote",
+        summary="Append a verbatim quote to an interview.",
+        effect=_derive_effect("add_quote"),
+        arguments=("interview_id", "text", "speaker", "start_ms", "end_ms"),
+        required=("interview_id", "text"),
+        returns="The created InterviewQuote.",
+    ),
+    ToolName.LIST_QUOTES.value: ToolSpec(
+        name="list_quotes",
+        summary="List an interview's quotes in ordinal order.",
+        effect=_derive_effect("list_quotes"),
+        arguments=("interview_id",),
+        required=("interview_id",),
+        returns="A list of InterviewQuotes ordered by ordinal.",
+    ),
+    ToolName.IMPORT_TRANSCRIPT.value: ToolSpec(
+        name="import_transcript",
+        summary="Parse a transcript and persist it as one interview with its quotes.",
+        effect=_derive_effect("import_transcript"),
+        arguments=(
+            "text",
+            "title",
+            "participant_label",
+            "filename",
+            "format",
+            "job_id",
+            "participant_role",
+            "conducted_at",
+        ),
+        required=("text", "title", "participant_label"),
+        returns="The created Interview and the number of quotes.",
+    ),
+    ToolName.EXTRACT_CANDIDATES.value: ToolSpec(
+        name="extract_candidates",
+        summary="Propose outcome candidates from one interview quote.",
+        effect=_derive_effect("extract_candidates"),
+        arguments=("quote_id", "stage_hint"),
+        required=("quote_id",),
+        returns="The newly stored OutcomeCandidates (valid ones proposed, invalid ones rejected).",
+    ),
+    ToolName.LIST_CANDIDATES.value: ToolSpec(
+        name="list_candidates",
+        summary="List outcome candidates, optionally filtered by interview or status.",
+        effect=_derive_effect("list_candidates"),
+        arguments=("interview_id", "status", "limit", "offset"),
+        returns="A list of OutcomeCandidates.",
+    ),
+    ToolName.GET_CANDIDATE.value: ToolSpec(
+        name="get_candidate",
+        summary="Get a single OutcomeCandidate by ID.",
+        effect=_derive_effect("get_candidate"),
+        arguments=("candidate_id",),
+        required=("candidate_id",),
+        returns="The OutcomeCandidate, or an error string if not found.",
+    ),
+    ToolName.UPDATE_CANDIDATE.value: ToolSpec(
+        name="update_candidate",
+        summary="Update an outcome candidate's review state or statement.",
+        effect=_derive_effect("update_candidate"),
+        arguments=("candidate_id", "status", "statement", "decision_reason"),
+        required=("candidate_id",),
+        returns="The updated OutcomeCandidate.",
+    ),
+    ToolName.DELETE_CANDIDATE.value: ToolSpec(
+        name="delete_candidate",
+        summary="Delete an OutcomeCandidate.",
+        effect=_derive_effect("delete_candidate"),
+        arguments=("candidate_id",),
+        required=("candidate_id",),
+        returns="The deleted candidate ID.",
+    ),
+    ToolName.ACCEPT_CANDIDATE.value: ToolSpec(
+        name="accept_candidate",
+        summary="Accept a candidate into exactly one outcome, with its quote as evidence.",
+        effect=_derive_effect("accept_candidate"),
+        arguments=("candidate_id", "importance", "satisfaction", "statement", "step_id"),
+        required=("candidate_id", "importance", "satisfaction"),
+        returns="The accepted candidate, the new Outcome, and the verbatim Evidence.",
+    ),
+    ToolName.REJECT_CANDIDATE.value: ToolSpec(
+        name="reject_candidate",
+        summary="Reject a candidate with a nonblank reason, keeping it and its quote.",
+        effect=_derive_effect("reject_candidate"),
+        arguments=("candidate_id", "reason"),
+        required=("candidate_id", "reason"),
+        returns="The rejected OutcomeCandidate.",
+    ),
+    ToolName.SUGGEST_DUPLICATE_CANDIDATES.value: ToolSpec(
+        name="suggest_duplicate_candidates",
+        summary="Suggest groups of proposed candidates that look like the same need. Read-only.",
+        effect=_derive_effect("suggest_duplicate_candidates"),
+        arguments=("interview_id", "threshold"),
+        returns="A JSON object with duplicate candidate id groups.",
+    ),
+    ToolName.MERGE_CANDIDATES.value: ToolSpec(
+        name="merge_candidates",
+        summary="Absorb proposed candidates' quotes as evidence on one accepted outcome.",
+        effect=_derive_effect("merge_candidates"),
+        arguments=("target_id", "merged_ids"),
+        required=("target_id", "merged_ids"),
+        returns="The outcome, the new Evidence rows, and the merged candidates.",
     ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         name="promote_evidence",

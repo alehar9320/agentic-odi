@@ -44,11 +44,14 @@ counted as done.
 - [ ] **Job validation at the model level** — name and description constraints live in `packages/core` ([PR #296](https://github.com/alehar9320/agentic-odi/pull/296)).
 - [ ] **MCP connection limits** — timeout and pool settings so a hanging connection is bounded ([PR #294](https://github.com/alehar9320/agentic-odi/pull/294)).
 - [ ] **Shared HTTP client for connectors** — configurable connection pools for ingest ([PR #292](https://github.com/alehar9320/agentic-odi/pull/292)).
-- [ ] **Merge candidate evidence into one outcome** — the review step for duplicate candidates ([PR #291](https://github.com/alehar9320/agentic-odi/pull/291)).
+- [ ] **Merge duplicate candidate evidence into one outcome** — `odi candidates duplicates` flags near-duplicate proposed candidates without writing anything, and `odi candidates merge` absorbs their quotes as evidence on one accepted outcome, keeping each source traceable ([PR #291](https://github.com/alehar9320/agentic-odi/pull/291)).
+- [ ] **Work the review queue at the keyboard** — `odi interviews review` drives accept, reject, edit, merge, and skip from six keys against the same candidate state machine the API uses; `--yes` is explicit batch consent and never invents a score ([PR #353](https://github.com/alehar9320/agentic-odi/pull/353)).
 - [ ] **`odi connectors health`** — every registered connector's health in one table ([PR #289](https://github.com/alehar9320/agentic-odi/pull/289)).
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
-- [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
+- [ ] **Accept or reject a candidate without losing evidence** — `odi accept` and `odi reject` decide one candidate, keeping the quote and the rejection reason beside it; the Studio API serves the same queue at `GET /api/candidates` ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
+- [ ] **Extract candidate outcomes from a quote** — `odi extract` proposes ODI-shaped candidates from one interview quote and `odi candidates` reads, decides, and removes them ([PR #282](https://github.com/alehar9320/agentic-odi/pull/282)).
+- [ ] **Interviews and quotes, persisted** — research enters the product as an interview and its verbatim quotes (ALH-6 · ALH-14, [PR #279](https://github.com/alehar9320/agentic-odi/pull/279)).
 - [ ] **Outcome-based segments and the strategy they imply** — the scored outcomes group into segments, and the recorded path names the ones it beat ([PR #367](https://github.com/alehar9320/agentic-odi/pull/367)).
 - [ ] **A vendor tree that cannot rot into app code** — copied markup lives in `src/vendor`, with lint and a resolving test on its imports ([PR #417](https://github.com/alehar9320/agentic-odi/pull/417)).
 - [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).

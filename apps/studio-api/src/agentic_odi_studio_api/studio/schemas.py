@@ -173,6 +173,7 @@ class UpdateCustomerOutcomeRequest(BaseModel):
     step_id: str | None = None
 
 
+<<<<<<< HEAD
 class AddAlternativeRequest(BaseModel):
     mcp_url: str = ""
     job_id: str
@@ -188,6 +189,25 @@ class LinkAlternativeRequest(BaseModel):
     adequacy: float
     usage_n: int | None = None
     note: str | None = None
+=======
+class DecideCandidateRequest(BaseModel):
+    """One reviewer decision on a candidate.
+
+    ``status`` is ``accepted``, ``rejected`` or ``merged``. Accepting requires
+    the importance and satisfaction the outcome contract needs; rejecting
+    requires a nonblank ``reason``; merging requires the accepted outcome id in
+    ``merged_into``. Omitting ``status`` edits the statement only.
+    """
+
+    status: Literal["accepted", "rejected", "merged"] | None = None
+    statement: str | None = None
+    reason: str | None = None
+    importance: float | None = Field(default=None, ge=1.0, le=10.0)
+    satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
+    step_id: str | None = None
+    merged_into: str | None = None
+    mcp_url: str = ""
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
 
 
 class StudioBrief(BaseModel):

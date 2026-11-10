@@ -18,6 +18,9 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    DUPLICATE_THRESHOLD,
+    CandidateNotFoundError,
+    CandidateStatus,
     EvidenceNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
@@ -27,7 +30,11 @@ from agentic_odi_core import (
     OutcomeNotFoundError,
     OutcomeProposal,
     OutcomeStatementError,
+<<<<<<< HEAD
     ProposalStatus,
+=======
+    QuoteNotFoundError,
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     SegmentNotFoundError,
     StepNotFoundError,
     ToolName,
@@ -87,6 +94,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
+    DecideCandidateRequest,
     LatestConversationResponse,
     LinkOutcomeRequest,
     LlmHealthRequest,
@@ -194,6 +202,8 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             OutcomeNotFoundError,
             EvidenceNotFoundError,
             SegmentNotFoundError,
+            CandidateNotFoundError,
+            QuoteNotFoundError,
         ),
     ):
         return StudioHTTPError(StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc)))
@@ -1158,6 +1168,181 @@ async def get_evidence(
     if record is None:
         raise _as_http_error(EvidenceNotFoundError(evidence_id))
     return {"ok": True, "result": record.model_dump(mode="json")}
+
+
+@router.get("/candidates")
+async def get_candidates(
+    request: Request,
+    interview_id: str | None = Query(None),
+    status: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """List proposed candidates, filtered by interview and/or status."""
+    parsed: CandidateStatus | None = None
+    if status:
+        try:
+            parsed = CandidateStatus(status)
+        except ValueError as exc:
+            raise StudioHTTPError(
+                StudioError(
+                    code=StudioErrorCode.VALIDATION,
+                    message=f"Unknown candidate status: {status}",
+                    suggestion="Use one of: proposed, accepted, rejected, merged.",
+                ),
+                status_code=422,
+            ) from exc
+    if _uses_mcp(request):
+        target = _require_mcp_url(mcp_url or "")
+        arguments: dict[str, Any] = {}
+        if interview_id:
+            arguments["interview_id"] = interview_id
+        if parsed:
+            arguments["status"] = parsed.value
+        result = await call_mcp_tool(target, ToolName.LIST_CANDIDATES.value, arguments)
+        return {"ok": True, "result": _json_or_raw(result)}
+    service = _service(request)
+    candidates = service.list_candidates(interview_id, parsed)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in candidates]}
+
+
+@router.patch("/candidates/{candidate_id}")
+async def patch_candidate(
+    candidate_id: str, body: DecideCandidateRequest, request: Request
+) -> dict:
+    """Accept, reject, merge, or edit one candidate without losing its evidence.
+
+    ``{"status": "accepted"}`` needs the outcome's importance and satisfaction;
+    ``{"status": "rejected"}`` needs a nonblank reason; ``{"status": "merged"}``
+    needs the accepted outcome id in ``merged_into``; omitting ``status`` edits
+    the statement only.
+    """
+    if body.status == "accepted" and (body.importance is None or body.satisfaction is None):
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="Accepting a candidate requires importance and satisfaction.",
+                suggestion="Send both scores so the new outcome is measurable.",
+            ),
+            status_code=422,
+        )
+    if body.status == "rejected" and not (body.reason or "").strip():
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="Rejecting a candidate requires a nonblank reason.",
+                suggestion="Say why the candidate is not a real need.",
+            ),
+            status_code=422,
+        )
+    if body.status == "merged" and not (body.merged_into or "").strip():
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="Merging a candidate requires the outcome id in merged_into.",
+                suggestion="Merge into an outcome a person already accepted.",
+            ),
+            status_code=422,
+        )
+
+    if _uses_mcp(request):
+        target = _require_mcp_url(body.mcp_url)
+        if body.status == "accepted":
+            arguments: dict[str, Any] = {
+                "candidate_id": candidate_id,
+                "importance": body.importance,
+                "satisfaction": body.satisfaction,
+            }
+            if body.statement is not None:
+                arguments["statement"] = body.statement
+            if body.step_id is not None:
+                arguments["step_id"] = body.step_id
+            result = await call_mcp_tool(target, ToolName.ACCEPT_CANDIDATE.value, arguments)
+            return {"ok": True, "result": _json_or_raw(result)}
+        if body.status == "rejected":
+            result = await call_mcp_tool(
+                target,
+                ToolName.REJECT_CANDIDATE.value,
+                {"candidate_id": candidate_id, "reason": body.reason},
+            )
+            return {"ok": True, "result": _json_or_raw(result)}
+        if body.status == "merged":
+            result = await call_mcp_tool(
+                target,
+                ToolName.MERGE_CANDIDATES.value,
+                {"target_id": body.merged_into, "merged_ids": [candidate_id]},
+            )
+            return {"ok": True, "result": _json_or_raw(result)}
+        result = await call_mcp_tool(
+            target,
+            ToolName.UPDATE_CANDIDATE.value,
+            {"candidate_id": candidate_id, "statement": body.statement},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+
+    service = _service(request)
+    try:
+        if body.status == "accepted":
+            candidate, outcome, evidence = service.accept_candidate(
+                candidate_id,
+                importance=body.importance,  # type: ignore[arg-type]
+                satisfaction=body.satisfaction,  # type: ignore[arg-type]
+                statement=body.statement,
+                step_id=body.step_id,
+            )
+            return {
+                "ok": True,
+                "result": candidate.model_dump(mode="json"),
+                "outcome": outcome.model_dump(mode="json"),
+                "evidence": evidence.model_dump(mode="json"),
+            }
+        if body.status == "rejected":
+            candidate = service.reject_candidate(candidate_id, reason=body.reason or "")
+            return {"ok": True, "result": candidate.model_dump(mode="json")}
+        if body.status == "merged":
+            merged_outcome, merged_evidence, merged_candidates = service.merge_candidates(
+                body.merged_into or "", [candidate_id]
+            )
+            return {
+                "ok": True,
+                "result": (
+                    merged_candidates[0].model_dump(mode="json") if merged_candidates else None
+                ),
+                "outcome": merged_outcome.model_dump(mode="json"),
+                "evidence": [item.model_dump(mode="json") for item in merged_evidence],
+            }
+        updates: dict[str, Any] = {}
+        if body.statement is not None:
+            updates["statement"] = body.statement
+        candidate = service.update_candidate(candidate_id, updates)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": candidate.model_dump(mode="json")}
+
+
+@router.get("/candidates/duplicates")
+async def get_duplicate_candidates(
+    request: Request,
+    interview_id: str | None = Query(None),
+    threshold: float | None = Query(None, ge=0.0, le=1.0),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Suggest groups of proposed candidates that look like the same need.
+
+    Read-only: nothing is written and nothing is merged. A match is a
+    suggestion; a person picks the target and merges the rest into it.
+    """
+    if _uses_mcp(request):
+        target = _require_mcp_url(mcp_url or "")
+        arguments: dict[str, Any] = {}
+        if interview_id:
+            arguments["interview_id"] = interview_id
+        if threshold is not None:
+            arguments["threshold"] = threshold
+        result = await call_mcp_tool(target, ToolName.SUGGEST_DUPLICATE_CANDIDATES.value, arguments)
+        return {"ok": True, "result": _json_or_raw(result)}
+    service = _service(request)
+    groups = service.suggest_duplicate_groups(interview_id, threshold or DUPLICATE_THRESHOLD)
+    return {"ok": True, "result": {"groups": groups}}
 
 
 @router.get("/memory/observations", response_model=ObservationListResponse)

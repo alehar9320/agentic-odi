@@ -779,6 +779,7 @@ def render_strategy(strategy: Any, *, as_json: bool) -> str:
     return "\n".join(lines)
 
 
+<<<<<<< HEAD
 def _when(value: Any) -> str:
     """One funnel timestamp, or the blank that says it has not happened."""
     if not value:
@@ -825,4 +826,195 @@ def render_funnel_summary(counts: Any, conversions: Any, *, as_json: bool) -> st
             for name, view in counts.items()
         ],
         empty="Nothing counted yet — this store has no funnel events.",
+=======
+def render_interview(item: Any, *, as_json: bool) -> str:
+    """Render one interview as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("title", item.get("title", "")),
+            ("participant", item.get("participant_label", "")),
+            ("role", item.get("participant_role") or ""),
+            ("job_id", item.get("job_id") or ""),
+            ("conducted_at", item.get("conducted_at") or ""),
+            ("source_kind", item.get("source_kind", "")),
+        ]
+    )
+
+
+def render_interview_list(items: Any, *, as_json: bool) -> str:
+    """Render interviews as an aligned table or JSON."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "title", "participant", "role"),
+        [
+            (
+                str(item.get("id", "")),
+                _truncate(str(item.get("title", ""))),
+                _truncate(str(item.get("participant_label", ""))),
+                _truncate(str(item.get("participant_role") or "")),
+            )
+            for item in items
+        ],
+        empty="No interviews found.",
+    )
+
+
+def render_quote_list(items: Any, *, as_json: bool) -> str:
+    """Render quotes as an aligned table or JSON, with ordinal and speaker."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("#", "speaker", "text"),
+        [
+            (
+                str(item.get("ordinal", "")),
+                _truncate(str(item.get("speaker") or "—"), 18),
+                _truncate(str(item.get("text", ""))),
+            )
+            for item in items
+        ],
+        empty="No quotes found.",
+    )
+
+
+def render_candidate(item: Any, *, as_json: bool) -> str:
+    """Render one outcome candidate as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("status", item.get("status", "")),
+            ("statement", item.get("statement", "")),
+            ("confidence", item.get("confidence", "")),
+            ("quote_id", item.get("quote_id") or ""),
+            ("rationale", item.get("rationale") or ""),
+            ("outcome_id", item.get("outcome_id") or ""),
+        ]
+    )
+
+
+def render_candidate_list(items: Any, *, as_json: bool) -> str:
+    """Render outcome candidates as an aligned table or JSON."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "status", "statement"),
+        [
+            (
+                str(item.get("id", "")),
+                str(item.get("status", "")),
+                _truncate(str(item.get("statement", ""))),
+            )
+            for item in items
+        ],
+        empty="No outcome candidates found.",
+    )
+
+
+def render_candidate_acceptance(result: Any, *, as_json: bool) -> str:
+    """Render an acceptance: the new outcome, its score, and the evidence quote."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    outcome = result.get("outcome", {})
+    evidence = result.get("evidence", {})
+    return _block(
+        [
+            ("outcome_id", outcome.get("id", "")),
+            ("statement", outcome.get("statement", "")),
+            ("opportunity_score", outcome.get("opportunity_score", "")),
+            ("evidence_id", evidence.get("id", "")),
+            ("evidence_source", evidence.get("source_name", "")),
+            ("quote", evidence.get("content", "")),
+        ]
+    )
+
+
+def render_review_prompt(
+    position: int,
+    total: int,
+    candidate: dict[str, Any],
+    quote: dict[str, Any] | None,
+) -> str:
+    """One review step: the progress line, the statement, and its source quote.
+
+    The candidate statement and the verbatim quote stay paired so a person
+    decides with the evidence in view.
+    """
+    lines = [f"[{position}/{total}] {candidate.get('id', '')}"]
+    statement = str(candidate.get("statement", "")).strip()
+    lines.append(f"  statement  {statement}")
+    if quote is not None:
+        speaker = quote.get("speaker")
+        prefix = f"{speaker}: " if speaker else ""
+        lines.append(f"  quote      {prefix}{quote.get('text', '')}")
+    else:
+        lines.append("  quote      (the source quote is missing)")
+    if candidate.get("confidence") is not None:
+        lines.append(f"  confidence {_num(candidate.get('confidence'))}")
+    return "\n".join(lines)
+
+
+def render_review_summary(result: dict[str, Any]) -> str:
+    """The end-of-pass tally: what was accepted, merged, rejected, or skipped."""
+    parts = [
+        f"accepted {result.get('accepted', 0)}",
+        f"merged {result.get('merged', 0)}",
+        f"rejected {result.get('rejected', 0)}",
+        f"skipped {result.get('skipped', 0)}",
+    ]
+    failed = result.get("failed", 0)
+    if failed:
+        parts.append(f"failed {failed}")
+    return "Review complete: " + ", ".join(parts) + "."
+
+
+def render_duplicate_groups(result: Any, *, as_json: bool) -> str:
+    """Render suggested duplicate groups as one line of candidate ids per group."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    groups = result.get("groups", [])
+    if not groups:
+        return "No near-duplicate candidates found."
+    return _table(
+        ("group", "candidate_ids"),
+        [(str(index), ", ".join(group)) for index, group in enumerate(groups, start=1)],
+        empty="No near-duplicate candidates found.",
+    )
+
+
+def render_candidate_merge(result: Any, *, as_json: bool) -> str:
+    """Render a merge: the target outcome and the candidate ids absorbed into it."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    outcome = result.get("outcome", {})
+    merged = result.get("merged", [])
+    return _block(
+        [
+            ("outcome_id", outcome.get("id", "")),
+            ("statement", outcome.get("statement", "")),
+            ("evidence_count", len(result.get("evidence", []))),
+            ("merged_ids", ", ".join(item.get("id", "") for item in merged)),
+        ]
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     )

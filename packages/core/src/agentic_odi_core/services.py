@@ -18,28 +18,46 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+<<<<<<< HEAD
 from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
     ProposalStatus,
     ProposalStrategy,
+=======
+from agentic_odi_core.messages import (
+    candidate_reason_required,
+    merge_source_already_merged,
+    merge_source_cannot_absorb_evidence,
+    merge_target_must_be_outcome,
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
 )
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     V2MOM,
     BusinessValue,
+<<<<<<< HEAD
     ClaimCheck,
     ClaimSkip,
+=======
+    CandidateStatus,
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     CustomerOutcome,
     CustomerValue,
     Evidence,
     EvidenceItemType,
+    Interview,
+    InterviewQuote,
     Job,
     JobStage,
     Outcome,
+<<<<<<< HEAD
     OutcomeAlignment,
+=======
+    OutcomeCandidate,
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -60,6 +78,7 @@ from agentic_odi_core.segmentation import (
     SegmentationStrategy,
     unclustered_outcomes,
 )
+from agentic_odi_core.similarity import DUPLICATE_THRESHOLD, find_duplicate_groups, normalize
 from agentic_odi_core.strategy import propose_strategy as build_strategy
 from agentic_odi_core.traceability import (
     Objective,
@@ -204,6 +223,24 @@ class SignalBudget:
         if _SEVERITY_RANK[severity] < _SEVERITY_RANK[self.min_severity]:
             return False
         return surfaced_today < self.daily_cap
+
+
+class InterviewNotFoundError(NotFoundError):
+    def __init__(self, interview_id: str) -> None:
+        self.interview_id = interview_id
+        super().__init__(interview_id, "interview")
+
+
+class QuoteNotFoundError(NotFoundError):
+    def __init__(self, quote_id: str) -> None:
+        self.quote_id = quote_id
+        super().__init__(quote_id, "quote")
+
+
+class CandidateNotFoundError(NotFoundError):
+    def __init__(self, candidate_id: str) -> None:
+        self.candidate_id = candidate_id
+        super().__init__(candidate_id, "outcome candidate")
 
 
 class InvalidOutcomeStatementError(OutcomeStatementError):
@@ -844,6 +881,450 @@ class ODIService:
                 evidence_id,
                 "List the stored records with list_evidence() to find a valid id.",
             )
+
+    def add_interview(
+        self,
+        title: str,
+        participant_label: str,
+        job_id: str | None = None,
+        participant_role: str | None = None,
+        conducted_at: str | None = None,
+        source_kind: str = "manual",
+        notes: str | None = None,
+    ) -> Interview:
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        interview = Interview(
+            id=str(uuid.uuid4()),
+            job_id=job_id,
+            title=title,
+            participant_label=participant_label,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+            notes=notes,
+        )
+        return self.repo.add_interview(interview)
+
+    def get_interview(self, interview_id: str) -> Interview | None:
+        return self.repo.get_interview(interview_id)
+
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]:
+        return self.repo.list_interviews(job_id, limit=limit, offset=offset)
+
+    def update_interview(self, interview_id: str, updates: dict[str, Any]) -> Interview:
+        res = self.repo.update_interview(interview_id, updates)
+        if not res:
+            raise InterviewNotFoundError(interview_id)
+        return res
+
+    def delete_interview(self, interview_id: str) -> list[str]:
+        """Delete an interview; return the ids of the quotes removed with it."""
+        if self.repo.get_interview(interview_id) is None:
+            raise InterviewNotFoundError(interview_id)
+        return self.repo.delete_interview(interview_id)
+
+    def add_quote(
+        self,
+        interview_id: str,
+        text: str,
+        speaker: str | None = None,
+        start_ms: int | None = None,
+        end_ms: int | None = None,
+    ) -> InterviewQuote:
+        """Append a quote to an interview.
+
+        The ordinal is assigned here as ``max(ordinal)+1`` within the
+        interview, so two quotes created in the same millisecond still have a
+        deterministic order. A missing interview is rejected before any event
+        is written.
+        """
+        if self.repo.get_interview(interview_id) is None:
+            raise InterviewNotFoundError(interview_id)
+        existing = self.repo.list_quotes(interview_id)
+        next_ordinal = (existing[-1].ordinal + 1) if existing else 0
+        quote = InterviewQuote(
+            id=str(uuid.uuid4()),
+            interview_id=interview_id,
+            speaker=speaker,
+            text=text,
+            ordinal=next_ordinal,
+            start_ms=start_ms,
+            end_ms=end_ms,
+        )
+        return self.repo.add_quote(quote)
+
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
+        return self.repo.list_quotes(interview_id)
+
+    def get_quote(self, quote_id: str) -> InterviewQuote | None:
+        return self.repo.get_quote(quote_id)
+
+    def import_transcript(
+        self,
+        text: str,
+        *,
+        title: str,
+        participant_label: str,
+        filename: str | None = None,
+        fmt: str | None = None,
+        job_id: str | None = None,
+        participant_role: str | None = None,
+        conducted_at: str | None = None,
+        source_kind: str = "transcript",
+    ) -> tuple[Interview, list[InterviewQuote]]:
+        """Parse a transcript, then persist it as one interview.
+
+        The parse is pure and runs first, so a malformed transcript raises
+        before any interview or quote is written — there is no partial state.
+        """
+        from agentic_odi_core.transcript import detect_format, parse_transcript
+
+        resolved = fmt or detect_format(text, filename)
+        turns = parse_transcript(text, resolved)
+        interview = self.add_interview(
+            title=title,
+            participant_label=participant_label,
+            job_id=job_id,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+        )
+        quotes = [
+            self.add_quote(
+                interview.id,
+                turn.text,
+                speaker=turn.speaker,
+                start_ms=turn.start_ms,
+                end_ms=turn.end_ms,
+            )
+            for turn in turns
+        ]
+        return interview, quotes
+
+    def extract_candidates(
+        self,
+        quote_id: str,
+        extractor: Any,
+        stage_hint: str | None = None,
+    ) -> list[OutcomeCandidate]:
+        """Propose candidates from one quote, storing each proposal once.
+
+        Every proposal is validated with :func:`evaluate_outcome_statement`. An
+        invalid one is stored as ``rejected`` with the validator's message in
+        ``rationale`` — the evidence that the extractor is wrong is kept, not
+        hidden. Candidates are keyed on ``(quote_id, normalised_statement)`` so
+        re-running extraction adds nothing and never resets a human decision.
+        No :class:`Outcome` is created here; only a person accepts a candidate.
+        """
+        quote = self.repo.get_quote(quote_id)
+        if quote is None:
+            raise QuoteNotFoundError(quote_id)
+        interview = self.repo.get_interview(quote.interview_id)
+        if interview is None:
+            raise InterviewNotFoundError(quote.interview_id)
+
+        existing = self._candidates_by_key(quote_id)
+        # Validate every proposal before the first write: a malformed payload or
+        # an out-of-range confidence must not leave a partly-written quote.
+        proposals = list(extractor.propose(quote, interview, stage_hint))
+        planned: list[tuple[str, OutcomeCandidate]] = []
+        for proposal in proposals:
+            statement = getattr(proposal, "statement", None)
+            if not isinstance(statement, str):
+                raise ValidationError(
+                    f"extractor returned a proposal without a statement: {proposal!r}"
+                )
+            key = normalize(statement)
+            if key in existing:
+                continue
+            verdict = evaluate_outcome_statement(statement)
+            if verdict["valid"]:
+                status = CandidateStatus.PROPOSED
+                rationale = proposal.rationale
+            else:
+                status = CandidateStatus.REJECTED
+                rationale = " ".join(verdict["issues"])
+            planned.append(
+                (
+                    key,
+                    OutcomeCandidate(
+                        id=str(uuid.uuid4()),
+                        interview_id=interview.id,
+                        quote_id=quote_id,
+                        statement=statement,
+                        rationale=rationale,
+                        confidence=proposal.confidence,
+                        status=status,
+                    ),
+                )
+            )
+            # Collapse repeated statements within this same batch.
+            existing.add(key)
+
+        created: list[OutcomeCandidate] = []
+        for _, candidate in planned:
+            created.append(self.repo.add_candidate(candidate))
+        return created
+
+    def _candidates_by_key(self, quote_id: str) -> set[str]:
+        """The normalised statements already stored for a quote."""
+        return {
+            normalize(c.statement) for c in self.repo.list_candidates() if c.quote_id == quote_id
+        }
+
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+        return self.repo.get_candidate(candidate_id)
+
+    def list_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]:
+        return self.repo.list_candidates(interview_id, status, limit=limit, offset=offset)
+
+    def update_candidate(self, candidate_id: str, updates: dict[str, Any]) -> OutcomeCandidate:
+        candidate = self.repo.update_candidate(candidate_id, updates)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+        return candidate
+
+    def delete_candidate(self, candidate_id: str) -> None:
+        if not self.repo.delete_candidate(candidate_id):
+            raise CandidateNotFoundError(candidate_id)
+
+    def accept_candidate(
+        self,
+        candidate_id: str,
+        *,
+        importance: float,
+        satisfaction: float,
+        statement: str | None = None,
+        step_id: str | None = None,
+    ) -> tuple[OutcomeCandidate, Outcome, Evidence]:
+        """Turn one proposed candidate into exactly one outcome with its evidence.
+
+        The edited ``statement`` (or the proposed one) is validated *before* any
+        write, then ``add_outcome`` runs, then the verbatim quote is written as
+        an ``Evidence`` row, and only then is the candidate marked ``accepted``
+        with the new ``outcome_id``. If the evidence write fails the new outcome
+        is removed again, so a failure can never leave an accepted candidate
+        without evidence or an orphan outcome.
+
+        Accepting an already-accepted candidate is a no-op that returns what the
+        first acceptance produced, so a retry cannot duplicate either the
+        outcome or the evidence.
+        """
+        candidate = self.repo.get_candidate(candidate_id)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+
+        if candidate.status == CandidateStatus.ACCEPTED and candidate.outcome_id:
+            outcome = self.repo.get_outcome(candidate.outcome_id)
+            if outcome is not None:
+                return candidate, outcome, self._candidate_evidence(candidate)
+        if candidate.status is not CandidateStatus.PROPOSED:
+            raise ValidationError(
+                f"Outcome candidate {candidate_id} is {candidate.status.value}, not proposed"
+            )
+
+        quote = self.repo.get_quote(candidate.quote_id)
+        if quote is None:
+            raise QuoteNotFoundError(candidate.quote_id)
+        interview = self.repo.get_interview(candidate.interview_id)
+        if interview is None:
+            raise InterviewNotFoundError(candidate.interview_id)
+        if interview.job_id is None:
+            raise ValidationError(
+                f"Interview {interview.id} is not linked to a job, so a candidate cannot "
+                "become an outcome. Link the interview to a job first."
+            )
+
+        text = (statement or candidate.statement).strip()
+        verdict = evaluate_outcome_statement(text)
+        if not verdict["valid"]:
+            raise InvalidOutcomeStatementError(verdict)
+
+        outcome = self.add_outcome(
+            interview.job_id,
+            text,
+            importance=importance,
+            satisfaction=satisfaction,
+            step_id=step_id,
+        )
+        try:
+            evidence = self.add_evidence(
+                source_name=interview.title,
+                source_kind="interview",
+                name="quote",
+                content=quote.text,
+                item_type="manual",
+                raw={"interview_id": interview.id, "quote_id": quote.id},
+                outcome_id=outcome.id,
+            )
+        except Exception:
+            self.repo.delete_outcome(outcome.id)
+            raise
+        accepted = self.repo.update_candidate(
+            candidate.id,
+            {
+                "status": CandidateStatus.ACCEPTED,
+                "statement": text,
+                "outcome_id": outcome.id,
+            },
+        )
+        assert accepted is not None  # the candidate existed a moment ago
+        return accepted, outcome, evidence
+
+    def reject_candidate(self, candidate_id: str, *, reason: str) -> OutcomeCandidate:
+        """Reject a candidate, keeping it and a nonblank reason.
+
+        The quote stays attached, so a rejected idea is still auditable. An
+        empty reason is refused without touching the store.
+        """
+        candidate = self.repo.get_candidate(candidate_id)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+        cleaned = (reason or "").strip()
+        if not cleaned:
+            raise ValidationError(candidate_reason_required(candidate_id))
+        if candidate.status is CandidateStatus.ACCEPTED:
+            raise ValidationError(
+                f"Outcome candidate {candidate_id} was accepted; rejecting it would orphan "
+                "the outcome it produced."
+            )
+        rejected = self.repo.update_candidate(
+            candidate_id,
+            {"status": CandidateStatus.REJECTED, "decision_reason": cleaned},
+        )
+        assert rejected is not None
+        return rejected
+
+    def _candidate_evidence(self, candidate: OutcomeCandidate) -> Evidence:
+        """The evidence row acceptance wrote for a candidate."""
+        for item in self.repo.list_evidence(outcome_id=candidate.outcome_id):
+            if item.raw.get("quote_id") == candidate.quote_id:
+                return item
+        raise EvidenceNotFoundError(
+            candidate.outcome_id or candidate.id,
+            "Acceptance should have written one evidence row for this candidate.",
+        )
+
+    def suggest_duplicate_groups(
+        self,
+        interview_id: str | None = None,
+        threshold: float = DUPLICATE_THRESHOLD,
+    ) -> list[list[str]]:
+        """Candidate id groups that look like the same need. Read-only.
+
+        Only candidates still ``proposed`` are compared — an accepted or
+        rejected candidate is a settled decision, not a merge source. Nothing is
+        written, so a suggestion can never itself change the store.
+        """
+        candidates = [
+            candidate
+            for candidate in self.repo.list_candidates(interview_id)
+            if candidate.status is CandidateStatus.PROPOSED
+        ]
+        return find_duplicate_groups(candidates, threshold)
+
+    def merge_candidates(
+        self,
+        target_id: str,
+        merged_ids: list[str],
+    ) -> tuple[Outcome, list[Evidence], list[OutcomeCandidate]]:
+        """Absorb other candidates' quotes into one accepted outcome.
+
+        ``target_id`` is an **outcome** id — the outcome a person already
+        accepted. Each id in ``merged_ids`` is a *proposed* candidate whose
+        verbatim quote is written as an additional ``Evidence`` row on that
+        outcome and then marked ``merged`` with ``merged_into=target_id``. No
+        second outcome is created, and the source candidate and its quote are
+        retained, so the original can be recovered by re-extraction.
+
+        Everything is validated before any write: an unknown target, a source
+        that is accepted/rejected, or a source already merged elsewhere fails
+        without moving anything. A source already merged into this same target
+        is skipped, so repeating a merge changes nothing and duplicates no
+        evidence. If an evidence write fails part-way, the evidence rows and
+        candidate updates made by this call are rolled back.
+        """
+        target = self.repo.get_outcome(target_id)
+        if target is None:
+            # A candidate id here is the common mistake: name it, rather than
+            # reporting a bare "outcome not found".
+            if self.repo.get_candidate(target_id) is not None:
+                raise ValidationError(merge_target_must_be_outcome(target_id))
+            raise OutcomeNotFoundError(target_id)
+
+        sources: list[OutcomeCandidate] = []
+        seen: set[str] = set()
+        for candidate_id in merged_ids:
+            if candidate_id in seen:
+                continue
+            seen.add(candidate_id)
+            candidate = self.repo.get_candidate(candidate_id)
+            if candidate is None:
+                raise CandidateNotFoundError(candidate_id)
+            if candidate.status is CandidateStatus.MERGED:
+                if candidate.merged_into == target_id:
+                    continue  # already absorbed here; repeating changes nothing
+                raise ValidationError(
+                    merge_source_already_merged(candidate_id, candidate.merged_into)
+                )
+            if candidate.status is not CandidateStatus.PROPOSED:
+                raise ValidationError(
+                    merge_source_cannot_absorb_evidence(candidate_id, candidate.status.value)
+                )
+            sources.append(candidate)
+
+        written_evidence: list[Evidence] = []
+        merged: list[OutcomeCandidate] = []
+        try:
+            for candidate in sources:
+                quote = self.repo.get_quote(candidate.quote_id)
+                if quote is None:
+                    raise QuoteNotFoundError(candidate.quote_id)
+                interview = self.repo.get_interview(candidate.interview_id)
+                if interview is None:
+                    raise InterviewNotFoundError(candidate.interview_id)
+                evidence = self.add_evidence(
+                    source_name=interview.title,
+                    source_kind="interview",
+                    name="quote",
+                    content=quote.text,
+                    item_type="manual",
+                    raw={
+                        "interview_id": interview.id,
+                        "quote_id": quote.id,
+                        "merged_from_candidate_id": candidate.id,
+                    },
+                    outcome_id=target_id,
+                )
+                written_evidence.append(evidence)
+                updated = self.repo.update_candidate(
+                    candidate.id,
+                    {"status": CandidateStatus.MERGED, "merged_into": target_id},
+                )
+                assert updated is not None  # the candidate existed a moment ago
+                merged.append(updated)
+        except Exception:
+            for evidence in written_evidence:
+                self.repo.delete_evidence(evidence.id)
+            for candidate in merged:
+                self.repo.update_candidate(
+                    candidate.id,
+                    {"status": CandidateStatus.PROPOSED, "merged_into": None},
+                )
+            raise
+        return target, written_evidence, merged
 
     def promote_evidence(
         self,

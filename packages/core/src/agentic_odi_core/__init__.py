@@ -47,11 +47,15 @@ from agentic_odi_core.messages import (
     CAPABILITIES,
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
+    candidate_not_found,
+    candidate_reason_required,
     customer_outcome_not_found,
     evidence_not_found,
+    interview_not_found,
     invalid_strategy_request,
     job_not_found,
     outcome_not_found,
+    quote_not_found,
     scheduled_work_not_found,
     step_not_found,
 )
@@ -61,17 +65,27 @@ from agentic_odi_core.models import (
     V2MOM,
     BusinessImpactCategory,
     BusinessValue,
+<<<<<<< HEAD
     ClaimCheck,
     ClaimSkip,
+=======
+    CandidateStatus,
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     CustomerOutcome,
     CustomerValue,
     Direction,
     Evidence,
     EvidenceItemType,
+    Interview,
+    InterviewQuote,
     Job,
     JobStage,
     Outcome,
+<<<<<<< HEAD
     OutcomeAlignment,
+=======
+    OutcomeCandidate,
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -107,14 +121,20 @@ from agentic_odi_core.segmentation import (
     unclustered_outcomes,
 )
 from agentic_odi_core.services import (
+<<<<<<< HEAD
     ClaimCheckError,
+=======
+    CandidateNotFoundError,
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     CustomerOutcomeNotFoundError,
     EvidenceNotFoundError,
+    InterviewNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
     NoStrategyEvidenceError,
     ODIService,
     OutcomeNotFoundError,
+    QuoteNotFoundError,
     ScheduledWorkNotFoundError,
     SegmentNotFoundError,
     SignalBudget,
@@ -125,6 +145,13 @@ from agentic_odi_core.services import (
     ValueOutOfRangeError,
     manual_claim_check,
     require_claim_check,
+)
+from agentic_odi_core.similarity import (
+    DUPLICATE_THRESHOLD,
+    duplicate_suggestions,
+    find_duplicate_groups,
+    normalize,
+    similar,
 )
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
@@ -169,17 +196,30 @@ __all__ = [
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
+<<<<<<< HEAD
     "ClaimCheck",
     "ClaimCheckError",
     "ClaimSkip",
+=======
+    "CandidateNotFoundError",
+    "CandidateStatus",
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     "ConflictError",
+    "DUPLICATE_THRESHOLD",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
     "Direction",
+    "duplicate_suggestions",
+    "find_duplicate_groups",
+    "normalize",
+    "similar",
     "Evidence",
     "EvidenceItemType",
     "EvidenceNotFoundError",
+    "Interview",
+    "InterviewNotFoundError",
+    "InterviewQuote",
     "Job",
     "JobNotFoundError",
     "JobStage",
@@ -193,6 +233,7 @@ __all__ = [
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",
     "OdiError",
+<<<<<<< HEAD
     "OnDeviceLLMEngine",
     "Outcome",
     "OutcomeAlignment",
@@ -204,6 +245,14 @@ __all__ = [
     "ProposalStrategy",
     "HeuristicProposalStrategy",
     "LocalOpenAIEngine",
+=======
+    "Outcome",
+    "OutcomeCandidate",
+    "OutcomeNotFoundError",
+    "OutcomeStatementError",
+    "OnDeviceLLMEngine",
+    "QuoteNotFoundError",
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     "RateLimitError",
     "RoutingMode",
     "SerializationError",
@@ -239,6 +288,8 @@ __all__ = [
     "build_repository",
     "compute_opportunity_score",
     "create_job",
+    "candidate_not_found",
+    "candidate_reason_required",
     "customer_outcome_not_found",
     "error_status",
     "evaluate_outcome_statement",
@@ -246,6 +297,7 @@ __all__ = [
     "format_opportunity_score_insight",
     "error_envelope",
     "generate_steve_jobs_response",
+    "interview_not_found",
     "invalid_strategy_request",
     "job_not_found",
     "job_stage_catalog",
@@ -253,7 +305,11 @@ __all__ = [
     "odi_schema",
     "outcome_not_found",
     "parse_tool_result",
+<<<<<<< HEAD
     "require_claim_check",
+=======
+    "quote_not_found",
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
     "statement_to_dict",
     "step_not_found",
     "tool_result_text",

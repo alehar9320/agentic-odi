@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const toast = vi.hoisted(() => ({ pushToast: vi.fn() }));
@@ -242,6 +242,185 @@ describe("registry parity", () => {
     for (const type of Object.keys(NODE_COMPONENTS)) {
       expect(types.has(type), type).toBe(true);
     }
+  });
+});
+
+describe("candidate review queue", () => {
+  const queue = {
+    type: "candidate-queue",
+    props: {
+      interviewId: "I-1",
+      state: "ready",
+      target: "O-7",
+      candidates: [
+        {
+          id: "C-1",
+          statement: "Minimize the time it takes to onboard",
+          quote: "Setup takes forever when a new hire starts.",
+          source: "Ana · onboarding call",
+          confidence: 0.9,
+        },
+        {
+          id: "C-2",
+          statement: "Minimize the effort to reconcile invoices",
+          quote: "I reconcile invoices by hand every Friday.",
+          source: "Bea · finance call",
+          confidence: 0.5,
+        },
+      ],
+      actions: [
+        { label: "Accept", intent: "Accept candidate C-1", tone: "primary" },
+        { label: "Reject", intent: "Reject candidate C-1 with a reason" },
+      ],
+    },
+  };
+
+  it("keeps each candidate beside the sentence it came from", () => {
+    renderSpec(queue);
+
+    expect(screen.getByLabelText("Review queue")).toBeInTheDocument();
+    expect(screen.getByText("Minimize the time it takes to onboard")).toBeInTheDocument();
+    expect(screen.getByText("Setup takes forever when a new hire starts.")).toBeInTheDocument();
+    expect(screen.getByText("From Ana · onboarding call")).toBeInTheDocument();
+    expect(screen.getByText("90% confidence")).toBeInTheDocument();
+  });
+
+  it("names the explicit merge target instead of guessing one", () => {
+    renderSpec(queue);
+    expect(screen.getByText(/into outcome O-7/)).toBeInTheDocument();
+  });
+
+  it("says a merge has no target when none was given", () => {
+    renderSpec({
+      type: "candidate-queue",
+      props: { state: "ready", candidates: queue.props.candidates },
+    });
+    expect(screen.getByText(/needs an accepted outcome to fold into/)).toBeInTheDocument();
+  });
+
+  it("dispatches a decision as an intent, never acting on its own", () => {
+    const { onIntent } = renderSpec(queue);
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    expect(onIntent).toHaveBeenCalledWith("Accept candidate C-1");
+    // The card is a view: the row stays until the agent reports the write.
+    expect(screen.getByText("Setup takes forever when a new hire starts.")).toBeInTheDocument();
+  });
+
+  it("distinguishes loading, empty, and failed", () => {
+    const { unmount } = render(
+      <UiActionContext.Provider value={{ onIntent: vi.fn(), busy: false }}>
+        <UiRenderer node={nodeOf({ type: "candidate-queue", props: { state: "loading" } })} />
+      </UiActionContext.Provider>,
+    );
+    expect(screen.getByLabelText("Loading the review queue")).toHaveAttribute("aria-busy", "true");
+    unmount();
+
+    const empty = render(
+      <UiActionContext.Provider value={{ onIntent: vi.fn(), busy: false }}>
+        <UiRenderer node={nodeOf({ type: "candidate-queue", props: { state: "empty" } })} />
+      </UiActionContext.Provider>,
+    );
+    expect(screen.getByLabelText("Nothing to review")).toBeInTheDocument();
+    empty.unmount();
+
+    renderSpec({
+      type: "candidate-queue",
+      props: { state: "failed", message: "The sidecar is unreachable." },
+    });
+    expect(screen.getByLabelText("The review queue could not be loaded")).toBeInTheDocument();
+    expect(screen.getByText("The sidecar is unreachable.")).toBeInTheDocument();
+  });
+
+  it("treats a ready queue with no candidates as empty", () => {
+    renderSpec({ type: "candidate-queue", props: { state: "ready", candidates: [] } });
+    expect(screen.getByLabelText("Nothing to review")).toBeInTheDocument();
+  });
+
+  it("reads the recorded decision back from the server, not from the click", () => {
+    renderSpec({
+      type: "candidate-queue",
+      props: {
+        state: "ready",
+        candidates: [
+          { ...queue.props.candidates[0], decision: "accepted" },
+          { ...queue.props.candidates[1], decision: "rejected" },
+        ],
+      },
+    });
+    expect(screen.getByText("accepted")).toBeInTheDocument();
+    expect(screen.getByText("rejected")).toBeInTheDocument();
+    // The quote stays paired with its candidate after the decision.
+    expect(screen.getByText("Setup takes forever when a new hire starts.")).toBeInTheDocument();
+    expect(screen.getByText("I reconcile invoices by hand every Friday.")).toBeInTheDocument();
+  });
+
+  it("shows the server's refusal and keeps the item for correction", () => {
+    renderSpec({
+      type: "candidate-queue",
+      props: {
+        state: "ready",
+        candidates: [
+          { ...queue.props.candidates[0], note: "a rejection needs a reason" },
+          { ...queue.props.candidates[1], note: "a statement must not be blank" },
+        ],
+      },
+    });
+    expect(screen.getByText("a rejection needs a reason")).toBeInTheDocument();
+    expect(screen.getByText("a statement must not be blank")).toBeInTheDocument();
+    // A refused decision leaves the candidate in the queue, still paired.
+    expect(screen.getAllByText(/confidence$/)).toHaveLength(2);
+  });
+
+  it("yields the same persisted results as the API fixture after three decisions", () => {
+    const three = {
+      type: "candidate-queue",
+      props: {
+        interviewId: "I-1",
+        state: "ready",
+        target: "O-7",
+        candidates: [
+          { id: "C-1", statement: "Onboard faster", quote: "Setup takes forever." },
+          { id: "C-2", statement: "Reconcile invoices", quote: "I reconcile by hand." },
+          { id: "C-3", statement: "Onboard faster", quote: "New hires struggle." },
+        ],
+        actions: [
+          { label: "Accept", intent: "Accept candidate C-1", tone: "primary" },
+          { label: "Reject", intent: "Reject candidate C-2 with a reason" },
+          { label: "Merge", intent: "Merge candidate C-3 into O-7" },
+        ],
+      },
+    };
+    const { onIntent } = renderSpec(three);
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      "Accept candidate C-1",
+      "Reject candidate C-2 with a reason",
+      "Merge candidate C-3 into O-7",
+    ]);
+
+    // The card is a view: the store is the authority. Rendering the decisions
+    // the API wrote back shows exactly those three, in place, still paired.
+    cleanup();
+    renderSpec({
+      type: "candidate-queue",
+      props: {
+        ...three.props,
+        candidates: [
+          { ...three.props.candidates[0], decision: "accepted" },
+          { ...three.props.candidates[1], decision: "rejected" },
+          { ...three.props.candidates[2], decision: "merged" },
+        ],
+      },
+    });
+    expect(screen.getByText("accepted")).toBeInTheDocument();
+    expect(screen.getByText("rejected")).toBeInTheDocument();
+    expect(screen.getByText("merged")).toBeInTheDocument();
+    expect(screen.getByText("Setup takes forever.")).toBeInTheDocument();
+    expect(screen.getByText("I reconcile by hand.")).toBeInTheDocument();
+    expect(screen.getByText("New hires struggle.")).toBeInTheDocument();
   });
 });
 

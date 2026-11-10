@@ -4104,6 +4104,7 @@ html.theme-fading *::after {
   color: #e2e8f0;
 }
 
+<<<<<<< HEAD
 /* Segment member outcomes: one row per outcome, each a way into the landscape. */
 .ui-members {
   display: flex;
@@ -4189,6 +4190,43 @@ html.theme-fading *::after {
   margin: 0;
   font-size: 0.78rem;
   color: var(--studio-muted);
+=======
+/* Candidate review queue */
+.ui-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ui-queue__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.ui-queue__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ui-queue__note {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: rgba(248, 113, 113, 0.07);
+  font-size: 0.8rem;
+  color: #fca5a5;
+>>>>>>> origin/alexanderharenstam/alh-153-a52-work-the-review-queue-at-the-keyboard
 }
 
 /* Segment and strategy cards */

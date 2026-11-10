@@ -25,6 +25,7 @@ from agentic_odi_core.models import (
     Step,
     Strategy,
     Study,
+    Theme,
 )
 from agentic_odi_core.repository import (
     V2MOM_ID,
