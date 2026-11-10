@@ -58,6 +58,13 @@ npm --prefix apps/studio run build       # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
+The build version is a single source of truth. `__STUDIO_VERSION__` is baked into
+the Vite build from `apps/studio/package.json` (`vite.config.ts`) and exposed
+through `src/lib/version.ts`; `src/lib/version.test.ts` fails if it drifts from
+`package.json` or `.release-please-manifest.json`. `Settings → About` renders it,
+and the diagnostics bundle records it together with its source (`build` or
+`desktop`).
+
 ### Visual tests
 
 `npm test` runs the jsdom suite and deliberately ignores `*.visual.test.tsx`.
