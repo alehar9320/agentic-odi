@@ -543,6 +543,22 @@ conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
 
+### Scheduled work says what happened
+
+The canvas can record background work to run on a schedule, and the schedule
+panel lists each item with the outcome of its last run. A run that fails is
+recorded as failed — never as completed — with the exception's type and message,
+a consecutive-attempt count, and the time of the next attempt. The first failure
+retries in two minutes, the second in four, and the delay is capped at thirty
+minutes. After three consecutive failures the item stops being scheduled and is
+marked **needs attention**, so a permanent failure does not retry forever. A run
+that succeeds resets the counter and clears the error.
+
+All of the timing arithmetic lives in `packages/core` (`run_scheduled_work`,
+`retry_delay_minutes`); the panel only formats the values the record carries. A
+turn with no outcome yet shows no run line rather than a plausible-looking
+default.
+
 ### Printing and export
 
 The bar's overflow menu has **Export → Markdown**. The file labels every

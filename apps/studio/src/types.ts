@@ -709,5 +709,9 @@ export interface ScheduledWork {
   job_id?: string | null;
   created_at: string;
   last_run_at?: string | null;
+  next_run_at?: string | null;
   result_summary?: string | null;
+  last_status?: "ok" | "failed" | "skipped" | null;
+  attempts?: number;
+  last_error?: string | null;
 }

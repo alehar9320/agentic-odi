@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import os
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
@@ -286,6 +287,20 @@ def _first_line(text: str) -> str:
         if stripped:
             return stripped
     return ""
+
+
+def _describe_run_error(exc: BaseException, limit: int = 500) -> str:
+    """The exception's type and message, truncated — never a traceback or payload.
+
+    A scheduled run's failure is shown to the person, so it carries only what
+    names the problem: ``RuntimeError: model unreachable``. Tracebacks and the
+    request payload are deliberately dropped.
+    """
+    message = str(exc).strip()
+    text = f"{type(exc).__name__}: {message}" if message else type(exc).__name__
+    if len(text) > limit:
+        text = text[: limit - 1] + "…"
+    return text
 
 
 def _opportunity_crossing(before: float | None, after: float | None) -> tuple[str, str] | None:
@@ -1071,6 +1086,73 @@ class ODIService:
         updated = self.repo.update_scheduled_work(
             work_id, {"status": ScheduledWorkStatus.CANCELLED}
         )
+        if updated is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        return updated
+
+    def run_scheduled_work(
+        self,
+        work_id: str,
+        runner: Callable[[ScheduledWork], Any],
+        *,
+        now: datetime | None = None,
+    ) -> ScheduledWork:
+        """Execute one scheduled run and record its outcome honestly.
+
+        A run that raises is recorded as ``failed`` with the exception's type and
+        message, a consecutive-attempt count, and a bounded backoff; it is never
+        recorded as completed. After ``MAX_RETRY_ATTEMPTS`` consecutive failures
+        the item stops being scheduled and is marked ``needs attention`` so a
+        permanent failure does not retry forever. A success resets the counter.
+        """
+        from .schedule import MAX_RETRY_ATTEMPTS, retry_delay_minutes
+
+        work = self.repo.get_scheduled_work(work_id)
+        if work is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        if now is None:
+            now = datetime.now(timezone.utc)
+        now_str = now.isoformat()
+        try:
+            runner(work)
+        except Exception as exc:  # noqa: BLE001 - any failure is a failed run
+            attempts = work.attempts + 1
+            error = _describe_run_error(exc)
+            if attempts >= MAX_RETRY_ATTEMPTS:
+                next_str = None
+                summary = (
+                    f"Failed at {now_str} — {error} · attempt {attempts} of "
+                    f"{MAX_RETRY_ATTEMPTS} · needs attention"
+                )
+                status = ScheduledWorkStatus.FAILED
+            else:
+                next_run = now + timedelta(minutes=retry_delay_minutes(attempts))
+                next_str = next_run.isoformat()
+                summary = (
+                    f"Failed at {now_str} — {error} · attempt {attempts} of "
+                    f"{MAX_RETRY_ATTEMPTS} · retrying at {next_str}"
+                )
+                status = ScheduledWorkStatus.SCHEDULED
+            updates = {
+                "status": status,
+                "last_run_at": now_str,
+                "last_status": "failed",
+                "attempts": attempts,
+                "last_error": error,
+                "next_run_at": next_str,
+                "result_summary": summary,
+            }
+        else:
+            updates = {
+                "status": ScheduledWorkStatus.COMPLETED,
+                "last_run_at": now_str,
+                "last_status": "ok",
+                "attempts": 0,
+                "last_error": None,
+                "next_run_at": None,
+                "result_summary": f"Ran at {now_str}.",
+            }
+        updated = self.repo.update_scheduled_work(work_id, updates)
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
         return updated
