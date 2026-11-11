@@ -305,6 +305,13 @@ MCP tool result (text)
   produces a readable message. Write routes no longer wrap their result in
   `{"ok": true, "result": ...}`: a success is the object, a delete is
   `{"deleted": id}`.
+- **Who produced the failure.** The hosted Worker builds its own failures from
+  one factory, and that body carries `origin: "proxy"`. The SPA treats any
+  body with that marker as transport — it falls back to the local BFF, the
+  same as a dropped connection — while a sidecar's own structured 502 stays an
+  application error the person can read. A static host that answers an `/api`
+  route with the SPA shell (`200 text/html`) is transport too, so the SPA
+  rejects a non-JSON payload before trusting it as an answer.
 - **The same envelope over MCP.** A failing tool returns
   `{"error": StudioError, "message": "Error: …"}` as its text: the code,
   retryability, detail, suggestion, and request id travel as data, and the

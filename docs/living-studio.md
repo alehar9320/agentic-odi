@@ -297,7 +297,9 @@ rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
 agentic_odi_mcp_server)…`. When the Studio is reached through the free
 Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 `{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
-…"}}` with `X-Request-ID` echoed for support.
+…", "origin": "proxy"}}` with `X-Request-ID` echoed for support. The `origin`
+marker is what tells the SPA this body came from the Worker, not the sidecar,
+so the turn still falls back to the local BFF instead of reading as an answer.
 
 ### When the database failed its check
 
