@@ -32,6 +32,11 @@ On Windows (PowerShell):
 iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
 ```
 
+[![macOS Apple Silicon](https://img.shields.io/badge/macOS%20Apple%20Silicon-.dmg-1e293b?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/agentic-odi-darwin-aarch64.dmg)
+[![macOS Intel](https://img.shields.io/badge/macOS%20Intel-.dmg-1e293b?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/agentic-odi-darwin-x86_64.dmg)
+[![Windows](https://img.shields.io/badge/Windows-.msi-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/agentic-odi-windows-x86_64.msi)
+[![Linux](https://img.shields.io/badge/Linux-.deb%20%7C%20.AppImage-1e293b?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/agentic-odi-linux-x86_64.deb)
+
 Both installers verify the download against `checksums.txt`; every
 [release](https://github.com/alehar9320/agentic-odi/releases/latest) also carries
 per-platform archives with SHA-256 checksums for a manual download. See

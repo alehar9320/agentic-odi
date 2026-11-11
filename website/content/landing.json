@@ -245,6 +245,36 @@
         "code": "curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\nagentic-odi --version"
       }
     ],
+    "downloads": [
+      {
+        "label": "macOS Apple Silicon",
+        "message": ".dmg",
+        "color": "1e293b",
+        "logo": "apple",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/agentic-odi-darwin-aarch64.dmg"
+      },
+      {
+        "label": "macOS Intel",
+        "message": ".dmg",
+        "color": "1e293b",
+        "logo": "apple",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/agentic-odi-darwin-x86_64.dmg"
+      },
+      {
+        "label": "Windows",
+        "message": ".msi",
+        "color": "0078D6",
+        "logo": "windows",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/agentic-odi-windows-x86_64.msi"
+      },
+      {
+        "label": "Linux",
+        "message": ".deb  |  .AppImage",
+        "color": "1e293b",
+        "logo": "linux",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/agentic-odi-linux-x86_64.deb"
+      }
+    ],
     "mcp_config": "{\n  \"mcpServers\": {\n    \"agentic-odi\": { \"url\": \"http://localhost:8000/mcp\" }\n  }\n}",
     "endpoints": [
       {
