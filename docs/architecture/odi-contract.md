@@ -47,7 +47,8 @@ hand-edited record cannot disagree about what a valid outcome is.
 | A score carries the questions behind it | `ClaimCheck` on `Outcome` (`models.py`), `require_claim_check` and `ODIService.add_outcome` (`services.py`), the `add_outcome` MCP tool (`apps/mcp-server/.../mcp_server.py`) | The MCP tool refuses a score with no `claim_check`; the check records `asked`/`answers`/`skips` and derives `verified`. Unscored outcomes stay legal; a skip without a reason is rejected |
 | The questions reach the person before the number | `assert_asked_before_scoring` (`evaluation.py`) over an interview transcript; the Studio system prompt (`apps/studio-api/.../studio/chat.py`), the ODI guidelines (`messages.py`) and the `add_outcome` description | The prompts put three questions before any score and forbid answering them yourself. The harness refuses a transcript that scores first, and any answer that is not in a customer turn before the score; an unscored outcome needs no interview |
 | Outcome statements follow the ODI format | `evaluate_outcome_statement` (`evaluation.py:84-147`) via `ODIService.add_outcome(validate_statement=True)` | Invalid statements raise `InvalidOutcomeStatementError` with issues and suggestions |
-| Statements can be checked before writing | `evaluate_outcome` MCP tool, `odi desired-outcomes evaluate`, `odi evaluate` | Returns `valid`, direction, unit, object, clarifier, issues, suggestions |
+| The format rules are publishable, rule by rule | `outcome_rubric()` (`evaluation.py`) and the `checks` list on every verdict | The rubric is generated from the same constants and rule objects the check runs, so a constant edit cannot drift from the published rubric; each verdict carries `{id, ok, message, fix}` per rule |
+| Statements can be checked before writing | `evaluate_outcome` MCP tool, `odi desired-outcomes evaluate`, `odi evaluate` | Returns `valid`, direction, unit, object, clarifier, issues, suggestions, and per-rule `checks` |
 | The eight Universal Job Map stages are one constant | `JOB_STAGE_ORDER` and `job_stage_catalog()` (`models.py`), generated to `apps/studio/src/domain/jobStages.ts` | `scripts/gen_job_stages.py` regenerates the file; `tests/scripts/test_gen_job_stages.py` fails if it is stale |
 | Steps occupy a stage | `Step.stage_index` (`ge=1, le=8`) and `Step.stage` (`JobStage`) | Position is optional but bounded when present |
 | A score above 10 is "underserved" | `UNDERSERVED_SCORE` (`evaluation.py:13`) and `isUnderserved` with `UNDERSERVED_THRESHOLD` (`apps/studio/src/lib/odi.ts:9`) | `classify_opportunity` buckets strictly above the line, so exactly 10 reads as served; `tests/test_underserved_threshold_parity.py` fails if the Python and TypeScript numbers ever disagree |
@@ -61,6 +62,26 @@ The statement checker is deliberately mechanical: it requires a leading
 `improve`, `optimize`, `faster`, `easier`), and no solution nouns
 (`notification`, `dashboard`, `button`, …). It returns issues and suggestions
 rather than a bare boolean so the agent can repair a statement in the same turn.
+
+Each verdict also carries a `checks` list — one `{id, ok, message, fix}` per
+rule — and `outcome_rubric()` publishes the same rules with a label, a summary,
+and a good/bad example each. Both are generated from the validator's own
+constants and rule objects, so the published rubric and the check that runs
+cannot disagree; a caller can name the rule that failed and route its message to
+the field that needs it.
+
+### The rules
+
+| id | Fails when | Example that fails |
+|---|---|---|
+| `direction` | The statement does not start with `Minimize` or `Maximize` | `The time to onboard a customer when they sign up` |
+| `unit_of_measure` | No known unit of measure and no digit is present | `Minimize the effort of onboarding a customer when they sign up` |
+| `object_of_control` | No object after "the" | `Minimize onboarding time when a customer signs up` |
+| `contextual_clarifier` | No context marker (`when`, `while`, `before`, `after`, `during`, `if`, `as`) | `Minimize the time to deploy` |
+| `min_words` | Fewer than six words | `Minimize the time` |
+| `max_chars` | More than 200 characters | a statement that runs past the ceiling |
+| `vague_terms` | A vague term (`better`, `improve`, `optimize`, `faster`, `easier`) appears | `Make it faster` |
+| `solution_nouns` | A solution noun (`notification`, `dashboard`, `button`, …) appears | `I want a notification` |
 
 ## What the alternatives were
 

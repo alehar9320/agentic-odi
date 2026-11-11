@@ -34,6 +34,7 @@ from agentic_odi_core.evaluation import (
     assert_outcome_scores_match,
     evaluate_outcome_statement,
     load_score_fixture,
+    outcome_rubric,
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
@@ -252,6 +253,7 @@ __all__ = [
     "manual_claim_check",
     "odi_schema",
     "outcome_not_found",
+    "outcome_rubric",
     "parse_tool_result",
     "require_claim_check",
     "statement_to_dict",

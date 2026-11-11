@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentic_odi_core.evaluation import evaluate_outcome_statement
+from agentic_odi_core.evaluation import evaluate_outcome_statement, outcome_rubric
 
 WELL_FORMED = "Minimize the time it takes to onboard a customer when they sign up"
 
@@ -107,3 +107,97 @@ def test_blank_input_reports_every_missing_part() -> None:
     assert result["valid"] is False
     assert len(result["issues"]) == 5
     assert result["statement"] == ""
+
+
+# -- The published rubric (#342) ----------------------------------------------
+
+
+def test_the_rubric_publishes_every_rule_the_verdict_reports() -> None:
+    rubric = outcome_rubric()
+
+    assert rubric["version"] == 1
+    rule_ids = {rule["id"] for rule in rubric["rules"]}
+    check_ids = {check["id"] for check in evaluate_outcome_statement("")["checks"]}
+    assert rule_ids == check_ids
+    assert len(rubric["rules"]) == 8
+
+
+def test_every_published_rule_carries_its_guidance_and_examples() -> None:
+    for rule in outcome_rubric()["rules"]:
+        assert rule["id"]
+        assert rule["label"]
+        assert rule["summary"]
+        assert rule["fix"]
+        assert rule["examples"]["good"]
+        assert rule["examples"]["bad"]
+
+
+def test_every_rule_flips_ok_on_its_own_failing_example() -> None:
+    # Each rule's own "bad" example is the statement that fails it. The rule
+    # must report not-ok for that statement and carry its id and fix, while
+    # the statement as a whole may fail other rules too.
+    for rule in outcome_rubric()["rules"]:
+        checks = {
+            check["id"]: check
+            for check in evaluate_outcome_statement(rule["examples"]["bad"])["checks"]
+        }
+        failed = checks[rule["id"]]
+        assert failed["ok"] is False, f"rule {rule['id']} did not flag its own bad example"
+        assert failed["fix"] == rule["fix"]
+        assert failed["message"]
+
+
+def test_every_rule_passes_on_the_well_formed_statement() -> None:
+    checks = evaluate_outcome_statement(WELL_FORMED)["checks"]
+
+    assert checks
+    assert all(check["ok"] is True for check in checks)
+    assert all(check["message"] is None for check in checks)
+
+
+def test_a_statement_breaking_three_rules_names_three_failing_checks() -> None:
+    # "Minimize the time better" fails the context, length-floor, and vague-term
+    # rules at once, and passes the other five.
+    checks = evaluate_outcome_statement("Minimize the time better")["checks"]
+    failing = [check for check in checks if check["ok"] is False]
+
+    assert {check["id"] for check in failing} == {
+        "contextual_clarifier",
+        "min_words",
+        "vague_terms",
+    }
+    assert all(check["fix"] for check in failing)
+
+
+def test_checks_match_issues_and_suggestions_one_to_one() -> None:
+    for statement in (WELL_FORMED, "Make it faster", "I want a notification", "   "):
+        result = evaluate_outcome_statement(statement)
+        failing = [check for check in result["checks"] if check["ok"] is False]
+        assert [check["message"] for check in failing] == result["issues"]
+        assert [check["fix"] for check in failing] == result["suggestions"]
+
+
+def test_the_rubric_is_derived_from_the_validator_constants() -> None:
+    # A constant edit that changes a check changes the published rubric with it:
+    # the summary names the same directions, units, vague terms, and bounds the
+    # validator reads, so a hand-copied second list cannot drift.
+    from agentic_odi_core.evaluation import (
+        _CONTEXT_MARKERS,
+        _DIRECTIONS,
+        _MAX_CHARS,
+        _MIN_WORDS,
+        _SOLUTION_NOUNS,
+        _UNITS,
+        _VAGUE_TERMS,
+    )
+
+    rules = {rule["id"]: rule for rule in outcome_rubric()["rules"]}
+    assert all(direction in rules["direction"]["summary"] for direction in _DIRECTIONS)
+    assert all(unit in rules["unit_of_measure"]["summary"] for unit in _UNITS)
+    assert all(term in rules["vague_terms"]["summary"] for term in _VAGUE_TERMS)
+    assert all(noun in rules["solution_nouns"]["summary"] for noun in _SOLUTION_NOUNS)
+    assert all(
+        marker.strip() in rules["contextual_clarifier"]["summary"] for marker in _CONTEXT_MARKERS
+    )
+    assert str(_MIN_WORDS) in rules["min_words"]["summary"]
+    assert str(_MAX_CHARS) in rules["max_chars"]["summary"]
