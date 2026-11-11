@@ -27,7 +27,7 @@ members = [
 
 [[package]]
 name = "agentic-odi"
-version = "0.14.0"
+version = "0.15.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -68,7 +68,7 @@ dev = [
 
 [[package]]
 name = "agentic-odi-cli"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "apps/cli" }
 dependencies = [
     { name = "agentic-odi-connectors" },
@@ -91,7 +91,7 @@ requires-dist = [
 
 [[package]]
 name = "agentic-odi-connectors"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "packages/connectors" }
 dependencies = [
     { name = "fastmcp" },
@@ -108,7 +108,7 @@ requires-dist = [
 
 [[package]]
 name = "agentic-odi-core"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "pydantic" },
@@ -119,7 +119,7 @@ requires-dist = [{ name = "pydantic" }]
 
 [[package]]
 name = "agentic-odi-mcp-server"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "apps/mcp-server" }
 dependencies = [
     { name = "agentic-odi-core" },
@@ -136,7 +136,7 @@ requires-dist = [
 
 [[package]]
 name = "agentic-odi-studio-api"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "apps/studio-api" }
 dependencies = [
     { name = "agentic-odi-connectors" },
