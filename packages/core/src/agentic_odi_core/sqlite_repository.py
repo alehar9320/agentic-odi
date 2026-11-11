@@ -106,7 +106,7 @@ class SQLiteRepository(Repository):
         if row is None or row[0] != "ok":
             integrity = self.store.conn.execute("PRAGMA integrity_check")
             rows = [str(item[0]) for item in integrity.fetchmany(20)]
-            raise StoreCorrupt(self.store.db_path, rows, label="Your database")
+            raise StoreCorrupt(self.db_path, rows, label="Your database")
 
     def _load_snapshot(self) -> None:
         self.jobs: dict[str, Job] = {}
@@ -980,7 +980,7 @@ class SQLiteRepository(Repository):
         tmp_path = backup_path + ".tmp"
         try:
             # Open the source read-only for the backup
-            source = sqlite3.connect(f"file:{self.store.db_path}?mode=ro", uri=True)
+            source = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
             try:
                 dest = sqlite3.connect(tmp_path)
                 try:
@@ -1034,20 +1034,20 @@ class SQLiteRepository(Repository):
             verify.close()
 
         # 2. Check live DB is not in use
-        live_conn = sqlite3.connect(self.store.db_path, timeout=1.0)
+        live_conn = sqlite3.connect(self.db_path, timeout=1.0)
         try:
             try:
                 live_conn.execute("BEGIN IMMEDIATE")
                 live_conn.execute("ROLLBACK")
             except sqlite3.OperationalError:
                 raise StoreError(
-                    f"Live database {self.store.db_path} is in use by another process"
+                    f"Live database {self.db_path} is in use by another process"
                 ) from None
         finally:
             live_conn.close()
 
         # 3. Check schema version
-        live_conn = sqlite3.connect(self.store.db_path)
+        live_conn = sqlite3.connect(self.db_path)
         try:
             cursor = live_conn.execute("PRAGMA user_version")
             row = cursor.fetchone()
@@ -1062,7 +1062,7 @@ class SQLiteRepository(Repository):
 
         # 4. Move live file aside, copy backup in, re-check
         ts = time.strftime("%Y%m%dT%H%M%SZ")
-        live_path = self.store.db_path
+        live_path = self.db_path
         for suffix in ("", "-wal", "-shm"):
             p = live_path + suffix
             if os.path.exists(p):
