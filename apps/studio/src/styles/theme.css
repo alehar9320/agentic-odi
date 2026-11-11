@@ -455,6 +455,14 @@ a {
   padding-bottom: max(56px, 14vh);
 }
 
+/* One quiet line under the hero when a stored thread could not be reopened. */
+.chat__restore-note {
+  margin: -12px 0 0;
+  color: var(--faint);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 .chat__transcript {
   position: relative;
   display: flex;
