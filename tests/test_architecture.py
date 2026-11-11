@@ -204,6 +204,7 @@ CORE_LAYERS: dict[str, tuple[str, ...]] = {
         "evaluation",
         "mapping",
         "corpus",
+        "similarity",
         "schedule",
         "traceability",
         "freshness",
@@ -218,7 +219,19 @@ CORE_LAYERS: dict[str, tuple[str, ...]] = {
         "integrity",
         "recovery",
     ),
-    "methodology": ("services", "segmentation", "strategy", "router", "messages", "steve_jobs"),
+    "methodology": (
+        "services",
+        "segmentation",
+        "strategy",
+        "router",
+        "messages",
+        "steve_jobs",
+        "extraction",
+        "review",
+        "spine",
+        "spine_stages",
+        "demo",
+    ),
     "contract": ("contract", "errors", "remote", "schema", "connection", "consent"),
 }
 

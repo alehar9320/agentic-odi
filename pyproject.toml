@@ -31,6 +31,7 @@ dev = [
     "ruff==0.17.3",
     "grimp==3.18",
     "pillow==12.3.0",
+    "inline-snapshot==0.36.1",
 ]
 
 [tool.bandit]
@@ -67,6 +68,13 @@ markers = [
     "integration: slower-tier tests that may exceed the default ceiling",
     "client_process: tests that spawn an external process",
 ]
+
+[tool.inline-snapshot]
+# Reformat an accepted snapshot with the project's formatter so a drift diff
+# stays readable in a PR, and show the full diff (not a truncated summary) when
+# a snapshot test fails. CI never accepts snapshots automatically.
+format-command = "ruff format --stdin-filename {filename} -"
+default-flags = ["report"]
 
 [tool.coverage.run]
 source = [

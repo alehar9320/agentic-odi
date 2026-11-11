@@ -5,9 +5,11 @@ proposal first. :class:`ConsentGate` keeps that rule in one place: a call is
 requested, the person approves or declines it, and only then may it run.
 Read-only tools pass straight through and never need a gate.
 
-The acting set is derived from :class:`~agentic_odi_core.contract.ToolName`, so
-a tool added to the contract is treated as acting until someone classifies it
-as read-only.
+The acting set is derived from the tool contract: every tool whose declared
+effect is :attr:`~agentic_odi_core.contract.ToolEffect.READ` passes through,
+and every other tool is acting. The contract is the single source of truth, so
+a tool cannot be read-only in one place and acting in another; a tool added to
+the contract is acting until its effect is declared read.
 """
 
 from __future__ import annotations
@@ -16,12 +18,17 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
-from agentic_odi_core.contract import ToolName
+from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
 from agentic_odi_core.errors import ConsentRequired
 
 T = TypeVar("T")
 
+#: Tools the contract declares read-only. Derived, never hand-maintained, so the
+#: gate and the contract cannot disagree about what needs consent.
 READ_ONLY_TOOLS: frozenset[str] = frozenset(
+<<<<<<< HEAD
+    name for name, spec in TOOL_SPECS.items() if spec.effect is ToolEffect.READ
+=======
     {
         ToolName.GET_JOBS.value,
         ToolName.GET_JOB.value,
@@ -41,9 +48,12 @@ READ_ONLY_TOOLS: frozenset[str] = frozenset(
         ToolName.GET_OUTCOME_ALIGNMENTS.value,
         ToolName.GET_TRACEABILITY_REPORT.value,
     }
+>>>>>>> origin/main
 )
 
-ACTING_TOOLS: frozenset[str] = frozenset(name.value for name in ToolName) - READ_ONLY_TOOLS
+#: Every other declared tool. A write or a delete changes the workspace, so it is
+#: a proposal until a person agrees.
+ACTING_TOOLS: frozenset[str] = frozenset(TOOL_SPECS) - READ_ONLY_TOOLS
 
 
 @dataclass(frozen=True)

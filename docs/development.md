@@ -176,6 +176,12 @@ uv run --directory website pytest tests/
 The site is generated at CI time and never committed. CI runs `build_site.py` to
 produce `_site` and uploads it as the `website-site` artifact for review.
 
+Every published page gets its own social card, rendered by the build from the
+page's own title, section, and a figure the page states. A page the build emits
+without a card fails the build, so a shared link can never fall back to someone
+else's image. The one committed image, `website/assets/og.png`, is the generic
+fallback; regenerate it with `uv run python website/tools/make_og.py` after
+changing the card layout.
 The landing page's primary call to action points at the **sample workspace**,
 `website/sample/index.html`. Unlike the rest of the site it *is* committed, so
 it survives an API outage and can be linked from the README. It is generated
@@ -552,6 +558,7 @@ uv run pytest \
 
 | Area | What it covers |
 |---|---|
+| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, store schema version/migration, and repository factory |
 | `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, the onboarding funnel counters, and the per-segment cold-open budget |
 | `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
 | `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, step/outcome passthrough, and the funnel endpoints |
@@ -567,6 +574,61 @@ uv run pytest \
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the
 > results automatically.
+
+## Store schema version
+
+The SQLite event store stamps its own file-format version in a `schema_meta`
+table on open. The constants live in
+`packages/core/src/agentic_odi_core/intent_store.py`:
+
+- `CURRENT_SCHEMA_VERSION` — the format this build writes. It starts at `1`.
+- `MIGRATIONS` — a `dict[int, Callable]` keyed by the version it produces;
+  `MIGRATIONS[n]` upgrades a store from `n - 1` to `n`.
+
+`IntentStore.ensure_version()` runs on every open:
+
+- A current-version store is left untouched (no migration, no version write).
+- An unstamped (legacy) store is stamped `v1` once, then migrated forward.
+- Migrations run **in order inside one transaction**. A step that raises rolls
+  back its data *and* schema changes together with the version stamp, so a
+  half-migrated event log can never be left behind.
+- A store written by a newer build is refused with both versions named and the
+  `odi update` upgrade command, and the file is left byte-for-byte unchanged.
+
+Bump `CURRENT_SCHEMA_VERSION` **only** when you register a migration. An
+additive field that needs no data change must not bump it.
+
+## Contract drift snapshot
+
+`tests/contract/test_contract_snapshot.py` pins three surfaces together so an
+accidental change fails CI instead of a customer: `contract.TOOL_SPECS`, the
+live FastMCP registry's input schemas, and `schema.odi_schema()`.
+
+When you make a **deliberate** change to any of those, regenerate the snapshot
+locally, then review the diff like code before committing:
+
+```bash
+uv run pytest tests/contract/test_contract_snapshot.py --inline-snapshot=fix
+```
+
+CI never accepts a snapshot automatically; drift fails the build. A newly
+accepted snapshot is not proof of backward compatibility — an intentional
+breaking change needs its own compatibility decision.
+
+## The ninety-second tour
+
+`docs/tour/README.md` and `docs/tour/tour.cast` are generated, never hand-edited.
+Regenerate them in one command after a change that affects the walkthrough:
+
+```bash
+uv run python scripts/tour.py
+```
+
+`scripts/tour.py` executes every command in `docs/tour/script.md` against a
+disposable store, so a command that no longer runs fails the build rather than
+rotting in prose. `tests/test_tour.py` fails if the committed artifacts differ
+from a fresh run, if the walkthrough exceeds the ninety-second budget, or if a
+documented command cannot be executed.
 
 ## Agent Session Tracking
 
