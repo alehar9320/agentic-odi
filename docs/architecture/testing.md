@@ -131,6 +131,7 @@ Checks that span the workspace rather than one distribution:
 - `tests/contract/test_cli_contract.py` — the CLI local-handler keys are a subset of `TOOL_NAMES`.
 - `tests/test_architecture.py` — the package diagram in the [architecture index](README.md#dependency-direction), the `[project] dependencies` each member declares, and the imports the source actually contains must all agree. It also checks the four groups inside `packages/core`: persistence imports no methodology, and every core module belongs to exactly one group ([the layer table](README.md#inside-packagescore)).
 - `tests/test_worker_security_headers.py` — the Living Studio Worker sends its security headers.
+- `tests/test_worker_error_origin.py` — every Worker-generated failure body carries `origin: "proxy"`, and no failure path bypasses the one factory.
 - `tests/scripts/test_dev.py`, `test_dev_main.py` — `scripts/dev.py` startup, ports, signals, and shutdown.
 - `tests/scripts/test_doc_check.py` — documentation drift: commands, paths, routes, env vars, and README layout.
 - `tests/scripts/test_assistant_ui_ledger.py` — the assistant-ui ledger (issue #429): adopted rows cite a merged delivery and name an existing file, counts and the Living Studio projection match the rows.

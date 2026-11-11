@@ -278,6 +278,25 @@ The capability probe and the bar's model chip both read this, so a person is tol
 why a local model cannot be reached from this page instead of being shown a generic
 offline state.
 
+### One probe at a time, and a breaker for a dead endpoint (#536)
+
+Every connection probe — the scheduled one and the person's "Check now" — runs
+through one breaker in `apps/studio/src/state/probeBreaker.ts`. It holds two
+guarantees:
+
+- **Single flight.** A probe already on the wire is joined, never duplicated, so a
+  slow failure cannot land after a fresher success and overwrite it.
+- **A circuit breaker.** Three transport failures open it, and a probe then costs
+  nothing until a half-open probe is allowed 60 s later; that probe closing the
+  breaker on success or reopening it on failure. A refusal a retry cannot clear — a
+  rejected key (401/403), a missing model — parks it as `degraded` instead of
+  retrying forever as though the network were flaky.
+
+While the breaker is open the bar shows a "Retrying in N min" countdown instead of
+a spinner, because nothing is being probed. A person asking resets the breaker and
+the cadence: the endpoint they just edited is not the one that kept failing.
+
+
 ## Trust Boundaries
 
 Each process, the credentials it holds, and what crosses every wire are
@@ -305,6 +324,13 @@ MCP tool result (text)
   produces a readable message. Write routes no longer wrap their result in
   `{"ok": true, "result": ...}`: a success is the object, a delete is
   `{"deleted": id}`.
+- **Who produced the failure.** The hosted Worker builds its own failures from
+  one factory, and that body carries `origin: "proxy"`. The SPA treats any
+  body with that marker as transport — it falls back to the local BFF, the
+  same as a dropped connection — while a sidecar's own structured 502 stays an
+  application error the person can read. A static host that answers an `/api`
+  route with the SPA shell (`200 text/html`) is transport too, so the SPA
+  rejects a non-JSON payload before trusting it as an answer.
 - **The same envelope over MCP.** A failing tool returns
   `{"error": StudioError, "message": "Error: …"}` as its text: the code,
   retryability, detail, suggestion, and request id travel as data, and the
