@@ -12,31 +12,6 @@ import type { Banner, BannerDefaults, BannerKind, BannerSeverity, BannerSpec } f
 export const DEFAULT_DURATION_MS = 6000;
 
 export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
-  "sidecar-down": {
-    severity: "critical",
-    life: "persistent",
-    dock: "top",
-    title: "The studio sidecar isn't running.",
-    body: "The assistant is paused and live data is frozen until it comes back.",
-    dismissible: true,
-    actions: [
-      { label: "Recheck", action: "recheck-sidecar", tone: "ghost" },
-      { label: "Start the sidecar", action: "open-setup", tone: "ghost" },
-    ],
-  },
-  "model-offline": {
-    severity: "warning",
-    life: "persistent",
-    dock: "top",
-    title: "Working by hand.",
-    body: "No model is reachable, so the assistant is paused. Every change still writes to your ODI repository.",
-    dismissible: false,
-    actions: [
-      { label: "Capture an outcome", action: "open-capture", tone: "ghost" },
-      { label: "Map the job", action: "open-jobmap", tone: "ghost" },
-      { label: "Set your context", action: "open-setup", tone: "ghost" },
-    ],
-  },
   "offline": {
     severity: "info",
     life: "persistent",
