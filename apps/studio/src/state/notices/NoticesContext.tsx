@@ -1,13 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- context module intentionally exports the hooks alongside the provider */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { noopAnnounce, type Announce } from "../../lib/announce";
 
 export type ToastKind = "success" | "error" | "info";
 
@@ -43,6 +36,7 @@ const NoticesActionsContext = createContext<{
     options?: { action?: { label: string; run: () => void }; durationMs?: number },
   ) => number;
   dismissToast: (id: number) => void;
+  announce: Announce;
   dismissedSidecarNotice: boolean;
   setDismissedSidecarNotice: (dismissed: boolean) => void;
 } | null>(null);
@@ -51,6 +45,14 @@ export function NoticesProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [dismissedSidecarNotice, setDismissedSidecarNoticeState] = useState<boolean>(loadSidecarNoticeDismissed());
   const toastId = useRef(0);
+  // One live region for the whole room (#701 D47): a burst of actions is three
+  // sentences in order, never three overlapping regions.
+  const [announcement, setAnnouncement] = useState("");
+  const announcedRef = useRef<Announce>((message) => setAnnouncement(message));
+
+  const announce = useCallback<Announce>((message) => {
+    announcedRef.current(message);
+  }, []);
 
   const pushToast = useCallback(
     (
@@ -94,13 +96,14 @@ export function NoticesProvider({ children }: { children: ReactNode }) {
   const toastsValue = useMemo(() => ({ toasts }), [toasts]);
   /** Identity-stable unless a notice is dismissed. */
   const actionsValue = useMemo(
-    () => ({ pushToast, dismissToast, dismissedSidecarNotice, setDismissedSidecarNotice }),
-    [pushToast, dismissToast, dismissedSidecarNotice, setDismissedSidecarNotice],
+    () => ({ pushToast, dismissToast, announce, dismissedSidecarNotice, setDismissedSidecarNotice }),
+    [pushToast, dismissToast, announce, dismissedSidecarNotice, setDismissedSidecarNotice],
   );
 
   return (
     <ToastsContext.Provider value={toastsValue}>
       <NoticesActionsContext.Provider value={actionsValue}>
+        <Announcer announcement={announcement} />
         {children}
       </NoticesActionsContext.Provider>
     </ToastsContext.Provider>

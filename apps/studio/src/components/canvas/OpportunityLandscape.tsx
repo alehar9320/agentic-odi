@@ -8,7 +8,7 @@ import {
   scoredAverage,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { usePrefersReducedMotion } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -448,7 +448,7 @@ export function OpportunityPlot({
   const [showAll, setShowAll] = useState(false);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
   // The pulse is decoration; with reduce-motion the ring stays still.
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotion = usePrefersReducedMotion();
 
   const plotted: PlottedOutcome[] = outcomes.map((outcome) => {
     const importance = Math.min(Math.max(outcome.importance ?? 5, 0), 10);

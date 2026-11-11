@@ -26,3 +26,14 @@ export function useMediaQuery(query: string): boolean {
 
   return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
+
+/**
+ * Whether the person asked for less motion.
+ *
+ * One hook, inherited by every JS-driven animation. CSS motion keeps its own
+ * media block — this is the JS side of the same answer, and a component that
+ * needs it reads it here rather than calling `matchMedia` again (#701 D50).
+ */
+export function usePrefersReducedMotion(): boolean {
+  return useMediaQuery("(prefers-reduced-motion: reduce)");
+}
