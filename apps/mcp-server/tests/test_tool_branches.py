@@ -89,7 +89,8 @@ async def test_add_outcome_rejects_out_of_range_scores() -> None:
 
     text = _text(result)
     assert failure(text).code.value == "out_of_range"
-    assert sentence(text) == "Error: importance and satisfaction must be between 1.0 and 10.0"
+    assert failure(text).field == "importance"
+    assert sentence(text) == "Error: importance must be between 1.0 and 10.0"
 
 
 @pytest.mark.asyncio
@@ -216,6 +217,42 @@ async def test_delete_customer_outcome_reports_missing_ids() -> None:
     assert sentence(text) == "Customer outcome not found: missing"
 
 
+def _capture_uvicorn(monkeypatch) -> list[dict]:
+    """Record what ``server.main`` hands to the server instead of listening.
+
+    Without this the test would bind a real socket and never return, because
+    ``main`` now serves an ASGI app it builds itself.
+    """
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        server.uvicorn,
+        "run",
+        lambda app, **kwargs: calls.append({"app": app, **kwargs}),
+    )
+    monkeypatch.setattr(server, "_configured_token", lambda: "test-token")
+    return calls
+
+
+def test_main_serves_the_token_gated_app(monkeypatch) -> None:
+    calls = _capture_uvicorn(monkeypatch)
+
+    server.main([])
+
+    assert calls[0]["host"] == "127.0.0.1"
+    assert calls[0]["port"] == 8000
+    # The gate is the point of the change: an app served without it is not gated.
+    assert isinstance(calls[0]["app"], server._AuthMiddleware)
+    assert calls[0]["app"].token == "test-token"
+
+
+def test_main_passes_an_explicit_port_through(monkeypatch) -> None:
+    calls = _capture_uvicorn(monkeypatch)
+
+    server.main(["--port", "8010"])
+
+    assert calls[0]["port"] == 8010
+
+
 @pytest.mark.asyncio
 async def test_open_study_reports_a_missing_job_as_an_envelope() -> None:
     async with Client(mcp) as client:
@@ -226,21 +263,3 @@ async def test_open_study_reports_a_missing_job_as_an_envelope() -> None:
     text = _text(result)
     assert failure(text).code.value == "not_found"
     assert sentence(text) == "Job not found: missing"
-
-
-def test_main_runs_the_http_transport(monkeypatch) -> None:
-    calls: list[dict] = []
-    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
-
-    server.main([])
-
-    assert calls == [{"transport": "http", "port": 8000}]
-
-
-def test_main_passes_an_explicit_port_through(monkeypatch) -> None:
-    calls: list[dict] = []
-    monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
-
-    server.main(["--port", "8010"])
-
-    assert calls == [{"transport": "http", "port": 8010}]

@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -25,6 +25,14 @@ const MCP_URL = "http://127.0.0.1:8000/mcp";
 // or a schema left behind by an older build.
 const E2E_STATE = mkdtempSync(join(tmpdir(), "agentic-odi-e2e-"));
 
+// The sidecar and the MCP server both gate their API with the per-install
+// bearer token in one file. The suite stands in for a local client that already
+// holds that file, so it writes a private one before the servers start, and the
+// same key goes on every request the tests make.
+export const E2E_TOKEN = "e2e-sidecar-token";
+export const E2E_TOKEN_FILE = join(E2E_STATE, "studio-token");
+writeFileSync(E2E_TOKEN_FILE, E2E_TOKEN);
+
 export default defineConfig({
   testDir: "./e2e",
   // The suite shares one sidecar and one repository, so tests must not run
@@ -39,6 +47,17 @@ export default defineConfig({
 
   use: {
     baseURL: STUDIO_ORIGIN,
+    extraHTTPHeaders: { Authorization: `Bearer ${E2E_TOKEN}` },
+    // The SPA takes the sidecar token from localStorage, which a real install
+    // writes when it launches the app. Seeding it here makes every page boot
+    // authenticated, on both origins the suite serves.
+    storageState: {
+      cookies: [],
+      origins: [STUDIO_ORIGIN, MCP_BACKED_ORIGIN].map((origin) => ({
+        origin,
+        localStorage: [{ name: "studio.token", value: E2E_TOKEN }],
+      })),
+    },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -72,6 +91,7 @@ export default defineConfig({
       stdout: "ignore",
       stderr: "pipe",
       timeout: 60_000,
+      env: { AGENTIC_ODI_STUDIO_TOKEN: E2E_TOKEN_FILE },
     },
     {
       command: "uv run python -m agentic_odi_studio_api.main",
@@ -89,6 +109,7 @@ export default defineConfig({
         // Point the sidecar at the built SPA explicitly rather than relying on
         // the package-relative path.
         AGENTIC_ODI_STUDIO_DIST: "apps/studio/dist",
+        AGENTIC_ODI_STUDIO_TOKEN: E2E_TOKEN_FILE,
       },
     },
     {
@@ -107,6 +128,7 @@ export default defineConfig({
         AGENTIC_ODI_MCP_URL: MCP_URL,
         AGENTIC_ODI_STUDIO_DB: join(E2E_STATE, "studio-mcp.db"),
         AGENTIC_ODI_STUDIO_DIST: "apps/studio/dist",
+        AGENTIC_ODI_STUDIO_TOKEN: E2E_TOKEN_FILE,
       },
     },
   ],
