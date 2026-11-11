@@ -23,7 +23,7 @@ test.describe("the workspace", () => {
     await openStudio(page);
 
     // The rail only appears once there is something to look at.
-    const landscape = rail(page).getByRole("button", { name: /^Landscape,/ });
+    const landscape = rail(page).getByRole("button", { name: /^Where to focus,/ });
     await expect(landscape).toBeVisible();
 
     await landscape.click();
@@ -34,7 +34,7 @@ test.describe("the workspace", () => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    const landscape = rail(page).getByRole("button", { name: /^Landscape,/ });
+    const landscape = rail(page).getByRole("button", { name: /^Where to focus,/ });
     await expect(landscape).not.toHaveAttribute("aria-current", "page");
 
     await landscape.click();
@@ -45,7 +45,7 @@ test.describe("the workspace", () => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
     await expect(lens(page)).toBeVisible();
 
     await page.getByRole("button", { name: "Close workspace view" }).click();
@@ -56,7 +56,7 @@ test.describe("the workspace", () => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
     await expect(lens(page)).toBeVisible();
 
     await page.keyboard.press("Escape");

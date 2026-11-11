@@ -39,7 +39,7 @@ test.describe("capturing an outcome", () => {
     await expect(page.locator(".banner").filter({ hasText: "Outcome captured" })).toBeVisible();
 
     // The outcome is now part of the canvas.
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
     const landscape = page.getByRole("complementary", { name: "Where to focus" });
     await expect(landscape).toBeVisible();
     await expect(landscape).toContainText("Minimize the time to deploy a service");
