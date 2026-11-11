@@ -12,6 +12,7 @@ import {
 
 import type { StudioConfig, StudioTheme } from "../../types";
 import { resolveTheme } from "../../lib/theme";
+import { prefersReducedMotion } from "../../lib/useMediaQuery";
 
 export const SETTINGS_KEY = "studio.settings";
 
@@ -78,9 +79,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (previous === null || previous === theme) {
       return;
     }
-    const reduceMotion =
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduceMotion = prefersReducedMotion();
     if (reduceMotion) {
       return;
     }

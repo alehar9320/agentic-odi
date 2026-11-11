@@ -6,7 +6,7 @@ import { isEndpointConfiguredForSettings, endpointReachability, isPrivateHost } 
 import { formatRelativeTime, groupByDay } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { formatRetryCountdown } from "../../state/probeBreaker";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useMediaQuery, usePrefersReducedMotion } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import {
@@ -63,7 +63,7 @@ export function StudioBar({
   const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
-  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reduceMotion = usePrefersReducedMotion();
   const [askOpen, setAskOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
