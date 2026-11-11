@@ -155,6 +155,17 @@ server is a normal state the picker explains.
 The studio memory is a separate SQLite file, not an ODI repository. It never
 feeds the canvas; it only supplies bounded context to the next chat turn.
 
+#### Browser fallback
+
+`apps/studio` calls the sidecar first. A transport failure — no answer, a
+502/503/504 proxy response with no sidecar body, or the hosted Worker's
+`sidecar_unavailable` code — falls through to the browser BFF. Reads, canvas
+writes, and the chat stream all take that path. A write drops `mcp_url` on the
+way in, because IndexedDB has no server to address. An application error the
+sidecar actually returned (a 422, `mcp_unreachable`, a rejected key) is not a
+transport failure and is shown as-is: falling back would hide the reason and
+leave two copies of the truth.
+
 ### Store open and close
 
 Both SQLite files are gated the same way at open. `IntentStore` and

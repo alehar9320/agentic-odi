@@ -86,9 +86,9 @@ The Living Studio SPA is deployed to Cloudflare Workers:
 Production deploys on every push to `main`. The Worker is `agentic-odi`; keep
 `name` in `wrangler.jsonc` aligned with the Worker connected in the dashboard.
 Preview builds run for non-production branches and are ephemeral: the Cloudflare
-PR comment is the source of truth, so do not copy a preview URL into docs. The
-hosted UI loads without a backend; canvas data, chat, and mutations need the
-sidecar tunnel described below.
+PR comment is the source of truth, so do not copy a preview URL into docs. The hosted UI loads and works without a backend: chat answers from the browser
+BFF and captures persist in IndexedDB. Live MCP data needs the sidecar tunnel
+described below.
 
 ## Component Visual Review (Chromatic)
 

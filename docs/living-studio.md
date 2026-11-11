@@ -278,8 +278,9 @@ nothing on screen can claim otherwise before the person has asked for something.
   rejected key) is reported, not hidden behind a local draft that looks like the
   model you asked for.
 - The **sidecar isn't running** strip is for the loss of a sidecar this session
-  was talking to: the assistant paused and live data froze is only said when both
-  are true. It offers **Recheck** and **Start the sidecar**, is dismissible for
+  was talking to. It says what still works: the assistant answers from this
+  browser, and every capture is saved here; live MCP data is what waits for the
+  sidecar. It offers **Recheck** and **Start the sidecar**, is dismissible for
   the session, and clears itself the moment the sidecar answers.
 - The canvas keeps showing the last thing it drew instead of going blank; a failed
   canvas is a failure panel with Retry, not an empty board. **Settings → About →
@@ -786,8 +787,9 @@ No server change is needed, and no new dependency.
 
 The built SPA is also served from Cloudflare Workers at
 **[https://agentic-odi.alehar.workers.dev/](https://agentic-odi.alehar.workers.dev/)**.
-The UI loads without a backend; canvas data, chat, and mutations need the local
-sidecar and MCP server. Pull requests get preview URLs from Cloudflare Workers
+The UI loads without a backend. With no sidecar, chat is answered by the browser
+BFF and captures are saved to IndexedDB; live MCP data needs the local sidecar
+and MCP server. Pull requests get preview URLs from Cloudflare Workers
 Builds. See [Deployment](deployment.md) for the Worker setup.
 
 ## 1. Web — production build (recommended for a quick look)
