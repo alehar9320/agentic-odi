@@ -64,12 +64,14 @@ describe("BriefingCard", () => {
   });
 
   it("stays hidden once dismissed and remembers that across a remount", async () => {
-    mocks.fetchLatestBriefing.mockResolvedValue(briefing());
+    const shown = briefing();
+    mocks.fetchLatestBriefing.mockResolvedValue(shown);
     const first = render(<BriefingCard />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Dismiss" }));
     expect(first.container).toBeEmptyDOMElement();
-    expect(JSON.parse(localStorage.getItem(BRIEFING_DISMISSED_KEY) ?? "[]")).toContain("work-1");
+    const dismissed = JSON.parse(localStorage.getItem(BRIEFING_DISMISSED_KEY) ?? "[]");
+    expect(dismissed).toContain(`work-1:${shown.created_at}`);
 
     const second = render(<BriefingCard />);
     await waitFor(() => expect(mocks.fetchLatestBriefing).toHaveBeenCalledTimes(2));

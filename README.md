@@ -73,7 +73,10 @@ The project card, rendered from the committed source by
 - **A morning briefing.** A finished run leaves one readable briefing — what
   changed, and what needs a decision — under "Since you were away". Each line
   links to the record it describes, and a run that changed nothing says so
-  rather than inventing a line.
+  rather than inventing a line. The briefing is written by
+  ``complete_scheduled_work``; no production executor calls it yet, so in normal
+  use the route returns 204 and the card stays hidden until a scheduler wires
+  in a real completion path.
 - **A check on whether onboarding works.** Five counters — launch, first message,
   first outcome, first score, return session — appended to the same local event
   log and read back by `agentic-odi stats`. The numbers never leave the machine,

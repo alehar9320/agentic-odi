@@ -1125,13 +1125,15 @@ class ODIService:
         if work is None:
             raise ScheduledWorkNotFoundError(work_id)
         now = datetime.now(timezone.utc)
+        # Build and validate the briefing before flipping the run to COMPLETED so
+        # a bad change can never leave a completed run without a briefing.
+        result = RunResult(run_id=work_id, changes=tuple(changes or ()), created_at=now)
+        briefing = build_briefing(result)
         updated = self.repo.update_scheduled_work(
             work_id, {"status": ScheduledWorkStatus.COMPLETED, "last_run_at": now.isoformat()}
         )
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
-        result = RunResult(run_id=work_id, changes=tuple(changes or ()), created_at=now)
-        briefing = build_briefing(result)
         self.repo.add_briefing(briefing)
         return briefing
 

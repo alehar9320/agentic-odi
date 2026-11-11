@@ -51,7 +51,7 @@ export function BriefingCard() {
           return;
         }
         setBriefing(latest);
-        setDismissed(latest ? isBriefingDismissed(latest.run_id) : false);
+        setDismissed(latest ? isBriefingDismissed(latest.run_id, latest.created_at) : false);
       })
       .catch(() => {
         // A briefing is a morning convenience, not a gate: a failed read shows
@@ -71,7 +71,7 @@ export function BriefingCard() {
 
   function dismiss() {
     if (briefing) {
-      markBriefingDismissed(briefing.run_id);
+      markBriefingDismissed(briefing.run_id, briefing.created_at);
     }
     setDismissed(true);
   }

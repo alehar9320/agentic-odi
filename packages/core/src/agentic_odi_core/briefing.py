@@ -71,6 +71,26 @@ class BriefingItem:
             record_kind=data["record_kind"],
         )
 
+    @classmethod
+    def try_from_dict(cls, data: Mapping[str, Any]) -> BriefingItem | None:
+        """Build an item from a mapping, returning ``None`` for malformed input.
+
+        An executor may record a change missing ``kind``, ``text``,
+        ``record_id`` or ``record_kind``; skip it rather than raising.
+        """
+        if not isinstance(data, Mapping):
+            return None
+        kind = data.get("kind")
+        text = data.get("text")
+        record_id = data.get("record_id")
+        record_kind = data.get("record_kind")
+        if kind is None or text is None or record_id is None or record_kind is None:
+            return None
+        try:
+            return cls(kind=kind, text=text, record_id=record_id, record_kind=record_kind)
+        except ValueError:
+            return None
+
 
 @dataclass(frozen=True)
 class Briefing:
@@ -162,12 +182,19 @@ def changes_from_summary(summary: Sequence[Mapping[str, Any]] | None) -> tuple[R
     """
     if not summary:
         return ()
-    return tuple(
-        RunChange(
-            kind=change["kind"],
-            text=change["text"],
-            record_id=change["record_id"],
-            record_kind=change["record_kind"],
+    changes: list[RunChange] = []
+    for change in summary:
+        if not isinstance(change, Mapping):
+            continue
+        item = BriefingItem.try_from_dict(change)
+        if item is None:
+            continue
+        changes.append(
+            RunChange(
+                kind=item.kind,
+                text=item.text,
+                record_id=item.record_id,
+                record_kind=item.record_kind,
+            )
         )
-        for change in summary
-    )
+    return tuple(changes)
