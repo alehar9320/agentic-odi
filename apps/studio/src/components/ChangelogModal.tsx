@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { fetchChangelog } from "../api/studioApi";
+import { announce } from "../lib/announce";
 import { markReleasesRead, readReleaseVersions, unreadReleases } from "../lib/changelogRead";
 import { formatExactTime } from "../lib/relativeTime";
 import { useFocusTrap } from "../lib/useFocusTrap";
@@ -34,9 +35,9 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   function markAllRead() {
     const count = unread.length;
     setReadVersions(markReleasesRead((changelog?.releases ?? []).map((r) => r.version)));
-    setMarkMessage(
-      count === 1 ? "1 release marked read" : `${count} releases marked read`,
-    );
+    const message = count === 1 ? "1 release marked read" : `${count} releases marked read`;
+    setMarkMessage(message);
+    announce(message);
   }
 
   useEffect(() => {
@@ -189,8 +190,9 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
             "Design is not just what it looks like and feels like. Design is how it works."
           </span>
           {/* Says what the action did. Kept out of the layout flow so the
-              button disabling never shifts the footer. */}
-          <p className="sr-only" aria-live="polite">
+              button disabling never shifts the footer. The sentence is spoken
+              by the single Announcer region, not a second live region here. */}
+          <p className="sr-only">
             {markMessage}
           </p>
           <div className="changelog-modal__actions">

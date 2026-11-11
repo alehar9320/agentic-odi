@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import { announce } from "../lib/announce";
 import { useToasts } from "../state/notices/NoticesContext";
 import { useBanner } from "./BannerProvider";
 import type { BannerKind } from "./types";
@@ -44,6 +45,12 @@ export function BannerToasts() {
           ? { actions: [{ label: toast.action.label, run: toast.action.run, tone: "ghost" as const }] }
           : {}),
       });
+      // The banner is the visual; the sentence is spoken once, by the single
+      // Announcer region, so a burst of toasts is a burst of sentences in
+      // order rather than several live regions talking over one another.
+      if (!shown.current.has(`toast-${toast.id}`)) {
+        announce(toast.message);
+      }
     }
     shown.current = live;
   }, [toasts, raise, dismiss]);

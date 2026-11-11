@@ -4,6 +4,7 @@ import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge"
 import { BannerProvider, useBanner } from "./banners/BannerProvider";
 import { BannerStack } from "./banners/BannerStack";
 import { BannerToasts } from "./banners/BannerToasts";
+import { Announcer } from "./components/Announcer";
 import { BootFailurePage } from "./components/BootFailurePage";
 import { ChangelogModal } from "./components/ChangelogModal";
 import { ChatStage } from "./components/chat/ChatStage";
@@ -135,6 +136,7 @@ function StudioShell() {
       </a>
       <BannerBridge />
       <BannerToasts />
+      <Announcer />
       <BannerStack
         banners={view.visible}
         overflow={view.overflow}
