@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { lens, openStudio } from "./helpers";
+import { COMPOSER, lens, openStudio } from "./helpers";
 
 /**
  * The Studio against its MCP passthrough backend.
@@ -33,7 +33,9 @@ test.describe("the Studio on the MCP backend", () => {
 
     // The job picker is rendered from the canvas. Only a canvas hydrated
     // from the MCP server knows about this job; the seed fallback does not.
-    await page.getByRole("button", { name: "Capture an outcome" }).click();
+    // The by-hand form, opened the way it is opened without a model.
+    await page.getByRole("textbox", { name: COMPOSER }).fill("/capture");
+    await page.keyboard.press("Enter");
     const panel = page.getByRole("complementary", { name: "Capture by hand" });
     await expect(panel.getByLabel("Job", { exact: true })).toContainText(JOB_NAME);
   });
@@ -41,7 +43,9 @@ test.describe("the Studio on the MCP backend", () => {
   test("records an outcome through the MCP server", async ({ page, request }) => {
     await openStudio(page);
 
-    await page.getByRole("button", { name: "Capture an outcome" }).click();
+    // The by-hand form, opened the way it is opened without a model.
+    await page.getByRole("textbox", { name: COMPOSER }).fill("/capture");
+    await page.keyboard.press("Enter");
     const panel = page.getByRole("complementary", { name: "Capture by hand" });
     await expect(panel).toBeVisible();
 
