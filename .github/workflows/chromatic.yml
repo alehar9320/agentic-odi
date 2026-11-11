@@ -74,6 +74,4 @@ jobs:
             exit 1
           fi
           npm run chromatic
-      - name: Install test tooling
-        run: npm run install:test-tooling
 
