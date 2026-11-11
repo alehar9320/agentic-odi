@@ -278,6 +278,25 @@ The capability probe and the bar's model chip both read this, so a person is tol
 why a local model cannot be reached from this page instead of being shown a generic
 offline state.
 
+### One probe at a time, and a breaker for a dead endpoint (#536)
+
+Every connection probe — the scheduled one and the person's "Check now" — runs
+through one breaker in `apps/studio/src/state/probeBreaker.ts`. It holds two
+guarantees:
+
+- **Single flight.** A probe already on the wire is joined, never duplicated, so a
+  slow failure cannot land after a fresher success and overwrite it.
+- **A circuit breaker.** Three transport failures open it, and a probe then costs
+  nothing until a half-open probe is allowed 60 s later; that probe closing the
+  breaker on success or reopening it on failure. A refusal a retry cannot clear — a
+  rejected key (401/403), a missing model — parks it as `degraded` instead of
+  retrying forever as though the network were flaky.
+
+While the breaker is open the bar shows a "Retrying in N min" countdown instead of
+a spinner, because nothing is being probed. A person asking resets the breaker and
+the cadence: the endpoint they just edited is not the one that kept failing.
+
+
 ## Trust Boundaries
 
 Each process, the credentials it holds, and what crosses every wire are
