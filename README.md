@@ -159,6 +159,11 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 
 - **Hot reload:** `npm --prefix apps/studio run dev:full` (Vite on
   http://localhost:5173).
+- **Install it as an app:** in a supporting browser, an **Install** pill in the
+  bar opens the Studio as its own window — no browser chrome, with the Odi icon
+  and the studio's theme colour. The offer only appears when the browser has a
+  prompt ready, and a dismissal is remembered. See
+  [Install as a browser app](docs/living-studio.md#install-as-a-browser-app).
 - **Desktop app:** `npm --prefix apps/studio run tauri dev`.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).

@@ -173,6 +173,12 @@ install, and the bounded in-session action log), `transport.test.ts` (Tauri boun
 `UpdateBanner`/`UpdateSettings` component tests. `StudioBar.test.tsx` and
 `SettingsPanel.test.tsx` cover the UI integration points.
 
+Installability is covered the same way: `install.test.ts` drives the
+`beforeinstallprompt` lifecycle (offer, prompt, acceptance, dismissal, and
+`dispose`), `InstallPill.test.tsx` proves the control is absent until the
+browser has a prompt and never prompts on render, and `pwa.test.ts` pins the
+manifest's fields and checks that every icon it names exists on disk.
+
 The outbox drain guard in `apps/studio/src/bff/outbox.ts` is covered by
 `outbox.test.ts`, which races two drains twice: once with a `navigator.locks`
 stub and once with `navigator.locks` deleted so the lease row runs. Both assert
