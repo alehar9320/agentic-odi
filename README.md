@@ -166,8 +166,9 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   sidecar-owned transcript, with attachments, tool traces under one foldable
   work row per turn, opt-in approvals for
   chat writes and unknown tools, and branch-aware editing and regeneration.
-  Settings → About also offers an opt-in, redacted local diagnostics preview; no
-  report is uploaded. See
+  Settings → About says where the app is running — desktop app, installed web
+  app, or browser tab — and whether the offline shell is on, and offers an
+  opt-in, redacted local diagnostics preview; no report is uploaded. See
   [The Living Studio](docs/living-studio.md).
 - **The agent knows what you are looking at.** Select a job, step, outcome, or
   evidence record and the Studio tells the sidecar only *which* record — kind and
