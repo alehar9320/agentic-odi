@@ -243,7 +243,7 @@ describe("Catch Up reads the signal inbox", () => {
     serveFeed([signal({ created_at: created })]);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: 1 unread" }));
 
     const time = await screen.findByText(/ago|just now/i, { selector: "time" });
     expect(time).toHaveAttribute("dateTime", created);
