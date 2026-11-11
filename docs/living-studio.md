@@ -481,6 +481,12 @@ cites the issue or PR that landed it.
 | Tool result rendering | Adopted | Each MCP call is a trace chip, gathered under the turn's work row. | #238 |
 | `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
 | ODI surfaces as `data` parts | Adopted | A validated `UiNode` rides the transcript and renders through `UiRenderer`. | #55 |
+| `adapters.threadList` | Adopted | The bar's history button opens an assistant-ui `ThreadListPrimitive` list over the sidecar's conversations, newest first, with rename and delete through `ThreadListItemMorePrimitive` and `ThreadListItemPrimitive.Delete`. | #858 |
+| `ThreadListPrimitive.Root` / `.New` / `.Items` / `.ItemByIndex` | Adopted | The list shell, new-thread button, and rows. | #858 |
+| `ThreadListItemPrimitive.Root` / `.Trigger` / `.Title` | Adopted | One keyboard-reachable row per thread: Enter/Space switches, `aria-current` on the open thread, `custom.updatedAt` renders through `formatRelativeTime`. | #858 |
+| `ThreadListItemPrimitive.Delete` | Adopted | Confirmed delete of a thread and its turns. | #858 |
+| `ThreadListItemMorePrimitive` (`Root`/`Trigger`/`Content`/`Item`/`Separator`) | Adopted | Overflow menu per row: rename via `threads.item().rename()` and delete via `threads.item().delete()`. | #858 |
+| `threads.item().rename()` / `.updateCustom()` | Adopted | Inline rename and per-row metadata (`updatedAt` rides in `custom` since `ExternalStoreThreadData` has no timestamp field). | #858 |
 
 #### Where the bridge lives
 
@@ -499,6 +505,8 @@ cites the issue or PR that landed it.
 | `apps/studio/src/components/settings/SavedField.tsx` | A field that saves when it is left, states **Saved** in its section, and refuses an unusable value beside itself with the reason. |
 | `apps/studio/src/components/settings/sections/` | One module per Settings section — Context, Data, Model, Studio bridge, Updates, About, Install — each reading its own source and reporting its own loading and error state. |
 | `apps/studio/src/components/settings/validation.ts` | What Settings accepts before it writes: a full http(s) URL, and a non-empty model name. |
+| `apps/studio/src/assistant/threadList.ts` | Pure `toThreadData` mapping conversations to `ExternalStoreThreadData`, newest first, blank title as "New conversation". |
+| `apps/studio/src/components/history/ThreadList.tsx` | `ThreadListPrimitive` / `ThreadListItemPrimitive` / `ThreadListItemMorePrimitive` composition for the bar's history list. |
 
 The sidecar remains the source of truth for what happened. Its additions are
 opt-in and additive: `reasoning`, `source`, and `approval` stream events;
