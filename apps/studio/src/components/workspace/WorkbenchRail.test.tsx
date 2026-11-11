@@ -92,7 +92,7 @@ describe("WorkbenchRail", () => {
     document.body.append(elsewhere);
     elsewhere.focus();
 
-    const chip = screen.getByRole("button", { name: "Landscape, 1 opportunity" });
+    const chip = screen.getByRole("button", { name: "Where to focus, 1 opportunity" });
     fireEvent.click(chip);
 
     expect(studio.openPanel).toHaveBeenCalledWith("landscape");
