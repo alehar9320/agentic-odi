@@ -31,11 +31,36 @@ export function formatOpportunityScore(score: number | null | undefined): string
 }
 
 export function opportunityPill(score: number | null | undefined): PillDescriptor {
+  // A missing score is not "served". Saying so would read as a verdict the
+  // store never reached, so it gets a neutral descriptor of its own.
+  if (!hasScore(score)) {
+    return { label: "Not scored", variant: "blue" };
+  }
   const formatted = formatOpportunityScore(score);
   if (isUnderserved(score)) {
     return { label: `🔥 Underserved (Opp: ${formatted})`, variant: "amber" };
   }
   return { label: `✓ Served (Opp: ${formatted})`, variant: "green" };
+}
+
+/**
+ * The importance at which an outcome's opportunity score crosses the threshold
+ * for a given satisfaction: the solution of `2·importance − satisfaction =
+ * UNDERSERVED_THRESHOLD` for importance. The underserved region sits above this
+ * line, so the drawn zone and `isUnderserved(opportunityScore(...))` cannot
+ * disagree.
+ */
+export function underservedBoundaryImportance(satisfaction: number): number {
+  return (UNDERSERVED_THRESHOLD + satisfaction) / 2;
+}
+
+/**
+ * The matrix's region test, in point space rather than score space. It is the
+ * same rule as `isUnderserved(opportunityScore(importance, satisfaction))`, kept
+ * separate so a plotted point and the shaded polygon share one boundary.
+ */
+export function isUnderservedPoint(importance: number, satisfaction: number): boolean {
+  return importance > underservedBoundaryImportance(satisfaction);
 }
 
 /** What a group of member scores supports, with no score invented. */

@@ -336,6 +336,18 @@ refresh, and polls once a minute while the window is visible. Connector rows in 
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
 
+The Opportunity Matrix is held to the same rule. It plots a point only for an
+outcome the store actually scored — no default of 5 fills a missing importance
+or satisfaction, and no score is computed from a pair that was never given. An
+unscored outcome is therefore absent from the plot rather than sitting at its
+centre as though it were measured; it appears instead under a **Not scored (n)**
+list below the matrix, where **Score me** opens that outcome's score form without
+inventing a rating. The shaded underserved zone is the score formula itself —
+sampled from `2 × importance − satisfaction > 10` and drawn with its threshold
+line — so the region a point sits in and `isUnderserved` never disagree. The
+pill follows suit: a score the store never computed reads **Not scored**, never
+**Served**.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront

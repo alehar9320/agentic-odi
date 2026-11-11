@@ -6,6 +6,7 @@ import {
   hasScore,
   isUnderserved,
   scoredAverage,
+  underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -43,6 +44,9 @@ export function OpportunityLandscape() {
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
     focusedSubject?.kind === "outcome" ? focusedSubject.id : null,
   );
+  // The outcome whose score form should open on the card, set by "Score me" so
+  // the reader lands on the one control that fixes a missing score.
+  const [scoringOutcomeId, setScoringOutcomeId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
 
@@ -111,12 +115,28 @@ export function OpportunityLandscape() {
     );
   }, [filteredOutcomes]);
 
+  // The outcomes the plot deliberately leaves off: no stored score means no
+  // point. They are listed below the matrix so a reader can still reach them and
+  // record the ratings that would place them.
+  const unscoredOutcomes = useMemo(
+    () => filteredOutcomes.filter((outcome) => !hasScore(outcome.opportunity_score)),
+    [filteredOutcomes],
+  );
+
   function toggleOutcome(id: string) {
     const next = selectedOutcomeId === id ? null : id;
     setSelectedOutcomeId(next);
     if (next) {
       focusSubject("outcome", next);
+    } else {
+      setScoringOutcomeId(null);
     }
+  }
+
+  function scoreOutcome(id: string) {
+    setSelectedOutcomeId(id);
+    setScoringOutcomeId(id);
+    focusSubject("outcome", id);
   }
 
   const activeOutcome = useMemo(() => {
@@ -321,6 +341,7 @@ export function OpportunityLandscape() {
           onSelectOutcome={toggleOutcome}
           onHoverOutcome={setHoveredOutcome}
           activeOutcome={activeOutcome}
+          scoringOutcomeId={scoringOutcomeId}
           sample={sample}
         />
       ) : viewMode === "table" ? (
@@ -340,6 +361,48 @@ export function OpportunityLandscape() {
           No opportunities match the current filter criteria.
         </p>
       )}
+
+      {/* The plot draws only scored outcomes, so the ones it cannot place are
+          listed here with the one action that fixes that. Nothing is invented to
+          fill the gap: the count and the statements come from the store. */}
+      {viewMode === "matrix" && canvasState.kind !== "error" && unscoredOutcomes.length > 0 ? (
+        <section className="unscored-list" aria-label="Not scored outcomes" style={{ marginTop: 24 }}>
+          <h2 className="catchup-title">{`Not scored (${unscoredOutcomes.length})`}</h2>
+          <p className="caption">
+            These outcomes have no importance and satisfaction recorded, so the matrix
+            cannot place them. Add ratings to plot each one.
+          </p>
+          <ul className="stack" style={{ listStyle: "none", margin: "12px 0 0", padding: 0 }}>
+            {unscoredOutcomes.map((outcome, index) => (
+              <li
+                key={outcome.id ?? index}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  padding: "10px 14px",
+                  border: "1px solid var(--studio-border)",
+                  borderRadius: 8,
+                }}
+              >
+                <span style={{ color: "var(--studio-text)" }}>
+                  {outcome.id ? <b style={{ color: "var(--studio-indigo)" }}>{outcome.id} </b> : null}
+                  {outcome.statement ?? "Untitled outcome"}
+                </span>
+                <button
+                  type="button"
+                  className="quiet-action"
+                  disabled={!outcome.id}
+                  onClick={() => outcome.id && scoreOutcome(outcome.id)}
+                >
+                  Score me
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {theses.length > 0 && (
         <section aria-label="Saved opportunity theses" style={{ marginTop: 28 }}>
@@ -387,6 +450,8 @@ interface MatrixViewProps {
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
+  /** The outcome whose score form should open on the detail card. */
+  scoringOutcomeId?: string | null;
   /** The one outcome the tour points at, ringed apart from the rest. */
   highlightedOutcomeId?: string | null;
   sample?: boolean;
@@ -424,15 +489,22 @@ export function plotY(importance: number): number {
   return PLOT_DATA_BOTTOM - (importance / 10) * PLOT_DATA_HEIGHT;
 }
 
-// Underserved zone polygon: top-left, boundary-left, boundary-right, top-right.
-const underservedPolygonPoints = [
-  [PLOT_LEFT, PLOT_TOP],
-  [plotX(0), plotY(5)],
-  [plotX(10), plotY(10)],
-  [PLOT_RIGHT, PLOT_TOP],
-]
-  .map(([x, y]) => `${x},${y}`)
-  .join(" ");
+// Underserved zone, sampled from the score formula rather than hard-coded:
+// the region is `importance > underservedBoundaryImportance(satisfaction)`,
+// which is `2 × importance − satisfaction > 10`. The zone is closed along the
+// top of the plot so it reads as a filled region, and the sampled path keeps it
+// agreeing with `isUnderserved(opportunityScore(...))` at every column.
+const BOUNDARY_SAMPLES = 10;
+const underservedPolygonPoints = (() => {
+  const points: Array<[number, number]> = [[PLOT_LEFT, PLOT_TOP]];
+  for (let step = 0; step <= BOUNDARY_SAMPLES; step += 1) {
+    const satisfaction = (step / BOUNDARY_SAMPLES) * 10;
+    const importance = Math.min(underservedBoundaryImportance(satisfaction), 10);
+    points.push([plotX(satisfaction), plotY(importance)]);
+  }
+  points.push([PLOT_RIGHT, PLOT_TOP]);
+  return points.map(([x, y]) => `${x},${y}`).join(" ");
+})();
 
 export function OpportunityPlot({
   outcomes,
@@ -440,6 +512,7 @@ export function OpportunityPlot({
   onSelectOutcome,
   onHoverOutcome,
   activeOutcome,
+  scoringOutcomeId = null,
   sample = false,
   highlightedOutcomeId = null,
   compact = false,
@@ -450,21 +523,32 @@ export function OpportunityPlot({
   // The pulse is decoration; with reduce-motion the ring stays still.
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
-  const plotted: PlottedOutcome[] = outcomes.map((outcome) => {
-    const importance = Math.min(Math.max(outcome.importance ?? 5, 0), 10);
-    const satisfaction = Math.min(Math.max(outcome.satisfaction ?? 5, 0), 10);
-    const score = outcome.opportunity_score ?? importance + Math.max(importance - satisfaction, 0);
-    return {
-      outcome,
-      importance,
-      satisfaction,
-      score,
-      underserved: isUnderserved(score),
-      // Map (satisfaction, importance) into the 500x360 viewBox.
-      cx: plotX(satisfaction),
-      cy: plotY(importance),
-    };
-  });
+  const plotted: PlottedOutcome[] = outcomes
+    .filter(
+      (outcome) =>
+        hasScore(outcome.importance) &&
+        hasScore(outcome.satisfaction) &&
+        hasScore(outcome.opportunity_score),
+    )
+    .map((outcome) => {
+      // Every plotted point carries stored numbers: a point needs a real
+      // importance, a real satisfaction, and a real score. There is no default
+      // of 5 and no fallback score, so an unscored outcome never lands
+      // mid-matrix pretending to be a measurement.
+      const importance = outcome.importance as number;
+      const satisfaction = outcome.satisfaction as number;
+      const score = outcome.opportunity_score as number;
+      return {
+        outcome,
+        importance,
+        satisfaction,
+        score,
+        underserved: isUnderserved(score),
+        // Map (satisfaction, importance) into the 500x360 viewBox.
+        cx: plotX(satisfaction),
+        cy: plotY(importance),
+      };
+    });
 
   // Above the fold: the highest-opportunity outcomes, which is what the
   // landscape exists to show. The tail is one click away rather than in the
@@ -619,6 +703,17 @@ export function OpportunityPlot({
               strokeWidth="1"
               strokeDasharray="4,4"
             />
+            {/* The threshold line itself: the boundary the polygon is sampled
+                from, `importance = (10 + satisfaction) / 2`. */}
+            <line
+              x1={plotX(0)}
+              y1={plotY(underservedBoundaryImportance(0))}
+              x2={plotX(10)}
+              y2={plotY(underservedBoundaryImportance(10))}
+              stroke="rgba(251, 191, 36, 0.45)"
+              strokeWidth="1.5"
+              strokeDasharray="6,3"
+            />
             <text x={60} y={45} fill="var(--studio-amber)" fontSize="11" fontWeight="600" opacity="0.8">
               ★ Underserved Innovation Zone (Opp Score &gt; 10)
             </text>
@@ -761,7 +856,18 @@ export function OpportunityPlot({
       <div>
         {activeOutcome ? (
           <div style={{ position: "sticky", top: 16 }}>
-            <OutcomeCard outcome={activeOutcome} sample={sample} />
+            <OutcomeCard
+              // Re-key on the scoring target so "Score me" reopens the form
+              // even when the card is already mounted for that outcome.
+              key={
+                scoringOutcomeId != null && scoringOutcomeId === activeOutcome.id
+                  ? `${activeOutcome.id}:scoring`
+                  : activeOutcome.id
+              }
+              outcome={activeOutcome}
+              sample={sample}
+              startEditing={scoringOutcomeId != null && scoringOutcomeId === activeOutcome.id}
+            />
           </div>
         ) : (
           <div

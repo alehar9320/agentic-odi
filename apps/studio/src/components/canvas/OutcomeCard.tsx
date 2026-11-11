@@ -11,7 +11,17 @@ import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
 
-export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sample?: boolean }) {
+export function OutcomeCard({
+  outcome,
+  sample = false,
+  startEditing = false,
+}: {
+  outcome: Outcome;
+  sample?: boolean;
+  /** Opens the score form on mount or when it flips true, so a caller can send
+   * the reader straight to the one control that fixes a missing score. */
+  startEditing?: boolean;
+}) {
   const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
   // Records captured against this outcome, with their way back to the source.
   const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
@@ -19,7 +29,7 @@ export function OutcomeCard({ outcome, sample = false }: { outcome: Outcome; sam
   );
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [thesisOpen, setThesisOpen] = useState(false);
   const [rationale, setRationale] = useState("");
   const [importance, setImportance] = useState(outcome.importance ?? 5);
