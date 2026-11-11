@@ -318,6 +318,20 @@ left untouched, and offers **Recheck the database** for after the person has
 restored a copy. It never offers to delete or overwrite anything — that decision
 belongs to the person.
 
+### When the browser is out of space
+
+A full disk is its own condition, not a generic failure. The browser refuses a
+write with a `QuotaExceededError` (Firefox says `NS_ERROR_DOM_QUOTA_REACHED`),
+which would otherwise surface as "something went wrong" and a retry that can
+never succeed. Instead the store catches it at the boundary, throws one
+`StorageFullError`, and pauses every later write before it reaches IndexedDB.
+Reads are untouched, so everything already captured stays on screen and stays
+exportable. One strip says **"This browser is out of space for this site. Your
+existing work is safe — export it, or free space and try again."** and its only
+action is **Export**, which downloads the whole workspace as one JSON file. The
+pause is never cleared by deleting a cache or by retrying on a timer; it clears
+when the person frees space or takes the work with them.
+
 ### What the canvas is made of
 
 Every canvas response carries its provenance: `live` when the sidecar read your

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { StorageFullError } from "../bff/errors";
+
 import {
   addConnector,
   addObservation,
@@ -480,6 +482,15 @@ describe("typed failures", () => {
 
     expect(problem.code).toBe("internal");
     expect(problem.message).toBe("boom");
+  });
+
+  it("carries a local BFF storage_full error through asStudioError", () => {
+    const problem = asStudioError(new StorageFullError());
+
+    expect(problem.code).toBe("storage_full");
+    expect(problem.retryable).toBe(false);
+    expect(problem.message).toMatch(/out of space/i);
+    expect(problem.message).toMatch(/existing work is safe/i);
   });
 
   it("classifies a network failure (sidecar down) as mcp_unreachable with a suggestion", () => {

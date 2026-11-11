@@ -33,6 +33,7 @@ import {
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
   dismissSignal as apiDismissSignal,
+  exportWorkspace as apiExportWorkspace,
   fetchCanvas,
   fetchConfig,
   fetchConnectorCatalog,
@@ -49,12 +50,14 @@ import {
   fetchUnreadSignalCount,
   healthLlm,
   healthMcp,
+  isStorageFull,
   listConversations as apiListConversations,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
   streamChat,
+  subscribeStorageFull,
   updateJob as apiUpdateJob,
   updateObservation as apiUpdateObservation,
   updateOutcome as apiUpdateOutcome,
@@ -76,6 +79,7 @@ import {
   type ProbeScheduler,
 } from "./scheduleProbe";
 import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
+import { downloadJson, workspaceExportFilename } from "../lib/export";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -342,6 +346,14 @@ export interface StudioContextValue {
   recheckBoot: () => Promise<void>;
   /** Whether the user has dismissed this session's sidecar-down notice. */
   dismissedSidecarNotice: boolean;
+  /**
+   * True once a local write was refused for lack of space. The studio stops
+   * offering writes, keeps the work it already has, and offers Export as the
+   * one next step. It never clears anything to make room.
+   */
+  storageFull: boolean;
+  /** Download the whole local workspace as one JSON file. */
+  exportWorkspace: () => Promise<void>;
   /** Probe again now, e.g. after the user started the sidecar. */
   recheckConnections: () => Promise<void>;
   dismissSidecarNotice: () => void;
@@ -643,6 +655,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
+  const [storageFull, setStorageFull] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -779,6 +792,68 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [refreshSignals, settings.mcp_url],
   );
 
+
+
+  /**
+   * Follow the store's write pause. A write refused for space flips the store
+   * once; this mirrors it into React so the shell can stop offering writes and
+   * raise the storage-full notice without polling.
+   */
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [alreadyFull, stop] = await Promise.all([
+          isStorageFull(),
+          subscribeStorageFull(() => setStorageFull(true)),
+        ]);
+        if (cancelled) {
+          stop();
+          return;
+        }
+        unsubscribe = stop;
+        if (alreadyFull) {
+          setStorageFull(true);
+        }
+      } catch {
+        // The notice is an enhancement: a store that cannot be watched must not
+        // stop the studio from rendering, and writes still refuse on their own.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, []);
+
+  const exportWorkspace = useCallback(async () => {
+    try {
+      const json = await apiExportWorkspace();
+      downloadJson(json, workspaceExportFilename());
+      pushToast("success", "Workspace exported.");
+    } catch (error) {
+      pushToast("error", `Could not export the workspace: ${(error as Error).message}`);
+    }
+  }, [pushToast]);
+
+  /**
+   * Report a failed local write. A full origin is the one failure with a single
+   * named next step, so it is stated in full and pauses the studio's write
+   * offers; anything else keeps its own fallback wording.
+   */
+  const reportWriteFailure = useCallback(
+    (error: unknown, fallback: string) => {
+      const problem = asStudioError(error);
+      if (problem.code === "storage_full") {
+        setStorageFull(true);
+        pushToast("error", problem.message);
+        return;
+      }
+      pushToast("error", fallback);
+    },
+    [pushToast],
+  );
 
   const threadSnapshot = useRef<ThreadSnapshot | null>(null);
 
@@ -1300,10 +1375,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         pushToast("success", writeReceipt(step, "Step added to Job Map!"));
         await refreshCanvas();
       } catch (error) {
-        pushToast("error", `Error adding step: ${(error as Error).message}`);
+        reportWriteFailure(error, `Error adding step: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, reportWriteFailure, refreshCanvas],
   );
 
   const addOutcome = useCallback(
@@ -1336,10 +1411,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         pushToast("success", writeReceipt(job, "Job updated."));
         await refreshCanvas();
       } catch (error) {
-        pushToast("error", `Could not update the job: ${(error as Error).message}`);
+        reportWriteFailure(error, `Could not update the job: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, reportWriteFailure, refreshCanvas],
   );
 
   const deleteJob = useCallback(
@@ -1349,10 +1424,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         pushToast("success", writeReceipt(result, "Job removed."));
         await refreshCanvas();
       } catch (error) {
-        pushToast("error", `Could not remove the job: ${(error as Error).message}`);
+        reportWriteFailure(error, `Could not remove the job: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, reportWriteFailure, refreshCanvas],
   );
 
   const updateStep = useCallback(
@@ -1362,10 +1437,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         pushToast("success", writeReceipt(step, "Step updated."));
         await refreshCanvas();
       } catch (error) {
-        pushToast("error", `Could not update the step: ${(error as Error).message}`);
+        reportWriteFailure(error, `Could not update the step: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, reportWriteFailure, refreshCanvas],
   );
 
   const deleteStep = useCallback(
@@ -1375,10 +1450,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         pushToast("success", writeReceipt(result, "Step removed."));
         await refreshCanvas();
       } catch (error) {
-        pushToast("error", `Could not remove the step: ${(error as Error).message}`);
+        reportWriteFailure(error, `Could not remove the step: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, reportWriteFailure, refreshCanvas],
   );
 
   const updateOutcome = useCallback(
@@ -1394,10 +1469,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         pushToast("success", writeReceipt(outcome, "Outcome updated."));
         await refreshCanvas();
       } catch (error) {
-        pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
+        reportWriteFailure(error, `Could not update the outcome: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, reportWriteFailure, refreshCanvas],
   );
 
   const deleteOutcome = useCallback(
@@ -1407,10 +1482,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         pushToast("success", writeReceipt(result, "Outcome removed."));
         await refreshCanvas();
       } catch (error) {
-        pushToast("error", `Could not remove the outcome: ${(error as Error).message}`);
+        reportWriteFailure(error, `Could not remove the outcome: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, reportWriteFailure, refreshCanvas],
   );
 
   const deleteEvidence = useCallback(
@@ -1420,10 +1495,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         pushToast("success", writeReceipt(result, "Evidence removed."));
         await refreshCanvas();
       } catch (error) {
-        pushToast("error", `Could not remove the evidence: ${(error as Error).message}`);
+        reportWriteFailure(error, `Could not remove the evidence: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, reportWriteFailure, refreshCanvas],
   );
 
   const promoteEvidence = useCallback(
@@ -2200,12 +2275,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         const observation = await apiAddObservation(payload);
         setMemory((prev) => [...prev, observation]);
         return observation;
-      } catch {
-        pushToast("error", "I couldn't save that context.");
+      } catch (error) {
+        reportWriteFailure(error, "I couldn't save that context.");
         return null;
       }
     },
-    [pushToast],
+    [reportWriteFailure],
   );
 
   const updateObservation = useCallback(
@@ -2218,12 +2293,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
             : prev.map((item) => (item.id === observationId ? observation : item)),
         );
         return observation;
-      } catch {
-        pushToast("error", "I couldn't update that context.");
+      } catch (error) {
+        reportWriteFailure(error, "I couldn't update that context.");
         return null;
       }
     },
-    [pushToast],
+    [reportWriteFailure],
   );
 
   const deleteObservation = useCallback(
@@ -2234,10 +2309,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       } catch (error) {
         const problem = asStudioError(error);
         recordStudioError(problem, "/api/memory/observations");
-        pushToast("error", "I couldn't forget that.");
+        reportWriteFailure(error, "I couldn't forget that.");
       }
     },
-    [pushToast],
+    [reportWriteFailure],
   );
 
   const clearMemory = useCallback(async () => {
@@ -2250,9 +2325,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     } catch (error) {
       const problem = asStudioError(error);
       recordStudioError(problem, "/api/memory");
-      pushToast("error", "I couldn't clear what I've learned.");
+      reportWriteFailure(error, "I couldn't clear what I've learned.");
     }
-  }, [pushToast]);
+  }, [reportWriteFailure]);
 
   const openConversation = useCallback(
     async (targetId: string) => {
@@ -2544,6 +2619,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       bootError,
       recheckBoot,
       dismissedSidecarNotice,
+      storageFull,
+      exportWorkspace,
       dismissSidecarNotice,
       recheckConnections,
       checkConnections,
@@ -2669,6 +2746,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       bootError,
       recheckBoot,
       dismissedSidecarNotice,
+      storageFull,
+      exportWorkspace,
       dismissSidecarNotice,
       recheckConnections,
       checkConnections,

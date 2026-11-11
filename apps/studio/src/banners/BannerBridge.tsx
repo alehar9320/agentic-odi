@@ -23,6 +23,7 @@ export function BannerBridge() {
     dismissedSidecarNotice,
     llmHealth,
     streaming,
+    storageFull,
   } = useStudio();
   const online = useOnlineStatus();
   const appUpdate = useAppUpdate();
@@ -68,6 +69,16 @@ export function BannerBridge() {
     }
   }, [llmHealth.healthy, online, raise, resolve]);
 
+  // A full origin is not dismissed by a retry: the strip stays until the write
+  // pause clears, which only happens when the person frees space or exports.
+  useEffect(() => {
+    if (storageFull) {
+      raise({ kind: "storage-full" });
+    } else {
+      resolve("storage-full");
+    }
+  }, [storageFull, raise, resolve]);
+
   return null;
 }
 
@@ -88,6 +99,7 @@ export function useBannerActionDispatcher(): {
     openSetup,
     openPanel,
     dismissSidecarNotice,
+    exportWorkspace,
     ask,
   } = useStudio();
 
@@ -104,6 +116,11 @@ export function useBannerActionDispatcher(): {
         break;
       case "open-jobmap":
         openPanel("jobmap");
+        break;
+      case "export-workspace":
+        // The one way out of a full disk: take the work with you. Nothing is
+        // cleared, and no write is retried.
+        void exportWorkspace();
         break;
       case "install-update":
       case "restart":

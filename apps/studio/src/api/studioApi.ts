@@ -37,6 +37,7 @@ import type {
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
+import { BffError } from "../bff/errors";
 import { applyPendingWrites } from "../bff/pending";
 
 /** A failure the sidecar reported, kept whole so the UI can show it. */
@@ -135,6 +136,11 @@ function describeStatus(status: number): StudioError {
 export function asStudioError(error: unknown): StudioError {
   if (error instanceof StudioApiError) {
     return error.error;
+  }
+  // A local BFF failure already carries a code the UI can branch on — most
+  // importantly `storage_full`, which must not be flattened into "internal".
+  if (error instanceof BffError) {
+    return error.studioError;
   }
   // A network-level failure means the sidecar (or the Worker that fronts it)
   // never answered: frame it as a sidecar problem with a path back, not a
@@ -372,6 +378,18 @@ export async function fetchCanvas(mcpUrl: string): Promise<CanvasData> {
   // A queued write has not reached the sidecar, so a read that answered from it
   // would erase the optimistic edit. Overlay the outbox on every read path.
   return overlayPending(canvas);
+}
+
+/** True while a full origin has paused every local write. */
+export async function isStorageFull(): Promise<boolean> {
+  const bff = await getStudioBff();
+  return bff.storageFull;
+}
+
+/** Notify when the store pauses or resumes writes. Returns the unsubscribe. */
+export async function subscribeStorageFull(listener: () => void): Promise<() => void> {
+  const bff = await getStudioBff();
+  return bff.subscribeStorageFull(listener);
 }
 
 export function healthMcp(mcpUrl: string): Promise<McpHealth> {
@@ -972,6 +990,12 @@ export async function getStorageFacts(): Promise<StorageFacts> {
   };
 }
 
+/**
+ * The whole local workspace as one JSON document.
+ *
+ * This reads the browser store directly: it is the escape hatch that must work
+ * when writes have paused, so it never routes through the sidecar.
+ */
 export async function exportWorkspace(): Promise<string> {
   const bff = await getStudioBff();
   return bff.exportWorkspace();

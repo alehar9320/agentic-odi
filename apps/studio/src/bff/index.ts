@@ -35,6 +35,16 @@ export class StudioBff {
     this.capabilities = capabilityRegistry;
   }
 
+  /** True while a full origin has paused every local write. */
+  get storageFull(): boolean {
+    return this.store.storageFull;
+  }
+
+  /** Called when `storageFull` flips, so a caller can stop offering writes. */
+  subscribeStorageFull(listener: () => void): () => void {
+    return this.store.subscribeStorageFull(listener);
+  }
+
   async init(): Promise<void> {
     // Forces the store to open eagerly so later calls are not awaiting open.
     await this.store.nextSeq().catch(() => undefined);

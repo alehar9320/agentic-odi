@@ -403,9 +403,9 @@ export function briefFilename(exportedAt: Date = new Date()): string {
   return `agentic-odi-decision-brief-${exportedAt.toISOString().slice(0, 10)}.md`;
 }
 
-/** Hand a Markdown file to the browser's save dialog. */
-export function downloadMarkdown(markdown: string, filename: string): void {
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+/** Hand a file to the browser's save dialog. */
+function downloadFile(content: string, filename: string, type: string): void {
+  const blob = new Blob([content], { type: `${type};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -415,4 +415,16 @@ export function downloadMarkdown(markdown: string, filename: string): void {
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
+}
+
+export function downloadMarkdown(markdown: string, filename: string): void {
+  downloadFile(markdown, filename, "text/markdown");
+}
+
+export function downloadJson(json: string, filename: string): void {
+  downloadFile(json, filename, "application/json");
+}
+
+export function workspaceExportFilename(exportedAt: Date = new Date()): string {
+  return `agentic-odi-workspace-${exportedAt.toISOString().slice(0, 10)}.json`;
 }

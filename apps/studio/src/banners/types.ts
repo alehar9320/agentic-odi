@@ -25,6 +25,7 @@ export type BannerKind =
   | "update-available"
   | "update-ready"
   | "write-rejected"
+  | "storage-full"
   | "info"
   | "success"
   | "error";
@@ -37,6 +38,7 @@ export type BannerActionId =
   | "open-jobmap"
   | "install-update"
   | "restart"
+  | "export-workspace"
   | "reload-app";
 
 export interface BannerAction {
