@@ -583,4 +583,3 @@ def test_local_backend_rejects_an_unknown_proposal_status(tmp_path):
 
     with pytest.raises(BackendError, match="Invalid proposal status"):
         backend.call("list_proposals", {"status": "pending"})
-

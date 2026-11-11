@@ -1907,6 +1907,12 @@ an outcome in the group has no score, because a segment cannot be classified
 from partial evidence. No demographic attribute appears here by design.\
 """,
                 "properties": {
+                    "computed_at_event_id": {
+                        "anyOf": [{"type": "integer"}, {"type": "null"}],
+                        "default": None,
+                        "description": "The store revision this segment was derived from. None when it was derived before the field existed, which reads as unknown, not fresh.",
+                        "title": "Computed At Event Id",
+                    },
                     "confidence": {
                         "description": "How much evidence supports this",
                         "maximum": 1.0,
@@ -1953,6 +1959,12 @@ from partial evidence. No demographic attribute appears here by design.\
                         "description": "Why this verdict, naming the outcomes behind it",
                         "title": "Rationale",
                         "type": "string",
+                    },
+                    "stale": {
+                        "anyOf": [{"type": "boolean"}, {"type": "null"}],
+                        "default": None,
+                        "description": "Computed at read time, never stored: whether the store has moved on since computed_at_event_id. None when no read has labelled it yet.",
+                        "title": "Stale",
                     },
                     "verdict": {
                         "anyOf": [{"$ref": "#/$defs/SegmentVerdict"}, {"type": "null"}],
@@ -2133,6 +2145,12 @@ A strategy without its rejections is a conclusion, not a recommendation, so
                         "title": "Bets",
                         "type": "array",
                     },
+                    "computed_at_event_id": {
+                        "anyOf": [{"type": "integer"}, {"type": "null"}],
+                        "default": None,
+                        "description": "The store revision this strategy was derived from. None when it was derived before the field existed, which reads as unknown, not fresh.",
+                        "title": "Computed At Event Id",
+                    },
                     "created_at": {"format": "date-time", "title": "Created At", "type": "string"},
                     "id": {"title": "Id", "type": "string"},
                     "kind": {"$ref": "#/$defs/StrategyKind"},
@@ -2147,6 +2165,12 @@ A strategy without its rejections is a conclusion, not a recommendation, so
                         "default": None,
                         "description": "The segment this bet is aimed at",
                         "title": "Segment Id",
+                    },
+                    "stale": {
+                        "anyOf": [{"type": "boolean"}, {"type": "null"}],
+                        "default": None,
+                        "description": "Computed at read time, never stored: whether the store has moved on since computed_at_event_id. None when no read has labelled it yet.",
+                        "title": "Stale",
                     },
                     "thesis": {
                         "description": "One paragraph: why this path, from the evidence",

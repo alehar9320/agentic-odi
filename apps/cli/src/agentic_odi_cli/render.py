@@ -635,5 +635,4 @@ def render_funnel_summary(counts: Any, conversions: Any, *, as_json: bool) -> st
             for name, view in counts.items()
         ],
         empty="Nothing counted yet — this store has no funnel events.",
-
     )
