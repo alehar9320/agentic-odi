@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
 import {
+  formatAdvances,
   formatOpportunityScore,
   hasScore,
   isUnderserved,
@@ -802,6 +803,7 @@ function OpportunityTableView({
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Satisfaction</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Opp. Score</th>
             <th style={{ padding: "10px 14px", textAlign: "center" }}>Status</th>
+            <th style={{ padding: "10px 14px" }}>Advances</th>
           </tr>
         </thead>
         <tbody>
@@ -866,6 +868,9 @@ function OpportunityTableView({
                   >
                     {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : "Not scored"}
                   </span>
+                </td>
+                <td style={{ padding: "10px 14px", color: "var(--studio-muted)", fontSize: "0.82rem" }}>
+                  {formatAdvances(outcome)}
                 </td>
               </tr>
             );

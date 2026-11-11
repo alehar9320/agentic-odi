@@ -36,6 +36,15 @@ export interface ClaimCheck {
   verified?: boolean;
 }
 
+export interface OutcomeAlignment {
+  /** Which V2MOM list the objective lives in: "method" or "measure". */
+  field: string;
+  /** Frozen content key for the objective text, computed when the link was made. */
+  key: string;
+  /** The objective text as it read when the link was made. */
+  text: string;
+}
+
 export interface Outcome {
   id?: string;
   job_id?: string;
@@ -46,6 +55,8 @@ export interface Outcome {
   claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
+  /** The V2MOM methods and measures this outcome advances. Empty means the outcome is unlinked. */
+  trace?: OutcomeAlignment[];
   /** True while the write is queued locally and the sidecar has not acknowledged it. */
   pending?: boolean;
 }
