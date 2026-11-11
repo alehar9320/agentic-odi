@@ -255,6 +255,45 @@ Studio says so in one place and keeps going:
 The user's context is sent with every chat request, so the assistant starts from
 the product, audience, job, and problem rather than asking for them again.
 
+### One list of what this device can do
+
+The nine capabilities the Studio reports — local data, local memory, the
+deterministic assistant, the browser model, a configured endpoint, and the four
+sidecar rows — are described in one data-only catalog,
+`apps/studio/src/bff/capabilities/catalog.ts`. It imports nothing and touches no
+DOM, so Wrangler bundles the same module into the hosted Worker
+(`infra/cloudflare/worker.ts`). Adding an id in one host and not the other fails a
+test (`tests/test_worker_capability_catalog.py`), which is the point: a
+capability can no longer be added in the SPA alone.
+
+The catalog owns ids, labels, descriptions, and the group each belongs to
+(`local`, `model`, `sidecar`). It never decides availability. Each host probes
+and answers with one of three states:
+
+| State | Meaning | Rendered as |
+|---|---|---|
+| `available` | Ready now, on this device. | **available** |
+| `downloadable` | Present but not ready — the browser offers a model it has not downloaded. | **needs setup** |
+| `unavailable` | Not reachable, with a reason. | **unavailable** |
+
+`downloadable` is a setup state, not an available one. It never renders as
+available and never starts a session; `capabilityGate` blocks on anything that is
+not `available`, so a downloadable browser model cannot be mistaken for a working
+one.
+
+The browser model is probed through its real API. `browserModelProbe` in
+`apps/studio/src/bff/capabilities/browserModel.ts` resolves the modern
+`LanguageModel` global first, then the legacy `ai.languageModel`, and maps
+`availability()` values: `available`/`readily` become `available`;
+`downloadable`/`after-download`/`downloading` become `downloadable`; anything
+unknown, missing, or throwing becomes `unavailable` with a reason. A `navigator.gpu`
+without a model names WebGPU and claims no model, rather than inferring one.
+
+The sidecar is read through one `GET /api/capabilities` per status pass, not one
+probe per route: the four `sidecar-*` rows come from that manifest, and when it
+cannot be read all four are `unavailable` with **The local sidecar is not
+reachable.** The old `/api/connectors` and `/api/health/mcp` probes are gone.
+
 ### When the studio is not running
 
 The first minute of a first visit never depends on a local server being up, so

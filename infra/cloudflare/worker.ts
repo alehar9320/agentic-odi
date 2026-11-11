@@ -18,6 +18,8 @@
  * conversations, and the deterministic assistant from IndexedDB.
  */
 
+import { CAPABILITY_CATALOG } from "../../apps/studio/src/bff/capabilities/catalog";
+
 interface Env {
   ASSETS: Fetcher;
   /** Public origin of the sidecar, e.g. https://random.trycloudflare.com */
@@ -44,64 +46,19 @@ const API_PREFIX = "/api/";
  * Capabilities the Worker can guarantee without any sidecar: local-only data,
  * memory, and the deterministic assistant. Everything that needs a sidecar
  * (connectors, MCP, model proxy, import) is unavailable until one is reachable.
+ *
+ * The list is built from the shared `CAPABILITY_CATALOG`, which the SPA imports
+ * too, so an id, label, or description cannot drift between the two hosts. The
+ * Worker answers `available` for what it can do itself and `false` for the rest;
+ * it never claims a sidecar or a model it cannot reach.
  */
 const LOCAL_CAPABILITIES = {
-  capabilities: [
-    {
-      id: "local-data",
-      label: "Local canvas data",
-      description: "Jobs, steps, and outcomes stored in your browser.",
-      available: true,
-    },
-    {
-      id: "local-memory",
-      label: "Local memory and conversations",
-      description: "Observations, conversation history, and context stored locally.",
-      available: true,
-    },
-    {
-      id: "deterministic-assistant",
-      label: "Deterministic assistant",
-      description: "Answers about your canvas and updates it without a model.",
-      available: true,
-    },
-    {
-      id: "browser-model",
-      label: "Browser built-in model",
-      description: "Uses the browser's built-in large language model when present.",
-      available: false,
-    },
-    {
-      id: "endpoint-model",
-      label: "Configured model endpoint",
-      description: "Calls the model endpoint you configured in Settings directly.",
-      available: false,
-    },
-    {
-      id: "sidecar-llm",
-      label: "Sidecar model proxy",
-      description: "Streams model responses through the local Python sidecar.",
-      available: false,
-    },
-    {
-      id: "sidecar-connectors",
-      label: "Sidecar connectors",
-      description: "Adds third-party data sources through the sidecar.",
-      available: false,
-    },
-    {
-      id: "sidecar-mcp",
-      label: "Sidecar MCP",
-      description: "Runs MCP servers through the sidecar.",
-      available: false,
-    },
-    {
-      id: "sidecar-import",
-      label: "Sidecar import",
-      description: "Imports canvas data and memory from a reachable sidecar.",
-      available: false,
-    },
-  ],
+  capabilities: CAPABILITY_CATALOG.map((definition) => ({
+    id: definition.id,
+    label: definition.label,
+    description: definition.description,
+    available: definition.group === "local",
+  })),
 } satisfies Record<string, unknown>;
 
 /** Curated provider origins the browser may call directly in hosted mode. */

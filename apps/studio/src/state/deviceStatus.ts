@@ -1,14 +1,17 @@
 import { useMemo } from "react";
 
 import type { Capability, CapabilityId } from "../bff/capabilities/registry";
+import { CAPABILITY_CATALOG, type CapabilityGroup } from "../bff/capabilities/catalog";
 import { useStudio } from "./StudioContext";
 
 /**
  * What a capability group can say about this device. `unknown` is the state
  * before the first probe resolves: it is deliberately distinct from `absent`,
- * because an empty list is not evidence that anything is missing.
+ * because an empty list is not evidence that anything is missing. `setup` means
+ * a capability exists but is not ready — the browser can download its model, so
+ * the group is neither ready nor absent.
  */
-export type Presence = "ready" | "absent" | "unknown";
+export type Presence = "ready" | "setup" | "absent" | "unknown";
 
 export interface DeviceStatus {
   local: Presence;
@@ -17,9 +20,15 @@ export interface DeviceStatus {
   checkedAt: string | null;
 }
 
-const LOCAL_IDS: CapabilityId[] = ["local-data", "local-memory"];
-const MODEL_IDS: CapabilityId[] = ["endpoint-model", "browser-model", "sidecar-llm"];
-const SIDECAR_IDS: CapabilityId[] = ["sidecar-connectors", "sidecar-mcp", "sidecar-import"];
+function idsInGroup(group: CapabilityGroup): CapabilityId[] {
+  return CAPABILITY_CATALOG.filter((definition) => definition.group === group).map(
+    (definition) => definition.id,
+  );
+}
+
+const LOCAL_IDS = idsInGroup("local");
+const MODEL_IDS = idsInGroup("model");
+const SIDECAR_IDS = idsInGroup("sidecar");
 
 function statusOf(capabilities: Capability[], id: CapabilityId): Capability | undefined {
   return capabilities.find((capability) => capability.id === id);
@@ -42,7 +51,11 @@ function presenceFor(
     if (present.length < ids.length) return "unknown";
     return available.length === ids.length ? "ready" : "absent";
   }
-  return available.length > 0 ? "ready" : "absent";
+  if (available.length > 0) return "ready";
+  // A group with nothing available but something downloadable is a setup state,
+  // not an absence: the person can make it work.
+  if (present.some((capability) => capability.status === "downloadable")) return "setup";
+  return "absent";
 }
 
 /** Derive one answer for what works here from the probed capability list. */
@@ -77,7 +90,8 @@ export function capabilityGate(
   }
   for (const id of requires) {
     const capability = statusOf(capabilities, id);
-    if (capability?.status === "unavailable") {
+    // `downloadable` is not `available`: it must never create a session.
+    if (capability && capability.status !== "available") {
       return {
         allowed: false,
         blockedBy: id,

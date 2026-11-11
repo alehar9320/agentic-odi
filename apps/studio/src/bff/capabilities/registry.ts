@@ -6,23 +6,23 @@ import {
   isPrivateHost,
 } from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
+import { browserModelProbe } from "./browserModel";
+import {
+  CAPABILITY_CATALOG,
+  definitionFor,
+  type CapabilityId,
+  type CapabilityStatus,
+} from "./catalog";
 
-export type CapabilityId =
-  | "local-data"
-  | "local-memory"
-  | "deterministic-assistant"
-  | "browser-model"
-  | "endpoint-model"
-  | "sidecar-llm"
-  | "sidecar-connectors"
-  | "sidecar-mcp"
-  | "sidecar-import";
+// The catalog owns the ids, labels, and descriptions; re-exporting the id type
+// keeps existing imports working without churning every call site.
+export type { CapabilityId } from "./catalog";
 
 export interface Capability {
   id: CapabilityId;
   label: string;
   description: string;
-  status: "available" | "unavailable";
+  status: CapabilityStatus;
   reason?: string;
 }
 
@@ -30,95 +30,37 @@ export interface CapabilityProbe {
   id: CapabilityId;
   label: string;
   description: string;
-  check(settings: StudioConfig): Promise<{ ok: boolean; reason?: string }>;
+  check(settings: StudioConfig): Promise<{ ok: boolean; status?: CapabilityStatus; reason?: string }>;
 }
 
-const localStatuses: Record<CapabilityId, Capability> = {
-  "local-data": {
-    id: "local-data",
-    label: "Local canvas data",
-    description: "Jobs, steps, and outcomes stored in your browser.",
-    status: "available",
-  },
-  "local-memory": {
-    id: "local-memory",
-    label: "Local memory and conversations",
-    description: "Observations, conversation history, and context stored locally.",
-    status: "available",
-  },
-  "deterministic-assistant": {
-    id: "deterministic-assistant",
-    label: "Deterministic assistant",
-    description: "Answers about your canvas and updates it without a model.",
-    status: "available",
-  },
-  "browser-model": {
-    id: "browser-model",
-    label: "Browser built-in model",
-    description: "Uses the browser's built-in large language model when present.",
-    status: "unavailable",
-  },
-  "endpoint-model": {
-    id: "endpoint-model",
-    label: "Configured model endpoint",
-    description: "Calls the model endpoint you configured in Settings directly.",
-    status: "unavailable",
-  },
-  "sidecar-llm": {
-    id: "sidecar-llm",
-    label: "Sidecar model proxy",
-    description: "Streams model responses through the local Python sidecar.",
-    status: "unavailable",
-  },
-  "sidecar-connectors": {
-    id: "sidecar-connectors",
-    label: "Sidecar connectors",
-    description: "Adds third-party data sources through the sidecar.",
-    status: "unavailable",
-  },
-  "sidecar-mcp": {
-    id: "sidecar-mcp",
-    label: "Sidecar MCP",
-    description: "Runs MCP servers through the sidecar.",
-    status: "unavailable",
-  },
-  "sidecar-import": {
-    id: "sidecar-import",
-    label: "Sidecar import",
-    description: "Imports canvas data and memory from a reachable sidecar.",
-    status: "unavailable",
-  },
-};
+const SIDECAR_UNREACHABLE_REASON = "The local sidecar is not reachable.";
 
-function isBrowserModelAvailable(): boolean {
-  const ai = (globalThis as { ai?: { languageModel?: unknown } }).ai;
-  return Boolean(ai && typeof ai.languageModel === "function");
-}
-
-/** Probe a same-origin sidecar route. In the browser this is the Worker
- * origin; in Tauri it is the local sidecar at 127.0.0.1:8100. When
- * `capabilityId` is given the route is expected to return a capabilities
- * manifest and the probe only succeeds if that capability is advertised
- * as available. This keeps the Worker's local-only manifest (which marks
- * sidecar capabilities unavailable) from being mistaken for a real sidecar. */
-async function probeSidecar(path: string, capabilityId?: CapabilityId): Promise<boolean> {
+/** One `GET /api/capabilities` for the whole sidecar group, not one probe per
+ * route. In the browser this is the Worker origin; in Tauri it is the local
+ * sidecar at 127.0.0.1:8100. `null` means the manifest could not be read, so
+ * every sidecar row is unavailable rather than guessed. */
+async function fetchSidecarManifest(): Promise<Map<string, { available: boolean; reason?: string }> | null> {
   try {
-    const response = await fetch(apiUrl(path), {
+    const response = await fetch(apiUrl("/api/capabilities"), {
       headers: authHeaders(),
       signal: AbortSignal.timeout(2000),
     });
     if (!response.ok) {
-      return false;
+      return null;
     }
-    if (!capabilityId) {
-      return true;
+    const body = (await response.json()) as {
+      capabilities?: Array<{ id: string; available?: boolean; reason?: string }>;
+    };
+    const manifest = new Map<string, { available: boolean; reason?: string }>();
+    for (const item of body.capabilities ?? []) {
+      manifest.set(item.id, {
+        available: item.available === true,
+        ...(item.reason ? { reason: item.reason } : {}),
+      });
     }
-    const body = (await response.json()) as { capabilities?: Array<{ id: string; available?: boolean }> };
-    return body.capabilities?.some(
-      (capability) => capability.id === capabilityId && capability.available === true,
-    ) ?? false;
+    return manifest;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -126,14 +68,22 @@ export class CapabilityRegistry {
   private readonly probes: CapabilityProbe[] = [
     {
       id: "browser-model",
-      label: localStatuses["browser-model"].label,
-      description: localStatuses["browser-model"].description,
-      check: async () => ({ ok: isBrowserModelAvailable() }),
+      label: definitionFor("browser-model").label,
+      description: definitionFor("browser-model").description,
+      check: async () => {
+        const probe = browserModelProbe();
+        const result = await probe.availability();
+        return {
+          ok: result.status === "available",
+          status: result.status,
+          ...(result.reason ? { reason: result.reason } : {}),
+        };
+      },
     },
     {
       id: "endpoint-model",
-      label: localStatuses["endpoint-model"].label,
-      description: localStatuses["endpoint-model"].description,
+      label: definitionFor("endpoint-model").label,
+      description: definitionFor("endpoint-model").description,
       check: async (settings) => {
         if (!isEndpointConfiguredForSettings(settings)) {
           return { ok: false };
@@ -157,58 +107,67 @@ export class CapabilityRegistry {
         return { ok: true };
       },
     },
-    {
-      id: "sidecar-llm",
-      label: localStatuses["sidecar-llm"].label,
-      description: localStatuses["sidecar-llm"].description,
-      check: async () => ({ ok: await probeSidecar("/api/capabilities", "sidecar-llm") }),
-    },
-    {
-      id: "sidecar-connectors",
-      label: localStatuses["sidecar-connectors"].label,
-      description: localStatuses["sidecar-connectors"].description,
-      check: async () => ({ ok: await probeSidecar("/api/connectors") }),
-    },
-    {
-      id: "sidecar-mcp",
-      label: localStatuses["sidecar-mcp"].label,
-      description: localStatuses["sidecar-mcp"].description,
-      check: async () => ({ ok: await probeSidecar("/api/health/mcp") }),
-    },
-    {
-      id: "sidecar-import",
-      label: localStatuses["sidecar-import"].label,
-      description: localStatuses["sidecar-import"].description,
-      check: async () => ({ ok: await probeSidecar("/api/capabilities", "sidecar-import") }),
-    },
   ];
 
   async statuses(settings: StudioConfig): Promise<Capability[]> {
-    const results = await Promise.all(
-      this.probes.map(async (probe) => {
-        let ok: boolean;
-        let reason: string | undefined;
-        try {
-          const result = await probe.check(settings);
-          ok = result.ok;
-          reason = result.reason;
-        } catch (error) {
-          ok = false;
-          reason = error instanceof Error ? error.message : "Probe failed.";
+    const [probeResults, manifest] = await Promise.all([
+      Promise.all(
+        this.probes.map(async (probe) => {
+          let status: CapabilityStatus;
+          let reason: string | undefined;
+          try {
+            const result = await probe.check(settings);
+            status = result.status ?? (result.ok ? "available" : "unavailable");
+            reason = result.reason;
+          } catch (error) {
+            status = "unavailable";
+            reason = error instanceof Error ? error.message : "Probe failed.";
+          }
+          return {
+            id: probe.id,
+            label: probe.label,
+            description: probe.description,
+            status,
+            ...(reason ? { reason } : {}),
+          } satisfies Capability;
+        }),
+      ),
+      fetchSidecarManifest(),
+    ]);
+
+    const byId = new Map<CapabilityId, Capability>(probeResults.map((result) => [result.id, result]));
+
+    // Every row takes its label and description from the catalog, so a change to
+    // the catalog moves the Worker and the SPA together. The catalog's `group`
+    // is the device-status grouping (which is why `sidecar-llm` sits in `model`);
+    // the status *source* is the id: the four `sidecar-*` rows come from the one
+    // manifest fetch, the two model probes answer for themselves, and the local
+    // rows are always available. No id list is kept beside the catalog.
+    return CAPABILITY_CATALOG.map((definition): Capability => {
+      const probed = byId.get(definition.id);
+      if (probed) {
+        return probed;
+      }
+      if (definition.id.startsWith("sidecar-")) {
+        const entry = manifest?.get(definition.id);
+        if (!entry || !entry.available) {
+          return {
+            ...definition,
+            status: "unavailable",
+            reason: entry?.reason ?? SIDECAR_UNREACHABLE_REASON,
+          };
         }
-        return {
-          ...localStatuses[probe.id],
-          status: (ok ? "available" : "unavailable") as Capability["status"],
-          ...(ok ? {} : { reason }),
-        };
-      }),
-    );
-    return [
-      localStatuses["local-data"],
-      localStatuses["local-memory"],
-      localStatuses["deterministic-assistant"],
-      ...results,
-    ];
+        return { ...definition, status: "available" };
+      }
+      if (definition.group === "local") {
+        return { ...definition, status: "available" };
+      }
+      return {
+        ...definition,
+        status: "unavailable",
+        reason: "No probe reports this capability yet.",
+      };
+    });
   }
 }
 

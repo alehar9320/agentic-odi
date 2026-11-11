@@ -287,6 +287,29 @@ describe("SettingsPanel capabilities", () => {
     expect(llmRow).toBeInTheDocument();
     expect(llmRow).toHaveTextContent(/unavailable/);
   });
+
+  it("renders a downloadable capability as needs setup, never available", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        capabilities: [
+          {
+            id: "browser-model",
+            label: "Browser built-in model",
+            description: "Uses the browser's built-in large language model when present.",
+            status: "downloadable",
+            reason: "The browser can download this model. It is not ready yet.",
+          },
+        ],
+      }),
+    );
+
+    renderPanel();
+
+    const row = screen.getByText(/browser built-in model/i).closest("li");
+    expect(row).toBeInTheDocument();
+    expect(row).toHaveTextContent("needs setup");
+    expect(row).not.toHaveTextContent(/\bavailable\b/);
+  });
 });
 
 describe("SettingsPanel about section", () => {
