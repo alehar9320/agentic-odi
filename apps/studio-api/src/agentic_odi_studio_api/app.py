@@ -35,6 +35,7 @@ from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.memory import StudioMemory
 from agentic_odi_studio_api.studio.paths import issue_token
 from agentic_odi_studio_api.studio.router import router as studio_router
+from agentic_odi_studio_api.studio.settings import StudioSettings
 from agentic_odi_studio_api.studio.sharing import ShareService
 
 CORS_ORIGINS = [
@@ -133,8 +134,10 @@ def create_app(
     connectors: ConnectorService | None = None,
     memory: StudioMemory | None = None,
     marketplace: StudioMarketplace | None = None,
+    settings: StudioSettings | None = None,
     sharing: ShareService | None = None,
 ) -> FastAPI:
+    owns_store = repo is None
     # A damaged file must not reach the person as a traceback. The store is
     # gated on open; when it fails, the app still starts and answers with the
     # failure page until the file is restored. The file itself is never touched.
@@ -152,7 +155,7 @@ def create_app(
 
     if memory is None:
         try:
-            memory = StudioMemory()
+            memory = StudioMemory(import_legacy=owns_store)
         except StoreCorrupt as exc:
             # The conversation history is a second database. Damage there is
             # reported the same way; the process keeps running on an empty,
@@ -208,7 +211,13 @@ def create_app(
     resolved_marketplace = marketplace or StudioMarketplace()
     app.state.marketplace = resolved_marketplace
     app.state.connectors = connectors or ConnectorService(marketplace=resolved_marketplace)
+    # ``memory`` may be an *empty* store, so test for None rather than truth.
+    # The conversation history is its own database; handing it the intent store's
+    # repository would put both in one file.
     app.state.memory = resolved_memory
+    app.state.settings = settings or StudioSettings()
+    # Sharing is a read-only window on one artifact; the service owns the store
+    # the tokens are written to.
     app.state.sharing = sharing or ShareService(service, resolved_memory)
     app.state.approvals = approvals
     app.state.studio_token = issue_token()

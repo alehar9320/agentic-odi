@@ -14,10 +14,15 @@ from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    BRIEF_ID,
     V2MOM,
+    Brief,
+    Conversation,
     CustomerOutcome,
     Evidence,
     Job,
+    Message,
+    Observation,
     Outcome,
     ScheduledWork,
     Segment,
@@ -87,6 +92,11 @@ class SQLiteRepository(Repository):
         self.strategies: dict[str, Strategy] = {}
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
+        self.conversations: dict[str, Conversation] = {}
+        self.messages: dict[str, Message] = {}
+        self.observations: dict[str, Observation] = {}
+        #: A workspace holds one brief, keyed by the fixed name the model declares.
+        self.brief: dict[str, Brief] = {}
         self._last_event_id = 0
         self._last_input_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
@@ -204,6 +214,28 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.proposals, p, OutcomeProposal)
         elif et == "V2MOM_UPDATED":
             self.v2mom[V2MOM_ID] = V2MOM.model_validate(p)
+        elif et == "CONVERSATION_CREATED":
+            self.conversations[p["id"]] = Conversation.model_validate(p)
+        elif et == "CONVERSATION_UPDATED":
+            self._merge_updates(self.conversations, p, Conversation)
+        elif et == "CONVERSATION_DELETED":
+            self.conversations.pop(p["id"], None)
+            for message_id in [
+                message.id
+                for message in self.messages.values()
+                if message.conversation_id == p["id"]
+            ]:
+                self.messages.pop(message_id, None)
+        elif et == "MESSAGE_CREATED":
+            self.messages[p["id"]] = Message.model_validate(p)
+        elif et == "BRIEF_SAVED":
+            self.brief[BRIEF_ID] = Brief.model_validate(p)
+        elif et == "OBSERVATION_CREATED":
+            self.observations[p["id"]] = Observation.model_validate(p)
+        elif et == "OBSERVATION_UPDATED":
+            self._merge_updates(self.observations, p, Observation)
+        elif et == "OBSERVATION_DELETED":
+            self.observations.pop(p["id"], None)
         elif et == "STUDY_CREATED":
             self.studies[p["id"]] = Study.model_validate(p)
         elif et == "STUDY_UPDATED":
@@ -788,6 +820,183 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return new_segment
+
+
+    def add_conversation(self, conversation: Conversation) -> Conversation:
+        with self._lock:
+            scoped = conversation.model_copy(
+                update={"workspace_id": self._workspace_id, "device_id": self._device_id}
+            )
+            self.store.append(
+                "CONVERSATION_CREATED",
+                scoped.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return scoped
+
+    def get_conversation(self, conversation_id: str) -> Conversation | None:
+        with self._lock:
+            self._sync()
+            return self.conversations.get(conversation_id)
+
+    def list_conversations(
+        self, limit: int | None = None, offset: int = 0
+    ) -> list[Conversation]:
+        with self._lock:
+            self._sync()
+            items = sorted(
+                self.conversations.values(), key=lambda item: item.updated_at, reverse=True
+            )
+            return page(items, limit, offset)
+
+    def update_conversation(self, conversation_id: str, updates: dict) -> Conversation | None:
+        with self._lock:
+            self._sync()
+            conversation = self.conversations.get(conversation_id)
+            if conversation is None:
+                return None
+            current = conversation.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                Conversation.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "CONVERSATION_UPDATED",
+                {"id": conversation_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return self.conversations.get(conversation_id)
+
+    def delete_conversation(self, conversation_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if conversation_id not in self.conversations:
+                return False
+            self.store.append(
+                "CONVERSATION_DELETED",
+                {"id": conversation_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
+
+    def add_message(self, message: Message) -> Message:
+        with self._lock:
+            scoped = message.model_copy(update={"workspace_id": self._workspace_id})
+            self.store.append(
+                "MESSAGE_CREATED",
+                scoped.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return scoped
+
+    def list_messages(
+        self, conversation_id: str, limit: int | None = None, before: str | None = None
+    ) -> list[Message]:
+        with self._lock:
+            self._sync()
+            items = [
+                message
+                for message in self.messages.values()
+                if message.conversation_id == conversation_id
+            ]
+            if before is not None:
+                ids = [message.id for message in items]
+                if before in ids:
+                    items = items[: ids.index(before)]
+            if limit is not None:
+                items = items[-limit:]
+            return items
+
+    def save_brief(self, brief: Brief) -> Brief:
+        with self._lock:
+            self.store.append(
+                "BRIEF_SAVED",
+                brief.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return brief
+
+    def get_brief(self) -> Brief | None:
+        with self._lock:
+            self._sync()
+            return self.brief.get(BRIEF_ID)
+
+    def add_observation(self, observation: Observation) -> Observation:
+        with self._lock:
+            scoped = observation.model_copy(update={"workspace_id": self._workspace_id})
+            self.store.append(
+                "OBSERVATION_CREATED",
+                scoped.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return scoped
+
+    def get_observation(self, observation_id: str) -> Observation | None:
+        with self._lock:
+            self._sync()
+            return self.observations.get(observation_id)
+
+    def list_observations(
+        self, status: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Observation]:
+        with self._lock:
+            self._sync()
+            items = sorted(
+                self.observations.values(),
+                key=lambda item: item.created_at,
+                reverse=True,
+            )
+            if status is not None:
+                items = [item for item in items if item.status == status]
+            return page(items, limit, offset)
+
+    def update_observation(self, observation_id: str, updates: dict) -> Observation | None:
+        with self._lock:
+            self._sync()
+            observation = self.observations.get(observation_id)
+            if observation is None:
+                return None
+            current = observation.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                Observation.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "OBSERVATION_UPDATED",
+                {"id": observation_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return self.observations.get(observation_id)
+
+    def delete_observation(self, observation_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if observation_id not in self.observations:
+                return False
+            self.store.append(
+                "OBSERVATION_DELETED",
+                {"id": observation_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
 
     def add_study(self, study: Study) -> Study:
         with self._lock:

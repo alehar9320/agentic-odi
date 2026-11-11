@@ -9,10 +9,15 @@ from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    BRIEF_ID,
     V2MOM,
+    Brief,
+    Conversation,
     CustomerOutcome,
     Evidence,
     Job,
+    Message,
+    Observation,
     Outcome,
     ScheduledWork,
     Segment,
@@ -219,6 +224,27 @@ class Repository(Protocol):
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM: ...
     def get_v2mom(self) -> V2MOM | None: ...
 
+    def add_conversation(self, conversation: Conversation) -> Conversation: ...
+    def get_conversation(self, conversation_id: str) -> Conversation | None: ...
+    def list_conversations(
+        self, limit: int | None = None, offset: int = 0
+    ) -> list[Conversation]: ...
+    def update_conversation(self, conversation_id: str, updates: dict) -> Conversation | None: ...
+    def delete_conversation(self, conversation_id: str) -> bool: ...
+    def add_message(self, message: Message) -> Message: ...
+    def list_messages(
+        self, conversation_id: str, limit: int | None = None, before: str | None = None
+    ) -> list[Message]: ...
+    def save_brief(self, brief: Brief) -> Brief: ...
+    def get_brief(self) -> Brief | None: ...
+    def add_observation(self, observation: Observation) -> Observation: ...
+    def get_observation(self, observation_id: str) -> Observation | None: ...
+    def list_observations(
+        self, status: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Observation]: ...
+    def update_observation(self, observation_id: str, updates: dict) -> Observation | None: ...
+    def delete_observation(self, observation_id: str) -> bool: ...
+
     def last_event_id(self) -> int: ...
 
     def last_input_event_id(self) -> int: ...
@@ -249,6 +275,11 @@ class InMemoryRepository:
         #: generated id because a workspace has exactly one V2MOM.
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
+        self.conversations: dict[str, Conversation] = {}
+        self.messages: dict[str, Message] = {}
+        self.observations: dict[str, Observation] = {}
+        #: A workspace holds one brief, keyed by the fixed name the model declares.
+        self.brief: dict[str, Brief] = {}
         self._last_event_id = 0
         self._last_input_event_id = 0
 
@@ -654,6 +685,110 @@ class InMemoryRepository:
         new_segment = segment.model_validate(current)
         self.segments[segment_id] = new_segment
         return new_segment
+
+
+    def add_conversation(self, conversation: Conversation) -> Conversation:
+        self._append_event()
+        self.conversations[conversation.id] = conversation
+        return conversation
+
+    def get_conversation(self, conversation_id: str) -> Conversation | None:
+        return self.conversations.get(conversation_id)
+
+    def list_conversations(
+        self, limit: int | None = None, offset: int = 0
+    ) -> list[Conversation]:
+        items = sorted(
+            self.conversations.values(), key=lambda item: item.updated_at, reverse=True
+        )
+        return page(items, limit, offset)
+
+    def update_conversation(self, conversation_id: str, updates: dict) -> Conversation | None:
+        conversation = self.conversations.get(conversation_id)
+        if conversation is None:
+            return None
+        self._append_event()
+        current = conversation.model_dump()
+        current.update(updates)
+        self.conversations[conversation_id] = Conversation.model_validate(current)
+        return self.conversations[conversation_id]
+
+    def delete_conversation(self, conversation_id: str) -> bool:
+        if conversation_id not in self.conversations:
+            return False
+        self._append_event()
+        del self.conversations[conversation_id]
+        for message_id in [
+            message.id
+            for message in self.messages.values()
+            if message.conversation_id == conversation_id
+        ]:
+            del self.messages[message_id]
+        return True
+
+    def add_message(self, message: Message) -> Message:
+        self._append_event()
+        self.messages[message.id] = message
+        return message
+
+    def list_messages(
+        self, conversation_id: str, limit: int | None = None, before: str | None = None
+    ) -> list[Message]:
+        items = [
+            message
+            for message in self.messages.values()
+            if message.conversation_id == conversation_id
+        ]
+        if before is not None:
+            ids = [message.id for message in items]
+            if before in ids:
+                items = items[: ids.index(before)]
+        if limit is not None:
+            items = items[-limit:]
+        return items
+
+    def save_brief(self, brief: Brief) -> Brief:
+        self._append_event()
+        self.brief[BRIEF_ID] = brief
+        return brief
+
+    def get_brief(self) -> Brief | None:
+        return self.brief.get(BRIEF_ID)
+
+    def add_observation(self, observation: Observation) -> Observation:
+        self._append_event()
+        self.observations[observation.id] = observation
+        return observation
+
+    def get_observation(self, observation_id: str) -> Observation | None:
+        return self.observations.get(observation_id)
+
+    def list_observations(
+        self, status: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[Observation]:
+        items = sorted(
+            self.observations.values(), key=lambda item: item.created_at, reverse=True
+        )
+        if status is not None:
+            items = [item for item in items if item.status == status]
+        return page(items, limit, offset)
+
+    def update_observation(self, observation_id: str, updates: dict) -> Observation | None:
+        observation = self.observations.get(observation_id)
+        if observation is None:
+            return None
+        self._append_event()
+        current = observation.model_dump()
+        current.update(updates)
+        self.observations[observation_id] = Observation.model_validate(current)
+        return self.observations[observation_id]
+
+    def delete_observation(self, observation_id: str) -> bool:
+        if observation_id not in self.observations:
+            return False
+        self._append_event()
+        del self.observations[observation_id]
+        return True
 
     def add_study(self, study: Study) -> Study:
         self._append_event()

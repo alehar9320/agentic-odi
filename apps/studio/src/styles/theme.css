@@ -7327,3 +7327,10 @@ textarea,
 [contenteditable="true"] {
   caret-color: var(--accent);
 }
+
+.memory-item__source {
+  color: var(--faint);
+  font-size: 0.76rem;
+  font-style: italic;
+  margin: 0 0 4px;
+}

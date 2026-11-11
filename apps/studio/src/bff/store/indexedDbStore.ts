@@ -284,9 +284,11 @@ export class IndexedDbLocalStore implements LocalStore {
     return this.db.countFromIndex("turns", "by-conversation", conversationId);
   }
 
-  async appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn> {
+  async appendTurn(
+    turn: Omit<StoredTurn, "id"> & { id?: string },
+  ): Promise<StoredTurn> {
     const id = await this.db.add("turns", turn as StoredTurn);
-    return { ...turn, id: Number(id) };
+    return { ...turn, id: turn.id ?? String(id) };
   }
 
   async conversationTree(conversationId: string): Promise<{

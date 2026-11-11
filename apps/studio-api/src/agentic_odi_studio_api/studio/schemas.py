@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
 from agentic_odi_core.models import JobStage
+from agentic_odi_core.models import ObservationCategory as CoreObservationCategory
+from agentic_odi_core.models import ObservationStatus as CoreObservationStatus
 from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
@@ -330,7 +332,8 @@ class ObservationResponse(BaseModel):
 
 
 class ObservationCreateRequest(BaseModel):
-    kind: ObservationKind
+    kind: ObservationKind | None = None
+    category: str | None = None
     text: str = Field(min_length=1, max_length=2000)
     data: dict[str, Any] | None = None
     confidence: float = Field(default=0.6, ge=0, le=1)
@@ -553,3 +556,31 @@ class SharedArtifactResponse(BaseModel):
     artifact_kind: str
     artifact: dict[str, Any]
     evidence: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SettingsUpdateRequest(BaseModel):
+    """A partial edit of the sidecar's own settings; an omitted key is kept."""
+
+    base_url: str | None = None
+    model: str | None = None
+    mcp_url: str | None = None
+    api_key: str | None = None
+
+
+class StoreObservationCreateRequest(BaseModel):
+    """A fact the studio proposes about the person, in the store's vocabulary."""
+
+    category: CoreObservationCategory = "other"
+    text: str = Field(min_length=1, max_length=300)
+    confidence: float = Field(default=0.5, ge=0, le=1)
+    confirmed: bool = False
+    conversation_id: str | None = None
+    source_message_id: str | None = None
+    data: dict[str, Any] | None = None
+
+
+class StoreObservationUpdateRequest(BaseModel):
+    text: str | None = None
+    status: CoreObservationStatus | None = None
+    data: dict[str, Any] | None = None
+    confidence: float | None = Field(default=None, ge=0, le=1)
