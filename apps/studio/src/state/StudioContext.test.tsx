@@ -965,6 +965,47 @@ describe("StudioContext first run in a browser with no server", () => {
     expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
   });
 
+  it("surfaces a real application error instead of falling back", async () => {
+    // A 401 from the sidecar is an application error, not a transport failure:
+    // the local assistant must not answer for it.
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/chat") {
+        chatAttempts += 1;
+        return new Response(
+          JSON.stringify({ error: { code: "unauthorized", message: "Bad token.", retryable: false } }),
+          { status: 401, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return route(input, init);
+    });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.sendMessage("what should I work on first?");
+    });
+
+    // The error surfaces on the assistant message; no local-served marker.
+    await waitFor(() => {
+      const last = result.current.messages.at(-1);
+      expect(last?.role).toBe("assistant");
+      expect(last?.error).toBeDefined();
+    });
+    const last = result.current.messages.at(-1);
+    expect(last?.error).toBeDefined();
+    expect(result.current.offlineReplyFor).toBeNull();
+    // Only one attempt at /api/chat — no fall-through to the browser BFF.
+    expect(chatAttempts).toBe(1);
+  });
+
   it("calls nothing broken until the person asks", async () => {
     vi.useFakeTimers();
     const { result } = renderHook(
