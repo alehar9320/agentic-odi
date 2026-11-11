@@ -44,7 +44,7 @@ function validateScore(value: number | null | undefined, label: string): number 
     return null;
   }
   if (!Number.isFinite(value) || value < 1 || value > 10) {
-    throw validation(`${label} must be between 1 and 10.`, label.toLowerCase());
+    throw validation(`${label} must be between 1 and 10.`);
   }
   return value;
 }

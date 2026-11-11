@@ -14,6 +14,7 @@ from typing import Any
 import typer
 
 from agentic_odi_cli import context, paths, update, version
+from agentic_odi_cli.alternatives import alternatives_app
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
@@ -31,6 +32,8 @@ from agentic_odi_cli.signals import signals_app
 from agentic_odi_cli.steps import steps_app
 from agentic_odi_cli.strategy import strategy_app
 from agentic_odi_cli.studies import studies_app
+from agentic_odi_cli.survey import survey_app
+from agentic_odi_cli.top import register as register_top
 from agentic_odi_cli.version import __version__  # noqa: F401  (re-exported for tests)
 
 app = typer.Typer(
@@ -45,8 +48,10 @@ app.add_typer(
 )
 app.add_typer(steps_app, name="steps", help="Manage Job-map Steps.")
 app.add_typer(desired_outcomes_app, name="desired-outcomes", help="Manage desired Outcomes.")
+app.add_typer(survey_app, name="survey", help="Import survey responses as measured scores.")
 app.add_typer(evidence_app, name="evidence", help="Manage evidence captured from connectors.")
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
+app.add_typer(alternatives_app, name="alternatives", help="Record what customers use today.")
 app.add_typer(
     signals_app,
     name="signals",
@@ -312,6 +317,7 @@ def capabilities_cmd(
         typer.echo(capability_summary())
 
 
+register_top(app)
 app.add_typer(capabilities_app, name="capabilities")
 app.add_typer(settings_app, name="settings")
 app.add_typer(profile_app, name="profile")
@@ -610,47 +616,6 @@ def update_cmd(
     typer.echo(f"Updated to v{target}")
     if now:
         _reexec_current()
-
-
-@app.command("backup")
-def backup_cmd(
-    db_path: str | None = typer.Option(  # noqa: B008
-        None, "--db", help="Database to snapshot (default: the local store)."
-    ),
-) -> None:
-    """Write a verified snapshot of the local database."""
-    from agentic_odi_core.recovery import backup_database
-
-    path = db_path or context.config().db_path or _default_db_path()
-    try:
-        out = backup_database(path)
-    except (OSError, RuntimeError) as exc:
-        typer.echo(f"Backup failed: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
-    typer.echo(f"Backup written: {out}")
-
-
-@app.command("restore")
-def restore_cmd(
-    backup_file: str = typer.Argument(..., help="Snapshot to restore from."),
-    db_path: str | None = typer.Option(  # noqa: B008
-        None, "--db", help="Database to replace (default: the local store)."
-    ),
-) -> None:
-    """Restore a verified backup, keeping the current file as .pre-restore."""
-    from agentic_odi_core.recovery import restore_database
-
-    path = db_path or context.config().db_path or _default_db_path()
-    try:
-        safety = restore_database(backup_file, path)
-    except (OSError, ValueError) as exc:
-        typer.echo(f"Restore failed: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
-    typer.echo(f"Restored. Previous file kept as {safety}")
-
-
-def _default_db_path() -> str:
-    return os.path.expanduser("~/.agentic-odi/odi.db")
 
 
 if __name__ == "__main__":
