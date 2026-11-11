@@ -198,6 +198,30 @@ Studio says so in one place and keeps going:
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
   all.
+
+### What works here
+
+One quiet pill in the bar answers the question the failure banners used to make
+the person ask: *is this tab going to keep working?* It says **What works
+here** and nothing else — the answer lives in the popover it opens, and the label
+never changes with state, so the control is always the same gesture.
+
+The popover lists every capability the registry models, one row each, with a
+single word: **Works here** for the local canvas, memory, and deterministic
+assistant; **Needs the local service** for the sidecar's connectors, MCP, and
+import; **Needs a model** for the configured endpoint, the browser's built-in,
+and the sidecar proxy; and **Unknown — not checked yet** for anything a probe
+has not settled. A probe that ran and failed is also unknown — the honest
+answer is *we checked and do not know*, not *works here*. Each row carries the
+description from `apps/studio/src/bff/capabilities/registry.ts` and the reason
+the probe gave when it had one. The wording is one exported function,
+`describeCapabilities`, so the bar, the popover, and any future surface cannot
+drift into a second vocabulary.
+
+The footer offers **Start the local service** when a sidecar probe failed,
+**Recheck** when one is running, and **Open Settings** either way. The popover
+is a dialog: it traps Tab, closes on Escape, returns focus to the pill, and its
+title is announced once. There is no motion, so reduced motion changes nothing.
 - The outbox is shared by every tab in the origin, so two tabs would otherwise
   drain it and send each record twice. `apps/studio/src/bff/outbox.ts` takes a
   drain guard for the length of a run: `navigator.locks` where the browser has

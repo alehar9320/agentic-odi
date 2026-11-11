@@ -15,6 +15,8 @@ import type { UpdateSnapshot } from "../../updater/types";
 import { StudioBar } from "./StudioBar";
 
 const stubContext = (overrides: Record<string, unknown> = {}) => ({
+  capabilities: [],
+  capabilitiesCheckedAt: null,
   conversationId: null,
   conversations: [],
   llmHealth: { healthy: true, message: "ok" },
@@ -730,5 +732,87 @@ describe("history is grouped by day (#694 D13)", () => {
     expect(screen.getByRole("group", { name: "Today" })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Yesterday" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Earlier" })).toBeNull();
+  });
+});
+
+describe("StudioBar what works here (#509)", () => {
+  it("offers one quiet control that names the question, not the answer", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        capabilities: [
+          {
+            id: "local-data",
+            label: "Local canvas data",
+            description: "Jobs, steps, and outcomes stored in your browser.",
+            status: "available",
+          },
+          {
+            id: "sidecar-mcp",
+            label: "Sidecar MCP",
+            description: "Runs MCP servers through the sidecar.",
+            status: "unavailable",
+          },
+        ],
+        capabilitiesCheckedAt: "2026-11-11T00:00:00.000Z",
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    const control = screen.getByRole("button", { name: "What works here" });
+    expect(control).toHaveAttribute("aria-haspopup", "dialog");
+    expect(control).toHaveAttribute("aria-expanded", "false");
+    // The label does not change with state: the answer lives in the popover.
+    expect(control.textContent).toContain("What works here");
+  });
+
+  it("opens the capability popover and closes on Escape", () => {
+    const openPanel = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        capabilities: [
+          {
+            id: "local-data",
+            label: "Local canvas data",
+            description: "Jobs, steps, and outcomes stored in your browser.",
+            status: "available",
+          },
+        ],
+        capabilitiesCheckedAt: null,
+        openPanel,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "What works here" }));
+    expect(screen.getByRole("dialog", { name: "What works here" })).toBeInTheDocument();
+    expect(screen.getByText("Works here")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "What works here" })).toBeNull();
+  });
+
+  it("opens Settings from the footer when a sidecar probe failed", () => {
+    const openPanel = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        capabilities: [
+          {
+            id: "sidecar-mcp",
+            label: "Sidecar MCP",
+            description: "Runs MCP servers through the sidecar.",
+            status: "unavailable",
+          },
+        ],
+        capabilitiesCheckedAt: null,
+        openPanel,
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "What works here" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start the local service" }));
+
+    expect(openPanel).toHaveBeenCalledWith("settings");
+    expect(screen.queryByRole("dialog", { name: "What works here" })).toBeNull();
   });
 });

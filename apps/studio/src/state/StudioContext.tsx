@@ -451,6 +451,8 @@ export interface StudioContextValue {
   connectorsLoading: boolean;
   /** Probed availability of local and sidecar capabilities. */
   capabilities: Capability[];
+  /** When the last probe ran, or null when nothing has been checked yet. */
+  capabilitiesCheckedAt: string | null;
   /** One answer for what works here, derived from `capabilities`. */
   deviceStatus: DeviceStatus;
   refreshConnectors: () => Promise<void>;
@@ -2595,6 +2597,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       connectorsError,
       connectorsLoading,
       capabilities,
+      capabilitiesCheckedAt,
       deviceStatus,
       presets,
       presetError,
@@ -2720,6 +2723,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       connectorsError,
       connectorsLoading,
       capabilities,
+      capabilitiesCheckedAt,
       deviceStatus,
       presets,
       presetError,
