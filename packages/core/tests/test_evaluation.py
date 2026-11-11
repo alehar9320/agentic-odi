@@ -224,7 +224,18 @@ def test_rubric_constants_not_hand_copied() -> None:
 
     # Check solution_nouns rule references _SOLUTION_NOUNS
     solution_nouns_rule = next(rule for rule in rubric["rules"] if rule["id"] == "solution_nouns")
-    for noun in ("notification", "dashboard", "button", "feature", "screen", "email", "workflow", "integration", "report", "toggle"):
+    for noun in (
+        "notification",
+        "dashboard",
+        "button",
+        "feature",
+        "screen",
+        "email",
+        "workflow",
+        "integration",
+        "report",
+        "toggle",
+    ):
         assert noun in solution_nouns_rule["summary"]
 
     # Check direction rule references _DIRECTIONS

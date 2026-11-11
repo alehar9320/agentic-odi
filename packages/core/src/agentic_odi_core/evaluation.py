@@ -218,7 +218,14 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
         suggestions.append(
             "Start with 'Minimize' or 'Maximize', e.g. 'Minimize the time it takes to...'."
         )
-        checks.append({"id": "direction", "ok": False, "message": "Statement must start with 'Minimize' or 'Maximize'.", "fix": "Start with 'Minimize' or 'Maximize', e.g. 'Minimize the time it takes to...'."})
+        checks.append(
+            {
+                "id": "direction",
+                "ok": False,
+                "message": "Statement must start with 'Minimize' or 'Maximize'.",
+                "fix": "Start with 'Minimize' or 'Maximize', e.g. 'Minimize the time it takes to...'.",
+            }
+        )
     else:
         checks.append({"id": "direction", "ok": True, "message": "", "fix": ""})
 
@@ -229,7 +236,14 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
             "Statement must contain a unit of measure (time, cost, number, frequency, rate, percentage, steps, attempts, or a digit)."
         )
         suggestions.append("Add a unit of measure, e.g. 'time', 'cost', or 'number of …'.")
-        checks.append({"id": "unit_of_measure", "ok": False, "message": "Statement must contain a unit of measure (time, cost, number, frequency, rate, percentage, steps, attempts, or a digit).", "fix": "Add a unit of measure, e.g. 'time', 'cost', or 'number of …'."})
+        checks.append(
+            {
+                "id": "unit_of_measure",
+                "ok": False,
+                "message": "Statement must contain a unit of measure (time, cost, number, frequency, rate, percentage, steps, attempts, or a digit).",
+                "fix": "Add a unit of measure, e.g. 'time', 'cost', or 'number of …'.",
+            }
+        )
     else:
         checks.append({"id": "unit_of_measure", "ok": True, "message": "", "fix": ""})
 
@@ -238,7 +252,14 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
     if object_of_control is None:
         issues.append("Statement must name an object of control after 'the'.")
         suggestions.append("Name the object, e.g. 'the time it takes to …'.")
-        checks.append({"id": "object_of_control", "ok": False, "message": "Statement must name an object of control after 'the'.", "fix": "Name the object, e.g. 'the time it takes to …'."})
+        checks.append(
+            {
+                "id": "object_of_control",
+                "ok": False,
+                "message": "Statement must name an object of control after 'the'.",
+                "fix": "Name the object, e.g. 'the time it takes to …'.",
+            }
+        )
     else:
         checks.append({"id": "object_of_control", "ok": True, "message": "", "fix": ""})
 
@@ -251,7 +272,14 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
             "Statement must state the context when it happens (when, while, before, after, during, if, as)."
         )
         suggestions.append("Add when it happens, e.g. '… when onboarding'.")
-        checks.append({"id": "contextual_clarifier", "ok": False, "message": "Statement must state the context when it happens (when, while, before, after, during, if, as).", "fix": "Add when it happens, e.g. '… when onboarding'."})
+        checks.append(
+            {
+                "id": "contextual_clarifier",
+                "ok": False,
+                "message": "Statement must state the context when it happens (when, while, before, after, during, if, as).",
+                "fix": "Add when it happens, e.g. '… when onboarding'.",
+            }
+        )
     else:
         checks.append({"id": "contextual_clarifier", "ok": True, "message": "", "fix": ""})
 
@@ -260,7 +288,14 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
     if word_count < _MIN_WORDS:
         issues.append(f"Statement is too short ({word_count} words); needs at least {_MIN_WORDS}.")
         suggestions.append("Describe the metric, the object, and the context.")
-        checks.append({"id": "min_words", "ok": False, "message": f"Statement is too short ({word_count} words); needs at least {_MIN_WORDS}.", "fix": "Describe the metric, the object, and the context."})
+        checks.append(
+            {
+                "id": "min_words",
+                "ok": False,
+                "message": f"Statement is too short ({word_count} words); needs at least {_MIN_WORDS}.",
+                "fix": "Describe the metric, the object, and the context.",
+            }
+        )
     else:
         checks.append({"id": "min_words", "ok": True, "message": "", "fix": ""})
 
@@ -270,7 +305,14 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
             f"Statement is longer than {_MAX_CHARS} characters; keep it to one measurable outcome."
         )
         suggestions.append("Split broad statements into separate outcomes.")
-        checks.append({"id": "max_chars", "ok": False, "message": f"Statement is longer than {_MAX_CHARS} characters; keep it to one measurable outcome.", "fix": "Split broad statements into separate outcomes."})
+        checks.append(
+            {
+                "id": "max_chars",
+                "ok": False,
+                "message": f"Statement is longer than {_MAX_CHARS} characters; keep it to one measurable outcome.",
+                "fix": "Split broad statements into separate outcomes.",
+            }
+        )
     else:
         checks.append({"id": "max_chars", "ok": True, "message": "", "fix": ""})
 
@@ -279,7 +321,14 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
     if vague:
         issues.append(f"Replace vague terms with a measurable metric: {', '.join(vague)}.")
         suggestions.append("Use a metric such as time, cost, effort, errors, or likelihood.")
-        checks.append({"id": "vague_terms", "ok": False, "message": f"Replace vague terms with a measurable metric: {', '.join(vague)}.", "fix": "Use a metric such as time, cost, effort, errors, or likelihood."})
+        checks.append(
+            {
+                "id": "vague_terms",
+                "ok": False,
+                "message": f"Replace vague terms with a measurable metric: {', '.join(vague)}.",
+                "fix": "Use a metric such as time, cost, effort, errors, or likelihood.",
+            }
+        )
     else:
         checks.append({"id": "vague_terms", "ok": True, "message": "", "fix": ""})
 
@@ -290,7 +339,14 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
             f"Statement names a solution ({', '.join(solution_found)}), not a customer problem."
         )
         suggestions.append("Name the customer's problem instead of a feature or product.")
-        checks.append({"id": "solution_nouns", "ok": False, "message": f"Statement names a solution ({', '.join(solution_found)}), not a customer problem.", "fix": "Name the customer's problem instead of a feature or product."})
+        checks.append(
+            {
+                "id": "solution_nouns",
+                "ok": False,
+                "message": f"Statement names a solution ({', '.join(solution_found)}), not a customer problem.",
+                "fix": "Name the customer's problem instead of a feature or product.",
+            }
+        )
     else:
         checks.append({"id": "solution_nouns", "ok": True, "message": "", "fix": ""})
 
