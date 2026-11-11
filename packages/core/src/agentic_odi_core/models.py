@@ -472,6 +472,20 @@ class Segment(BaseModel):
     )
     rationale: str = Field(..., description="Why this verdict, naming the outcomes behind it")
     confidence: float = Field(..., ge=0.0, le=1.0, description="How much evidence supports this")
+    computed_at_event_id: int | None = Field(
+        None,
+        description=(
+            "The store revision this segment was derived from. None when it was "
+            "derived before the field existed, which reads as unknown, not fresh."
+        ),
+    )
+    stale: bool | None = Field(
+        None,
+        description=(
+            "Computed at read time, never stored: whether the store has moved on "
+            "since computed_at_event_id. None when no read has labelled it yet."
+        ),
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -489,6 +503,20 @@ class Strategy(BaseModel):
     bets: list[str] = Field(default_factory=list, description="The proposed moves")
     rejected: list[dict[str, Any]] = Field(
         default_factory=list, description='[{"kind": "disruptive", "why": "..."}]'
+    )
+    computed_at_event_id: int | None = Field(
+        None,
+        description=(
+            "The store revision this strategy was derived from. None when it was "
+            "derived before the field existed, which reads as unknown, not fresh."
+        ),
+    )
+    stale: bool | None = Field(
+        None,
+        description=(
+            "Computed at read time, never stored: whether the store has moved on "
+            "since computed_at_event_id. None when no read has labelled it yet."
+        ),
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

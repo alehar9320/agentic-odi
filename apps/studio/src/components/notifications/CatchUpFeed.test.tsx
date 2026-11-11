@@ -261,4 +261,17 @@ describe("Catch Up reads the signal inbox", () => {
     expect(screen.queryByText(/^Simulated$/i)).toBeNull();
     expect(screen.getByRole("button", { name: "All (3)" })).toBeInTheDocument();
   });
+
+  it("exposes each relative time as a machine-readable <time> with the exact moment on hover", async () => {
+    const created = "2026-10-22T10:00:00+00:00";
+    serveFeed([signal({ created_at: created })]);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+
+    const time = await screen.findByText(/ago|just now/i, { selector: "time" });
+    expect(time).toHaveAttribute("dateTime", created);
+    expect(time.getAttribute("title")).toBeTruthy();
+    expect(time.getAttribute("title")).not.toBe("");
+  });
 });
