@@ -15,6 +15,7 @@ import {
   MoonIcon,
   PlugIcon,
   PlusIcon,
+  SearchIcon,
   SettingsIcon,
   SunIcon,
 } from "../icons";
@@ -50,6 +51,7 @@ export function StudioBar({
     customizeOpen,
     setupOpen,
     openCustomize,
+    openSearch,
     pushToast,
     saveSettings,
     settings,
@@ -250,6 +252,17 @@ export function StudioBar({
       </div>
 
       <div className="bar__right">
+        <button
+          type="button"
+          className="icon-button bar__search"
+          onClick={openSearch}
+          aria-label="Search everything"
+          aria-keyshortcuts="Control+Shift+F Meta+Shift+F"
+          title="Search everything (Ctrl/Cmd+Shift+F)"
+        >
+          <SearchIcon size={17} />
+        </button>
+
         <button
           type="button"
           className="studio-pill pill-customize"

@@ -698,6 +698,47 @@ export interface ChangelogData {
   releases: ChangelogRelease[];
 }
 
+/**
+ * The artifacts one query can reach: the ODI store's own records (jobs, steps,
+ * outcomes, evidence) and what the Studio has learned about the person
+ * (observations). These are the records the client already holds and every one
+ * of them has a surface that can focus it. Derived views (segments, strategy),
+ * the vision (#312, not stored yet), and saved theses stay out — a thesis is a
+ * local view of an outcome an outcome hit already covers.
+ */
+export type SearchKind = "job" | "step" | "outcome" | "evidence" | "observation";
+
+/** One matched record, with the words that matched it. */
+export interface SearchHit {
+  kind: SearchKind;
+  id: string;
+  /** The record's own name or statement, so a row reads without opening it. */
+  label: string;
+  /** Bounded context around the match, never a whole transcript. */
+  snippet: string;
+  /** Higher is a better match; the order the groups are drawn in. */
+  score: number;
+}
+
+/** One artifact's hits. A group with no hits is not returned. */
+export interface SearchGroup {
+  kind: SearchKind;
+  label: string;
+  hits: SearchHit[];
+}
+
+/**
+ * The answer to one query: hits grouped per artifact, the total before the cap,
+ * and whether anything was left out. `truncated` is what lets the box say a
+ * group was cut rather than pretending it showed everything.
+ */
+export interface SearchResponse {
+  query: string;
+  groups: SearchGroup[];
+  total: number;
+  truncated: boolean;
+}
+
 export interface ScheduledWork {
   id: string;
   name: string;

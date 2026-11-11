@@ -20,6 +20,7 @@ import { ChatStage } from "../components/chat/ChatStage";
 import { Composer } from "../components/chat/Composer";
 import { ChangelogModal } from "../components/ChangelogModal";
 import { SettingsPanel } from "../components/SettingsPanel";
+import { SearchBox } from "../components/search/SearchBox";
 import { FirstRunWizard } from "../onboarding/FirstRunWizard";
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
 import { useOnboarding } from "../onboarding/context";
@@ -113,6 +114,14 @@ const state = vi.hoisted(() => ({
   llmHealth: { healthy: true, message: "ok" },
   connectorSuggestions: [] as string[],
   dismissConnectorSuggestion: vi.fn(),
+  // Search (#539)
+  memory: [] as unknown[],
+  searchOpen: false,
+  openSearch: vi.fn(),
+  closeSearch: vi.fn(),
+  focusSubject: vi.fn(),
+  focusEvidence: vi.fn(),
+  focusObservation: vi.fn(),
 }));
 
 vi.mock("../state/StudioContext", () => ({
@@ -358,5 +367,42 @@ describe("axe sweep", () => {
     );
 
     await expectAccessible(container);
+  });
+
+  it("passes the search overlay with grouped hits", async () => {
+    state.canvas = { ...canvasData, source: "local" };
+    state.memory = [
+      {
+        id: "obs-1",
+        kind: "constraint",
+        text: "We cannot sync secrets until the quarter closes.",
+        data: {},
+        status: "confirmed",
+        confidence: 0.9,
+        source_turn: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ];
+    state.searchOpen = true;
+
+    const { container } = renderWithUpdates(
+      <Surface>
+        <SearchBox />
+      </Surface>,
+    );
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search everything" }), {
+      target: { value: "secrets" },
+    });
+    // Let the 250 ms debounce settle so the grouped list is on screen.
+    await waitFor(() =>
+      expect(screen.getByRole("group", { name: "Desired outcomes" })).toBeInTheDocument(),
+    );
+
+    await expectAccessible(container);
+
+    state.searchOpen = false;
+    state.memory = [];
   });
 });
