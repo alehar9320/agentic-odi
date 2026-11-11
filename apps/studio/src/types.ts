@@ -197,6 +197,12 @@ export interface StudioError {
   suggestion?: string | null;
   retryable: boolean;
   request_id?: string | null;
+  /**
+   * Set to `"proxy"` when the Worker, not the sidecar, produced the body. A
+   * Worker-generated 502 is a transport failure even though it arrives
+   * structured, so the client falls back to the local BFF for it.
+   */
+  origin?: "proxy";
   /** The input field that failed, when the failure names one. Omitted when the
    * failure is not field-specific — a client can tell "no field" from "the
    * field is the whole form" rather than guessing at a default. */
