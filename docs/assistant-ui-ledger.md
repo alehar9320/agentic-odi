@@ -321,14 +321,14 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 47 |
+| Adopted | 48 |
 | Partial | 10 |
 | Planned | 13 |
 | Decision | 42 |
-| Rejected | 43 |
-| Total | 155 |
+| Rejected | 44 |
+| Total | 157 |
 
-Read it as: **56** of the library's 155 relevant capabilities already deliver
+Read it as: **58** of the library's 157 relevant capabilities already deliver
 something a person can use, **13** more are carried by open issues, **42** rows
 wait on a named decision, and **44** are rejected with a reason. Every row is
 accounted for — that is the whole point of the page.

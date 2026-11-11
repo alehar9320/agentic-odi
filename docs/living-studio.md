@@ -479,6 +479,7 @@ cites the issue or PR that landed it.
 | `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count is ours (`arrivalCount.ts`). | #245 |
 | Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
 | Tool result rendering | Adopted | Each MCP call is a trace chip, gathered under the turn's work row. | #238 |
+| Pending-call strip | Adopted | The calls a turn is still waiting on, below the last message: running, or holding an unanswered approval — never a speculative "up next" list. | #390 |
 | `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
 | ODI surfaces as `data` parts | Adopted | A validated `UiNode` rides the transcript and renders through `UiRenderer`. | #55 |
 
