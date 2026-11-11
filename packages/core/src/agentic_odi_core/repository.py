@@ -781,6 +781,7 @@ class InMemoryRepository:
         self.strategies.clear()
         self.interviews.clear()
         self.quotes.clear()
+
         self.v2mom.clear()
 
     def reload(self) -> None:
