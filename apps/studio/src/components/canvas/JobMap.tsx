@@ -53,6 +53,10 @@ export function JobMap() {
       : undefined;
   const activeJob = focusedJob ?? jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
   const activeJobId = activeJob?.id ?? "";
+  // A destructive control names what it destroys; an unnamed job says so
+  // rather than printing an empty pair of quotes.
+  const activeJobName = activeJob?.name?.trim();
+  const deleteJobLabel = activeJobName ? `Delete “${activeJobName}”` : "Delete this job";
   const steps = (canvas?.steps ?? []).filter(
     (step) => !activeJobId || !step.job_id || step.job_id === activeJobId,
   );
@@ -541,7 +545,7 @@ export function JobMap() {
                 void deleteJob(activeJobId);
               }}
             >
-              {confirmDelete ? "Confirm delete job" : "Delete job"}
+              {confirmDelete ? "Confirm delete job" : deleteJobLabel}
             </button>
           </div>
         </details>

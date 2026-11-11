@@ -5879,11 +5879,8 @@ details[open] summary {
 
 .model-picker__check {
   flex: none;
+  display: block;
   color: var(--accent);
-  font-size: 0.58rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .model-picker__state {
