@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useFocusTrap } from "../lib/useFocusTrap";
 
@@ -17,7 +18,7 @@ export function DiagnosticsModal({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [copyMessage, setCopyMessage] = useState("");
-  useFocusTrap(dialogRef, true);
+  useFocusTrap(dialogRef, true, true);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -47,7 +48,7 @@ export function DiagnosticsModal({
     URL.revokeObjectURL(url);
   }
 
-  return (
+  return createPortal(
     <div className="diagnostics-overlay" role="presentation">
       <div
         ref={dialogRef}
@@ -118,6 +119,7 @@ export function DiagnosticsModal({
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

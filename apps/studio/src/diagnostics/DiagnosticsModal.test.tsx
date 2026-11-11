@@ -108,6 +108,22 @@ describe("DiagnosticsModal", () => {
     expect(modalProps.onClose).toHaveBeenCalledOnce();
   });
 
+  it("takes the page behind the dialog out of reach while it is open", () => {
+    const { unmount } = render(
+      <div className="studio-app">
+        <DiagnosticsModal {...modalProps} />
+      </div>,
+    );
+
+    const shell = document.querySelector(".studio-app");
+    expect(shell).toHaveAttribute("inert");
+    // The dialog sits outside the inert shell, so it stays reachable.
+    expect(shell?.contains(screen.getByRole("dialog"))).toBe(false);
+
+    unmount();
+    expect(shell).not.toHaveAttribute("inert");
+  });
+
   it("creates a local JSON download only when Save is pressed", () => {
     const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:diagnostics");
     const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
