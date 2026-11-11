@@ -15,6 +15,7 @@ import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { dialogOpen, focusComposer, startComposerCommand } from "./lib/composerFocus";
+import { homeTitle, threadTitle, unreadPrefix } from "./lib/brand";
 import { isEditableTarget } from "./lib/commands";
 import { sharedTokenFromPath } from "./lib/share";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
@@ -43,10 +44,24 @@ function StudioShell() {
     stopStreaming,
     bootError,
     recheckBoot,
+    conversationId,
+    conversations,
+    messages,
+    unreadSignalCount,
   } = useStudio();
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
+
+  // The tab says where you are: the thread's own name when a thread is open, the
+  // product at home, and a `(3) ` when signals are waiting. The name is what the
+  // store already derived; nothing here invents one.
+  useEffect(() => {
+    const open = conversations.find((conversation) => conversation.id === conversationId);
+    const base =
+      messages.length > 0 ? threadTitle(open?.title) : homeTitle();
+    document.title = `${unreadPrefix(unreadSignalCount)}${base}`;
+  }, [conversationId, conversations, messages.length, unreadSignalCount]);
 
   function goHome() {
     // Home closes what is open and leaves the thread alone. Discarding it is

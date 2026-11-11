@@ -15,6 +15,25 @@ export function productTitle(): string {
   return PRODUCT_NAME;
 }
 
+/** The document title at home: the product, then who makes it. */
+export function homeTitle(): string {
+  return `The ${PRODUCT_NAME} | ${COMPANY_NAME}`;
+}
+
+/**
+ * The document title for a thread: what the thread is called, then the product.
+ * A thread with no name yet is the product alone rather than a trailing dash.
+ */
+export function threadTitle(name: string | null | undefined): string {
+  const trimmed = name?.trim();
+  return trimmed ? `${trimmed} — ${PRODUCT_NAME}` : productTitle();
+}
+
+/** The `(3) ` a browser tab shows when there is something unread. */
+export function unreadPrefix(count: number): string {
+  return count > 0 ? `(${count}) ` : "";
+}
+
 /** The version, named without the product: the banner is already inside it. */
 export function versionLabel(version: string): string {
   return `Version ${version}`;

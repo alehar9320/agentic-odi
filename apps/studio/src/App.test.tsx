@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { fetchConfig, healthLlm } from "./api/studioApi";
+import { fetchConfig, fetchUnreadSignalCount, healthLlm } from "./api/studioApi";
 import { PROBE_BASE_MS, PROBE_JITTER } from "./state/scheduleProbe";
 
 vi.mock("./api/studioApi", () => ({
@@ -935,6 +935,28 @@ describe("the bar's new thread can be undone (#319)", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Where do I start?")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("the window title follows the work (#695 D18)", () => {
+  it("is the product and maker at home", async () => {
+    vi.mocked(fetchUnreadSignalCount).mockResolvedValue(0);
+    render(<App />);
+
+    await screen.findByRole("textbox", { name: /message the studio/i });
+    await waitFor(() => {
+      expect(document.title).toBe("The Living Studio | Agentic ODI");
+    });
+  });
+
+  it("prefixes the unread count when signals are waiting", async () => {
+    vi.mocked(fetchUnreadSignalCount).mockResolvedValue(3);
+    render(<App />);
+
+    // The probe reports signals on boot; the title leads with the count.
+    await waitFor(() => {
+      expect(document.title).toMatch(/^\(\d+\) The Living Studio \| Agentic ODI$/);
     });
   });
 });

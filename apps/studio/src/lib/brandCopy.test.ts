@@ -10,7 +10,13 @@ import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { COMPANY_NAME, PRODUCT_NAME, productTitle, updateTitle, versionLabel } from "./brand";
+import {
+  COMPANY_NAME,
+  PRODUCT_NAME,
+  homeTitle,
+  updateTitle,
+  versionLabel,
+} from "./brand";
 
 // Vitest runs with the studio package as its working directory.
 const STUDIO = process.cwd();
@@ -41,7 +47,7 @@ describe("brand copy", () => {
 
   it("names the document, the desktop bundle, and the identifier once each", () => {
     const html = readFileSync(join(STUDIO, "index.html"), "utf8");
-    expect(html).toContain(`<title>${productTitle()}</title>`);
+    expect(html).toContain(`<title>${homeTitle()}</title>`);
 
     const tauri = JSON.parse(readFileSync(join(STUDIO, "src-tauri", "tauri.conf.json"), "utf8")) as {
       productName: string;
