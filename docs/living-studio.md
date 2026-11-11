@@ -580,11 +580,14 @@ Conversations are stored beside the memory. On launch the SPA asks
 turns, and continues with the same `conversation_id` on the next message. **New
 conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
-flight, and a restore failure simply leaves the room empty.
+flight, the hero is held back until boot has looked, so a reload with a stored
+thread never paints home first, and a restore failure leaves the room empty with
+one quiet line saying the thread could not be reopened.
 
 ### Printing and export
 
-The bar's overflow menu has **Export → Markdown**. The file labels every
+The bar has one **Export as Markdown** button (⌘⇧E / Ctrl+Shift+E), inert with
+nothing to export. The file labels every
 speaker, keeps the prose as Markdown, and writes each agent-composed surface as
 a fenced JSON block, so a thread can be pasted into a doc or a ticket without
 the reader needing the Studio. A reply that arrived with claims keeps them: each
