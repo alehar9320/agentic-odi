@@ -30,7 +30,7 @@ function fieldForError(error: StudioError): FailureField {
 }
 
 export function DirectCapture() {
-  const { canvas, addOutcome, createJob } = useStudio();
+  const { canvas, createJob, queueCapture, queuedCaptures, failedCaptures } = useStudio();
   const jobs = canvas?.jobs ?? [];
 
   const [jobId, setJobId] = useState<string | null>(null);
@@ -82,7 +82,10 @@ export function DirectCapture() {
     setBusy(true);
     setFailure(null);
     try {
-      await addOutcome({
+      // The queue-aware path: it tries the sidecar and, when the network is
+      // the only thing missing, saves the capture on this device instead of
+      // dropping it. A real refusal still throws and lands on the field.
+      await queueCapture({
         job_id: activeJobId,
         statement: statement.trim(),
         importance,
@@ -102,6 +105,21 @@ export function DirectCapture() {
 
   return (
     <div className="stack">
+      {queuedCaptures > 0 ? (
+        <p className="queue-badge" role="status">
+          {queuedCaptures === 1
+            ? "1 capture waiting to sync."
+            : `${queuedCaptures} captures waiting to sync.`}{" "}
+          They arrive once when the sidecar is back.
+        </p>
+      ) : null}
+      {failedCaptures.length > 0 ? (
+        <p className="queue-badge queue-badge--failed" role="alert">
+          {failedCaptures.length === 1
+            ? "1 capture was refused by the sidecar and is kept on this device."
+            : `${failedCaptures.length} captures were refused by the sidecar and are kept on this device.`}
+        </p>
+      ) : null}
       <form onSubmit={submit} className="form">
         <div className="field">
           <label htmlFor="dc-job">Job</label>

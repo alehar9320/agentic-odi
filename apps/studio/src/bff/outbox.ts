@@ -31,6 +31,12 @@ export interface DrainOptions {
    * the lease path, which is how the tests exercise it.
    */
   locks?: LockManager | null;
+  /**
+   * Restrict the drain to the records this predicate accepts. Omitted, every
+   * pending record is sent; a caller that owns one kind of record passes its
+   * own test so a drain never sends a record another path queued.
+   */
+  select?: (record: OutboxRecord) => boolean;
 }
 
 export type DrainSkipReason = "locked" | "lease-held";
@@ -105,12 +111,20 @@ async function runWithLease(options: DrainOptions): Promise<DrainOutcome> {
 
 async function drainPending(options: DrainOptions): Promise<number> {
   const records = await options.store.listOutbox();
+  const select = options.select ?? (() => true);
   let sent = 0;
   for (const record of records) {
-    if (record.state !== "pending") {
+    if (record.state !== "pending" || !select(record)) {
       continue;
     }
     await options.send(record);
+    // `send` may have moved the record on (a capture the sidecar refused is
+    // marked failed so it does not block the ones behind it). Acknowledge only
+    // what is still pending, so that decision is not overwritten.
+    const current = await options.store.getOutbox(record.id);
+    if (current && current.state !== "pending") {
+      continue;
+    }
     await options.store.putOutbox({
       ...record,
       state: "acknowledged",

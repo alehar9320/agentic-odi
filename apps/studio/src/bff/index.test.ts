@@ -17,9 +17,9 @@ describe("StudioBff queued writes (#523)", () => {
     const bff = makeBff();
 
     const job = await bff.createJob({ name: "Get a service to production" });
-    const step = await bff.addStep({ job_id: job.id, name: "Ship", order: 1 });
+    const step = await bff.addStep({ job_id: job.id!, name: "Ship", order: 1 });
     const outcome = await bff.addOutcome({
-      job_id: job.id,
+      job_id: job.id!,
       statement: "Minimize the time from merge to production",
       importance: 9,
       satisfaction: 3,
@@ -80,7 +80,7 @@ describe("StudioBff workspace export/import", () => {
     const bff = makeBff();
     const job = await bff.data.createJob({ name: "Job A" });
     await bff.data.createJob({ name: "Job B" });
-    await bff.data.addStep({ job_id: job.id, name: "Step", order: 0 });
+    await bff.data.addStep({ job_id: job.id!, name: "Step", order: 0 });
 
     const json = await bff.exportWorkspace();
     const snapshot = JSON.parse(json);
@@ -180,5 +180,81 @@ describe("StudioBff workspace export/import", () => {
     expect(memory[0].text).toBe("Sidecar observation");
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe("StudioBff capture queue", () => {
+  it("queues a capture and counts it until it syncs", async () => {
+    const bff = makeBff();
+    const job = await bff.data.createJob({ name: "Ship a service" });
+
+    const queued = await bff.queueCapture({
+      job_id: job.id!,
+      statement: "Minimize the time it takes to ship",
+      importance: 8,
+      satisfaction: 3,
+    });
+    expect(queued.pending).toBe(true);
+    expect(await bff.countQueuedCaptures()).toBe(1);
+    expect((await bff.listQueuedCaptures()).map((o) => o.statement)).toEqual([
+      "Minimize the time it takes to ship",
+    ]);
+  });
+
+  it("replays each capture at most once across a losing second call", async () => {
+    const bff = makeBff();
+    const job = await bff.data.createJob({ name: "Ship a service" });
+    await bff.queueCapture({
+      job_id: job.id!,
+      statement: "Minimize the time it takes to ship",
+      importance: 8,
+      satisfaction: 3,
+    });
+
+    const keys: string[] = [];
+    const send = (record: { id: string }) => {
+      keys.push(record.id);
+    };
+    await bff.replayCaptures(send);
+    await bff.replayCaptures(send);
+
+    expect(keys).toHaveLength(1);
+    expect(await bff.countQueuedCaptures()).toBe(0);
+  });
+
+  it("keeps a refused capture and surfaces it instead of dropping it", async () => {
+    const bff = makeBff();
+    const job = await bff.data.createJob({ name: "Ship a service" });
+    const queued = await bff.queueCapture({
+      job_id: job.id!,
+      statement: "Minimize the time it takes to ship",
+      importance: 8,
+      satisfaction: 3,
+    });
+
+    await bff.failQueuedCapture(queued.id!, "The sidecar refused this capture.");
+
+    expect(await bff.countQueuedCaptures()).toBe(0);
+    expect(await bff.listFailedCaptures()).toHaveLength(1);
+    // The record is kept, not deleted: nothing is silently dropped.
+    expect(await bff.store.getOutbox(queued.id!)).toMatchObject({
+      state: "failed",
+      last_error: "The sidecar refused this capture.",
+    });
+  });
+
+  it("drops a queued capture the person no longer wants", async () => {
+    const bff = makeBff();
+    const job = await bff.data.createJob({ name: "Ship a service" });
+    const queued = await bff.queueCapture({
+      job_id: job.id!,
+      statement: "Minimize the time it takes to ship",
+      importance: 8,
+      satisfaction: 3,
+    });
+
+    await bff.discardQueuedCapture(queued.id!);
+    expect(await bff.countQueuedCaptures()).toBe(0);
+    await expect(bff.discardQueuedCapture(queued.id!)).rejects.toThrow();
   });
 });
