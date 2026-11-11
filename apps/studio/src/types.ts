@@ -711,3 +711,14 @@ export interface ScheduledWork {
   last_run_at?: string | null;
   result_summary?: string | null;
 }
+
+/**
+ * The sidecar's own liveness answer. `ok` says the process answered; `degraded`
+ * names the one thing that is wrong when it answered with a problem, which is
+ * not the same as being down.
+ */
+export interface SidecarLiveness {
+  ok: boolean;
+  degraded: { reason: string } | null;
+  checked_at: number;
+}
