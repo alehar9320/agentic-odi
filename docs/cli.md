@@ -326,8 +326,7 @@ agentic-odi capabilities --json   # machine-readable manifest
 agentic-odi capabilities tools  # tool names only
 ```
 
-`evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
-check works with or without a running server.
+`evaluate` returns the same verdict the `evaluate_outcome` MCP tool does — including the per-rule `checks` list — so the check works with or without a running server.
 
 `health` runs the `get_health` check against the configured backend and exits
 non-zero when the store is degraded, so it can gate a deployment.
