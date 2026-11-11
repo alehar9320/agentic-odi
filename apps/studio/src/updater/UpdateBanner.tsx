@@ -79,7 +79,7 @@ export function UpdateBanner() {
 
       {/* The announcement rides the title and detail only. The progress bar
           below changes on every percent and is not announced: a screen reader
-          hears "Living Studio X is ready" once, not once per tick. */}
+          hears the title once, not once per tick. */}
       <div className="update-banner__copy" role="status" aria-live="polite">
         <p className="update-banner__title">{title}</p>
         <p className="update-banner__detail">{detail}</p>
