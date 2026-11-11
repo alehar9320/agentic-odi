@@ -59,6 +59,7 @@ from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     V2MOM,
+    Brief,
     BusinessImpactCategory,
     BusinessValue,
     ClaimCheck,
@@ -142,6 +143,7 @@ from agentic_odi_core.traceability import (
 )
 
 __all__ = [
+    "Brief",
     "ScheduledWork",
     "ScheduledWorkNotFoundError",
     "OutcomeScoreMismatchError",

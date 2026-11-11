@@ -30,10 +30,7 @@ from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     V2MOM,
-<<<<<<< HEAD
     Brief,
-=======
->>>>>>> origin/main
     BusinessValue,
     ClaimCheck,
     ClaimSkip,

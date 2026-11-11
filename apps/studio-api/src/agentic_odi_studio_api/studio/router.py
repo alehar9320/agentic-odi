@@ -36,8 +36,11 @@ from agentic_odi_core import (
     invalid_strategy_request,
     manual_claim_check,
 )
+from agentic_odi_core.errors import ValidationError as CoreValidationError
 from agentic_odi_core.funnel import count_reset, read_counts
+from agentic_odi_core.models import V2MOM as CoreV2MOM
 from agentic_odi_core.remote import StudioError, StudioErrorCode
+from agentic_odi_core.services import ObservationNotFoundError as CoreObservationNotFound
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
@@ -107,9 +110,13 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeStrategyRequest,
     RejectProposalRequest,
     ScheduleWorkRequest,
+    SettingsUpdateRequest,
     SharedArtifactResponse,
     ShareMintResponse,
     SignalActionRequest,
+    StoreObservationCreateRequest,
+    StoreObservationUpdateRequest,
+    StudioBrief,
     TraceabilityReportResponse,
     TurnNode,
     UpdateConversationRequest,
@@ -118,6 +125,7 @@ from agentic_odi_studio_api.studio.schemas import (
     UpdateOutcomeRequest,
     UpdateStepRequest,
 )
+from agentic_odi_studio_api.studio.settings import StudioSettings
 from agentic_odi_studio_api.studio.sharing import (
     ShareError,
     ShareNotFoundError,
@@ -247,13 +255,20 @@ def _memory(request: Request) -> StudioMemory:
     return request.app.state.memory
 
 
+def _settings(request: Request) -> StudioSettings:
+    return request.app.state.settings
+
+
 def _approvals(request: Request) -> ApprovalRegistry:
     return request.app.state.approvals
 
 
 @router.get("/config")
 def get_config() -> dict:
-    return {"defaults": defaults()}
+    """Provider defaults for the form; the key is never part of the answer."""
+    config = defaults()
+    config["api_key"] = ""
+    return {"defaults": config}
 
 
 @router.get("/diagnostics")
@@ -1172,7 +1187,7 @@ def list_observations(request: Request) -> ObservationListResponse:
 def create_observation(body: ObservationCreateRequest, request: Request) -> ObservationResponse:
     try:
         observation = _memory(request).add_observation(
-            kind=body.kind,
+            kind=body.kind or body.category or "other",
             text=body.text,
             data=body.data,
             status="confirmed" if body.confirmed else "suggested",
@@ -1230,6 +1245,97 @@ def delete_observation(observation_id: str, request: Request) -> dict:
 @router.delete("/memory")
 def clear_memory(request: Request) -> dict:
     _memory(request).clear_memory()
+    return {"ok": True}
+
+
+@router.get("/settings")
+def get_settings(request: Request) -> dict[str, Any]:
+    """The redacted settings: enough to recognise the key, never the key."""
+    return _settings(request).redacted()
+
+
+@router.post("/settings")
+def post_settings(body: SettingsUpdateRequest, request: Request) -> dict[str, Any]:
+    _settings(request).update(body.model_dump(exclude_unset=True))
+    return _settings(request).redacted()
+
+
+@router.get("/brief")
+def get_brief(request: Request) -> dict[str, Any]:
+    brief = _service(request).get_brief()
+    return {"brief": brief.model_dump(mode="json") if brief is not None else None}
+
+
+@router.put("/brief")
+def put_brief(body: StudioBrief, request: Request) -> dict[str, Any]:
+    brief = _service(request).save_brief(
+        product_name=body.product_name,
+        product_url=body.product_url,
+        target_user=body.target_user,
+        job_statement=body.job_statement,
+        core_problem=body.core_problem,
+        v2mom=CoreV2MOM.model_validate(body.v2mom.model_dump())
+        if body.v2mom is not None
+        else None,
+    )
+    return {"brief": brief.model_dump(mode="json")}
+
+
+@router.get("/observations")
+def list_store_observations(request: Request) -> dict[str, Any]:
+    observations = _service(request).list_observations()
+    return {"observations": [item.model_dump(mode="json") for item in observations]}
+
+
+@router.post("/observations")
+def create_store_observation(
+    body: StoreObservationCreateRequest, request: Request
+) -> dict[str, Any]:
+    service = _service(request)
+    try:
+        observation = service.remember(
+            body.text,
+            category=body.category,
+            conversation_id=body.conversation_id,
+            source_message_id=body.source_message_id,
+            data=body.data,
+            confidence=body.confidence,
+        )
+        if body.confirmed:
+            observation = service.set_observation_status(observation.id, "confirmed")
+    except CoreValidationError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
+        ) from exc
+    return {"observation": observation.model_dump(mode="json")}
+
+
+@router.patch("/observations/{observation_id}")
+def update_store_observation(
+    observation_id: str, body: StoreObservationUpdateRequest, request: Request
+) -> dict[str, Any]:
+    service = _service(request)
+    updates = body.model_dump(exclude_unset=True, exclude_none=True)
+    try:
+        if "status" in updates and len(updates) == 1:
+            observation = service.set_observation_status(observation_id, updates["status"])
+        else:
+            observation = service.update_observation(observation_id, updates)
+    except (CoreValidationError, ObservationNotFoundError, CoreObservationNotFound) as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
+        ) from exc
+    return {"observation": observation.model_dump(mode="json")}
+
+
+@router.delete("/observations/{observation_id}")
+def delete_store_observation(observation_id: str, request: Request) -> dict[str, Any]:
+    try:
+        _service(request).delete_observation(observation_id)
+    except (ObservationNotFoundError, CoreObservationNotFound) as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc))
+        ) from exc
     return {"ok": True}
 
 
@@ -1351,6 +1457,10 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
     # server minted), never one the body claims, so the id in the frames, the
     # header, and the log line are always the same one.
     request_id = request_id_for(request)
+    # The browser stopped sending the secret; the sidecar holds it.
+    body = body.model_copy(
+        update={"api_key": _settings(request).resolve_api_key(body.api_key)}
+    )
     return StreamingResponse(
         stream_chat(
             body,
