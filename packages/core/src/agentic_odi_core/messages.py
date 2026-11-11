@@ -119,3 +119,7 @@ def invalid_strategy_request(message: str) -> str:
     server failure.
     """
     return f"Invalid strategy request: {message}"
+
+
+def interview_not_found(interview_id: str | None) -> str:
+    return f"Interview not found: {interview_id}"
