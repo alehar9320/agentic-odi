@@ -37,6 +37,22 @@ from agentic_odi_core.repository import (
     unread_signals,
 )
 
+#: Writes that are derived from the store rather than inputs to it. Their own
+#: revision must not make a later derivation look stale. Signals are facts
+#: *about* the store, and segmentation reads jobs, steps, and outcomes — never
+#: signals — so recording one is not an input a later derivation would read.
+_DERIVED_EVENT_TYPES = frozenset(
+    {
+        "SEGMENT_CREATED",
+        "SEGMENT_UPDATED",
+        "STRATEGY_CREATED",
+        "STRATEGY_UPDATED",
+        "SIGNAL_CREATED",
+        "SIGNAL_READ",
+        "SIGNAL_DISMISSED",
+    }
+)
+
 
 class SQLiteRepository(Repository):
     def __init__(
@@ -70,6 +86,7 @@ class SQLiteRepository(Repository):
                 os.utime(db_path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
             raise
         self._last_event_id = 0
+        self._last_input_event_id = 0
         self._checkpoint("TRUNCATE")
         self._load_snapshot()
 
@@ -105,6 +122,7 @@ class SQLiteRepository(Repository):
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
         self._last_event_id = 0
+        self._last_input_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
 
@@ -225,6 +243,8 @@ class SQLiteRepository(Repository):
         elif et == "STUDY_UPDATED":
             self._merge_updates(self.studies, p, Study)
         self._last_event_id = max(self._last_event_id, ev["id"])
+        if et not in _DERIVED_EVENT_TYPES:
+            self._last_input_event_id = max(self._last_input_event_id, ev["id"])
 
     @staticmethod
     def _merge_updates(entities: dict[str, Any], p: dict, model: type[BaseModel]) -> None:
@@ -243,6 +263,18 @@ class SQLiteRepository(Repository):
         with self._lock:
             self._sync()
             return self._last_event_id
+
+    def last_input_event_id(self) -> int:
+        """Rowid of the most recent event that is an input to derivation.
+
+        Segments and strategies are derived *from* the store, so their own
+        writes are not inputs a later derivation would read. Leaving them out of
+        the revision lets a freshly derived artifact read as current while a
+        later outcome rescore makes it stale.
+        """
+        with self._lock:
+            self._sync()
+            return self._last_input_event_id
 
     def add_job(self, job: Job) -> Job:
         with self._lock:

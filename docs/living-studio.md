@@ -301,6 +301,30 @@ Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 marker is what tells the SPA this body came from the Worker, not the sidecar,
 so the turn still falls back to the local BFF instead of reading as an answer.
 
+### Where the Studio is running
+
+The Studio can run in four places, and **Settings → About** says which one before
+anyone starts diagnosing. One module, `apps/studio/src/bridge/runtime.ts`, answers
+it; About and the diagnostics bundle read the same answer, so the two cannot
+disagree.
+
+| Host | Label | Reaches the sidecar | Offline shell |
+|---|---|---|---|
+| Installed desktop app (Tauri) | `Desktop app` | Directly, on the sidecar's own origin | as the shell provides |
+| Installed web app (PWA) | `Installed web app` | Same origin as the page | on when a service worker controls the page |
+| Browser tab on this device | `Browser tab` | Same origin; loopback | on when a service worker controls the page |
+| Browser tab on a host | `Browser tab` | Same origin; remote | on when a service worker controls the page |
+
+The **Runtime** row reads `Installed web app · on this device · offline shell on`
+and never a URL or a key. The same facts travel in the diagnostics bundle under
+`app.runtime` (`host`, `install`, `originClass`, `apiTransport`, `offlineShell`,
+`platform`), which still carries no hostname. Host decides the API base, not what
+the app can do: nothing here infers that a model is missing.
+
+Installing is offered only where it is meaningful — in a browser, and only while
+the app is not already its own window. The desktop app and an installed web app
+show no **Install** control, because neither can be installed again.
+
 ### When the database failed its check
 
 A store that is *reachable* but *damaged* is a different condition from a sidecar
@@ -426,8 +450,9 @@ cites the issue or PR that landed it.
 | `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
 | `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Custom text/file renderers, because claim chips and extraction state need them. | — |
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
-| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter. | #238 |
+| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter; each chip is an `AttachmentPrimitive.Root`. | #238 |
 | `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works through the composer's own handlers with the same accept rules. | — |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`; extraction state, refusal reason and size ride inside `Root` as children, but the sent-turn chip in `parts.tsx` still writes its own markup. | — |
 | `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | The quote shows above the input and can be cleared before send. | #435 |
 | `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | The microphone, hidden where unsupported. | #433 |
 | `ComposerPrimitive.Queue` | Adopted | The pending lane rendered above the composer. | #410 |
