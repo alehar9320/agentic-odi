@@ -20,6 +20,7 @@ default tier.
 
 ```bash
 uv run pytest                       # all packages + root contract/launcher tests
+uv run pytest -n auto               # the same suite, distributed across CPU workers
 uv run pytest packages/core         # one package
 uv run pytest tests/contract        # MCP contract only
 uv run mypy apps brand packages
@@ -28,6 +29,17 @@ uv run ruff format --check .
 uv run bandit -c pyproject.toml -r apps packages
 uv run bandit -c pyproject.toml -r website/
 ```
+
+`-n auto` is an explicit, opt-in flag (pytest-xdist), never an `addopts`
+entry: a two-core laptop is not told to use sixteen workers. CI's `test` job
+runs the suite with `-n auto` and keeps every `--cov*` flag, so `coverage.xml`
+is still produced and uploaded.
+
+Measured on a 4-core runner with 2,270 tests: serial ≈ 73 s, `-n auto` ≈ 35 s,
+with identical collected/pass/skip counts (2,270 passed, 1 xfailed) across
+three consecutive parallel runs. The suite is in-memory and each worker is its
+own process, so the six `conftest.py` files' module-level state and
+`monkeypatch` fixtures stay isolated.
 
 The root `pyproject.toml` owns pytest, coverage, ruff, mypy, and bandit configuration. There is no per-package test configuration to keep in sync. Coverage floor is enforced in CI (`fail_under = 89`).
 

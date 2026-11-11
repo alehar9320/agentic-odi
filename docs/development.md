@@ -339,9 +339,33 @@ uv run python scripts/verify.py --full      # full matrix (CI's job)
 Per-command ceiling is 300s; designed for a 10–30 minute agent budget. CI owns
 `--full`. The PR body must list the tiers run and skipped.
 
+The full suite, one app, one package, or the cross-package contracts, when you
+want them by hand:
+
+```bash
+uv run pytest                        # everything
+uv run pytest -n auto                # the same suite, across CPU workers
+uv run pytest apps/cli               # one app
+uv run pytest packages/core          # one package
+uv run pytest tests/contract         # cross-package contracts
+uv run pytest tests/scripts          # dev launcher
+```
+
+`-n auto` is opt-in per invocation (pytest-xdist); it is not an `addopts`
+entry, so a small machine is never told to use more workers than it has. The
+suite is in-memory and each xdist worker is its own process, so the six
+`conftest.py` files' module-level state and `monkeypatch` fixtures stay
+isolated. CI's `test` job runs with `-n auto` and keeps every `--cov*` flag.
+
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
 in-memory — no running server required. Tests live next to the package they
 cover.
+
+The pre-PR procedure is not "run everything". It is the **default** tier in
+[`.agents/workflows/test.md`](../.agents/workflows/test.md): the fast tier,
+plus type checking, plus the studio units. The full tier — the studio build
+and the browser e2e suite — is CI's job and is not asked of anyone before
+they open a pull request.
 
 The MCP server contract test compares the live FastMCP registry with
 `packages/core/src/agentic_odi_core/contract.py`, so add or change a tool in
