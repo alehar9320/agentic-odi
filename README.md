@@ -280,6 +280,8 @@ quick answer on the changed slice; the full tier (the studio build and the
 browser e2e suite) is CI's job and is not asked of anyone before they open a
 pull request.
 
+For e2e/visual testing, install optional tooling with `npm --prefix apps/studio run install:test-tooling`.
+
 ```bash
 uv run ruff check . && uv run ruff format --check .
 uv run mypy apps packages && uv run pytest

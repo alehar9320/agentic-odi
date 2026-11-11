@@ -357,6 +357,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install test tooling
+        run: npm run install:test-tooling
+
       - name: Build the Studio
         run: npm run build
 
@@ -406,6 +409,10 @@ jobs:
       - name: Install dependencies
         working-directory: apps/studio
         run: npm ci
+
+      - name: Install test tooling
+        working-directory: apps/studio
+        run: npm run install:test-tooling
 
       - name: Build the Studio
         working-directory: apps/studio
@@ -488,6 +495,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
         working-directory: apps/studio
+
+      - name: Install test tooling
+        working-directory: apps/studio
+        run: npm run install:test-tooling
 
       # Dependabot PRs cannot read repository secrets, so the signing key is
       # empty there. Export it only when present and disable updater artifacts

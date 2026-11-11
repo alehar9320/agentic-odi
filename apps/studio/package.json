@@ -16,7 +16,8 @@
     "typecheck": "tsc -b --noEmit",
     "gen:api-types": "openapi-typescript openapi.json -o src/api/schema.d.ts",
     "dev:full": "concurrently -k -n mcp,sidecar,vite \"uv run python -m agentic_odi_mcp_server\" \"uv run python -m agentic_odi_studio_api.main\" \"vite\"",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "install:test-tooling": "node scripts/install-test-tooling.mjs"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.31",
@@ -33,20 +34,15 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
-    "@chromatic-com/vitest": "^1.0.1",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "^4.3.3",
-    "@tauri-apps/cli": "^2.12.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "@vitest/browser-playwright": "^4.1.12",
     "axe-core": "^4.14.0",
-    "chromatic": "^18.13.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
@@ -57,17 +53,24 @@
     "globals": "^17.13.0",
     "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
-    "playwright": "^1.64.1",
     "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.2",
     "vite": "^8.3.4",
     "vitest": "^4.1.12",
-    "vitest-axe": "^0.1.0",
-    "vitest-browser-react": "^2.3.0"
+    "vitest-axe": "^0.1.0"
   },
   "overrides": {
     "storybook": "10.6.3"
+  },
+  "optionalDependencies": {
+    "@playwright/test": "1.64.1",
+    "playwright": "^1.64.1",
+    "@vitest/browser-playwright": "^4.1.12",
+    "vitest-browser-react": "^2.3.0",
+    "chromatic": "^18.13.3",
+    "@chromatic-com/vitest": "^1.0.1",
+    "@tauri-apps/cli": "^2.12.3"
   }
 }
