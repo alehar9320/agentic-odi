@@ -45,6 +45,15 @@ export interface ClaimCheck {
   verified?: boolean;
 }
 
+export interface OutcomeAlignment {
+  /** Which V2MOM list the objective lives in: "method" or "measure". */
+  field: string;
+  /** Frozen content key for the objective text, computed when the link was made. */
+  key: string;
+  /** The objective text as it read when the link was made. */
+  text: string;
+}
+
 export interface Outcome {
   id?: string;
   job_id?: string;
@@ -56,6 +65,8 @@ export interface Outcome {
   evidence?: string;
   telemetry?: string;
   origin?: Origin;
+  /** The V2MOM methods and measures this outcome advances. Empty means the outcome is unlinked. */
+  trace?: OutcomeAlignment[];
   /** True while the write is queued locally and the sidecar has not acknowledged it. */
   pending?: boolean;
 }
@@ -208,6 +219,12 @@ export interface StudioError {
   suggestion?: string | null;
   retryable: boolean;
   request_id?: string | null;
+  /**
+   * Set to `"proxy"` when the Worker, not the sidecar, produced the body. A
+   * Worker-generated 502 is a transport failure even though it arrives
+   * structured, so the client falls back to the local BFF for it.
+   */
+  origin?: "proxy";
   /** The input field that failed, when the failure names one. Omitted when the
    * failure is not field-specific — a client can tell "no field" from "the
    * field is the whole form" rather than guessing at a default. */
