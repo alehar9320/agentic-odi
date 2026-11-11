@@ -352,7 +352,11 @@ describe("StudioBar", () => {
     expect(refreshConversations).toHaveBeenCalledOnce();
     expect(within(menu).getByText("Where does onboarding leak?")).toBeInTheDocument();
     expect(within(menu).getByText("Price the churn spike")).toBeInTheDocument();
-    expect(within(menu).getByText(/Just now · 4 turns/)).toBeInTheDocument();
+    // The relative time is its own <time>, so it is read as a date, and the
+    // turn count rides alongside it rather than inside the element.
+    const when = within(menu).getByText("Just now");
+    expect(when.tagName).toBe("TIME");
+    expect(within(menu).getByText(/· 4 turns/)).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -669,7 +673,10 @@ describe("history says when and how much (#694 D12)", () => {
       ],
     });
 
-    expect(within(menu).getByText("2h ago · 6 turns")).toBeInTheDocument();
+    const when = within(menu).getByText("2h ago");
+    expect(when.tagName).toBe("TIME");
+    expect(when).toHaveAttribute("dateTime", new Date(2026, 9, 22, 8, 0).toISOString());
+    expect(within(menu).getByText(/· 6 turns/)).toBeInTheDocument();
   });
 
   it("gives a thread with no turns no meta line at all", () => {

@@ -127,7 +127,6 @@ export function DataSection({ sidecarReachable }: DataSectionProps) {
   const storeLabel = facts?.kind === "sidecar" ? "On this device (sidecar)" : "In this browser";
   const storePath = facts?.path ? ` · ${facts.path}` : "";
   const storeSize = ` · ${formatBytes(facts?.bytes)}`;
-  const storeRecency = ` · last written ${formatRelativeTime(facts?.lastWrittenAt)}`;
 
   return (
     <div className="settings__section">
@@ -142,7 +141,17 @@ export function DataSection({ sidecarReachable }: DataSectionProps) {
       {!loading && !error && facts && (
         <div className="settings__storage-facts">
           <p className="settings__storage-summary">
-            {storeLabel}{storePath}{storeSize}{storeRecency}
+            {storeLabel}{storePath}{storeSize}
+            {/* Every visible time is a <time>; an unknown one says so plainly
+                rather than wearing a relative phrase that reads as a record. */}
+            {" · last written "}
+            {facts.lastWrittenAt ? (
+              <time dateTime={facts.lastWrittenAt}>
+                {formatRelativeTime(facts.lastWrittenAt)}
+              </time>
+            ) : (
+              "—"
+            )}
           </p>
           <p className="settings__storage-exclusions">
             This file does not contain uploads, connector tokens, or provider API keys.

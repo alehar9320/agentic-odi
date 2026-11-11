@@ -374,8 +374,10 @@ export function StudioBar({
                               it says nothing rather than "0 turns". */}
                           {conversation.turn_count > 0 ? (
                             <span className="bar__history-meta">
-                              {formatRelativeTime(conversation.updated_at)} ·{" "}
-                              {conversation.turn_count}{" "}
+                              <time dateTime={conversation.updated_at}>
+                                {formatRelativeTime(conversation.updated_at)}
+                              </time>{" "}
+                              · {conversation.turn_count}{" "}
                               {conversation.turn_count === 1 ? "turn" : "turns"}
                             </span>
                           ) : null}
