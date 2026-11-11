@@ -478,4 +478,8 @@ TOOL_PURPOSES: dict[str, str] = {
     "list_scheduled_work": "List scheduled work, optionally for one Job or status.",
     "cancel_scheduled_work": "Cancel a scheduled work item.",
     "trigger_scheduled_work": "Dispatch a scheduled work item immediately.",
+    "link_outcome": "Link an Outcome to the V2MOM method or measure it advances.",
+    "unlink_outcome": "Remove an Outcome's link to a method or measure.",
+    "get_outcome_alignments": "Read how each Outcome lines up with the V2MOM.",
+    "get_traceability_report": "Report which outcomes trace to a method and which do not.",
 }

@@ -350,6 +350,13 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["outcome_id"],
                 "type": "object",
             },
+            "get_outcome_alignments": {
+                "additionalProperties": False,
+                "properties": {
+                    "outcome_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None}
+                },
+                "type": "object",
+            },
             "get_outcome_score": {
                 "additionalProperties": False,
                 "properties": {"outcome_id": {"type": "string"}},
@@ -388,6 +395,21 @@ async def test_live_registry_snapshot() -> None:
                 "type": "object",
             },
             "get_strategy": {"additionalProperties": False, "properties": {}, "type": "object"},
+            "get_traceability_report": {
+                "additionalProperties": False,
+                "properties": {},
+                "type": "object",
+            },
+            "link_outcome": {
+                "additionalProperties": False,
+                "properties": {
+                    "field": {"type": "string"},
+                    "outcome_id": {"type": "string"},
+                    "text": {"type": "string"},
+                },
+                "required": ["field", "outcome_id", "text"],
+                "type": "object",
+            },
             "list_candidates": {
                 "additionalProperties": False,
                 "properties": {
@@ -577,6 +599,16 @@ async def test_live_registry_snapshot() -> None:
                 "additionalProperties": False,
                 "properties": {"work_id": {"type": "string"}},
                 "required": ["work_id"],
+                "type": "object",
+            },
+            "unlink_outcome": {
+                "additionalProperties": False,
+                "properties": {
+                    "field": {"type": "string"},
+                    "key": {"type": "string"},
+                    "outcome_id": {"type": "string"},
+                },
+                "required": ["field", "key", "outcome_id"],
                 "type": "object",
             },
             "update_customer_outcome": {
@@ -960,6 +992,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": "2",
                 "summary": "Get a single Outcome by ID.",
             },
+            "get_outcome_alignments": {
+                "arguments": ["outcome_id"],
+                "effect": "read",
+                "required": [],
+                "returns": "A list of links, each naming the outcome, field, key, and text.",
+                "stage": "6",
+                "summary": "List the V2MOM links recorded on Outcomes.",
+            },
             "get_outcome_score": {
                 "arguments": ["outcome_id"],
                 "effect": "read",
@@ -1007,6 +1047,22 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The Strategy with its rejected alternatives, or null if none was recorded.",
                 "stage": "6",
                 "summary": "Get the most recently recorded innovation strategy.",
+            },
+            "get_traceability_report": {
+                "arguments": [],
+                "effect": "read",
+                "required": [],
+                "returns": "The orphans, unfunded, and drift lists, or a note that no objectives exist.",
+                "stage": "6",
+                "summary": "Report orphans, unfunded objectives, and links the vision dropped.",
+            },
+            "link_outcome": {
+                "arguments": ["field", "outcome_id", "text"],
+                "effect": "write",
+                "required": ["field", "outcome_id", "text"],
+                "returns": "The updated Outcome, or a refusal naming the objectives that do exist.",
+                "stage": "6",
+                "summary": "Link an Outcome to the V2MOM method or measure it advances.",
             },
             "list_candidates": {
                 "arguments": ["job_id", "limit", "offset", "quote_id", "status"],
@@ -1182,6 +1238,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The dispatched scheduled work item.",
                 "stage": None,
                 "summary": "Dispatch a scheduled work item immediately.",
+            },
+            "unlink_outcome": {
+                "arguments": ["field", "key", "outcome_id"],
+                "effect": "write",
+                "required": ["field", "key", "outcome_id"],
+                "returns": "The updated Outcome.",
+                "stage": "6",
+                "summary": "Remove one V2MOM link from an Outcome.",
             },
             "update_customer_outcome": {
                 "arguments": [
@@ -1766,6 +1830,38 @@ A skip without a reason is not a skip, it is a missing answer, so
                         "title": "ClaimSkip",
                         "type": "object",
                     },
+                    "OutcomeAlignment": {
+                        "description": """\
+A claim that an Outcome advances one V2MOM objective.
+
+``field`` is ``method`` or ``measure``; ``key`` is the content key computed
+from ``field`` and ``text`` when the link was made; ``text`` is the
+canonical objective text then. Storing the key *and* the text means a
+reworded objective shows up as drift carrying the text the outcome was
+linked to, and the key is never re-derived under a later normalization rule.\
+""",
+                        "properties": {
+                            "field": {
+                                "description": "Which V2MOM list the objective lives in",
+                                "enum": ["measure", "method"],
+                                "title": "Field",
+                                "type": "string",
+                            },
+                            "key": {
+                                "description": "Frozen content key for the objective text",
+                                "title": "Key",
+                                "type": "string",
+                            },
+                            "text": {
+                                "description": "The objective text as it read when the link was made",
+                                "title": "Text",
+                                "type": "string",
+                            },
+                        },
+                        "required": ["field", "key", "text"],
+                        "title": "OutcomeAlignment",
+                        "type": "object",
+                    },
                 },
                 "properties": {
                     "claim_check": {
@@ -1827,9 +1923,47 @@ A skip without a reason is not a skip, it is a missing answer, so
                         "description": "The Study wave this outcome was measured in, or None for a row that predates studies",
                         "title": "Study Id",
                     },
+                    "trace": {
+                        "description": "The V2MOM methods and measures this outcome advances. Empty means the outcome is unlinked, which the traceability report calls an orphan.",
+                        "items": {"$ref": "#/$defs/OutcomeAlignment"},
+                        "title": "Trace",
+                        "type": "array",
+                    },
                 },
                 "required": ["job_id", "statement"],
                 "title": "Outcome",
+                "type": "object",
+            },
+            "OutcomeAlignment": {
+                "description": """\
+A claim that an Outcome advances one V2MOM objective.
+
+``field`` is ``method`` or ``measure``; ``key`` is the content key computed
+from ``field`` and ``text`` when the link was made; ``text`` is the
+canonical objective text then. Storing the key *and* the text means a
+reworded objective shows up as drift carrying the text the outcome was
+linked to, and the key is never re-derived under a later normalization rule.\
+""",
+                "properties": {
+                    "field": {
+                        "description": "Which V2MOM list the objective lives in",
+                        "enum": ["measure", "method"],
+                        "title": "Field",
+                        "type": "string",
+                    },
+                    "key": {
+                        "description": "Frozen content key for the objective text",
+                        "title": "Key",
+                        "type": "string",
+                    },
+                    "text": {
+                        "description": "The objective text as it read when the link was made",
+                        "title": "Text",
+                        "type": "string",
+                    },
+                },
+                "required": ["field", "key", "text"],
+                "title": "OutcomeAlignment",
                 "type": "object",
             },
             "OutcomeCandidate": {
@@ -2036,6 +2170,12 @@ an outcome in the group has no score, because a segment cannot be classified
 from partial evidence. No demographic attribute appears here by design.\
 """,
                 "properties": {
+                    "computed_at_event_id": {
+                        "anyOf": [{"type": "integer"}, {"type": "null"}],
+                        "default": None,
+                        "description": "The store revision this segment was derived from. None when it was derived before the field existed, which reads as unknown, not fresh.",
+                        "title": "Computed At Event Id",
+                    },
                     "confidence": {
                         "description": "How much evidence supports this",
                         "maximum": 1.0,
@@ -2082,6 +2222,12 @@ from partial evidence. No demographic attribute appears here by design.\
                         "description": "Why this verdict, naming the outcomes behind it",
                         "title": "Rationale",
                         "type": "string",
+                    },
+                    "stale": {
+                        "anyOf": [{"type": "boolean"}, {"type": "null"}],
+                        "default": None,
+                        "description": "Computed at read time, never stored: whether the store has moved on since computed_at_event_id. None when no read has labelled it yet.",
+                        "title": "Stale",
                     },
                     "verdict": {
                         "anyOf": [{"$ref": "#/$defs/SegmentVerdict"}, {"type": "null"}],
@@ -2176,6 +2322,12 @@ A strategy without its rejections is a conclusion, not a recommendation, so
                         "title": "Bets",
                         "type": "array",
                     },
+                    "computed_at_event_id": {
+                        "anyOf": [{"type": "integer"}, {"type": "null"}],
+                        "default": None,
+                        "description": "The store revision this strategy was derived from. None when it was derived before the field existed, which reads as unknown, not fresh.",
+                        "title": "Computed At Event Id",
+                    },
                     "created_at": {"format": "date-time", "title": "Created At", "type": "string"},
                     "id": {"title": "Id", "type": "string"},
                     "kind": {"$ref": "#/$defs/StrategyKind"},
@@ -2190,6 +2342,12 @@ A strategy without its rejections is a conclusion, not a recommendation, so
                         "default": None,
                         "description": "The segment this bet is aimed at",
                         "title": "Segment Id",
+                    },
+                    "stale": {
+                        "anyOf": [{"type": "boolean"}, {"type": "null"}],
+                        "default": None,
+                        "description": "Computed at read time, never stored: whether the store has moved on since computed_at_event_id. None when no read has labelled it yet.",
+                        "title": "Stale",
                     },
                     "thesis": {
                         "description": "One paragraph: why this path, from the evidence",

@@ -141,7 +141,7 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 
 <!-- BEGIN GENERATED TOOLS (scripts/integration_guide.py) -->
 
-61 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
+65 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
 
 | Tool | Effect | Stage | Required arguments | Purpose |
 | ---- | ------ | ----- | ------------------ | ------- |
@@ -204,6 +204,10 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `list_proposals` | `read` | 2 | — | List outcome proposals, optionally filtered by status. |
 | `approve_proposal` | `write` | 2 | `proposal_id` | Approve a proposal and write it as an Outcome. |
 | `reject_proposal` | `write` | 2 | `proposal_id` | Reject a proposal; nothing is written to the ODI store. |
+| `link_outcome` | `write` | 6 | `outcome_id`, `field`, `text` | Link an Outcome to the V2MOM method or measure it advances. |
+| `unlink_outcome` | `write` | 6 | `outcome_id`, `field`, `key` | Remove an Outcome's link to a method or measure. |
+| `get_outcome_alignments` | `read` | 6 | — | Read how each Outcome lines up with the V2MOM. |
+| `get_traceability_report` | `read` | 6 | — | Report which outcomes trace to a method and which do not. |
 | `open_study` | `write` | — | `job_id`, `name`, `wave` | Open a named study pass over a Job at a given wave number. |
 | `list_studies` | `read` | — | — | List the studies opened for a Job. |
 
