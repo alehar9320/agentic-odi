@@ -65,6 +65,7 @@ from agentic_odi_core import (
 from agentic_odi_core import (
     reject_candidate as reject_candidate_impl,
 )
+from agentic_odi_core.errors import ValidationError as OdiValidationError
 from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
 from pydantic import ValidationError
