@@ -71,15 +71,16 @@ export function UpdateBanner() {
   return (
     <section
       className={`update-banner update-banner--${view.kind}`}
-      role="status"
-      aria-live="polite"
       aria-label="Software update"
     >
       <span className="update-banner__mark" aria-hidden="true">
         {view.kind === "ready" ? <CheckIcon size={15} /> : "◍"}
       </span>
 
-      <div className="update-banner__copy">
+      {/* The announcement rides the title and detail only. The progress bar
+          below changes on every percent and is not announced: a screen reader
+          hears the title once, not once per tick. */}
+      <div className="update-banner__copy" role="status" aria-live="polite">
         <p className="update-banner__title">{title}</p>
         <p className="update-banner__detail">{detail}</p>
       </div>

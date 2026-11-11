@@ -297,7 +297,33 @@ rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
 agentic_odi_mcp_server)…`. When the Studio is reached through the free
 Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 `{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
-…"}}` with `X-Request-ID` echoed for support.
+…", "origin": "proxy"}}` with `X-Request-ID` echoed for support. The `origin`
+marker is what tells the SPA this body came from the Worker, not the sidecar,
+so the turn still falls back to the local BFF instead of reading as an answer.
+
+### Where the Studio is running
+
+The Studio can run in four places, and **Settings → About** says which one before
+anyone starts diagnosing. One module, `apps/studio/src/bridge/runtime.ts`, answers
+it; About and the diagnostics bundle read the same answer, so the two cannot
+disagree.
+
+| Host | Label | Reaches the sidecar | Offline shell |
+|---|---|---|---|
+| Installed desktop app (Tauri) | `Desktop app` | Directly, on the sidecar's own origin | as the shell provides |
+| Installed web app (PWA) | `Installed web app` | Same origin as the page | on when a service worker controls the page |
+| Browser tab on this device | `Browser tab` | Same origin; loopback | on when a service worker controls the page |
+| Browser tab on a host | `Browser tab` | Same origin; remote | on when a service worker controls the page |
+
+The **Runtime** row reads `Installed web app · on this device · offline shell on`
+and never a URL or a key. The same facts travel in the diagnostics bundle under
+`app.runtime` (`host`, `install`, `originClass`, `apiTransport`, `offlineShell`,
+`platform`), which still carries no hostname. Host decides the API base, not what
+the app can do: nothing here infers that a model is missing.
+
+Installing is offered only where it is meaningful — in a browser, and only while
+the app is not already its own window. The desktop app and an installed web app
+show no **Install** control, because neither can be installed again.
 
 ### When the database failed its check
 
@@ -349,6 +375,18 @@ fixtures. Its real content is the store's signal inbox
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
+
+The Opportunity Matrix is held to the same rule. It plots a point only for an
+outcome the store actually scored — no default of 5 fills a missing importance
+or satisfaction, and no score is computed from a pair that was never given. An
+unscored outcome is therefore absent from the plot rather than sitting at its
+centre as though it were measured; it appears instead under a **Not scored (n)**
+list below the matrix, where **Score me** opens that outcome's score form without
+inventing a rating. The shaded underserved zone is the score formula itself —
+sampled from `2 × importance − satisfaction > 10` and drawn with its threshold
+line — so the region a point sits in and `isUnderserved` never disagree. The
+pill follows suit: a score the store never computed reads **Not scored**, never
+**Served**.
 
 ### The thread is the room
 
@@ -426,8 +464,9 @@ cites the issue or PR that landed it.
 | `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
 | `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Custom text/file renderers, because claim chips and extraction state need them. | — |
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
-| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter. | #238 |
+| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter; each chip is an `AttachmentPrimitive.Root`. | #238 |
 | `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works through the composer's own handlers with the same accept rules. | — |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`; extraction state, refusal reason and size ride inside `Root` as children, but the sent-turn chip in `parts.tsx` still writes its own markup. | — |
 | `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | The quote shows above the input and can be cleared before send. | #435 |
 | `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | The microphone, hidden where unsupported. | #433 |
 | `ComposerPrimitive.Queue` | Adopted | The pending lane rendered above the composer. | #410 |
