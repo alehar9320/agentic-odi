@@ -26,29 +26,7 @@ T = TypeVar("T")
 #: Tools the contract declares read-only. Derived, never hand-maintained, so the
 #: gate and the contract cannot disagree about what needs consent.
 READ_ONLY_TOOLS: frozenset[str] = frozenset(
-<<<<<<< HEAD
     name for name, spec in TOOL_SPECS.items() if spec.effect is ToolEffect.READ
-=======
-    {
-        ToolName.GET_JOBS.value,
-        ToolName.GET_JOB.value,
-        ToolName.GET_JOB_MAP.value,
-        ToolName.GET_STEP.value,
-        ToolName.GET_OUTCOMES.value,
-        ToolName.GET_OUTCOME.value,
-        ToolName.GET_CUSTOMER_OUTCOME.value,
-        ToolName.LIST_CUSTOMER_OUTCOMES.value,
-        ToolName.GET_EVIDENCE.value,
-        ToolName.LIST_EVIDENCE.value,
-        ToolName.EVALUATE_OUTCOME.value,
-        ToolName.GET_ODI_SCHEMA.value,
-        ToolName.COMPUTE_OPPORTUNITY.value,
-        ToolName.GET_FRAMEWORK_GUIDELINES.value,
-        ToolName.GET_CAPABILITIES.value,
-        ToolName.GET_OUTCOME_ALIGNMENTS.value,
-        ToolName.GET_TRACEABILITY_REPORT.value,
-    }
->>>>>>> origin/main
 )
 
 #: Every other declared tool. A write or a delete changes the workspace, so it is

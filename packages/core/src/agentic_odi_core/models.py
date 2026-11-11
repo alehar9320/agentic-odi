@@ -209,9 +209,7 @@ class Outcome(BaseModel):
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
     )
-<<<<<<< HEAD
     origin: Origin = Field("user", description="Where this row came from")
-=======
     trace: list[OutcomeAlignment] = Field(
         default_factory=list,
         description=(
@@ -219,7 +217,6 @@ class Outcome(BaseModel):
             "the outcome is unlinked, which the traceability report calls an orphan."
         ),
     )
->>>>>>> origin/main
     claim_check: ClaimCheck | None = Field(
         None, description="The questions that produced the score, and what came back"
     )
