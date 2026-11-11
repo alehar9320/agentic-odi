@@ -9,7 +9,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Any
 
 import typer
 
@@ -296,38 +296,6 @@ def doctor_cmd(
                 err=True,
             )
             raise typer.Exit(code=1)
-
-
-@app.command(name="restore")
-def restore_cmd(
-    backup_file: Annotated[Path, typer.Argument(help="Path to the backup file to restore from.")],
-    yes: bool = typer.Option(False, "--yes", help="Skip confirmation and restore immediately."),
-) -> None:
-    """Restore the ODI store from a backup file."""
-    from agentic_odi_core.errors import StoreCorrupt
-    from agentic_odi_core.sqlite_repository import SQLiteRepository
-
-    db_path_str = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
-
-    if not yes:
-        typer.echo(
-            f"This will replace {db_path_str} with {backup_file}. "
-            "The current database will be moved to a .pre-restore-* file. Continue?"
-        )
-        if not typer.confirm("Proceed?"):
-            typer.echo("Aborted.")
-            raise typer.Exit(code=0)
-
-    repo = SQLiteRepository(db_path=db_path_str)
-    try:
-        repo.restore(str(backup_file))
-    except (StoreCorrupt, Exception) as exc:  # noqa: BLE001
-        typer.echo(f"Restore failed: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
-    finally:
-        repo.close()
-
-    typer.echo(f"Restored {db_path_str} from {backup_file}.")
 
 
 def _export_payload(job_id: str | None) -> dict[str, Any]:
