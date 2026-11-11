@@ -17,12 +17,14 @@ import {
   hasScore,
   isOnlyWorkaround,
   isUnderserved,
+  isUnderservedPoint,
   nAdvisory,
   opportunityPill,
   opportunityScore,
   scoredAverage,
   segmentBasisLine,
   summarizeMemberScores,
+  underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
 } from "./odi";
 
@@ -163,11 +165,44 @@ describe("opportunityPill", () => {
     });
   });
 
-  it("marks served outcomes green and never crashes on null", () => {
-    expect(opportunityPill(null)).toEqual({
-      label: "✓ Served (Opp: N/A)",
+  it("marks served outcomes green", () => {
+    expect(opportunityPill(8)).toEqual({
+      label: "✓ Served (Opp: 8.0)",
       variant: "green",
     });
+  });
+
+  // A missing score is not a verdict. The pill must not read "Served", and it
+  // must not print "N/A" inside a sentence that claims something about the outcome.
+  it("returns a neutral Not scored descriptor for a missing score", () => {
+    expect(opportunityPill(null)).toEqual({ label: "Not scored", variant: "blue" });
+    expect(opportunityPill(undefined)).toEqual({ label: "Not scored", variant: "blue" });
+    expect(opportunityPill(null).label).not.toContain("Served");
+    expect(opportunityPill(null).label).not.toContain("N/A");
+  });
+});
+
+describe("the underserved boundary", () => {
+  it("solves 2·importance − satisfaction = 10 for importance", () => {
+    expect(underservedBoundaryImportance(0)).toBe(5);
+    expect(underservedBoundaryImportance(4.9)).toBeCloseTo(7.45, 5);
+    expect(underservedBoundaryImportance(10)).toBe(10);
+  });
+
+  it("agrees with isUnderserved at and around the boundary", () => {
+    // At satisfaction 8 the boundary importance is (10 + 8) / 2 = 9, and the
+    // values are exactly representable so the two rules cannot diverge on
+    // floating-point noise rather than on the boundary itself.
+    const cases: Array<[number, number, boolean]> = [
+      [4, 8, false], // score 4 -> served
+      [9, 8, false], // score 10 -> on the line, not underserved
+      [9.5, 8, true], // score 11 -> underserved
+      [5.5, 0, true], // score 11 -> underserved
+    ];
+    for (const [importance, satisfaction, expected] of cases) {
+      expect(isUnderservedPoint(importance, satisfaction)).toBe(expected);
+      expect(isUnderserved(opportunityScore(importance, satisfaction))).toBe(expected);
+    }
   });
 });
 

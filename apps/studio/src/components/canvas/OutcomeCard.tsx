@@ -8,6 +8,7 @@ import {
 } from "../../api/studioApi";
 import {
   existingSolutionLabel,
+  formatAdvances,
   formatBandProvenance,
   formatOpportunityScore,
   formatSample,
@@ -24,10 +25,14 @@ export function OutcomeCard({
   outcome,
   sample = false,
   detail = false,
+  startEditing = false,
 }: {
   outcome: Outcome;
   sample?: boolean;
   detail?: boolean;
+  /** Opens the score form on mount or when it flips true, so a caller can send
+   * the reader straight to the one control that fixes a missing score. */
+  startEditing?: boolean;
 }) {
   const { ask, canvasState, deleteOutcome, pushToast, saveThesis, settings, updateOutcome } =
     useStudio();
@@ -37,7 +42,7 @@ export function OutcomeCard({
   );
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [thesisOpen, setThesisOpen] = useState(false);
   const [rationale, setRationale] = useState("");
   const [importance, setImportance] = useState(outcome.importance ?? 5);
@@ -217,6 +222,8 @@ export function OutcomeCard({
           ) : null}
         </div>
       ) : null}
+
+      <p className="card__advances">{formatAdvances(outcome)}</p>
       {(check || bareNumber) && (
         <div className={`claim-check${verified ? "" : " claim-check--unverified"}`}>
           {check ? (

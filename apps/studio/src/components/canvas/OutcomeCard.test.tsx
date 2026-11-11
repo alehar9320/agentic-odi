@@ -144,3 +144,43 @@ describe("OutcomeCard claim check", () => {
     expect(container.querySelector(".claim-check")).toBeNull();
   });
 });
+
+describe("OutcomeCard advances link", () => {
+  it("names the objective an outcome advances, with the field", () => {
+    const linked = {
+      ...outcome,
+      trace: [{ field: "method", key: "abc123", text: "Cut release time in half" }],
+    };
+    render(<OutcomeCard outcome={linked} />);
+    expect(screen.getByText(/Advances Cut release time in half \(method\)/i)).toBeInTheDocument();
+  });
+
+  it("joins several links with a separator", () => {
+    const linked = {
+      ...outcome,
+      trace: [
+        { field: "method", key: "abc123", text: "Cut release time in half" },
+        { field: "measure", key: "def456", text: "Release time" },
+      ],
+    };
+    render(<OutcomeCard outcome={linked} />);
+    expect(screen.getByText(/Cut release time in half \(method\) · Release time \(measure\)/i)).toBeInTheDocument();
+  });
+
+  it("says plainly that an unlinked outcome advances nothing yet", () => {
+    render(<OutcomeCard outcome={outcome} />);
+    expect(screen.getByText("Advances nothing yet")).toBeInTheDocument();
+  });
+
+  it("never invents an objective from a guessed id", () => {
+    // The link text is recorded at filing time. A reworded vision leaves the
+    // frozen text behind as drift evidence rather than updating the card.
+    const drifted = {
+      ...outcome,
+      trace: [{ field: "method", key: "old-key", text: "Old objective wording" }],
+    };
+    render(<OutcomeCard outcome={drifted} />);
+    expect(screen.getByText(/Old objective wording \(method\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/new objective/i)).toBeNull();
+  });
+});

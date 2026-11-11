@@ -63,6 +63,24 @@ The statement checker is deliberately mechanical: it requires a leading
 (`notification`, `dashboard`, `button`, …). It returns issues and suggestions
 rather than a bare boolean so the agent can repair a statement in the same turn.
 
+## Outcome statement rubric
+
+The following table lists every rule enforced by `evaluate_outcome_statement`,
+published by `outcome_rubric()`, and checked per rule in the `checks` array
+returned by the evaluator. The rubric is derived from the validator constants,
+so a constant edit cannot drift from the published rules.
+
+| Rule ID | Label | Check | Fails when | Example (failing) |
+|---|---|---|---|---|
+| `direction` | Leading direction | Statement starts with "Minimize" or "Maximize" | Missing or wrong leading word | `The time it takes to onboard a customer when they sign up` |
+| `unit_of_measure` | Unit of measure | Contains a known unit (time, cost, number, frequency, rate, percentage, steps, attempts, or a digit) | No unit and no digit | `Minimize the onboarding when they sign up` |
+| `object_of_control` | Object of control | Names an object after "the" | No " the " in statement | `Minimize time to onboard a customer when they sign up` |
+| `contextual_clarifier` | Contextual clarifier | Contains a context marker (when, while, before, after, during, if, as) | No context marker | `Minimize the time it takes to onboard a customer` |
+| `min_words` | Minimum length | At least 6 words | Fewer than 6 words | `Minimize the time` |
+| `max_chars` | Maximum length | At most 200 characters | More than 200 characters | (long statement exceeding 200 chars) |
+| `vague_terms` | No vague terms | No vague terms (better, improve, optimize, faster, easier) | Any vague term present | `Make onboarding faster when they sign up` |
+| `solution_nouns` | No solution nouns | No solution nouns (notification, dashboard, button, feature, screen, email, workflow, integration, report, toggle) | Any solution noun present | `I want a notification when onboarding finishes` |
+
 ## What the alternatives were
 
 - **Free-text outcomes judged by the model.** Rejected: the model cannot be the
