@@ -130,3 +130,22 @@ export function segmentBasisLine(peopleInferred: boolean): string {
     : "People named from your evidence.";
 }
 
+/**
+ * The one line an outcome card or table row shows for what it advances.
+ *
+ * The link is recorded at filing time, so the text shown is the objective's
+ * text as it read then — a reworded vision leaves the old text behind as
+ * drift evidence rather than silently updating the card. An outcome with no
+ * link says plainly that it advances nothing yet, and never invents an
+ * objective: a guess dressed as a record is the one thing this surface must
+ * not do.
+ */
+export function formatAdvances(outcome: Outcome): string {
+  const links = outcome.trace ?? [];
+  if (links.length === 0) {
+    return "Advances nothing yet";
+  }
+  const parts = links.map((link) => `${link.text} (${link.field})`);
+  return `Advances ${parts.join(" · ")}`;
+}
+

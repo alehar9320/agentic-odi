@@ -426,6 +426,55 @@ describe("OpportunityLandscape stored versus displayed score", () => {
   });
 });
 
+describe("OpportunityLandscape advances column", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  it("shows the objective an outcome advances, in the table view", () => {
+    renderWith([
+      {
+        id: "O-101",
+        statement: "Minimize time spent syncing secrets",
+        importance: 9,
+        satisfaction: 2,
+        opportunity_score: 16,
+        trace: [{ field: "method", key: "abc123", text: "Cut release time in half" }],
+      },
+    ]);
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText(/Advances Cut release time in half \(method\)/i)).toBeInTheDocument();
+  });
+
+  it("says plainly that an unlinked outcome advances nothing yet", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getAllByText("Advances nothing yet").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the frozen text of a reworded vision as drift evidence", () => {
+    renderWith([
+      {
+        id: "O-101",
+        statement: "Minimize time spent syncing secrets",
+        importance: 9,
+        satisfaction: 2,
+        opportunity_score: 16,
+        trace: [{ field: "method", key: "old-key", text: "Old objective wording" }],
+      },
+    ]);
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText(/Old objective wording \(method\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/new objective/i)).toBeNull();
+  });
+});
+
 describe("OpportunityLandscape motion preference", () => {
   function stubMotion(reduced: boolean) {
     vi.stubGlobal("matchMedia", (query: string) => ({

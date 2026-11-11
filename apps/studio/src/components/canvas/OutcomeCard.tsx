@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import {
+  formatAdvances,
   formatOpportunityScore,
   hasScore,
   isUnderserved,
@@ -81,6 +82,8 @@ export function OutcomeCard({
         <span aria-hidden="true"> · </span>
         Opportunity <b>{formatOpportunityScore(opp)}</b>
       </p>
+
+      <p className="card__advances">{formatAdvances(outcome)}</p>
 
       {(check || bareNumber) && (
         <div className={`claim-check${verified ? "" : " claim-check--unverified"}`}>
