@@ -315,6 +315,12 @@ export type ChatPart =
       name: string;
       status: ToolStatus;
       preview?: string;
+      /**
+       * Epoch milliseconds the store recorded when the running call arrived, so
+       * a pending row can show a real elapsed time without inventing one. Absent
+       * on a turn restored from history, where the store never saw it start.
+       */
+      startedAt?: number;
       /** Present while the runtime is waiting for the user's answer. */
       approval?: ToolApproval;
     }
