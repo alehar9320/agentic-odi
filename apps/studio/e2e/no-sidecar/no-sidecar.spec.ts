@@ -10,6 +10,8 @@ import { COMPOSER, CONVERSATION, openStudio, sendMessage } from "../helpers";
  */
 const JOB = "Get a service from commit to production";
 const STATEMENT = "Minimize the time it takes to rotate deployment secrets";
+/** What `writeReceipt` says when a write landed in the browser store. */
+const PENDING_RECEIPT = "Saved on this device · will sync";
 
 /**
  * Page errors are collected per test. A caught fetch failure is not a
@@ -105,14 +107,14 @@ test("captures a job and an outcome, then keeps them across a reload", async ({ 
 
   await page.getByLabel("Job name").fill(JOB);
   await page.getByRole("button", { name: "Add job" }).click();
-  await expect(page.getByText(`Job created: ${JOB}`).first()).toBeVisible();
+  // A browser-only write is acknowledged as a local save, not as a sidecar ack.
+  await expect(page.getByText(PENDING_RECEIPT).first()).toBeVisible();
 
   await page.getByLabel("Desired outcome").fill(STATEMENT);
   await page.getByRole("button", { name: "Record outcome" }).click();
-  await expect(page.getByText("Outcome captured successfully!").first()).toBeVisible();
-
-  // The write went to the browser store, not into a failed request's error state.
-  expect(await storedStatements(page)).toContain(STATEMENT);
+  // Both writes were acknowledged as local saves; the browser store is where
+  // the outcome actually is, so wait on that rather than on a sidecar receipt.
+  await expect.poll(async () => await storedStatements(page)).toContain(STATEMENT);
   await expect(page.locator(".banner").filter({ hasText: "That write was rejected" })).toHaveCount(
     0,
   );
