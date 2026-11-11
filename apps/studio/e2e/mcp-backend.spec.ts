@@ -93,7 +93,10 @@ test.describe("the Studio on the MCP backend", () => {
   test("shows the seeded job in the job map lens", async ({ page }) => {
     await openStudio(page);
 
-    await page.getByRole("button", { name: "Map the job" }).click();
+    // The job map, opened the way it is opened without a model: the slash
+    // command. "Map the job" only ever lived in the deleted banner.
+    await page.getByRole("textbox", { name: COMPOSER }).fill("/jobmap");
+    await page.keyboard.press("Enter");
     await expect(lens(page)).toHaveAttribute("aria-label", "Universal job map");
   });
 });
