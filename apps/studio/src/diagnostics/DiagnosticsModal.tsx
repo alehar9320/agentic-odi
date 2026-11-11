@@ -20,6 +20,16 @@ export function DiagnosticsModal({
   const [copyMessage, setCopyMessage] = useState("");
   useFocusTrap(dialogRef, true, true);
 
+  // The confirmation is a receipt, not a state: it says the copy happened and
+  // then gets out of the way, leaving the dialog exactly as it was.
+  useEffect(() => {
+    if (!copyMessage) {
+      return;
+    }
+    const timer = window.setTimeout(() => setCopyMessage(""), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copyMessage]);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {

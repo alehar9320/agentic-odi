@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
@@ -136,6 +136,33 @@ describe("DiagnosticsModal", () => {
     expect(create).toHaveBeenCalledOnce();
     expect(revoke).toHaveBeenCalledWith("blob:diagnostics");
     expect(click).toHaveBeenCalledOnce();
+  });
+
+  it("clears the copy confirmation after two seconds", async () => {
+    vi.useFakeTimers();
+    const write = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: write },
+    });
+    render(<DiagnosticsModal {...modalProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Diagnostics copied.")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1999);
+    });
+    expect(screen.getByText("Diagnostics copied.")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByText("Diagnostics copied.")).toBeNull();
+    vi.useRealTimers();
   });
 
   it("still prepares a local bundle when the sidecar is unavailable", async () => {

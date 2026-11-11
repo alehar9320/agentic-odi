@@ -62,6 +62,8 @@ vi.mock("./api/studioApi", () => ({
   dismissSignal: vi.fn(async () => ({ id: "sig-1" })),
   fetchConnectorCatalog: vi.fn(async () => []),
   fetchConnectors: vi.fn(async () => []),
+  // The probe breaker (#536) asks this to tell a flaky network from a refusal.
+  isTransportFailure: () => false,
   asStudioError: (error: unknown) => {
     // Mirror the real helper: a StudioApiError carries the sidecar's whole
     // error body, so a structured failure survives the mock.
