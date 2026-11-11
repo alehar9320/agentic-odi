@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { offlineNotice, openStudio, rail, resetRepository } from "./helpers";
+import { openStudio, rail, resetRepository } from "./helpers";
 
 /**
  * Capturing an outcome by hand is the promise the Studio makes when no model
@@ -21,7 +21,7 @@ test.describe("capturing an outcome", () => {
     await openStudio(page);
 
     // The offline notice offers a way into the capture panel.
-    await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
+    await page.getByRole("button", { name: "Capture an outcome" }).click();
 
     const panel = page.getByRole("complementary", { name: "Capture by hand" });
     await expect(panel).toBeVisible();
@@ -47,7 +47,7 @@ test.describe("capturing an outcome", () => {
 
   test("recomputes the opportunity score as the sliders move", async ({ page }) => {
     await openStudio(page);
-    await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
+    await page.getByRole("button", { name: "Capture an outcome" }).click();
 
     const panel = page.getByRole("complementary", { name: "Capture by hand" });
     const score = panel.locator(".score-preview");
@@ -70,7 +70,7 @@ test.describe("capturing an outcome", () => {
 
   test("marks a low-importance outcome as appropriately served", async ({ page }) => {
     await openStudio(page);
-    await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
+    await page.getByRole("button", { name: "Capture an outcome" }).click();
 
     const panel = page.getByRole("complementary", { name: "Capture by hand" });
     await panel.getByLabel(/^Importance/).fill("4");
@@ -83,7 +83,7 @@ test.describe("capturing an outcome", () => {
 
   test("will not record an outcome without a statement", async ({ page }) => {
     await openStudio(page);
-    await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
+    await page.getByRole("button", { name: "Capture an outcome" }).click();
 
     const panel = page.getByRole("complementary", { name: "Capture by hand" });
     // An outcome always belongs to a job, so the repository starts empty here.
