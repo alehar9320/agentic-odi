@@ -7,6 +7,13 @@ import { formatRelativeTime, groupByDay } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { formatRetryCountdown } from "../../state/probeBreaker";
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import { fetchChangelog } from "../../api/studioApi";
+import {
+  CHANGELOG_READ_EVENT,
+  readReleaseVersions,
+  unreadReleases,
+} from "../../lib/changelogRead";
+import type { ChangelogRelease } from "../../types";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import {
@@ -61,6 +68,9 @@ export function StudioBar({
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Unread release notes: null until the fetch answers. A failed fetch leaves it
+  // null and shows no dot, so a sidecar that is down is never mistaken for news.
+  const [unreadReleasesCount, setUnreadReleasesCount] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -96,6 +106,33 @@ export function StudioBar({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [menuOpen]);
+
+  // The dot means "there is something you have not read". It is fetched once on
+  // mount and cleared when the modal says the releases were marked read; a failed
+  // fetch leaves it null, and null draws nothing.
+  useEffect(() => {
+    let mounted = true;
+    const show = (releases: ChangelogRelease[] | null) => {
+      if (mounted) {
+        setUnreadReleasesCount(
+          releases ? unreadReleases(releases, readReleaseVersions()).length : null,
+        );
+      }
+    };
+    function onRead() {
+      if (mounted) {
+        setUnreadReleasesCount(0);
+      }
+    }
+    fetchChangelog()
+      .then((data) => show(data.releases))
+      .catch(() => show(null));
+    window.addEventListener(CHANGELOG_READ_EVENT, onRead);
+    return () => {
+      mounted = false;
+      window.removeEventListener(CHANGELOG_READ_EVENT, onRead);
+    };
+  }, []);
 
   useEffect(() => {
     if (!askOpen) {
@@ -276,6 +313,12 @@ export function StudioBar({
           aria-label="Open What's New changelog"
         >
           ✨ What's New
+          {unreadReleasesCount ? (
+            <>
+              <span className="changelog-dot" aria-hidden="true" />
+              <span className="sr-only">new release notes</span>
+            </>
+          ) : null}
         </button>
 
         <div className="bar__new-wrap" ref={askRef} onKeyDown={onAskKeyDown}>

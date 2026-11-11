@@ -4301,6 +4301,16 @@ html.theme-fading *::after {
   box-shadow: 0 0 12px rgba(129, 140, 248, 0.25);
 }
 
+/* The unread dot on "What's New": one accent mark, no count, cleared the moment
+ * the releases are marked read. */
+.changelog-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.6);
+}
+
 .changelog-overlay {
   position: fixed;
   inset: 0;

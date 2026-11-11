@@ -10,6 +10,12 @@ import type { ChangelogRelease } from "../types";
 
 export const CHANGELOG_READ_KEY = "agentic-odi.changelog.read";
 
+/**
+ * Fired after releases are marked read. The bar's unread dot lives outside the
+ * modal, so it clears by hearing this rather than by the modal reaching into it.
+ */
+export const CHANGELOG_READ_EVENT = "agentic-odi:changelog-read";
+
 /** Old versions fall off the end; nobody scrolls back further than this. */
 const MAX_REMEMBERED = 200;
 
@@ -38,6 +44,7 @@ export function markReleasesRead(versions: readonly string[]): string[] {
   } catch {
     /* storage unavailable: the badge still clears for this session */
   }
+  window.dispatchEvent(new Event(CHANGELOG_READ_EVENT));
   return next;
 }
 

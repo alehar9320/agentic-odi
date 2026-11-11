@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -9,6 +9,11 @@ vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
 
+vi.mock("../../api/studioApi", () => ({
+  fetchChangelog: vi.fn(async () => ({ releases: [] })),
+}));
+
+import { fetchChangelog } from "../../api/studioApi";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import type { UpdateSnapshot } from "../../updater/types";
@@ -745,5 +750,58 @@ describe("history is grouped by day (#694 D13)", () => {
     expect(screen.getByRole("group", { name: "Today" })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Yesterday" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Earlier" })).toBeNull();
+  });
+});
+
+describe("What's New unread dot (#695 D19)", () => {
+  beforeEach(() => {
+    vi.mocked(useUpdateSnapshot).mockReturnValue(stubSnapshot() as never);
+    window.localStorage.clear();
+  });
+
+  it("shows one dot with an sr-only label when a release is unread", async () => {
+    vi.mocked(fetchChangelog).mockResolvedValue({
+      releases: [{ version: "0.16.0", date: "2026-11-01", notes: [] }],
+    } as never);
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+
+    const { container } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+
+    expect(await screen.findByText("new release notes")).toBeInTheDocument();
+    expect(container.querySelectorAll(".changelog-dot")).toHaveLength(1);
+  });
+
+  it("clears the dot the moment the releases are marked read", async () => {
+    vi.mocked(fetchChangelog).mockResolvedValue({
+      releases: [{ version: "0.16.0", date: "2026-11-01", notes: [] }],
+    } as never);
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+
+    const { container } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+    await screen.findByText("new release notes");
+
+    fireEvent(window, new Event("agentic-odi:changelog-read"));
+
+    await waitFor(() => {
+      expect(container.querySelectorAll(".changelog-dot")).toHaveLength(0);
+    });
+  });
+
+  it("draws no dot when the fetch fails", async () => {
+    vi.mocked(fetchChangelog).mockRejectedValue(new Error("sidecar down"));
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+
+    const { container } = render(
+      <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />,
+    );
+
+    await waitFor(() => {
+      expect(fetchChangelog).toHaveBeenCalled();
+    });
+    expect(container.querySelectorAll(".changelog-dot")).toHaveLength(0);
   });
 });
