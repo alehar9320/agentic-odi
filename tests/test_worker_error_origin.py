@@ -21,7 +21,9 @@ def _source() -> str:
 
 def test_the_factory_marks_every_body_as_proxy_origin() -> None:
     source = _source()
-    factory = source[source.index("function sidecarError(") : source.index("function localCapabilitiesResponse(")]
+    factory = source[
+        source.index("function sidecarError(") : source.index("function localCapabilitiesResponse(")
+    ]
     assert 'origin: "proxy"' in factory
 
 
