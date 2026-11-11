@@ -161,6 +161,7 @@ the pure count arithmetic:
 | `apps/studio/src/lib/intro.test.ts` | Introduction turns, parsing under empty, very long, and multi-fact replies, the proposed defaults, draft storage, and one-shot migration |
 | `apps/studio/src/components/setup/IntroConversation.test.tsx` | Five turns, skip, Escape, in-place summary edits, and the accepted brief with role, team, and evidence |
 | `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | The summary card as one Chromatic snapshot |
+| `apps/studio/src/components/OdiMascot.visual.test.tsx` | The home mark at 32 px, dark and light |
 
 ## Website Checks (GitHub Pages)
 
