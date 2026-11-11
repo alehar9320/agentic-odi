@@ -39,6 +39,7 @@ import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon, SpeakerIcon } from "../icons";
 import { Markdown } from "./Markdown";
+import { PendingCalls } from "./PendingCalls";
 import { StallNotice } from "./StallNotice";
 import { WorkBlock } from "./WorkBlock";
 import { workGrouping } from "./workGrouping";
@@ -445,6 +446,10 @@ export function Conversation() {
               EditComposer,
             }}
           />
+          {/* The calls still in flight, below the last message: the transcript
+              is the record of what happened, and this is the one place that
+              answers what has not happened yet. */}
+          <PendingCalls />
         </div>
       </TranscriptClockContext.Provider>
     </UiActionContext.Provider>

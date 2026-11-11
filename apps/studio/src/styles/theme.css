@@ -7327,3 +7327,48 @@ textarea,
 [contenteditable="true"] {
   caret-color: var(--accent);
 }
+
+/* The calls a turn is waiting on (issue #390). A summary, not a second
+   transcript: it sits below the last message and carries only what is still in
+   flight, in the transcript's own row anatomy. */
+.pending-calls {
+  margin: 2px 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.pending-calls__head {
+  margin: 0 0 4px;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.pending-calls__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pending-calls__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pending-calls__state {
+  color: var(--faint);
+  opacity: 0.85;
+}
+
+.pending-calls__elapsed {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.pending-calls__prompt {
+  color: var(--muted);
+  font-size: 12.5px;
+}

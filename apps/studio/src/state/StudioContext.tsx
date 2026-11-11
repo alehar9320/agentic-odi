@@ -1846,7 +1846,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           toolSeq += 1;
           parts = [
             ...parts,
-            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status },
+            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status, startedAt: Date.now() },
           ];
           return;
         }
@@ -1855,6 +1855,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
             ...open,
             status,
             ...(preview ? { preview } : {}),
+            // The call settled, so the pending row stops counting: the start is
+            // dropped with the status it belonged to.
+            startedAt: undefined,
             // A result means the gate was answered; the question is spent.
             approval: undefined,
           };
@@ -1936,6 +1939,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
                 id: String(event.data.tool_call_id ?? `approval-${approvalId}`),
                 name: String(event.data.name ?? ""),
                 status: "running",
+                startedAt: Date.now(),
                 approval: {
                   id: approvalId,
                   prompt: String(event.data.prompt ?? "Allow this change?"),
