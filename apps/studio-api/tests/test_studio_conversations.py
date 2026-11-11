@@ -5,7 +5,6 @@ from __future__ import annotations
 import sqlite3
 
 import pytest
-
 from agentic_odi_core import InMemoryRepository
 from agentic_odi_studio_api.app import create_app
 from agentic_odi_studio_api.studio.claims import (
@@ -396,8 +395,7 @@ def test_deleting_a_thread_takes_its_turns_and_citations(tmp_path) -> None:
         ).fetchone()[0]
         # A citation whose turn is gone is a record nobody can read.
         orphan_citations = connection.execute(
-            "SELECT COUNT(*) FROM turn_citations "
-            "WHERE turn_id NOT IN (SELECT id FROM turns)"
+            "SELECT COUNT(*) FROM turn_citations WHERE turn_id NOT IN (SELECT id FROM turns)"
         ).fetchone()[0]
         kept_turns = connection.execute(
             "SELECT COUNT(*) FROM turns WHERE conversation_id = ?", (kept.id,)

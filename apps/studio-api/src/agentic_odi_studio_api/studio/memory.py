@@ -646,9 +646,7 @@ class StudioMemory:
             self._connection.execute(
                 "DELETE FROM turns WHERE conversation_id = ?", (conversation_id,)
             )
-            self._connection.execute(
-                "DELETE FROM conversations WHERE id = ?", (conversation_id,)
-            )
+            self._connection.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
 
     def _updated_conversation(self, conversation_id: str) -> Conversation:
         """Read back a row this instance just wrote.
