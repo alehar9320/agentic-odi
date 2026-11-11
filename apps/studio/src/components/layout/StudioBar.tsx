@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
@@ -187,12 +187,32 @@ export function StudioBar({
     }
   }
 
-  function exportConversation() {
+  const exportConversation = useCallback(() => {
     const exportedAt = new Date();
     downloadMarkdown(conversationToMarkdown(messages, exportedAt), exportFilename(exportedAt));
     setMenuOpen(false);
     pushToast("success", "Conversation exported as Markdown.");
-  }
+  }, [messages, pushToast]);
+
+  // The declared export shortcut (D46) has to actually fire, or the declaration
+  // is a lie. It reaches the same handler the menu item does and is inert when
+  // there is no thread to export.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === "e" &&
+        messages.length > 0
+      ) {
+        event.preventDefault();
+        exportConversation();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [messages, exportConversation]);
 
   // A measured answer outranks an inference from the settings. The shipped desktop
   // default points at the sidecar's own proxy — a loopback address the browser cannot
@@ -481,6 +501,7 @@ export function StudioBar({
                 className="bar__menu-item"
                 onClick={exportConversation}
                 disabled={messages.length === 0}
+                aria-keyshortcuts="Meta+Shift+E"
               >
                 Export → Markdown
               </button>

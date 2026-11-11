@@ -333,6 +333,7 @@ function ComposerBody({
           className="composer__input"
           rows={1}
           autoFocus={autoFocus}
+          aria-keyshortcuts="Meta+K"
           placeholder={
             placeholder ??
             (offline
@@ -415,6 +416,7 @@ function ComposerBody({
             <ComposerPrimitive.Send
               className="composer__send"
               aria-label="Send message"
+              aria-keyshortcuts="Enter"
               disabled={readBlocked}
             >
               <ArrowUpIcon size={18} />

@@ -153,7 +153,13 @@ export function CommandPalette({
   }
 
   return (
-    <div className="palette" role="listbox" id={id} aria-label="Commands">
+    <div
+      className="palette"
+      role="listbox"
+      id={id}
+      aria-label="Commands"
+      aria-keyshortcuts="/"
+    >
       {matches.length ? (
         matches.map((command, index) => (
           <PaletteOption
