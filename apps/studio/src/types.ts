@@ -80,11 +80,12 @@ export interface Thesis {
   outcome_id: string;
   job_id?: string;
   statement: string;
+  rationale: string;
   importance: number | null;
   satisfaction: number | null;
   opportunity_score: number | null;
-  rationale: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export type SegmentVerdict = "underserved" | "overserved" | "appropriately_served";
@@ -727,4 +728,12 @@ export interface ScheduledWork {
   created_at: string;
   last_run_at?: string | null;
   result_summary?: string | null;
+}
+
+export interface V2MOM {
+  vision: string;
+  values: string[];
+  methods: string[];
+  obstacles: string[];
+  measures: string[];
 }

@@ -482,6 +482,25 @@ python -m agentic_odi_cli connectors ingest --name github
 python -m agentic_odi_cli connectors ingest --name github --dry-run   # preview only
 ```
 
+## Check and restore the store
+
+`doctor` reports store health without mutating it, and `restore` recovers from a
+backup when `doctor` reports corruption.
+
+```bash
+agentic-odi doctor                          # quick_check, WAL size, entity counts
+agentic-odi doctor --json                   # machine-readable report
+agentic-odi doctor --backup                 # write a fresh backup first
+agentic-odi restore <backup-file>           # asks before replacing the store
+agentic-odi restore <backup-file> --yes     # skip the confirmation prompt
+```
+
+`doctor` runs `PRAGMA quick_check` and reports the schema version, the WAL size,
+entity counts, and the backups on disk. `restore` refuses a backup that fails
+`quick_check` or that a newer binary wrote, moves the current database aside as
+`<path>.pre-restore-<timestamp>`, and verifies the replacement before loading
+any state from it.
+
 ## Updates
 
 `odi update` checks for and installs a new binary release. Auto-update is on by

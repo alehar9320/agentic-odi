@@ -18,6 +18,7 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
 )
 from agentic_odi_core import (
+    V2MOM,
     EvidenceNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
@@ -110,6 +111,7 @@ from agentic_odi_studio_api.studio.schemas import (
     SharedArtifactResponse,
     ShareMintResponse,
     SignalActionRequest,
+    ThesisRequest,
     TraceabilityReportResponse,
     TurnNode,
     UpdateConversationRequest,
@@ -117,6 +119,7 @@ from agentic_odi_studio_api.studio.schemas import (
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
+    V2MOMRequest,
 )
 from agentic_odi_studio_api.studio.sharing import (
     ShareError,
@@ -1653,6 +1656,101 @@ async def promote_evidence(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return {"ok": True, "result": artifact.model_dump(mode="json")}
+
+
+@router.get("/api/vision")
+def get_vision(request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True, "result": None}
+    service = _service(request)
+    v2mom = service.get_v2mom()
+    if v2mom is None:
+        return {"ok": True, "result": None}
+    return {
+        "ok": True,
+        "result": {
+            "vision": v2mom.vision,
+            "values": v2mom.values,
+            "methods": v2mom.methods,
+            "obstacles": v2mom.obstacles,
+            "measures": v2mom.measures,
+        },
+    }
+
+
+@router.put("/api/vision")
+def put_vision(body: V2MOMRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True, "result": None}
+    service = _service(request)
+    v2mom = service.save_v2mom(
+        V2MOM(
+            vision=body.vision,
+            values=body.values,
+            methods=body.methods,
+            obstacles=body.obstacles,
+            measures=body.measures,
+        )
+    )
+    return {
+        "ok": True,
+        "result": {
+            "vision": v2mom.vision,
+            "values": v2mom.values,
+            "methods": v2mom.methods,
+            "obstacles": v2mom.obstacles,
+            "measures": v2mom.measures,
+        },
+    }
+
+
+@router.get("/api/theses")
+def list_theses(request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True, "result": []}
+    theses = _memory(request).list_theses()
+    return {
+        "ok": True,
+        "result": [thesis.to_dict() for thesis in theses],
+    }
+
+
+@router.post("/api/theses")
+def create_thesis(body: ThesisRequest, request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True, "result": None}
+    service = _service(request)
+    # Verify the outcome exists
+    outcome = service.repo.get_outcome(body.outcome_id)
+    if outcome is None:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Outcome {body.outcome_id} not found",
+            )
+        )
+    thesis = _memory(request).add_thesis(
+        outcome_id=body.outcome_id,
+        job_id=body.job_id,
+        statement=body.statement,
+        rationale=body.rationale,
+        importance=body.importance,
+        satisfaction=body.satisfaction,
+    )
+    return {"ok": True, "result": thesis.to_dict()}
+
+
+@router.delete("/api/theses/{thesis_id}")
+def delete_thesis(thesis_id: str, request: Request) -> dict:
+    if _uses_mcp(request):
+        return {"ok": True}
+    try:
+        _memory(request).delete_thesis(thesis_id)
+    except MemoryError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.NOT_FOUND, message=str(exc))
+        ) from exc
+    return {"ok": True}
 
 
 def _proposal_out(proposal: OutcomeProposal) -> ProposalOut:
