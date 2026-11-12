@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ATTACHMENT_READ_FAILURE, MAX_ATTACHMENT_CHARS, tooLargeMessage } from "../../assistant/attachments";
@@ -541,3 +541,57 @@ describe("ThreadComposer oversized attachments", () => {
     expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
   });
 });
+
+describe("ThreadComposer attachment tray", () => {
+  it("shows one row per file, in drop order, each with its state word", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [readableFile("first.md"), readableFile("second.md"), readableFile("third.md")]);
+
+    const rows = await screen.findAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.querySelector(".attachment-chip__name")?.textContent)).toEqual([
+      "first.md",
+      "second.md",
+      "third.md",
+    ]);
+    // Every row says what it is doing without relying on colour.
+    for (const row of rows) {
+      expect(within(row).getByText("Ready")).toBeInTheDocument();
+    }
+  });
+
+  it("retries only the failed file, re-running extraction for it alone", async () => {
+    const { root } = composerWithFiles();
+    const retried = readableFile("later.md");
+    const text = vi.fn(() => Promise.resolve("a thought worth sending"));
+    Object.defineProperty(retried, "text", { value: text });
+    const brokenReads = vi.fn(() => Promise.reject(new Error("Read interrupted")));
+    const broken = new File(["x"], "notes.md", { type: "text/markdown" });
+    Object.defineProperty(broken, "text", { value: brokenReads });
+
+    dropFiles(root, [retried, broken]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+    expect(brokenReads).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(brokenReads).toHaveBeenCalledTimes(2));
+    // The other file was not read again: one bad file does not cost the good one.
+    expect(text).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the file and the count limit and never drops a file silently", async () => {
+    const { root } = composerWithFiles();
+    const files = [1, 2, 3, 4, 5, 6].map(
+      (n) => new File(["x"], `notes-${n}.txt`, { type: "text/plain" }),
+    );
+
+    dropFiles(root, files);
+
+    await screen.findByText("notes-5.txt");
+    expect(screen.queryByText("notes-6.txt")).toBeNull();
+    expect(screen.getByText(/notes-6\.txt exceeds the 5-file attachment limit/)).toBeInTheDocument();
+  });
+});
+

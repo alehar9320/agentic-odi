@@ -5976,6 +5976,31 @@ details[open] summary {
   font-size: 10.5px;
 }
 
+/* The state word, so a row says what it is doing without colour alone. */
+.attachment-chip__state {
+  color: var(--faint);
+  font-size: 10.5px;
+  flex: none;
+}
+
+.attachment-chip__state[data-state="reading"] {
+  color: var(--muted);
+}
+
+.attachment-chip__retry {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 10.5px;
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+}
+
+.attachment-chip__retry:hover {
+  text-decoration: underline;
+}
+
 .composer.is-dragging .composer__shell {
   border-color: rgba(139, 140, 248, 0.6);
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12), 0 14px 34px rgba(0, 0, 0, 0.3);

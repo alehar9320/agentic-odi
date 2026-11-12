@@ -19,12 +19,15 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_READ_FAILURE,
+  ATTACHMENT_STATE_LABEL,
   MAX_ATTACHMENT_CHARS,
   MAX_ATTACHMENTS,
   MAX_IMAGE_BYTES,
   attachmentRejection,
+  attachmentState,
   formatFileSize,
   isImageLike,
+  tooManyMessage,
 } from "../../assistant/attachments";
 import { dictationSupported } from "../../assistant/dictation";
 import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
@@ -75,9 +78,22 @@ function AttachmentThumb({ file }: { file?: File }) {
 
 function AttachmentRow({ onRemove }: { onRemove?: () => void }) {
   const attachments = useAuiState((state) => state.composer.attachments);
+  const aui = useAui();
 
   if (attachments.length === 0) {
     return null;
+  }
+
+  // Retrying one file re-runs the same extraction the adapter already owns, for
+  // that file only: the record is dropped and the file re-added, which leaves
+  // every other row untouched. It is the only way back for a file whose bytes
+  // were not readable when it was first dropped.
+  async function retry(id: string, file: File | undefined) {
+    if (!file) {
+      return;
+    }
+    await aui.composer.attachment({ id }).remove();
+    await aui.composer.addAttachment(file);
   }
 
   return (
@@ -86,20 +102,21 @@ function AttachmentRow({ onRemove }: { onRemove?: () => void }) {
         {attachments.length} of {MAX_ATTACHMENTS} files
       </p>
       {/* `Attachments` scopes each chip to its own attachment, so `Root`,
-          `Name` and `Remove` read and act on the right one; the extraction
-          state, the refusal reason and the size ride inside `Root` as children. */}
+          `Name` and `Remove` read and act on the right one; the state word, the
+          refusal reason and the size ride inside `Root` as children. */}
       <ComposerPrimitive.Attachments>
         {({ attachment }) => {
           const status = attachment.status;
-          const failed = status.type === "incomplete" && status.reason === "error";
+          const state = attachmentState(status);
+          const retryable = state === "failed" || state === "refused";
           const failureMessage =
-            status.type === "incomplete" && status.reason === "error" && status.message
+            status.type === "incomplete" && status.message
               ? status.message
               : ATTACHMENT_READ_FAILURE;
-          const size = failed ? "" : formatFileSize(attachment.file?.size ?? 0);
+          const size = retryable ? "" : formatFileSize(attachment.file?.size ?? 0);
           return (
             <AttachmentPrimitive.Root
-              className={`attachment-chip${failed ? " attachment-chip--failed" : ""}`}
+              className={`attachment-chip${retryable ? " attachment-chip--failed" : ""}`}
               role="listitem"
             >
               {isImageLike(attachment.contentType ?? "") ? (
@@ -111,12 +128,27 @@ function AttachmentRow({ onRemove }: { onRemove?: () => void }) {
                 <span className="attachment-chip__name">
                   <AttachmentPrimitive.Name />
                 </span>
-                {failed ? (
+                {retryable ? (
                   <span className="attachment-chip__failure">{failureMessage}</span>
                 ) : size ? (
                   <span className="attachment-chip__size">{size}</span>
                 ) : null}
               </span>
+              {/* The state word says what this file is doing without relying on
+                  colour, so a refused or failed row is legible to a screen
+                  reader and to anyone who cannot see the border change. */}
+              <span className="attachment-chip__state" data-state={state}>
+                {ATTACHMENT_STATE_LABEL[state]}
+              </span>
+              {retryable ? (
+                <button
+                  type="button"
+                  className="attachment-chip__retry"
+                  onClick={() => void retry(attachment.id, attachment.file)}
+                >
+                  Retry
+                </button>
+              ) : null}
               <AttachmentPrimitive.Remove
                 className="attachment-chip__remove"
                 aria-label={`Remove ${attachment.name}`}
@@ -457,7 +489,7 @@ export function ThreadComposer(props: {
         continue;
       }
       if (attachments.length + accepted >= MAX_ATTACHMENTS) {
-        const message = `${file.name} exceeds the ${MAX_ATTACHMENTS}-file attachment limit.`;
+        const message = tooManyMessage(file.name);
         pushToast("error", message);
         setRefusal(message);
         continue;

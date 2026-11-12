@@ -10,6 +10,7 @@
 
 import type {
   AttachmentAdapter,
+  AttachmentStatus,
   CompleteAttachment,
   PendingAttachment,
 } from "@assistant-ui/react";
@@ -43,6 +44,42 @@ export const ATTACHMENT_READ_FAILURE = "Could not read this file";
 export function tooLargeMessage(fileName: string): string {
   return `${fileName} is larger than the ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")}-character limit`;
 }
+
+/** What a row says when the file would exceed the per-turn count. */
+export function tooManyMessage(fileName: string): string {
+  return `${fileName} exceeds the ${MAX_ATTACHMENTS}-file attachment limit.`;
+}
+
+/**
+ * The four states a row in the tray can be in.
+ *
+ * `reading` covers a file whose bytes are still being turned into content;
+ * `ready` is a file the model will receive; `refused` is a file the studio's
+ * own policy rejected and never read; `failed` is a file whose bytes could not
+ * become content. Refused and failed are the two a person can retry.
+ */
+export type AttachmentState = "reading" | "ready" | "refused" | "failed";
+
+/** The state a runtime attachment is in, read from the status it reports. */
+export function attachmentState(status: AttachmentStatus): AttachmentState {
+  if (status.type === "running") {
+    return "reading";
+  }
+  if (status.type === "incomplete") {
+    // A message is a read that failed and can say why; no message is a pause
+    // with nothing to explain, which reads as a refusal.
+    return status.message ? "failed" : "refused";
+  }
+  return "ready";
+}
+
+/** The word a row shows for its state. */
+export const ATTACHMENT_STATE_LABEL: Record<AttachmentState, string> = {
+  reading: "Reading",
+  ready: "Ready",
+  refused: "Refused",
+  failed: "Failed",
+};
 
 export const ATTACHMENT_ACCEPT = [
   "text/*",

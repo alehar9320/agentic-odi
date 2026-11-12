@@ -11,11 +11,13 @@ import {
   MAX_DOCUMENT_BYTES,
   MAX_IMAGE_BYTES,
   attachmentRejection,
+  attachmentState,
   createAttachmentAdapter,
   formatFileSize,
   isTextLike,
   prepareAttachment,
   tooLargeMessage,
+  tooManyMessage,
 } from "./attachments";
 
 function fileOf(name: string, type: string, size = 10): File {
@@ -249,5 +251,29 @@ describe("formatFileSize", () => {
 
   it("says nothing when there is no size to report", () => {
     expect(formatFileSize(0)).toBe("");
+  });
+});
+
+describe("attachmentState", () => {
+  it("reads the four states from the runtime's own status", () => {
+    expect(attachmentState({ type: "running", reason: "uploading", progress: 0.5 })).toBe(
+      "reading",
+    );
+    expect(attachmentState({ type: "requires-action", reason: "composer-send" })).toBe("ready");
+    expect(attachmentState({ type: "complete" })).toBe("ready");
+    expect(
+      attachmentState({ type: "incomplete", reason: "error", message: ATTACHMENT_READ_FAILURE }),
+    ).toBe("failed");
+  });
+
+  it("reads a pause with nothing to explain as a refusal", () => {
+    expect(attachmentState({ type: "incomplete", reason: "upload-paused" })).toBe("refused");
+  });
+});
+
+describe("tooManyMessage", () => {
+  it("names the file and the count limit", () => {
+    expect(tooManyMessage("notes-6.txt")).toContain("notes-6.txt");
+    expect(tooManyMessage("notes-6.txt")).toContain("5-file");
   });
 });
