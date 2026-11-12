@@ -76,6 +76,8 @@ export interface Evidence {
   job_id?: string | null;
   step_id?: string | null;
   outcome_id?: string | null;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
 }
 
 export interface DecisionRejection {
@@ -289,6 +291,11 @@ export interface CanvasProvenance {
     outcomes: number;
     evidence: number;
   };
+  /**
+   * True when at least one write on this canvas was kept by the browser store
+   * because the sidecar was unreachable, so the board says who holds the record.
+   */
+  kept_by_browser?: boolean;
 }
 
 export interface CanvasData {

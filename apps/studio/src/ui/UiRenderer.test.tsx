@@ -23,12 +23,13 @@ function nodeOf(spec: unknown): UiNode {
 
 function renderSpec(spec: unknown, overrides: { busy?: boolean } = {}) {
   const onIntent = vi.fn();
+  const onDetail = vi.fn();
   render(
-    <UiActionContext.Provider value={{ onIntent, busy: overrides.busy ?? false }}>
+    <UiActionContext.Provider value={{ onIntent, onDetail, busy: overrides.busy ?? false }}>
       <UiRenderer node={nodeOf(spec)} />
     </UiActionContext.Provider>,
   );
-  return { onIntent };
+  return { onIntent, onDetail };
 }
 
 describe("UiRenderer", () => {
@@ -265,6 +266,47 @@ describe("UiRenderer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Simulate this bet" }));
     expect(onIntent).toHaveBeenCalledWith("Simulate a bet on O-1");
+  });
+
+  it("opens a detail from a detail action without sending a message", () => {
+    const { onIntent, onDetail } = renderSpec({
+      type: "outcome-card",
+      props: {
+        id: "O-1",
+        statement: "x",
+        importance: 9,
+        satisfaction: 3,
+        actions: [
+          {
+            kind: "detail",
+            label: "See the finding",
+            target: { panel: "landscape", subject: { kind: "outcome", id: "O-1" } },
+          },
+        ],
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "See the finding" }));
+    expect(onDetail).toHaveBeenCalledWith({
+      panel: "landscape",
+      subject: { kind: "outcome", id: "O-1" },
+    });
+    expect(onIntent).not.toHaveBeenCalled();
+  });
+
+  it("drops a detail action that cannot name a panel", () => {
+    renderSpec({
+      type: "outcome-card",
+      props: {
+        id: "O-1",
+        statement: "x",
+        importance: 9,
+        satisfaction: 3,
+        actions: [{ kind: "detail", label: "Broken", target: { subject: { kind: "outcome", id: "O-1" } } }],
+      },
+    });
+
+    expect(screen.queryByRole("button", { name: "Broken" })).toBeNull();
   });
 
   it("disables actions while a reply is streaming", () => {
