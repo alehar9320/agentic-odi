@@ -38,6 +38,7 @@ import {
   fetchConfig,
   fetchConnectorCatalog,
   fetchConnectors,
+  fetchActiveConversationId,
   fetchConversationTree,
   fetchFeatured,
   fetchLatestConversation,
@@ -55,6 +56,7 @@ import {
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
+  setActiveConversationId as apiSetActiveConversationId,
   streamChat,
   updateJob as apiUpdateJob,
   updateObservation as apiUpdateObservation,
@@ -83,7 +85,7 @@ import {
   type ProbeBreaker,
   type ProbeOutcome,
 } from "./probeBreaker";
-import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
+import { clearSession, loadConversationId, loadSession, saveConversationId, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -680,6 +682,13 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [bootError, setBootError] = useState<StudioError | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const persistedConversation = useRef<string | null>(null);
+  useEffect(() => {
+    if (conversationId === persistedConversation.current) return;
+    persistedConversation.current = conversationId;
+    saveConversationId(conversationId);
+    void apiSetActiveConversationId(conversationId).catch(() => undefined);
+  }, [conversationId]);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
@@ -1603,6 +1612,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const clearFocus = useCallback(() => {
     setFocusedSubject(null);
     clearSession();
+    void apiSetActiveConversationId(null).catch(() => undefined);
   }, []);
 
   /**
@@ -2442,17 +2452,28 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       void refreshCanvas();
       void refreshMemory();
       void refreshConversations();
+      let storedId = await fetchActiveConversationId().catch(() => null);
+      storedId ??= loadConversationId();
+      if (storedId) {
+        try {
+          const tree = await fetchConversationTree(storedId);
+          if (cancelled) return;
+          setConversationId(tree.conversation.id);
+          setMessages(turnsToMessages(tree.messages, tree.head_id));
+          saveConversationId(tree.conversation.id);
+          void apiSetActiveConversationId(tree.conversation.id).catch(() => undefined);
+          return;
+        } catch {
+          // The preference can outlive its conversation after a data reset.
+          saveConversationId(null);
+          void apiSetActiveConversationId(null).catch(() => undefined);
+        }
+      }
       const { conversation } = await fetchLatestConversation();
-      if (cancelled || !conversation) {
-        return;
-      }
-      setConversationId(conversation.id);
-      // The tree, not the flat turn list: a conversation with branches
-      // must open on the branch that was visible when it was left.
+      if (cancelled || !conversation) return;
       const tree = await fetchConversationTree(conversation.id);
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
+      setConversationId(tree.conversation.id);
       setMessages(turnsToMessages(tree.messages, tree.head_id));
     };
     void loadLocalData().catch(() => undefined);

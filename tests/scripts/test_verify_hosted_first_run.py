@@ -259,7 +259,7 @@ def test_a_deploy_that_is_still_coming_up_is_waited_for_not_judged() -> None:
     routes = _good_routes({("GET", "/api/deploy"): not_yet})
 
     with _stub(routes) as url:
-        result = _probe(url, "--commit", _DEPLOY["commit"])
+        result = _probe(url, "--commit", _DEPLOY["commit"], "--wait", "5")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "waiting" in result.stdout.lower()
