@@ -275,6 +275,7 @@ class Outcome(BaseModel):
                     "naming where the estimate came from."
                 )
         return self
+
     claim_check: ClaimCheck | None = Field(
         None, description="The questions that produced the score, and what came back"
     )

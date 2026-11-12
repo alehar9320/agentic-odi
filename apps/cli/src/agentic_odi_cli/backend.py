@@ -1059,14 +1059,6 @@ class LocalBackend(Backend):
             raise BackendError(str(exc)) from None
         return strategy.model_dump(mode="json")
 
-    def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any]:
-        from agentic_odi_core import strategy_not_found
-
-        strategy = self.service.get_strategy(args["strategy_id"])
-        if strategy is None:
-            raise BackendError(strategy_not_found(args["strategy_id"]))
-        return strategy.model_dump(mode="json")
-
     def _list_strategies(self, args: dict[str, Any]) -> list[dict[str, Any]]:
         strategies = self.service.list_strategies(
             segment_id=args.get("segment_id"),
@@ -1137,6 +1129,14 @@ class LocalBackend(Backend):
         return [study.model_dump(mode="json") for study in studies]
 
     def _get_strategy(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        from agentic_odi_core import strategy_not_found
+
+        strategy_id = args.get("strategy_id")
+        if strategy_id:
+            strategy = self.service.get_strategy(strategy_id)
+            if strategy is None:
+                raise BackendError(strategy_not_found(strategy_id))
+            return strategy.model_dump(mode="json")
         strategy = self.service.get_strategy()
         return None if strategy is None else strategy.model_dump(mode="json")
 

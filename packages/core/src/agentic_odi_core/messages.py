@@ -131,6 +131,8 @@ def strategy_not_found(strategy_id: str | None, hint: str | None = None) -> str:
     if hint:
         message = f"{message}. {hint}"
     return message
+
+
 def invalid_strategy_request(message: str) -> str:
     """The one spelling of a refused Stage 6 request.
 

@@ -143,6 +143,8 @@ class BetNotFoundError(NotFoundError):
     def __init__(self, bet_id: str) -> None:
         self.bet_id = bet_id
         super().__init__(bet_id, "bet")
+
+
 class StudyNotFoundError(NotFoundError):
     """Raised when a study id does not resolve."""
 
@@ -161,7 +163,6 @@ class ScheduledWorkNotFoundError(NotFoundError, ValueError):
     def __init__(self, work_id: str, hint: str | None = None) -> None:
         self.work_id = work_id
         super().__init__(work_id, "scheduled work", hint)
-
 
 
 class EvidenceNotFoundError(NotFoundError, ValueError):
@@ -1507,10 +1508,6 @@ class ODIService:
 
     # ---------------------------------------------------------------- segments
 
-
-
-
-
     def suggest_segments(self, job_id: str) -> SegmentCandidateSet:
         """Propose segment candidates from the scores. Persists nothing (D2).
 
@@ -1521,7 +1518,6 @@ class ODIService:
             raise JobNotFoundError(job_id)
         outcomes = self.repo.get_outcomes(job_id, limit=None)
         return suggest_segment_candidates(outcomes)
-
 
     def segment_profile(self, segment_id: str) -> SegmentProfile:
         """Read a segment's servability, split into underserved and overserved.
@@ -1544,13 +1540,10 @@ class ODIService:
 
     # -------------------------------------------------------------- strategies
 
-
-
-
     def latest_strategy(self, segment_id: str) -> Strategy | None:
         """The most recently chosen strategy for a segment, or ``None``."""
-        history = self.repo.list_strategies(segment_id, limit=None)
-        history.sort(key=lambda s: (s.chosen_at, s.id))
+        history = self.repo.list_strategies(segment_id)
+        history.sort(key=lambda s: (s.created_at, s.id))
         return history[-1] if history else None
 
     # ------------------------------------------------------------------ review
@@ -1633,18 +1626,18 @@ class ODIService:
             return None
         segments = [
             BriefSegment(segment_id=s.id, name=s.name, outcome_ids=tuple(s.outcome_ids))
-            for s in self.repo.list_segments(job_id, limit=None)
+            for s in self.repo.list_segments(job_id)
         ]
         strategies = [
             BriefStrategyRecord(
                 strategy_id=s.id,
-                segment_id=s.segment_id,
-                chosen_at=s.chosen_at,
+                segment_id=s.segment_id or "",
+                chosen_at=s.created_at.isoformat(),
                 kind=s.kind.value,
-                rationale=s.rationale,
-                expected_effect=s.expected_effect,
+                rationale=s.thesis,
+                expected_effect="",
             )
-            for s in self.repo.list_strategies(limit=None)
+            for s in self.repo.list_strategies()
         ]
         return select_brief_strategy(decision.chosen_outcome_ids, segments, strategies)
 
@@ -1881,10 +1874,55 @@ class ODIService:
         ]
         return strategies[offset : offset + limit] if limit is not None else strategies[offset:]
 
-    def get_strategy(self) -> Strategy | None:
-        """The most recently recorded strategy, or ``None``."""
+    def get_strategy(self, strategy_id: str | None = None) -> Strategy | None:
+        """One recorded strategy by id, or the most recently recorded one."""
+        if strategy_id is not None:
+            found = self.repo.get_strategy(strategy_id)
+            return None if found is None else self._label_freshness(found)
         strategies = self.repo.list_strategies()
         return self._label_freshness(strategies[-1]) if strategies else None
+
+    def delete_segment(self, segment_id: str) -> None:
+        """Delete a segment. Its outcomes are untouched."""
+        if not self.repo.delete_segment(segment_id):
+            raise SegmentNotFoundError(segment_id)
+
+    def accept_segment_candidate(
+        self,
+        job_id: str,
+        fingerprint: str,
+        name: str | None = None,
+        criterion: str | None = None,
+    ) -> Segment:
+        """Accept exactly the candidate the person saw (D2.2/ALH-161).
+
+        The candidate is recomputed from the current landscape and matched by its
+        stable fingerprint, so acceptance targets the proposal that was shown. A
+        fingerprint that no longer matches is stale and refused by name rather
+        than accepting a different group. Repeat acceptance is idempotent: a
+        segment already built from this name and membership is returned instead
+        of creating a second one, so a retry cannot duplicate a segment.
+        """
+        candidates = self.suggest_segments(job_id)
+        match = next((c for c in candidates.candidates if c.fingerprint == fingerprint), None)
+        if match is None:
+            raise ValidationError(
+                "No candidate matches that fingerprint for this job; it is stale "
+                "(the scores changed since it was proposed). Suggest again and accept "
+                "the candidate you are shown."
+            )
+        label = name if name is not None else match.name
+        members = [str(member) for member in match.members]
+        for existing in self.repo.list_segments(job_id):
+            if existing.name == label and list(existing.outcome_ids) == members:
+                return self._label_freshness(existing)
+        return self.add_segment(
+            job_id=job_id,
+            name=label,
+            criterion=criterion if criterion is not None else match.rationale,
+            outcome_ids=members,
+            origin="candidate",
+        )
 
     def save_strategy(self, strategy: Strategy) -> Strategy:
         """Persist a strategy, requiring the alternatives it beat."""
@@ -1975,7 +2013,6 @@ class ODIService:
         if "created_at" in fields and chosen_at:
             kwargs["created_at"] = chosen_at
         return self.save_strategy(Strategy(**kwargs))
-
 
     # -- Traceability: what an outcome advances ------------------------------
 

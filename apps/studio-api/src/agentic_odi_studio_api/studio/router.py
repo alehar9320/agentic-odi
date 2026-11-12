@@ -906,8 +906,6 @@ async def post_segment(body: AddSegmentRequest, request: Request) -> dict:
     return segment.model_dump(mode="json")
 
 
-
-
 @router.get("/segments/{segment_id}")
 async def get_segment(segment_id: str, request: Request) -> dict:
     try:
@@ -1184,9 +1182,7 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
         arguments["claim_check"] = claim_check.model_dump(mode="json")
     if _uses_mcp(request):
         payload = {"job_id": body.job_id, "statement": body.statement}
-        payload.update(
-            {k: v for k, v in arguments.items() if k not in ("job_id", "statement")}
-        )
+        payload.update({k: v for k, v in arguments.items() if k not in ("job_id", "statement")})
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.ADD_OUTCOME.value,

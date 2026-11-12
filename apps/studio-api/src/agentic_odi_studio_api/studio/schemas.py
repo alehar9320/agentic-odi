@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
 from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
@@ -177,6 +178,13 @@ class AdvanceBetRequest(BaseModel):
     mcp_url: str = ""
 
 
+class SegmentOrigin(str, Enum):
+    """Where a segment came from: typed by hand, or accepted from a suggestion."""
+
+    MANUAL = "manual"
+    CANDIDATE = "candidate"
+
+
 class AddSegmentRequest(BaseModel):
     """Create a segment from its member outcomes."""
 
@@ -186,6 +194,7 @@ class AddSegmentRequest(BaseModel):
     criterion: str = Field(min_length=1)
     outcome_ids: list[str] = Field(min_length=1)
     notes: str | None = None
+    origin: SegmentOrigin = SegmentOrigin.MANUAL
 
 
 class AcceptSegmentCandidateRequest(BaseModel):

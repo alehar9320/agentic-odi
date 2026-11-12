@@ -273,6 +273,8 @@ class SegmentCandidate:
     segment: OpportunitySegment
     decile: int
     fingerprint: str
+
+
 @dataclass(frozen=True)
 class SegmentCandidateSet:
     """Every candidate a landscape yields, plus why there may be none."""
@@ -283,6 +285,8 @@ class SegmentCandidateSet:
     @property
     def has_candidates(self) -> bool:
         return bool(self.candidates)
+
+
 def _normalise_statement(statement: str) -> str:
     return " ".join(statement.split()).lower()
 

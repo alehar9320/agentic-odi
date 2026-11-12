@@ -138,9 +138,3 @@ def _normalise(record: dict) -> dict:
     if members is not None:
         normalised["member_count"] = len(members)
     return normalised
-
-
-
-
-
-

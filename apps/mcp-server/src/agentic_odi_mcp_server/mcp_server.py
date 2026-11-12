@@ -173,9 +173,7 @@ def _fail(exc: BaseException, sentence: str | None = None) -> str:
 
 
 def _decision_not_found(decision_id: str) -> str:
-    return _fail(
-        DecisionNotFoundError(decision_id), f"Error: decision not found: {decision_id}"
-    )
+    return _fail(DecisionNotFoundError(decision_id), f"Error: decision not found: {decision_id}")
 
 
 def _step_not_found(step_id: str | None) -> str:
@@ -901,7 +899,7 @@ async def record_decision(
     except OutcomeNotFoundError as exc:
         return _outcome_not_found(exc.outcome_id)
     except DecisionNotFoundError:
-        return _decision_not_found(supersedes)
+        return _decision_not_found(str(supersedes))
     except (OdiError, ValueError) as exc:
         return _fail(exc)
     await ctx.report_progress(2, 2, "Decision recorded")
@@ -930,7 +928,9 @@ def review_decision(decision_id: str, today: str) -> str:
     try:
         parsed_today = date.fromisoformat(today)
     except ValueError:
-        return _fail(ValueError("today must be an ISO-8601 date"), "Error: today must be an ISO-8601 date")
+        return _fail(
+            ValueError("today must be an ISO-8601 date"), "Error: today must be an ISO-8601 date"
+        )
     try:
         review = service.review_decision(decision_id, today=parsed_today)
     except DecisionNotFoundError:
@@ -1207,8 +1207,6 @@ def choose_strategy(
     except (OdiError, ValueError) as exc:
         return _fail(exc)
     return f"Strategy recorded: {strategy.model_dump_json()}"
-
-
 
 
 @mcp.tool

@@ -189,8 +189,6 @@ def test_brief_export_omits_worth_when_no_value_recorded(tmp_path) -> None:
     assert "(market, sized)" not in result.output
 
 
-
-
 def test_brief_export_omits_the_strategy_section_when_none_is_recorded(tmp_path) -> None:
     db = str(tmp_path / "studio.db")
     job_id = _seed(db)

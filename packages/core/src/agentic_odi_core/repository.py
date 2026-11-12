@@ -366,8 +366,11 @@ class InMemoryRepository:
         #: they cascade; the evidence rows stay, unlinked.
         for key in [k for k, v in self.decisions.items() if v.job_id == job_id]:
             del self.decisions[key]
-        for key in [k for k, v in self.bets.items()
-                    if v.decision_id not in self.decisions or v.outcome_id not in self.outcomes]:
+        for key in [
+            k
+            for k, v in self.bets.items()
+            if v.decision_id not in self.decisions or v.outcome_id not in self.outcomes
+        ]:
             del self.bets[key]
         self.score_snapshots = [s for s in self.score_snapshots if s.outcome_id in self.outcomes]
         return True
@@ -645,9 +648,6 @@ class InMemoryRepository:
         self.bets[bet_id] = new_bet
         return new_bet
 
-
-
-
     def delete_segment(self, segment_id: str) -> bool:
         # Deleting a segment never touches an outcome: the segment was a lens on
         # the outcomes, not their owner. Its strategies go with it.
@@ -657,9 +657,6 @@ class InMemoryRepository:
         for key in [k for k, v in self.strategies.items() if v.segment_id == segment_id]:
             del self.strategies[key]
         return True
-
-
-
 
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
         self.score_snapshots.append(snapshot)
@@ -671,6 +668,7 @@ class InMemoryRepository:
             items = [s for s in items if s.outcome_id == outcome_id]
         # Append-only, so the stored order is the chronological order.
         return list(items)
+
     def get_evidence_by_fingerprint(
         self,
         source_kind: str,

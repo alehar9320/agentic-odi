@@ -125,8 +125,6 @@ def test_local_propose_refuses_and_says_what_is_missing() -> None:
     assert body["message"].startswith("Invalid strategy request:")
 
 
-
-
 def test_mcp_backend_refusal_is_the_same_422_as_the_local_backend(monkeypatch) -> None:
     async def _call(mcp_url: str, tool: str, arguments: dict) -> str:
         raise StudioHTTPError(
@@ -142,5 +140,3 @@ def test_mcp_backend_refusal_is_the_same_422_as_the_local_backend(monkeypatch) -
     response = client.post("/api/strategy/propose", json={"mcp_url": "http://mcp"})
     assert response.status_code == 422
     assert response.json()["error"]["message"].startswith("Invalid strategy request:")
-
-

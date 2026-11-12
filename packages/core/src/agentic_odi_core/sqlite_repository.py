@@ -754,9 +754,6 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.bets.get(bet_id)
 
-
-
-
     def delete_segment(self, segment_id: str) -> bool:
         with self._lock:
             self._sync()
@@ -770,9 +767,6 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return True
-
-
-
 
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
         with self._lock:

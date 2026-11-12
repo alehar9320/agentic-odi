@@ -43,7 +43,10 @@ async def _seed(client: Client) -> str:
                     "statement": _STATEMENT,
                     "importance": 9.0,
                     "satisfaction": 3.0,
-                    "claim_check": {"asked": ["How often does this happen?"], "answers": ["Every week"]},
+                    "claim_check": {
+                        "asked": ["How often does this happen?"],
+                        "answers": ["Every week"],
+                    },
                 },
             )
         )
