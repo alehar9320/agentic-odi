@@ -33,6 +33,7 @@ import {
   TypingPart,
 } from "../../assistant/parts";
 import { formatClockTime, formatDayHeading, startsNewDay } from "../../lib/relativeTime";
+import { COPY_CONFIRMATION_MS } from "../../lib/useCopyConfirmation";
 import { useStudio } from "../../state/StudioContext";
 import type { ChatMessage, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
@@ -239,6 +240,7 @@ function AssistantMessage() {
             ) : null}
             <ActionBarPrimitive.Copy
               className="quiet-action"
+              copiedDuration={COPY_CONFIRMATION_MS}
               aria-label={copied ? "Reply copied" : "Copy reply"}
             >
               {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
