@@ -198,6 +198,20 @@ Studio says so in one place and keeps going:
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
   all.
+- A write falls back the same way a read does. Every canvas write the UI offers —
+  job, step, outcome, score correction, and the evidence capture — goes through
+  `queuedWrite` in `apps/studio/src/api/studioApi.ts`: the sidecar first, and on
+  a transport failure the browser store, plus an outbox record so a later drain
+  can replay it. A sidecar that answers with an application error (400/401/409)
+  still surfaces as a failure — the fallback is for a sidecar that is not there,
+  not for one that refused.
+- A capture therefore never dies with the server. `addEvidence` and
+  `deleteEvidence` write to the browser's `evidence` store (schema v3 in
+  `apps/studio/src/bff/store/migrations.ts`) and return `ok`, and the canvas
+  overlay marks the record `pending` until the outbox drain acknowledges it. The
+  board then says **Kept by this browser · will sync** (`kept_by_browser` on the
+  canvas provenance) instead of letting the row read as though the server holds
+  it. A write the sidecar accepted sets none of this.
 - The outbox is shared by every tab in the origin, so two tabs would otherwise
   drain it and send each record twice. `apps/studio/src/bff/outbox.ts` takes a
   drain guard for the length of a run: `navigator.locks` where the browser has
