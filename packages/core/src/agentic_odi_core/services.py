@@ -1158,7 +1158,8 @@ class ODIService:
                 "outcome_id": outcome.id,
             },
         )
-        assert accepted is not None  # the candidate existed a moment ago
+        if accepted is None:  # the candidate existed a moment ago
+            raise CandidateNotFoundError(candidate.id)
         return accepted, outcome, evidence
 
     def reject_candidate(self, candidate_id: str, *, reason: str) -> OutcomeCandidate:
@@ -1182,7 +1183,8 @@ class ODIService:
             candidate_id,
             {"status": CandidateStatus.REJECTED, "decision_reason": cleaned},
         )
-        assert rejected is not None
+        if rejected is None:  # the candidate existed a moment ago
+            raise CandidateNotFoundError(candidate_id)
         return rejected
 
     def _candidate_evidence(self, candidate: OutcomeCandidate) -> Evidence:
@@ -1291,7 +1293,8 @@ class ODIService:
                     candidate.id,
                     {"status": CandidateStatus.MERGED, "merged_into": target_id},
                 )
-                assert updated is not None  # the candidate existed a moment ago
+                if updated is None:  # the candidate existed a moment ago
+                    raise CandidateNotFoundError(candidate.id)
                 merged.append(updated)
         except Exception:
             for evidence in written_evidence:
