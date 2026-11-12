@@ -67,8 +67,9 @@ async def test_import_transcript_reports_malformed_input() -> None:
             },
         )
 
-    assert _text(result).startswith("Error: ")
-    assert "cue timing" in _text(result)
+    payload = json.loads(_text(result))
+    assert payload["error"]["code"]
+    assert "cue timing" in payload["error"]["message"]
 
 
 @pytest.mark.asyncio

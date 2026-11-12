@@ -4,34 +4,6 @@
 
 # Agentic ODI
 
-### Your roadmap is a guess. This makes it evidence.
-
-An **MCP server** that hands your agents verified customer outcomes — the jobs,
-desired outcomes, and opportunity scores that rank them.
-
-[![Open the Living Studio](https://img.shields.io/badge/Open%20the%20Living%20Studio-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://agentic-odi.alehar.workers.dev/)
-[![Run it locally](https://img.shields.io/badge/Run%20it%20locally-1e293b?style=for-the-badge&logo=gnubash&logoColor=white)](#quick-start)
-
-**Try it now — nothing to install.** The Studio opens in your browser; live data
-and chat need the local sidecar below.
-
-**Or install the CLI in one line** (Linux, macOS):
-
-```bash
-curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
-```
-
-On Windows (PowerShell):
-
-```powershell
-iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
-```
-
-Both installers verify the download against `checksums.txt`; every
-[release](https://github.com/alehar9320/agentic-odi/releases/latest) also carries
-per-platform archives with SHA-256 checksums for a manual download. See
-[Installation](docs/installation.md) for the install layout and updater.
-
 [![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/alehar9320/agentic-odi/branch/main/graph/badge.svg)](https://codecov.io/gh/alehar9320/agentic-odi)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
@@ -42,10 +14,29 @@ per-platform archives with SHA-256 checksums for a manual download. See
 [![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-enabled-8A2BE2)](https://modelcontextprotocol.io)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/signup)
 
+### Your roadmap is a guess. This makes it evidence.
+
+An **MCP server** that hands your agents verified customer outcomes — the jobs,
+desired outcomes, and opportunity scores that rank them.
+
+**Try it now — nothing to install.** The Studio opens in your browser and works
+from the first minute: the canvas, the thread, and the assistant all run on your
+device.
+
+[![Open the Living Studio](https://img.shields.io/badge/Open%20the%20Living%20Studio-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://agentic-odi.alehar.workers.dev/)
+[![Open the sample workspace](https://img.shields.io/badge/Open%20the%20sample%20workspace-1e293b?style=for-the-badge&logo=githubpages&logoColor=white)](https://alehar9320.github.io/agentic-odi/sample/)
+
+Want to see what it produces first? [Open the sample
+workspace](https://alehar9320.github.io/agentic-odi/sample/) — a read-only job,
+its scored outcomes, and the evidence behind them, generated from a committed
+fixture and labelled a sample on every row.
+
 > **[![Experimental](https://img.shields.io/badge/Experimental-1e293b?style=for-the-badge)](https://github.com/alehar9320/agentic-odi)**
 
-> **Experimental test to learn and evaluate the feasibility of utilizing Model Context Protocol (MCP) for Outcome-Driven Innovation (ODI) specifications.**
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-site-blue?logo=github)](https://alehar9320.github.io/agentic-odi/)
+<img src="website/assets/og.png" alt="Agentic ODI — your roadmap is a guess. Verified customer outcomes, jobs, and opportunity scores, served over MCP." width="640" />
+
+The project card, rendered from the committed source by
+`website/tools/make_og.py`.
 
 </div>
 
@@ -62,52 +53,79 @@ per-platform archives with SHA-256 checksums for a manual download. See
 
 ## What you get
 
-- **A brain for customer needs.** Jobs, desired outcomes, evidence, and
-  opportunity scores in one store — queryable by any MCP client.
-- **The other half of ODI.** Stage 5 clusters the scored outcomes into segments —
-  a group of people plus a functional job, never a demographic — and Stage 6
-  recommends the one innovation path those segments support, with every path it
-  rejected and why.
-- **A conversation, not a form.** The Living Studio opens on one question —
-  **What do you want to win?** — with the composer focused. When you ask for
-  context, the agent speaks first: who you are and your team, who feels the
-  problem, what they are trying to win, where it breaks, and what you already
-  have. The answers come back as a brief you can edit line by line, not a
-  settings dialog. Its optional four-step tour stays out of the way, and
-  in-place guidance appears only after the first exchange. It turns "a customer
-  still reconciles invoices by hand" into a scored outcome, a job map, and a
-  ranked opportunity board — inline in the thread. Every claim in a reply names
-  the record behind it, or says it is a hypothesis.
-- **Local-first by default.** The CLI and server work with no network and no
-  account. Point them at a remote MCP server with one flag.
-- **A catch-up that means something.** Writes emit signals — an outcome
-  re-scored, evidence promoted, a job map completed — stored in the same
-  event log and read by the CLI, any MCP client, and the Studio's bell.
-  Nothing is invented, and the feed is deduped and budgeted so it stays
-  worth opening.
+| What you get | Where to look |
+|---|---|
+| **A brain for customer needs.** Jobs, desired outcomes, evidence, and opportunity scores in one store — queryable by any MCP client. | [The method →](docs/method.md) |
+| **The other half of ODI.** Stage 5 clusters the scored outcomes into segments — a group of people plus a functional job, never a demographic — and Stage 6 recommends the one innovation path those segments support, with every path it rejected and why. | [The method →](docs/method.md) |
+| **A conversation, not a form.** The Living Studio opens on one question — **What do you want to win?** — with the composer focused. When you ask for context, the agent speaks first, and the answers come back as a brief you can edit line by line. Every claim in a reply names the record behind it, or says it is a hypothesis. | [The Living Studio →](docs/living-studio.md) |
+| **A document when the conversation needs one.** `/brief` writes the decision brief from the canvas — the ranked bets, the records behind each, what argues against them, and the next evidence to collect — as Markdown a review can read with or without the Studio. Provenance travels with it: demo rows are excluded from every count and labelled. | [The Living Studio →](docs/living-studio.md) |
+| **Evidence becomes outcomes.** An ingested record is mined into a scored, approvable outcome proposal — statement, direction, importance, satisfaction, and a stated confidence, with its rationale and the quote it came from. The mining is deterministic and offline. | [The method →](docs/method.md) |
+| **A catch-up that means something.** Writes emit signals — an outcome re-scored, evidence promoted, a job map completed — stored in the same event log and read by the CLI, any MCP client, and the Studio's bell. Nothing is invented, and the feed is deduped and budgeted. | [CLI reference →](docs/cli.md) |
+| **Connectors, without storing a credential.** Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) from a trusted vendor marketplace, conversationally, or from the CLI. A listing that needs a token names the environment variable to set. | [External Connectors →](docs/connectors.md) |
+| **Local-first by default.** The CLI and server work with no network and no account. Point them at a remote MCP server with one flag, or run an OpenAI-compatible model on your own machine. | [Local LLM Backend →](docs/local-llm.md) |
 
-## How it works
+### Also in the box
 
-Outcome-Driven Innovation asks customers two numbers per outcome — how much it
-**matters** and how **satisfied** they are today. The gap is where products win
-or die:
+- **One artifact you can hand over.** A read-only link opens a single artifact
+  and its evidence on its own page — no rail, no composer, no way into the rest
+  of the workspace — and states when the link expires. The link is a capability,
+  not a copy of the database.
+- **A check on whether onboarding works.** Five counters — launch, first message,
+  first outcome, first score, return session — appended to the same local event
+  log and read back by `agentic-odi stats`. The numbers never leave the machine,
+  and a counter that has not happened reads as zero rather than a guess.
+- **The agent knows what you are looking at.** Select a job, step, outcome, or
+  evidence record and the Studio tells the sidecar only *which* record — kind and
+  id — never what it says.
+- **A desktop app and an offline shell.** Tauri 2 desktop builds update
+  themselves in the background, and a service worker precaches the built shell so
+  the Studio opens with no network.
+- **Odi the Otter.** The mascot appears in the CLI, the Studio, the desktop icon,
+  and this page. See [Brand](#brand).
 
-```text
-Opportunity Score = Importance + max(Importance − Satisfaction, 0)
+## Supported platforms
+
+[![Linux](https://img.shields.io/badge/Linux-x86__64-blue?logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+[![macOS Intel](https://img.shields.io/badge/macOS-Intel-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+[![Windows](https://img.shields.io/badge/Windows-x86__64-blue?logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+
+## Install
+
+**One line, Linux and macOS.** Both installers verify the download against
+`checksums.txt`.
+
+```bash
+curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
 ```
 
-Score **> 10** → underserved, innovate. **= 10** → served, maintain.
-**< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
-(as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
+**One line, Windows (PowerShell).**
 
-A score says *which outcome* to chase; the job map says *who* is underserved.
-Stage 5 clusters a job's scored outcomes by the step they attach to, and Stage 6
-recommends one of three paths — differentiated for an underserved segment,
-disruptive for an overserved one, new-market for outcomes that map to no job in
-the store — recording the two it rejected. An outcome that joins no cluster is
-reported as unclustered, never inflated into a market.
+```powershell
+iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
+```
 
-## Quick Start
+**Per-platform archives.** Every
+[release](https://github.com/alehar9320/agentic-odi/releases/latest) also carries
+a direct build with a SHA-256 checksum. Pick the one for your machine:
+
+| Platform | Archive |
+|---|---|
+| Linux (x86_64) | [`odi_0.14.0_linux_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz) |
+| macOS (Apple Silicon) | [`odi_0.14.0_macos_arm64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz) |
+| macOS (Intel) | [`odi_0.14.0_macos_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz) |
+| Windows (x86_64) | [`odi_0.14.0_windows_x86_64.zip`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip) |
+
+See [Installation](docs/installation.md) for the install layout, the updater, and
+how a release is cut.
+
+**Package managers.** The CLI is a `uv`-managed Python workspace, so you can run
+it from source with [uv](https://docs.astral.sh/uv/) instead of a binary:
+
+```bash
+uv sync --all-packages
+uv run odi --version
+```
 
 **Run the full stack locally.** Prerequisites: Python 3.10+,
 [uv](https://docs.astral.sh/uv/), and Node.js for the Studio build.
@@ -134,8 +152,11 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its
-  sidecar-owned transcript, with attachments, tool traces, approvals, and
-  branch-aware editing and regeneration. Settings → About also offers an
+  sidecar-owned transcript, with attachments, tool traces under one foldable
+  work row per turn, opt-in approvals for
+  chat writes and unknown tools, and branch-aware editing and regeneration.
+  Settings → About says where the app is running — desktop app, installed web
+  app, or browser tab — and whether the offline shell is on, and offers an
   opt-in, redacted local diagnostics preview; no report is uploaded. See
   [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
@@ -143,12 +164,34 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 ```bash
 odi jobs list
 odi desired-outcomes list --job-id <id>
+odi studies open --job <id> --name "Invoice sweep" --wave 1   # one pass; re-running is a new wave
 odi segments run --job <id>          # Stage 5: who the scored outcomes point at
 odi strategy propose                 # Stage 6: the bet, and the paths it beat
 odi signals unread                    # what changed while you were away
 odi score 8 2                        # → 14.00
 odi                                  # interactive chat in a terminal
 ```
+
+## How it works
+
+Outcome-Driven Innovation asks customers two numbers per outcome — how much it
+**matters** and how **satisfied** they are today. The gap is where products win
+or die:
+
+```text
+Opportunity Score = Importance + max(Importance − Satisfaction, 0)
+```
+
+Score **> 10** → underserved, innovate. **= 10** → served, maintain.
+**< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
+(as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
+
+A score says *which outcome* to chase; the job map says *who* is underserved.
+Stage 5 clusters a job's scored outcomes by the step they attach to, and Stage 6
+recommends one of three paths — differentiated for an underserved segment,
+disruptive for an overserved one, new-market for outcomes that map to no job in
+the store — recording the two it rejected. An outcome that joins no cluster is
+reported as unclustered, never inflated into a market.
 
 ## Connect your agent
 
@@ -175,14 +218,17 @@ soon". See [External Connectors](docs/connectors.md).
 |---|---|
 | [The Living Studio](docs/living-studio.md) | The chat-first interface, first run, approvals, memory, and the desktop app |
 | [CLI Reference](docs/cli.md) | Backends, chat, entities, scoring, and environment variables |
+| [The Method, Stage by Stage](docs/method.md) | The eight job-map stages as a practitioner works them — what each is for, the mistakes, and the commands |
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
+| [Reuse First](docs/architecture/reuse.md) | The ladder agents walk before writing code: reuse what exists, adopt what is declared, copy with provenance, then build |
 | [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
 | [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
 | [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
 | [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
 | [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
+| [Agent assignment](docs/agents.md) | Which agents take issues, how they claim one, and when a claim expires |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
 
 Every guide is also published on the
@@ -190,35 +236,68 @@ Every guide is also published on the
 these files. The site adds a quick start, a generated MCP tool reference, the
 connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
 
+## Community & Support
+
+- **Questions and bugs.** [Open an issue](https://github.com/alehar9320/agentic-odi/issues)
+  and say what you expected and what happened.
+- **Experimental, and honest about it.** This is a feasibility test for using MCP
+  with Outcome-Driven Innovation, and we don't publish dates.
+- **Buy me a coffee.** If this saved you a roadmap argument,
+  [the maintainer takes coffee](https://buymeacoffee.com/signup).
+- **Brand.** Odi the Otter is documented in [brand/README.md](brand/README.md).
+
 ## Code Overview
 
 A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
 shared tooling at the root. Packages live in `packages/`, runnable services in
 `apps/`, and deployment assets in `infra/`. The
 [architecture index](docs/architecture/README.md) explains how the pieces fit
-together and where each contract is enforced:
+together and where each contract is enforced; its Dependency Direction diagram
+is a contract of its own — `tests/test_architecture.py` checks the drawn arrows
+against the declared dependencies and the real imports, so the picture cannot
+drift from the workspace. The distributions are:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, the shared MCP tool contract, opportunity-score computation, outcome-based segmentation (Stage 5), and the innovation strategy (Stage 6). |
+| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, research interviews, transcript import, and their quotes, outcome-based segmentation (Stage 5), the innovation strategy (Stage 6), and traceability (which objectives outcomes advance, which are unfunded, which links drifted). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
-| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, Segments, Strategy, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, and PM memory. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, traceability, and context tools over HTTP. SQLite by default. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, PM memory, and scoped read-only share tokens for one artifact. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. |
+| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) precaches the built shell so the app opens with no network, answers an uncached navigation with the cached shell or `public/offline.html`, and never caches `/api/**`. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
-| **`scripts/`** | — | Dev launcher, binary build, installer tests. |
+| **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
+| **`scripts/`** | — | Dev launcher, binary build, installer tests, the deterministic study-corpus generator (`gen_corpus.py`), the shared structural audit every artifact HTML passes through (`artifact_a11y.py`, with its renderer inventory in `artifact_renderers.py`), and the hosted probe that asks the production URL whether it keeps the promises this README makes (`verify-hosted-first-run.sh`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
+
+Inside `packages/core` there are four groups, and the rules between them are
+written down rather than implied — with `errors.py`, the exception hierarchy, open
+to every group. **Domain** (`models.py`, `evaluation.py`, `mapping.py`,
+`corpus.py`) is the vocabulary and imports no other group. **Persistence**
+(`repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`,
+`factory.py`) stores what the other groups decide and may not import methodology —
+`tests/test_architecture.py` enforces that one rule, and also refuses a new core
+module that belongs to no group. **Methodology** (`services.py`, `segmentation.py`,
+`strategy.py`, `router.py`, `messages.py`, `steve_jobs.py`) owns the service door,
+which is `services.py`. **Contract** (`contract.py`, `errors.py`, `remote.py`,
+`schema.py`, `connection.py`, `consent.py`) is the MCP wire protocol; anything may
+import it and it imports no persistence or methodology. The full table, and the
+reason `contract.py` is not its own package yet, is in
+[ADR 0005](docs/architecture/adr/0005-core-layers-and-the-contract-split.md).
 
 ## Contributing
 
-Contributions are welcome. Run the checks that CI runs before opening a pull
-request:
+Open a pull request against the **default** tier in
+[`.agents/workflows/test.md`](.agents/workflows/test.md) — that is the bar.
+The fast tier (pytest on the changed packages, `uv run ruff check .`) is a
+quick answer on the changed slice; the full tier (the studio build and the
+browser e2e suite) is CI's job and is not asked of anyone before they open a
+pull request.
 
 ```bash
 uv run ruff check . && uv run ruff format --check .
-uv run mypy apps packages && uv run pytest
-uv run python scripts/doc_check.py   # documented commands, paths, routes, and env vars exist
+uv run python scripts/verify.py --changed  # PR bar; see .agents/workflows/test.md
+uv run python scripts/doc_check.py   # documented commands, paths, routes, env vars, and the assistant-ui ledger hold up
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage

@@ -5,8 +5,8 @@
     "title": "Your roadmap is a guess.",
     "sub": "An MCP server that hands your agents verified customer outcomes \u2014 and the evidence behind them.",
     "primary": {
-      "label": "Run it in 60 seconds",
-      "href": "#run"
+      "label": "Open the sample workspace",
+      "href": "sample/"
     },
     "secondary": {
       "label": "Open the Living Studio",
@@ -243,6 +243,28 @@
         "label": "Prebuilt binary",
         "language": "bash",
         "code": "curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\nagentic-odi --version"
+      }
+    ],
+    "downloads": [
+      {
+        "label": "Download Linux",
+        "platform": "Linux",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz"
+      },
+      {
+        "label": "Download macOS Apple Silicon",
+        "platform": "macOS Apple Silicon",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz"
+      },
+      {
+        "label": "Download macOS Intel",
+        "platform": "macOS Intel",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz"
+      },
+      {
+        "label": "Download Windows",
+        "platform": "Windows",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip"
       }
     ],
     "mcp_config": "{\n  \"mcpServers\": {\n    \"agentic-odi\": { \"url\": \"http://localhost:8000/mcp\" }\n  }\n}",

@@ -1,20 +1,39 @@
 # Installation
 
 Prebuilt binaries are available for Linux, macOS, and Windows. Install the latest
-release with one command:
+release with one command (Linux, macOS):
 
 ```bash
 curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
 ```
 
-The installer places the binary under `~/.local/share/agentic-odi/versions/<version>/`,
-creates a `current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and
-`agentic-odi` into `~/.local/bin/`.
+On Windows (PowerShell):
+
+```powershell
+iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
+```
+
+Both installers verify the download against `checksums.txt`. The installer places
+the binary under `~/.local/share/agentic-odi/versions/<version>/`, creates a
+`current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into
+`~/.local/bin/`.
 
 If `~/.local/bin` is not on your PATH, add it (e.g.,
 `export PATH="$HOME/.local/bin:$PATH"`). On Windows, the PowerShell installer
 uses `~\AppData\Local\agentic-odi\` and copies `.exe` files to
 `~\AppData\Local\agentic-odi\bin\`.
+
+## Prebuilt archives
+
+Prefer a direct archive? Pick the build for your machine and expand it. Every
+release carries each of these with a SHA-256 checksum in `checksums.txt`:
+
+| Platform | Archive |
+|---|---|
+| Linux (x86_64) | [`odi_0.14.0_linux_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz) |
+| macOS (Apple Silicon) | [`odi_0.14.0_macos_arm64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz) |
+| macOS (Intel) | [`odi_0.14.0_macos_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz) |
+| Windows (x86_64) | [`odi_0.14.0_windows_x86_64.zip`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip) |
 
 ## Update
 
@@ -131,13 +150,29 @@ lists every drifted file and exits non-zero.
 
 **Updater proof.** `scripts/verify-desktop-update.sh` builds signed 0.1.0 and
 0.2.0 AppImages against a local `latest.json` with a throwaway key, runs the
-app, and asserts it replaces its own file and then reports no update. It runs
-headless every Sunday in the `updater-e2e` job of the CI workflow (schedule or
-`workflow_dispatch` only; it deliberately stays out of the `CI green` gate so
-it never blocks a PR), and needs no repository secret. It is also runnable
-from a workstation with `bash scripts/verify-desktop-update.sh`. The running
-version is visible in the app itself: the top bar shows it, and Settings →
-About lists the version, build date, platform, and update status.
+app, and asserts it replaces its own file and then reports no update. The wait
+after the second launch polls the feed's access log for up to 120 seconds and
+reports the app process state, because the launch needs longer than any fixed
+sleep — the updater's own 4-second startup delay plus the extraction of an 83 MB
+bundle. A failure prints both logs, `ls -l run/`, and the elapsed wait.
+`bash scripts/tests/desktop_update_wait_e2e.sh` exercises that wait against a
+stub app and a real local feed in about 30 seconds, with no build, and the CI
+`smoke` job runs it on every pull request.
+
+The full proof runs where the release decision is made. `updater-proof` in
+`.github/workflows/tauri-release.yml` runs the script against the tagged tree,
+and the `build` job that attaches and publishes the desktop bundles waits for it
+(#613) — three weekly runs had failed on the second-launch assertion while
+nothing read the result. The Sunday `updater-e2e` job in CI stays as early
+warning, outside the `CI green` gate: a schedule-only job reports `skipped` on a
+pull request, and that aggregate treats `skipped` as a failure. A release may
+still be shipped with `skip_updater_proof`, which records on the run summary
+that the updater is unproven in it. Neither run needs a repository secret: the
+script generates a throwaway minisign key per run and the committed updater
+public key is untouched. It is also runnable from a workstation with
+`bash scripts/verify-desktop-update.sh`. The running version is visible in the
+app itself: the top bar shows it, and Settings → About lists the version, build
+date, platform, and update status.
 
 **Optional one-time setup (GitHub App).** A release-only GitHub App is no longer
 required for assets to be attached, but it still makes the release PR merge

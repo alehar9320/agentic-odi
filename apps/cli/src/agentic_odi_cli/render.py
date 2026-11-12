@@ -7,6 +7,7 @@ terminal and a script piping into ``jq`` without a second code path.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import Any
 
 _STATEMENT_WIDTH = 60
@@ -417,6 +418,20 @@ def _verdict(segment: dict[str, Any]) -> str:
     return f"{verdict} (confidence {_num(segment.get('confidence', ''))})"
 
 
+def _freshness(artifact: dict[str, Any]) -> str:
+    """Whether the store has moved on since this was derived.
+
+    ``stale`` is computed when the record is read, so it is absent from a record
+    an older backend returned. That absence reads as "unknown", never "current".
+    """
+    stale = artifact.get("stale")
+    if stale is True:
+        return "stale — re-run"
+    if stale is False:
+        return "current"
+    return "unknown"
+
+
 def render_segment_list(segments: Any, *, as_json: bool) -> str:
     """Render segments as a table where every verdict carries its confidence."""
     if not isinstance(segments, list):
@@ -424,7 +439,7 @@ def render_segment_list(segments: Any, *, as_json: bool) -> str:
     if as_json:
         return _json(segments)
     return _table(
-        ("id", "people", "job_id", "outcomes", "verdict"),
+        ("id", "people", "job_id", "outcomes", "verdict", "freshness"),
         [
             (
                 _cell(item, "id"),
@@ -432,6 +447,7 @@ def render_segment_list(segments: Any, *, as_json: bool) -> str:
                 _cell(item, "job_id"),
                 str(len(item.get("outcome_ids") or [])),
                 _verdict(item),
+                _freshness(item),
             )
             for item in segments
         ],
@@ -456,11 +472,54 @@ def render_segment(segment: Any, *, as_json: bool) -> str:
                     ("inferred", _cell(segment, "people_inferred")),
                     ("job", _cell(segment, "job_statement")),
                     ("verdict", _verdict(segment)),
+                    ("freshness", _freshness(segment)),
                     ("evidence", f"{len(outcome_ids)} outcomes"),
                 ]
             ),
             "",
             str(segment.get("rationale", "")),
+        ]
+    )
+
+
+def render_study_list(studies: Any, *, as_json: bool) -> str:
+    """Render studies as a table: a wave is meaningless without its status."""
+    if not isinstance(studies, list):
+        return _json(studies) if as_json else str(studies)
+    if as_json:
+        return _json(studies)
+    return _table(
+        ("id", "name", "wave", "status", "job_id"),
+        [
+            (
+                _cell(item, "id"),
+                _truncate(_cell(item, "name")),
+                _cell(item, "wave"),
+                _cell(item, "status"),
+                _cell(item, "job_id"),
+            )
+            for item in studies
+        ],
+        empty="No studies yet — run `odi studies open` on a job.",
+    )
+
+
+def render_study(study: Any, *, as_json: bool) -> str:
+    """Render one study: the pass it names and where it stands."""
+    if not isinstance(study, dict):
+        return _json(study) if as_json else str(study)
+    if as_json:
+        return _json(study)
+    return _block(
+        [
+            ("id", _cell(study, "id")),
+            ("name", _cell(study, "name")),
+            ("wave", _cell(study, "wave")),
+            ("status", _cell(study, "status")),
+            ("job", _cell(study, "job_id")),
+            ("opened", _cell(study, "opened_at")),
+            ("closed", _cell(study, "closed_at") or "—"),
+            ("method notes", _cell(study, "method_notes") or "—"),
         ]
     )
 
@@ -484,6 +543,7 @@ def render_strategy(strategy: Any, *, as_json: bool) -> str:
                 ("path", _cell(strategy, "kind")),
                 ("segment", _cell(strategy, "segment_id") or "—"),
                 ("bets", str(len(strategy.get("bets") or []))),
+                ("freshness", _freshness(strategy)),
             ]
         ),
         "",
@@ -561,6 +621,55 @@ def render_quote_list(items: Any, *, as_json: bool) -> str:
             for item in items
         ],
         empty="No quotes found.",
+    )
+
+
+def _when(value: Any) -> str:
+    """One funnel timestamp, or the blank that says it has not happened."""
+    if not value:
+        return "—"
+    text = str(value)
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return text
+    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M")
+
+
+def _share(value: Any) -> str:
+    """A conversion that cannot be measured is blank, not zero.
+
+    "Nobody has got this far" and "there is nothing to compare against yet" are
+    different facts; printing 0% for the second one would be a lie about people.
+    """
+    if value is None:
+        return "—"
+    return f"{float(value) * 100:.0f}%"
+
+
+def render_funnel_summary(counts: Any, conversions: Any, *, as_json: bool) -> str:
+    """Render the onboarding funnel: five counters, their window, and the step between them."""
+    if as_json:
+        return _json({"events": counts, "conversions": conversions})
+    if not any(int(view["counts"]) for view in counts.values()):
+        return (
+            "Nothing counted yet — no launch, message, outcome, score or return "
+            "in this store's event log."
+        )
+    reached = {row["to"]: row["conversion"] for row in conversions}
+    return _table(
+        ("counter", "count", "first seen", "last seen", "from previous"),
+        [
+            (
+                name,
+                str(view["counts"]),
+                _when(view["first_seen"]),
+                _when(view["last_seen"]),
+                _share(reached.get(name)),
+            )
+            for name, view in counts.items()
+        ],
+        empty="Nothing counted yet — this store has no funnel events.",
     )
 
 

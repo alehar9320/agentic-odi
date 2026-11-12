@@ -7,13 +7,15 @@
  * Tunnel. (Running the sidecar inside Cloudflare requires Workers Containers,
  * which is a paid-plan feature.)
  *
- * When `SIDECAR_URL` is absent, the Worker answers `/api/capabilities` with a
- * local-only manifest so the browser BFF can run fully offline. Every other
- * `/api/*` request returns a 502 carrying the shared `{"error": StudioError}`
- * shape, so a dead tunnel reads as a recoverable, actionable failure instead of
- * a blank page or a legacy `{"detail": ...}` blob. The browser BFF then serves
- * canvas data, memory, conversations, and the deterministic assistant from
- * IndexedDB.
+ * The Worker answers three `/api/*` routes itself, before the sidecar is
+ * consulted: `GET /api/build` reports the release tag, `GET /api/deploy` reports
+ * which commit and which bundle this artifact is, and `/api/capabilities`
+ * falls back to a local-only manifest when `SIDECAR_URL` is absent so the
+ * browser BFF can run fully offline. Every other `/api/*` request returns a 502
+ * carrying the shared `{"error": StudioError}` shape, so a dead tunnel reads as
+ * a recoverable, actionable failure instead of a blank page or a legacy
+ * `{"detail": ...}` blob. The browser BFF then serves canvas data, memory,
+ * conversations, and the deterministic assistant from IndexedDB.
  */
 
 interface Env {
@@ -24,6 +26,16 @@ interface Env {
    * model endpoint, e.g. "https://api.myprovider.com". Curated defaults are
    * always included. */
   LLM_ORIGINS?: string;
+  /** The tag this Worker was deployed from, declared in `wrangler.jsonc`.
+   * Answers `GET /api/build`; nothing else about the deployment. */
+  RELEASE_VERSION?: string;
+  /** The commit this artifact was built from, passed by the deploy command
+   * (`wrangler deploy --var COMMIT_SHA:$(git rev-parse HEAD)`). Answers
+   * `GET /api/deploy`, which is the route that can say whether a merge reached
+   * the branch that deploys — a release tag cannot. */
+  COMMIT_SHA?: string;
+  /** The Cloudflare deployment id, passed the same way as `COMMIT_SHA`. */
+  BUILD_ID?: string;
 }
 
 const API_PREFIX = "/api/";
@@ -151,15 +163,27 @@ interface StudioError {
   suggestion?: string;
   retryable?: boolean;
   request_id?: string | null;
+  /**
+   * Always `"proxy"`: this body was produced by the Worker, not the sidecar.
+   * The client uses it to tell a Worker-originated transport failure from a
+   * sidecar's own structured application error, even when both are a 502.
+   */
+  origin?: "proxy";
 }
 
 /**
  * Build a Worker-originated failure as the shared `{"error": StudioError}` the
  * sidecar returns, so a dead tunnel reads as a recoverable, actionable failure
- * instead of a blank page or a legacy `{"detail": ...}` blob. The returned
- * Response is wrapped with `secure(...)` by its callers.
+ * instead of a blank page or a legacy `{"detail": ...}` blob. The default
+ * status is the 502 that means "downstream unreachable"; a route the Worker
+ * answers itself passes its own. The returned Response is wrapped with
+ * `secure(...)` by its callers.
  */
-function sidecarError(error: StudioError, requestId: string | null): Response {
+function sidecarError(
+  error: StudioError,
+  requestId: string | null,
+  init: ResponseInit = { status: 502 },
+): Response {
   return Response.json(
     {
       error: {
@@ -168,9 +192,10 @@ function sidecarError(error: StudioError, requestId: string | null): Response {
         suggestion: error.suggestion ?? null,
         retryable: error.retryable ?? false,
         request_id: requestId,
+        origin: "proxy",
       },
     },
-    { status: 502 },
+    init,
   );
 }
 
@@ -185,6 +210,74 @@ export default {
 
     if (!url.pathname.startsWith(API_PREFIX)) {
       return secure(await env.ASSETS.fetch(request), env);
+    }
+
+    // Release identity is the Worker's own answer, so it responds whether or
+    // not a sidecar is configured, and before the proxy branch does. It exposes
+    // nothing but the declared tag: no env dump, and never a timestamp, because
+    // two deploys of one release must report the same string.
+    if (url.pathname === "/api/build") {
+      if (request.method !== "GET") {
+        return secure(
+          sidecarError(
+            {
+              code: "method_not_allowed",
+              message: "The build route only answers GET.",
+              suggestion: "Read /api/build with GET.",
+              retryable: false,
+            },
+            requestId,
+            { status: 405, headers: { Allow: "GET" } },
+          ),
+          env,
+        );
+      }
+      return secure(
+        Response.json(
+          { version: env.RELEASE_VERSION ?? "unknown" },
+          { headers: { "Cache-Control": "no-store" } },
+        ),
+        env,
+      );
+    }
+
+    // The deploy identity, which is not the release identity: a tag shared by two
+    // deploys cannot tell a visitor that the merge they are waiting for never
+    // landed, and a Worker that moved while its page stayed cached cannot tell
+    // either. `entry` is read from this Worker's own asset shelf, so the answer
+    // describes the artifact rather than the configuration that named it.
+    if (url.pathname === "/api/deploy") {
+      if (request.method !== "GET") {
+        return secure(
+          sidecarError(
+            {
+              code: "method_not_allowed",
+              message: "The deploy route only answers GET.",
+              suggestion: "Read /api/deploy with GET.",
+              retryable: false,
+            },
+            requestId,
+            { status: 405, headers: { Allow: "GET" } },
+          ),
+          env,
+        );
+      }
+      const page = await env.ASSETS.fetch(new Request("https://assets/"));
+      const entry =
+        page.status === 200
+          ? ((await page.text()).match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? "unknown")
+          : "unknown";
+      return secure(
+        Response.json(
+          {
+            build_id: env.BUILD_ID ?? "unknown",
+            commit: env.COMMIT_SHA ?? "unknown",
+            entry,
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        ),
+        env,
+      );
     }
 
     const sidecar = env.SIDECAR_URL?.trim().replace(/\/+$/, "");

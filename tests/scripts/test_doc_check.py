@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from doc_check import (
+    ALL_METHODS,
     collect_issues,
     documented_cli_commands,
     documented_env_vars,
@@ -13,7 +14,9 @@ from doc_check import (
     missing_env_vars,
     missing_file_paths,
     missing_routes,
+    planned_rows_cite_installed_primitives,
     readme_code_overview_paths,
+    worker_routes,
 )
 
 
@@ -105,6 +108,51 @@ def test_reports_a_documented_route_the_router_does_not_serve() -> None:
     assert missing == ["GET /api/imagination"]
 
 
+def _worker_source(tmp_path: Path) -> Path:
+    worker = tmp_path / "infra" / "cloudflare" / "worker.ts"
+    worker.parent.mkdir(parents=True)
+    worker.write_text(
+        'if (url.pathname === "/api/build") {\n'
+        '  if (request.method !== "GET") {\n'
+        "    return 405;\n"
+        "  }\n"
+        "  return 200;\n"
+        "}\n"
+        "const sidecar = env.SIDECAR_URL;\n"
+        'if (url.pathname === "/api/capabilities") {\n'
+        "  return 200;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    return worker
+
+
+def test_a_route_the_worker_answers_is_read_from_its_source(tmp_path: Path) -> None:
+    # The Worker has no router object to introspect, so `docs/deployment.md`
+    # could not name `/api/build` if the check only knew the sidecar's routes.
+    _worker_source(tmp_path)
+
+    assert worker_routes(root=tmp_path) == {"/api/build": {"GET"}, "/api/capabilities": ALL_METHODS}
+
+
+def test_a_method_the_worker_refuses_is_still_reported_as_missing(tmp_path: Path) -> None:
+    _worker_source(tmp_path)
+
+    missing = missing_routes(
+        {"guide": "`GET /api/build`\n`POST /api/build`"},
+        set(),
+        worker_routes(root=tmp_path),
+    )
+
+    assert missing == ["POST /api/build"]
+
+
+def test_a_bare_worker_route_path_counts_as_served(tmp_path: Path) -> None:
+    _worker_source(tmp_path)
+
+    assert missing_routes({"guide": "`/api/build`"}, set(), worker_routes(root=tmp_path)) == []
+
+
 def test_reports_an_environment_variable_nothing_reads() -> None:
     sources = "DB = os.environ.get('AGENTIC_ODI_DB')"
 
@@ -134,3 +182,48 @@ def test_the_repository_documentation_matches_the_code() -> None:
 
 def test_env_vars_are_not_invented_by_the_checker() -> None:
     assert documented_env_vars("`AGENTIC_ODI_DB` then `AGENTIC_ODI_DB`") == {"AGENTIC_ODI_DB"}
+
+
+def test_a_planned_row_citing_an_installed_primitive_is_an_error(tmp_path: Path) -> None:
+    (tmp_path / "apps" / "studio" / "src").mkdir(parents=True)
+    (tmp_path / "apps" / "studio" / "src" / "Conversation.tsx").write_text(
+        "import { ActionBarPrimitive } from '@assistant-ui/react';\n<ActionBarPrimitive.Speak />"
+    )
+    ledger = (
+        "# The assistant-ui ledger\n\n"
+        "| Capability | Status | File | Delivered | Where / why |\n"
+        "|---|---|---|---|---|\n"
+        "| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Planned | — | #412 | Read a reply aloud. |\n"
+    )
+    assert planned_rows_cite_installed_primitives(ledger, root=tmp_path) == [
+        "planned row cites an installed primitive: "
+        "`ActionBarPrimitive.Speak` / `.StopSpeaking` "
+        "(ActionBarPrimitive.Speak in apps/studio/src/Conversation.tsx)"
+    ]
+
+
+def test_a_planned_row_citing_nothing_installed_is_silent(tmp_path: Path) -> None:
+    (tmp_path / "apps" / "studio" / "src").mkdir(parents=True)
+    (tmp_path / "apps" / "studio" / "src" / "Empty.tsx").write_text("const x = 1")
+    ledger = (
+        "# The assistant-ui ledger\n\n"
+        "| Capability | Status | File | Delivered | Where / why |\n"
+        "|---|---|---|---|---|\n"
+        "| `ThreadListPrimitive.Root` | Planned | — | #408 | The switcher. |\n"
+    )
+    assert planned_rows_cite_installed_primitives(ledger, root=tmp_path) == []
+
+
+def test_non_planned_rows_are_not_scanned(tmp_path: Path) -> None:
+    (tmp_path / "apps" / "studio" / "src").mkdir(parents=True)
+    (tmp_path / "apps" / "studio" / "src" / "Conversation.tsx").write_text(
+        "<ActionBarPrimitive.Speak />"
+    )
+    ledger = (
+        "# The assistant-ui ledger\n\n"
+        "| Capability | Status | File | Delivered | Where / why |\n"
+        "|---|---|---|---|---|\n"
+        "| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | "
+        "`apps/studio/src/components/chat/Conversation.tsx` | #432 | Read aloud. |\n"
+    )
+    assert planned_rows_cite_installed_primitives(ledger, root=tmp_path) == []
