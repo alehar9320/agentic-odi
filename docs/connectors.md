@@ -21,7 +21,7 @@ python -m agentic_odi_cli connectors catalog --json
 | Voice of customer & qualitative research (`voice-of-customer`) | `notion`, `gong`, `fireflies`, `intercom`, `confluence` |
 | Quantitative data & opportunity scoring (`quantitative-data`) | `posthog`, `amplitude`, `mixpanel` |
 | Market & competitive intelligence (`market-intelligence`) | `exa`, `tavily` |
-| Product strategy & backlog alignment (`strategy-alignment`) | `linear`, `github`, `jira`, `miro`, `figma` |
+| Product strategy & backlog alignment (`strategy-alignment`) | `linear`, `github`, `jira`, `miro`, `figma`, `composio` |
 | Strategy & knowledge management output (`knowledge-output`) | `context7`, `slack` |
 
 `docs/connectors-catalog.json` is the catalog as JSON, committed so a drift shows
