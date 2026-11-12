@@ -60,6 +60,7 @@ export function ModelKeyField() {
     try {
       const next = await saveModelKey(value);
       setStatus(next);
+      setUnavailable(false);
       setDraft("");
       setEditing(false);
       setError(null);
