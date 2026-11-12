@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BannerBridge, useBannerActionDispatcher } from "./BannerBridge";
@@ -11,6 +11,7 @@ const studio = vi.hoisted(() => ({
   dismissedSidecarNotice: false,
   streaming: false,
   dismissSidecarNotice: vi.fn(),
+  dismissToast: vi.fn(),
   recheckConnections: vi.fn(),
   openSetup: vi.fn(),
   openPanel: vi.fn(),
@@ -323,5 +324,33 @@ describe("BannerBridge", () => {
 
     expect(swUpdate.dismissAppUpdate).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/a new version of the studio is ready/i)).not.toBeInTheDocument();
+  });
+
+  it("clears the backing toast when an error banner is dismissed", () => {
+    // A raised error is a toast the bridge mirrors. Dismissing the banner must
+    // clear the toast too, or the next render raises it again.
+    studio.dismissToast.mockClear();
+    const { result } = renderHook(() => useBannerActionDispatcher(), {
+      wrapper: BannerProvider,
+    });
+
+    act(() => {
+      result.current.onDismiss("toast-7");
+    });
+
+    expect(studio.dismissToast).toHaveBeenCalledWith(7);
+  });
+
+  it("does not touch the toast list when a non-toast banner is dismissed", () => {
+    studio.dismissToast.mockClear();
+    const { result } = renderHook(() => useBannerActionDispatcher(), {
+      wrapper: BannerProvider,
+    });
+
+    act(() => {
+      result.current.onDismiss("app-update-ready");
+    });
+
+    expect(studio.dismissToast).not.toHaveBeenCalled();
   });
 });

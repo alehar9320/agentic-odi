@@ -58,11 +58,18 @@ describe("BANNER_CATALOG", () => {
     expect(`${entry.title} ${entry.body}`).not.toMatch(/sync/i);
   });
 
-  it("keeps the toast kinds transient and in the corner", () => {
-    for (const kind of ["info", "success", "error"] as const) {
+  it("keeps the info and success kinds transient and in the corner", () => {
+    for (const kind of ["info", "success"] as const) {
       expect(BANNER_CATALOG[kind].life).toBe("transient");
       expect(BANNER_CATALOG[kind].dock).toBe("corner");
     }
+  });
+
+  it("keeps an error banner up until it is dismissed, so it cannot vanish mid-read", () => {
+    const entry = BANNER_CATALOG.error;
+    expect(entry.life).toBe("persistent");
+    expect(entry.dock).toBe("corner");
+    expect(entry.dismissible).toBe(true);
   });
 
   it("offers a reload, never a forced one, when a new build is staged", () => {
