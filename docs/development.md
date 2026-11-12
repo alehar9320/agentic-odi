@@ -407,6 +407,14 @@ a second sidecar on the MCP passthrough backend. Two projects run against
 them: `chromium` for the local backend (the product default) and
 `mcp-backend` for the passthrough.
 
+A third project, `screenshots`, is added only when `PR_SCREENSHOTS=1` is set.
+It runs `e2e/pr-screenshots.spec.ts`, which writes one PNG per key screen into
+`apps/studio/pr-screenshots/` for human review. The default `test:e2e` run
+never sees it. The `pr-screenshots` workflow sets the variable, captures the
+screens against a live backend, and posts them as a single comment on the pull
+request. The job is advisory — `continue-on-error: true` and no membership in
+`ci-green`'s `needs` — so a screenshot failure cannot block a merge.
+
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none. When a test
 needs data behind it, it seeds through the API rather than through the UI, so
