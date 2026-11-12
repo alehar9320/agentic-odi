@@ -309,7 +309,7 @@ jobs:
           cache-dependency-path: apps/studio/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --omit=optional
 
       - name: Lint
         run: npm run lint
@@ -355,7 +355,7 @@ jobs:
           cache-dependency-path: apps/studio/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --omit=optional
 
       - name: Install test tooling
         run: npm run install:test-tooling
@@ -408,7 +408,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: apps/studio
-        run: npm ci
+        run: npm ci --omit=optional
 
       - name: Install test tooling
         working-directory: apps/studio
@@ -496,14 +496,10 @@ jobs:
         run: npm ci
         working-directory: apps/studio
 
-      - name: Install test tooling
-        working-directory: apps/studio
-        run: npm run install:test-tooling
-
       # Dependabot PRs cannot read repository secrets, so the signing key is
-      # empty there. Export it only when present and disable updater artifacts
-      # otherwise; passing an empty key makes the bundler try (and fail) to
-      # decode it.
+        # empty there. Export it only when present and disable updater artifacts
+        # otherwise; passing an empty key makes the bundler try (and fail) to
+        # decode it.
       - name: Build desktop bundle
         working-directory: apps/studio
         env:

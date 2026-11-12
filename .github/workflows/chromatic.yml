@@ -44,7 +44,7 @@ jobs:
           cache-dependency-path: apps/studio/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --omit=optional
 
       - name: Install test tooling
         run: npm run install:test-tooling

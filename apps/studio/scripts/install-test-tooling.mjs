@@ -8,7 +8,7 @@ const studioDir = path.resolve(__dirname, '..');
 
 const packages = [
   '@playwright/test@1.64.1',
-  'playwright@^1.64.1',
+  'playwright@1.64.1',
   '@vitest/browser-playwright@^4.1.12',
   'vitest-browser-react@^2.3.0',
   'chromatic@^18.13.3',
