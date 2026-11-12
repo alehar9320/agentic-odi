@@ -1153,7 +1153,8 @@ class ODIService:
                 "outcome_id": outcome.id,
             },
         )
-        assert accepted is not None  # the candidate existed a moment ago
+        if accepted is None:  # the candidate existed a moment ago
+            raise CandidateNotFoundError(candidate.id)
         return accepted, outcome, evidence
 
     def reject_candidate(self, candidate_id: str, *, reason: str) -> OutcomeCandidate:
@@ -1177,7 +1178,8 @@ class ODIService:
             candidate_id,
             {"status": CandidateStatus.REJECTED, "decision_reason": cleaned},
         )
-        assert rejected is not None
+        if rejected is None:  # the candidate existed a moment ago
+            raise CandidateNotFoundError(candidate_id)
         return rejected
 
     def _candidate_evidence(self, candidate: OutcomeCandidate) -> Evidence:
