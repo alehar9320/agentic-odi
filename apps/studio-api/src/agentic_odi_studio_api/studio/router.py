@@ -1030,6 +1030,7 @@ async def post_strategy(segment_id: str, body: ChooseStrategyRequest, request: R
                 "rationale": body.rationale,
                 "expected_effect": body.expected_effect,
                 "chosen_at": body.chosen_at,
+                "rejected": body.rejected,
             },
         )
         return _payload_from_text(result)
@@ -1040,6 +1041,7 @@ async def post_strategy(segment_id: str, body: ChooseStrategyRequest, request: R
             rationale=body.rationale,
             expected_effect=body.expected_effect,
             chosen_at=body.chosen_at,
+            rejected=body.rejected,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc

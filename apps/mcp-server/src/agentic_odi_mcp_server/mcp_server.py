@@ -1191,6 +1191,7 @@ def choose_strategy(
     rationale: str,
     expected_effect: str,
     chosen_at: str | None = None,
+    rejected: list[dict[str, Any]] | None = None,
 ) -> str:
     from agentic_odi_core import SegmentNotFoundError
 
@@ -1201,6 +1202,7 @@ def choose_strategy(
             rationale=rationale,
             expected_effect=expected_effect,
             chosen_at=chosen_at,
+            rejected=rejected,
         )
     except SegmentNotFoundError:
         return _segment_not_found(segment_id)

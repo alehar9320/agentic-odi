@@ -215,6 +215,10 @@ class ChooseStrategyRequest(BaseModel):
     rationale: str = Field(min_length=1)
     expected_effect: str = Field(min_length=1)
     chosen_at: str | None = None
+    rejected: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description='The paths this one beat: [{"kind": "disruptive", "why": "..."}]',
+    )
 
 
 class SignalActionRequest(BaseModel):

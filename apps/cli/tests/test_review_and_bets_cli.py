@@ -281,3 +281,177 @@ def test_bets_add_refuses_a_bet_for_an_unchosen_outcome(tmp_path) -> None:
     )
     assert result.exit_code != 0
     assert "not one the decision" in result.output
+
+
+def test_bets_list_says_when_nothing_is_recorded_then_names_each_bet(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0])
+
+    empty = runner.invoke(app, ["--db", db, "bets", "list"])
+    assert empty.exit_code == 0, empty.output
+    assert "No bets recorded yet." in empty.output
+
+    added = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "bets",
+            "add",
+            "--decision-id",
+            decision_id,
+            "--outcome-id",
+            ids[0],
+            "--hypothesis",
+            "Publishing gets under five minutes",
+            "--target",
+            "6.0",
+            "--measure-by",
+            "2026-04-01",
+            "--json",
+        ],
+    )
+    assert added.exit_code == 0, added.output
+    bet = json.loads(added.output)
+
+    listed = runner.invoke(app, ["--db", db, "bets", "list", "--job-id", job_id])
+    assert listed.exit_code == 0, listed.output
+    assert bet["id"] in listed.output
+    assert "baseline" in listed.output
+    assert "Publishing gets under five minutes" in listed.output
+
+
+def test_bets_show_prints_the_hypothesis_baseline_and_target(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0])
+    added = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "bets",
+            "add",
+            "--decision-id",
+            decision_id,
+            "--outcome-id",
+            ids[0],
+            "--hypothesis",
+            "Publishing gets under five minutes",
+            "--target",
+            "6.0",
+            "--measure-by",
+            "2026-04-01",
+            "--json",
+        ],
+    )
+    assert added.exit_code == 0, added.output
+    bet = json.loads(added.output)
+
+    shown = runner.invoke(app, ["--db", db, "bets", "show", "--bet-id", bet["id"]])
+    assert shown.exit_code == 0, shown.output
+    assert bet["id"] in shown.output
+    assert "Publishing gets under five minutes" in shown.output
+    assert "Target: 6.0" in shown.output
+
+
+def test_bets_list_and_show_emit_json(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+    decision_id = _decide(db, job_id, ids[0])
+
+    empty = runner.invoke(app, ["--db", db, "bets", "list", "--json"])
+    assert empty.exit_code == 0, empty.output
+    assert json.loads(empty.output) == []
+
+    added = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "bets",
+            "add",
+            "--decision-id",
+            decision_id,
+            "--outcome-id",
+            ids[0],
+            "--hypothesis",
+            "Publishing gets under five minutes",
+            "--target",
+            "6.0",
+            "--measure-by",
+            "2026-04-01",
+            "--json",
+        ],
+    )
+    assert added.exit_code == 0, added.output
+    bet = json.loads(added.output)
+
+    listed = runner.invoke(app, ["--db", db, "bets", "list", "--json"])
+    assert listed.exit_code == 0, listed.output
+    assert [item["id"] for item in json.loads(listed.output)] == [bet["id"]]
+
+    shown = runner.invoke(app, ["--db", db, "bets", "show", "--bet-id", bet["id"], "--json"])
+    assert shown.exit_code == 0, shown.output
+    assert json.loads(shown.output)["id"] == bet["id"]
+
+
+def test_decide_record_prints_the_choice_and_the_rejected_option(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "decide",
+            "record",
+            "--job-id",
+            job_id,
+            "--choose",
+            ids[0],
+            "--reject",
+            f"{ids[1]}=Support cost is not the bottleneck.",
+            "--rationale",
+            "The publishing path blocks every release.",
+            "--decided-by",
+            "dana",
+            "--decided-at",
+            "2026-11-15T00:00:00Z",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Decision recorded:" in result.output
+    assert f"Chose: {ids[0]}" in result.output
+
+
+def test_decide_record_refuses_a_rejection_without_a_separator(tmp_path) -> None:
+    db = str(tmp_path / "studio.db")
+    job_id, ids = _seed(db)
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "decide",
+            "record",
+            "--job-id",
+            job_id,
+            "--choose",
+            ids[0],
+            "--reject",
+            "no-separator-here",
+            "--rationale",
+            "The publishing path blocks every release.",
+            "--decided-by",
+            "dana",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Traceback" not in result.output
+    assert "OUTCOME_ID=REASON" in result.output

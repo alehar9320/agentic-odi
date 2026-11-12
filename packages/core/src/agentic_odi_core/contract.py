@@ -681,7 +681,14 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "evidence is absent."
         ),
         effect=_derive_effect("choose_strategy"),
-        arguments=("segment_id", "kind", "rationale", "expected_effect", "chosen_at"),
+        arguments=(
+            "segment_id",
+            "kind",
+            "rationale",
+            "expected_effect",
+            "chosen_at",
+            "rejected",
+        ),
         required=("segment_id", "kind", "rationale", "expected_effect"),
         returns="The recorded Strategy, or an error naming the unmet condition.",
         stage="6",
