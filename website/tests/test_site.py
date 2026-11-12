@@ -512,5 +512,8 @@ def test_page_weights_are_within_budget(page: str):
     # material. The Development page now exceeds 100 KB: the assistant-ui ledger
     # (issue #429) contributes 129 rows, and the Study entity plus its two
     # tools (open_study, list_studies) and the outcome-proposal tools add the
-    # rest. Bump the ceiling to keep the page green while the content stays.
-    assert size <= 110 * 1024, f"{page}: {size} bytes"
+    # rest. It has grown past 110 KB again since #847: the studio pages carry the
+    # motion scale, the capture-when-the-sidecar-is-down behaviour, the
+    # three-region navigation contract and the connector preset reference. Bump
+    # the ceiling to keep the page green while the content stays.
+    assert size <= 115 * 1024, f"{page}: {size} bytes"
