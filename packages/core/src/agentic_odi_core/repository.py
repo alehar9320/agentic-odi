@@ -10,10 +10,14 @@ from typing import Any, Protocol, TypeVar
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
+    CandidateStatus,
     CustomerOutcome,
     Evidence,
+    Interview,
+    InterviewQuote,
     Job,
     Outcome,
+    OutcomeCandidate,
     ScheduledWork,
     Segment,
     Signal,
@@ -130,6 +134,9 @@ class Repository(Protocol):
     strategies: dict[str, Strategy]
     v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
+    interviews: dict[str, Interview]
+    quotes: dict[str, InterviewQuote]
+    candidates: dict[str, OutcomeCandidate]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -212,6 +219,19 @@ class Repository(Protocol):
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
+    def add_interview(self, interview: Interview) -> Interview: ...
+    def get_interview(self, interview_id: str) -> Interview | None: ...
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]: ...
+    def update_interview(self, interview_id: str, updates: dict) -> Interview | None: ...
+    def delete_interview(self, interview_id: str) -> list[str]: ...
+    def add_quote(self, quote: InterviewQuote) -> InterviewQuote: ...
+    def get_quote(self, quote_id: str) -> InterviewQuote | None: ...
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]: ...
     def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal: ...
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
     def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
@@ -219,8 +239,21 @@ class Repository(Protocol):
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM: ...
     def get_v2mom(self) -> V2MOM | None: ...
 
+    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate: ...
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None: ...
+    def list_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]: ...
+    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None: ...
+    def delete_candidate(self, candidate_id: str) -> bool: ...
+
     def last_event_id(self) -> int: ...
 
+    def last_input_event_id(self) -> int: ...
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -247,7 +280,11 @@ class InMemoryRepository:
         #: generated id because a workspace has exactly one V2MOM.
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
+        self.interviews: dict[str, Interview] = {}
+        self.quotes: dict[str, InterviewQuote] = {}
         self._last_event_id = 0
+        self._last_input_event_id = 0
+        self.candidates: dict[str, OutcomeCandidate] = {}
 
     def last_event_id(self) -> int:
         """Id of the most recent stored write, 0 before any.
@@ -258,9 +295,25 @@ class InMemoryRepository:
         """
         return self._last_event_id
 
+    def last_input_event_id(self) -> int:
+        """Id of the most recent write that is an input to derivation.
+
+        Segments and strategies are derived *from* the store, so writing one is
+        not a change to the inputs a later derivation would read. Counting only
+        the non-derived writes is what lets a freshly derived artifact read as
+        current while a later outcome rescore makes it stale.
+        """
+        return self._last_input_event_id
+
     def _append_event(self) -> None:
         #: Spend an id only where the event-sourced store would append an event:
         #: a write that found nothing to change must not look like a new change.
+        self._last_event_id += 1
+        self._last_input_event_id += 1
+
+    def _append_derived_event(self) -> None:
+        #: A derived write spends an event id but leaves the input revision
+        #: where it was, so deriving twice from the same inputs reads as fresh.
         self._last_event_id += 1
 
     def add_job(self, job: Job) -> Job:
@@ -312,6 +365,12 @@ class InMemoryRepository:
                 current = ev.model_dump(exclude_unset=True)
                 current.update(updates)
                 self.evidence[key] = Evidence.model_validate(current)
+        for key in [k for k, v in self.interviews.items() if v.job_id == job_id]:
+            del self.interviews[key]
+            for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
+                del self.quotes[quote_key]
+            for candidate_key in [c for c, v in self.candidates.items() if v.interview_id == key]:
+                del self.candidates[candidate_key]
         return True
 
     def add_step(self, step: Step) -> Step:
@@ -539,7 +598,7 @@ class InMemoryRepository:
         return new_evidence
 
     def add_signal(self, signal: Signal) -> Signal:
-        self._append_event()
+        self._append_derived_event()
         self.signals[signal.id] = signal
         return signal
 
@@ -559,7 +618,7 @@ class InMemoryRepository:
         if signal is None:
             return None
         if signal.read_at is None:
-            self._append_event()
+            self._append_derived_event()
             signal.read_at = datetime.now(timezone.utc)
         return signal
 
@@ -568,7 +627,7 @@ class InMemoryRepository:
         if signal is None:
             return None
         if signal.dismissed_at is None:
-            self._append_event()
+            self._append_derived_event()
             signal.dismissed_at = datetime.now(timezone.utc)
         return signal
 
@@ -612,7 +671,7 @@ class InMemoryRepository:
         return False
 
     def add_segment(self, segment: Segment) -> Segment:
-        self._append_event()
+        self._append_derived_event()
         self.segments[segment.id] = segment
         return segment
 
@@ -629,7 +688,7 @@ class InMemoryRepository:
         segment = self.segments.get(segment_id)
         if segment is None:
             return None
-        self._append_event()
+        self._append_derived_event()
         current = segment.model_dump(exclude_unset=True)
         current.update(updates)
         new_segment = segment.model_validate(current)
@@ -662,7 +721,7 @@ class InMemoryRepository:
         return new_study
 
     def add_strategy(self, strategy: Strategy) -> Strategy:
-        self._append_event()
+        self._append_derived_event()
         self.strategies[strategy.id] = strategy
         return strategy
 
@@ -679,12 +738,66 @@ class InMemoryRepository:
         strategy = self.strategies.get(strategy_id)
         if strategy is None:
             return None
-        self._append_event()
+        self._append_derived_event()
         current = strategy.model_dump(exclude_unset=True)
         current.update(updates)
         new_strategy = strategy.model_validate(current)
         self.strategies[strategy_id] = new_strategy
         return new_strategy
+
+    def add_interview(self, interview: Interview) -> Interview:
+        self.interviews[interview.id] = interview
+        return interview
+
+    def get_interview(self, interview_id: str) -> Interview | None:
+        return self.interviews.get(interview_id)
+
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]:
+        if job_id is None:
+            items = list(self.interviews.values())
+        else:
+            items = [i for i in self.interviews.values() if i.job_id == job_id]
+        return page(items, limit, offset)
+
+    def update_interview(self, interview_id: str, updates: dict) -> Interview | None:
+        interview = self.interviews.get(interview_id)
+        if not interview:
+            return None
+        current = interview.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_interview = interview.model_validate(current)
+        self.interviews[interview_id] = new_interview
+        return new_interview
+
+    def delete_interview(self, interview_id: str) -> list[str]:
+        """Delete an interview and cascade its quotes; return the removed quote ids."""
+        if interview_id not in self.interviews:
+            return []
+        del self.interviews[interview_id]
+        removed = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
+        for quote_id in removed:
+            del self.quotes[quote_id]
+        for candidate_id in [
+            c for c, v in self.candidates.items() if v.interview_id == interview_id
+        ]:
+            del self.candidates[candidate_id]
+        return removed
+
+    def add_quote(self, quote: InterviewQuote) -> InterviewQuote:
+        self.quotes[quote.id] = quote
+        return quote
+
+    def get_quote(self, quote_id: str) -> InterviewQuote | None:
+        return self.quotes.get(quote_id)
+
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
+        items = [q for q in self.quotes.values() if q.interview_id == interview_id]
+        return sorted(items, key=lambda q: q.ordinal)
 
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
         self.v2mom[V2MOM_ID] = v2mom
@@ -693,10 +806,45 @@ class InMemoryRepository:
     def get_v2mom(self) -> V2MOM | None:
         return next(iter(self.v2mom.values()), None)
 
+    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
+        self.candidates[candidate.id] = candidate
+        return candidate
+
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+        return self.candidates.get(candidate_id)
+
+    def list_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]:
+        items = list(self.candidates.values())
+        if interview_id is not None:
+            items = [c for c in items if c.interview_id == interview_id]
+        if status is not None:
+            items = [c for c in items if c.status == status]
+        return page(items, limit, offset)
+
+    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None:
+        candidate = self.candidates.get(candidate_id)
+        if not candidate:
+            return None
+        current = candidate.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_candidate = candidate.model_validate(current)
+        self.candidates[candidate_id] = new_candidate
+        return new_candidate
+
+    def delete_candidate(self, candidate_id: str) -> bool:
+        return self.candidates.pop(candidate_id, None) is not None
+
     def clear(self) -> None:
         #: The event-sourced store empties its log and restarts numbering, so the
         #: counter starts over with it.
         self._last_event_id = 0
+        self._last_input_event_id = 0
         self.jobs.clear()
         self.scheduled_work.clear()
         self.steps.clear()
@@ -706,6 +854,10 @@ class InMemoryRepository:
         self.signals.clear()
         self.segments.clear()
         self.strategies.clear()
+        self.interviews.clear()
+        self.quotes.clear()
+        self.candidates.clear()
+
         self.v2mom.clear()
 
     def reload(self) -> None:

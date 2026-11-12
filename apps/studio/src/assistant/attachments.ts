@@ -39,6 +39,11 @@ export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 /** What a chip says when the bytes never became content. */
 export const ATTACHMENT_READ_FAILURE = "Could not read this file";
 
+/** What a chip says when a text file is longer than the per-file cap. */
+export function tooLargeMessage(fileName: string): string {
+  return `${fileName} is larger than the ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")}-character limit`;
+}
+
 export const ATTACHMENT_ACCEPT = [
   "text/*",
   ".md",
@@ -134,11 +139,14 @@ function readAsDataUrl(file: File): Promise<string> {
  * reaching for the original.
  */
 export class AttachmentReadError extends Error {
-  readonly code = "unreadable" as const;
+  readonly code: "unreadable" | "too_large";
 
-  constructor(fileName: string) {
-    super(`Could not read ${fileName}.`);
+  constructor(fileName: string, code: "unreadable" | "too_large" = "unreadable") {
+    super(
+      code === "too_large" ? tooLargeMessage(fileName) : `Could not read ${fileName}.`,
+    );
     this.name = fileName;
+    this.code = code;
   }
 }
 
@@ -146,7 +154,11 @@ export class AttachmentReadError extends Error {
  * Prepare one file for a turn.
  *
  * Throws `AttachmentReadError` when the bytes do not become content: a name-only
- * attachment would promise a file the model never receives.
+ * attachment would promise a file the model never receives. A text file longer
+ * than the per-file cap is refused rather than silently shortened, because the
+ * person would otherwise send an interview transcript believing all of it
+ * arrived. `.docx` is capped with the cut announced in the extracted text, the
+ * same contract the document formats share.
  */
 export async function prepareAttachment(file: File): Promise<ChatAttachment> {
   const base: ChatAttachment = {
@@ -166,9 +178,15 @@ export async function prepareAttachment(file: File): Promise<ChatAttachment> {
     }
     if (isTextLike(file.name, base.contentType)) {
       const text = await file.text();
-      return { ...base, text: text.slice(0, MAX_ATTACHMENT_CHARS) };
+      if (text.length > MAX_ATTACHMENT_CHARS) {
+        throw new AttachmentReadError(base.name, "too_large");
+      }
+      return { ...base, text };
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof AttachmentReadError) {
+      throw error;
+    }
     throw new AttachmentReadError(base.name);
   }
 
@@ -205,7 +223,13 @@ export function createAttachmentAdapter(): AttachmentAdapter {
         if (!(error instanceof AttachmentReadError)) {
           throw error;
         }
-        yield chip({ type: "incomplete", reason: "error", message: ATTACHMENT_READ_FAILURE });
+        // The chip carries the reason, so an oversized text file says which
+        // file and which limit rather than the generic read failure.
+        yield chip({
+          type: "incomplete",
+          reason: "error",
+          message: error.code === "too_large" ? error.message : ATTACHMENT_READ_FAILURE,
+        });
         return;
       }
 

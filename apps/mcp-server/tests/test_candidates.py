@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from agentic_odi_core.remote import error_envelope
 from agentic_odi_mcp_server import mcp
 from fastmcp import Client
 from mcp.types import TextContent
@@ -87,9 +88,8 @@ async def test_update_candidate_reports_unknown_status() -> None:
             "update_candidate", {"candidate_id": candidates[0]["id"], "status": "sideways"}
         )
     payload = json.loads(_text(result))
-    assert payload["error"]["code"] == "validation"
-    assert payload["error"]["message"] == "unknown candidate status: sideways"
     assert payload["message"] == "Error: unknown candidate status: sideways"
+    assert payload["error"] == error_envelope(ValueError("unknown candidate status: sideways"))
 
 
 @pytest.mark.asyncio
@@ -117,6 +117,5 @@ async def test_list_candidates_rejects_unknown_status() -> None:
     async with Client(mcp) as client:
         result = await client.call_tool("list_candidates", {"status": "nope"})
     payload = json.loads(_text(result))
-    assert payload["error"]["code"] == "validation"
-    assert payload["error"]["message"] == "unknown candidate status: nope"
     assert payload["message"] == "Error: unknown candidate status: nope"
+    assert payload["error"] == error_envelope(ValueError("unknown candidate status: nope"))
