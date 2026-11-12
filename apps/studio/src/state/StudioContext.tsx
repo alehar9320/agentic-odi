@@ -17,6 +17,7 @@ import type {
 } from "@assistant-ui/react";
 
 import { focusLabel, focusPointer } from "../lib/focus";
+import { useRegionState, type Detail } from "./regions";
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -462,6 +463,18 @@ export interface StudioContextValue {
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
+  /**
+   * The right region's one detail (#735). `openDetail` is the single entry;
+   * `openPanel` is the one-hop alias that remains during transition.
+   */
+  detail: Detail | null;
+  openDetail: (panel: WorkspacePanelId, subject?: { kind: string; id: string }) => void;
+  closeDetail: () => void;
+  /** The left drawer, whose accessible name the rail helper reuses. */
+  drawerOpen: boolean;
+  toggleDrawer: () => void;
+  /** The left drawer's collapsed state. */
+  collapsed: boolean;
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
   pushToast: (
@@ -687,7 +700,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   // The URL is the single source of truth for what is on screen. The route is
   // parsed from the address bar on boot and updated on every navigation; the
   // conversation, active panel, and customize-open state are derived from it.
-  const initialRoute = parseRoute(currentPath(), window.location.search);
+  // Read once: the boot route is a starting value, not something to recompute
+  // on every render.
+  const [initialRoute] = useState<Route>(() => parseRoute(currentPath(), window.location.search));
   const [currentRoute, setCurrentRoute] = useState<Route>(initialRoute);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(
@@ -703,11 +718,25 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
-  const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(
-    initialRoute.name === "threadPanel" || initialRoute.name === "threadPanelSubject"
-      ? initialRoute.panel
-      : null,
-  );
+  // The three-region contract (#735), declared once in its own module so this
+  // provider's in-flight splits (#345, #506) do not collide with it. The right
+  // region's `detail` is the single source of truth: `activePanel` is derived
+  // from it, and `openPanel` is the one-hop alias that writes through.
+  const regions = useRegionState();
+  // The right region holds exactly one detail; its panel id is what the lens
+  // renders. Kept derived so no caller can set one without the other.
+  const activePanel: WorkspacePanelId | null = regions.detail?.panel ?? null;
+
+  // A deep link names the panel too, so the boot URL opens it once. Later
+  // navigation goes through `openPanel`/`closePanel`, which write both the
+  // region and the address bar.
+  useEffect(() => {
+    if (initialRoute.name === "threadPanel" || initialRoute.name === "threadPanelSubject") {
+      regions.openDetail(initialRoute.panel);
+    }
+    // Boot only; later navigation writes both the region and the URL itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
@@ -795,7 +824,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         route.name === "customize" || route.name === "customizeListing";
 
       setConversationId(threadId);
-      setActivePanel(panel);
+      if (panel === null) {
+        regions.closeDetail();
+      } else {
+        regions.openDetail(panel);
+      }
       setCustomizeOpen(customize);
 
       if (replace) {
@@ -804,7 +837,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         window.history.pushState({}, "", path);
       }
     },
-    []
+    [regions.closeDetail, regions.openDetail]
   );
 
   /**
@@ -822,14 +855,16 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           ? route.threadId
           : null
       );
-      setActivePanel(
-        route.name === "threadPanel" || route.name === "threadPanelSubject" ? route.panel : null
-      );
+      if (route.name === "threadPanel" || route.name === "threadPanelSubject") {
+        regions.openDetail(route.panel);
+      } else {
+        regions.closeDetail();
+      }
       setCustomizeOpen(route.name === "customize" || route.name === "customizeListing");
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  }, [regions.closeDetail, regions.openDetail]);
 
 
 
@@ -1227,9 +1262,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   const openSetup = useCallback(() => {
-    setActivePanel(null);
+    regions.closeDetail();
     setSetupOpen(true);
-  }, []);
+  }, [regions.closeDetail]);
 
   const closeSetup = useCallback(() => {
     setSetupOpen(false);
@@ -1651,24 +1686,23 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [settings.mcp_url, pushToast, refreshCanvas],
   );
   const closePanel = useCallback(() => {
-    setActivePanel(null);
+    regions.closeDetail();
     if (conversationId) {
       navigateTo({ name: "thread", threadId: conversationId }, false);
     }
-  }, [conversationId, navigateTo]);
+  }, [conversationId, navigateTo, regions.closeDetail]);
 
   const openPanel = useCallback(
     (panel: WorkspacePanelId) => {
       if (setupOpen) {
         closeSetup();
       }
+      regions.openDetail(panel);
       if (conversationId) {
         navigateTo({ name: "threadPanel", threadId: conversationId, panel }, false);
-      } else {
-        setActivePanel(panel);
       }
     },
-    [conversationId, navigateTo, setupOpen, closeSetup],
+    [conversationId, navigateTo, setupOpen, closeSetup, regions.openDetail],
   );
 
   /**
@@ -1967,7 +2001,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           toolSeq += 1;
           parts = [
             ...parts,
-            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status },
+            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status, startedAt: Date.now() },
           ];
           return;
         }
@@ -1976,6 +2010,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
             ...open,
             status,
             ...(preview ? { preview } : {}),
+            // The call settled, so the pending row stops counting: the start is
+            // dropped with the status it belonged to.
+            startedAt: undefined,
             // A result means the gate was answered; the question is spent.
             approval: undefined,
           };
@@ -2057,6 +2094,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
                 id: String(event.data.tool_call_id ?? `approval-${approvalId}`),
                 name: String(event.data.name ?? ""),
                 status: "running",
+                startedAt: Date.now(),
                 approval: {
                   id: approvalId,
                   prompt: String(event.data.prompt ?? "Allow this change?"),
@@ -2402,10 +2440,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   /** The single conversational exit from any lens. */
   const ask = useCallback(
     (intent: string) => {
-      setActivePanel(null);
+      regions.closeDetail();
       void sendMessage(intent);
     },
-    [sendMessage],
+    [sendMessage, regions.closeDetail],
   );
 
   const refreshMemory = useCallback(async () => {
@@ -2898,6 +2936,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       focusedEvidenceId,
       focusEvidence,
       navigateTo,
+      detail: regions.detail,
+      openDetail: regions.openDetail,
+      closeDetail: regions.closeDetail,
+      drawerOpen: regions.drawerOpen,
+      toggleDrawer: regions.toggleDrawer,
+      collapsed: regions.collapsed,
     }),
     [
       settings,
@@ -3025,6 +3069,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       focusedEvidenceId,
       focusEvidence,
       navigateTo,
+      regions.detail,
+      regions.openDetail,
+      regions.closeDetail,
+      regions.drawerOpen,
+      regions.toggleDrawer,
+      regions.collapsed,
     ],
   );
 
