@@ -8,6 +8,8 @@ import { ChatStage } from "./ChatStage";
 const harness = vi.hoisted(() => ({
   state: {
     messages: [] as unknown[],
+    threadRestoring: false,
+    restoreFailed: false,
     streaming: false,
     thinkingPhase: null as string | null,
     toolActivity: [] as unknown[],
@@ -70,8 +72,56 @@ const FAILED_TURN: ChatMessage[] = [
 describe("ChatStage", () => {
   afterEach(() => {
     harness.state.messages = [];
+    harness.state.threadRestoring = false;
+    harness.state.restoreFailed = false;
     harness.state.streaming = false;
     vi.restoreAllMocks();
+  });
+
+  it("holds the hero until boot has looked for a stored thread (#695 D17)", () => {
+    harness.state.threadRestoring = true;
+
+    const { container } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    // The stage is there, but the invitation is not — a reload with a thread
+    // must never paint home and then swap it out.
+    expect(container.querySelector(".chat--empty")).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: /what do you want to win/i })).toBeNull();
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+
+  it("paints home once with a quiet line when a restore fails (#695 D17)", () => {
+    harness.state.threadRestoring = false;
+    harness.state.restoreFailed = true;
+
+    const { container } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: /what do you want to win/i }),
+    ).toBeInTheDocument();
+    const note = container.querySelector(".chat__restore-note");
+    expect(note).toHaveTextContent(/could not be reopened/i);
+  });
+
+  it("shows no restore note when the restore was clean (#695 D17)", () => {
+    harness.state.threadRestoring = false;
+    harness.state.restoreFailed = false;
+
+    const { container } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    expect(container.querySelector(".chat__restore-note")).toBeNull();
   });
 
   it("shows a jump-to-latest control when the viewport is detached during a run", async () => {

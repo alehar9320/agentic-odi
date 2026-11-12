@@ -364,6 +364,14 @@ export interface StudioContextValue {
   /** Measure the same three connections for one panel, without changing what the studio believes. */
   surveyConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   messages: ChatMessage[];
+  /**
+   * True while boot is still deciding whether a stored thread should be shown.
+   * The stage holds off the hero until this is false, so a reload with a saved
+   * conversation never paints home first and then swap it out (#695 D17).
+   */
+  threadRestoring: boolean;
+  /** Set when reopening the stored thread threw; home says so once, quietly. */
+  restoreFailed: boolean;
   streaming: boolean;
   thinkingPhase: string | null;
   toolActivity: ToolActivity[];
@@ -680,6 +688,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [bootError, setBootError] = useState<StudioError | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  // Starts true: boot has not yet read the store. It settles to false once the
+  // latest conversation has been looked for, whether or not one was found.
+  const [threadRestoring, setThreadRestoring] = useState(true);
+  /** Set when reopening the stored thread threw; home says so once, quietly. */
+  const [restoreFailed, setRestoreFailed] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
@@ -2439,7 +2452,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       void refreshMemory();
       void refreshConversations();
       const { conversation } = await fetchLatestConversation();
-      if (cancelled || !conversation) {
+      if (cancelled) {
+        return;
+      }
+      if (!conversation) {
+        // Nothing to reopen: home paints once, and it is the truth.
+        setThreadRestoring(false);
         return;
       }
       setConversationId(conversation.id);
@@ -2450,8 +2468,15 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         return;
       }
       setMessages(turnsToMessages(tree.messages, tree.head_id));
+      setThreadRestoring(false);
     };
-    void loadLocalData().catch(() => undefined);
+    void loadLocalData().catch(() => {
+      // A restore that fails still paints home; the flag must settle either way.
+      if (!cancelled) {
+        setRestoreFailed(true);
+        setThreadRestoring(false);
+      }
+    });
 
     // Configuration is a convenience, not a gate. It may fill defaults for a
     // browser that has none; a failure is silent, because a hosted studio with no
@@ -2685,6 +2710,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       checkConnections,
       surveyConnections,
       messages,
+      threadRestoring,
+      restoreFailed,
       streaming,
       thinkingPhase,
       toolActivity,
@@ -2817,6 +2844,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       checkConnections,
       surveyConnections,
       messages,
+      threadRestoring,
+      restoreFailed,
       streaming,
       thinkingPhase,
       toolActivity,

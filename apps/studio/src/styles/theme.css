@@ -455,6 +455,14 @@ a {
   padding-bottom: max(56px, 14vh);
 }
 
+/* One quiet line under the hero when a stored thread could not be reopened. */
+.chat__restore-note {
+  margin: -12px 0 0;
+  color: var(--faint);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 .chat__transcript {
   position: relative;
   display: flex;
@@ -4291,6 +4299,16 @@ html.theme-fading *::after {
   border-color: #818cf8;
   color: #ffffff;
   box-shadow: 0 0 12px rgba(129, 140, 248, 0.25);
+}
+
+/* The unread dot on "What's New": one accent mark, no count, cleared the moment
+ * the releases are marked read. */
+.changelog-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.6);
 }
 
 .changelog-overlay {

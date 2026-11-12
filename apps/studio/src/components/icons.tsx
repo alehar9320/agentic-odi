@@ -256,6 +256,16 @@ export function ArrowLeftIcon(props: IconProps) {
   );
 }
 
+export function ExportIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3v12" />
+      <path d="m7 8 5-5 5 5" />
+      <path d="M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4" />
+    </Icon>
+  );
+}
+
 export function MenuIcon(props: IconProps) {
   return (
     <Icon {...props}>

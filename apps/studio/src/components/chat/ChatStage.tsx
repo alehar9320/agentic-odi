@@ -85,6 +85,8 @@ function LatestMessageButton({ messageCount }: { messageCount: number }) {
 export function ChatStage() {
   const {
     messages,
+    threadRestoring,
+    restoreFailed,
     sendMessage,
     pushNotice,
     openPanel,
@@ -197,7 +199,18 @@ export function ChatStage() {
       <section className="chat chat--empty" aria-label="Studio conversation">
         <div className="chat__welcome">
           <div className="chat__welcome-inner">
-            <Hero />
+            {/* Hold the hero until boot has looked for a stored thread, so a
+                reload with one never paints home first (#695 D17). */}
+            {threadRestoring ? null : (
+              <>
+                <Hero />
+                {restoreFailed ? (
+                  <p className="chat__restore-note">
+                    Your last thread could not be reopened. Starting fresh here.
+                  </p>
+                ) : null}
+              </>
+            )}
             <ThreadComposer
               onCommand={(command) => runCommand(command)}
               onSlashCommand={submitCommand}
