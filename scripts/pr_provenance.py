@@ -17,6 +17,7 @@ HUMAN_LABEL = "👤 human"
 # this repository (`slay` and `jules`) plus the common coding tools.
 AGENT_BRANCH_PREFIXES: frozenset[str] = frozenset(
     {
+        "agent",
         "aider",
         "amp",
         "claude",

@@ -1,13 +1,33 @@
 import { useMemo, useState } from "react";
 
 import { asStudioError } from "../../api/studioApi";
-import { isUnderserved, opportunityScore } from "../../lib/odi";
+import { formatOpportunityScore, isUnderserved, opportunityScore } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { StudioError } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 
 /** Which field the failure belongs to, so the message lands next to it. */
 type FailureField = "statement" | "range" | "form";
+
+/**
+ * Where to show a failure. The server names the field when it knows one, so a
+ * field-specific failure lands next to the field that needs it; otherwise we
+ * fall back to the code-based heuristic and, failing that, the whole form —
+ * the best guess we have for a failure that predates the field or came from a
+ * peer that only sends text.
+ */
+function fieldForError(error: StudioError): FailureField {
+  if (error.field === "importance" || error.field === "satisfaction") {
+    return "range";
+  }
+  if (error.field === "statement" || error.field === "business_statement") {
+    return "statement";
+  }
+  if (error.code === "out_of_range") {
+    return "range";
+  }
+  return "form";
+}
 
 export function DirectCapture() {
   const { canvas, addOutcome, createJob } = useStudio();
@@ -71,11 +91,10 @@ export function DirectCapture() {
       setStatement("");
     } catch (error) {
       const problem = asStudioError(error);
-      // A rejected score belongs to the score fields; anything else belongs to
-      // the statement the user wrote.
-      const field: FailureField =
-        problem.code === "out_of_range" || problem.code === "validation" ? "range" : "statement";
-      setFailure({ error: problem, field });
+      // A fielded error lands beside the input it names; an out-of-range score
+      // keeps today's behaviour and lands on the score fields; anything else
+      // goes to form level.
+      setFailure({ error: problem, field: fieldForError(problem) });
     } finally {
       setBusy(false);
     }
@@ -89,6 +108,7 @@ export function DirectCapture() {
           <select
             id="dc-job"
             className="select"
+            aria-describedby={jobs.length ? "dc-job-hint" : "dc-job-hint dc-job-first-hint"}
             value={activeJobId}
             onChange={(event) => setJobId(event.target.value)}
           >
@@ -102,8 +122,12 @@ export function DirectCapture() {
               <option value="">No job yet</option>
             )}
           </select>
+          <p className="field__hint" id="dc-job-hint">
+            The job is what the customer is trying to get done. Every outcome measures how
+            well they get it done.
+          </p>
           {!jobs.length && (
-            <p className="field__hint">
+            <p className="field__hint" id="dc-job-first-hint">
               Add the job below first — an outcome is always a metric for a job.
             </p>
           )}
@@ -115,14 +139,20 @@ export function DirectCapture() {
             id="dc-statement"
             className="input"
             placeholder="Minimize the time it takes to…"
+            aria-describedby={
+              failure?.field === "statement"
+                ? "dc-statement-hint dc-statement-error"
+                : "dc-statement-hint"
+            }
             value={statement}
             onChange={(event) => setStatement(event.target.value)}
           />
-          <p className="field__hint">
-            Direction + unit of measure + object of control + contextual clarifier.
+          <p className="field__hint" id="dc-statement-hint">
+            What the customer measures success by: a direction, a unit of measure, the object
+            it acts on, and the context. For example: “Minimize the time it takes to …”
           </p>
           {failure?.field === "statement" ? (
-            <FailurePanel error={failure.error} />
+            <FailurePanel id="dc-statement-error" error={failure.error} />
           ) : null}
         </div>
 
@@ -135,8 +165,13 @@ export function DirectCapture() {
             max={10}
             step={0.1}
             value={importance}
+            aria-describedby="dc-importance-hint"
             onChange={(event) => setImportance(Number(event.target.value))}
           />
+          <p className="field__hint" id="dc-importance-hint">
+            How much this outcome matters, from 1 (not at all) to 10 (extremely), in steps of
+            0.1.
+          </p>
         </div>
 
         <div className="field">
@@ -148,14 +183,26 @@ export function DirectCapture() {
             max={10}
             step={0.1}
             value={satisfaction}
+            aria-describedby={
+              failure?.field === "range" ? "dc-satisfaction-hint dc-range-error" : "dc-satisfaction-hint"
+            }
             onChange={(event) => setSatisfaction(Number(event.target.value))}
           />
-          {failure?.field === "range" ? <FailurePanel error={failure.error} /> : null}
+          <p className="field__hint" id="dc-satisfaction-hint">
+            How well it is met today, from 1 (not at all) to 10 (completely), in steps of 0.1.
+          </p>
+          {failure?.field === "range" ? (
+            <FailurePanel id="dc-range-error" error={failure.error} />
+          ) : null}
         </div>
 
-        <p className="score-preview">
-          Opportunity <b>{calcOpp.toFixed(2)}</b>
+        <p className="score-preview" aria-describedby="dc-score-hint">
+          Opportunity <b>{formatOpportunityScore(calcOpp)}</b>
           <span>{isUnderserved(calcOpp) ? "underserved" : "appropriately served"}</span>
+        </p>
+        <p className="field__hint" id="dc-score-hint">
+          A preview calculated from the two numbers you chose above — not customer evidence,
+          and not independently verified.
         </p>
 
         <button

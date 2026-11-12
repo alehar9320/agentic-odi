@@ -8,6 +8,18 @@ name: Tauri Release
 # release-please run itself; `workflow_dispatch` is the manual self-heal path,
 # and `push` stays for tags created by hand. The `resolve` job gates every path
 # so a run that finds the release already carrying every bundle does nothing.
+#
+# Where the updater's proof lives (#613). `scripts/verify-desktop-update.sh` is
+# the only evidence that "it updates itself" is more than a claim, and it used to
+# run only on a schedule in `ci.yml`, where nothing read the result — three
+# consecutive runs went red on the same assertion and the release still shipped.
+# It cannot simply join `ci-green`'s needs either: that job aggregates every
+# result it depends on, and a schedule-only job reports `skipped` on a pull
+# request, which would turn the aggregate red for a check that never ran. So the
+# proof gates the release, which is where the decision is made: the
+# `updater-proof` job below runs the script against the tagged tree, and `build`
+# — the job that attaches and publishes the bundles — waits for it. The weekly CI
+# job stays as early warning.
 on:
   push:
     tags:
@@ -25,6 +37,11 @@ on:
         type: string
       force:
         description: "Rebuild even when the release already has every bundle"
+        required: false
+        type: boolean
+        default: false
+      skip_updater_proof:
+        description: "Ship without running the updater proof (a maintainer's override; it is written to the run summary)"
         required: false
         type: boolean
         default: false
@@ -90,9 +107,82 @@ jobs:
             exit 1
           fi
 
-  build:
-    needs: [resolve, preflight]
+  updater-proof:
+    # This is the gate #613 asked for: the release runs the updater proof against
+    # the tagged tree and `build` waits for it. The weekly `updater-e2e` job in
+    # `ci.yml` stays as early warning and deliberately never blocks a pull request.
+    # No secret is used here either: the script generates its own throwaway minisign
+    # key and the committed updater public key is untouched.
+    needs: resolve
     if: needs.resolve.outputs.should_build == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+
+      - name: Record a maintainer's override of the proof
+        if: ${{ inputs.skip_updater_proof == true }}
+        run: |
+          {
+            echo "## Desktop release shipped with an unproven updater"
+            echo ""
+            echo "The \`skip_updater_proof\` override was set, so"
+            echo "\`scripts/verify-desktop-update.sh\` (#613) did not run for this tag."
+            echo "The updater is unproven in this release; a normal run does not skip it."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install webview, AppImage, and display dependencies
+        if: ${{ inputs.skip_updater_proof != true }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf \
+            libfuse2 xvfb
+
+      - uses: actions/setup-node@v7
+        if: ${{ inputs.skip_updater_proof != true }}
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: apps/studio/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ inputs.skip_updater_proof != true }}
+
+      - uses: swatinem/rust-cache@v2
+        if: ${{ inputs.skip_updater_proof != true }}
+        with:
+          workspaces: apps/studio/src-tauri -> target
+
+      - name: Install frontend dependencies
+        if: ${{ inputs.skip_updater_proof != true }}
+        run: npm ci
+        working-directory: apps/studio
+
+      - name: Prove the updater against a local feed
+        if: ${{ inputs.skip_updater_proof != true }}
+        env:
+          # GitHub runners have no FUSE daemon; extract-and-run also keeps the
+          # on-disk AppImage as the updater's replacement target.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: xvfb-run -a bash scripts/verify-desktop-update.sh
+
+      - name: Upload the run logs on failure
+        if: ${{ failure() && inputs.skip_updater_proof != true }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: updater-proof-log
+          if-no-files-found: ignore
+          path: /tmp/studio-update-e2e/
+
+  build:
+    needs: [resolve, preflight, updater-proof]
+    # The proof above has to have said yes: this job is the one that attaches and
+    # publishes the bundles, so it is the last place a release can still be stopped.
+    if: ${{ needs.resolve.outputs.should_build == 'true'
+      && needs.updater-proof.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:

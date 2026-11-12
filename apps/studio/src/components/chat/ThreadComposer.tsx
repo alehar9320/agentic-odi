@@ -7,22 +7,40 @@
  * setup wizard's composer.
  */
 
-import { AuiIf, ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
+import {
+  AttachmentPrimitive,
+  AuiIf,
+  ComposerPrimitive,
+  useAui,
+  useAuiState,
+} from "@assistant-ui/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
   ATTACHMENT_ACCEPT,
+  ATTACHMENT_READ_FAILURE,
   MAX_ATTACHMENT_CHARS,
+  MAX_ATTACHMENTS,
   MAX_IMAGE_BYTES,
   attachmentRejection,
   formatFileSize,
   isImageLike,
 } from "../../assistant/attachments";
 import { dictationSupported } from "../../assistant/dictation";
+import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
+import { registerComposer } from "../../lib/composerFocus";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
-import { CommandPalette, ComposerHint, ConnectorChips, SuggestionPills, paletteOpenFor } from "./composerParts";
+import {
+  CommandPalette,
+  ComposerHint,
+  ConnectorChips,
+  ContextChip,
+  SuggestionPills,
+  paletteOpenFor,
+} from "./composerParts";
+import { QueueLane } from "./QueueLane";
 import { ModelPicker } from "./ModelPicker";
 
 const acceptedAttachmentTypes = ATTACHMENT_ACCEPT.split(",");
@@ -30,7 +48,7 @@ const acceptedTextExtensions = acceptedAttachmentTypes.filter((type) => type.sta
 const acceptedImageTypes = acceptedAttachmentTypes
   .filter((type) => type.startsWith("image/"))
   .map((type) => type.slice("image/".length).toUpperCase());
-const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*) and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files up to ${MAX_ATTACHMENT_CHARS.toLocaleString()} characters.`;
+const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*), Word documents (.docx), and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files up to ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")} characters, longer files are refused.`;
 
 /** The local preview for an image before it is ever sent. */
 function AttachmentThumb({ file }: { file?: File }) {
@@ -55,8 +73,7 @@ function AttachmentThumb({ file }: { file?: File }) {
   return <img className="attachment-chip__thumb" src={url} alt="" />;
 }
 
-function AttachmentRow() {
-  const aui = useAui();
+function AttachmentRow({ onRemove }: { onRemove?: () => void }) {
   const attachments = useAuiState((state) => state.composer.attachments);
 
   if (attachments.length === 0) {
@@ -65,26 +82,52 @@ function AttachmentRow() {
 
   return (
     <div className="composer__attachments" role="list" aria-label="Attachments">
-      {attachments.map((attachment, index) => {
-        const size = formatFileSize(attachment.file?.size ?? 0);
-        return (
-          <span className="attachment-chip" role="listitem" key={attachment.id}>
-            <AttachmentThumb file={attachment.file} />
-            <span className="attachment-chip__meta">
-              <span className="attachment-chip__name">{attachment.name}</span>
-              {size ? <span className="attachment-chip__size">{size}</span> : null}
-            </span>
-            <button
-              type="button"
-              className="attachment-chip__remove"
-              aria-label={`Remove ${attachment.name}`}
-              onClick={() => void aui.composer.attachment({ index }).remove()}
+      <p className="attachment-count" aria-live="polite">
+        {attachments.length} of {MAX_ATTACHMENTS} files
+      </p>
+      {/* `Attachments` scopes each chip to its own attachment, so `Root`,
+          `Name` and `Remove` read and act on the right one; the extraction
+          state, the refusal reason and the size ride inside `Root` as children. */}
+      <ComposerPrimitive.Attachments>
+        {({ attachment }) => {
+          const status = attachment.status;
+          const failed = status.type === "incomplete" && status.reason === "error";
+          const failureMessage =
+            status.type === "incomplete" && status.reason === "error" && status.message
+              ? status.message
+              : ATTACHMENT_READ_FAILURE;
+          const size = failed ? "" : formatFileSize(attachment.file?.size ?? 0);
+          return (
+            <AttachmentPrimitive.Root
+              className={`attachment-chip${failed ? " attachment-chip--failed" : ""}`}
+              role="listitem"
             >
-              ✕
-            </button>
-          </span>
-        );
-      })}
+              {isImageLike(attachment.contentType ?? "") ? (
+                <AttachmentPrimitive.unstable_Thumb>
+                  <AttachmentThumb file={attachment.file} />
+                </AttachmentPrimitive.unstable_Thumb>
+              ) : null}
+              <span className="attachment-chip__meta">
+                <span className="attachment-chip__name">
+                  <AttachmentPrimitive.Name />
+                </span>
+                {failed ? (
+                  <span className="attachment-chip__failure">{failureMessage}</span>
+                ) : size ? (
+                  <span className="attachment-chip__size">{size}</span>
+                ) : null}
+              </span>
+              <AttachmentPrimitive.Remove
+                className="attachment-chip__remove"
+                aria-label={`Remove ${attachment.name}`}
+                onClick={() => onRemove?.()}
+              >
+                ✕
+              </AttachmentPrimitive.Remove>
+            </AttachmentPrimitive.Root>
+          );
+        }}
+      </ComposerPrimitive.Attachments>
     </div>
   );
 }
@@ -95,15 +138,21 @@ function ComposerBody({
   onFiles,
   placeholder,
   autoFocus = false,
+  attachmentRefusal,
+  onClearAttachmentRefusal,
 }: {
   onCommand: (command: StudioCommand) => void;
   onSlashCommand?: (text: string) => boolean;
   onFiles: (files: File[]) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  attachmentRefusal: string | null;
+  onClearAttachmentRefusal: () => void;
 }) {
   const aui = useAui();
   const { llmHealth } = useStudio();
+  const history = useComposerHistory();
+  const [recall, setRecall] = useState("");
   // A page can mount more than one composer, so every id and description needs
   // to be unique per instance rather than a fixed string in the document.
   const attachmentHelpId = useId();
@@ -111,6 +160,15 @@ function ComposerBody({
   const paletteId = useId();
   const text = useAuiState((state) => state.composer.text);
   const running = useAuiState((state) => state.thread.isRunning);
+  // A file whose bytes never became content has to be dealt with before the
+  // turn goes out: sending anyway would hand the model a plausible name and
+  // nothing behind it.
+  const readBlocked = useAuiState((state) =>
+    state.composer.attachments.some(
+      (attachment) =>
+        attachment.status.type === "incomplete" && attachment.status.reason === "error",
+    ),
+  );
   const [highlight, setHighlight] = useState(0);
   // Remember which draft was dismissed, so typing again re-opens the palette
   // without an effect that writes state on every keystroke.
@@ -129,8 +187,35 @@ function ComposerBody({
     onCommand(command);
   }
 
+  // The runtime owns the textarea, so the shell's shortcuts reach it through
+  // the id this composer already gives its input and label.
+  useEffect(
+    () =>
+      registerComposer({
+        focus: () => document.getElementById(inputId)?.focus(),
+        startCommand: () => {
+          aui.composer.setText("/");
+          setHighlight(0);
+          setDismissedFor("");
+          document.getElementById(inputId)?.focus();
+        },
+      }),
+    [aui, inputId],
+  );
+
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // An input method owns the keyboard while it composes: choosing a Japanese,
+    // Chinese, or Korean candidate must never run a command, move the palette,
+    // recall history, or send. `keyCode === 229` covers WebKit shells that leave
+    // `isComposing` unset on the keydown that commits the candidate.
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+      return;
+    }
+
     if (open) {
+      if (event.nativeEvent.isComposing || event.keyCode === 229) {
+        return;
+      }
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         if (!matches.length) {
@@ -165,11 +250,43 @@ function ComposerBody({
       aui.composer.setText("");
       setDismissedFor("");
       onSlashCommand(text);
+      return;
+    }
+
+    // Enter is a send, not a race (#410): while a turn runs the follow-up
+    // joins the queue lane instead of interrupting the live answer.
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing &&
+      text.trim() !== ""
+    ) {
+      event.preventDefault();
+      if (!readBlocked) {
+        aui.composer.send({ steer: false });
+      }
+      return;
+    }
+
+    // The palette owns the arrows while it is open; history must not fight it.
+    if (open || event.defaultPrevented) {
+      return;
+    }
+
+    const empty = text.trim() === "";
+    history.onKeyDown(event);
+    // The hook prevents the default only when it actually recalled a message.
+    // Announcing here keeps it to one status change per recall, never per key.
+    if (event.key === "ArrowUp" && empty && event.defaultPrevented) {
+      setRecall(recallAnnouncement(aui.composer.getState().text));
     }
   }
 
   return (
     <>
+      <p className="sr-only" role="status">
+        {recall}
+      </p>
       <SuggestionPills />
       <CommandPalette
         id={paletteId}
@@ -180,7 +297,14 @@ function ComposerBody({
         onChoose={choose}
       />
       <ConnectorChips />
-      <AttachmentRow />
+      <ContextChip />
+      <QueueLane />
+      <AttachmentRow onRemove={onClearAttachmentRefusal} />
+      {attachmentRefusal && (
+        <p className="attachment-refusal" role="status" aria-live="polite">
+          {attachmentRefusal}
+        </p>
+      )}
       {/* The live transcript is recognition output, not a draft: it is marked
           as interim and the primitive replaces it with the final sentence. */}
       <AuiIf condition={(state) => state.composer.dictation != null}>
@@ -189,6 +313,17 @@ function ComposerBody({
           <ComposerPrimitive.DictationTranscript />
         </p>
       </AuiIf>
+      {/* The runtime renders this container only while a quote is set, so the
+          strip cannot promise a quote that is not there. */}
+      <ComposerPrimitive.Quote className="composer__quote">
+        <ComposerPrimitive.QuoteText className="composer__quote-text" />
+        <ComposerPrimitive.QuoteDismiss
+          className="composer__quote-dismiss"
+          aria-label="Remove quote"
+        >
+          ✕
+        </ComposerPrimitive.QuoteDismiss>
+      </ComposerPrimitive.Quote>
       <div className="composer__shell">
         <label className="sr-only" htmlFor={inputId}>
           Message the studio
@@ -208,11 +343,27 @@ function ComposerBody({
           aria-haspopup="listbox"
           aria-controls={open ? paletteId : undefined}
           onKeyDown={onKeyDown}
+          // This composer owns pasting: the library's built-in handler would
+          // preventDefault whenever the clipboard carries a file, which is the
+          // one case that must keep its text. Disabling it avoids a double
+          // attach and leaves the decision below.
+          addAttachmentOnPaste={false}
           onPaste={(event) => {
             // A screenshot on the clipboard is a file, not text: attach it
-            // rather than letting the browser paste a placeholder name.
+            // rather than letting the browser paste a placeholder name. But a
+            // clipboard can carry both — a screenshot and the paragraph that
+            // explains it — and swallowing the text is a silent loss. When text
+            // is present, attach the files and leave the paste unprevented so
+            // the browser inserts the text at the caret.
             const files = Array.from(event.clipboardData?.files ?? []);
             if (files.length === 0) {
+              return;
+            }
+            const text = event.clipboardData?.getData?.("text/plain") ?? "";
+            if (text !== "") {
+              // Mixed payload: let the browser insert the text at the caret,
+              // and attach the files alongside it.
+              onFiles(files);
               return;
             }
             event.preventDefault();
@@ -261,7 +412,11 @@ function ComposerBody({
               <StopIcon size={16} />
             </ComposerPrimitive.Cancel>
           ) : (
-            <ComposerPrimitive.Send className="composer__send" aria-label="Send message">
+            <ComposerPrimitive.Send
+              className="composer__send"
+              aria-label="Send message"
+              disabled={readBlocked}
+            >
               <ArrowUpIcon size={18} />
             </ComposerPrimitive.Send>
           )}
@@ -288,15 +443,28 @@ export function ThreadComposer(props: {
   // dragenter/dragleave fire for every child; count depth so moving over the
   // textarea does not flicker the drop state off and on.
   const dragDepth = useRef(0);
+  const attachments = useAuiState((state) => state.composer.attachments);
+  // A refusal names the refused file and the limit and stays on screen until the
+  // person makes room, so a screen reader can reach it (a toast alone expires).
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   function attachFiles(files: File[]) {
+    let accepted = 0;
     for (const file of files) {
       const rejection = attachmentRejection(file);
       if (rejection) {
         pushToast("error", rejection);
         continue;
       }
+      if (attachments.length + accepted >= MAX_ATTACHMENTS) {
+        const message = `${file.name} exceeds the ${MAX_ATTACHMENTS}-file attachment limit.`;
+        pushToast("error", message);
+        setRefusal(message);
+        continue;
+      }
       void aui.composer.addAttachment(file);
+      accepted += 1;
+      setRefusal(null);
     }
   }
 
@@ -337,7 +505,12 @@ export function ThreadComposer(props: {
       }}
     >
       {dragging ? <p className="composer__drop-hint">Drop to attach</p> : null}
-      <ComposerBody {...props} onFiles={attachFiles} />
+      <ComposerBody
+        {...props}
+        onFiles={attachFiles}
+        attachmentRefusal={refusal}
+        onClearAttachmentRefusal={() => setRefusal(null)}
+      />
     </ComposerPrimitive.Root>
   );
 }

@@ -12,7 +12,9 @@ from pydantic import BaseModel, ValidationError
 
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
+from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    V2MOM,
     CandidateStatus,
     CustomerOutcome,
     Evidence,
@@ -26,15 +28,32 @@ from agentic_odi_core.models import (
     Signal,
     Step,
     Strategy,
-    compute_opportunity_score,
+    Study,
 )
 from agentic_odi_core.repository import (
+    V2MOM_ID,
     Repository,
     compute_evidence_fingerprint,
     page,
     rank_signals,
     sort_outcomes,
     unread_signals,
+)
+
+#: Writes that are derived from the store rather than inputs to it. Their own
+#: revision must not make a later derivation look stale. Signals are facts
+#: *about* the store, and segmentation reads jobs, steps, and outcomes — never
+#: signals — so recording one is not an input a later derivation would read.
+_DERIVED_EVENT_TYPES = frozenset(
+    {
+        "SEGMENT_CREATED",
+        "SEGMENT_UPDATED",
+        "STRATEGY_CREATED",
+        "STRATEGY_UPDATED",
+        "SIGNAL_CREATED",
+        "SIGNAL_READ",
+        "SIGNAL_DISMISSED",
+    }
 )
 
 
@@ -49,75 +68,46 @@ class SQLiteRepository(Repository):
             db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
+        self.db_path = db_path
         self._workspace_id = workspace_id or os.environ.get(
             "AGENTIC_ODI_WORKSPACE", DEFAULT_WORKSPACE
         )
         self._device_id = device_id or os.environ.get("AGENTIC_ODI_DEVICE_ID", DEFAULT_DEVICE)
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
-        self._backfilled = False
+        self._last_input_event_id = 0
         self._load_snapshot()
-        self._backfill_legacy_outcomes()
 
     def _load_snapshot(self) -> None:
         self.jobs: dict[str, Job] = {}
         self.steps: dict[str, Step] = {}
         self.outcomes: dict[str, Outcome] = {}
+        self.proposals: dict[str, OutcomeProposal] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.segments: dict[str, Segment] = {}
+        self.strategies: dict[str, Strategy] = {}
+        self.v2mom: dict[str, V2MOM] = {}
+        self.studies: dict[str, Study] = {}
         self.interviews: dict[str, Interview] = {}
         self.quotes: dict[str, InterviewQuote] = {}
         self.candidates: dict[str, OutcomeCandidate] = {}
-        self.segments: dict[str, Segment] = {}
-        self.strategies: dict[str, Strategy] = {}
         self._last_event_id = 0
+        self._last_input_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
 
-    def _backfill_legacy_outcomes(self) -> None:
-        """One-time migration: backfill null scores on legacy outcomes.
-
-        Assigns importance=5.0, satisfaction=5.0 to any outcome missing either
-        score, records an OUTCOME_BACKFILLED event per outcome, and marks the
-        repository as backfilled so reloads do not repeat the migration.
-        """
-        if self._backfilled:
-            return
-        needs_backfill = [
-            o for o in self.outcomes.values() if o.importance is None or o.satisfaction is None
-        ]
-        if not needs_backfill:
-            self._backfilled = True
-            return
-        for outcome in needs_backfill:
-            updates: dict[str, Any] = {}
-            importance = outcome.importance
-            if importance is None:
-                importance = 5.0
-                updates["importance"] = importance
-            satisfaction = outcome.satisfaction
-            if satisfaction is None:
-                satisfaction = 5.0
-                updates["satisfaction"] = satisfaction
-            updates["opportunity_score"] = compute_opportunity_score(
-                importance,
-                satisfaction,
-            )
-            self.store.append(
-                "OUTCOME_BACKFILLED",
-                {"id": outcome.id, "updates": updates},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-        self._sync()
-        self._backfilled = True
-
     def _sync(self) -> None:
-        for ev in self.store.get_stream(workspace_id=self._workspace_id):
-            if ev["id"] > self._last_event_id:
-                self._apply_event(ev)
+        # Only the events appended since the last apply. Reading the whole log
+        # here made every repository read O(all events): a canvas assembly over
+        # a 1,500-outcome store re-parsed 200k rows instead of 3k. ``after_id``
+        # is a covering range scan on the rowid, which is the append order.
+        for ev in self.store.get_stream(
+            workspace_id=self._workspace_id, after_id=self._last_event_id
+        ):
+            self._apply_event(ev)
 
     def _apply_event(self, ev: Event) -> None:
         et = ev["type"]
@@ -253,19 +243,49 @@ class SQLiteRepository(Repository):
             self.strategies[p["id"]] = Strategy.model_validate(p)
         elif et == "STRATEGY_UPDATED":
             self._merge_updates(self.strategies, p, Strategy)
+        elif et == "PROPOSAL_CREATED":
+            self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
+        elif et == "PROPOSAL_UPDATED":
+            self._merge_updates(self.proposals, p, OutcomeProposal)
+        elif et == "V2MOM_UPDATED":
+            self.v2mom[V2MOM_ID] = V2MOM.model_validate(p)
+        elif et == "STUDY_CREATED":
+            self.studies[p["id"]] = Study.model_validate(p)
+        elif et == "STUDY_UPDATED":
+            self._merge_updates(self.studies, p, Study)
         self._last_event_id = max(self._last_event_id, ev["id"])
+        if et not in _DERIVED_EVENT_TYPES:
+            self._last_input_event_id = max(self._last_input_event_id, ev["id"])
 
     @staticmethod
     def _merge_updates(entities: dict[str, Any], p: dict, model: type[BaseModel]) -> None:
         entity = entities.get(p["id"])
         if entity is None:
             return
-        current = entity.model_dump(exclude_unset=True)
+        current = entity.model_dump(mode="json", exclude_unset=True)
         current.update(p.get("updates", {}))
         try:
             entities[p["id"]] = model.model_validate(current)
         except ValidationError:
             pass
+
+    def last_event_id(self) -> int:
+        """Rowid of the event most recently applied, 0 before any write."""
+        with self._lock:
+            self._sync()
+            return self._last_event_id
+
+    def last_input_event_id(self) -> int:
+        """Rowid of the most recent event that is an input to derivation.
+
+        Segments and strategies are derived *from* the store, so their own
+        writes are not inputs a later derivation would read. Leaving them out of
+        the revision lets a freshly derived artifact read as current while a
+        later outcome rescore makes it stale.
+        """
+        with self._lock:
+            self._sync()
+            return self._last_input_event_id
 
     def add_job(self, job: Job) -> Job:
         with self._lock:
@@ -375,6 +395,53 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return True
+
+    def list_steps(self, limit: int | None = None, offset: int = 0) -> list[Step]:
+        with self._lock:
+            self._sync()
+            return page(list(self.steps.values()), limit, offset)
+
+    def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal:
+        with self._lock:
+            self.store.append(
+                "PROPOSAL_CREATED",
+                proposal.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return proposal
+
+    def get_proposal(self, proposal_id: str) -> OutcomeProposal | None:
+        with self._lock:
+            self._sync()
+            return self.proposals.get(proposal_id)
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]:
+        with self._lock:
+            self._sync()
+            props = list(self.proposals.values())
+            if status is not None:
+                props = [p for p in props if p.status == status]
+            return props
+
+    def update_proposal(self, proposal_id: str, updates: dict) -> OutcomeProposal | None:
+        with self._lock:
+            self._sync()
+            proposal = self.proposals.get(proposal_id)
+            if not proposal:
+                return None
+            current = proposal.model_dump(mode="json", exclude_unset=True)
+            current.update(updates)
+            new_proposal = OutcomeProposal.model_validate(current)
+            self.store.append(
+                "PROPOSAL_UPDATED",
+                {"id": proposal_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_proposal
 
     def add_outcome(self, outcome: Outcome) -> Outcome:
         with self._lock:
@@ -767,6 +834,51 @@ class SQLiteRepository(Repository):
             self._sync()
             return new_segment
 
+    def add_study(self, study: Study) -> Study:
+        with self._lock:
+            self.store.append(
+                "STUDY_CREATED",
+                study.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return study
+
+    def get_study(self, study_id: str) -> Study | None:
+        with self._lock:
+            self._sync()
+            return self.studies.get(study_id)
+
+    def list_studies(self, job_id: str | None = None) -> list[Study]:
+        with self._lock:
+            self._sync()
+            items = list(self.studies.values())
+            if job_id is not None:
+                items = [study for study in items if study.job_id == job_id]
+            return items
+
+    def update_study(self, study_id: str, updates: dict[str, Any]) -> Study | None:
+        with self._lock:
+            self._sync()
+            study = self.studies.get(study_id)
+            if study is None:
+                return None
+            current = study.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_study = study.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "STUDY_UPDATED",
+                {"id": study_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_study
+
     def add_strategy(self, strategy: Strategy) -> Strategy:
         with self._lock:
             self.store.append(
@@ -904,6 +1016,22 @@ class SQLiteRepository(Repository):
             items = [q for q in self.quotes.values() if q.interview_id == interview_id]
             return sorted(items, key=lambda q: q.ordinal)
 
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        with self._lock:
+            self.store.append(
+                "V2MOM_UPDATED",
+                v2mom.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        with self._lock:
+            self._sync()
+            return next(iter(self.v2mom.values()), None)
+
     def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
         with self._lock:
             self.store.append(
@@ -985,6 +1113,16 @@ class SQLiteRepository(Repository):
         """Flush any open transaction in the event store to disk."""
         with self._lock:
             self.store.commit()
+
+    def checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """Fold the write-ahead log back into the database file."""
+        with self._lock:
+            self.store.checkpoint(mode)
+
+    @property
+    def integrity(self) -> str:
+        """The boot check result: ``ok`` or ``deferred``."""
+        return self.store.integrity.status
 
     def close(self) -> None:
         """Close the event store and let SQLite clean up its journal files."""

@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { JOB_STAGES, type JobStage } from "../../domain/jobStages";
+import { canvasHasRecords, savedCopyCaption } from "../../lib/canvasProvenance";
 import { useStudio } from "../../state/StudioContext";
 import { FailurePanel } from "../FailurePanel";
 import { GhostJobSteps } from "../Skeletons";
@@ -17,7 +18,9 @@ function phaseIndexFor(order: number, stepCount: number): number {
 export function JobMap() {
   const {
     canvasState,
+    canvasCached,
     refreshCanvas,
+    openPanel,
     addStep,
     updateStep,
     deleteStep,
@@ -50,6 +53,10 @@ export function JobMap() {
       : undefined;
   const activeJob = focusedJob ?? jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
   const activeJobId = activeJob?.id ?? "";
+  // A destructive control names what it destroys; an unnamed job says so
+  // rather than printing an empty pair of quotes.
+  const activeJobName = activeJob?.name?.trim();
+  const deleteJobLabel = activeJobName ? `Delete “${activeJobName}”` : "Delete this job";
   const steps = (canvas?.steps ?? []).filter(
     (step) => !activeJobId || !step.job_id || step.job_id === activeJobId,
   );
@@ -137,6 +144,13 @@ export function JobMap() {
           return phaseIndexFor(order, steps.length) === selectedPhaseIndex;
         });
 
+  const hasRecords = canvasHasRecords(canvas);
+  // A saved copy is on disk and the sidecar has not answered yet: draw it and
+  // say when it was saved rather than hiding real work behind a skeleton. A
+  // warm reload (previous data, not from cache) draws it too, but captions
+  // nothing, because that data is live rather than a saved copy.
+  const savedCaption = canvasCached && hasRecords ? savedCopyCaption(canvas) : null;
+
   if (canvasState.kind === "error") {
     // A failed canvas must not render as eight empty phases.
     return (
@@ -158,6 +172,11 @@ export function JobMap() {
         Ulwick Universal Job Steps: Define ➔ Locate ➔ Prepare ➔ Confirm ➔ Execute ➔ Monitor ➔ Modify
         ➔ Conclude
       </p>
+      {savedCaption ? (
+        <p className="canvas-saved" role="status">
+          {savedCaption}
+        </p>
+      ) : null}
 
       {jobs.length > 1 && (
         <div className="field">
@@ -260,7 +279,6 @@ export function JobMap() {
                 <span
                   className="studio-pill"
                   style={{
-                    fontSize: "0.68rem",
                     padding: "2px 6px",
                     background: hasSteps ? "rgba(129, 140, 248, 0.15)" : "transparent",
                     color: hasSteps ? "var(--studio-indigo)" : "rgba(255,255,255,0.2)",
@@ -326,8 +344,22 @@ export function JobMap() {
         </div>
       )}
 
-      {canvasState.kind === "loading" ? (
+      {canvasState.kind === "loading" && !hasRecords ? (
         <GhostJobSteps />
+      ) : canvasState.kind === "empty" ? (
+        <div className="studio-empty" role="status">
+          <p className="studio-empty__title">No saved copy on this device</p>
+          <p className="studio-empty__body">
+            Name the job and its steps, and the map will keep them here.
+          </p>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={() => openPanel("capture")}
+          >
+            Capture what you know
+          </button>
+        </div>
       ) : steps.length ? (
         <div
           role="list"
@@ -513,7 +545,7 @@ export function JobMap() {
                 void deleteJob(activeJobId);
               }}
             >
-              {confirmDelete ? "Confirm delete job" : "Delete job"}
+              {confirmDelete ? "Confirm delete job" : deleteJobLabel}
             </button>
           </div>
         </details>
