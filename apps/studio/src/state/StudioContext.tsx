@@ -68,8 +68,12 @@ import { textOf } from "../assistant/convert";
 import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
+import { getStudioBff } from "../bff";
 import { deriveDeviceStatus, type DeviceStatus } from "./deviceStatus";
 import { isOnline } from "../lib/onlineStatus";
+import type {
+  StoredNotice,
+} from "../bff/store/types";
 import {
   PROBE_SETTINGS_DEBOUNCE_MS,
   createProbeScheduler,
@@ -526,6 +530,10 @@ export interface StudioContextValue {
   /** The evidence record a citation chip asked the Evidence lens to show. */
   focusedEvidenceId: string | null;
   focusEvidence: (evidenceId: string) => void;
+  /** Load activity notices from the local store. */
+  loadNotices: () => Promise<StoredNotice[]>;
+  /** Save activity notices to the local store. */
+  saveNotices: (notices: StoredNotice[]) => Promise<void>;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -702,8 +710,45 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [connectorModalDismissed, setConnectorModalDismissed] = useState(false);
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
   const abortRef = useRef<AbortController | null>(null);
+  const storeRef = useRef<Awaited<ReturnType<typeof getStudioBff>> | null>(null);
+
+  // Initialize the store reference
+  useEffect(() => {
+    let cancelled = false;
+    getStudioBff().then((bff) => {
+      if (!cancelled) {
+        storeRef.current = bff;
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   /** The id of the newest turn on the wire; a steered cut-in takes it over (#410). */
   const liveTurnId = useRef<string | null>(null);
+
+  const loadNotices = useCallback(async (): Promise<StoredNotice[]> => {
+    const store = storeRef.current;
+    if (!store) return [];
+    try {
+      return await store.listNotices();
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const saveNotices = useCallback(async (noticesToSave: StoredNotice[]): Promise<void> => {
+    const store = storeRef.current;
+    if (!store) return;
+    try {
+      for (const notice of noticesToSave) {
+        await store.putNotice(notice);
+      }
+    } catch {
+      /* storage failure - notice stays in memory */
+    }
+  }, []);
+
   /** The deferred connectivity probe, until the person speaks or the view unmounts. */
   const idleProbeRef = useRef<{ cancel: () => void } | null>(null);
   /**
@@ -2758,6 +2803,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      loadNotices,
+      saveNotices,
     }),
     [
       settings,
@@ -2884,6 +2931,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      loadNotices,
+      saveNotices,
     ],
   );
 

@@ -6,6 +6,7 @@ import type {
   OutboxRecord,
   StoredConversation,
   StoredJob,
+  StoredNotice,
   StoredOutcome,
   StoredStep,
   StoredTurn,
@@ -18,7 +19,7 @@ export const DB_NAME = "agentic-odi-studio";
  * `MIGRATIONS` entry is caught by `migrations.test.ts`, so a release can never
  * ship a bump that would throw `ConstraintError` on an existing database.
  */
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export type MetaValue = number | DrainLease;
 
@@ -60,6 +61,11 @@ export interface StudioDb extends DBSchema {
     value: StoredTurn;
     indexes: { "by-conversation": string };
   };
+  notices: {
+    key: string;
+    value: StoredNotice;
+    indexes: { "by-at": string };
+  };
 }
 
 /** One step in the ladder. It creates or alters stores; it never clears them. */
@@ -100,6 +106,10 @@ export const MIGRATIONS: Record<number, Migration> = {
     const outbox = db.createObjectStore("outbox", { keyPath: "id" });
     outbox.createIndex("by-state", "state");
     outbox.createIndex("by-created", "created_at");
+  },
+  3: (db) => {
+    const notices = db.createObjectStore("notices", { keyPath: "id" });
+    notices.createIndex("by-at", "at");
   },
 };
 

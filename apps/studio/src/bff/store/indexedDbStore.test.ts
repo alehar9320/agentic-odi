@@ -420,7 +420,7 @@ async function rowsOf(name: string, version: number) {
   return rows;
 }
 
-/** The v2 schema written out, so the migrated shape is asserted, not assumed. */
+/** The v3 schema written out, so the migrated shape is asserted, not assumed. */
 function expectedV2Schema() {
   return [
     {
@@ -440,6 +440,12 @@ function expectedV2Schema() {
       keyPath: "key",
       autoIncrement: false,
       indexes: [],
+    },
+    {
+      store: "notices",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-at"],
     },
     {
       store: "observations",
