@@ -6,6 +6,7 @@ import {
   isPrivateHost,
 } from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
+import { isBrowserModelPresent } from "../chat/nativeModel";
 
 export type CapabilityId =
   | "local-data"
@@ -91,8 +92,9 @@ const localStatuses: Record<CapabilityId, Capability> = {
 };
 
 function isBrowserModelAvailable(): boolean {
-  const ai = (globalThis as { ai?: { languageModel?: unknown } }).ai;
-  return Boolean(ai && typeof ai.languageModel === "function");
+  // One check, shared with the orchestrator's browser-native provider, so the
+  // status the person reads and the provider the turn uses never disagree.
+  return isBrowserModelPresent();
 }
 
 /** Probe a same-origin sidecar route. In the browser this is the Worker

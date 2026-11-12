@@ -55,24 +55,43 @@ function isApi(value: unknown): value is BrowserLanguageModelApi {
 }
 
 /**
- * The first usable browser model, or nothing.
+ * The browser's model API, under either spelling.
  *
  * `LanguageModel` is the current global; `ai.languageModel` is the older spelling
- * some builds still expose. A browser with neither gets `null`, which reads as
- * "this device has no model" rather than as an error.
+ * some builds still expose. Both the capability probe and the orchestrator read
+ * this one function, so a browser is never reported as having a model it cannot
+ * be asked to use — or the reverse.
+ */
+export function browserModelApi(
+  scope: typeof globalThis = globalThis,
+): BrowserLanguageModelApi | null {
+  const direct = (scope as { LanguageModel?: unknown }).LanguageModel;
+  if (isApi(direct)) {
+    return direct;
+  }
+  const ai = (scope as { ai?: { languageModel?: unknown } }).ai;
+  if (ai && isApi(ai.languageModel)) {
+    return ai.languageModel;
+  }
+  return null;
+}
+
+/** Whether the browser exposes a model at all, whatever its readiness. */
+export function isBrowserModelPresent(scope: typeof globalThis = globalThis): boolean {
+  return browserModelApi(scope) !== null;
+}
+
+/**
+ * The first usable browser model, or nothing.
+ *
+ * A browser with neither spelling gets `null`, which reads as "this device has
+ * no model" rather than as an error.
  */
 export function resolveNativeModel(
   scope: typeof globalThis = globalThis,
 ): NativeModelAdapter | null {
-  const direct = (scope as { LanguageModel?: unknown }).LanguageModel;
-  if (isApi(direct)) {
-    return wrapApi(direct);
-  }
-  const ai = (scope as { ai?: { languageModel?: unknown } }).ai;
-  if (ai && isApi(ai.languageModel)) {
-    return wrapApi(ai.languageModel);
-  }
-  return null;
+  const api = browserModelApi(scope);
+  return api ? wrapApi(api) : null;
 }
 
 function wrapApi(api: BrowserLanguageModelApi): NativeModelAdapter {

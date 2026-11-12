@@ -173,6 +173,38 @@ describe("CapabilityRegistry", () => {
   });
 });
 
+describe("browser-model status", () => {
+  const settings = {
+    base_url: "http://localhost:8001/v1",
+    api_key: "local",
+    model_name: "local-tools-model",
+    mcp_url: "http://localhost:8000/mcp",
+    theme: "dark" as const,
+  };
+
+  it("sees a model under either spelling, so the status matches the provider", async () => {
+    vi.stubGlobal("LanguageModel", { availability: vi.fn(), create: vi.fn() });
+    let byId = Object.fromEntries(
+      (await capabilityRegistry.statuses(settings)).map((c) => [c.id, c]),
+    );
+    expect(byId["browser-model"].status).toBe("available");
+
+    vi.unstubAllGlobals();
+    vi.stubGlobal("ai", { languageModel: { availability: vi.fn(), create: vi.fn() } });
+    byId = Object.fromEntries(
+      (await capabilityRegistry.statuses(settings)).map((c) => [c.id, c]),
+    );
+    expect(byId["browser-model"].status).toBe("available");
+  });
+
+  it("reports no model when the browser has none", async () => {
+    const byId = Object.fromEntries(
+      (await capabilityRegistry.statuses(settings)).map((c) => [c.id, c]),
+    );
+    expect(byId["browser-model"].status).toBe("unavailable");
+  });
+});
+
 describe("endpoint-model reachability", () => {
   let originalLocation: Location;
 
