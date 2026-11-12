@@ -635,6 +635,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/mcp-server/tests/test_tool_progress.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
 | `apps/mcp-server/tests/test_tool_spec_validation.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
 | `apps/mcp-server/tests/test_tools.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_traceability_tools.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/models.py` |
 | `apps/studio/e2e/a11y.spec.ts` | `apps/studio/e2e/a11y/knownPairs.ts`<br>`apps/studio/e2e/helpers.ts`<br>`apps/studio/src/test/contrast.ts` |
 | `apps/studio/e2e/brief.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/capture.spec.ts` | `apps/studio/e2e/helpers.ts` |
@@ -643,12 +644,13 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/e2e/first-run.spec.ts` | — no direct source pair |
 | `apps/studio/e2e/landscape.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/mcp-backend.spec.ts` | `apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/motion.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/no-sidecar/offline.spec.ts` | — no direct source pair |
 | `apps/studio/e2e/starters.spec.ts` | `apps/studio/e2e/helpers.ts` |
 | `apps/studio/e2e/workspace.spec.ts` | `apps/studio/e2e/helpers.ts` |
-| `apps/studio/src/App.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/api/studioApi.ts` |
+| `apps/studio/src/App.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/state/scheduleProbe.ts` |
 | `apps/studio/src/api/sse.test.ts` | `apps/studio/src/api/sse.ts` |
-| `apps/studio/src/api/studioApi.local.test.ts` | `apps/studio/src/api/studioApi.ts` |
+| `apps/studio/src/api/studioApi.local.test.ts` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/bff/store/types.ts` |
 | `apps/studio/src/api/studioApi.test.ts` | `apps/studio/src/api/studioApi.ts` |
 | `apps/studio/src/assistant/attachments.test.ts` | `apps/studio/src/assistant/attachments.ts` |
 | `apps/studio/src/assistant/claims.test.ts` | `apps/studio/src/assistant/claims.ts`<br>`apps/studio/src/types.ts` |
@@ -659,6 +661,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/assistant/parts.test.tsx` | `apps/studio/src/assistant/parts.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/assistant/queue.test.ts` | `apps/studio/src/assistant/queue.ts` |
 | `apps/studio/src/assistant/quote.test.ts` | `apps/studio/src/assistant/quote.ts` |
+| `apps/studio/src/assistant/speech.test.ts` | `apps/studio/src/assistant/speech.ts` |
 | `apps/studio/src/assistant/starterCopy.test.ts` | `apps/studio/src/assistant/StudioRuntime.tsx` |
 | `apps/studio/src/banners/BannerBridge.test.tsx` | `apps/studio/src/banners/BannerBridge.tsx`<br>`apps/studio/src/banners/BannerProvider.tsx`<br>`apps/studio/src/banners/BannerStack.tsx` |
 | `apps/studio/src/banners/BannerProvider.test.tsx` | `apps/studio/src/banners/BannerProvider.tsx` |
@@ -677,11 +680,15 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/bff/store/indexedDbStore.test.ts` | `apps/studio/src/bff/store/indexedDbStore.ts`<br>`apps/studio/src/bff/store/memoryStore.ts`<br>`apps/studio/src/bff/store/migrations.ts`<br>`apps/studio/src/bff/store/types.ts` |
 | `apps/studio/src/bff/store/migrations.test.ts` | `apps/studio/src/bff/store/migrations.ts` |
 | `apps/studio/src/bridge/desktopBridge.test.ts` | `apps/studio/src/bridge/desktopBridge.ts` |
+| `apps/studio/src/bridge/runtime.test.ts` | `apps/studio/src/bridge/runtime.ts` |
 | `apps/studio/src/components/BootFailurePage.test.tsx` | `apps/studio/src/components/BootFailurePage.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/ChangelogModal.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/ChangelogModal.tsx`<br>`apps/studio/src/lib/changelogRead.ts` |
 | `apps/studio/src/components/FailurePanel.visual.test.tsx` | `apps/studio/src/components/FailurePanel.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/OdiMascot.test.tsx` | `apps/studio/src/components/OdiMascot.tsx` |
-| `apps/studio/src/components/SettingsPanel.test.tsx` | `apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/SettingsPanel.test.tsx` | `apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/lib/version.ts`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/ShareAction.test.tsx` | `apps/studio/src/components/ShareAction.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/ShareSheet.test.tsx` | `apps/studio/src/components/ShareSheet.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/SharedArtifact.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/components/SharedArtifact.tsx` |
 | `apps/studio/src/components/brief/BriefLens.test.tsx` | `apps/studio/src/components/brief/BriefLens.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/canvas/DirectCapture.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/canvas/DirectCapture.tsx` |
 | `apps/studio/src/components/canvas/EvidenceStream.test.tsx` | `apps/studio/src/components/canvas/EvidenceStream.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
@@ -695,27 +702,37 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/components/canvas/ThesisAction.test.tsx` | `apps/studio/src/components/canvas/OutcomeCard.tsx` |
 | `apps/studio/src/components/canvas/opportunityLandscape.perf.test.tsx` | `apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/chat/ChatStage.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ChatStage.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/ClaimCitation.test.tsx` | `apps/studio/src/components/chat/ClaimCitation.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/chat/CommandPalette.test.tsx` | `apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/Composer.test.tsx` | `apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
-| `apps/studio/src/components/chat/Conversation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
+| `apps/studio/src/components/chat/Conversation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/lib/relativeTime.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
 | `apps/studio/src/components/chat/Dictation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | `apps/studio/src/components/chat/ModelPicker.tsx` |
 | `apps/studio/src/components/chat/QueueLane.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/components/chat/QueueLane.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/SelectionToolbar.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/SelectionToolbar.tsx` |
+| `apps/studio/src/components/chat/Speech.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/chat/StallNotice.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/components/chat/StallNotice.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/chat/SuggestionPills.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/composerParts.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
-| `apps/studio/src/components/chat/ThreadComposer.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/ThreadComposer.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/assistant/attachments.ts`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/lib/commands.ts`<br>`apps/studio/src/lib/useFocusTrap.ts`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/chat/WorkBlock.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/components/chat/WorkBlock.tsx`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
 | `apps/studio/src/components/chat/arrivalCount.test.ts` | `apps/studio/src/components/chat/arrivalCount.ts` |
 | `apps/studio/src/components/customize/ConnectorSuggestionModal.test.tsx` | `apps/studio/src/components/customize/ConnectorSuggestionModal.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/customize/CustomizePage.test.tsx` | `apps/studio/src/components/customize/CustomizePage.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/interview/InterviewCard.test.tsx` | `apps/studio/src/components/interview/InterviewCard.tsx`<br>`apps/studio/src/components/interview/types.ts`<br>`apps/studio/src/test/axe.ts` |
 | `apps/studio/src/components/layout/StudioBar.test.tsx` | `apps/studio/src/components/layout/StudioBar.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
 | `apps/studio/src/components/layout/StudioBar.visual.test.tsx` | `apps/studio/src/components/layout/StudioBar.tsx` |
 | `apps/studio/src/components/notifications/CatchUpFeed.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/notifications/CatchUpFeed.tsx`<br>`apps/studio/src/components/notifications/__fixtures__/signals.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/notifications/noFabricatedSignals.test.ts` | — no direct source pair |
 | `apps/studio/src/components/records/RecordDetail.test.tsx` | `apps/studio/src/components/records/RecordDetail.tsx`<br>`apps/studio/src/components/records/RecordsPanel.tsx`<br>`apps/studio/src/lib/records.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/records/RecordsTable.test.tsx` | `apps/studio/src/components/records/RecordsTable.tsx`<br>`apps/studio/src/lib/records.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/settings/AboutSection.test.tsx` | `apps/studio/src/components/settings/sections/AboutSection.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/settings/ConnectionsSection.test.tsx` | `apps/studio/src/components/settings/sections/ConnectionsSection.tsx`<br>`apps/studio/src/components/settings/sections/ModelSection.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/settings/ContextSection.test.tsx` | `apps/studio/src/components/settings/sections/ContextSection.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/settings/DataSection.test.tsx` | `apps/studio/src/components/settings/sections/DataSection.tsx` |
+| `apps/studio/src/components/settings/InstallSection.test.tsx` | `apps/studio/src/bridge/runtime.ts`<br>`apps/studio/src/components/settings/sections/InstallSection.tsx`<br>`apps/studio/src/install.ts` |
+| `apps/studio/src/components/settings/ModelSection.test.tsx` | `apps/studio/src/components/settings/sections/ModelSection.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/settings/SettingsPanel.perFieldSave.test.tsx` | `apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/settings/UpdatesSection.test.tsx` | `apps/studio/src/components/settings/sections/UpdatesSection.tsx`<br>`apps/studio/src/updater/types.ts` |
 | `apps/studio/src/components/settings/saves.test.ts` | `apps/studio/src/components/settings/saves.ts`<br>`apps/studio/src/components/settings/validation.ts` |
 | `apps/studio/src/components/setup/IntroConversation.test.tsx` | `apps/studio/src/components/setup/IntroConversation.tsx`<br>`apps/studio/src/lib/intro.ts` |
 | `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | `apps/studio/src/components/setup/IntroConversation.tsx` |
@@ -728,6 +745,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/diagnostics/bundle.test.ts` | `apps/studio/src/diagnostics/bundle.ts` |
 | `apps/studio/src/diagnostics/redact.test.ts` | `apps/studio/src/diagnostics/redact.ts` |
 | `apps/studio/src/features/flags.test.ts` | `apps/studio/src/features/flags.ts` |
+| `apps/studio/src/install.test.ts` | `apps/studio/src/install.ts` |
 | `apps/studio/src/lib/boot.test.ts` | `apps/studio/src/lib/boot.ts` |
 | `apps/studio/src/lib/brandCopy.test.ts` | `apps/studio/src/lib/brand.ts` |
 | `apps/studio/src/lib/brief.test.ts` | `apps/studio/src/lib/brief.ts`<br>`apps/studio/src/lib/export.ts`<br>`apps/studio/src/types.ts` |
@@ -746,23 +764,34 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/lib/onlineStatus.test.tsx` | `apps/studio/src/lib/onlineStatus.ts` |
 | `apps/studio/src/lib/records.test.ts` | `apps/studio/src/lib/records.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/lib/relativeTime.test.ts` | `apps/studio/src/lib/relativeTime.ts` |
+| `apps/studio/src/lib/sampleLoop.test.ts` | `apps/studio/src/lib/odi.ts`<br>`apps/studio/src/lib/sampleLoop.ts` |
 | `apps/studio/src/lib/session.test.ts` | `apps/studio/src/lib/session.ts` |
 | `apps/studio/src/lib/setup.test.ts` | `apps/studio/src/lib/setup.ts` |
+| `apps/studio/src/lib/share.test.ts` | `apps/studio/src/lib/share.ts` |
 | `apps/studio/src/lib/swRouting.test.ts` | `apps/studio/src/lib/swRouting.ts` |
+| `apps/studio/src/lib/swUpdate.test.ts` | `apps/studio/src/lib/swUpdate.ts` |
 | `apps/studio/src/lib/theme.test.ts` | `apps/studio/src/lib/theme.ts` |
-| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | `apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/onboarding/storage.ts` |
+| `apps/studio/src/lib/useReducedMotion.test.tsx` | `apps/studio/src/lib/useReducedMotion.ts` |
+| `apps/studio/src/lib/version.test.ts` | `apps/studio/src/lib/version.ts` |
+| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | `apps/studio/src/lib/sampleLoop.ts`<br>`apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/onboarding/storage.ts` |
+| `apps/studio/src/onboarding/LandScene.test.tsx` | `apps/studio/src/lib/sampleLoop.ts`<br>`apps/studio/src/onboarding/LandScene.tsx` |
 | `apps/studio/src/onboarding/machine.test.ts` | `apps/studio/src/onboarding/machine.ts`<br>`apps/studio/src/onboarding/storage.ts` |
-| `apps/studio/src/state/StudioContext.test.tsx` | `apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/lib/session.ts`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/test/renderCounts.tsx` |
+| `apps/studio/src/onboarding/sampleCleanup.test.ts` | `apps/studio/src/lib/sampleLoop.ts`<br>`apps/studio/src/onboarding/sampleCleanup.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/state/StudioContext.test.tsx` | `apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/bff/index.ts`<br>`apps/studio/src/lib/session.ts`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/state/notices/NoticesContext.tsx`<br>`apps/studio/src/state/scheduleProbe.ts`<br>`apps/studio/src/test/renderCounts.tsx` |
 | `apps/studio/src/state/deviceStatus.test.ts` | `apps/studio/src/bff/capabilities/registry.ts`<br>`apps/studio/src/state/deviceStatus.ts` |
+| `apps/studio/src/state/probeBreaker.test.ts` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/state/probeBreaker.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/state/regions.test.ts` | `apps/studio/src/state/regions.ts` |
+| `apps/studio/src/state/scheduleProbe.test.ts` | `apps/studio/src/state/scheduleProbe.ts` |
 | `apps/studio/src/styles/bootShell.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/brief.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/colors.test.ts` | — no direct source pair |
+| `apps/studio/src/styles/motion.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/print.test.ts` | — no direct source pair |
 | `apps/studio/src/styles/theme.test.ts` | — no direct source pair |
 | `apps/studio/src/test/a11y.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/ChangelogModal.tsx`<br>`apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/components/brief/BriefLens.tsx`<br>`apps/studio/src/components/canvas/JobMap.tsx`<br>`apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/components/chat/ChatStage.tsx`<br>`apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/components/notifications/CatchUpFeed.tsx`<br>`apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/test/axe.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/updater/types.ts` |
 | `apps/studio/src/test/contrast.test.ts` | `apps/studio/src/test/contrast.ts` |
 | `apps/studio/src/test/keyboard.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/lib/useFocusTrap.ts` |
-| `apps/studio/src/test/renderCounts.test.tsx` | `apps/studio/src/test/renderCounts.tsx` |
+| `apps/studio/src/test/renderCounts.test.tsx` | `apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/state/notices/NoticesContext.tsx`<br>`apps/studio/src/state/settings/SettingsContext.tsx`<br>`apps/studio/src/test/renderCounts.tsx` |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | `apps/studio/src/ui/UiRenderer.tsx`<br>`apps/studio/src/ui/actions.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts`<br>`apps/studio/src/ui/registry.ts` |
 | `apps/studio/src/ui/protocol.test.ts` | `apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
 | `apps/studio/src/updater/UpdateBanner.test.tsx` | `apps/studio/src/updater/UpdateBanner.tsx`<br>`apps/studio/src/updater/UpdateProvider.tsx`<br>`apps/studio/src/updater/service.ts`<br>`apps/studio/src/updater/types.ts` |
@@ -779,6 +808,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio-api/tests/test_probe_cache.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/probes.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py` |
 | `apps/studio-api/tests/test_studio_api.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/chat.py` |
 | `apps/studio-api/tests/test_studio_approvals.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py` |
+| `apps/studio-api/tests/test_studio_auth.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_brief.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
 | `apps/studio-api/tests/test_studio_capabilities.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_chat_branches.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/connectors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
@@ -807,12 +837,14 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio-api/tests/test_studio_proposals.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_router.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
 | `apps/studio-api/tests/test_studio_segments.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
+| `apps/studio-api/tests/test_studio_sharing.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/sharing.py` |
 | `apps/studio-api/tests/test_studio_signals.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
 | `apps/studio-api/tests/test_studio_studies.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py` |
+| `apps/studio-api/tests/test_studio_traceability.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
 | `apps/studio-api/tests/test_studio_ui_spec.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/ui_spec.py` |
 | `brand/tests/test_brand_assets.py` | — no direct source pair |
 | `brand/tests/test_generated_sources.py` | — no direct source pair |
-| `packages/connectors/tests/test_catalog.py` | `packages/connectors/src/agentic_odi_connectors/catalog.py`<br>`packages/connectors/src/agentic_odi_connectors/registry.py` |
+| `packages/connectors/tests/test_catalog.py` | `packages/connectors/src/agentic_odi_connectors/catalog.py`<br>`packages/connectors/src/agentic_odi_connectors/factory.py`<br>`packages/connectors/src/agentic_odi_connectors/protocol.py`<br>`packages/connectors/src/agentic_odi_connectors/registry.py` |
 | `packages/connectors/tests/test_config_path.py` | `packages/connectors/src/agentic_odi_connectors/paths.py` |
 | `packages/connectors/tests/test_config_validation.py` | — no direct source pair |
 | `packages/connectors/tests/test_evidence_equivalence.py` | `packages/connectors/src/agentic_odi_connectors/mapping.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/core/src/agentic_odi_core/models.py` |
@@ -857,12 +889,14 @@ the code disagree, so do not edit it by hand — run
 | `packages/core/tests/test_schema.py` | `packages/core/src/agentic_odi_core/schema.py` |
 | `packages/core/tests/test_segmentation.py` | `packages/core/src/agentic_odi_core/segmentation.py` |
 | `packages/core/tests/test_segments_service.py` | `packages/core/src/agentic_odi_core/errors.py` |
-| `packages/core/tests/test_service.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_segments_staleness.py` | `packages/core/src/agentic_odi_core/freshness.py`<br>`packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_service.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_signal_inbox.py` | `packages/core/src/agentic_odi_core/services.py` |
 | `packages/core/tests/test_sqlite_integrity.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/integrity.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/recovery.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_sqlite_repository.py` | `packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_strategy.py` | `packages/core/src/agentic_odi_core/strategy.py` |
 | `packages/core/tests/test_study.py` | `packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/schema.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_traceability.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py`<br>`packages/core/src/agentic_odi_core/traceability.py` |
 | `tests/contract/test_cli_contract.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
 | `tests/contract/test_mcp_contract.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/services.py` |
 | `tests/contract/test_protected_files.py` | — no direct source pair |
@@ -878,18 +912,22 @@ the code disagree, so do not edit it by hand — run
 | `tests/scripts/test_doc_check.py` | `scripts/doc_check.py` |
 | `tests/scripts/test_gen_corpus.py` | `packages/core/src/agentic_odi_core/corpus.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py`<br>`scripts/gen_corpus.py` |
 | `tests/scripts/test_gen_job_stages.py` | `scripts/gen_job_stages.py` |
+| `tests/scripts/test_hosted_first_run_workflow.py` | — no direct source pair |
 | `tests/scripts/test_label_merge_conflicts.py` | `scripts/pr_labels.py` |
 | `tests/scripts/test_pr_body_gate.py` | — no direct source pair |
 | `tests/scripts/test_pr_guards.py` | `scripts/pr_guards.py` |
 | `tests/scripts/test_pr_labeler_workflow.py` | — no direct source pair |
 | `tests/scripts/test_pr_labels.py` | `scripts/pr_labels.py`<br>`scripts/pr_provenance.py` |
 | `tests/scripts/test_pr_provenance.py` | `scripts/pr_provenance.py` |
+| `tests/scripts/test_pr_triage.py` | `scripts/pr_triage.py` |
 | `tests/scripts/test_release_assets.py` | `scripts/release_assets.py` |
 | `tests/scripts/test_release_instructions.py` | `scripts/release_instructions.py` |
 | `tests/scripts/test_release_version_gate.py` | — no direct source pair |
 | `tests/scripts/test_release_workflow.py` | — no direct source pair |
 | `tests/scripts/test_updater_proof_gate.py` | — no direct source pair |
 | `tests/scripts/test_vendor_policy.py` | `scripts/vendor_policy.py` |
+| `tests/scripts/test_verify.py` | `scripts/verify.py` |
+| `tests/scripts/test_verify_hosted_first_run.py` | — no direct source pair |
 | `tests/scripts/test_version_sync.py` | `apps/cli/src/agentic_odi_cli/_build_info.py`<br>`scripts/check_version_parity.py` |
 | `tests/scripts/test_workflow_triggers.py` | — no direct source pair |
 | `tests/test_architecture.py` | — no direct source pair |
@@ -899,13 +937,15 @@ the code disagree, so do not edit it by hand — run
 | `tests/test_timeout_ceiling.py` | — no direct source pair |
 | `tests/test_underserved_threshold_parity.py` | `packages/core/src/agentic_odi_core/evaluation.py` |
 | `tests/test_worker_build_route.py` | — no direct source pair |
+| `tests/test_worker_deploy_route.py` | — no direct source pair |
+| `tests/test_worker_error_origin.py` | — no direct source pair |
 | `tests/test_worker_error_shape.py` | — no direct source pair |
 | `tests/test_worker_security_headers.py` | — no direct source pair |
 | `website/tests/site_support.py` | `website/tools/build_site.py` |
 | `website/tests/test_ci_required.py` | — no direct source pair |
 | `website/tests/test_content_sync.py` | `website/tools/build_sample.py`<br>`website/tools/extract.py` |
 | `website/tests/test_design_system.py` | `website/tools/extract.py` |
-| `website/tests/test_docs_render.py` | `scripts/artifact_a11y.py`<br>`website/tools/markdown_render.py` |
+| `website/tests/test_docs_render.py` | `scripts/artifact_a11y.py`<br>`website/tools/build_site.py`<br>`website/tools/markdown_render.py` |
 | `website/tests/test_generated.py` | `website/tools/build_site.py`<br>`website/tools/extract.py` |
 | `website/tests/test_make_og.py` | `website/tools/make_og.py` |
 | `website/tests/test_pages_deploy.py` | — no direct source pair |
