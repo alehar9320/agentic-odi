@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SECRET_PATH_ENV = "AGENTIC_ODI_STUDIO_SECRETS"
+STORE_PATH_ENV = "AGENTIC_ODI_STUDIO_SECRETS"
 
 MODEL_KEY_NAME = "model_key"
 
@@ -29,7 +29,7 @@ class SecretStoreError(RuntimeError):
 
 def secrets_path() -> Path:
     """Return the path to the per-install secret store."""
-    env = os.getenv(SECRET_PATH_ENV)
+    env = os.getenv(STORE_PATH_ENV)
     if env:
         return Path(env)
     return Path.home() / ".config" / "agentic-odi" / "studio-secrets.json"

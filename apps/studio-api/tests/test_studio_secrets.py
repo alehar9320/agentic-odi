@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture(autouse=True)
 def isolate_secrets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(secrets.SECRET_PATH_ENV, str(tmp_path / "studio-secrets.json"))
+    monkeypatch.setenv(secrets.STORE_PATH_ENV, str(tmp_path / "studio-secrets.json"))
 
 
 def _client() -> TestClient:
@@ -94,7 +94,7 @@ def test_unwritable_store_fails_closed(tmp_path: Path, monkeypatch: pytest.Monke
     # rather than silently drop the key.
     blocker = tmp_path / "blocker"
     blocker.write_text("not a directory", encoding="utf-8")
-    monkeypatch.setenv(secrets.SECRET_PATH_ENV, str(blocker / "nested" / "secrets.json"))
+    monkeypatch.setenv(secrets.STORE_PATH_ENV, str(blocker / "nested" / "secrets.json"))
 
     with pytest.raises(secrets.SecretStoreError):
         secrets.set_model_key("sk-DO-NOT-LEAK")
