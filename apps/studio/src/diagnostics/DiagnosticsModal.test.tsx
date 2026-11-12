@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
@@ -53,12 +53,20 @@ function stubContext(): StudioContextValue {
     mcpReachable: false,
     sidecarReachable: false,
     connectors: [],
+    connectorsLoading: false,
     presets: [],
+    presetsLoading: false,
     addConnector: vi.fn().mockResolvedValue(undefined),
     deleteConnector: vi.fn().mockResolvedValue(undefined),
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     refreshPresets: vi.fn().mockResolvedValue(undefined),
     refreshCapabilities: vi.fn().mockResolvedValue(undefined),
+    surveyConnections: vi.fn().mockResolvedValue({
+      sidecarReachable: false,
+      mcpReachable: false,
+      llmHealthy: false,
+      llmMessage: "no sidecar",
+    }),
     capabilities: [],
     toasts: [],
     pushToast: vi.fn(),
@@ -100,6 +108,22 @@ describe("DiagnosticsModal", () => {
     expect(modalProps.onClose).toHaveBeenCalledOnce();
   });
 
+  it("takes the page behind the dialog out of reach while it is open", () => {
+    const { unmount } = render(
+      <div className="studio-app">
+        <DiagnosticsModal {...modalProps} />
+      </div>,
+    );
+
+    const shell = document.querySelector(".studio-app");
+    expect(shell).toHaveAttribute("inert");
+    // The dialog sits outside the inert shell, so it stays reachable.
+    expect(shell?.contains(screen.getByRole("dialog"))).toBe(false);
+
+    unmount();
+    expect(shell).not.toHaveAttribute("inert");
+  });
+
   it("creates a local JSON download only when Save is pressed", () => {
     const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:diagnostics");
     const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
@@ -112,6 +136,33 @@ describe("DiagnosticsModal", () => {
     expect(create).toHaveBeenCalledOnce();
     expect(revoke).toHaveBeenCalledWith("blob:diagnostics");
     expect(click).toHaveBeenCalledOnce();
+  });
+
+  it("clears the copy confirmation after two seconds", async () => {
+    vi.useFakeTimers();
+    const write = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: write },
+    });
+    render(<DiagnosticsModal {...modalProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Diagnostics copied.")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1999);
+    });
+    expect(screen.getByText("Diagnostics copied.")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByText("Diagnostics copied.")).toBeNull();
+    vi.useRealTimers();
   });
 
   it("still prepares a local bundle when the sidecar is unavailable", async () => {

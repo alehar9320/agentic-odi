@@ -328,55 +328,6 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     ["title", "bet", "rationale"],
   ),
   entry(
-    "candidate-queue",
-    "leaf",
-    "The review queue for one interview's proposed candidates: each candidate's statement beside the sentence it came from, with the decision actions. Use when a person is turning proposals into outcomes.",
-    {
-      interviewId: { type: "string", description: "The interview the candidates were extracted from." },
-      state: {
-        enum: ["loading", "ready", "empty", "failed"],
-        description:
-          "Be honest about which it is: `loading` while the fetch is in flight, `failed` with `message` when it errored, `empty` when nothing is waiting, `ready` with `candidates` otherwise.",
-      },
-      candidates: {
-        type: "array",
-        maxItems: UI_LIMITS.maxChildren,
-        description: "Each candidate paired with the verbatim quote it was extracted from.",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            statement: { type: "string" },
-            quote: { type: "string", description: "Exact words. Never paraphrase inside this field." },
-            source: { type: "string", description: "Where the quote came from, e.g. \"Ana · onboarding call\"." },
-            confidence: { type: "number", minimum: 0, maximum: 1 },
-            decision: {
-              enum: ["proposed", "accepted", "rejected", "merged"],
-              description:
-                "The decision the server last recorded. Read it back from the store; never assume a write landed because a button was clicked.",
-            },
-            note: {
-              type: "string",
-              description:
-                "The server's reason when it refused a decision — a blank reject reason, an invalid statement, an unknown merge target. Show it beside the candidate, which stays in the queue for correction.",
-            },
-          },
-          required: ["id", "statement", "quote"],
-        },
-      },
-      target: {
-        type: "string",
-        description:
-          "The accepted outcome id a merge would fold the candidates into. A merge needs this explicit target; without it, say so rather than guessing.",
-      },
-      message: {
-        type: "string",
-        description: "Why the queue is empty or failed, in the server's words. Omit when it is ready.",
-      },
-    },
-    ["state"],
-  ),
-  entry(
     "segment-card",
     "leaf",
     "One outcome-based segment (Stage 5): the people, the job they are doing, and the verdict their scored outcomes support. Never a demographic grouping.",
@@ -412,6 +363,34 @@ export const CATALOG: readonly UiCatalogEntry[] = [
         maxItems: 40,
         items: { type: "string" },
         description: "The outcomes this segment rests on. Two is the floor: one is a hypothesis.",
+      },
+      members: {
+        type: "array",
+        maxItems: 40,
+        description:
+          "The member outcomes, resolved for display. Optional and additive: the board builds it from the canvas so the card can show each member's statement and stored score. A member whose outcome is missing is dropped, never invented.",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "The outcome's id, as stored." },
+            statement: {
+              type: "string",
+              description: "The outcome's statement. Falls back to the id when none is stored.",
+            },
+            opportunityScore: {
+              type: "number",
+              description:
+                "The stored opportunity score, read as-is. Omit it when the outcome is unscored; never compute one here.",
+            },
+          },
+          required: ["id"],
+        },
+      },
+      missingMembers: {
+        type: "integer",
+        minimum: 0,
+        description:
+          "How many of `outcomeIds` resolved to no outcome on the canvas. Counted and reported, never rendered as an empty row.",
       },
       rationale: { type: "string", description: "Why this verdict, naming the outcomes behind it." },
       unclustered: {
@@ -461,6 +440,55 @@ export const CATALOG: readonly UiCatalogEntry[] = [
       },
     },
     ["kind", "thesis", "rejected"],
+  ),
+  entry(
+    "candidate-queue",
+    "leaf",
+    "The review queue for one interview's proposed candidates: each candidate's statement beside the sentence it came from, with the decision actions. Use when a person is turning proposals into outcomes.",
+    {
+      interviewId: { type: "string", description: "The interview the candidates were extracted from." },
+      state: {
+        enum: ["loading", "ready", "empty", "failed"],
+        description:
+          "Be honest about which it is: `loading` while the fetch is in flight, `failed` with `message` when it errored, `empty` when nothing is waiting, `ready` with `candidates` otherwise.",
+      },
+      candidates: {
+        type: "array",
+        maxItems: UI_LIMITS.maxChildren,
+        description: "Each candidate paired with the verbatim quote it was extracted from.",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            statement: { type: "string" },
+            quote: { type: "string", description: "Exact words. Never paraphrase inside this field." },
+            source: { type: "string", description: "Where the quote came from, e.g. \"Ana · onboarding call\"." },
+            confidence: { type: "number", minimum: 0, maximum: 1 },
+            decision: {
+              enum: ["proposed", "accepted", "rejected", "merged"],
+              description:
+                "The decision the server last recorded. Read it back from the store; never assume a write landed because a button was clicked.",
+            },
+            note: {
+              type: "string",
+              description:
+                "The server's reason when it refused a decision — a blank reject reason, an invalid statement, an unknown merge target. Show it beside the candidate, which stays in the queue for correction.",
+            },
+          },
+          required: ["id", "statement", "quote"],
+        },
+      },
+      target: {
+        type: "string",
+        description:
+          "The accepted outcome id a merge would fold the candidates into. A merge needs this explicit target; without it, say so rather than guessing.",
+      },
+      message: {
+        type: "string",
+        description: "Why the queue is empty or failed, in the server's words. Omit when it is ready.",
+      },
+    },
+    ["state"],
   ),
 ];
 

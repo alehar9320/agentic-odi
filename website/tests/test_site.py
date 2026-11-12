@@ -13,12 +13,14 @@ import re
 
 import extract
 import pytest
+from artifact_a11y import audit_html
 from site_support import (
     CATALOG_PY,
     CATALOG_TS,
     CONTRACT_PY,
     CORE_MODELS_PY,
     MCP_SERVER_PY,
+    STANDALONE_PAGES,
     _built_root,
     all_pages,
     h1_text,
@@ -54,6 +56,13 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
+    # The agent vendors whose docs the assignment guide cites as sources.
+    "https://docs.openhands.dev",
+    "https://kiro.dev",
+    "https://kilo.ai",
+    "https://docs.qoder.com",
+    "https://docs.github.com",
+    "https://www.theverge.com",
     # A placeholder in the connector documentation. It is not routable, and
     # it is shown as an example of what a connector URL looks like.
     "https://mcp.internal.example",
@@ -90,6 +99,7 @@ EMOJI = re.compile("[\u2600-\u27bf\U0001f300-\U0001faff]")
 # The pages rendered verbatim from the repository's guides. Their prose is
 # the maintainers', so the site's own copy rules do not apply to them.
 MIRRORED_GUIDES = {
+    "docs/agents/index.html",
     "docs/architecture/index.html",
     "docs/cli/index.html",
     "docs/connectors/index.html",
@@ -130,22 +140,25 @@ def test_page_has_the_required_basics(page: str):
     assert 'lang="en"' in html
     assert '<meta charset="utf-8">' in html
     assert "width=device-width" in html
+    # The audit reports how many <h1> a page has and whether its levels skip;
+    # only the shell's own contract says the title comes first.
+    first_heading = re.search(r"<h([1-6])\b", html)
+    assert first_heading is not None and first_heading.group(1) == "1", (
+        f"{page} must open on its <h1>"
+    )
 
 
-@pytest.mark.parametrize("page", all_pages())
-def test_page_has_exactly_one_h1(page: str):
-    html = read_page(page)
-    assert html.count("<h1") == 1, f"{page} must have exactly one <h1>"
+@pytest.mark.parametrize("page", all_pages() + sorted(STANDALONE_PAGES))
+def test_page_passes_the_artifact_audit(page: str):
+    """Every page is an artifact, including the two that skip the shell.
 
-
-@pytest.mark.parametrize("page", all_pages())
-def test_page_headings_never_skip_a_level(page: str):
-    html = read_page(page)
-    levels = [int(level) for level in re.findall(r"<h([1-6])\b", html)]
-    assert levels, f"{page} has no headings"
-    assert levels[0] == 1, f"{page} must start at <h1>"
-    for previous, current in zip(levels, levels[1:], strict=False):
-        assert current <= previous + 1, f"{page} skips from <h{previous}> to <h{current}>"
+    `all_pages()` deliberately excludes the standalone pages because they are
+    not subject to the site shell's contract. That exemption was never about
+    their structure, and a page a reader downloads or forwards — the sample
+    workspace above all — is exactly where the structure matters.
+    """
+    violations = audit_html(read_page(page))
+    assert violations == [], "\n".join(str(v) for v in violations)
 
 
 @pytest.mark.parametrize("page", all_pages())
@@ -187,13 +200,6 @@ def test_no_milestone_dates(page: str):
     html = read_page(page)
     assert not QUARTER.search(html), f"{page} contains a quarter"
     assert not MONTH_YEAR.search(html), f"{page} contains a month and year"
-
-
-@pytest.mark.parametrize("page", all_pages())
-def test_decorative_svg_is_hidden_from_assistive_tech(page: str):
-    html = read_page(page)
-    for tag in re.findall(r"<svg\b[^>]*>", html):
-        assert "aria-hidden" in tag or "role=" in tag, f"{page}: {tag}"
 
 
 # ---------------------------------------------------------------- landing
@@ -465,6 +471,24 @@ def test_the_404_page_is_self_contained():
     assert "<img" not in html
 
 
+def test_the_sample_page_is_self_contained():
+    # The sample workspace is the landing page's primary call to action. It
+    # must render with no network, so it carries its own style and references
+    # nothing external. This is the same contract as the 404 page, asserted the
+    # same way.
+    html = read_page("sample/index.html")
+    assert 'lang="en"' in html
+    assert '<meta charset="utf-8">' in html
+    assert "width=device-width" in html
+    assert html.count("<h1") == 1
+    assert "<main" in html and "<footer" in html
+    assert "<link" not in html
+    assert "<script" not in html
+    assert "<img" not in html
+    assert not EMOJI.search(html)
+    assert not QUARTER.search(html) and not MONTH_YEAR.search(html)
+
+
 # ---------------------------------------------------------------- weight & links
 
 
@@ -483,10 +507,14 @@ def test_every_page_resolves_its_own_assets(page: str):
 @pytest.mark.parametrize("page", all_pages())
 def test_page_weights_are_within_budget(page: str):
     size = _built_root(page).stat().st_size
-    # The MCP reference is the long pole: every tool's argument table and the
-    # whole ODI schema live on that one page, so it grows with each paginated
-    # list tool and each entity we add. The V2MOM entity, the five scheduled-work
-    # tools, the three signal tools, the four Stage 5 and 6 tools, and the
-    # interview/quote tools with their two schema entities, the evidence-claim
-    # markers, and the candidate review tools bring the page to ~105 KB.
-    assert size <= 109 * 1024, f"{page}: {size} bytes"
+    # The page budget is a soft ceiling: individual pages are coverage records
+    # (ledgers, entity docs, schema references), not decoration, so the ceiling
+    # moves with legitimate content growth rather than trimming reference
+    # material. The MCP reference is the long pole: every tool's argument table
+    # and the whole ODI schema live on that one page, so it grows with each
+    # paginated list tool, each entity, and each new tool group. The
+    # Development page also carries the assistant-ui ledger (issue #429, 129
+    # rows), the Study entity, the candidate review tools, their schema entity,
+    # and the duplicate-suggestion and merge tools. Both pages stay under the
+    # same soft ceiling, which tracks that content instead of trimming it.
+    assert size <= 110 * 1024, f"{page}: {size} bytes"

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from agentic_odi_studio_api.studio import chat
 from agentic_odi_studio_api.studio.approvals import (
     ApprovalDecision,
@@ -297,14 +299,51 @@ def test_an_expired_gate_tells_the_model_nothing_changed(monkeypatch) -> None:
     assert [name for name, _ in events if name in {"message", "error"}] == ["message"]
 
 
-def test_mutating_tools_are_named_by_prefix() -> None:
-    assert chat.is_mutating_tool("add_job")
-    assert chat.is_mutating_tool("delete_outcome")
-    assert chat.is_mutating_tool("ingest_notion")
-    assert chat.is_mutating_tool("promote_evidence")
+@pytest.mark.parametrize(
+    "name",
+    [
+        "schedule_work",
+        "trigger_scheduled_work",
+        "cancel_scheduled_work",
+        "mark_signal_read",
+        "dismiss_signal",
+        "unknown_tool",
+    ],
+)
+def test_declining_a_contract_write_or_unknown_tool_prevents_execution(monkeypatch, name) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call("{}", name)])]),
+            _FakeStream([_chunk(content="Nothing changed.")]),
+        ],
+    )
+    events = _parse(
+        _collect_answering(
+            _request(approvals=True), ApprovalRegistry(), ApprovalDecision(approved=False)
+        )
+    )
+    assert [data["name"] for event, data in events if event == "approval"] == [name]
+    assert _Mcp.calls == []
+
+
+def test_approval_classification_preserves_reads_and_local_surfaces(monkeypatch) -> None:
+    from agentic_odi_core.contract import TOOL_SPECS, ToolEffect, ToolSpec
+
     assert not chat.is_mutating_tool("get_jobs")
+    assert not chat.is_mutating_tool("compute_opportunity")
+    assert not chat.is_mutating_tool("evaluate_outcome")
     assert not chat.is_mutating_tool("remember")
     assert not chat.is_mutating_tool("render_ui")
+    assert chat.is_mutating_tool("add_connector")
+    assert chat.is_mutating_tool("open_study")
+    assert not chat.is_mutating_tool("list_studies")
+    monkeypatch.setitem(
+        TOOL_SPECS,
+        "get_future_write",
+        ToolSpec(name="get_future_write", summary="writes", effect=ToolEffect.WRITE),
+    )
+    assert chat.is_mutating_tool("get_future_write")
 
 
 def test_model_receives_visible_turn_history_in_order() -> None:
@@ -385,6 +424,56 @@ def test_attachment_text_is_truncated(monkeypatch) -> None:
 
     assert len(block) < 50_000
     assert chat.MAX_ATTACHMENT_TEXT < 50_000
+
+
+def test_a_bmp_file_at_the_client_limit_arrives_whole(monkeypatch) -> None:
+    """The client cap and the sidecar cap agree for BMP text.
+
+    The studio refuses a text file longer than `MAX_ATTACHMENT_CHARS` (20,000)
+    before it is sent, and the sidecar slices at `MAX_ATTACHMENT_TEXT` (20,000).
+    For BMP text every character is one UTF-16 unit on the client and one code
+    point here, so a file the client accepts arrives whole: the sidecar slice
+    only ever bites on text the client would already have refused. The two
+    counts diverge for astral characters (an emoji is two UTF-16 units but one
+    code point), which makes the client the stricter of the two; that is
+    deliberate and neither limit is changed to paper over it.
+    """
+    at_limit = "a" * chat.MAX_ATTACHMENT_TEXT
+    assert len(at_limit) == chat.MAX_ATTACHMENT_TEXT
+
+    block = chat._attachment_block(
+        [AttachmentRef(name="notes.md", content_type="text/markdown", text=at_limit)]
+    )
+
+    # The whole 20,000-character file is in the block, unshortened: the body
+    # between the label lines is exactly the text that was attached.
+    body = block.split("\n", 1)[1].rsplit("\n", 1)[0]
+    assert body == at_limit
+    assert len(body) == chat.MAX_ATTACHMENT_TEXT
+
+
+def test_a_client_accepted_file_with_an_emoji_arrives_whole() -> None:
+    """A 20,000-UTF-16-unit file with one emoji reaches the sidecar intact.
+
+    The client counts UTF-16 code units (`String.length`); the sidecar counts
+    code points (`len()` on a Python `str`). 19,998 BMP characters plus one
+    astral emoji is 20,000 units on the client — exactly what it allows — but
+    only 19,999 code points here, so the sidecar keeps every code point. The
+    counts diverge for astral characters, and the client is the stricter of the
+    two: nothing the client accepts is cut here. Neither limit is changed to
+    paper over the difference.
+    """
+    text = "a" * 19_998 + "🎯"
+    assert len(text.encode("utf-16-le")) // 2 == 20_000  # client units
+    assert len(text) == 19_999  # sidecar code points
+
+    block = chat._attachment_block(
+        [AttachmentRef(name="notes.md", content_type="text/markdown", text=text)]
+    )
+
+    body = block.split("\n", 1)[1].rsplit("\n", 1)[0]
+    assert body == text
+    assert "🎯" in body
 
 
 def test_a_cited_sentence_names_the_record_not_the_tool(monkeypatch) -> None:
@@ -477,3 +566,96 @@ def test_claims_are_persisted_with_the_turn(monkeypatch) -> None:
     assistant = memory.conversation_tree(conversation.id)[-1]
     assert assistant.claims[0].status == "cited"
     assert assistant.claims[0].evidence[0].name == "Call with Acme"
+
+
+def _offline(monkeypatch) -> None:
+    """Force the deterministic tier: no MCP, no model, one short reply."""
+
+    async def _unhealthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+        return False, "down"
+
+    monkeypatch.setattr(chat, "check_llm_health", _unhealthy)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
+
+
+def _memory_that_forgets_replies(monkeypatch) -> StudioMemory:
+    """A store that keeps what the person typed and fails on every reply."""
+    memory = StudioMemory(":memory:")
+    real_append = memory.append_turn
+
+    def _append(*args: Any, **kwargs: Any) -> int:
+        role = kwargs.get("role", args[1] if len(args) > 1 else "")
+        if role == "assistant":
+            raise RuntimeError("the store is closed")
+        return real_append(*args, **kwargs)
+
+    monkeypatch.setattr(memory, "append_turn", _append)
+    return memory
+
+
+def _ask_and_answer(memory: StudioMemory) -> list[str]:
+    async def _run() -> list[str]:
+        return [
+            frame
+            async for frame in chat.stream_chat(_request(), memory=memory, request_id="req-466")
+        ]
+
+    return asyncio.run(_run())
+
+
+def _warnings(caplog) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+
+
+def test_a_reply_that_is_not_stored_still_finishes(monkeypatch) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+
+    frames = _ask_and_answer(memory)
+
+    message = next(data for name, data in _parse(frames) if name == "message")
+    assert message["content"]
+
+
+def test_a_reply_that_is_not_stored_logs_a_warning(monkeypatch, caplog) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger="agentic_odi_studio_api.studio.chat"):
+        _ask_and_answer(memory)
+
+    assert len(_warnings(caplog)) == 1
+
+
+def test_the_persistence_warning_names_the_request_and_the_error(monkeypatch, caplog) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger="agentic_odi_studio_api.studio.chat"):
+        _ask_and_answer(memory)
+
+    warning = _warnings(caplog)[0]
+    assert "req-466" in warning
+    assert "RuntimeError" in warning
+    assert "assistant" in warning
+
+
+def test_the_persistence_warning_quotes_nothing_anyone_said(monkeypatch, caplog) -> None:
+    _offline(monkeypatch)
+    memory = _memory_that_forgets_replies(monkeypatch)
+    secret_words = "Propagate the quarterly hiring freeze"
+    request = _request(
+        api_key="sk-supersecret",
+        messages=[ChatMessage(role="user", content=secret_words, id="m-1")],
+    )
+
+    async def _run() -> None:
+        async for _frame in chat.stream_chat(request, memory=memory, request_id="req-466"):
+            pass
+
+    with caplog.at_level(logging.WARNING, logger="agentic_odi_studio_api.studio.chat"):
+        asyncio.run(_run())
+    logged = "\n".join(_warnings(caplog))
+    assert logged
+    assert secret_words not in logged
+    assert "sk-supersecret" not in logged

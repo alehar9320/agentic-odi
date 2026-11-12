@@ -1,4 +1,5 @@
 import { CheckIcon } from "../components/icons";
+import { updateTitle, versionLabel } from "../lib/brand";
 import { useUpdateService, useUpdateSnapshot } from "./UpdateProvider";
 import { bannerView } from "./machine";
 
@@ -25,17 +26,17 @@ export function UpdateBanner() {
     switch (view.kind) {
       case "downloading":
         return {
-          title: `Getting Living Studio ${view.version} ready`,
+          title: updateTitle(view.version, "downloading"),
           detail: "Downloading in the background — you can keep working.",
         };
       case "installing":
         return {
-          title: `Installing Living Studio ${view.version}`,
+          title: updateTitle(view.version, "installing"),
           detail: "One moment.",
         };
       case "ready":
         return {
-          title: `Living Studio ${view.version} is ready`,
+          title: `${versionLabel(view.version)} is ready`,
           detail: view.pendingInstall
             ? "Updating closes and reopens the app."
             : "Restart now, or it will apply the next time you open the studio.",
@@ -70,15 +71,16 @@ export function UpdateBanner() {
   return (
     <section
       className={`update-banner update-banner--${view.kind}`}
-      role="status"
-      aria-live="polite"
       aria-label="Software update"
     >
       <span className="update-banner__mark" aria-hidden="true">
         {view.kind === "ready" ? <CheckIcon size={15} /> : "◍"}
       </span>
 
-      <div className="update-banner__copy">
+      {/* The announcement rides the title and detail only. The progress bar
+          below changes on every percent and is not announced: a screen reader
+          hears the title once, not once per tick. */}
+      <div className="update-banner__copy" role="status" aria-live="polite">
         <p className="update-banner__title">{title}</p>
         <p className="update-banner__detail">{detail}</p>
       </div>

@@ -1,8 +1,10 @@
 import { useState } from "react";
 
+import { formatExactTime, formatRelativeTime } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
 import type { Signal, SignalKind, SignalSeverity } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { StatusDot } from "../status/StatusDot";
 import {
   BoltIcon,
   CheckIcon,
@@ -30,24 +32,6 @@ const SEVERITY_BADGE: Record<SignalSeverity, string> = {
   notice: "badge--green",
   urgent: "badge--amber",
 };
-
-function formatRelativeTime(isoString: string): string {
-  try {
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-  } catch {
-    return "Recently";
-  }
-}
 
 function kindIcon(kind: SignalKind) {
   if (kind === "job_added" || kind === "job_map_completed") return <RouteIcon size={16} />;
@@ -210,14 +194,20 @@ export function CatchUpFeed() {
                 />
                 <div className="card__head">
                   <div className="catchup-card__meta">
-                    {unreadCard && <span className="status-dot" title="Unread signal" />}
+                    {unreadCard && <StatusDot tone="ok" label="Unread signal" />}
                     <span className={`badge ${SEVERITY_BADGE[item.severity]}`}>
                       <span className="catchup-card__badge">
                         {kindIcon(item.kind)}
                         {KIND_LABEL[item.kind].toUpperCase()} · {item.severity}
                       </span>
                     </span>
-                    <span className="card__id">{formatRelativeTime(item.created_at)}</span>
+                    <time
+                      className="card__id"
+                      dateTime={item.created_at}
+                      title={formatExactTime(item.created_at)}
+                    >
+                      {formatRelativeTime(item.created_at)}
+                    </time>
                   </div>
 
                   <div className="catchup-card__controls">

@@ -21,13 +21,16 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
 from typing import Any
 
-from agentic_odi_core import ModelRouter, ModelTier, ODIService, RoutingMode
+from agentic_odi_core import ModelRouter, ModelTier, ODIService, Outcome, RoutingMode
+from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
+from agentic_odi_core.funnel import FIRST_MESSAGE, count_milestone
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
     parse_tool_result,
     tool_result_text,
 )
+from agentic_odi_core.steve_jobs import generate_steve_jobs_response
 from fastmcp import Client as McpClient
 from openai import AsyncOpenAI
 
@@ -49,6 +52,7 @@ from agentic_odi_studio_api.studio.schemas import (
     AttachmentRef,
     ChatMessage,
     ChatRequest,
+    FocusRef,
     StudioBrief,
 )
 from agentic_odi_studio_api.studio.ui_spec import RENDER_UI_TOOL, UiCatalog
@@ -59,22 +63,9 @@ log = logging.getLogger(__name__)
 #: missing must not be able to loop forever.
 MAX_TOOL_ROUNDS = 3
 
-#: Tool names that change stored data. Everything else is a read, a surface, or
-#: a memory note — none of which needs a confirmation the user would learn to
-#: click through.
-MUTATING_TOOL_PREFIXES: tuple[str, ...] = (
-    "add_",
-    "create_",
-    "update_",
-    "delete_",
-    "ingest_",
-    "remove_",
-)
-
-#: Writes whose names do not follow the verb-prefix convention.
-MUTATING_TOOLS: frozenset[str] = frozenset(
-    {"promote_evidence", "segment_market", "propose_strategy"}
-)
+#: Local tools deliberately handled without a write approval: rendering a UI
+#: and suggesting a memory observation retain their existing conversation flow.
+_LOCAL_UNGATED_TOOLS = frozenset({"remember", RENDER_UI_TOOL})
 
 #: Attachments are context, not a corpus: five files, and a bounded slice of each.
 MAX_ATTACHMENTS = 5
@@ -86,7 +77,10 @@ MAX_SOURCE_PREVIEW = 160
 
 def is_mutating_tool(name: str) -> bool:
     """Whether a tool call changes stored data and should be confirmed."""
-    return name in MUTATING_TOOLS or name.startswith(MUTATING_TOOL_PREFIXES)
+    if name in _LOCAL_UNGATED_TOOLS:
+        return False
+    spec = TOOL_SPECS.get(name)
+    return spec is None or spec.effect != ToolEffect.READ
 
 
 SYSTEM_PROMPT = """You are an elite product strategist working inside The Living Studio, a room built for product managers.
@@ -98,7 +92,7 @@ How to work:
 2. Mirror their words back, then offer a sharp hypothesis they can correct.
 3. When they give you context worth keeping — a career goal, a constraint, a stakeholder, a belief — call `remember` with the smallest useful observation. Do not ask permission first; the UI lets them confirm, edit, or dismiss it.
 4. Use ODI when it earns its keep: a job statement clarifies, a desired outcome sharpens, an opportunity score compares. Never lead with the framework or lecture about stages.
-5. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Above 10 means underserved.
+5. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Above 10 means underserved. Before either number, put three questions to the PM about the claim — four when it is broad — and record their replies as the answers; never answer your own question and count it. A skip with a reason is honest, a guess is not.
 6. When a surface carries the evidence better than a paragraph, call `render_ui` once, then write one short sentence. Never describe in prose what a card can already show.
 7. The conversation is the product: every surface you render lands in the thread the PM is already reading. Never tell them to open a panel, a tab, or a view to see something you can show inline.
 8. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
@@ -108,7 +102,8 @@ How to work:
 12. Every declarative sentence you write ends with an evidence marker: `[[ev:<id>]]`, `[[ev:<id>,<id>]]` (at most three), or `[[hypothesis]]` when no record supports it. Questions, instructions, headings, and code carry no marker.
 13. Never invent an evidence id. Cite only ids a tool returned in this turn; anything else is shown as unsupported and your sentence is underlined as uncited.
 14. Before any claim about what customers said, did, or want, call `list_evidence` (or `get_evidence`) and cite the record it returns.
-15. Put the marker at the very end of the sentence, outside code. One marker supports one sentence, never the sentence beside it."""
+15. Put the marker at the very end of the sentence, outside code. One marker supports one sentence, never the sentence beside it.
+16. When you file an Outcome — by `add_outcome`, by approving a proposal, or by promoting a record — say which V2MOM method or measure it advances, and call `link_outcome` with the objective's text exactly as the vision states it. If no objective fits, say plainly that it advances nothing yet and do not guess an id or a plausible-sounding objective. The link is recorded at filing time because that is when it is known; a reworded vision leaves the frozen text behind as drift evidence rather than updating the card."""
 
 
 def _brief_lines(brief: StudioBrief | None) -> list[str]:
@@ -148,52 +143,16 @@ def _brief_block(brief: StudioBrief | None) -> str:
 def offline_fallback(user_input: str, brief: StudioBrief | None = None) -> str:
     """Deterministic, honest guidance when no LLM backend is reachable.
 
-    No fabricated customer data, no invented scores: the studio says what it can
-    do by hand and points at the surface that does it.
+    Single Tier-0 implementation: delegates to ``generate_steve_jobs_response``.
+    No fabricated customer data, no invented scores.
     """
-    lower_inp = user_input.lower()
-    context = ""
-    if brief is not None and brief.job_statement.strip():
-        context = (
-            f"\n\n**Working job:** {brief.job_statement.strip()}"
-            if not brief.product_name.strip()
-            else f"\n\n**{brief.product_name.strip()}** — {brief.job_statement.strip()}"
-        )
-
-    if "guideline" in lower_inp or "framework" in lower_inp or "stage" in lower_inp:
-        return (
-            "### ODI, stage by stage\n\n"
-            "1. **Define the job** — the functional progress a person is trying to make.\n"
-            "2. **Capture desired outcomes** — `[direction] + [unit of measure] + [object of control] + [context]`.\n"
-            "3. **Score the opportunity** — `importance + max(importance - satisfaction, 0)`; above 10 is underserved.\n"
-            "4. **Map the job** — Define, Locate, Prepare, Confirm, Execute, Monitor, Modify, Conclude.\n\n"
-            "Type `/capture` to record an outcome, `/jobmap` to walk the phases, "
-            "and `/landscape` to see what is underserved." + context
-        )
-    if "simulate" in lower_inp or "bet" in lower_inp or "impact" in lower_inp:
-        return (
-            "### Simulate the bet by hand\n\n"
-            "Open **`/impact`** and pick the outcome you want to test. The simulation "
-            "shows before/after friction; it no longer invents a result when no model "
-            "is connected." + context
-        )
-    if "evidence" in lower_inp or "call" in lower_inp or "quote" in lower_inp:
-        return (
-            "### Evidence needs a source\n\n"
-            "No connector is wired up, so there is no live transcript to quote. "
-            "Capture the signal you already have in **`/capture`** — the evidence field "
-            "is stored with the outcome." + context
-        )
-    return (
-        "I can't reason about that right now — no model is reachable. "
-        "The studio still works by hand:\n\n"
-        "- `/start` — set or correct your context\n"
-        "- `/capture` — record an outcome with importance and satisfaction\n"
-        "- `/jobmap` — add or edit the steps of the job\n"
-        "- `/landscape` — review what is underserved\n\n"
-        "Type `/help` for every command, or point Settings at a local model to "
-        "bring the assistant back." + context
-    )
+    context: dict[str, str] = {}
+    if brief is not None:
+        if brief.product_name and brief.product_name.strip():
+            context["product_name"] = brief.product_name.strip()
+        if brief.job_statement and brief.job_statement.strip():
+            context["job_statement"] = brief.job_statement.strip()
+    return generate_steve_jobs_response(user_input, context=context or None)
 
 
 def _sse(event: str, data: dict[str, Any]) -> str:
@@ -245,10 +204,14 @@ def _user_content(message: ChatMessage, attachments: list[AttachmentRef]) -> Any
     return [{"type": "text", "text": text}, *images]
 
 
-def _to_openai_messages(request: ChatRequest, memory_context: str = "") -> list[dict[str, Any]]:
+def _to_openai_messages(
+    request: ChatRequest, memory_context: str = "", focus_context: str = ""
+) -> list[dict[str, Any]]:
     system_prompt = SYSTEM_PROMPT + _brief_block(request.brief)
     if memory_context:
         system_prompt += "\n\n" + memory_context
+    if focus_context:
+        system_prompt += "\n\n" + focus_context
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     last_user = next((m for m in reversed(request.messages) if m.role == "user"), None)
     for message in request.messages:
@@ -446,11 +409,13 @@ def _persist_turn(
     message_id: str | None = None,
     parent_id: str | None = None,
     claims: list[Claim] | None = None,
+    request_id: str = "",
 ) -> int | None:
     """Record a turn and its claims, tolerating a duplicate retry.
 
     A retry that reuses a message id rewrites the same citation rows instead of
-    stacking new ones. A failure to remember never breaks the reply.
+    stacking new ones. A failure to remember never breaks the reply, but it is
+    logged: a turn the store lost is otherwise invisible.
     """
     if memory is None or conversation_id is None or not content.strip():
         return None
@@ -470,7 +435,15 @@ def _persist_turn(
         if claims:
             memory.add_citations(turn_id, claims)
         return turn_id
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # Deliberate degradation: the person keeps the reply they already read,
+        # and the request id here is what makes the missing turn findable.
+        log.warning(
+            "turn was not persisted (request_id=%s, role=%s, error=%s)",
+            request_id,
+            role,
+            type(exc).__name__,
+        )
         return None
 
 
@@ -526,6 +499,53 @@ def _local_evidence_resolver(
         return EvidenceSnapshot(id=record.id, name=record.name, source_name=record.source_name)
 
     return resolve
+
+
+def _outcome_scores(outcome: Outcome) -> str:
+    parts = []
+    if outcome.importance is not None:
+        parts.append(f"importance {outcome.importance:g}")
+    if outcome.satisfaction is not None:
+        parts.append(f"satisfaction {outcome.satisfaction:g}")
+    if outcome.opportunity_score is not None:
+        parts.append(f"opportunity {outcome.opportunity_score:g}")
+    return f" — {', '.join(parts)}" if parts else ""
+
+
+def _focus_description(focus: FocusRef, service: ODIService) -> str:
+    """The focused record as the store spells it, or nothing at all."""
+    if focus.kind == "job":
+        job = service.get_job(focus.id)
+        return "" if job is None else f'"{job.name}"'
+    if focus.kind == "step":
+        step = service.get_step(focus.id)
+        return "" if step is None else f'"{step.name}" (step {step.order} of the job map)'
+    if focus.kind == "outcome":
+        outcome = service.get_outcome(focus.id)
+        return "" if outcome is None else f'"{outcome.statement}"{_outcome_scores(outcome)}'
+    record = service.get_evidence(focus.id)
+    return "" if record is None else f'"{record.name}" from {record.source_name}'
+
+
+def _focus_context(focus: FocusRef | None, service: ODIService | None) -> str:
+    """Say what the person is looking at — using only the store's own words.
+
+    The browser sends a pointer, never a label, and an id this store does not
+    have earns no sentence: an unverified description would put words in the
+    record's mouth.
+    """
+    if focus is None or service is None:
+        return ""
+    try:
+        described = _focus_description(focus, service)
+    except Exception:  # noqa: BLE001 - the store is optional context
+        return ""
+    if not described:
+        return ""
+    return (
+        f"The user is looking at this {focus.kind} right now: {described} (id {focus.id}). "
+        "Answer about it unless they point somewhere else."
+    )
 
 
 def _message_payload(content: str, claims: list[Claim]) -> dict[str, Any]:
@@ -590,7 +610,15 @@ async def _turn_frames(
         if conversation is None:
             conversation = memory.create_conversation()
         conversation_id = conversation.id
-        _persist_turn(memory, conversation_id, "user", last_user, user_message_id, user_parent_id)
+        _persist_turn(
+            memory,
+            conversation_id,
+            "user",
+            last_user,
+            user_message_id,
+            user_parent_id,
+            request_id=request_id,
+        )
         updated = memory.get_conversation(conversation_id) or conversation
         yield frame("conversation", {"id": updated.id, "title": updated.title})
 
@@ -598,16 +626,29 @@ async def _turn_frames(
 
     routing_mode = _routing_mode(request.routing_mode)
     router = ModelRouter(mode=routing_mode)
-    target_tier = router.resolve_tier(remote_available=healthy)
-    if target_tier == ModelTier.ON_DEVICE_LLM and routing_mode == RoutingMode.AUTO:
-        # Automatic routing keeps the studio's own deterministic guidance as the
-        # floor: honest, useful answers beat a placeholder model's guess.
-        target_tier = ModelTier.RULE_BASED
-    if target_tier == ModelTier.REMOTE_LLM and not healthy:
-        # A forced remote tier still has to answer when the backend is down.
-        target_tier = ModelTier.RULE_BASED
+    local_available = router.local_engine.is_available()
+    target_tier = router.resolve_tier(remote_available=healthy, local_available=local_available)
 
-    if target_tier == ModelTier.RULE_BASED:
+    # Report which tier answered so the UI can show an honest indicator.
+    yield frame(
+        "status",
+        {"phase": "tier", "tier": target_tier.value, "local_available": local_available},
+    )
+
+    if target_tier == ModelTier.REMOTE_LLM and not healthy:
+        # A forced remote tier still has to answer when the backend is down:
+        # demote honestly and say so.
+        target_tier = ModelTier.DETERMINISTIC
+        yield frame(
+            "status",
+            {
+                "phase": "tier_demoted",
+                "tier": target_tier.value,
+                "reason": "remote backend unreachable",
+            },
+        )
+
+    if target_tier == ModelTier.DETERMINISTIC:
         yield frame("status", {"phase": "offline"})
         reply = offline_fallback(last_user, request.brief)
         yield frame("delta", {"text": reply})
@@ -619,15 +660,31 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            request_id=request_id,
         )
         return
 
-    if target_tier == ModelTier.ON_DEVICE_LLM:
+    if target_tier == ModelTier.LOCAL_LLM:
         yield frame("status", {"phase": "fallback_tier", "tier": target_tier.value})
         chunks: list[str] = []
-        async for chunk in router.generate_fallback_stream(last_user, target_tier):
-            chunks.append(chunk)
-            yield frame("delta", {"text": chunk})
+        try:
+            async for chunk in router.generate_fallback_stream(last_user, target_tier):
+                chunks.append(chunk)
+                yield frame("delta", {"text": chunk})
+        except Exception:  # noqa: BLE001
+            log.exception("Local tier failed mid-stream (request_id=%s)", request_id)
+            # Local tier failed mid-stream: demote to deterministic and say so.
+            yield frame(
+                "status",
+                {
+                    "phase": "tier_demoted",
+                    "tier": ModelTier.DETERMINISTIC.value,
+                    "reason": "local model stopped responding",
+                },
+            )
+            reply = offline_fallback(last_user, request.brief)
+            yield frame("delta", {"text": reply})
+            chunks.append(reply)
         reply = "".join(chunks)
         yield frame("message", {"content": reply})
         _persist_turn(
@@ -637,6 +694,7 @@ async def _turn_frames(
             reply,
             assistant_message_id,
             user_message_id,
+            request_id=request_id,
         )
         return
 
@@ -660,6 +718,8 @@ async def _turn_frames(
     llm_client = AsyncOpenAI(base_url=request.base_url, api_key=request.api_key, timeout=15.0)
     connector_service = service if service is not None else ConnectorService()
     memory_context = memory.memory_context() if memory is not None else ""
+    # What the person is looking at, re-read from the store before it is repeated.
+    focus_context = _focus_context(request.focus, local_service)
     # Every id the turn actually received, with the label that came with it.
     evidence = EvidenceIndex(resolver=_local_evidence_resolver(local_service))
 
@@ -680,7 +740,7 @@ async def _turn_frames(
             ) from exc
 
         openai_tools = _openai_tools(mcp_tools) + _local_tools(catalog)
-        messages: list[Any] = _to_openai_messages(request, memory_context)
+        messages: list[Any] = _to_openai_messages(request, memory_context, focus_context)
 
         spoken: list[str] = []
         ui_count = 0
@@ -748,6 +808,7 @@ async def _turn_frames(
                     assistant_message_id,
                     user_message_id,
                     claims,
+                    request_id=request_id,
                 )
                 yield frame("message", _message_payload(final, claims))
                 return
@@ -908,6 +969,7 @@ async def _turn_frames(
             assistant_message_id,
             user_message_id,
             claims,
+            request_id=request_id,
         )
         yield frame("message", _message_payload(content, claims))
 
@@ -974,6 +1036,12 @@ async def stream_chat(
             outcome=outcome,
             error_code=error_code,
         )
+        if outcome != "failed":
+            # A turn that reached an ending is the first message of this
+            # workspace's funnel. A partial or rounds-exhausted turn still
+            # counts: the person did get an answer, which is what the counter
+            # is for. Failed turns do not, and neither path writes twice.
+            count_milestone(local_service, FIRST_MESSAGE)
 
 
 __all__ = [

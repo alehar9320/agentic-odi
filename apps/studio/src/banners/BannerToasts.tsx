@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { useStudio } from "../state/StudioContext";
+import { useToasts } from "../state/notices/NoticesContext";
 import { useBanner } from "./BannerProvider";
 import type { BannerKind } from "./types";
 
@@ -18,9 +18,12 @@ const TOAST_KIND: Record<string, BannerKind> = {
  * two cannot drift and no call site has to change. Only toasts that actually
  * left are cleared, so a new toast does not restart the animation of the ones
  * already on screen.
+ *
+ * Reads only the toast list from `NoticesContext`, so a settings or theme
+ * change elsewhere never re-renders this component.
  */
 export function BannerToasts() {
-  const { toasts } = useStudio();
+  const toasts = useToasts();
   const { raise, dismiss } = useBanner();
   const shown = useRef<Set<string>>(new Set());
 
@@ -36,6 +39,10 @@ export function BannerToasts() {
         kind: TOAST_KIND[toast.kind] ?? "info",
         key: `toast-${toast.id}`,
         body: toast.message,
+        ...(toast.durationMs ? { durationMs: toast.durationMs } : {}),
+        ...(toast.action
+          ? { actions: [{ label: toast.action.label, run: toast.action.run, tone: "ghost" as const }] }
+          : {}),
       });
     }
     shown.current = live;

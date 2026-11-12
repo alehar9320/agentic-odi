@@ -48,7 +48,7 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
   "evidence-quote": EvidenceQuote,
   "job-map": JobMap,
   "decision-record": DecisionRecord,
-  "candidate-queue": CandidateQueue,
   "segment-card": SegmentCard,
   "strategy-card": StrategyCard,
+  "candidate-queue": CandidateQueue,
 };

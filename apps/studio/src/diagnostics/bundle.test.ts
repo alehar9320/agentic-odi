@@ -11,6 +11,7 @@ import {
 
 const options = {
   version: "1.2.3",
+  versionSource: "build" as const,
   build: "2026-10-30",
   platform: "Desktop",
   theme: "light",
@@ -19,6 +20,14 @@ const options = {
   engine: null,
   capabilities: [],
   apiKey: "configured-secret",
+  runtime: {
+    host: "browser",
+    install: "tab",
+    originClass: "loopback",
+    apiTransport: "same-origin",
+    offlineShell: true,
+    platform: "linux",
+  },
 };
 
 describe("diagnostics bundle", () => {
@@ -64,5 +73,29 @@ describe("diagnostics bundle", () => {
     expect(bundle).not.toHaveProperty("messages");
     expect(bundle).not.toHaveProperty("canvas");
     expect(diagnosticsEntryCount(bundle)).toBe(3);
+  });
+
+  // #800: About and diagnostics must report the same runtime facts, and those
+  // facts must carry no URL, key, or message.
+  it("carries the runtime facts without a host, url, key, or message", () => {
+    const bundle = createDiagnosticsBundle(options);
+    const serialized = JSON.stringify(bundle);
+
+    expect(bundle).toMatchObject({
+      app: {
+        runtime: {
+          host: "browser",
+          install: "tab",
+          originClass: "loopback",
+          apiTransport: "same-origin",
+          offlineShell: true,
+          platform: "linux",
+        },
+        versionSource: "build",
+      },
+    });
+    expect(serialized).not.toMatch(/https?:\/\//);
+    expect(serialized).not.toContain("configured-secret");
+    expect(bundle).not.toHaveProperty("messages");
   });
 });

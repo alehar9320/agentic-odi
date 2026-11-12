@@ -79,10 +79,38 @@ describe("UpdateBanner", () => {
     });
     act(() => push?.({ received: 5, total: 10 }));
 
-    expect(screen.getByText("Getting Living Studio 0.12.0 ready")).toBeInTheDocument();
+    expect(screen.getByText("Downloading version 0.12.0")).toBeInTheDocument();
     expect(screen.getByText(/keep working/i)).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
     expect(screen.getByText("50%")).toBeInTheDocument();
+  });
+
+  it("announces the title and detail, never the percent (D45)", async () => {
+    let push: ((progress: DownloadProgress) => void) | null = null;
+    const transport = makeTransport({
+      check: vi.fn(async () =>
+        makeHandle({
+          download: (onProgress) => {
+            push = onProgress;
+            return new Promise<void>(() => undefined);
+          },
+        }),
+      ),
+    });
+    const service = renderBanner(transport);
+
+    await act(async () => {
+      void service.check();
+      await Promise.resolve();
+    });
+    act(() => push?.({ received: 5, total: 10 }));
+
+    const live = screen.getByRole("status");
+    expect(live).toHaveTextContent("Downloading version 0.12.0");
+    // The bar keeps changing; if it lived inside the live region a screen
+    // reader would re-announce the whole banner on every tick.
+    expect(live).not.toContainElement(screen.getByRole("progressbar"));
+    expect(live).not.toHaveTextContent("50%");
   });
 
   it("offers one clear restart once the update is staged", async () => {
@@ -93,7 +121,7 @@ describe("UpdateBanner", () => {
       await service.check();
     });
 
-    expect(screen.getByText("Living Studio 0.12.0 is ready")).toBeInTheDocument();
+    expect(screen.getByText("Version 0.12.0 is ready")).toBeInTheDocument();
     expect(screen.getByText(/next time you open the studio/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
@@ -132,7 +160,7 @@ describe("UpdateBanner", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss update notice" }));
 
-    expect(screen.queryByText("Living Studio 0.12.0 is ready")).toBeNull();
+    expect(screen.queryByText("Version 0.12.0 is ready")).toBeNull();
     expect(service.getSnapshot().installed).toBe(true);
   });
 
@@ -157,7 +185,7 @@ describe("UpdateBanner", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(
-      await screen.findByText("Living Studio 0.12.0 is ready"),
+      await screen.findByText("Version 0.12.0 is ready"),
     ).toBeInTheDocument();
   });
 });
