@@ -40,6 +40,29 @@ def test_tauri_release_verify_job_checks_every_platform_signed() -> None:
     assert "exit 1" in verify, "the verify job must fail the release, not warn"
 
 
+def test_tauri_release_publishes_the_manifest_it_verifies() -> None:
+    """The verify job checks a latest.json nothing used to write.
+
+    Tauri's action attaches the bundles and their .sig files but never produced
+    `latest.json`, so the release had nothing for the updater to fetch. A
+    `manifest` job must write it from the attached bundles' signatures, sign it,
+    and attach it before `verify` runs.
+    """
+    workflow = _workflow("tauri-release.yml")
+    assert "\n  manifest:\n" in workflow, "there must be a job that writes latest.json"
+    manifest_job = workflow.split("\n  manifest:\n", 1)[1].split("\n  verify:\n", 1)[0]
+    assert "scripts/release_manifest.py write" in manifest_job
+    assert "--discover" in manifest_job, "the bundles' names are discovered, not spelled out"
+    assert "tauri signer sign" in manifest_job, "the manifest itself must be signed"
+    assert "gh release upload" in manifest_job
+    assert "latest.json.sig" in manifest_job
+
+    verify_job = workflow.split("\n  verify:\n", 1)[1]
+    assert "needs: [build, manifest]" in verify_job, "verify must wait for the manifest"
+    assert "release_manifest.py verify" in verify_job
+    assert "--release-please-manifest" in verify_job, "the tag is cross-checked against release-please"
+
+
 def test_release_please_workflow_guards_on_app_credentials() -> None:
     text = _workflow("release-please.yml")
     assert "Check for GitHub App credentials" in text

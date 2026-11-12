@@ -90,8 +90,12 @@ Releases are cut and published by CI with no approval step:
    install scripts, the desktop bundles, and the signed `latest.json` updater
    manifest. They run on the published release, on the `release-please` run
    itself, and on a hand-cut `v*` tag; the `resolve` gate makes whichever fires
-   first do the work and the rest no-ops. The `release-instructions` job then
-   sets a human-friendly release title (`vX.Y.Z — YYYY-MM-DD`, the date pulled
+   first do the work and the rest no-ops. `scripts/release_manifest.py write`
+   is what produces `latest.json`: it discovers each platform's bundle among the
+   assets the build just attached, reads that bundle's `.sig` verbatim into the
+   manifest's `signature`, and the job signs the manifest itself with the
+   project key before attaching it and its `.sig`. The `release-instructions`
+   job then sets a human-friendly release title (`vX.Y.Z — YYYY-MM-DD`, the date pulled
    from the tagged commit — the same `RELEASE_DATE_UTC` the CLI prints via
    `odi --version`) and appends an end-user "## 📦 Download & Run" section to
    the release page: numbered download / verify / install / quick-start steps,

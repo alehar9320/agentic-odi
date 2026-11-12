@@ -272,16 +272,109 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+  # Nothing in the repo wrote the updater manifest. Tauri's action attaches the
+  # bundles and their .sig files, but `latest.json` — the file the app actually
+  # fetches from `/releases/latest/download/` — was never produced, so the
+  # updater could only ever say "up to date". This job is that writer: it
+  # downloads the signed bundles the build just attached, discovers each
+  # platform's artifact, and publishes `latest.json` and its own signature onto
+  # the same release. `verify` then re-downloads the manifest over HTTP and
+  # fails the release unless it names every platform with a resolvable URL.
+  manifest:
+    needs: [resolve, preflight, build]
+    if: ${{ needs.resolve.outputs.should_build == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+
+      - name: Download the signed bundles the build attached
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p assets
+          gh release download "$TAG" --dir assets --clobber
+          ls -l assets
+
+      - name: Write latest.json from the bundles' .sig files
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release_manifest.py write \
+            --tag "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --asset-dir assets \
+            --pub-date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --discover \
+            --out assets/latest.json
+          cat assets/latest.json
+
+      - name: Sign the manifest itself with the project key
+        working-directory: apps/studio
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # The key is a string; write it to a file so the CLI cannot mistake it
+          # for a path, and so its permissions are ours to set.
+          key="$(mktemp)"
+          printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > "$key"
+          chmod 600 "$key"
+          npx tauri signer sign \
+            -k "$key" \
+            -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+            "../assets/latest.json"
+          rm -f "$key"
+          test -f ../assets/latest.json.sig
+
+      - name: Attach the manifest and its signature to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" assets/latest.json assets/latest.json.sig --clobber
+
   # A release without a usable latest.json cannot update anybody. Fail the
   # release loudly instead of leaving a quiet download that installs nothing:
   # the manifest must advertise this tag, every platform must point at an
   # artifact that is attached to the Release with its .sig twin, and every
   # advertised URL must actually resolve.
   verify:
-    needs: [build]
+    needs: [build, manifest]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+
+      # Three versions have to agree before anything is published: the tag, the
+      # version the manifest advertises, and the version release-please recorded
+      # in `.release-please-manifest.json`. The step below already compares the
+      # first two; this one catches a tag that was cut for a version
+      # release-please never wrote, naming all three so the fix is unambiguous.
+      - name: The tag, the manifest, and release-please agree
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          dir="$(mktemp -d)"
+          gh release download "$TAG" --pattern latest.json --dir "$dir" --clobber
+          python3 scripts/release_manifest.py verify \
+            --tag "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --manifest "$dir/latest.json" \
+            --release-please-manifest .release-please-manifest.json \
+            --version-only
+
       - name: Verify the signed updater manifest covers every platform
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
