@@ -26,10 +26,9 @@ from agentic_odi_cli.jobs import jobs_app
 from agentic_odi_cli.onboard import maybe_run_first_launch
 from agentic_odi_cli.profile import app as profile_app
 from agentic_odi_cli.profile import setup_wizard
-from agentic_odi_cli.render import render_job_summary
+from agentic_odi_cli.render import render_funnel_summary, render_job_summary
 from agentic_odi_cli.review import review_app
 from agentic_odi_cli.roadmap import roadmap_app
-from agentic_odi_cli.render import render_funnel_summary, render_job_summary
 from agentic_odi_cli.schedule import schedule_app
 from agentic_odi_cli.segments import segments_app
 from agentic_odi_cli.settings import settings_app
@@ -57,11 +56,6 @@ app.add_typer(decide_app, name="decide", help="Record a decision with its reject
 app.add_typer(roadmap_app, name="roadmap", help="Render a job's outcome roadmap.")
 app.add_typer(review_app, name="review", help="Re-examine a past decision against today.")
 app.add_typer(bets_app, name="bets", help="Record, list and advance bets.")
-app.add_typer(
-    segments_app,
-    name="segments",
-    help="Define segments and record the strategy per segment.",
-)
 app.add_typer(customer_outcomes_app, name="customer-outcomes", help="Manage Customer Outcomes")
 app.add_typer(
     signals_app,

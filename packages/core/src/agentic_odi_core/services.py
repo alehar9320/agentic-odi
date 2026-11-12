@@ -61,10 +61,10 @@ from agentic_odi_core.models import (
     JobStage,
     Outcome,
     Rejection,
-    ScoreMethod,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
+    ScoreMethod,
     ScoreSnapshot,
     Segment,
     SegmentVerdict,
@@ -84,10 +84,12 @@ from agentic_odi_core.review import DecisionReview, review_decision
 from agentic_odi_core.roadmap import Roadmap, build_roadmap
 from agentic_odi_core.segment_profile import SegmentProfile, build_segment_profile
 from agentic_odi_core.segmentation import (
+    _FULL_EVIDENCE_COUNT,
     MIN_OUTCOMES_PER_SEGMENT,
     OutcomeClusterStrategy,
     SegmentationStrategy,
     SegmentCandidateSet,
+    segment_verdict,
     suggest_segment_candidates,
     unclustered_outcomes,
 )
@@ -147,17 +149,6 @@ class ScheduledWorkNotFoundError(NotFoundError, ValueError):
         self.work_id = work_id
         super().__init__(work_id, "scheduled work", hint)
 
-
-class SegmentNotFoundError(NotFoundError):
-    def __init__(self, segment_id: str) -> None:
-        self.segment_id = segment_id
-        super().__init__(segment_id, "segment")
-
-
-class StrategyNotFoundError(NotFoundError):
-    def __init__(self, strategy_id: str) -> None:
-        self.strategy_id = strategy_id
-        super().__init__(strategy_id, "strategy")
 
 
 class EvidenceNotFoundError(NotFoundError, ValueError):
@@ -555,7 +546,11 @@ class ODIService:
         return self.repo.add_score_snapshot(snapshot)
 
     def update_outcome(
-        self, outcome_id: str, updates: dict[str, Any], at: str | None = None
+        self,
+        outcome_id: str,
+        updates: dict[str, Any],
+        at: str | None = None,
+        note: str | None = None,
     ) -> Outcome:
         existing = self.repo.get_outcome(outcome_id)
         if existing is None:
@@ -580,7 +575,7 @@ class ODIService:
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
             raise OutcomeNotFoundError(outcome_id)
-        self._capture_snapshot(res, at=at or _now_iso())
+        self._capture_snapshot(res, at=at or _now_iso(), note=note)
         self._emit_outcome_updates(existing, res)
         self._count_outcome_milestones(res)
         return res
@@ -1518,70 +1513,6 @@ class ODIService:
 
     # -------------------------------------------------------------- strategies
 
-    def choose_strategy(
-        self,
-        segment_id: str,
-        kind: StrategyKind | str,
-        rationale: str,
-        expected_effect: str,
-        chosen_at: str | None = None,
-    ) -> Strategy:
-        """Record a strategy for a segment, refusing one its data does not support.
-
-        Each kind has a guardrail that fails with a message naming the missing
-        condition, so a strategy is a claim with evidence rather than a slogan:
-
-        * ``differentiated`` needs at least one underserved outcome in the segment.
-        * ``disruptive`` needs at least one overserved outcome.
-        * ``new_market`` needs an outcome with no evidence of an existing solution.
-          That evidence (alternatives data, ``M2-07``/``ALH-71``) is not in the
-          product yet, so the rule cannot distinguish an *unchecked* absence from
-          an explicit ``nothing`` alternative. Rather than treat unchecked absence
-          as proof, the write is refused and the missing evidence is named.
-        """
-        segment = self.repo.get_segment(segment_id)
-        if segment is None:
-            raise SegmentNotFoundError(segment_id)
-        try:
-            resolved_kind = StrategyKind(kind)
-        except ValueError as exc:
-            raise ValidationError(
-                f"Unknown strategy kind: {kind!r}. Use one of {[k.value for k in StrategyKind]}."
-            ) from exc
-        rationale = rationale.strip()
-        if not rationale:
-            raise ValidationError("A strategy needs a rationale.")
-        expected_effect = expected_effect.strip()
-        if not expected_effect:
-            raise ValidationError("A strategy needs an expected_effect.")
-
-        profile = self.segment_profile(segment_id)
-        if resolved_kind is StrategyKind.DIFFERENTIATED and profile.underserved_count < 1:
-            raise ValidationError(
-                "A differentiated strategy needs at least one underserved outcome "
-                "in the segment; this segment has none."
-            )
-        if resolved_kind is StrategyKind.DISRUPTIVE and profile.overserved_count < 1:
-            raise ValidationError(
-                "A disruptive strategy needs at least one overserved outcome "
-                "in the segment; this segment has none."
-            )
-        if resolved_kind is StrategyKind.NEW_MARKET:
-            raise ValidationError(
-                "A new-market strategy needs evidence that no existing solution "
-                "serves the outcome. That alternatives data is not recorded yet "
-                "(M2-07/ALH-71), so an unchecked absence cannot stand in for a "
-                "checked one. Record the alternatives first."
-            )
-
-        strategy = Strategy(
-            segment_id=segment_id,
-            kind=resolved_kind,
-            rationale=rationale,
-            chosen_at=chosen_at or _now_iso(),
-            expected_effect=expected_effect,
-        )
-        return self.repo.add_strategy(strategy)
 
 
 
@@ -1910,6 +1841,8 @@ class ODIService:
         job_statement: str | None = None,
         outcome_ids: list[str] | None = None,
         origin: str = "manual",
+        criterion: str | None = None,
+        notes: str | None = None,
     ) -> Segment:
         """Create a segment through main's ``save_segment`` writer.
 
@@ -1917,16 +1850,23 @@ class ODIService:
         and nothing else is: the PR's ``origin`` becomes main's
         ``people_inferred`` when the group was proposed rather than typed.
         """
+        cited = list(outcome_ids or [])
+        group = [o for o in (self.repo.get_outcome(oid) for oid in cited) if o is not None]
         fields = Segment.model_fields
-        kwargs: dict[str, Any] = {"job_id": job_id, "name": name,
-                                  "outcome_ids": list(outcome_ids or [])}
+        label = job_statement or criterion or name
+        kwargs: dict[str, Any] = {"job_id": job_id, "name": name, "outcome_ids": cited}
         if "people" in fields:
             kwargs["people"] = name
             kwargs["people_inferred"] = str(origin) != "manual"
         if "job_statement" in fields:
-            kwargs["job_statement"] = job_statement or name
-        if "rationale" in fields and job_statement:
-            kwargs["rationale"] = job_statement
+            kwargs["job_statement"] = label
+        if "verdict" in fields:
+            kwargs["verdict"] = segment_verdict(group) if group else None
+        if "rationale" in fields:
+            kwargs["rationale"] = label
+        if "confidence" in fields:
+            size = min(len(cited) / _FULL_EVIDENCE_COUNT, 1.0)
+            kwargs["confidence"] = round(0.5 + 0.5 * size, 2)
         return self.save_segment(Segment(**kwargs))
 
     def choose_strategy(
@@ -1936,6 +1876,7 @@ class ODIService:
         rationale: str = "",
         expected_effect: str | None = None,
         chosen_at: str | None = None,
+        rejected: list[dict[str, Any]] | None = None,
     ) -> Strategy:
         """Record a path through main's ``save_strategy`` writer.
 
@@ -1946,6 +1887,8 @@ class ODIService:
         kwargs: dict[str, Any] = {"segment_id": segment_id, "kind": StrategyKind(kind)}
         if "thesis" in fields:
             kwargs["thesis"] = rationale or (expected_effect or "")
+        if "rejected" in fields and rejected is not None:
+            kwargs["rejected"] = rejected
         if "created_at" in fields and chosen_at:
             kwargs["created_at"] = chosen_at
         return self.save_strategy(Strategy(**kwargs))
@@ -1956,13 +1899,27 @@ class ODIService:
                 raise SegmentNotFoundError(segment_id, "run segment_market to produce segments")
             return segment
 
-    def list_segments(self, job_id: str | None = None) -> list[Segment]:
-            return self.repo.list_segments(job_id=job_id)
+    def list_segments(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Segment]:
+        segments = self.repo.list_segments(job_id=job_id)
+        if offset:
+            segments = segments[offset:]
+        return segments[:limit] if limit is not None else segments
 
     def get_strategy(self) -> Strategy | None:
             """The most recently recorded strategy, or ``None``."""
             strategies = self.repo.list_strategies()
             return strategies[-1] if strategies else None
 
-    def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
-            return self.repo.list_strategies(segment_id=segment_id)
+    def list_strategies(
+        self,
+        segment_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Strategy]:
+        strategies = self.repo.list_strategies(segment_id=segment_id)
+        return strategies[offset : offset + limit] if limit is not None else strategies[offset:]

@@ -669,6 +669,15 @@ export function Roadmap({ node }: NodeProps) {
         <p className="ui-roadmap__exclusions">
           {undecidedCount != null ? `${undecidedCount} undecided · ` : ""}
           {exclusionNote}
+        </p>
+      ) : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* segment-card                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -1022,6 +1031,16 @@ export function SegmentProfile({ node }: NodeProps) {
         <ul className="ui-segment__gaps">
           {gaps.map((gap, index) => (
             <li key={`gap-${index}`}>{gap}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* strategy-card                                                       */
 /* ------------------------------------------------------------------ */
 

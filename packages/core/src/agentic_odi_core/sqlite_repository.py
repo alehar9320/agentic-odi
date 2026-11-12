@@ -758,31 +758,8 @@ class SQLiteRepository(Repository):
             self._sync()
             return self.bets.get(bet_id)
 
-    def add_segment(self, segment: Segment) -> Segment:
-        with self._lock:
-            self.store.append(
-                "SEGMENT_CREATED",
-                segment.model_dump(mode="json"),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return segment
 
-    def get_segment(self, segment_id: str) -> Segment | None:
-        with self._lock:
-            self._sync()
-            return self.segments.get(segment_id)
 
-    def list_segments(
-        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[Segment]:
-        with self._lock:
-            self._sync()
-            items = list(self.segments.values())
-            if job_id is not None:
-                items = [s for s in items if s.job_id == job_id]
-            return page(items, limit, offset)
 
     def delete_segment(self, segment_id: str) -> bool:
         with self._lock:
@@ -798,31 +775,8 @@ class SQLiteRepository(Repository):
             self._sync()
             return True
 
-    def add_strategy(self, strategy: Strategy) -> Strategy:
-        with self._lock:
-            self.store.append(
-                "STRATEGY_RECORDED",
-                strategy.model_dump(mode="json"),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return strategy
 
-    def get_strategy(self, strategy_id: str) -> Strategy | None:
-        with self._lock:
-            self._sync()
-            return self.strategies.get(strategy_id)
 
-    def list_strategies(
-        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[Strategy]:
-        with self._lock:
-            self._sync()
-            items = list(self.strategies.values())
-            if segment_id is not None:
-                items = [s for s in items if s.segment_id == segment_id]
-            return page(items, limit, offset)
 
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
         with self._lock:

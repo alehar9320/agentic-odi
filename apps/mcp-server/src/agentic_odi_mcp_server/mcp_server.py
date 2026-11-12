@@ -31,8 +31,8 @@ from agentic_odi_core import (
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
-    Rejection,
     ProposalStatus,
+    Rejection,
     ScheduledWorkNotFoundError,
     SignalNotFoundError,
     StepNotFoundError,
@@ -169,6 +169,12 @@ def _fail(exc: BaseException, sentence: str | None = None) -> str:
     human = sentence if sentence is not None else f"Error: {exc}"
     body = human[len("Error:") :].strip() if human.lower().startswith("error:") else human
     return json.dumps({"error": {**error_envelope(exc), "message": body}, "message": human})
+
+
+def _decision_not_found(decision_id: str) -> str:
+    return _fail(
+        DecisionNotFoundError(decision_id), f"Error: decision not found: {decision_id}"
+    )
 
 
 def _step_not_found(step_id: str | None) -> str:
@@ -340,10 +346,9 @@ def add_outcome(
     except ClaimCheckError as exc:
         return _fail(exc)
     except OutcomeStatementError as exc:
-        return f"Error: {exc}"
-    except ValidationError as exc:
-        return f"Error: {_first_line(str(exc))}"
         return _fail(exc)
+    except ValidationError as exc:
+        return _fail(exc, f"Error: {_first_line(str(exc))}")
     return f"Outcome created successfully: {outcome.model_dump_json()}"
 
 
@@ -606,14 +611,11 @@ def update_outcome(
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     except OutcomeStatementError as exc:
-        return f"Error: {exc}"
-    except ValueOutOfRangeError:
-        return "Error: importance and satisfaction must be between 1.0 and 10.0"
-    except ValidationError as exc:
-        return f"Error: {_first_line(str(exc))}"
         return _fail(exc)
     except ValueOutOfRangeError as exc:
         return _fail(exc, "Error: importance and satisfaction must be between 1.0 and 10.0")
+    except ValidationError as exc:
+        return _fail(exc, f"Error: {_first_line(str(exc))}")
     return f"Outcome updated successfully: {updated.model_dump_json()}"
 
 
@@ -644,7 +646,7 @@ def set_outcome_value(
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     except (OdiError, ValueError) as exc:
-        return f"Error: {_first_line(str(exc))}"
+        return _fail(exc, f"Error: {_first_line(str(exc))}")
     return f"Outcome value updated successfully: {updated.model_dump_json()}"
 
 
@@ -801,7 +803,7 @@ def compare_outcomes(outcome_ids: list[str]) -> str:
     except OutcomeNotFoundError as exc:
         return _outcome_not_found(exc.outcome_id)
     except (OdiError, ValueError) as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps(
         {
             "columns": list(comparison.columns),
@@ -829,13 +831,16 @@ def get_roadmap(job_id: str, horizon: int = 4, today: str | None = None) -> str:
         try:
             pinned = date.fromisoformat(today)
         except ValueError:
-            return f"Error: today must be an ISO-8601 date, got {today!r}"
+            return _fail(
+                ValueError(f"today must be an ISO-8601 date, got {today!r}"),
+                f"Error: today must be an ISO-8601 date, got {today!r}",
+            )
     try:
         roadmap = service.build_roadmap(job_id, horizon=horizon, today=pinned)
     except JobNotFoundError:
         return job_not_found(job_id)
     except (OdiError, ValueError) as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return json.dumps(
         {
             "entries": [
@@ -894,9 +899,9 @@ async def record_decision(
     except OutcomeNotFoundError as exc:
         return _outcome_not_found(exc.outcome_id)
     except DecisionNotFoundError:
-        return f"Error: decision not found: {supersedes}"
+        return _decision_not_found(supersedes)
     except (OdiError, ValueError) as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     await ctx.report_progress(2, 2, "Decision recorded")
     return f"Decision recorded successfully: {decision.model_dump_json()}"
 
@@ -905,7 +910,7 @@ async def record_decision(
 def get_decision(decision_id: str) -> str:
     decision = service.get_decision(decision_id)
     if decision is None:
-        return f"Error: decision not found: {decision_id}"
+        return _decision_not_found(decision_id)
     return decision.model_dump_json()
 
 
@@ -923,11 +928,11 @@ def review_decision(decision_id: str, today: str) -> str:
     try:
         parsed_today = date.fromisoformat(today)
     except ValueError:
-        return "Error: today must be an ISO-8601 date"
+        return _fail(ValueError("today must be an ISO-8601 date"), "Error: today must be an ISO-8601 date")
     try:
         review = service.review_decision(decision_id, today=parsed_today)
     except DecisionNotFoundError:
-        return f"Error: decision not found: {decision_id}"
+        return _decision_not_found(decision_id)
     payload = {
         "decision_id": review.decision_id,
         "job_id": review.job_id,
@@ -994,11 +999,11 @@ def record_bet(
             baseline=baseline,
         )
     except DecisionNotFoundError:
-        return f"Error: decision not found: {decision_id}"
+        return _decision_not_found(decision_id)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     except (OdiError, ValueError) as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return f"Bet recorded successfully: {bet.model_dump_json()}"
 
 
@@ -1028,7 +1033,7 @@ def advance_bet(bet_id: str, status: str, at: str | None = None) -> str:
     except BetNotFoundError:
         return _bet_not_found(bet_id)
     except (OdiError, ValueError) as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return f"Bet advanced successfully: {bet.model_dump_json()}"
 
 
@@ -1055,7 +1060,7 @@ def add_segment(
     except OutcomeNotFoundError as exc:
         return _outcome_not_found(exc.outcome_id)
     except (OdiError, ValueError) as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return f"Segment created successfully: {segment.model_dump_json()}"
 
 
@@ -1130,7 +1135,7 @@ def accept_segment_candidate(
     except JobNotFoundError:
         return job_not_found(job_id)
     except (OdiError, ValueError) as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return f"Segment accepted: {segment.model_dump_json()}"
 
 
@@ -1198,16 +1203,10 @@ def choose_strategy(
     except SegmentNotFoundError:
         return _segment_not_found(segment_id)
     except (OdiError, ValueError) as exc:
-        return f"Error: {exc}"
+        return _fail(exc)
     return f"Strategy recorded: {strategy.model_dump_json()}"
 
 
-@mcp.tool
-def get_strategy(strategy_id: str) -> str:
-    strategy = service.get_strategy(strategy_id)
-    if strategy is None:
-        return _strategy_not_found(strategy_id)
-    return strategy.model_dump_json()
 
 
 @mcp.tool

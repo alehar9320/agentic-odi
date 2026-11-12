@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from agentic_odi_core import BusinessValue, CustomerValue
+from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
 from agentic_odi_core.models import (
     MAX_VALUE_SOURCE,
     BetStatus,
@@ -15,9 +15,6 @@ from agentic_odi_core.models import (
     ValueBasis,
     ValueUnit,
 )
-from pydantic import BaseModel, Field
-from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
-from agentic_odi_core.models import JobStage
 from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
@@ -71,11 +68,12 @@ class AddOutcomeRequest(BaseModel):
     mcp_url: str
     job_id: str
     statement: str
-    importance: float = Field(ge=1.0, le=10.0)
-    satisfaction: float = Field(ge=1.0, le=10.0)
+    importance: float | None = Field(None, ge=1.0, le=10.0)
+    satisfaction: float | None = Field(None, ge=1.0, le=10.0)
     importance_n: int | None = Field(None, ge=1)
     satisfaction_n: int | None = Field(None, ge=1)
     score_method: ScoreMethod = "estimate"
+    claim_check: ClaimCheck | None = None
 
 
 class RejectedOptionRequest(BaseModel):

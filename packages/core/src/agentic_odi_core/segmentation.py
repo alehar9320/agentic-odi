@@ -18,12 +18,22 @@ import math
 import re
 import uuid
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from agentic_odi_core.evaluation import UNDERSERVED_SCORE, classify_opportunity
-from agentic_odi_core.models import Job, Outcome, Segment, SegmentVerdict, Step
+from agentic_odi_core.evaluation import (
+    UNDERSERVED_SCORE,
+    OpportunitySegment,
+    classify_opportunity,
+)
+from agentic_odi_core.models import (
+    Job,
+    Outcome,
+    Segment,
+    SegmentVerdict,
+    Step,
+)
 
 #: A group of one is a hypothesis, not a segment.
 MIN_OUTCOMES_PER_SEGMENT = 2

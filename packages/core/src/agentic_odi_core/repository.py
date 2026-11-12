@@ -203,17 +203,7 @@ class Repository(Protocol):
         offset: int = 0,
     ) -> list[Bet]: ...
     def update_bet(self, bet_id: str, updates: dict) -> Bet | None: ...
-    def add_segment(self, segment: Segment) -> Segment: ...
-    def get_segment(self, segment_id: str) -> Segment | None: ...
-    def list_segments(
-        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[Segment]: ...
     def delete_segment(self, segment_id: str) -> bool: ...
-    def add_strategy(self, strategy: Strategy) -> Strategy: ...
-    def get_strategy(self, strategy_id: str) -> Strategy | None: ...
-    def list_strategies(
-        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[Strategy]: ...
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot: ...
     def list_score_snapshots(self, outcome_id: str | None = None) -> list[ScoreSnapshot]: ...
     def add_signal(self, signal: Signal) -> Signal: ...
@@ -625,21 +615,8 @@ class InMemoryRepository:
         self.bets[bet_id] = new_bet
         return new_bet
 
-    def add_segment(self, segment: Segment) -> Segment:
-        self.segments[segment.id] = segment
-        return segment
 
-    def get_segment(self, segment_id: str) -> Segment | None:
-        return self.segments.get(segment_id)
 
-    def list_segments(
-        self, job_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[Segment]:
-        items = list(self.segments.values())
-        if job_id is not None:
-            items = [s for s in items if s.job_id == job_id]
-        # Insertion order, so a segment list is stable across a reload.
-        return page(items, limit, offset)
 
     def delete_segment(self, segment_id: str) -> bool:
         # Deleting a segment never touches an outcome: the segment was a lens on
@@ -651,20 +628,8 @@ class InMemoryRepository:
             del self.strategies[key]
         return True
 
-    def add_strategy(self, strategy: Strategy) -> Strategy:
-        self.strategies[strategy.id] = strategy
-        return strategy
 
-    def get_strategy(self, strategy_id: str) -> Strategy | None:
-        return self.strategies.get(strategy_id)
 
-    def list_strategies(
-        self, segment_id: str | None = None, limit: int | None = None, offset: int = 0
-    ) -> list[Strategy]:
-        items = list(self.strategies.values())
-        if segment_id is not None:
-            items = [s for s in items if s.segment_id == segment_id]
-        return page(items, limit, offset)
 
     def add_score_snapshot(self, snapshot: ScoreSnapshot) -> ScoreSnapshot:
         self.score_snapshots.append(snapshot)

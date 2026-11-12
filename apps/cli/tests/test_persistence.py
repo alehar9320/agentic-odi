@@ -12,7 +12,7 @@ def test_every_entity_type_survives_reopen(tmp_path):
 
     job_id = backend.call("add_job", {"name": "Job", "description": "d"})["id"]
     # An outcome must exist before steps can be added.
-    backend.call(
+    first_outcome_id = backend.call(
         "add_outcome",
         {
             "job_id": job_id,
@@ -20,7 +20,7 @@ def test_every_entity_type_survives_reopen(tmp_path):
             "importance": 8.0,
             "satisfaction": 4.0,
         },
-    )
+    )["id"]
     step_id = backend.call("add_step", {"job_id": job_id, "name": "S", "order": 1})["id"]
     outcome = backend.call(
         "add_outcome",
@@ -87,7 +87,7 @@ def test_every_entity_type_survives_reopen(tmp_path):
             "job_id": job_id,
             "name": "Release engineers",
             "criterion": "They own the publish step.",
-            "outcome_ids": [outcome["id"]],
+            "outcome_ids": [outcome["id"], first_outcome_id],
         },
     )
     strategy = backend.call(
@@ -97,11 +97,16 @@ def test_every_entity_type_survives_reopen(tmp_path):
             "kind": "differentiated",
             "rationale": "The publish path blocks every release.",
             "expected_effect": "Shorter publish time.",
+            "rejected": [
+                {"kind": "disruptive", "why": "The job is established, not new."},
+                {"kind": "new_market", "why": "The people are already served."},
+            ],
         },
     )
 
     reopened = SQLiteRepository(db_path=db)
     stored_segment = reopened.get_segment(segment["id"])
-    assert stored_segment is not None and stored_segment.outcome_ids == [outcome["id"]]
+    assert stored_segment is not None
+    assert stored_segment.outcome_ids == [outcome["id"], first_outcome_id]
     stored_strategy = reopened.get_strategy(strategy["id"])
     assert stored_strategy is not None and stored_strategy.segment_id == segment["id"]

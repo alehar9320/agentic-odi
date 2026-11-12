@@ -29,16 +29,16 @@ from agentic_odi_core import (
     OutcomeNotFoundError,
     OutcomeProposal,
     OutcomeStatementError,
-    Rejection,
     ProposalStatus,
+    Rejection,
     SegmentNotFoundError,
     StepNotFoundError,
     ToolName,
     ValueOutOfRangeError,
     error_status,
-    outcome_delta,
     invalid_strategy_request,
     manual_claim_check,
+    outcome_delta,
 )
 from agentic_odi_core.funnel import count_reset, read_counts
 from agentic_odi_core.remote import StudioError, StudioErrorCode
@@ -109,16 +109,15 @@ from agentic_odi_studio_api.studio.schemas import (
     ObservationResponse,
     ObservationUpdateRequest,
     PromoteEvidenceRequest,
-    RecordBetRequest,
-    RecordDecisionRequest,
-    ReviewDecisionRequest,
-    ScheduleWorkRequest,
-    SetOutcomeValueRequest,
     ProposalOut,
     ProposeOutcomeRequest,
     ProposeStrategyRequest,
+    RecordBetRequest,
+    RecordDecisionRequest,
     RejectProposalRequest,
+    ReviewDecisionRequest,
     ScheduleWorkRequest,
+    SetOutcomeValueRequest,
     SharedArtifactResponse,
     ShareMintResponse,
     SignalActionRequest,
@@ -905,16 +904,6 @@ async def post_segment(body: AddSegmentRequest, request: Request) -> dict:
     return segment.model_dump(mode="json")
 
 
-@router.get("/segments")
-async def get_segments(
-    request: Request,
-    job_id: str | None = Query(None),
-) -> list[dict]:
-    try:
-        segments = _service(request).list_segments(job_id)
-    except Exception as exc:  # noqa: BLE001
-        raise _as_http_error(exc) from exc
-    return [s.model_dump(mode="json") for s in segments]
 
 
 @router.get("/segments/{segment_id}")
@@ -1192,22 +1181,14 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
     if claim_check is not None:
         arguments["claim_check"] = claim_check.model_dump(mode="json")
     if _uses_mcp(request):
-        payload = {
-            "job_id": body.job_id,
-            "statement": body.statement,
-            "importance": body.importance,
-            "satisfaction": body.satisfaction,
-        }
-        for key in ("importance_n", "satisfaction_n"):
-            if getattr(body, key) is not None:
-                payload[key] = getattr(body, key)
-        if body.score_method != "estimate":
-            payload["score_method"] = body.score_method
+        payload = {"job_id": body.job_id, "statement": body.statement}
+        payload.update(
+            {k: v for k, v in arguments.items() if k not in ("job_id", "statement")}
+        )
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.ADD_OUTCOME.value,
             payload,
-            arguments,
         )
         return _payload_from_text(result)
     try:

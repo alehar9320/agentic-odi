@@ -8,8 +8,6 @@ evidence — the refusal is the feature.
 
 from __future__ import annotations
 
-import json
-
 from agentic_odi_core import InMemoryRepository, invalid_strategy_request
 from agentic_odi_core.remote import StudioError, StudioErrorCode
 from agentic_odi_studio_api.app import create_app
@@ -127,33 +125,6 @@ def test_local_propose_refuses_and_says_what_is_missing() -> None:
     assert body["message"].startswith("Invalid strategy request:")
 
 
-def test_mcp_backend_uses_the_contract_tools(monkeypatch) -> None:
-    calls: list[tuple[str, dict]] = []
-
-    async def _call(mcp_url: str, tool: str, arguments: dict) -> str:
-        calls.append((tool, arguments))
-        if tool == "get_segments":
-            return json.dumps([{"id": "seg-1", "verdict": "underserved"}])
-        if tool == "get_strategy":
-            return "null"
-        return json.dumps({"id": "st-1", "kind": "differentiated", "rejected": []})
-
-    monkeypatch.setattr(router_module, "call_mcp_tool", _call)
-    client = _client(backend="mcp")
-
-    assert client.get("/api/segments?job_id=j-1&mcp_url=http://mcp").json() == [
-        {"id": "seg-1", "verdict": "underserved"}
-    ]
-    assert client.get("/api/strategy?mcp_url=http://mcp").json() is None
-    proposed = client.post("/api/strategy/propose", json={"mcp_url": "http://mcp"})
-    assert proposed.status_code == 200
-    assert proposed.json()["kind"] == "differentiated"
-
-    assert calls == [
-        ("get_segments", {"job_id": "j-1"}),
-        ("get_strategy", {}),
-        ("propose_strategy", {}),
-    ]
 
 
 def test_mcp_backend_refusal_is_the_same_422_as_the_local_backend(monkeypatch) -> None:
@@ -173,7 +144,3 @@ def test_mcp_backend_refusal_is_the_same_422_as_the_local_backend(monkeypatch) -
     assert response.json()["error"]["message"].startswith("Invalid strategy request:")
 
 
-def test_mcp_backend_requires_mcp_url_with_the_existing_400_shape() -> None:
-    client = _client(backend="mcp")
-    assert client.get("/api/segments").status_code == 400
-    assert client.post("/api/strategy/propose", json={}).status_code == 400

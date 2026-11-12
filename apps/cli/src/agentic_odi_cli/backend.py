@@ -1051,6 +1051,7 @@ class LocalBackend(Backend):
                 rationale=args["rationale"],
                 expected_effect=args["expected_effect"],
                 chosen_at=args.get("chosen_at"),
+                rejected=args.get("rejected"),
             )
         except SegmentNotFoundError:
             raise BackendError(segment_not_found(args["segment_id"])) from None
@@ -1209,7 +1210,6 @@ _LOCAL_HANDLERS = {
     "accept_segment_candidate": LocalBackend._accept_segment_candidate,
     "get_segment_profile": LocalBackend._get_segment_profile,
     "choose_strategy": LocalBackend._choose_strategy,
-    "get_strategy": LocalBackend._get_strategy,
     "list_strategies": LocalBackend._list_strategies,
     "get_odi_framework_guidelines": LocalBackend._get_odi_framework_guidelines,
     "get_capabilities": LocalBackend._get_capabilities,

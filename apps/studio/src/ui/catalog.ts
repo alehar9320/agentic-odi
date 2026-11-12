@@ -580,6 +580,8 @@ export const CATALOG: readonly UiCatalogEntry[] = [
       },
     },
     ["total_members", "measured_count", "underserved_count", "overserved_count"],
+  ),
+  entry(
     "segment-card",
     "leaf",
     "One outcome-based segment (Stage 5): the people, the job they are doing, and the verdict their scored outcomes support. Never a demographic grouping.",

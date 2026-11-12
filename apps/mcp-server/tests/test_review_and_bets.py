@@ -22,9 +22,20 @@ _OTHER = "Minimize the cost of supporting a plugin when it ships"
 
 
 def _text(result) -> str:
+    """The tool's text, as the human half of a failure when it carries an envelope.
+
+    Failures now travel as a JSON envelope with the sentence in ``message``;
+    these tests quote that sentence, so unwrap it here the way a text client does.
+    """
     content = result.content[0]
     assert isinstance(content, TextContent)
-    return content.text
+    text = content.text
+    if text.startswith('{"error"') or text.startswith('{"code"'):
+        try:
+            return str(json.loads(text)["message"])
+        except (ValueError, KeyError):  # pragma: no cover - malformed envelope
+            return text
+    return text
 
 
 def _payload(text: str) -> dict:
@@ -52,6 +63,7 @@ async def _seed(client: Client) -> tuple[str, str]:
                     "statement": _STATEMENT,
                     "importance": 9.0,
                     "satisfaction": 3.0,
+                    "claim_check": {"asked": ["How often does this happen?"], "answers": ["Every week"]},
                 },
             )
         )
