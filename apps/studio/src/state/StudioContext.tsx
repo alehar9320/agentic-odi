@@ -54,6 +54,7 @@ import {
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
+  saveModelKey as apiSaveModelKey,
   streamChat,
   updateJob as apiUpdateJob,
   updateObservation as apiUpdateObservation,
@@ -119,7 +120,13 @@ import type {
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
-import { SettingsProvider, useSettings, SETTINGS_KEY } from "./settings/SettingsContext";
+import {
+  SettingsProvider,
+  useSettings,
+  SETTINGS_KEY,
+  readLegacyApiKey,
+  clearLegacyApiKey,
+} from "./settings/SettingsContext";
 import {
   NoticesProvider,
   useNoticesActions,
@@ -2448,6 +2455,17 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         setBootError(null);
         if (localStorage.getItem(SETTINGS_KEY) === null) {
           saveSettings(defaults);
+        }
+        // A key a previous version left in the browser store is handed to the
+        // sidecar's write-only store and then deleted, so the page stops holding
+        // it either way -- even if the write fails.
+        const legacyKey = readLegacyApiKey();
+        if (legacyKey) {
+          void apiSaveModelKey(legacyKey)
+            .catch(() => undefined)
+            .finally(clearLegacyApiKey);
+        } else {
+          clearLegacyApiKey();
         }
       })
       .catch((error) => {

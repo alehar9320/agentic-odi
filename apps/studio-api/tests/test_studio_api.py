@@ -99,12 +99,16 @@ def test_config_returns_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     response = _client().get("/api/config")
 
     assert response.status_code == 200
+    # The endpoint and model are defaults; the key is not: it is held by the
+    # sidecar's write-only store and reported only as a state.
     assert response.json()["defaults"] == {
         "base_url": "http://llm:9999/v1",
-        "api_key": "secret-key",
+        "api_key": "",
         "model_name": "my-model",
         "mcp_url": "http://mcp:9999/mcp",
     }
+    assert "secret-key" not in response.text
+    assert response.json()["model_key"] == {"configured": False, "set_at": None}
 
 
 def test_config_uses_streamlit_compatible_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,7 +124,7 @@ def test_config_uses_streamlit_compatible_fallbacks(monkeypatch: pytest.MonkeyPa
 
     assert defaults == {
         "base_url": "http://localhost:8001/v1",
-        "api_key": "local",
+        "api_key": "",
         "model_name": "local-tools-model",
         "mcp_url": "http://localhost:8000/mcp",
     }

@@ -22,11 +22,54 @@ export const EMPTY_CONFIG: StudioConfig = {
   mcp_url: "http://localhost:8000/mcp",
 };
 
+/** The one field that must never reach a browser store again. */
+function withoutSecret(config: StudioConfig): StudioConfig {
+  return { ...config, api_key: "" };
+}
+
+/** The key a previous version left in `studio.settings`, if any. Read once so it
+ *  can be handed to the sidecar's write-only store and then deleted. */
+export function readLegacyApiKey(): string | null {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) {
+      return null;
+    }
+    const stored = JSON.parse(raw) as Partial<StudioConfig>;
+    const value = typeof stored.api_key === "string" ? stored.api_key : "";
+    // The shipped default is not a secret and never needs migrating.
+    return value && value !== EMPTY_CONFIG.api_key ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Rewrite the store without the key. Idempotent; safe to call after a failed
+ *  migration because the key is gone from the browser either way. */
+export function clearLegacyApiKey(): void {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) {
+      return;
+    }
+    const stored = JSON.parse(raw) as Partial<StudioConfig>;
+    if (!("api_key" in stored)) {
+      return;
+    }
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(withoutSecret(stored as StudioConfig)));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 function loadSettings(): StudioConfig {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
-      return { ...EMPTY_CONFIG, ...(JSON.parse(raw) as Partial<StudioConfig>) };
+      const stored = JSON.parse(raw) as Partial<StudioConfig>;
+      // A stored key is deliberately not read into state: it belongs to the
+      // sidecar now, and a page script must not be able to read it back.
+      return { ...EMPTY_CONFIG, ...withoutSecret(stored as StudioConfig) };
     }
   } catch {
     /* ignore malformed cache */
@@ -51,7 +94,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const saveSettings = useCallback((config: StudioConfig) => {
     setSettings(config);
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
+      // The model key is the sidecar's to hold; it is written there, never here.
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(withoutSecret(config)));
     } catch {
       /* storage unavailable */
     }

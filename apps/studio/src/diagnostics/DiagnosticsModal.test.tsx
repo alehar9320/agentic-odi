@@ -186,7 +186,9 @@ describe("DiagnosticsModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create diagnostics bundle" }));
 
     expect(await screen.findByRole("dialog", { name: "Review diagnostics" })).toBeInTheDocument();
-    expect(calls).toEqual(["/api/diagnostics"]);
+    // The bundle is prepared from the diagnostics route; the key control's
+    // mount-time state read is not a diagnostics call.
+    expect(calls.filter((url) => url === "/api/diagnostics")).toEqual(["/api/diagnostics"]);
     expect(screen.getByText(/sidecar is unavailable/i)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Exact diagnostics JSON preview" })).toHaveTextContent('"engine": null');
     expect(calls.every((url) => url.startsWith("/api/"))).toBe(true);
@@ -220,11 +222,13 @@ describe("DiagnosticsModal", () => {
       </UpdateProvider>,
     );
 
-    expect(calls).toEqual([]);
+    // The key control reads whether a key is set on mount; that is not a
+    // diagnostics request, so the consent gate is measured against diagnostics.
+    expect(calls.filter((url) => url === "/api/diagnostics")).toEqual([]);
     fireEvent.click(screen.getByRole("button", { name: "Create diagnostics bundle" }));
 
     expect(await screen.findByRole("dialog", { name: "Review diagnostics" })).toBeInTheDocument();
-    await waitFor(() => expect(calls).toEqual(["/api/diagnostics"]));
+    await waitFor(() => expect(calls).toContain("/api/diagnostics"));
     expect(calls.every((url) => url.startsWith("/api/"))).toBe(true);
     expect(screen.getByRole("region", { name: "Exact diagnostics JSON preview" })).not.toHaveTextContent("local-secret");
   });

@@ -96,6 +96,7 @@ from agentic_odi_studio_api.studio.schemas import (
     MarketplaceSearchResponse,
     McpHealthRequest,
     MintShareRequest,
+    ModelKeyRequest,
     ModelListRequest,
     ObservationCreateRequest,
     ObservationListResponse,
@@ -117,6 +118,12 @@ from agentic_odi_studio_api.studio.schemas import (
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
+)
+from agentic_odi_studio_api.studio.secrets import (
+    SecretStoreError,
+    load_model_key,
+    model_key_status,
+    set_model_key,
 )
 from agentic_odi_studio_api.studio.sharing import (
     ShareError,
@@ -253,7 +260,56 @@ def _approvals(request: Request) -> ApprovalRegistry:
 
 @router.get("/config")
 def get_config() -> dict:
-    return {"defaults": defaults()}
+    """Defaults for the client. The model key is reported as a state, never a value."""
+    try:
+        key_status = model_key_status()
+    except SecretStoreError:
+        key_status = {"configured": False, "set_at": None}
+    # The key is deliberately absent from the body: this route is read by any
+    # script in the page, so it may report only whether one is set.
+    safe_defaults = {**defaults(), "api_key": ""}
+    return {"defaults": safe_defaults, "model_key": key_status}
+
+
+@router.get("/settings/model-key")
+def get_model_key() -> dict:
+    """Whether a model key is set, and when -- the value is never returned."""
+    try:
+        return model_key_status()
+    except SecretStoreError:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.INTERNAL,
+                message="The secret store could not be read.",
+                suggestion="Check that your profile directory is readable, then try again.",
+            )
+        ) from None
+
+
+@router.put("/settings/model-key")
+def put_model_key(body: ModelKeyRequest) -> dict:
+    """Store a model key once. The response reports its state, not its value."""
+    value = body.value.strip()
+    if not value:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="A model key cannot be empty.",
+                suggestion="Type a key, or use the replace action to overwrite the stored one.",
+            )
+        )
+    try:
+        set_at = set_model_key(value)
+    except SecretStoreError:
+        # Fail closed: the key was not stored, so do not pretend it was.
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.INTERNAL,
+                message="The secret store is not writable, so the key was not saved.",
+                suggestion="Check permissions on your profile directory, then try again.",
+            )
+        ) from None
+    return {"configured": True, "set_at": set_at}
 
 
 @router.get("/diagnostics")
@@ -342,6 +398,22 @@ def post_mcp_health(body: McpHealthRequest) -> dict:
     return {"reachable": is_endpoint_reachable(body.mcp_url)}
 
 
+def _with_stored_key(value: str) -> str:
+    """Fall back to the stored key when the client sent none.
+
+    The browser no longer holds the key, so a request that carries an empty one
+    is answered with the key the sidecar holds: first the write-only store, then
+    the profile default an operator configured.
+    """
+    if value:
+        return value
+    try:
+        stored = load_model_key()
+    except SecretStoreError:
+        stored = None
+    return stored or defaults().get("api_key", "")
+
+
 @router.post("/health/llm", response_model=LlmHealthResponse)
 async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) -> dict:
     """Probe the configured LLM endpoint, cached per (endpoint, model).
@@ -349,7 +421,9 @@ async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) ->
     Concurrent tabs within the TTL cause a single upstream probe. ``?fresh=true``
     bypasses the cache so a user-initiated "check now" is never stale.
     """
-    result = await probe_llm_health(body.base_url, body.api_key, body.model, fresh=fresh)
+    result = await probe_llm_health(
+        body.base_url, _with_stored_key(body.api_key), body.model, fresh=fresh
+    )
     return {
         "healthy": result["healthy"],
         "message": result["message"],
@@ -361,7 +435,7 @@ async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) ->
 @router.post("/models")
 async def post_models(body: ModelListRequest) -> dict:
     """The model ids this backend serves, for the composer's model picker."""
-    models, error = await list_models(body.base_url, body.api_key)
+    models, error = await list_models(body.base_url, _with_stored_key(body.api_key))
     return {"models": models, "error": error}
 
 
@@ -1351,6 +1425,9 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
     # server minted), never one the body claims, so the id in the frames, the
     # header, and the log line are always the same one.
     request_id = request_id_for(request)
+    # The browser no longer holds the model key, so an empty one is filled from
+    # the sidecar's write-only store before the turn is streamed.
+    body = body.model_copy(update={"api_key": _with_stored_key(body.api_key)})
     return StreamingResponse(
         stream_chat(
             body,
@@ -1444,8 +1521,9 @@ async def proxy_llm_chat(body: LlmProxyRequest) -> StreamingResponse:
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
-        if body.api_key:
-            headers["Authorization"] = f"Bearer {body.api_key}"
+        stored_key = _with_stored_key(body.api_key)
+        if stored_key:
+            headers["Authorization"] = f"Bearer {stored_key}"
         payload: dict[str, Any] = {
             "model": body.model,
             "messages": [message.model_dump() for message in body.messages],
