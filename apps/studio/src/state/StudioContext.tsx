@@ -75,7 +75,15 @@ import {
   createProbeScheduler,
   type ProbeScheduler,
 } from "./scheduleProbe";
+import {
+  classifyProbeError,
+  createProbeBreaker,
+  type BreakerState,
+  type ProbeBreaker,
+  type ProbeOutcome,
+} from "./probeBreaker";
 import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
+import { parseRoute, routeToPath, type Route, withSearch } from "../lib/routes";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -244,6 +252,17 @@ const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const THESES_KEY = "studio.theses";
 
+/**
+ * The current browser path, honoring the file/protocol split: http(s) uses
+ * the pathname; anything else (Tauri's asset protocol) uses the hash.
+ */
+function currentPath(): string {
+  if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+    return window.location.pathname;
+  }
+  return window.location.hash.replace(/^#/, "") || "/";
+}
+
 /** How often a focused window re-reads the signal inbox from the store. */
 const SIGNAL_POLL_INTERVAL_MS = 60_000;
 
@@ -324,6 +343,12 @@ export interface StudioContextValue {
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
+  /**
+   * What the probe breaker is doing (#536): `state` is `closed`, `open`,
+   * `half-open`, or `degraded`, and `retryInMs` is how long until the next
+   * probe is allowed. The bar reads this to say "Retrying in N min".
+   */
+  probeRetry: { state: BreakerState; retryInMs: number };
   /** Model ids the configured endpoint publishes. Empty means "type one". */
   models: string[];
   modelsLoading: boolean;
@@ -382,6 +407,12 @@ export interface StudioContextValue {
    */
   startNewThread: (options?: { stop?: boolean }) => NewThreadHandle | null;
   conversationId: string | null;
+  /**
+   * Move to another address without a reload: the URL is the source of truth
+   * for the thread, the open panel and its subject. `replace` keeps the entry
+   * out of history, for redirects that correct a stale address.
+   */
+  navigateTo: (route: Route, replace?: boolean) => void;
   /** The recent threads, newest first, as the history list shows them. */
   conversations: ConversationSummary[];
   /** Re-read the history list; called when it opens and after a turn persists. */
@@ -637,21 +668,46 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     healthy: null,
     message: "Health not checked yet.",
   });
+  /**
+   * What the probe breaker is doing (#536): whether an endpoint has stopped
+   * answering, and how long until the next probe is allowed. The bar reads this
+   * to say "Retrying in N min" instead of showing a spinner forever.
+   */
+  const [probeRetry, setProbeRetry] = useState<{ state: BreakerState; retryInMs: number }>({
+    state: "closed",
+    retryInMs: 0,
+  });
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
+
+  // The URL is the single source of truth for what is on screen. The route is
+  // parsed from the address bar on boot and updated on every navigation; the
+  // conversation, active panel, and customize-open state are derived from it.
+  const initialRoute = parseRoute(currentPath(), window.location.search);
+  const [currentRoute, setCurrentRoute] = useState<Route>(initialRoute);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(
+    currentRoute.name === "thread" ||
+    currentRoute.name === "threadPanel" ||
+    currentRoute.name === "threadPanelSubject"
+      ? currentRoute.threadId
+      : null,
+  );
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
-  const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
+  const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(
+    initialRoute.name === "threadPanel" || initialRoute.name === "threadPanelSubject"
+      ? initialRoute.panel
+      : null,
+  );
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
@@ -669,7 +725,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [segmentsError, setSegmentsError] = useState<StudioError | null>(null);
   const [focusedSubject, setFocusedSubject] = useState<FocusSubject | null>(loadFocusedSubject);
   const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
-  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useState(
+    initialRoute.name === "customize" || initialRoute.name === "customizeListing",
+  );
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [marketplace, setMarketplace] = useState<MarketplaceSearch | null>(null);
   const [marketplaceError, setMarketplaceError] = useState<StudioError | null>(null);
@@ -690,6 +748,20 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * second timer on top of the first (#535).
    */
   const probeSchedulerRef = useRef<ProbeScheduler | null>(null);
+  /**
+   * The single-flight breaker every probe shares (#536): one probe on the wire
+   * at a time, and no probe at all while an endpoint keeps refusing.
+   */
+  const probeBreakerRef = useRef<ProbeBreaker | null>(null);
+  if (probeBreakerRef.current === null) {
+    probeBreakerRef.current = createProbeBreaker();
+  }
+
+  /** Publish the breaker's state so the bar can show a countdown while it is open. */
+  const publishProbeRetry = useCallback(() => {
+    const breaker = probeBreakerRef.current!;
+    setProbeRetry({ state: breaker.state(), retryInMs: breaker.retryInMs() });
+  }, []);
   /** What a scheduled probe should run, kept current without re-creating the timer. */
   const probeNowRef = useRef<() => Promise<boolean>>(async () => false);
   /** Runs the debounced probe a connection-setting edit earns. */
@@ -698,6 +770,68 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const settingsProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The last written settings, so an edit can be compared without a stale closure. */
   const settingsRef = useRef(settings);
+
+  /**
+   * Navigate to a route: update the browser URL and the derived studio state
+   * (conversation, active panel, customize-open). `replace` controls whether
+   * the navigation pushes a new history entry or replaces the current one.
+   */
+  const navigateTo = useCallback(
+    (route: Route, replace = false) => {
+      const path = withSearch(routeToPath(route), route.search ?? "");
+      setCurrentRoute(route);
+
+      const threadId =
+        route.name === "thread" ||
+        route.name === "threadPanel" ||
+        route.name === "threadPanelSubject"
+          ? route.threadId
+          : null;
+      const panel =
+        route.name === "threadPanel" || route.name === "threadPanelSubject"
+          ? route.panel
+          : null;
+      const customize =
+        route.name === "customize" || route.name === "customizeListing";
+
+      setConversationId(threadId);
+      setActivePanel(panel);
+      setCustomizeOpen(customize);
+
+      if (replace) {
+        window.history.replaceState({}, "", path);
+      } else {
+        window.history.pushState({}, "", path);
+      }
+    },
+    []
+  );
+
+  /**
+   * Restore the route from the URL on boot: a non-home URL loads that thread
+   * through `fetchConversationTree`; "/" falls back to today's latest
+   * conversation behaviour. A popstate listener restores state on back/
+   * forward without starting any stream.
+   */
+  useEffect(() => {
+    function onPopState() {
+      const route = parseRoute(currentPath(), window.location.search);
+      setCurrentRoute(route);
+      setConversationId(
+        route.name === "thread" || route.name === "threadPanel" || route.name === "threadPanelSubject"
+          ? route.threadId
+          : null
+      );
+      setActivePanel(
+        route.name === "threadPanel" || route.name === "threadPanelSubject" ? route.panel : null
+      );
+      setCustomizeOpen(route.name === "customize" || route.name === "customizeListing");
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+
 
   const signals = useMemo(
     () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
@@ -1114,6 +1248,59 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Measure the sidecar, the MCP server, and the model, keeping the failure that
+   * made a negative answer negative. The scheduled probe needs that failure to
+   * tell a flaky network from a rejected key (#536); a panel does not.
+   */
+  const measureConnections = useCallback(
+    async (
+      override: Partial<StudioConfig> = {},
+    ): Promise<{ report: ConnectionReport; failure: unknown }> => {
+      const target = { ...settings, ...override };
+      let failure: unknown = null;
+      const noteFailure = (error: unknown) => {
+        failure = failure ?? error;
+      };
+      const [sidecar, mcp, llm] = await Promise.all([
+        fetchConfig()
+          .then(() => true)
+          .catch((error: unknown) => {
+            noteFailure(error);
+            return false;
+          }),
+        healthMcp(target.mcp_url)
+          .then((result) => result.reachable)
+          .catch((error: unknown) => {
+            noteFailure(error);
+            return false;
+          }),
+        healthLlm({
+          base_url: target.base_url,
+          api_key: target.api_key,
+          model: target.model_name,
+        }).catch((error: unknown) => {
+          noteFailure(error);
+          return {
+            healthy: false,
+            message: (error as Error).message || "The model did not answer.",
+          };
+        }),
+      ]);
+      void refreshCapabilities();
+      return {
+        report: {
+          sidecarReachable: sidecar,
+          mcpReachable: mcp,
+          llmHealthy: llm.healthy,
+          llmMessage: llm.message,
+        },
+        failure,
+      };
+    },
+    [settings, refreshCapabilities],
+  );
+
+  /**
    * Measure the sidecar, the MCP server, and the model without recording the result.
    *
    * A panel that owes the person looking at it fresh numbers calls this. Nothing here
@@ -1122,32 +1309,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    */
   const surveyConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
-      const target = { ...settings, ...override };
-      const [sidecar, mcp, llm] = await Promise.all([
-        fetchConfig()
-          .then(() => true)
-          .catch(() => false),
-        healthMcp(target.mcp_url)
-          .then((result) => result.reachable)
-          .catch(() => false),
-        healthLlm({
-          base_url: target.base_url,
-          api_key: target.api_key,
-          model: target.model_name,
-        }).catch((error: unknown) => ({
-          healthy: false,
-          message: (error as Error).message || "The model did not answer.",
-        })),
-      ]);
-      void refreshCapabilities();
-      return {
-        sidecarReachable: sidecar,
-        mcpReachable: mcp,
-        llmHealthy: llm.healthy,
-        llmMessage: llm.message,
-      };
+      return (await measureConnections(override)).report;
     },
-    [settings, refreshCapabilities],
+    [measureConnections],
   );
 
   /**
@@ -1214,16 +1378,50 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * restarts the cadence, because the endpoint they just changed is not the one
    * that kept failing.
    */
+  /**
+   * One measurement through the shared breaker: the probe joins whatever is
+   * already on the wire, records the report for the caller, and classifies a
+   * negative answer so the breaker knows whether a retry is worth making (#536).
+   */
+  const probeOnce = useCallback(
+    async (
+      override: Partial<StudioConfig>,
+      mode: "evidence" | "recovery",
+    ): Promise<ConnectionReport | null> => {
+      const settled = await probeBreakerRef.current!.run(async () => {
+        const { report, failure } = await measureConnections(override);
+        applyReport(report, mode);
+        return {
+          outcome: (report.llmHealthy
+            ? "success"
+            : classifyProbeError(failure, report.llmMessage)) as ProbeOutcome,
+          value: report,
+        };
+      });
+      publishProbeRetry();
+      // A joined probe returns the other caller's promise, whose report is the
+      // one this call also wants: both measured the same endpoint. `null` means
+      // the breaker refused, so nothing was measured and nothing is reported.
+      return settled?.value ?? null;
+    },
+    [measureConnections, applyReport, publishProbeRetry],
+  );
+
   const checkConnections = useCallback(
     async (
       override: Partial<StudioConfig> = {},
       mode: "evidence" | "recovery" = "evidence",
     ): Promise<ConnectionReport> => {
-      const report = applyReport(await surveyConnections(override), mode);
+      // A person asking restarts the cadence and closes the breaker: the endpoint
+      // they just edited is not the one that kept failing (#536). They still join
+      // a probe already in flight rather than starting a second one.
+      probeBreakerRef.current?.reset();
+      const report = await probeOnce(override, mode);
       probeSchedulerRef.current?.reset();
-      return report;
+      // `reset` cleared the breaker, so this probe was allowed to run.
+      return report!;
     },
-    [surveyConnections, applyReport],
+    [probeOnce],
   );
 
   // Re-probe after the user acted on the sidecar notice (e.g. started the
@@ -1236,15 +1434,19 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * One scheduled probe: it records what it finds, and it reports back whether
    * the endpoint answered so the scheduler can widen or reset the gap. It does
    * not reset the cadence itself — only a person asking does that.
+   *
+   * The breaker wraps the measurement, so an overlapping tick joins the probe
+   * already in flight and a streak of transport failures stops the requests
+   * rather than repeating them (#536).
    */
   const scheduledProbe = useCallback(async (): Promise<boolean> => {
     if (!isOnline()) {
       applyOffline();
       return false;
     }
-    const report = applyReport(await surveyConnections({}), "recovery");
-    return report.llmHealthy;
-  }, [surveyConnections, applyReport, applyOffline]);
+    const report = await probeOnce({}, "recovery");
+    return report?.llmHealthy ?? false;
+  }, [probeOnce, applyOffline]);
 
   // Keep the scheduler pointed at the freshest probe without ever re-creating
   // the timer: the ref is what the running scheduler reads on each tick.
@@ -1448,16 +1650,25 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
-  const closePanel = useCallback(() => setActivePanel(null), []);
+  const closePanel = useCallback(() => {
+    setActivePanel(null);
+    if (conversationId) {
+      navigateTo({ name: "thread", threadId: conversationId }, false);
+    }
+  }, [conversationId, navigateTo]);
 
   const openPanel = useCallback(
     (panel: WorkspacePanelId) => {
       if (setupOpen) {
         closeSetup();
       }
-      setActivePanel(panel);
+      if (conversationId) {
+        navigateTo({ name: "threadPanel", threadId: conversationId, panel }, false);
+      } else {
+        setActivePanel(panel);
+      }
     },
-    [setupOpen, closeSetup],
+    [conversationId, navigateTo, setupOpen, closeSetup],
   );
 
   /**
@@ -1470,7 +1681,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       return;
     }
     saveSession(sessionForSubject(kind, id));
-  }, []);
+    const panel = PANEL_FOR_SUBJECT[kind];
+    if (conversationId && panel) {
+      navigateTo(
+        { name: "threadPanelSubject", threadId: conversationId, panel, subjectKind: kind, subjectId: id },
+        false
+      );
+    }
+  }, [conversationId, navigateTo]);
 
   /**
    * Stop speaking for the screen. The session slot goes with the selection, so a
@@ -1511,9 +1729,16 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const focusEvidence = useCallback(
     (evidenceId: string) => {
       setFocusedEvidenceId(evidenceId);
-      openPanel("evidence");
+      if (conversationId) {
+        navigateTo(
+          { name: "threadPanelSubject", threadId: conversationId, panel: "evidence", subjectKind: "evidence", subjectId: evidenceId },
+          false
+        );
+      } else {
+        openPanel("evidence");
+      }
     },
-    [openPanel],
+    [conversationId, navigateTo, openPanel],
   );
 
   /**
@@ -2273,6 +2498,23 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [refreshConversations],
   );
 
+  // A deep link is a promise: the thread named in the address bar is opened,
+  // not merely named, so a reload lands in the lens the person left. Later
+  // navigations go through `navigateTo`, so this runs once, on boot.
+  useEffect(() => {
+    if (
+      initialRoute.name === "thread" ||
+      initialRoute.name === "threadPanel" ||
+      initialRoute.name === "threadPanelSubject"
+    ) {
+      // Deferred by a microtask so the load never sets state during the effect
+      // that asked for it; the thread still opens before the first paint ends.
+      const threadId = initialRoute.threadId;
+      void Promise.resolve().then(() => openConversation(threadId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -2286,11 +2528,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     setOfflineReplyFor(null);
     setConversationId(null);
     void apiCreateConversation()
-      .then((conversation) =>
-        setConversationId((current) => current ?? conversation.id),
-      )
+      .then((conversation) => {
+        setConversationId((current) => current ?? conversation.id);
+        navigateTo({ name: "thread", threadId: conversation.id }, true);
+      })
       .catch(() => undefined);
-  }, []);
+  }, [navigateTo]);
 
   // First paint shows the person's own work; nothing that nobody asked for gets
   // to declare the studio broken. Boot order, and why nothing on the first
@@ -2403,6 +2646,17 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       probeSchedulerRef.current = null;
     };
   }, []);
+
+  // While the breaker is open the countdown is the only thing changing, so tick
+  // it once a second — the timer that carries it is separate from the probe
+  // schedule, and it stops the moment the breaker closes or is reset (#536).
+  useEffect(() => {
+    if (probeRetry.state !== "open") {
+      return;
+    }
+    const timer = window.setInterval(publishProbeRetry, 1_000);
+    return () => window.clearInterval(timer);
+  }, [probeRetry.state, publishProbeRetry]);
 
   // A network that comes back is worth one probe; a network that goes away is
   // worth one sentence and no further requests until it returns. The scheduler
@@ -2535,6 +2789,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      probeRetry,
       models,
       modelsLoading,
       modelsMessage,
@@ -2642,6 +2897,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      navigateTo,
     }),
     [
       settings,
@@ -2660,6 +2916,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      probeRetry,
       models,
       modelsLoading,
       modelsMessage,
@@ -2767,6 +3024,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      navigateTo,
     ],
   );
 

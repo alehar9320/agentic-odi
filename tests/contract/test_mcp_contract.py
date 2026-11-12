@@ -43,18 +43,6 @@ async def test_mcp_argument_names_match_the_contract() -> None:
         assert set(schema.get("required", [])) == set(spec.required), name
 
 
-def test_add_outcome_exposes_sample_metadata() -> None:
-    assert {"importance_n", "satisfaction_n", "score_method"} <= set(
-        TOOL_SPECS["add_outcome"].arguments
-    )
-
-
-def test_update_outcome_exposes_sample_metadata() -> None:
-    assert {"importance_n", "satisfaction_n", "score_method"} <= set(
-        TOOL_SPECS["update_outcome"].arguments
-    )
-
-
 def _envelope_text(exc: BaseException) -> str:
     """The text a failing tool returns, built the way the server builds it."""
     envelope = error_envelope(exc)

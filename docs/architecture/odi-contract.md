@@ -52,7 +52,6 @@ hand-edited record cannot disagree about what a valid outcome is.
 | Steps occupy a stage | `Step.stage_index` (`ge=1, le=8`) and `Step.stage` (`JobStage`) | Position is optional but bounded when present |
 | A score above 10 is "underserved" | `UNDERSERVED_SCORE` (`evaluation.py:13`) and `isUnderserved` with `UNDERSERVED_THRESHOLD` (`apps/studio/src/lib/odi.ts:9`) | `classify_opportunity` buckets strictly above the line, so exactly 10 reads as served; `tests/test_underserved_threshold_parity.py` fails if the Python and TypeScript numbers ever disagree |
 | Every adapter exposes the same tools | `ToolName` / `TOOL_SPECS` in `contract.py` | `tests/contract/test_mcp_contract.py` and `test_cli_contract.py` fail on drift |
-| "No solution" is never fabricated from an un-inventoried outcome | `_solution_state` (`services.py`), `EXISTING_SOLUTION_LABELS` (`models.py`), `render_alternative_lines` (`alternatives.py`) | One three-state rule: `yes`, `no_linked_nothing`, `no_link_at_all`; the last two word differently, so "we asked and there is nothing" is never rendered as "we have not asked" |
 | A record shown in full is only ever what was stored | `DETAIL_FIELDS` and the honesty sentences (`apps/studio/src/components/records/RecordDetail.tsx`) | The detail names the fields each kind really has and nothing else — `Outcome.telemetry` stays unshown because it has no defined shape — and says in words that no author or timestamp exists. A missing value renders `—`, an unscored outcome `unscored`; `Unknown`, `N/A`, and a guessed date are never rendered |
 
 The statement checker is deliberately mechanical: it requires a leading
@@ -62,6 +61,24 @@ The statement checker is deliberately mechanical: it requires a leading
 `improve`, `optimize`, `faster`, `easier`), and no solution nouns
 (`notification`, `dashboard`, `button`, …). It returns issues and suggestions
 rather than a bare boolean so the agent can repair a statement in the same turn.
+
+## Outcome statement rubric
+
+The following table lists every rule enforced by `evaluate_outcome_statement`,
+published by `outcome_rubric()`, and checked per rule in the `checks` array
+returned by the evaluator. The rubric is derived from the validator constants,
+so a constant edit cannot drift from the published rules.
+
+| Rule ID | Label | Check | Fails when | Example (failing) |
+|---|---|---|---|---|
+| `direction` | Leading direction | Statement starts with "Minimize" or "Maximize" | Missing or wrong leading word | `The time it takes to onboard a customer when they sign up` |
+| `unit_of_measure` | Unit of measure | Contains a known unit (time, cost, number, frequency, rate, percentage, steps, attempts, or a digit) | No unit and no digit | `Minimize the onboarding when they sign up` |
+| `object_of_control` | Object of control | Names an object after "the" | No " the " in statement | `Minimize time to onboard a customer when they sign up` |
+| `contextual_clarifier` | Contextual clarifier | Contains a context marker (when, while, before, after, during, if, as) | No context marker | `Minimize the time it takes to onboard a customer` |
+| `min_words` | Minimum length | At least 6 words | Fewer than 6 words | `Minimize the time` |
+| `max_chars` | Maximum length | At most 200 characters | More than 200 characters | (long statement exceeding 200 chars) |
+| `vague_terms` | No vague terms | No vague terms (better, improve, optimize, faster, easier) | Any vague term present | `Make onboarding faster when they sign up` |
+| `solution_nouns` | No solution nouns | No solution nouns (notification, dashboard, button, feature, screen, email, workflow, integration, report, toggle) | Any solution noun present | `I want a notification when onboarding finishes` |
 
 ## What the alternatives were
 

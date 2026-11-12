@@ -1,22 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
-import { fetchAlternativeLinks } from "../../api/studioApi";
 import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
 import {
-  confidenceClass,
-  formatBand,
+  formatAdvances,
   formatOpportunityScore,
-  formatSample,
   hasScore,
-  isOnlyWorkaround,
   isUnderserved,
-  nAdvisory,
   scoredAverage,
+  underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome, OutcomeAlternativeLink } from "../../types";
+import type { Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import { ShareAction } from "../ShareAction";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
@@ -43,25 +39,17 @@ export function OpportunityLandscape() {
     theses,
     focusedSubject,
     focusSubject,
-    settings,
   } = useStudio();
   const [underservedOnly, setUnderservedOnly] = useState(false);
-  const [workaroundOnly, setWorkaroundOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(
     focusedSubject?.kind === "outcome" ? focusedSubject.id : null,
   );
+  // The outcome whose score form should open on the card, set by "Score me" so
+  // the reader lands on the one control that fixes a missing score.
+  const [scoringOutcomeId, setScoringOutcomeId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [hoveredOutcome, setHoveredOutcome] = useState<Outcome | null>(null);
-  // Every alternative recorded for the job(s) on screen, read once per job so
-  // the facet never issues a request per row. Both the links and the failure are
-  // keyed by the job set they were read for, so a stale page is ignored and a
-  // failed read is never confused with an empty inventory.
-  const [linksRead, setLinksRead] = useState<{
-    key: string;
-    links: OutcomeAlternativeLink[];
-  } | null>(null);
-  const [readFailureKey, setReadFailureKey] = useState<string | null>(null);
 
   const canvas = canvasState.data;
   const sample = canvas?.source === "seed";
@@ -82,54 +70,6 @@ export function OpportunityLandscape() {
   // say when it was saved. A warm reload with live data draws it too but gets
   // no caption, because that data is not a saved copy.
   const savedCaption = canvasCached && hasRecords ? savedCopyCaption(canvas) : null;
-
-  const jobIds = useMemo(
-    () =>
-      [
-        ...new Set(
-          outcomes
-            .map((outcome) => outcome.job_id)
-            .filter((jobId): jobId is string => Boolean(jobId)),
-        ),
-      ].sort(),
-    [outcomes],
-  );
-  const jobKey = jobIds.join(",");
-  const readyToRead = canvasState.kind === "ready" && jobIds.length > 0;
-  const links = useMemo(
-    () => (readyToRead && linksRead?.key === jobKey ? linksRead.links : []),
-    [readyToRead, linksRead, jobKey],
-  );
-  const alternativesReadFailed = readyToRead && readFailureKey === jobKey;
-
-  useEffect(() => {
-    if (!readyToRead) return;
-    let cancelled = false;
-    void Promise.all(jobIds.map((jobId) => fetchAlternativeLinks(jobId, settings.mcp_url)))
-      .then((pages) => {
-        if (cancelled) return;
-        setLinksRead({ key: jobKey, links: pages.flat() });
-        setReadFailureKey(null);
-      })
-      .catch(() => {
-        // The facet is supporting context: a failure disables it with a notice
-        // rather than filtering every outcome away as "not a workaround".
-        if (!cancelled) setReadFailureKey(jobKey);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [readyToRead, jobKey, jobIds, settings.mcp_url]);
-
-  const linksByOutcome = useMemo(() => {
-    const grouped = new Map<string, OutcomeAlternativeLink[]>();
-    for (const entry of links) {
-      const bucket = grouped.get(entry.outcome_id) ?? [];
-      bucket.push(entry);
-      grouped.set(entry.outcome_id, bucket);
-    }
-    return grouped;
-  }, [links]);
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -156,12 +96,6 @@ export function OpportunityLandscape() {
       if (underservedOnly && !isUnderserved(outcome.opportunity_score)) {
         return false;
       }
-      if (
-        workaroundOnly &&
-        !isOnlyWorkaround(outcome.id ? (linksByOutcome.get(outcome.id) ?? []) : [])
-      ) {
-        return false;
-      }
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const stmt = outcome.statement?.toLowerCase() ?? "";
@@ -170,37 +104,40 @@ export function OpportunityLandscape() {
       }
       return true;
     });
-  }, [outcomes, underservedOnly, workaroundOnly, linksByOutcome, searchQuery]);
+  }, [outcomes, underservedOnly, searchQuery]);
 
   // One rule for every score on this canvas: compare the stored number, display the
   // rounded one. The sort, the underserved filter and the average all read
   // `opportunity_score` as stored, because two outcomes that both print "13.0" still have
   // an order. Rounding happens once, where a score becomes text.
   const sortedOutcomes = useMemo(() => {
-    // Group by confidence class (measured, then thin, then none) and order
-    // within a group by the low end of the band, matching the core's honest
-    // ranking. This keeps a thin high-variance guess below a measured need and
-    // never sorts an unscored outcome as a zero.
-    const order: Record<string, number> = { measured: 0, thin: 1, none: 2 };
-    return [...filteredOutcomes].sort((a, b) => {
-      const classA = order[confidenceClass(a)];
-      const classB = order[confidenceClass(b)];
-      if (classA !== classB) return classA - classB;
-      const lowA = a.opportunity_low ?? a.opportunity_score ?? null;
-      const lowB = b.opportunity_low ?? b.opportunity_score ?? null;
-      if (lowA === null && lowB === null) return 0;
-      if (lowA === null) return 1;
-      if (lowB === null) return -1;
-      return lowB - lowA;
-    });
+    return [...filteredOutcomes].sort(
+      (a, b) => (b.opportunity_score ?? -Infinity) - (a.opportunity_score ?? -Infinity),
+    );
   }, [filteredOutcomes]);
+
+  // The outcomes the plot deliberately leaves off: no stored score means no
+  // point. They are listed below the matrix so a reader can still reach them and
+  // record the ratings that would place them.
+  const unscoredOutcomes = useMemo(
+    () => filteredOutcomes.filter((outcome) => !hasScore(outcome.opportunity_score)),
+    [filteredOutcomes],
+  );
 
   function toggleOutcome(id: string) {
     const next = selectedOutcomeId === id ? null : id;
     setSelectedOutcomeId(next);
     if (next) {
       focusSubject("outcome", next);
+    } else {
+      setScoringOutcomeId(null);
     }
+  }
+
+  function scoreOutcome(id: string) {
+    setSelectedOutcomeId(id);
+    setScoringOutcomeId(id);
+    focusSubject("outcome", id);
   }
 
   const activeOutcome = useMemo(() => {
@@ -375,25 +312,7 @@ export function OpportunityLandscape() {
             />
             Show Underserved Only (&gt;10)
           </label>
-          <label
-            style={{ fontSize: "0.85rem", color: "var(--studio-text)", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}
-            title={
-              alternativesReadFailed
-                ? "The alternatives inventory could not be read; the facet is unavailable rather than treating every outcome as not a workaround."
-                : "Outcomes whose only recorded solution is a workaround."
-            }
-          >
-            <input
-              type="checkbox"
-              data-testid="facet-only-workaround"
-              checked={workaroundOnly}
-              disabled={isLoading || alternativesReadFailed}
-              onChange={(event) => setWorkaroundOnly(event.target.checked)}
-              style={{ accentColor: "var(--studio-indigo)" }}
-            />
-            Only Workaround
-          </label>
-          {searchQuery || underservedOnly || workaroundOnly ? (
+          {searchQuery || underservedOnly ? (
             <button
               type="button"
               className="studio-button"
@@ -402,7 +321,6 @@ export function OpportunityLandscape() {
               onClick={() => {
                 setSearchQuery("");
                 setUnderservedOnly(false);
-                setWorkaroundOnly(false);
               }}
             >
               Clear Filters
@@ -424,6 +342,7 @@ export function OpportunityLandscape() {
           onSelectOutcome={toggleOutcome}
           onHoverOutcome={setHoveredOutcome}
           activeOutcome={activeOutcome}
+          scoringOutcomeId={scoringOutcomeId}
           sample={sample}
         />
       ) : viewMode === "table" ? (
@@ -443,6 +362,48 @@ export function OpportunityLandscape() {
           No opportunities match the current filter criteria.
         </p>
       )}
+
+      {/* The plot draws only scored outcomes, so the ones it cannot place are
+          listed here with the one action that fixes that. Nothing is invented to
+          fill the gap: the count and the statements come from the store. */}
+      {viewMode === "matrix" && canvasState.kind !== "error" && unscoredOutcomes.length > 0 ? (
+        <section className="unscored-list" aria-label="Not scored outcomes" style={{ marginTop: 24 }}>
+          <h2 className="catchup-title">{`Not scored (${unscoredOutcomes.length})`}</h2>
+          <p className="caption">
+            These outcomes have no importance and satisfaction recorded, so the matrix
+            cannot place them. Add ratings to plot each one.
+          </p>
+          <ul className="stack" style={{ listStyle: "none", margin: "12px 0 0", padding: 0 }}>
+            {unscoredOutcomes.map((outcome, index) => (
+              <li
+                key={outcome.id ?? index}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  padding: "10px 14px",
+                  border: "1px solid var(--studio-border)",
+                  borderRadius: 8,
+                }}
+              >
+                <span style={{ color: "var(--studio-text)" }}>
+                  {outcome.id ? <b style={{ color: "var(--studio-indigo)" }}>{outcome.id} </b> : null}
+                  {outcome.statement ?? "Untitled outcome"}
+                </span>
+                <button
+                  type="button"
+                  className="quiet-action"
+                  disabled={!outcome.id}
+                  onClick={() => outcome.id && scoreOutcome(outcome.id)}
+                >
+                  Score me
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {theses.length > 0 && (
         <section aria-label="Saved opportunity theses" style={{ marginTop: 28 }}>
@@ -490,6 +451,8 @@ interface MatrixViewProps {
   onSelectOutcome: (id: string) => void;
   onHoverOutcome: (outcome: Outcome | null) => void;
   activeOutcome: Outcome | null;
+  /** The outcome whose score form should open on the detail card. */
+  scoringOutcomeId?: string | null;
   /** The one outcome the tour points at, ringed apart from the rest. */
   highlightedOutcomeId?: string | null;
   sample?: boolean;
@@ -527,15 +490,22 @@ export function plotY(importance: number): number {
   return PLOT_DATA_BOTTOM - (importance / 10) * PLOT_DATA_HEIGHT;
 }
 
-// Underserved zone polygon: top-left, boundary-left, boundary-right, top-right.
-const underservedPolygonPoints = [
-  [PLOT_LEFT, PLOT_TOP],
-  [plotX(0), plotY(5)],
-  [plotX(10), plotY(10)],
-  [PLOT_RIGHT, PLOT_TOP],
-]
-  .map(([x, y]) => `${x},${y}`)
-  .join(" ");
+// Underserved zone, sampled from the score formula rather than hard-coded:
+// the region is `importance > underservedBoundaryImportance(satisfaction)`,
+// which is `2 × importance − satisfaction > 10`. The zone is closed along the
+// top of the plot so it reads as a filled region, and the sampled path keeps it
+// agreeing with `isUnderserved(opportunityScore(...))` at every column.
+const BOUNDARY_SAMPLES = 10;
+const underservedPolygonPoints = (() => {
+  const points: Array<[number, number]> = [[PLOT_LEFT, PLOT_TOP]];
+  for (let step = 0; step <= BOUNDARY_SAMPLES; step += 1) {
+    const satisfaction = (step / BOUNDARY_SAMPLES) * 10;
+    const importance = Math.min(underservedBoundaryImportance(satisfaction), 10);
+    points.push([plotX(satisfaction), plotY(importance)]);
+  }
+  points.push([PLOT_RIGHT, PLOT_TOP]);
+  return points.map(([x, y]) => `${x},${y}`).join(" ");
+})();
 
 export function OpportunityPlot({
   outcomes,
@@ -543,6 +513,7 @@ export function OpportunityPlot({
   onSelectOutcome,
   onHoverOutcome,
   activeOutcome,
+  scoringOutcomeId = null,
   sample = false,
   highlightedOutcomeId = null,
   compact = false,
@@ -553,21 +524,32 @@ export function OpportunityPlot({
   // The pulse is decoration; with reduce-motion the ring stays still.
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
-  const plotted: PlottedOutcome[] = outcomes.map((outcome) => {
-    const importance = Math.min(Math.max(outcome.importance ?? 5, 0), 10);
-    const satisfaction = Math.min(Math.max(outcome.satisfaction ?? 5, 0), 10);
-    const score = outcome.opportunity_score ?? importance + Math.max(importance - satisfaction, 0);
-    return {
-      outcome,
-      importance,
-      satisfaction,
-      score,
-      underserved: isUnderserved(score),
-      // Map (satisfaction, importance) into the 500x360 viewBox.
-      cx: plotX(satisfaction),
-      cy: plotY(importance),
-    };
-  });
+  const plotted: PlottedOutcome[] = outcomes
+    .filter(
+      (outcome) =>
+        hasScore(outcome.importance) &&
+        hasScore(outcome.satisfaction) &&
+        hasScore(outcome.opportunity_score),
+    )
+    .map((outcome) => {
+      // Every plotted point carries stored numbers: a point needs a real
+      // importance, a real satisfaction, and a real score. There is no default
+      // of 5 and no fallback score, so an unscored outcome never lands
+      // mid-matrix pretending to be a measurement.
+      const importance = outcome.importance as number;
+      const satisfaction = outcome.satisfaction as number;
+      const score = outcome.opportunity_score as number;
+      return {
+        outcome,
+        importance,
+        satisfaction,
+        score,
+        underserved: isUnderserved(score),
+        // Map (satisfaction, importance) into the 500x360 viewBox.
+        cx: plotX(satisfaction),
+        cy: plotY(importance),
+      };
+    });
 
   // Above the fold: the highest-opportunity outcomes, which is what the
   // landscape exists to show. The tail is one click away rather than in the
@@ -722,6 +704,17 @@ export function OpportunityPlot({
               strokeWidth="1"
               strokeDasharray="4,4"
             />
+            {/* The threshold line itself: the boundary the polygon is sampled
+                from, `importance = (10 + satisfaction) / 2`. */}
+            <line
+              x1={plotX(0)}
+              y1={plotY(underservedBoundaryImportance(0))}
+              x2={plotX(10)}
+              y2={plotY(underservedBoundaryImportance(10))}
+              stroke="rgba(251, 191, 36, 0.45)"
+              strokeWidth="1.5"
+              strokeDasharray="6,3"
+            />
             <text x={60} y={45} fill="var(--studio-amber)" fontSize="11" fontWeight="600" opacity="0.8">
               ★ Underserved Innovation Zone (Opp Score &gt; 10)
             </text>
@@ -780,9 +773,7 @@ export function OpportunityPlot({
                     stroke="#0b0d13"
                     strokeWidth="2"
                     filter={plot.underserved || isSelected ? "url(#glowEffect)" : undefined}
-                  >
-                    <title>{`${outcome.id} · ${formatSample(outcome)}`}</title>
-                  </circle>
+                  />
 
                   {/* Node ID Label */}
                   <text
@@ -866,7 +857,18 @@ export function OpportunityPlot({
       <div>
         {activeOutcome ? (
           <div style={{ position: "sticky", top: 16 }}>
-            <OutcomeCard outcome={activeOutcome} sample={sample} detail />
+            <OutcomeCard
+              // Re-key on the scoring target so "Score me" reopens the form
+              // even when the card is already mounted for that outcome.
+              key={
+                scoringOutcomeId != null && scoringOutcomeId === activeOutcome.id
+                  ? `${activeOutcome.id}:scoring`
+                  : activeOutcome.id
+              }
+              outcome={activeOutcome}
+              sample={sample}
+              startEditing={scoringOutcomeId != null && scoringOutcomeId === activeOutcome.id}
+            />
           </div>
         ) : (
           <div
@@ -906,9 +908,8 @@ function OpportunityTableView({
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Importance</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Satisfaction</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Opp. Score</th>
-            <th style={{ padding: "10px 14px" }}>Band</th>
-            <th style={{ padding: "10px 14px" }}>Sample</th>
             <th style={{ padding: "10px 14px", textAlign: "center" }}>Status</th>
+            <th style={{ padding: "10px 14px" }}>Advances</th>
           </tr>
         </thead>
         <tbody>
@@ -963,46 +964,6 @@ function OpportunityTableView({
                 >
                   {scored ? formatOpportunityScore(outcome.opportunity_score) : "—"}
                 </td>
-                <td
-                  style={{
-                    padding: "10px 14px",
-                    color: "var(--studio-muted)",
-                    whiteSpace: "nowrap",
-                  }}
-                  title="The band around the score; an estimate has no band"
-                >
-                  {formatBand(outcome)}
-                </td>
-                <td
-                  style={{
-                    padding: "10px 14px",
-                    color: "var(--studio-muted)",
-                    whiteSpace: "nowrap",
-                  }}
-                  title="How many people stand behind each score, and how it was obtained"
-                >
-                  {formatSample(outcome)}
-                  {(() => {
-                    // The M2-14 chip marks exactly the outcomes the shared
-                    // advisory flags; it never hides or re-ranks a row.
-                    const advisory = nAdvisory(outcome);
-                    return advisory ? (
-                      <span
-                        className="studio-pill"
-                        data-testid={`advisory-${outcome.id}`}
-                        title={advisory.message}
-                        style={{
-                          marginLeft: 6,
-                          background: "rgba(251, 191, 36, 0.15)",
-                          color: "var(--studio-amber)",
-                          fontSize: "0.68rem",
-                        }}
-                      >
-                        n&lt;{advisory.threshold}
-                      </span>
-                    ) : null;
-                  })()}
-                </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
                   <span
                     className="studio-pill"
@@ -1013,6 +974,9 @@ function OpportunityTableView({
                   >
                     {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : "Not scored"}
                   </span>
+                </td>
+                <td style={{ padding: "10px 14px", color: "var(--studio-muted)", fontSize: "0.82rem" }}>
+                  {formatAdvances(outcome)}
                 </td>
               </tr>
             );

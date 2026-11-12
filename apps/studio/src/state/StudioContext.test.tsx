@@ -73,6 +73,7 @@ let releaseChat: (() => void) | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
 let llmUnhealthy = false;
+let llmTransportFails = false;
 let signalFetches = 0;
 let configHangs = false;
 let configAborts = 0;
@@ -350,6 +351,14 @@ function route(
   }
   if (url === "/api/health/llm") {
     llmHealthFetches += 1;
+    // A dead proxy: the request never reaches a model, so nothing answers. The
+    // 502 with a non-sidecar body is what the studio reads as a transport failure.
+    if (llmTransportFails) {
+      return new Response(JSON.stringify({ detail: "bad gateway" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return json(
       llmUnhealthy
         ? { healthy: false, message: "connection refused" }
@@ -377,6 +386,7 @@ describe("StudioContext memory and resume", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -743,6 +753,7 @@ describe("StudioContext failures", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -858,6 +869,7 @@ describe("StudioContext first run in a browser with no server", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     configAborts = 0;
     catalogFetches = 0;
     featuredFetches = 0;
@@ -1043,6 +1055,63 @@ describe("StudioContext first run in a browser with no server", () => {
     });
     expect(result.current.llmHealth.healthy).toBe(false);
   });
+
+  it("stops probing a dead endpoint and counts down to the next try (#536)", async () => {
+    // A proxy that answers 502 is dead, not flaky: after three transport failures
+    // the breaker opens, the scheduled probe stops spending requests, and the
+    // status the bar reads turns into a countdown.
+    llmTransportFails = true;
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // Step until the breaker opens, so the assertion below sits at the start of a
+    // fresh window rather than somewhere unknown inside it.
+    for (let i = 0; i < 300 && result.current.probeRetry.state !== "open"; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+    }
+    expect(result.current.probeRetry.state).toBe("open");
+    expect(result.current.probeRetry.retryInMs).toBeGreaterThan(0);
+    const spent = llmHealthFetches;
+
+    // Well inside the window the cadence keeps ticking, but the breaker forbids
+    // every request, so nothing is spent.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(result.current.probeRetry.state).toBe("open");
+    expect(llmHealthFetches).toBe(spent);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  });
+
+  it("lets a person asking through an open breaker (#536)", async () => {
+    llmTransportFails = true;
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200_000);
+    });
+    expect(result.current.probeRetry.state).toBe("open");
+    const spent = llmHealthFetches;
+
+    // "Check now" is the person overruling the breaker: it resets and probes.
+    await act(async () => {
+      await result.current.checkConnections();
+    });
+    expect(llmHealthFetches).toBeGreaterThan(spent);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  });
+
 
   it("asks the browser for idle time, and gives it up when the person types", async () => {
     // The branch every real browser takes — jsdom has no requestIdleCallback, so the
@@ -1380,6 +1449,7 @@ describe("StudioContext on a desktop install whose model is down", () => {
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
@@ -1435,6 +1505,7 @@ describe("StudioContext probe scheduling", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.useFakeTimers();
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
@@ -1684,6 +1755,7 @@ describe("StudioContext theme", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
@@ -1803,6 +1875,7 @@ describe("StudioContext canvas state", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -1854,6 +1927,7 @@ describe("StudioContext stopped turns", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -1896,6 +1970,7 @@ describe("StudioContext write approval and branches", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -1990,6 +2065,7 @@ describe("StudioContext boot failure", () => {
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal(
       "fetch",
@@ -2064,6 +2140,7 @@ describe("StudioContext startNewThread (#319)", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -2465,6 +2542,7 @@ describe("StudioContext agent focus", () => {
     canvasFails = false;
     canvasRecords = {};
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];

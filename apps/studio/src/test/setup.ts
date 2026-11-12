@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { beforeEach } from "vitest";
 
 // assistant-ui's viewport measures the scroll container. jsdom has no layout,
 // so the observer only needs to exist and to be inert.
@@ -63,3 +64,10 @@ if (typeof globalThis.ResizeObserver === "undefined") {
     writable: true,
   });
 }
+
+// The studio reads the address bar on boot. A test is a page load, so each one
+// starts at the home address instead of inheriting a deep link from the test
+// before it.
+beforeEach(() => {
+  window.history.replaceState({}, "", "/");
+});
