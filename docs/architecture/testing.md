@@ -1,21 +1,22 @@
 # Testing
 
-## Tiers
+## Tiers (pre-PR)
+See [`.agents/workflows/test.md`](../../.agents/workflows/test.md):
+- `--changed` — PR bar (fast gate on touched files)
+- `--default` — adds `mypy` and `vitest` for touched areas
+- `--full` — CI's responsibility (full matrix)
 
-There are three tiers of verification, named in
-[`.agents/workflows/test.md`](../.agents/workflows/test.md):
-
-| Tier | What it runs | Who runs it |
-|---|---|---|
-| **Fast** | pytest on the changed packages, ruff on the changed files | anyone who wants a quick answer |
-| **Default** | the fast tier, plus type checking, plus the studio units | **the bar for opening a PR** |
-| **Full** | the default tier, plus the studio build, plus the browser e2e suite | CI |
+```bash
+uv run python scripts/verify.py --changed
+uv run python scripts/verify.py --default
+uv run python scripts/verify.py --full
+```
 
 The full tier is CI's responsibility and is not asked of anyone before they
-open a pull request. The commands below are the default tier; the fast tier
-is pytest on the changed packages plus `uv run ruff check .`.
+open a pull request. The commands below are the manual equivalent of the
+default tier.
 
-## Commands
+## Commands (reference)
 
 ```bash
 uv run pytest                       # all packages + root contract/launcher tests
@@ -28,7 +29,7 @@ uv run bandit -c pyproject.toml -r apps packages
 uv run bandit -c pyproject.toml -r website/
 ```
 
-The root `pyproject.toml` owns pytest, coverage, ruff, mypy, and bandit configuration. There is no per-package test configuration to keep in sync.
+The root `pyproject.toml` owns pytest, coverage, ruff, mypy, and bandit configuration. There is no per-package test configuration to keep in sync. Coverage floor is enforced in CI (`fail_under = 89`).
 
 ## Layout
 
@@ -131,6 +132,7 @@ Checks that span the workspace rather than one distribution:
 - `tests/contract/test_cli_contract.py` — the CLI local-handler keys are a subset of `TOOL_NAMES`.
 - `tests/test_architecture.py` — the package diagram in the [architecture index](README.md#dependency-direction), the `[project] dependencies` each member declares, and the imports the source actually contains must all agree. It also checks the four groups inside `packages/core`: persistence imports no methodology, and every core module belongs to exactly one group ([the layer table](README.md#inside-packagescore)).
 - `tests/test_worker_security_headers.py` — the Living Studio Worker sends its security headers.
+- `tests/test_worker_error_origin.py` — every Worker-generated failure body carries `origin: "proxy"`, and no failure path bypasses the one factory.
 - `tests/scripts/test_dev.py`, `test_dev_main.py` — `scripts/dev.py` startup, ports, signals, and shutdown.
 - `tests/scripts/test_doc_check.py` — documentation drift: commands, paths, routes, env vars, and README layout.
 - `tests/scripts/test_assistant_ui_ledger.py` — the assistant-ui ledger (issue #429): adopted rows cite a merged delivery and name an existing file, counts and the Living Studio projection match the rows.
@@ -301,9 +303,14 @@ test suites, so a regression turns the build red without a separate command:
   structural statement, not WCAG conformance and not a screen-reader
   certification — that evidence is ALH-252's to collect.
 
-Reduced motion is honoured globally in `theme.css` (`@media
-(prefers-reduced-motion: reduce)` collapses animations, transitions, and
-`scroll-behavior`), so new components inherit it without opting in.
+Reduced motion is honoured globally in `theme.css`: `@media
+(prefers-reduced-motion: reduce)` collapses the `--motion-*` duration tokens to
+`0ms` and turns off `scroll-behavior`, so a new rule inherits it by reading a
+token instead of opting in. Motion driven from JavaScript reads
+`useReducedMotion()` (`src/lib/useReducedMotion.ts`), which follows a change
+without a reload. The budget is asserted in `src/styles/motion.test.ts`: every
+duration outside the token block must be a token, exactly one reduced-motion
+rule exists, and only the thinking dots and the streaming caret loop.
 
 ### Contrast as a build gate
 

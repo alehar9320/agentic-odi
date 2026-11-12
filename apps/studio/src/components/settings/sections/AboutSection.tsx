@@ -3,6 +3,7 @@ import { useState } from "react";
 import { fetchDiagnostics } from "../../../api/studioApi";
 import type { SidecarDiagnostics } from "../../../api/studioApi";
 import type { Capability } from "../../../bff/capabilities/registry";
+import { runtimeFacts } from "../../../bridge/runtime";
 import {
   createDiagnosticsBundle,
   diagnosticsEntryCount,
@@ -23,6 +24,17 @@ const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
   unknown: "Desktop",
 };
 
+/**
+ * One honest line for a support thread: which host, how it reaches home, and
+ * whether the offline shell is on. No URL and no key — this is the same fact
+ * set the diagnostics bundle carries (#800).
+ */
+function runtimeLine(facts: ReturnType<typeof runtimeFacts>): string {
+  const origin = facts.originClass === "loopback" ? "on this device" : "remote";
+  const shell = facts.offlineShell ? "offline shell on" : "offline shell off";
+  return `${facts.label} · ${origin} · ${shell}`;
+}
+
 interface AboutSectionProps {
   settings: StudioConfig;
   capabilities: Capability[];
@@ -37,6 +49,7 @@ export function AboutSection({ settings, capabilities }: AboutSectionProps) {
   const service = useUpdateService();
   const snapshot = useUpdateSnapshot();
   const platform = detectPlatform();
+  const facts = runtimeFacts();
   const label = versionLabel(snapshot.currentVersion);
   const [diagnosticsJson, setDiagnosticsJson] = useState<string | null>(null);
 
@@ -67,6 +80,14 @@ export function AboutSection({ settings, capabilities }: AboutSectionProps) {
       engine,
       capabilities,
       apiKey: settings.api_key,
+      runtime: {
+        host: facts.host,
+        install: facts.install,
+        originClass: facts.originClass,
+        apiTransport: facts.apiTransport,
+        offlineShell: facts.offlineShell,
+        platform: facts.platform,
+      },
     });
     setDiagnosticsJson(JSON.stringify(bundle, null, 2));
   }
@@ -82,6 +103,8 @@ export function AboutSection({ settings, capabilities }: AboutSectionProps) {
         <dd>v{label.version}</dd>
         <dt>Build</dt>
         <dd>{__STUDIO_BUILD_DATE__}</dd>
+        <dt>Runtime</dt>
+        <dd>{runtimeLine(facts)}</dd>
         <dt>Platform</dt>
         <dd>{PLATFORM_LABELS[platform]}</dd>
         <dt>Updates</dt>
