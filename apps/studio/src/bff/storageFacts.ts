@@ -29,6 +29,7 @@ export interface KeyFacts {
 
 /** Every key the app writes, read from the writers rather than from memory. */
 export const APP_STORAGE_KEYS: readonly string[] = [
+  "agentic-odi.briefing.dismissed",
   "agentic-odi.changelog.read",
   "agentic-odi.evidence-order",
   "studio.brief",

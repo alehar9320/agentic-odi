@@ -3091,6 +3091,64 @@ button.message__tag:hover {
   color: var(--accent);
 }
 
+.briefing-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%);
+  border-color: rgba(139, 140, 248, 0.22);
+}
+
+.briefing-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.briefing-card__time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.briefing-card__items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.briefing-card__item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.briefing-card__link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.briefing-card__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.briefing-card__text {
+  color: var(--text);
+}
+
+.briefing-card__empty {
+  color: var(--muted);
+  margin: 12px 0 0;
+}
+
 .catchup-empty {
   text-align: center;
   padding: 32px 16px;

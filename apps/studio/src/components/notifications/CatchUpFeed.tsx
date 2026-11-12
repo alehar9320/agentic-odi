@@ -5,6 +5,7 @@ import { useStudio } from "../../state/StudioContext";
 import type { Signal, SignalKind, SignalSeverity } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import { StatusDot } from "../status/StatusDot";
+import { BriefingCard } from "./BriefingCard";
 import {
   BoltIcon,
   CheckIcon,
@@ -94,6 +95,8 @@ export function CatchUpFeed() {
 
   return (
     <div className="stack catchup-feed" role="region" aria-label="Signal inbox">
+      <BriefingCard />
+
       <section className="catchup-summary card" aria-label="Summary while you were away">
         <div className="card__head">
           <div>

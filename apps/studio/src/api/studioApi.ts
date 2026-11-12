@@ -4,6 +4,7 @@ import type {
   AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
+  Briefing,
   CanvasData,
   ChangelogData,
   ChatStreamRequest,
@@ -662,6 +663,27 @@ export async function fetchSignals(
     params.set("limit", String(options.limit));
   }
   return getJson<Signal[]>(`/api/signals?${params.toString()}`);
+}
+
+/**
+ * The latest finished run's briefing, or null when no run has ever finished.
+ *
+ * The route answers 204 for "none yet", which is not an error, so this reads
+ * the response directly rather than going through `getJson`.
+ */
+export async function fetchLatestBriefing(): Promise<Briefing | null> {
+  const response = await fetch(apiUrl("/api/briefings/latest"), {
+    headers: { Accept: "application/json", ...authHeaders() },
+  });
+  if (response.status === 204) {
+    return null;
+  }
+  if (!response.ok) {
+    const error = await studioError(response);
+    recordStudioError(error.error, "/api/briefings/latest");
+    throw error;
+  }
+  return (await response.json()) as Briefing;
 }
 
 export async function fetchUnreadSignalCount(mcpUrl: string): Promise<number> {

@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from agentic_odi_core.briefing import Briefing
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
@@ -37,10 +38,12 @@ from agentic_odi_core.repository import (
 )
 
 #: Writes that are derived from the store rather than inputs to it. Their own
-#: revision must not make a later derivation look stale. Signals are facts
-#: *about* the store, and segmentation reads jobs, steps, and outcomes — never
-#: signals — so recording one is not an input a later derivation would read.
-_DERIVED_EVENT_TYPES = frozenset(
+#: revision must not make a later derivation look stale. A briefing is a
+#: derived read-model of a finished run: persisting it must not make
+#: previously derived records appear stale. Signals are facts *about* the
+#: store, and segmentation reads jobs, steps, and outcomes — never signals —
+#: so recording one is not an input a later derivation would read.
+_DERIVED_EVENT_TYPES: frozenset[str] = frozenset(
     {
         "SEGMENT_CREATED",
         "SEGMENT_UPDATED",
@@ -49,6 +52,7 @@ _DERIVED_EVENT_TYPES = frozenset(
         "SIGNAL_CREATED",
         "SIGNAL_READ",
         "SIGNAL_DISMISSED",
+        "BRIEFING_WRITTEN",
     }
 )
 
@@ -83,6 +87,7 @@ class SQLiteRepository(Repository):
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        self.briefings: dict[str, Briefing] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
         self.v2mom: dict[str, V2MOM] = {}
@@ -190,6 +195,9 @@ class SQLiteRepository(Repository):
             self._merge_updates(self.signals, p, Signal)
         elif et == "SIGNAL_DISMISSED":
             self._merge_updates(self.signals, p, Signal)
+        elif et == "BRIEFING_WRITTEN":
+            briefing = Briefing.from_dict(p)
+            self.briefings[briefing.run_id] = briefing
         elif et == "SEGMENT_CREATED":
             self.segments[p["id"]] = Segment.model_validate(p)
         elif et == "SEGMENT_UPDATED":
@@ -743,6 +751,32 @@ class SQLiteRepository(Repository):
                 self._sync()
                 return True
             return False
+
+    def add_briefing(self, briefing: Briefing) -> Briefing:
+        with self._lock:
+            self.store.append(
+                "BRIEFING_WRITTEN",
+                briefing.to_dict(),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            #: A briefing is a derived event: record it durably and keep memory
+            #: current without advancing the store's revision, so persisting a
+            #: briefing cannot make existing derived records appear stale.
+            self.briefings[briefing.run_id] = briefing
+            return briefing
+
+    def get_latest_briefing(self) -> Briefing | None:
+        with self._lock:
+            self._sync()
+            if not self.briefings:
+                return None
+            return max(self.briefings.values(), key=lambda item: item.created_at)
+
+    def list_briefings(self) -> list[Briefing]:
+        with self._lock:
+            self._sync()
+            return sorted(self.briefings.values(), key=lambda item: item.created_at)
 
     def add_segment(self, segment: Segment) -> Segment:
         with self._lock:

@@ -558,3 +558,20 @@ class SharedArtifactResponse(BaseModel):
     artifact_kind: str
     artifact: dict[str, Any]
     evidence: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class BriefingItemOut(BaseModel):
+    """One briefing line and the coordinates of the record behind it."""
+
+    kind: Literal["added", "changed", "failed"]
+    text: str
+    record_id: str
+    record_kind: str
+
+
+class BriefingResponse(BaseModel):
+    """The latest run's briefing. An empty ``items`` list is a real briefing."""
+
+    run_id: str
+    created_at: str
+    items: list[BriefingItemOut] = Field(default_factory=list)

@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
+from agentic_odi_core.briefing import Briefing
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
@@ -27,6 +28,12 @@ _Item = TypeVar("_Item")
 #: A workspace has exactly one V2MOM, and the model carries no id, so the store
 #: keys it by this constant rather than a generated one.
 V2MOM_ID = "v2mom"
+
+#: Event types that describe a stored write but do not advance the input
+#: revision. A briefing is a derived read-model of a finished run: persisting
+#: it must not make previously derived records appear stale, and replaying the
+#: log must rebuild briefings without re-numbering the real changes.
+_DERIVED_EVENT_TYPES: frozenset[str] = frozenset({"BRIEFING_WRITTEN"})
 
 
 def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
@@ -200,6 +207,9 @@ class Repository(Protocol):
     ) -> list[ScheduledWork]: ...
     def update_scheduled_work(self, work_id: str, updates: dict) -> ScheduledWork | None: ...
     def delete_scheduled_work(self, work_id: str) -> bool: ...
+    def add_briefing(self, briefing: Briefing) -> Briefing: ...
+    def get_latest_briefing(self) -> Briefing | None: ...
+    def list_briefings(self) -> list[Briefing]: ...
     def add_segment(self, segment: Segment) -> Segment: ...
     def get_segment(self, segment_id: str) -> Segment | None: ...
     def list_segments(self, job_id: str | None = None) -> list[Segment]: ...
@@ -243,6 +253,9 @@ class InMemoryRepository:
         self.evidence: dict[str, Evidence] = {}
         self.signals: dict[str, Signal] = {}
         self.scheduled_work: dict[str, ScheduledWork] = {}
+        #: Keyed by run id: a rerun of the same run replaces its own briefing
+        #: instead of leaving two behind.
+        self.briefings: dict[str, Briefing] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
         #: The store holds one vision; it is keyed by a fixed name rather than a
@@ -630,6 +643,21 @@ class InMemoryRepository:
             return True
         return False
 
+    def add_briefing(self, briefing: Briefing) -> Briefing:
+        #: A briefing is a derived event: it records what a finished run
+        #: produced without advancing the store's revision, so persisting it
+        #: cannot make existing derived records appear stale.
+        self.briefings[briefing.run_id] = briefing
+        return briefing
+
+    def get_latest_briefing(self) -> Briefing | None:
+        if not self.briefings:
+            return None
+        return max(self.briefings.values(), key=lambda item: item.created_at)
+
+    def list_briefings(self) -> list[Briefing]:
+        return sorted(self.briefings.values(), key=lambda item: item.created_at)
+
     def add_segment(self, segment: Segment) -> Segment:
         self._append_derived_event()
         self.segments[segment.id] = segment
@@ -724,6 +752,7 @@ class InMemoryRepository:
         self.customer_outcomes.clear()
         self.evidence.clear()
         self.signals.clear()
+        self.briefings.clear()
         self.segments.clear()
         self.strategies.clear()
         self.v2mom.clear()

@@ -59,6 +59,7 @@ const api = vi.hoisted(() => ({
   fetchUnreadSignalCount: vi.fn(async () => 0),
   markSignalRead: vi.fn(async () => ({ id: "sig-1" })),
   dismissSignal: vi.fn(async () => ({ id: "sig-1" })),
+  fetchLatestBriefing: vi.fn(async () => null),
 }));
 
 vi.mock("../../api/studioApi", () => api);

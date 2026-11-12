@@ -521,6 +521,12 @@ export interface StudioContextValue {
   focusSignalSubject: (signal: Signal) => void;
   /** Point the studio at a subject and remember it for the next visit. */
   focusSubject: (kind: SignalSubjectKind, id: string) => void;
+  /**
+   * The one open-record path: focus a record and open the lens that shows it.
+   * Every surface that names a record goes through here rather than inventing a
+   * second navigation mechanism.
+   */
+  openRecord: (kind: SignalSubjectKind, id: string) => void;
   /** Stop speaking for the screen: forget the selection and the next visit's. */
   clearFocus: () => void;
   focusedSubject: FocusSubject | null;
@@ -1606,6 +1612,30 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * The one open-record path: focus the record and open the lens that shows it.
+   * A signal card and a briefing line both land here.
+   */
+  const openRecord = useCallback(
+    (kind: SignalSubjectKind, id: string) => {
+      // Evidence is focused straight on its id via the state setter (declared
+      // above this callback) instead of `focusEvidence`, which is defined later
+      // and would hit the temporal dead zone. Other subjects go through the
+      // shared focus-subject path.
+      if (kind === "evidence") {
+        setFocusedEvidenceId(id);
+        openPanel("evidence");
+        return;
+      }
+      focusSubject(kind, id);
+      const panel = PANEL_FOR_SUBJECT[kind];
+      if (panel) {
+        openPanel(panel);
+      }
+    },
+    [focusSubject, openPanel, setFocusedEvidenceId],
+  );
+
+  /**
    * What a card does when activated: read the signal, then take the person to
    * the record it names. This is the job `targetId` never did.
    */
@@ -1619,13 +1649,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       if (!kind || !id) {
         return;
       }
-      focusSubject(kind, id);
-      const panel = PANEL_FOR_SUBJECT[kind];
-      if (panel) {
-        openPanel(panel);
-      }
+      openRecord(kind, id);
     },
-    [markSignalAsRead, openPanel, focusSubject],
+    [markSignalAsRead, openRecord],
   );
 
   /**
@@ -2771,6 +2797,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       dismissSignal,
       focusSignalSubject,
       focusSubject,
+      openRecord,
       clearFocus,
       focusedSubject,
       focusedSubjectLabel,
@@ -2904,6 +2931,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       focusSignalSubject,
       focusSubject,
       clearFocus,
+      openRecord,
       focusedSubject,
       focusedSubjectLabel,
       revealFocusedSubject,

@@ -11,6 +11,7 @@ from typing import Any, TypeVar
 
 from pydantic import ValidationError as PydanticValidationError
 
+from agentic_odi_core.briefing import Briefing, RunChange, RunResult, build_briefing
 from agentic_odi_core.errors import NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
@@ -1106,6 +1107,52 @@ class ODIService:
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
         return updated
+
+    def complete_scheduled_work(
+        self, work_id: str, changes: list[RunChange] | None = None
+    ) -> Briefing:
+        """Mark a run finished and write the briefing a person reads in the morning.
+
+        This is the completion point: it flips the run to ``completed`` and
+        stores exactly one briefing for that run. A rerun of the same work id
+        replaces its own briefing instead of leaving two behind, and a run that
+        produced no structured changes stores an honestly empty briefing rather
+        than inventing a line.
+
+        The briefing is keyed by a separate *execution id*, not by the recurring
+        work id: retries of one execution reuse the stored id, while each
+        distinct execution gets a fresh one. That keeps reruns from collapsing
+        into a single ``run_id`` and losing their own briefing.
+        """
+        work = self.repo.get_scheduled_work(work_id)
+        if work is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        now = datetime.now(timezone.utc)
+        # A separate execution id identifies this run distinctly from the
+        # recurring work id. Retries of one execution reuse the stored id; a
+        # new execution gets a fresh one.
+        execution_id = (work.payload or {}).get("execution_id") or str(uuid.uuid4())
+        payload = dict(work.payload or {})
+        payload["execution_id"] = execution_id
+        # Build and validate the briefing before flipping the run to COMPLETED so
+        # a bad change can never leave a completed run without a briefing.
+        result = RunResult(run_id=execution_id, changes=tuple(changes or ()), created_at=now)
+        briefing = build_briefing(result)
+        updated = self.repo.update_scheduled_work(
+            work_id,
+            {
+                "status": ScheduledWorkStatus.COMPLETED,
+                "last_run_at": now.isoformat(),
+                "payload": payload,
+            },
+        )
+        if updated is None:
+            raise ScheduledWorkNotFoundError(work_id)
+        self.repo.add_briefing(briefing)
+        return briefing
+
+    def get_latest_briefing(self) -> Briefing | None:
+        return self.repo.get_latest_briefing()
 
     # -- Stage 5: outcome-based segments -------------------------------------
 

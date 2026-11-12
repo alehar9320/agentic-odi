@@ -38,8 +38,8 @@ from agentic_odi_core import (
 )
 from agentic_odi_core.funnel import count_reset, read_counts
 from agentic_odi_core.remote import StudioError, StudioErrorCode
-from fastapi import APIRouter, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Query, Request, Response
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 
 from agentic_odi_studio_api.studio.approvals import (
@@ -77,6 +77,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
     ApproveProposalRequest,
+    BriefingResponse,
     CapabilitiesResponse,
     CapabilityItem,
     ChatRequest,
@@ -842,6 +843,25 @@ async def post_signal_dismiss(
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return signal.model_dump(mode="json")
+
+
+@router.get(
+    "/briefings/latest",
+    response_model=BriefingResponse,
+    responses={204: {"description": "No run has ever finished"}},
+)
+async def get_latest_briefing(request: Request) -> Response:
+    """The latest run's briefing, or 204 when no run has ever finished.
+
+    A briefing lives in the local store the completion point wrote it to; there
+    is no MCP tool for it, so this reads the local service under both backends.
+    An empty ``items`` list is a real briefing — the honest "nothing changed" —
+    and is returned as 200, not 204.
+    """
+    briefing = _service(request).get_latest_briefing()
+    if briefing is None:
+        return Response(status_code=204)
+    return JSONResponse(BriefingResponse(**briefing.to_dict()).model_dump(mode="json"))
 
 
 @router.get("/segments", response_model=list[dict[str, Any]])
