@@ -21,6 +21,7 @@ import type { ChatMessage } from "../types";
 import { createAttachmentAdapter, preparedAttachments } from "./attachments";
 import { textOf, toThreadMessageLike } from "./convert";
 import { createDictationAdapter } from "./dictation";
+import { toThreadData } from "./threadList";
 import { textWithQuote, type ComposerQuote } from "./quote";
 import { createSpeechAdapter } from "./speech";
 
@@ -143,6 +144,10 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
     respondToApproval,
     stopStreaming,
     queue,
+    conversationId,
+    conversations,
+    startNewThread,
+    openConversation,
   } = useStudio();
 
   const attachments = useMemo(() => createAttachmentAdapter(), []);
@@ -158,6 +163,23 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
     [jobCount, outcomeCount],
   );
 
+  const threadList = useMemo(
+    () => ({
+      threadId: conversationId ?? undefined,
+      threads: toThreadData(conversations),
+      onSwitchToNewThread: () => {
+        const handle = startNewThread();
+        if (handle) {
+          handle.commit();
+        }
+      },
+      onSwitchToThread: async (threadId: string) => {
+        await openConversation(threadId);
+      },
+    }),
+    [conversationId, conversations, startNewThread, openConversation],
+  );
+
   const runtime = useExternalStoreRuntime<ChatMessage>({
     isRunning: streaming,
     messages,
@@ -170,6 +192,7 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
       attachments,
       ...(dictation ? { dictation } : {}),
       ...(speech ? { speech } : {}),
+      threadList,
     },
     onNew: async (message) => {
       // assistant-ui attaches the composer quote as message metadata. The turn
