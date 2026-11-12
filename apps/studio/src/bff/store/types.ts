@@ -56,6 +56,19 @@ export interface StoredTurn extends ConversationTurn {
   parent_id: string | null;
 }
 
+export type NoticeSeverity = "info" | "success" | "warning" | "critical";
+
+export interface StoredNotice {
+  id: string;
+  severity: NoticeSeverity;
+  title: string;
+  detail: string;
+  context: string | null;
+  at: string;
+  read: boolean;
+  dismissed: boolean;
+}
+
 export type OutboxKind = "create" | "update" | "delete";
 export type OutboxEntity = "job" | "step" | "outcome" | "evidence";
 export type OutboxState =
@@ -186,6 +199,16 @@ export interface LocalStore {
   /** Replace every stored workspace record with the imported snapshot. */
   restore(snapshot: WorkspaceSnapshot): Promise<void>;
   clearAll(): Promise<void>;
+  /** Every notice, newest first. */
+  listNotices(): Promise<StoredNotice[]>;
+  /** Get one notice by id. */
+  getNotice(id: string): Promise<StoredNotice | undefined>;
+  /** Upsert one notice. */
+  putNotice(notice: StoredNotice): Promise<void>;
+  /** Remove one notice permanently. */
+  deleteNotice(id: string): Promise<void>;
+  /** Mark every notice as read. */
+  markAllRead(): Promise<void>;
   close(): void;
 }
 

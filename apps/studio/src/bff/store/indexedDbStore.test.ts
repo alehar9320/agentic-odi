@@ -449,6 +449,12 @@ function expectedSchema() {
       indexes: [],
     },
     {
+      store: "notices",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-at"],
+    },
+    {
       store: "observations",
       keyPath: "id",
       autoIncrement: false,
