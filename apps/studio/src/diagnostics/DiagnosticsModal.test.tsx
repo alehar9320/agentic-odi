@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
@@ -108,6 +108,22 @@ describe("DiagnosticsModal", () => {
     expect(modalProps.onClose).toHaveBeenCalledOnce();
   });
 
+  it("takes the page behind the dialog out of reach while it is open", () => {
+    const { unmount } = render(
+      <div className="studio-app">
+        <DiagnosticsModal {...modalProps} />
+      </div>,
+    );
+
+    const shell = document.querySelector(".studio-app");
+    expect(shell).toHaveAttribute("inert");
+    // The dialog sits outside the inert shell, so it stays reachable.
+    expect(shell?.contains(screen.getByRole("dialog"))).toBe(false);
+
+    unmount();
+    expect(shell).not.toHaveAttribute("inert");
+  });
+
   it("creates a local JSON download only when Save is pressed", () => {
     const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:diagnostics");
     const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
@@ -120,6 +136,33 @@ describe("DiagnosticsModal", () => {
     expect(create).toHaveBeenCalledOnce();
     expect(revoke).toHaveBeenCalledWith("blob:diagnostics");
     expect(click).toHaveBeenCalledOnce();
+  });
+
+  it("clears the copy confirmation after two seconds", async () => {
+    vi.useFakeTimers();
+    const write = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: write },
+    });
+    render(<DiagnosticsModal {...modalProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Diagnostics copied.")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1999);
+    });
+    expect(screen.getByText("Diagnostics copied.")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByText("Diagnostics copied.")).toBeNull();
+    vi.useRealTimers();
   });
 
   it("still prepares a local bundle when the sidecar is unavailable", async () => {
@@ -143,7 +186,9 @@ describe("DiagnosticsModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create diagnostics bundle" }));
 
     expect(await screen.findByRole("dialog", { name: "Review diagnostics" })).toBeInTheDocument();
-    expect(calls).toEqual(["/api/diagnostics"]);
+    // The bundle is prepared from the diagnostics route; the key control's
+    // mount-time state read is not a diagnostics call.
+    expect(calls.filter((url) => url === "/api/diagnostics")).toEqual(["/api/diagnostics"]);
     expect(screen.getByText(/sidecar is unavailable/i)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Exact diagnostics JSON preview" })).toHaveTextContent('"engine": null');
     expect(calls.every((url) => url.startsWith("/api/"))).toBe(true);
@@ -177,11 +222,13 @@ describe("DiagnosticsModal", () => {
       </UpdateProvider>,
     );
 
-    expect(calls).toEqual([]);
+    // The key control reads whether a key is set on mount; that is not a
+    // diagnostics request, so the consent gate is measured against diagnostics.
+    expect(calls.filter((url) => url === "/api/diagnostics")).toEqual([]);
     fireEvent.click(screen.getByRole("button", { name: "Create diagnostics bundle" }));
 
     expect(await screen.findByRole("dialog", { name: "Review diagnostics" })).toBeInTheDocument();
-    await waitFor(() => expect(calls).toEqual(["/api/diagnostics"]));
+    await waitFor(() => expect(calls).toContain("/api/diagnostics"));
     expect(calls.every((url) => url.startsWith("/api/"))).toBe(true);
     expect(screen.getByRole("region", { name: "Exact diagnostics JSON preview" })).not.toHaveTextContent("local-secret");
   });

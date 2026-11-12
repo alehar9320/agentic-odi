@@ -58,6 +58,11 @@ export class StudioApiError extends Error {
 /** Network or sidecar-proxy failures are transport failures; application errors are not. */
 export function isTransportFailure(error: unknown): boolean {
   if (error instanceof StudioApiError) {
+    // A Worker-generated failure says so with `origin: "proxy"`; a sidecar's
+    // own structured 502 keeps `fromSidecar` and stays an application error.
+    if (error.error.origin === "proxy") {
+      return true;
+    }
     return (
       (error.status === 502 || error.status === 503 || error.status === 504) &&
       !error.fromSidecar
@@ -208,6 +213,21 @@ async function studioError(response: Response): Promise<StudioApiError> {
   return new StudioApiError(described, response.status, false);
 }
 
+/**
+ * A static host answers an unknown `/api` route with the SPA shell and status
+ * 200, so `response.ok` alone cannot tell a payload from an HTML document.
+ * Anything that came back as HTML is transport, not an answer: throwing a
+ * `TypeError` sends it down the same fallback path as a dropped connection.
+ * A missing content type is accepted, because only an explicit HTML header
+ * proves the response was not the API's.
+ */
+function ensureApiPayload(response: Response): void {
+  const contentType = response.headers.get("Content-Type");
+  if (contentType && contentType.toLowerCase().includes("text/html")) {
+    throw new TypeError(`Expected an API payload, got ${contentType}`);
+  }
+}
+
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(apiUrl(path), {
     headers: { Accept: "application/json", ...authHeaders() },
@@ -218,6 +238,7 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     recordStudioError(error.error, path);
     throw error;
   }
+  ensureApiPayload(response);
   return (await response.json()) as T;
 }
 
@@ -232,6 +253,7 @@ async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown
     recordStudioError(error.error, path);
     throw error;
   }
+  ensureApiPayload(response);
   return (await response.json()) as T;
 }
 
@@ -249,6 +271,7 @@ async function deleteJson<T>(path: string): Promise<T> {
     recordStudioError(error.error, path);
     throw error;
   }
+  ensureApiPayload(response);
   return (await response.json()) as T;
 }
 
@@ -315,6 +338,32 @@ export async function fetchConfig(): Promise<StudioConfig> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Whether the sidecar holds a model key, and when it was set. Never the value. */
+export interface ModelKeyStatus {
+  configured: boolean;
+  set_at: string | null;
+}
+
+export function fetchModelKeyStatus(): Promise<ModelKeyStatus> {
+  return getJson<ModelKeyStatus>("/api/settings/model-key");
+}
+
+/** Store a model key once. The response reports its state, not its value. */
+export async function saveModelKey(value: string): Promise<ModelKeyStatus> {
+  const response = await fetch(apiUrl("/api/settings/model-key"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
+    body: JSON.stringify({ value }),
+  });
+  if (!response.ok) {
+    const error = await studioError(response);
+    recordStudioError(error.error, "/api/settings/model-key");
+    throw error;
+  }
+  ensureApiPayload(response);
+  return (await response.json()) as ModelKeyStatus;
 }
 
 export interface SidecarDiagnostics {
@@ -593,6 +642,8 @@ export async function streamChat(
     if (!response.ok || !response.body) {
       throw await studioError(response);
     }
+
+    ensureApiPayload(response);
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -877,12 +928,32 @@ export function addEvidence(payload: {
   outcome_id?: string;
   mcp_url: string;
 }): Promise<{ ok: boolean }> {
-  return postJson<{ ok: boolean }>("/api/evidence", payload);
+  return queuedWrite<{ ok: boolean }>(
+    () => postJson<{ ok: boolean }>("/api/evidence", payload),
+    (bff) =>
+      bff
+        .addEvidence({
+          source_name: payload.source_name,
+          source_kind: payload.source_kind,
+          item_type: payload.item_type,
+          name: payload.name,
+          content: payload.content,
+          url: payload.url,
+          job_id: payload.job_id,
+          step_id: payload.step_id,
+          outcome_id: payload.outcome_id,
+        })
+        .then(() => ({ ok: true })),
+  );
 }
 
 export function deleteEvidence(evidenceId: string, mcpUrl: string): Promise<{ ok: boolean }> {
-  return deleteJson<{ ok: boolean }>(
-    `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ ok: boolean }>(
+    () =>
+      deleteJson<{ ok: boolean }>(
+        `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteEvidence(evidenceId).then(() => ({ ok: true })),
   );
 }
 

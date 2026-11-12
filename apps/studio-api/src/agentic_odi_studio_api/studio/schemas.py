@@ -46,6 +46,18 @@ class ModelListRequest(BaseModel):
     api_key: str = ""
 
 
+class ModelKeyRequest(BaseModel):
+    """A model key on its way to the sidecar's write-only store.
+
+    The value travels in the body and is never echoed back: the response to a
+    write reports only whether a key is set and when it was set.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: str = Field(min_length=1)
+
+
 class AddStepRequest(BaseModel):
     mcp_url: str
     job_id: str
@@ -162,23 +174,6 @@ class UpdateCustomerOutcomeRequest(BaseModel):
     customer_value: CustomerValue | None = None
     business_value: BusinessValue | None = None
     step_id: str | None = None
-
-
-class DecideCandidateRequest(BaseModel):
-    """One reviewer decision on a candidate.
-
-    ``status`` is ``accepted`` or ``rejected``. Accepting requires the
-    importance and satisfaction the outcome contract needs; rejecting requires
-    a nonblank ``reason``. Omitting ``status`` edits the statement only.
-    """
-
-    status: Literal["accepted", "rejected"] | None = None
-    statement: str | None = None
-    reason: str | None = None
-    importance: float | None = Field(default=None, ge=1.0, le=10.0)
-    satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
-    step_id: str | None = None
-    mcp_url: str = ""
 
 
 class StudioBrief(BaseModel):

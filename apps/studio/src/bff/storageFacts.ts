@@ -8,7 +8,8 @@ import type { LocalStore } from "./store/types";
  * only a sequence counter, so no write time is stored anywhere to read. `bytes` is the origin's
  * usage as the browser measures it, not this database's share of it, which is why an absent
  * `estimate()` is reported as `unknown` rather than as zero. No value is ever read out of
- * storage here: `studio.settings` holds an API key, and a size costs nothing to show.
+ * storage here: the model key lives in the sidecar's write-only store, not in `studio.settings`,
+ * and a size costs nothing to show.
  */
 
 export type ByteTotal = number | "unknown";
