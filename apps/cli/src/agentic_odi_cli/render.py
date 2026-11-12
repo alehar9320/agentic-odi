@@ -418,6 +418,20 @@ def _verdict(segment: dict[str, Any]) -> str:
     return f"{verdict} (confidence {_num(segment.get('confidence', ''))})"
 
 
+def _freshness(artifact: dict[str, Any]) -> str:
+    """Whether the store has moved on since this was derived.
+
+    ``stale`` is computed when the record is read, so it is absent from a record
+    an older backend returned. That absence reads as "unknown", never "current".
+    """
+    stale = artifact.get("stale")
+    if stale is True:
+        return "stale — re-run"
+    if stale is False:
+        return "current"
+    return "unknown"
+
+
 def render_segment_list(segments: Any, *, as_json: bool) -> str:
     """Render segments as a table where every verdict carries its confidence."""
     if not isinstance(segments, list):
@@ -425,7 +439,7 @@ def render_segment_list(segments: Any, *, as_json: bool) -> str:
     if as_json:
         return _json(segments)
     return _table(
-        ("id", "people", "job_id", "outcomes", "verdict"),
+        ("id", "people", "job_id", "outcomes", "verdict", "freshness"),
         [
             (
                 _cell(item, "id"),
@@ -433,6 +447,7 @@ def render_segment_list(segments: Any, *, as_json: bool) -> str:
                 _cell(item, "job_id"),
                 str(len(item.get("outcome_ids") or [])),
                 _verdict(item),
+                _freshness(item),
             )
             for item in segments
         ],
@@ -457,6 +472,7 @@ def render_segment(segment: Any, *, as_json: bool) -> str:
                     ("inferred", _cell(segment, "people_inferred")),
                     ("job", _cell(segment, "job_statement")),
                     ("verdict", _verdict(segment)),
+                    ("freshness", _freshness(segment)),
                     ("evidence", f"{len(outcome_ids)} outcomes"),
                 ]
             ),
@@ -527,6 +543,7 @@ def render_strategy(strategy: Any, *, as_json: bool) -> str:
                 ("path", _cell(strategy, "kind")),
                 ("segment", _cell(strategy, "segment_id") or "—"),
                 ("bets", str(len(strategy.get("bets") or []))),
+                ("freshness", _freshness(strategy)),
             ]
         ),
         "",
@@ -545,6 +562,66 @@ def render_strategy(strategy: Any, *, as_json: bool) -> str:
         lines.append("")
         lines.append("No rejected paths recorded — this is a conclusion, not a recommendation.")
     return "\n".join(lines)
+
+
+def render_interview(item: Any, *, as_json: bool) -> str:
+    """Render one interview as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("title", item.get("title", "")),
+            ("participant", item.get("participant_label", "")),
+            ("role", item.get("participant_role") or ""),
+            ("job_id", item.get("job_id") or ""),
+            ("conducted_at", item.get("conducted_at") or ""),
+            ("source_kind", item.get("source_kind", "")),
+        ]
+    )
+
+
+def render_interview_list(items: Any, *, as_json: bool) -> str:
+    """Render interviews as an aligned table or JSON."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "title", "participant", "role"),
+        [
+            (
+                str(item.get("id", "")),
+                _truncate(str(item.get("title", ""))),
+                _truncate(str(item.get("participant_label", ""))),
+                _truncate(str(item.get("participant_role") or "")),
+            )
+            for item in items
+        ],
+        empty="No interviews found.",
+    )
+
+
+def render_quote_list(items: Any, *, as_json: bool) -> str:
+    """Render quotes as an aligned table or JSON, with ordinal and speaker."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("#", "speaker", "text"),
+        [
+            (
+                str(item.get("ordinal", "")),
+                _truncate(str(item.get("speaker") or "—"), 18),
+                _truncate(str(item.get("text", ""))),
+            )
+            for item in items
+        ],
+        empty="No quotes found.",
+    )
 
 
 def _when(value: Any) -> str:
@@ -593,4 +670,63 @@ def render_funnel_summary(counts: Any, conversions: Any, *, as_json: bool) -> st
             for name, view in counts.items()
         ],
         empty="Nothing counted yet — this store has no funnel events.",
+    )
+
+
+def render_candidate(item: Any, *, as_json: bool) -> str:
+    """Render one outcome candidate as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("status", item.get("status", "")),
+            ("statement", item.get("statement", "")),
+            ("confidence", item.get("confidence", "")),
+            ("quote_id", item.get("quote_id") or ""),
+            ("rationale", item.get("rationale") or ""),
+            ("outcome_id", item.get("outcome_id") or ""),
+        ]
+    )
+
+
+def render_candidate_list(items: Any, *, as_json: bool) -> str:
+    """Render outcome candidates as an aligned table or JSON."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "status", "statement"),
+        [
+            (
+                str(item.get("id", "")),
+                str(item.get("status", "")),
+                _truncate(str(item.get("statement", ""))),
+            )
+            for item in items
+        ],
+        empty="No outcome candidates found.",
+    )
+
+
+def render_candidate_acceptance(result: Any, *, as_json: bool) -> str:
+    """Render an acceptance: the new outcome, its score, and the evidence quote."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    outcome = result.get("outcome", {})
+    evidence = result.get("evidence", {})
+    return _block(
+        [
+            ("outcome_id", outcome.get("id", "")),
+            ("statement", outcome.get("statement", "")),
+            ("opportunity_score", outcome.get("opportunity_score", "")),
+            ("evidence_id", evidence.get("id", "")),
+            ("evidence_source", evidence.get("source_name", "")),
+            ("quote", evidence.get("content", "")),
+        ]
     )

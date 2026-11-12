@@ -7,7 +7,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import ValidationError as PydanticValidationError
 
@@ -18,6 +18,7 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.freshness import is_stale
 from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
@@ -25,21 +26,26 @@ from agentic_odi_core.mapping import (
     ProposalStatus,
     ProposalStrategy,
 )
+from agentic_odi_core.messages import candidate_reason_required
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     V2MOM,
     BusinessValue,
+    CandidateStatus,
     ClaimCheck,
     ClaimSkip,
     CustomerOutcome,
     CustomerValue,
     Evidence,
     EvidenceItemType,
+    Interview,
+    InterviewQuote,
     Job,
     JobStage,
     Outcome,
     OutcomeAlignment,
+    OutcomeCandidate,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -60,6 +66,7 @@ from agentic_odi_core.segmentation import (
     SegmentationStrategy,
     unclustered_outcomes,
 )
+from agentic_odi_core.similarity import normalize
 from agentic_odi_core.strategy import propose_strategy as build_strategy
 from agentic_odi_core.traceability import (
     Objective,
@@ -68,6 +75,9 @@ from agentic_odi_core.traceability import (
     objective_key,
     objectives_from_v2mom,
 )
+
+#: The two artifacts that carry a derivation stamp and a read-time ``stale`` flag.
+_Artifact = TypeVar("_Artifact", Segment, Strategy)
 
 
 class JobNotFoundError(NotFoundError):
@@ -196,6 +206,24 @@ class SignalBudget:
         if _SEVERITY_RANK[severity] < _SEVERITY_RANK[self.min_severity]:
             return False
         return surfaced_today < self.daily_cap
+
+
+class InterviewNotFoundError(NotFoundError):
+    def __init__(self, interview_id: str) -> None:
+        self.interview_id = interview_id
+        super().__init__(interview_id, "interview")
+
+
+class QuoteNotFoundError(NotFoundError):
+    def __init__(self, quote_id: str) -> None:
+        self.quote_id = quote_id
+        super().__init__(quote_id, "quote")
+
+
+class CandidateNotFoundError(NotFoundError):
+    def __init__(self, candidate_id: str) -> None:
+        self.candidate_id = candidate_id
+        super().__init__(candidate_id, "outcome candidate")
 
 
 class InvalidOutcomeStatementError(OutcomeStatementError):
@@ -827,6 +855,341 @@ class ODIService:
                 "List the stored records with list_evidence() to find a valid id.",
             )
 
+    def add_interview(
+        self,
+        title: str,
+        participant_label: str,
+        job_id: str | None = None,
+        participant_role: str | None = None,
+        conducted_at: str | None = None,
+        source_kind: str = "manual",
+        notes: str | None = None,
+    ) -> Interview:
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        interview = Interview(
+            id=str(uuid.uuid4()),
+            job_id=job_id,
+            title=title,
+            participant_label=participant_label,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+            notes=notes,
+        )
+        return self.repo.add_interview(interview)
+
+    def get_interview(self, interview_id: str) -> Interview | None:
+        return self.repo.get_interview(interview_id)
+
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]:
+        return self.repo.list_interviews(job_id, limit=limit, offset=offset)
+
+    def update_interview(self, interview_id: str, updates: dict[str, Any]) -> Interview:
+        res = self.repo.update_interview(interview_id, updates)
+        if not res:
+            raise InterviewNotFoundError(interview_id)
+        return res
+
+    def delete_interview(self, interview_id: str) -> list[str]:
+        """Delete an interview; return the ids of the quotes removed with it."""
+        if self.repo.get_interview(interview_id) is None:
+            raise InterviewNotFoundError(interview_id)
+        return self.repo.delete_interview(interview_id)
+
+    def add_quote(
+        self,
+        interview_id: str,
+        text: str,
+        speaker: str | None = None,
+        start_ms: int | None = None,
+        end_ms: int | None = None,
+    ) -> InterviewQuote:
+        """Append a quote to an interview.
+
+        The ordinal is assigned here as ``max(ordinal)+1`` within the
+        interview, so two quotes created in the same millisecond still have a
+        deterministic order. A missing interview is rejected before any event
+        is written.
+        """
+        if self.repo.get_interview(interview_id) is None:
+            raise InterviewNotFoundError(interview_id)
+        existing = self.repo.list_quotes(interview_id)
+        next_ordinal = (existing[-1].ordinal + 1) if existing else 0
+        quote = InterviewQuote(
+            id=str(uuid.uuid4()),
+            interview_id=interview_id,
+            speaker=speaker,
+            text=text,
+            ordinal=next_ordinal,
+            start_ms=start_ms,
+            end_ms=end_ms,
+        )
+        return self.repo.add_quote(quote)
+
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
+        return self.repo.list_quotes(interview_id)
+
+    def get_quote(self, quote_id: str) -> InterviewQuote | None:
+        return self.repo.get_quote(quote_id)
+
+    def import_transcript(
+        self,
+        text: str,
+        *,
+        title: str,
+        participant_label: str,
+        filename: str | None = None,
+        fmt: str | None = None,
+        job_id: str | None = None,
+        participant_role: str | None = None,
+        conducted_at: str | None = None,
+        source_kind: str = "transcript",
+    ) -> tuple[Interview, list[InterviewQuote]]:
+        """Parse a transcript, then persist it as one interview.
+
+        The parse is pure and runs first, so a malformed transcript raises
+        before any interview or quote is written — there is no partial state.
+        """
+        from agentic_odi_core.transcript import detect_format, parse_transcript
+
+        resolved = fmt or detect_format(text, filename)
+        turns = parse_transcript(text, resolved)
+        interview = self.add_interview(
+            title=title,
+            participant_label=participant_label,
+            job_id=job_id,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+        )
+        quotes = [
+            self.add_quote(
+                interview.id,
+                turn.text,
+                speaker=turn.speaker,
+                start_ms=turn.start_ms,
+                end_ms=turn.end_ms,
+            )
+            for turn in turns
+        ]
+        return interview, quotes
+
+    def extract_candidates(
+        self,
+        quote_id: str,
+        extractor: Any,
+        stage_hint: str | None = None,
+    ) -> list[OutcomeCandidate]:
+        """Propose candidates from one quote, storing each proposal once.
+
+        Every proposal is validated with :func:`evaluate_outcome_statement`. An
+        invalid one is stored as ``rejected`` with the validator's message in
+        ``rationale`` — the evidence that the extractor is wrong is kept, not
+        hidden. Candidates are keyed on ``(quote_id, normalised_statement)`` so
+        re-running extraction adds nothing and never resets a human decision.
+        No :class:`Outcome` is created here; only a person accepts a candidate.
+        """
+        quote = self.repo.get_quote(quote_id)
+        if quote is None:
+            raise QuoteNotFoundError(quote_id)
+        interview = self.repo.get_interview(quote.interview_id)
+        if interview is None:
+            raise InterviewNotFoundError(quote.interview_id)
+
+        existing = self._candidates_by_key(quote_id)
+        # Validate every proposal before the first write: a malformed payload or
+        # an out-of-range confidence must not leave a partly-written quote.
+        proposals = list(extractor.propose(quote, interview, stage_hint))
+        planned: list[tuple[str, OutcomeCandidate]] = []
+        for proposal in proposals:
+            statement = getattr(proposal, "statement", None)
+            if not isinstance(statement, str):
+                raise ValidationError(
+                    f"extractor returned a proposal without a statement: {proposal!r}"
+                )
+            key = normalize(statement)
+            if key in existing:
+                continue
+            verdict = evaluate_outcome_statement(statement)
+            if verdict["valid"]:
+                status = CandidateStatus.PROPOSED
+                rationale = proposal.rationale
+            else:
+                status = CandidateStatus.REJECTED
+                rationale = " ".join(verdict["issues"])
+            planned.append(
+                (
+                    key,
+                    OutcomeCandidate(
+                        id=str(uuid.uuid4()),
+                        interview_id=interview.id,
+                        quote_id=quote_id,
+                        statement=statement,
+                        rationale=rationale,
+                        confidence=proposal.confidence,
+                        status=status,
+                    ),
+                )
+            )
+            # Collapse repeated statements within this same batch.
+            existing.add(key)
+
+        created: list[OutcomeCandidate] = []
+        for _, candidate in planned:
+            created.append(self.repo.add_candidate(candidate))
+        return created
+
+    def _candidates_by_key(self, quote_id: str) -> set[str]:
+        """The normalised statements already stored for a quote."""
+        return {
+            normalize(c.statement) for c in self.repo.list_candidates() if c.quote_id == quote_id
+        }
+
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+        return self.repo.get_candidate(candidate_id)
+
+    def list_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]:
+        return self.repo.list_candidates(interview_id, status, limit=limit, offset=offset)
+
+    def update_candidate(self, candidate_id: str, updates: dict[str, Any]) -> OutcomeCandidate:
+        candidate = self.repo.update_candidate(candidate_id, updates)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+        return candidate
+
+    def delete_candidate(self, candidate_id: str) -> None:
+        if not self.repo.delete_candidate(candidate_id):
+            raise CandidateNotFoundError(candidate_id)
+
+    def accept_candidate(
+        self,
+        candidate_id: str,
+        *,
+        importance: float,
+        satisfaction: float,
+        statement: str | None = None,
+        step_id: str | None = None,
+    ) -> tuple[OutcomeCandidate, Outcome, Evidence]:
+        """Turn one proposed candidate into exactly one outcome with its evidence.
+
+        The edited ``statement`` (or the proposed one) is validated *before* any
+        write, then ``add_outcome`` runs, then the verbatim quote is written as
+        an ``Evidence`` row, and only then is the candidate marked ``accepted``
+        with the new ``outcome_id``. If the evidence write fails the new outcome
+        is removed again, so a failure can never leave an accepted candidate
+        without evidence or an orphan outcome.
+
+        Accepting an already-accepted candidate is a no-op that returns what the
+        first acceptance produced, so a retry cannot duplicate either the
+        outcome or the evidence.
+        """
+        candidate = self.repo.get_candidate(candidate_id)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+
+        if candidate.status == CandidateStatus.ACCEPTED and candidate.outcome_id:
+            outcome = self.repo.get_outcome(candidate.outcome_id)
+            if outcome is not None:
+                return candidate, outcome, self._candidate_evidence(candidate)
+        if candidate.status is not CandidateStatus.PROPOSED:
+            raise ValidationError(
+                f"Outcome candidate {candidate_id} is {candidate.status.value}, not proposed"
+            )
+
+        quote = self.repo.get_quote(candidate.quote_id)
+        if quote is None:
+            raise QuoteNotFoundError(candidate.quote_id)
+        interview = self.repo.get_interview(candidate.interview_id)
+        if interview is None:
+            raise InterviewNotFoundError(candidate.interview_id)
+        if interview.job_id is None:
+            raise ValidationError(
+                f"Interview {interview.id} is not linked to a job, so a candidate cannot "
+                "become an outcome. Link the interview to a job first."
+            )
+
+        text = (statement or candidate.statement).strip()
+        verdict = evaluate_outcome_statement(text)
+        if not verdict["valid"]:
+            raise InvalidOutcomeStatementError(verdict)
+
+        outcome = self.add_outcome(
+            interview.job_id,
+            text,
+            importance=importance,
+            satisfaction=satisfaction,
+            step_id=step_id,
+        )
+        try:
+            evidence = self.add_evidence(
+                source_name=interview.title,
+                source_kind="interview",
+                name="quote",
+                content=quote.text,
+                item_type="manual",
+                raw={"interview_id": interview.id, "quote_id": quote.id},
+                outcome_id=outcome.id,
+            )
+        except Exception:
+            self.repo.delete_outcome(outcome.id)
+            raise
+        accepted = self.repo.update_candidate(
+            candidate.id,
+            {
+                "status": CandidateStatus.ACCEPTED,
+                "statement": text,
+                "outcome_id": outcome.id,
+            },
+        )
+        assert accepted is not None  # the candidate existed a moment ago
+        return accepted, outcome, evidence
+
+    def reject_candidate(self, candidate_id: str, *, reason: str) -> OutcomeCandidate:
+        """Reject a candidate, keeping it and a nonblank reason.
+
+        The quote stays attached, so a rejected idea is still auditable. An
+        empty reason is refused without touching the store.
+        """
+        candidate = self.repo.get_candidate(candidate_id)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+        cleaned = (reason or "").strip()
+        if not cleaned:
+            raise ValidationError(candidate_reason_required(candidate_id))
+        if candidate.status is CandidateStatus.ACCEPTED:
+            raise ValidationError(
+                f"Outcome candidate {candidate_id} was accepted; rejecting it would orphan "
+                "the outcome it produced."
+            )
+        rejected = self.repo.update_candidate(
+            candidate_id,
+            {"status": CandidateStatus.REJECTED, "decision_reason": cleaned},
+        )
+        assert rejected is not None
+        return rejected
+
+    def _candidate_evidence(self, candidate: OutcomeCandidate) -> Evidence:
+        """The evidence row acceptance wrote for a candidate."""
+        for item in self.repo.list_evidence(outcome_id=candidate.outcome_id):
+            if item.raw.get("quote_id") == candidate.quote_id:
+                return item
+        raise EvidenceNotFoundError(
+            candidate.outcome_id or candidate.id,
+            "Acceptance should have written one evidence row for this candidate.",
+        )
+
     def promote_evidence(
         self,
         evidence_id: str,
@@ -1102,16 +1465,35 @@ class ODIService:
         strategy = self.segmentation or OutcomeClusterStrategy(
             steps=list(self.repo.steps.values()), people=people
         )
-        return [self.save_segment(item) for item in strategy.segment(jobs, outcomes)]
+        #: One read for the whole derivation: the revision the clusters were
+        #: computed from, stamped on every segment so a later outcome rescore
+        #: is what makes them stale — not the write of the segment itself.
+        stamp = self.repo.last_input_event_id()
+        return [
+            self.save_segment(item.model_copy(update={"computed_at_event_id": stamp}))
+            for item in strategy.segment(jobs, outcomes)
+        ]
 
     def list_segments(self, job_id: str | None = None) -> list[Segment]:
-        return self.repo.list_segments(job_id=job_id)
+        return [
+            self._label_freshness(segment) for segment in self.repo.list_segments(job_id=job_id)
+        ]
 
     def get_segment(self, segment_id: str) -> Segment:
         segment = self.repo.get_segment(segment_id)
         if segment is None:
             raise SegmentNotFoundError(segment_id, "run segment_market to produce segments")
-        return segment
+        return self._label_freshness(segment)
+
+    def _label_freshness(self, artifact: _Artifact) -> _Artifact:
+        """Stamp the read-time ``stale`` flag: derived, never written back.
+
+        The store revision the artifact was derived from is compared against the
+        input revision *now*, so a verdict computed after the latest outcome
+        rescore reads as current and one computed before it reads as stale.
+        """
+        stale = is_stale(artifact, self.repo.last_input_event_id())
+        return artifact.model_copy(update={"stale": stale})
 
     def save_segment(self, segment: Segment) -> Segment:
         """Persist one segment, rejecting one the store cannot vouch for."""
@@ -1129,7 +1511,8 @@ class ODIService:
         existing = self.repo.get_segment(segment.id)
         saved = (
             self.repo.update_segment(
-                segment.id, segment.model_dump(mode="json", exclude={"id", "created_at"})
+                segment.id,
+                segment.model_dump(mode="json", exclude={"id", "created_at", "stale"}),
             )
             if existing is not None
             else self.repo.add_segment(segment)
@@ -1137,7 +1520,7 @@ class ODIService:
         if saved is None:
             raise SegmentNotFoundError(segment.id)
         self._emit_segment_signal(saved, is_new=existing is None)
-        return saved
+        return self._label_freshness(saved)
 
     def _emit_segment_signal(self, segment: Segment, *, is_new: bool) -> None:
         severity = "notice" if segment.verdict is SegmentVerdict.UNDERSERVED else "info"
@@ -1175,6 +1558,9 @@ class ODIService:
         segments = self._segments_in_scope(segment_ids, job_id)
         jobs = self.repo.list_jobs()
         outcomes = list(self.repo.outcomes.values())
+        #: The revision the recommendation was computed from, read once and
+        #: stamped so a later score change is what makes it stale.
+        stamp = self.repo.last_input_event_id()
         strategy = build_strategy(segments, jobs, outcomes)
         if strategy is None:
             underserved = sum(1 for item in segments if item.verdict is SegmentVerdict.UNDERSERVED)
@@ -1188,7 +1574,7 @@ class ODIService:
                 f"{len(orphans)} outcome(s) outside a stored job, {leftover} unclustered. "
                 "Score outcomes against a job map before asking for a strategy."
             )
-        return self.save_strategy(strategy)
+        return self.save_strategy(strategy.model_copy(update={"computed_at_event_id": stamp}))
 
     def _segments_in_scope(
         self, segment_ids: list[str] | None, job_id: str | None = None
@@ -1198,12 +1584,15 @@ class ODIService:
         return [self.get_segment(segment_id) for segment_id in segment_ids]
 
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
-        return self.repo.list_strategies(segment_id=segment_id)
+        return [
+            self._label_freshness(strategy)
+            for strategy in self.repo.list_strategies(segment_id=segment_id)
+        ]
 
     def get_strategy(self) -> Strategy | None:
         """The most recently recorded strategy, or ``None``."""
         strategies = self.repo.list_strategies()
-        return strategies[-1] if strategies else None
+        return self._label_freshness(strategies[-1]) if strategies else None
 
     def save_strategy(self, strategy: Strategy) -> Strategy:
         """Persist a strategy, requiring the alternatives it beat."""
@@ -1217,7 +1606,8 @@ class ODIService:
         existing = self.repo.get_strategy(strategy.id)
         saved = (
             self.repo.update_strategy(
-                strategy.id, strategy.model_dump(mode="json", exclude={"id", "created_at"})
+                strategy.id,
+                strategy.model_dump(mode="json", exclude={"id", "created_at", "stale"}),
             )
             if existing is not None
             else self.repo.add_strategy(strategy)
@@ -1233,7 +1623,7 @@ class ODIService:
             detail=saved.thesis[:500],
             discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
         )
-        return saved
+        return self._label_freshness(saved)
 
     # -- Traceability: what an outcome advances ------------------------------
 

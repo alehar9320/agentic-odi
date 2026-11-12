@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from agentic_odi_core.remote import error_envelope
 from agentic_odi_mcp_server import mcp
 from fastmcp import Client
 from mcp.types import TextContent
@@ -86,7 +87,9 @@ async def test_update_candidate_reports_unknown_status() -> None:
         result = await client.call_tool(
             "update_candidate", {"candidate_id": candidates[0]["id"], "status": "sideways"}
         )
-    assert _text(result) == "Error: unknown candidate status: sideways"
+    payload = json.loads(_text(result))
+    assert payload["message"] == "Error: unknown candidate status: sideways"
+    assert payload["error"] == error_envelope(ValueError("unknown candidate status: sideways"))
 
 
 @pytest.mark.asyncio
@@ -113,7 +116,9 @@ async def test_get_and_delete_candidate() -> None:
 async def test_list_candidates_rejects_unknown_status() -> None:
     async with Client(mcp) as client:
         result = await client.call_tool("list_candidates", {"status": "nope"})
-    assert _text(result) == "Error: unknown candidate status: nope"
+    payload = json.loads(_text(result))
+    assert payload["message"] == "Error: unknown candidate status: nope"
+    assert payload["error"] == error_envelope(ValueError("unknown candidate status: nope"))
 
 
 @pytest.mark.asyncio
@@ -192,7 +197,9 @@ async def test_reject_candidate_requires_a_reason_and_keeps_the_candidate() -> N
             _text(await client.call_tool("get_candidate", {"candidate_id": candidate_id}))
         )
 
-    assert _text(refused).startswith("Error: A rejection reason is required")
+    refusal = json.loads(_text(refused))
+    assert refusal["message"].startswith("Error: A rejection reason is required")
+    assert refusal["error"]["code"] == "validation"
     assert rejected["status"] == "rejected"
     assert rejected["decision_reason"] == "not a need"
     assert kept["quote_id"] == candidates[0]["quote_id"]
