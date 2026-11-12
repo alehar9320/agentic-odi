@@ -509,8 +509,8 @@ def test_page_weights_are_within_budget(page: str):
     # The page budget is a soft ceiling: individual pages are coverage records
     # (ledgers, entity docs, schema references), not decoration, so the ceiling
     # moves with legitimate content growth rather than trimming reference
-    # material. The Development page now exceeds 100 KB: the assistant-ui ledger
-    # (issue #429) contributes 129 rows, and the Study entity plus its two
-    # tools (open_study, list_studies) and the outcome-proposal tools add the
-    # rest. Bump the ceiling to keep the page green while the content stays.
+    # material. The MCP reference grows with each tool and entity; the
+    # assistant-ui ledger (issue #429) puts 129 rows on the Development page and
+    # makes it the new long pole at ~106 KB (#809). Keep the ceiling above that
+    # while the content remains factual.
     assert size <= 110 * 1024, f"{page}: {size} bytes"
