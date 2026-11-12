@@ -296,6 +296,42 @@ merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
 workflows and are deliberately left alone. The workflow is silent: it updates
 labels only and never posts PR comments.
 
+### AI merge trust
+
+The [`pr-ai-merge`](../.github/workflows/pr-ai-merge.yml) workflow applies a
+single, machine-readable label, `ai-merge-safe`, that marks a pull request as
+non-disruptive and non-sensitive enough that an AI agent may be trusted to
+merge it. Phase 1 is labelling only: humans still merge, but the label tells a
+reviewer "this PR is safe to hand to an agent." Phase 2 is delegation: an AI
+merge agent watches for `ai-merge-safe` alongside `ready-for-merge` and
+performs the merge, posting an audit comment on the pull request.
+
+The label is AND-gated: every condition below must hold, and any failure
+removes the label. Computation is deterministic — [`scripts/pr_ai_merge.py`](../scripts/pr_ai_merge.py)
+does pure gate evaluation, no LLM calls, no network beyond the GitHub API — and
+the workflow owns **only** `ai-merge-safe`; it never touches labels owned by
+the risk or merge-conflict jobs.
+
+| Gate | Condition |
+|------|-----------|
+| Low disruption | PR carries `safe to merge` (risk score ≤ 20) |
+| CI green, no conflicts | PR carries `ready-for-merge` |
+| Small enough | `size/XS` or `size/S` (< 250 lines changed) |
+| Clean telemetry | none of `breaking change`, `needs deep dive`, `telemetry invalid` |
+| Non-sensitive areas | diff touches no `area/ci`, `area/infra`, or `area/release` path, no `.ci/protected-files.txt` path is deleted, and it is not a dependency change |
+| Hygiene | open pull request targeting `main`, not a draft |
+
+The workflow runs on every pull request event plus a six-hourly schedule and a
+manual dispatch, so the label stays eventually consistent when `ready-for-merge`
+lands after the pull request event. Fork pull requests are skipped because they
+carry a read-only token.
+
+```bash
+python3 scripts/pr_ai_merge.py --managed          # -> ai-merge-safe
+echo '{"labels":["safe to merge","ready-for-merge","size/XS"],"files":[]}' \
+  | python3 scripts/pr_ai_merge.py                # -> ai-merge-safe
+```
+
 ### Tiered Automated Triage (shift-left filtering)
 
 The same risk workflow runs a third job, **triage**, which decides whether a
@@ -325,6 +361,7 @@ executes pull request code.
 ```bash
 python3 scripts/pr_triage.py --labels labels.txt   # print the triage decision
 ```
+
 
 ## Testing
 
