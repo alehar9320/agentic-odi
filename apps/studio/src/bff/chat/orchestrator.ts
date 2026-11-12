@@ -13,8 +13,32 @@ import type { LocalStore } from "../store/types";
 import { LocalDataService } from "../data/localDataService";
 import { LocalMemoryService } from "../memory/localMemoryService";
 import { createSseParser, type RawSseEvent } from "../../api/sse";
+import {
+  resolveNativeModel,
+  type NativeModelAdapter,
+  type NativeModelSession,
+} from "./nativeModel";
 
-type Provider = "endpoint" | "deterministic";
+type Provider = "endpoint" | "browser-native" | "deterministic";
+
+/**
+ * The phrases the assistant performs itself, whatever model is available.
+ *
+ * These four prefixes are the deterministic surface: "add job", "add outcome",
+ * "remember", and the render/show family. They run before any model is consulted,
+ * so a browser-only turn still creates a job even when a native model is ready.
+ */
+export function isDeterministicCommand(message: string): boolean {
+  const lower = message.trim().toLowerCase();
+  return (
+    lower.startsWith("add job") ||
+    lower.startsWith("add outcome") ||
+    lower.startsWith("remember") ||
+    lower.includes("render") ||
+    lower.includes("board") ||
+    lower.includes("show")
+  );
+}
 
 const TOOLS = [
   {
@@ -194,6 +218,11 @@ function emit(event: RawSseEvent, onEvent: (event: RawSseEvent) => void): void {
   onEvent(event);
 }
 
+/** An abort is the caller's intent, not a provider failure to be reported. */
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 function toolEvent(name: string, status: string, preview?: string): RawSseEvent {
   return { event: "tool", data: { name, status, preview } };
 }
@@ -212,26 +241,29 @@ interface ToolCall {
 }
 
 export class ChatOrchestrator {
+  private readonly nativeModel: NativeModelAdapter | null;
+
   constructor(
     private readonly store: LocalStore,
     private readonly data: LocalDataService,
     private readonly memory: LocalMemoryService,
-  ) {}
+    nativeModel: NativeModelAdapter | null = resolveNativeModel(),
+  ) {
+    this.nativeModel = nativeModel;
+  }
 
   async stream(
     request: ChatStreamRequest,
     onEvent: (event: RawSseEvent) => void,
     signal?: AbortSignal,
   ): Promise<void> {
-    const provider: Provider = isEndpointConfigured(request)
-      ? "endpoint"
-      : "deterministic";
+    const provider = await this.chooseProvider(request);
     // "offline" is the sidecar's own word for an answer no model produced, so a
     // browser-only turn and a local turn are labeled the same way in the transcript.
     emit(
       {
         event: "status",
-        data: { phase: provider === "endpoint" ? "streaming" : "offline" },
+        data: { phase: provider === "deterministic" ? "offline" : "streaming" },
       },
       onEvent,
     );
@@ -254,9 +286,108 @@ export class ChatOrchestrator {
 
     if (provider === "endpoint") {
       await this.streamEndpoint(request, conversation, onEvent, signal);
+    } else if (provider === "browser-native") {
+      await this.streamNative(userMessage, conversation, onEvent, signal);
     } else {
       await this.streamDeterministic(userMessage, onEvent);
     }
+  }
+
+  /**
+   * The provider ladder, in order: a command the assistant performs itself, then a
+   * configured endpoint, then the browser's own model, then the deterministic
+   * answer. A `downloadable` model is a setup state, not a session, so it never
+   * selects `browser-native`.
+   */
+  private async chooseProvider(request: ChatStreamRequest): Promise<Provider> {
+    const lastMessage = request.messages[request.messages.length - 1];
+    const userMessage =
+      lastMessage && lastMessage.role === "user" ? lastMessage.content : "";
+    if (isDeterministicCommand(userMessage)) {
+      return "deterministic";
+    }
+    if (isEndpointConfigured(request)) {
+      return "endpoint";
+    }
+    if (this.nativeModel && (await this.nativeModel.availability()) === "available") {
+      return "browser-native";
+    }
+    return "deterministic";
+  }
+
+  /**
+   * Prose from the browser's model, and nothing else.
+   *
+   * The native model cannot read or change the canvas, so this emits only text
+   * deltas and one `message` — never a `tool`, `ui`, or `canvas_dirty` event. A
+   * failure before any text demotes to the deterministic answer, because nothing
+   * has been shown yet; a failure after text is reported, matching the endpoint
+   * rules.
+   */
+  private async streamNative(
+    userMessage: ChatMessage | undefined,
+    conversation: StoredConversationLike,
+    onEvent: (event: RawSseEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const adapter = this.nativeModel;
+    if (!adapter) {
+      await this.streamDeterministic(userMessage, onEvent);
+      return;
+    }
+
+    let session: NativeModelSession | null = null;
+    const collected: string[] = [];
+    try {
+      session = await adapter.create({
+        system:
+          "You are a helpful ODI assistant running inside the person's browser. " +
+          "You cannot read or change the canvas and you have no tools. " +
+          "Answer in prose, briefly and practically. If the person wants the canvas " +
+          "changed, tell them to use a command like “add job <name>”, " +
+          "“add outcome <statement> importance N satisfaction N”, “remember <note>”, " +
+          "or “render the opportunity board”.",
+        signal,
+      });
+      const text = userMessage ? userMessage.content : "";
+      for await (const delta of session.stream(text, signal)) {
+        collected.push(delta);
+        emit({ event: "delta", data: { text: delta } }, onEvent);
+      }
+    } catch (error) {
+      if (isAbortError(error)) {
+        throw error;
+      }
+      if (collected.length > 0) {
+        emit({ event: "error", data: { error: asStudioError(error) } }, onEvent);
+        return;
+      }
+      emit({ event: "status", data: { phase: "offline" } }, onEvent);
+      await this.streamDeterministic(userMessage, onEvent);
+      return;
+    } finally {
+      await session?.destroy();
+    }
+
+    if (collected.length === 0) {
+      // The model returned no prose. An empty reply would look like a silence the
+      // person cannot act on, so the deterministic answer speaks instead.
+      emit({ event: "status", data: { phase: "offline" } }, onEvent);
+      await this.streamDeterministic(userMessage, onEvent);
+      return;
+    }
+
+    const assistantTurn = collected.join("");
+    const assistantId = crypto.randomUUID();
+    const userMessageId = userMessage?.id ?? null;
+    await this.memory.appendTurn(
+      conversation.id,
+      "assistant",
+      assistantTurn,
+      assistantId,
+      userMessageId,
+    );
+    emit({ event: "message", data: { content: assistantTurn } }, onEvent);
   }
 
   private async ensureConversation(

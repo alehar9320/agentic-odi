@@ -241,6 +241,27 @@ A conversation written before ids existed has none, so the tree endpoint
 synthesises a linear chain and old threads still open. `apps/studio` never
 invents a branch the sidecar cannot reproduce.
 
+### The provider ladder
+
+`ChatOrchestrator` picks one provider per turn, in this order:
+
+1. A deterministic command (`add job`, `add outcome`, `remember`, and the
+   render/show family) → **deterministic**. It runs first so a browser-only turn
+   still changes the canvas.
+2. A configured endpoint → **endpoint**.
+3. A browser model whose `availability()` is `available` → **browser-native**.
+4. Otherwise → **deterministic**.
+
+`browser-native` is prose only: the browser's own model (`LanguageModel`, or the
+older `ai.languageModel`) emits text deltas and one `message`, and never a
+`tool`, `ui`, or `canvas_dirty` event, because it cannot read or change the
+canvas. A `downloadable` model is a setup state, not a session, so it never
+selects this provider. A failure before any text demotes to `deterministic` with
+`status: offline`; a failure after text is an `error` — the same pre-output /
+post-output split the endpoint provider uses. The adapter lives in
+`apps/studio/src/bff/chat/nativeModel.ts`; the ladder and its `streamNative` in
+`apps/studio/src/bff/chat/orchestrator.ts`.
+
 ## Read Paths
 
 ```text
