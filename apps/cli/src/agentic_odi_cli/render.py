@@ -564,6 +564,124 @@ def render_strategy(strategy: Any, *, as_json: bool) -> str:
     return "\n".join(lines)
 
 
+<<<<<<< HEAD
+def render_interview(item: Any, *, as_json: bool) -> str:
+    """Render one interview as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("title", item.get("title", "")),
+            ("participant", item.get("participant_label", "")),
+            ("role", item.get("participant_role") or ""),
+            ("job_id", item.get("job_id") or ""),
+            ("conducted_at", item.get("conducted_at") or ""),
+            ("source_kind", item.get("source_kind", "")),
+        ]
+    )
+
+
+def render_interview_list(items: Any, *, as_json: bool) -> str:
+    """Render interviews as an aligned table or JSON."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "title", "participant", "role"),
+        [
+            (
+                str(item.get("id", "")),
+                _truncate(str(item.get("title", ""))),
+                _truncate(str(item.get("participant_label", ""))),
+                _truncate(str(item.get("participant_role") or "")),
+            )
+            for item in items
+        ],
+        empty="No interviews found.",
+    )
+
+
+def render_quote_list(items: Any, *, as_json: bool) -> str:
+    """Render quotes as an aligned table or JSON, with ordinal and speaker."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("#", "speaker", "text"),
+        [
+            (
+                str(item.get("ordinal", "")),
+                _truncate(str(item.get("speaker") or "—"), 18),
+                _truncate(str(item.get("text", ""))),
+            )
+            for item in items
+        ],
+        empty="No quotes found.",
+    )
+
+
+def render_candidate(item: Any, *, as_json: bool) -> str:
+    """Render one outcome candidate as a labelled block or JSON."""
+    if not isinstance(item, dict):
+        return _json(item) if as_json else str(item)
+    if as_json:
+        return _json(item)
+    return _block(
+        [
+            ("id", item.get("id", "")),
+            ("status", item.get("status", "")),
+            ("statement", item.get("statement", "")),
+            ("confidence", item.get("confidence", "")),
+            ("quote_id", item.get("quote_id") or ""),
+            ("rationale", item.get("rationale") or ""),
+            ("outcome_id", item.get("outcome_id") or ""),
+        ]
+    )
+
+
+def render_candidate_list(items: Any, *, as_json: bool) -> str:
+    """Render outcome candidates as an aligned table or JSON."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "status", "statement"),
+        [
+            (
+                str(item.get("id", "")),
+                str(item.get("status", "")),
+                _truncate(str(item.get("statement", ""))),
+            )
+            for item in items
+        ],
+        empty="No outcome candidates found.",
+    )
+
+
+def render_candidate_acceptance(result: Any, *, as_json: bool) -> str:
+    """Render an acceptance: the new outcome, its score, and the evidence quote."""
+    if not isinstance(result, dict):
+        return _json(result) if as_json else str(result)
+    if as_json:
+        return _json(result)
+    outcome = result.get("outcome", {})
+    evidence = result.get("evidence", {})
+    return _block(
+        [
+            ("outcome_id", outcome.get("id", "")),
+            ("statement", outcome.get("statement", "")),
+            ("opportunity_score", outcome.get("opportunity_score", "")),
+            ("evidence_id", evidence.get("id", "")),
+            ("evidence_source", evidence.get("source_name", "")),
+            ("quote", evidence.get("content", "")),
+        ]
+=======
 def _when(value: Any) -> str:
     """One funnel timestamp, or the blank that says it has not happened."""
     if not value:
@@ -610,4 +728,5 @@ def render_funnel_summary(counts: Any, conversions: Any, *, as_json: bool) -> st
             for name, view in counts.items()
         ],
         empty="Nothing counted yet — this store has no funnel events.",
+>>>>>>> origin/main
     )
