@@ -41,6 +41,16 @@ export function canvasHasRecords(data: CanvasData | null | undefined): boolean {
   return data.jobs.length > 0 || data.steps.length > 0 || data.outcomes.length > 0;
 }
 
+/**
+ * The one caption for a board whose newest write was kept by the browser store
+ * because the sidecar was unreachable. `null` when the server holds everything,
+ * so a sidecar write never shows it. Reuses the saved-copy vocabulary rather
+ * than adding a second badge.
+ */
+export function keptByBrowserCaption(data: CanvasData | null | undefined): string | null {
+  return data?.provenance?.kept_by_browser ? "Kept by this browser · will sync" : null;
+}
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
