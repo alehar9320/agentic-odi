@@ -81,10 +81,10 @@ test.describe("the workspace", () => {
     await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
 
     const switcher = lens(page).getByRole("navigation", { name: "Workspace views" });
-    await switcher.getByRole("button", { name: /^Job map/ }).click();
+    await switcher.getByRole("button", { name: /^Records,/ }).click();
 
-    await expect(lens(page)).toHaveAttribute("aria-label", "Universal job map");
-    await expect(switcher.getByRole("button", { name: /^Job map/ })).toHaveAttribute(
+    await expect(lens(page)).toHaveAttribute("aria-label", "Records");
+    await expect(switcher.getByRole("button", { name: /^Records,/ })).toHaveAttribute(
       "aria-current",
       "page",
     );
