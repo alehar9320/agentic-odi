@@ -21,7 +21,9 @@ import {
   SunIcon,
 } from "../icons";
 import { OdiMascot } from "../OdiMascot";
+import { ActivityCentre } from "../activity/ActivityCentre";
 import { StatusDot } from "../status/StatusDot";
+import { AlertIcon } from "../icons";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -66,6 +68,7 @@ export function StudioBar({
   const wide = useMediaQuery("(min-width: 720px)");
   const reduceMotion = useReducedMotion();
   const [askOpen, setAskOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
@@ -418,6 +421,18 @@ export function StudioBar({
 
         <button
           type="button"
+          className="icon-button bar__activity"
+          aria-label={
+            activityOpen ? "Close activity centre" : "Open activity centre"
+          }
+          title="Activity centre"
+          onClick={() => setActivityOpen((open) => !open)}
+        >
+          <AlertIcon size={17} />
+        </button>
+
+        <button
+          type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
           aria-label={`Model status: ${status}. ${statusDetail}`}
@@ -494,6 +509,8 @@ export function StudioBar({
           ? `${unreadSignalCount} new ${unreadSignalCount === 1 ? "notification" : "notifications"}`
           : ""}
       </p>
+
+      {activityOpen && <ActivityCentre open={activityOpen} onClose={() => setActivityOpen(false)} />}
     </header>
   );
 }

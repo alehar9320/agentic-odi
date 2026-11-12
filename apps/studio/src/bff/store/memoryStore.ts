@@ -9,6 +9,7 @@ import {
   type StoredConversation,
   type StoredEvidence,
   type StoredJob,
+  type StoredNotice,
   type StoredOutcome,
   type StoredStep,
   type StoredTurn,
@@ -28,6 +29,7 @@ export class MemoryLocalStore implements LocalStore {
   private readonly conversations = new Map<string, StoredConversation>();
   private readonly turns: StoredTurn[] = [];
   private readonly outbox = new Map<string, OutboxRecord>();
+  private readonly notices = new Map<string, StoredNotice>();
   private lease: DrainLease | null = null;
 
   // A Map-backed store has no second connection to lose, so it never asks for a
@@ -153,6 +155,32 @@ export class MemoryLocalStore implements LocalStore {
 
   async clearOutbox(): Promise<void> {
     this.outbox.clear();
+  }
+
+  async listNotices(): Promise<StoredNotice[]> {
+    return [...this.notices.values()].sort((left, right) =>
+      right.at.localeCompare(left.at),
+    );
+  }
+
+  async getNotice(id: string): Promise<StoredNotice | undefined> {
+    return this.notices.get(id);
+  }
+
+  async putNotice(notice: StoredNotice): Promise<void> {
+    this.notices.set(notice.id, notice);
+  }
+
+  async deleteNotice(id: string): Promise<void> {
+    this.notices.delete(id);
+  }
+
+  async markAllRead(): Promise<void> {
+    for (const notice of this.notices.values()) {
+      if (!notice.read) {
+        this.notices.set(notice.id, { ...notice, read: true });
+      }
+    }
   }
 
   async claimDrainLease(
@@ -336,6 +364,7 @@ export class MemoryLocalStore implements LocalStore {
     this.conversations.clear();
     this.turns.length = 0;
     this.outbox.clear();
+    this.notices.clear();
     this.lease = null;
     this.seq = 0;
     this.turnId = 0;

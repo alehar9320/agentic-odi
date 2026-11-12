@@ -18,6 +18,7 @@ import {
   type StoredConversation,
   type StoredEvidence,
   type StoredJob,
+  type StoredNotice,
   type StoredOutcome,
   type StoredStep,
   type StoredTurn,
@@ -412,6 +413,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "outbox",
         "conversations",
         "turns",
+        "notices",
       ],
       "readwrite",
     );
@@ -425,7 +427,36 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("outbox").clear(),
       tx.objectStore("conversations").clear(),
       tx.objectStore("turns").clear(),
+      tx.objectStore("notices").clear(),
     ]);
+    await tx.done;
+  }
+
+  async listNotices(): Promise<StoredNotice[]> {
+    const notices = await this.db.getAllFromIndex("notices", "by-at");
+    return notices.sort((left, right) => right.at.localeCompare(left.at));
+  }
+
+  async getNotice(id: string): Promise<StoredNotice | undefined> {
+    return this.db.get("notices", id);
+  }
+
+  async putNotice(notice: StoredNotice): Promise<void> {
+    await this.db.put("notices", notice);
+  }
+
+  async deleteNotice(id: string): Promise<void> {
+    await this.db.delete("notices", id);
+  }
+
+  async markAllRead(): Promise<void> {
+    const notices = await this.listNotices();
+    const tx = this.db.transaction("notices", "readwrite");
+    for (const notice of notices) {
+      if (!notice.read) {
+        await tx.objectStore("notices").put({ ...notice, read: true });
+      }
+    }
     await tx.done;
   }
 
