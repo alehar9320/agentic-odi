@@ -67,7 +67,7 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /mcp-backend\.spec\.ts/,
+      testIgnore: /mcp-backend\.spec\.ts|visual\.spec\.ts/,
     },
     {
       // The same Studio against its MCP passthrough backend, which talks to
@@ -77,6 +77,23 @@ export default defineConfig({
       name: "mcp-backend",
       use: { ...devices["Desktop Chrome"], baseURL: MCP_BACKED_ORIGIN },
       testMatch: /mcp-backend\.spec\.ts/,
+    },
+    {
+      // The screen-level visual harness (issue #547). It renders named screens
+      // with fixed data and compares them against committed baselines, in
+      // both themes and at two viewports. Chromatic covers components; this
+      // project covers the assembled screen. It is excluded from the default
+      // `chromium` project so `npm run test:e2e` keeps its current coverage.
+name: "visual",
+      testMatch: /visual\.spec\.ts/,
+      snapshotDir: "e2e/__screenshots__",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 800 },
+        locale: "en-US",
+        timezoneId: "UTC",
+        reducedMotion: "reduce",
+      },
     },
   ],
 
