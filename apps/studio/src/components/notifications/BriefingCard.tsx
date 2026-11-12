@@ -45,21 +45,44 @@ export function BriefingCard() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchLatestBriefing()
-      .then((latest) => {
-        if (cancelled) {
-          return;
+
+    const load = () => {
+      fetchLatestBriefing()
+        .then((latest) => {
+          if (cancelled) {
+            return;
+          }
+          setBriefing(latest);
+          setDismissed(
+            latest ? isBriefingDismissed(latest.run_id, latest.created_at) : false
+          );
+        })
+        .catch(() => {
+          // A briefing is a morning convenience, not a gate: a failed read shows
+          // nothing rather than an error the reader cannot act on.
+          if (!cancelled) {
+            setBriefing(null);
+          }
+        });
+    };
+
+    load();
+
+    // Reload when the window becomes visible again: the latest finished run may
+    // have changed while the tab was backgrounded.
+    if (typeof document !== "undefined" && document.addEventListener) {
+      const onVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          load();
         }
-        setBriefing(latest);
-        setDismissed(latest ? isBriefingDismissed(latest.run_id, latest.created_at) : false);
-      })
-      .catch(() => {
-        // A briefing is a morning convenience, not a gate: a failed read shows
-        // nothing rather than an error the reader cannot act on.
-        if (!cancelled) {
-          setBriefing(null);
-        }
-      });
+      };
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      return () => {
+        cancelled = true;
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      };
+    }
+
     return () => {
       cancelled = true;
     };
@@ -75,6 +98,10 @@ export function BriefingCard() {
     }
     setDismissed(true);
   }
+
+  // At most four lines, and every displayed line opens its record: non-openable
+  // kinds are excluded so no line lacks an open action.
+  const items = briefing.items.filter((item) => isOpenable(item.record_kind)).slice(0, 4);
 
   return (
     <section className="card briefing-card" aria-label="Since you were away">
@@ -98,26 +125,22 @@ export function BriefingCard() {
         </div>
       </div>
 
-      {briefing.items.length === 0 ? (
+      {items.length === 0 ? (
         <p className="briefing-card__empty">
           The run finished and found nothing that needs your attention.
         </p>
       ) : (
         <ul className="briefing-card__items">
-          {briefing.items.map((item) => (
+          {items.map((item) => (
             <li key={`${item.record_kind}:${item.record_id}`} className="briefing-card__item">
               <KindTag kind={item.kind} />
-              {isOpenable(item.record_kind) ? (
-                <button
-                  type="button"
-                  className="briefing-card__link"
-                  onClick={() => openRecord(item.record_kind as SignalSubjectKind, item.record_id)}
-                >
-                  {item.text}
-                </button>
-              ) : (
-                <span className="briefing-card__text">{item.text}</span>
-              )}
+              <button
+                type="button"
+                className="briefing-card__link"
+                onClick={() => openRecord(item.record_kind as SignalSubjectKind, item.record_id)}
+              >
+                {item.text}
+              </button>
             </li>
           ))}
         </ul>

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime, timezone
 
 import pytest
+from agentic_odi_core.briefing import Briefing
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
@@ -712,4 +714,19 @@ def test_last_event_id_is_the_rowid_of_the_event_just_appended(tmp_path) -> None
 
     repo.update_step("missing", {"name": "Prepare"})
     assert repo.last_event_id() == after_step
+    repo.close()
+
+
+def test_adding_a_briefing_is_a_derived_event_that_spends_no_event_id(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+
+    created = datetime(2026, 11, 10, 2, 0, tzinfo=timezone.utc)
+    briefing = Briefing(run_id="run-1", created_at=created)
+    repo.add_briefing(briefing)
+
+    #: A briefing is derived: it is stored durably and readable back, and the
+    #: log carries a BRIEFING_WRITTEN event for it.
+    assert repo.get_latest_briefing() == briefing
+    event_types = [event["type"] for event in repo.store.get_stream()]
+    assert "BRIEFING_WRITTEN" in event_types
     repo.close()

@@ -29,6 +29,12 @@ _Item = TypeVar("_Item")
 #: keys it by this constant rather than a generated one.
 V2MOM_ID = "v2mom"
 
+#: Event types that describe a stored write but do not advance the input
+#: revision. A briefing is a derived read-model of a finished run: persisting
+#: it must not make previously derived records appear stale, and replaying the
+#: log must rebuild briefings without re-numbering the real changes.
+_DERIVED_EVENT_TYPES: frozenset[str] = frozenset({"BRIEFING_WRITTEN"})
+
 
 def rank_outcomes(outcomes: list[Outcome]) -> list[Outcome]:
     """Rank outcomes by opportunity score, highest first, unscored last."""
@@ -638,7 +644,9 @@ class InMemoryRepository:
         return False
 
     def add_briefing(self, briefing: Briefing) -> Briefing:
-        self._append_event()
+        #: A briefing is a derived event: it records what a finished run
+        #: produced without advancing the store's revision, so persisting it
+        #: cannot make existing derived records appear stale.
         self.briefings[briefing.run_id] = briefing
         return briefing
 

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
+from agentic_odi_core.briefing import Briefing
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
@@ -333,3 +336,17 @@ def test_stamping_the_same_signal_twice_spends_one_event_id() -> None:
     #: The second read changes nothing, so no event is appended and no id spent.
     assert repo.mark_signal_read("sig-1") is not None
     assert repo.last_event_id() == after_add + 1
+
+
+def test_adding_a_briefing_is_a_derived_event_that_spends_no_event_id():
+    repo = InMemoryRepository()
+    repo.add_job(Job(id="job-1", name="Job"))
+    before = repo.last_event_id()
+
+    created = datetime(2026, 11, 10, 2, 0, tzinfo=timezone.utc)
+    briefing = Briefing(run_id="run-1", created_at=created)
+    repo.add_briefing(briefing)
+
+    #: A briefing is derived: persisting it does not spend an event id.
+    assert repo.last_event_id() == before
+    assert repo.get_latest_briefing() == briefing

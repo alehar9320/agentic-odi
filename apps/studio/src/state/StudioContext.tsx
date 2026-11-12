@@ -1597,13 +1597,22 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    */
   const openRecord = useCallback(
     (kind: SignalSubjectKind, id: string) => {
+      // Evidence is focused straight on its id via the state setter (declared
+      // above this callback) instead of `focusEvidence`, which is defined later
+      // and would hit the temporal dead zone. Other subjects go through the
+      // shared focus-subject path.
+      if (kind === "evidence") {
+        setFocusedEvidenceId(id);
+        openPanel("evidence");
+        return;
+      }
       focusSubject(kind, id);
       const panel = PANEL_FOR_SUBJECT[kind];
       if (panel) {
         openPanel(panel);
       }
     },
-    [focusSubject, openPanel],
+    [focusSubject, openPanel, setFocusedEvidenceId],
   );
 
   /**

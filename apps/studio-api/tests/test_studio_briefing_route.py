@@ -41,7 +41,8 @@ def test_a_stored_briefing_validates_against_the_schema() -> None:
 
     assert response.status_code == 200
     parsed = BriefingResponse.model_validate(response.json())
-    assert parsed.run_id == work.id
+    execution_id = (service.get_scheduled_work(work.id).payload or {}).get("execution_id")
+    assert parsed.run_id == execution_id
     assert [item.record_id for item in parsed.items] == ["ev-1", "o-12"]
     assert parsed.items[0].kind == "added"
     assert parsed.items[0].record_kind == "evidence"

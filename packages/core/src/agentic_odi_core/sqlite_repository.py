@@ -38,10 +38,12 @@ from agentic_odi_core.repository import (
 )
 
 #: Writes that are derived from the store rather than inputs to it. Their own
-#: revision must not make a later derivation look stale. Signals are facts
-#: *about* the store, and segmentation reads jobs, steps, and outcomes — never
-#: signals — so recording one is not an input a later derivation would read.
-_DERIVED_EVENT_TYPES = frozenset(
+#: revision must not make a later derivation look stale. A briefing is a
+#: derived read-model of a finished run: persisting it must not make
+#: previously derived records appear stale. Signals are facts *about* the
+#: store, and segmentation reads jobs, steps, and outcomes — never signals —
+#: so recording one is not an input a later derivation would read.
+_DERIVED_EVENT_TYPES: frozenset[str] = frozenset(
     {
         "SEGMENT_CREATED",
         "SEGMENT_UPDATED",
@@ -50,6 +52,7 @@ _DERIVED_EVENT_TYPES = frozenset(
         "SIGNAL_CREATED",
         "SIGNAL_READ",
         "SIGNAL_DISMISSED",
+        "BRIEFING_WRITTEN",
     }
 )
 
@@ -757,7 +760,10 @@ class SQLiteRepository(Repository):
                 workspace_id=self._workspace_id,
                 device_id=self._device_id,
             )
-            self._sync()
+            #: A briefing is a derived event: record it durably and keep memory
+            #: current without advancing the store's revision, so persisting a
+            #: briefing cannot make existing derived records appear stale.
+            self.briefings[briefing.run_id] = briefing
             return briefing
 
     def get_latest_briefing(self) -> Briefing | None:

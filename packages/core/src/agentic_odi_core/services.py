@@ -1118,19 +1118,33 @@ class ODIService:
         replaces its own briefing instead of leaving two behind, and a run that
         produced no structured changes stores an honestly empty briefing rather
         than inventing a line.
-        """
-        from datetime import datetime, timezone
 
+        The briefing is keyed by a separate *execution id*, not by the recurring
+        work id: retries of one execution reuse the stored id, while each
+        distinct execution gets a fresh one. That keeps reruns from collapsing
+        into a single ``run_id`` and losing their own briefing.
+        """
         work = self.repo.get_scheduled_work(work_id)
         if work is None:
             raise ScheduledWorkNotFoundError(work_id)
         now = datetime.now(timezone.utc)
+        # A separate execution id identifies this run distinctly from the
+        # recurring work id. Retries of one execution reuse the stored id; a
+        # new execution gets a fresh one.
+        execution_id = (work.payload or {}).get("execution_id") or str(uuid.uuid4())
+        payload = dict(work.payload or {})
+        payload["execution_id"] = execution_id
         # Build and validate the briefing before flipping the run to COMPLETED so
         # a bad change can never leave a completed run without a briefing.
-        result = RunResult(run_id=work_id, changes=tuple(changes or ()), created_at=now)
+        result = RunResult(run_id=execution_id, changes=tuple(changes or ()), created_at=now)
         briefing = build_briefing(result)
         updated = self.repo.update_scheduled_work(
-            work_id, {"status": ScheduledWorkStatus.COMPLETED, "last_run_at": now.isoformat()}
+            work_id,
+            {
+                "status": ScheduledWorkStatus.COMPLETED,
+                "last_run_at": now.isoformat(),
+                "payload": payload,
+            },
         )
         if updated is None:
             raise ScheduledWorkNotFoundError(work_id)
