@@ -534,3 +534,10 @@ class ScheduledWork(BaseModel):
     last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
     next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
     result_summary: str | None = Field(None, description="Execution outcome or error summary")
+    last_status: Literal["ok", "failed", "skipped"] | None = Field(
+        None, description="Outcome of the most recent run: ok, failed, or skipped"
+    )
+    attempts: int = Field(0, description="Consecutive failed attempts since the last success")
+    last_error: str | None = Field(
+        None, description="Type and message of the most recent run failure"
+    )
