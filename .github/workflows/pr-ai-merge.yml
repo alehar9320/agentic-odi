@@ -1,0 +1,142 @@
+name: PR AI merge trust
+
+# Labels a pull request ``ai-merge-safe`` when every gate passes:
+#   * ``safe to merge`` (risk score <= 20 — small churn, no critical path,
+#     tests present when source changes)
+#   * ``ready-for-merge`` (CI green and no merge conflicts)
+#   * size/XS or size/S (< 250 lines changed)
+#   * clean agent telemetry (no breaking change, needs deep dive, or invalid)
+#   * non-sensitive areas (no CI/infra/release path, no deleted protected file,
+#     no dependency change)
+#   * open pull request targeting main, not a draft
+#
+# Any failing gate removes the label. Deterministic: no LLM calls, no network
+# beyond the GitHub API, no pull request code executed. Fork pull requests are
+# skipped per-job because they carry a read-only token.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write # gh label create lives under the issues API
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  labels:
+    name: Label pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      # A fork pull request gets a read-only token, so labeling it cannot
+      # succeed. Say so instead of failing red on a PR we may not touch.
+      - name: Note fork pull requests
+        if: ${{ github.event.pull_request.head.repo.fork }}
+        run: echo "::notice::Skipping AI merge trust labels for a fork pull request (read-only token)."
+
+      - name: Checkout base branch
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The label did not exist, so --add-label failed with
+      # "'ai-merge-safe' not found" and the job went red. Create it once, here.
+      - name: Ensure the AI merge trust label exists
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh label create "ai-merge-safe" --color 0e8a16 \
+            --description "An AI agent may be trusted to merge this PR" \
+            --repo "$REPO" --force
+
+      # Resolve which pull request(s) to process. On pull_request events we
+      # have a PR number. On schedule / workflow_dispatch we re-scan every
+      # open PR targeting main so labels stay eventually consistent.
+      - name: Resolve pull request numbers to process
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-numbers.txt"
+          else
+            gh pr list --repo "$REPO" --base main \
+              --state open --json number -q '.[].number' \
+              > "$RUNNER_TEMP/pr-numbers.txt"
+          fi
+
+      - name: Process each pull request
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          while IFS= read -r PR_NUMBER; do
+            [ -z "$PR_NUMBER" ] && continue
+
+            # Assemble the fact sheet the tested Python entrypoint reads.
+            gh pr view "$PR_NUMBER" --repo "$REPO" \
+              --json author,body,headRefName,baseRefName,isDraft,state,labels \
+              > "$RUNNER_TEMP/meta-$PR_NUMBER.json"
+            gh api "repos/$REPO/pulls/$PR_NUMBER/commits?per_page=100" --paginate --slurp \
+              > "$RUNNER_TEMP/commits-$PR_NUMBER.json"
+            gh api "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --paginate --slurp \
+              > "$RUNNER_TEMP/files-$PR_NUMBER.json"
+            jq -n \
+              --slurpfile meta "$RUNNER_TEMP/meta-$PR_NUMBER.json" \
+              --slurpfile commits "$RUNNER_TEMP/commits-$PR_NUMBER.json" \
+              --slurpfile files "$RUNNER_TEMP/files-$PR_NUMBER.json" \
+              '{
+                author: $meta[0].author,
+                branch: $meta[0].headRefName,
+                body: $meta[0].body,
+                commits: $commits[0],
+                files: $files[0],
+                labels: ($meta[0].labels | map(.name)),
+                state: $meta[0].state,
+                draft: $meta[0].isDraft,
+                base: $meta[0].baseRefName
+              }' \
+              > "$RUNNER_TEMP/facts-$PR_NUMBER.json"
+
+            computed="$(python3 scripts/pr_ai_merge.py --facts "$RUNNER_TEMP/facts-$PR_NUMBER.json")"
+
+            # Removing an absent label is a harmless no-op, so it is tolerated.
+            # Adding must not be swallowed, or the next silent failure looks
+            # exactly like the one this workflow was written to fix.
+            if [ -n "$computed" ]; then
+              gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label "ai-merge-safe"
+            else
+              gh pr edit "$PR_NUMBER" --repo "$REPO" --remove-label "ai-merge-safe" || true
+            fi
+
+            {
+              echo "### AI merge trust label — PR #$PR_NUMBER"
+              echo
+              if [ -n "$computed" ]; then
+                echo "Applied: ai-merge-safe"
+              else
+                echo "Not applied: one or more gates did not pass."
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+          done < "$RUNNER_TEMP/pr-numbers.txt"

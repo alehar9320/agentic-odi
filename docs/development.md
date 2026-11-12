@@ -325,6 +325,37 @@ executes pull request code.
 python3 scripts/pr_triage.py --labels labels.txt   # print the triage decision
 ```
 
+## AI merge trust label
+
+The [PR AI merge trust workflow](../.github/workflows/pr-ai-merge.yml) applies the
+`ai-merge-safe` label to a pull request only when every gate passes, and removes
+it when any gate fails. It is deterministic — no LLM calls, no network beyond
+the GitHub API, no pull request code executed — and fork pull requests are
+skipped per-job.
+
+| Gate | Requirement |
+|------|-------------|
+| Low disruption | `safe to merge` (risk score ≤ 20) |
+| CI green, no conflicts | `ready-for-merge` |
+| Small enough | `size/XS` or `size/S` (< 250 lines changed) |
+| Clean telemetry | none of `breaking change`, `needs deep dive`, `telemetry invalid` |
+| Non-sensitive areas | no CI/infra/release path, no deleted protected file, no dependency change |
+| Hygiene | open, non-draft PR targeting `main` |
+
+Phase 1 of this work is labelling only: reviewers see `ai-merge-safe` at a
+glance, but humans still merge. Phase 2 delegates the actual merge to an AI
+agent watching this label (not yet implemented).
+
+The label is owned exclusively by this workflow — it never touches the risk
+tiers (`safe to merge`, `needs a look`, `danger zone`) or the merge-state
+labels (`ready-for-merge`, `merge-conflict`), which are managed by `pr-risk.yml`
+and `label-merge-conflicts.yml`.
+
+```bash
+python3 scripts/pr_ai_merge.py --facts facts.json   # print the label or nothing
+python3 scripts/pr_ai_merge.py --managed            # list owned labels
+```
+
 ## Testing
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
