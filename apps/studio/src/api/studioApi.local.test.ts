@@ -28,6 +28,14 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/** A static host that answered an `/api` call with the SPA shell, not JSON. */
+function htmlResponse(status = 200): Response {
+  return new Response("<!doctype html><html></html>", {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
 /** A sidecar that is not there: a proxy that answers 503 with no structured error. */
 function offlineResponse(): Response {
   return new Response(JSON.stringify({ detail: "Sidecar unreachable" }), {
@@ -86,15 +94,35 @@ describe("isTransportFailure", () => {
   it("treats network errors as transport", () => {
     expect(isTransportFailure(new TypeError("failed to fetch"))).toBe(true);
   });
+
+  it("treats a Worker-generated 502 carrying origin proxy as transport", () => {
+    expect(
+      isTransportFailure(
+        new StudioApiError(
+          { code: "mcp_unreachable", message: "down", retryable: true, origin: "proxy" },
+          502,
+          true,
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not treat a sidecar 502 without origin proxy as transport", () => {
+    expect(
+      isTransportFailure(
+        new StudioApiError({ code: "mcp_unreachable", message: "down", retryable: true }, 502, true),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("fetchCanvas fallback", () => {
   it("falls back to the local BFF when the sidecar returns 502 with a proxy detail", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
-    vi.mocked(bff.data.fetchCanvas).mockResolvedValueOnce({ jobs: [], steps: [], outcomes: [], source: "local" });
+    vi.mocked(bff.data.fetchCanvas).mockResolvedValueOnce({ jobs: [], steps: [], outcomes: [], source: "browser" });
 
     const canvas = await fetchCanvas("http://mcp");
-    expect(canvas.source).toBe("local");
+    expect(canvas.source).toBe("browser");
     expect(bff.data.fetchCanvas).toHaveBeenCalled();
   });
 
@@ -108,6 +136,34 @@ describe("fetchCanvas fallback", () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: { code: "validation", message: "bad" } }, 422));
     await expect(fetchCanvas("http://mcp")).rejects.toThrow();
     expect(bff.data.fetchCanvas).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the local BFF for a Worker 502 that marks origin proxy", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ error: { code: "mcp_unreachable", message: "down", retryable: true, origin: "proxy" } }, 502),
+    );
+    vi.mocked(bff.data.fetchCanvas).mockResolvedValueOnce({ jobs: [], steps: [], outcomes: [], source: "local" });
+
+    const canvas = await fetchCanvas("http://mcp");
+    expect(canvas.source).toBe("local");
+    expect(bff.data.fetchCanvas).toHaveBeenCalled();
+  });
+
+  it("does not fall back for a sidecar 502 that does not mark origin proxy", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ error: { code: "mcp_unreachable", message: "down", retryable: true } }, 502),
+    );
+    await expect(fetchCanvas("http://mcp")).rejects.toThrow();
+    expect(bff.data.fetchCanvas).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the local BFF when a static host answers 200 text/html", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
+    vi.mocked(bff.data.fetchCanvas).mockResolvedValueOnce({ jobs: [], steps: [], outcomes: [], source: "local" });
+
+    const canvas = await fetchCanvas("http://mcp");
+    expect(canvas.source).toBe("local");
+    expect(bff.data.fetchCanvas).toHaveBeenCalled();
   });
 });
 
@@ -139,6 +195,14 @@ describe("streamChat fallback", () => {
       streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {}),
     ).rejects.toThrow();
     expect(bff.chat.stream).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the local BFF when a static host answers 200 text/html", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
+    vi.mocked(bff.chat.stream).mockResolvedValueOnce(undefined);
+
+    await streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {});
+    expect(bff.chat.stream).toHaveBeenCalled();
   });
 });
 

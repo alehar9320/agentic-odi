@@ -16,6 +16,7 @@ import {
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
 import { StudioProvider, useStudio } from "./StudioContext";
+import { LOCAL_BOARD_NOTE } from "../lib/canvasProvenance";
 import { useToasts } from "./notices/NoticesContext";
 import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
 
@@ -73,6 +74,7 @@ let releaseChat: (() => void) | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
 let llmUnhealthy = false;
+let llmTransportFails = false;
 let signalFetches = 0;
 let configHangs = false;
 let configAborts = 0;
@@ -350,6 +352,14 @@ function route(
   }
   if (url === "/api/health/llm") {
     llmHealthFetches += 1;
+    // A dead proxy: the request never reaches a model, so nothing answers. The
+    // 502 with a non-sidecar body is what the studio reads as a transport failure.
+    if (llmTransportFails) {
+      return new Response(JSON.stringify({ detail: "bad gateway" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return json(
       llmUnhealthy
         ? { healthy: false, message: "connection refused" }
@@ -377,6 +387,7 @@ describe("StudioContext memory and resume", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -743,6 +754,7 @@ describe("StudioContext failures", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -858,6 +870,7 @@ describe("StudioContext first run in a browser with no server", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     configAborts = 0;
     catalogFetches = 0;
     featuredFetches = 0;
@@ -1043,6 +1056,63 @@ describe("StudioContext first run in a browser with no server", () => {
     });
     expect(result.current.llmHealth.healthy).toBe(false);
   });
+
+  it("stops probing a dead endpoint and counts down to the next try (#536)", async () => {
+    // A proxy that answers 502 is dead, not flaky: after three transport failures
+    // the breaker opens, the scheduled probe stops spending requests, and the
+    // status the bar reads turns into a countdown.
+    llmTransportFails = true;
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // Step until the breaker opens, so the assertion below sits at the start of a
+    // fresh window rather than somewhere unknown inside it.
+    for (let i = 0; i < 300 && result.current.probeRetry.state !== "open"; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+    }
+    expect(result.current.probeRetry.state).toBe("open");
+    expect(result.current.probeRetry.retryInMs).toBeGreaterThan(0);
+    const spent = llmHealthFetches;
+
+    // Well inside the window the cadence keeps ticking, but the breaker forbids
+    // every request, so nothing is spent.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(result.current.probeRetry.state).toBe("open");
+    expect(llmHealthFetches).toBe(spent);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  });
+
+  it("lets a person asking through an open breaker (#536)", async () => {
+    llmTransportFails = true;
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200_000);
+    });
+    expect(result.current.probeRetry.state).toBe("open");
+    const spent = llmHealthFetches;
+
+    // "Check now" is the person overruling the breaker: it resets and probes.
+    await act(async () => {
+      await result.current.checkConnections();
+    });
+    expect(llmHealthFetches).toBeGreaterThan(spent);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  });
+
 
   it("asks the browser for idle time, and gives it up when the person types", async () => {
     // The branch every real browser takes — jsdom has no requestIdleCallback, so the
@@ -1380,6 +1450,7 @@ describe("StudioContext on a desktop install whose model is down", () => {
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
@@ -1435,6 +1506,7 @@ describe("StudioContext probe scheduling", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.useFakeTimers();
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
@@ -1684,6 +1756,7 @@ describe("StudioContext theme", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
@@ -1803,6 +1876,7 @@ describe("StudioContext canvas state", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -1854,6 +1928,7 @@ describe("StudioContext stopped turns", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -1896,6 +1971,7 @@ describe("StudioContext write approval and branches", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -1990,6 +2066,7 @@ describe("StudioContext boot failure", () => {
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal(
       "fetch",
@@ -2064,6 +2141,7 @@ describe("StudioContext startNewThread (#319)", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -2465,6 +2543,7 @@ describe("StudioContext agent focus", () => {
     canvasFails = false;
     canvasRecords = {};
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -2729,5 +2808,69 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+});
+
+describe("StudioContext when the board is kept in this browser", () => {
+  /**
+   * The board reports where it lives through `source`. The local BFF answers
+   * "browser"; the sidecar answers "mcp", or "local" for its own repository. A
+   * receipt that just says "saved" promises a server that isn't there, so the
+   * browser-kept case must name the store — and every other case must keep its
+   * old, truthful copy.
+   */
+  beforeEach(() => {
+    localStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.startsWith("/api/canvas")) {
+          return json({ jobs: [], steps: [], outcomes: [], source: "browser" });
+        }
+        return route(input, init);
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("tells the visitor which store kept their write", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+    expect(result.current.boardStoredLocally).toBe(true);
+
+    let jobId = "";
+    await act(async () => {
+      jobId =
+        (await result.current.createJob({
+          name: "Get a service from commit to production",
+        })) ?? "";
+    });
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time from merge to production",
+        importance: 9,
+        satisfaction: 3,
+      });
+    });
+
+    const receipts = result.current.toasts.map((toast) => toast.message).join("\n");
+    // "Saved" is not enough on a deployment with no server: a person who later
+    // opens the studio on another machine needs to know the board they wrote is
+    // the one they are standing at.
+    expect(receipts).toContain("Job created: Get a service from commit to production");
+    expect(receipts).toContain(LOCAL_BOARD_NOTE);
+    expect((receipts.match(/Saved in this browser\./g) ?? []).length).toBe(2);
   });
 });

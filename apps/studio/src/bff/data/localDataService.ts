@@ -70,7 +70,7 @@ export class LocalDataService {
       jobs: jobs.map(stripJob),
       steps: steps.map(stripStep),
       outcomes: outcomes.map(stripOutcome),
-      source: "local",
+      source: "browser",
       provenance: {
         kind: empty ? "empty" : "live",
         reason: empty ? "local_store_empty" : "local_store",

@@ -1,20 +1,39 @@
 # Installation
 
 Prebuilt binaries are available for Linux, macOS, and Windows. Install the latest
-release with one command:
+release with one command (Linux, macOS):
 
 ```bash
 curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh
 ```
 
-The installer places the binary under `~/.local/share/agentic-odi/versions/<version>/`,
-creates a `current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and
-`agentic-odi` into `~/.local/bin/`.
+On Windows (PowerShell):
+
+```powershell
+iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
+```
+
+Both installers verify the download against `checksums.txt`. The installer places
+the binary under `~/.local/share/agentic-odi/versions/<version>/`, creates a
+`current` symlink, and symlinks `odi`, `odipm`, `odi-cli`, and `agentic-odi` into
+`~/.local/bin/`.
 
 If `~/.local/bin` is not on your PATH, add it (e.g.,
 `export PATH="$HOME/.local/bin:$PATH"`). On Windows, the PowerShell installer
 uses `~\AppData\Local\agentic-odi\` and copies `.exe` files to
 `~\AppData\Local\agentic-odi\bin\`.
+
+## Prebuilt archives
+
+Prefer a direct archive? Pick the build for your machine and expand it. Every
+release carries each of these with a SHA-256 checksum in `checksums.txt`:
+
+| Platform | Archive |
+|---|---|
+| Linux (x86_64) | [`odi_0.14.0_linux_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz) |
+| macOS (Apple Silicon) | [`odi_0.14.0_macos_arm64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz) |
+| macOS (Intel) | [`odi_0.14.0_macos_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz) |
+| Windows (x86_64) | [`odi_0.14.0_windows_x86_64.zip`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip) |
 
 ## Update
 

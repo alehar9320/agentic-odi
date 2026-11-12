@@ -197,6 +197,12 @@ Studio says so in one place and keeps going:
   in the browser: the conversation, the canvas, and memory are read and written
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
+  all. While that board is the browser's — `canvas.source === "browser"`, the
+  one value `isBrowserCanvas` accepts, since the sidecar's own repository says
+  `local` and `provenance.kind` says *live* for both — the receipt for a job, a
+  step, an outcome, and the first-run context ends with **Saved in this
+  browser.** "Saved" alone would promise a server that is not there, and the
+  next machine would look like it lost their work.
   all.
 - The outbox is shared by every tab in the origin, so two tabs would otherwise
   drain it and send each record twice. `apps/studio/src/bff/outbox.ts` takes a
@@ -297,7 +303,33 @@ rendered as `Error: …` followed by `Hint: Start the MCP server (python -m
 agentic_odi_mcp_server)…`. When the Studio is reached through the free
 Cloudflare Worker proxy, a missing `SIDECAR_URL` is reported to the browser as
 `{"error": {"code": "mcp_unreachable", "suggestion": "Start the studio sidecar
-…"}}` with `X-Request-ID` echoed for support.
+…", "origin": "proxy"}}` with `X-Request-ID` echoed for support. The `origin`
+marker is what tells the SPA this body came from the Worker, not the sidecar,
+so the turn still falls back to the local BFF instead of reading as an answer.
+
+### Where the Studio is running
+
+The Studio can run in four places, and **Settings → About** says which one before
+anyone starts diagnosing. One module, `apps/studio/src/bridge/runtime.ts`, answers
+it; About and the diagnostics bundle read the same answer, so the two cannot
+disagree.
+
+| Host | Label | Reaches the sidecar | Offline shell |
+|---|---|---|---|
+| Installed desktop app (Tauri) | `Desktop app` | Directly, on the sidecar's own origin | as the shell provides |
+| Installed web app (PWA) | `Installed web app` | Same origin as the page | on when a service worker controls the page |
+| Browser tab on this device | `Browser tab` | Same origin; loopback | on when a service worker controls the page |
+| Browser tab on a host | `Browser tab` | Same origin; remote | on when a service worker controls the page |
+
+The **Runtime** row reads `Installed web app · on this device · offline shell on`
+and never a URL or a key. The same facts travel in the diagnostics bundle under
+`app.runtime` (`host`, `install`, `originClass`, `apiTransport`, `offlineShell`,
+`platform`), which still carries no hostname. Host decides the API base, not what
+the app can do: nothing here infers that a model is missing.
+
+Installing is offered only where it is meaningful — in a browser, and only while
+the app is not already its own window. The desktop app and an installed web app
+show no **Install** control, because neither can be installed again.
 
 ### When the database failed its check
 
@@ -335,6 +367,18 @@ fixtures. Its real content is the store's signal inbox
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
 already connected.
+
+The Opportunity Matrix is held to the same rule. It plots a point only for an
+outcome the store actually scored — no default of 5 fills a missing importance
+or satisfaction, and no score is computed from a pair that was never given. An
+unscored outcome is therefore absent from the plot rather than sitting at its
+centre as though it were measured; it appears instead under a **Not scored (n)**
+list below the matrix, where **Score me** opens that outcome's score form without
+inventing a rating. The shaded underserved zone is the score formula itself —
+sampled from `2 × importance − satisfaction > 10` and drawn with its threshold
+line — so the region a point sits in and `isUnderserved` never disagree. The
+pill follows suit: a score the store never computed reads **Not scored**, never
+**Served**.
 
 ### The thread is the room
 
@@ -412,8 +456,9 @@ cites the issue or PR that landed it.
 | `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
 | `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Custom text/file renderers, because claim chips and extraction state need them. | — |
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
-| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter. | #238 |
+| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter; each chip is an `AttachmentPrimitive.Root`. | #238 |
 | `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works through the composer's own handlers with the same accept rules. | — |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`; extraction state, refusal reason and size ride inside `Root` as children, but the sent-turn chip in `parts.tsx` still writes its own markup. | — |
 | `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | The quote shows above the input and can be cleared before send. | #435 |
 | `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | The microphone, hidden where unsupported. | #433 |
 | `ComposerPrimitive.Queue` | Adopted | The pending lane rendered above the composer. | #410 |
@@ -706,54 +751,6 @@ The opportunity thesis is the intent-first card: one opportunity with its
 importance, satisfaction, the gap in plain words, the thesis itself, and the
 smallest next move. It is the shape the agent reaches for when the PM is deciding
 what to chase, rather than when they are inspecting a single score.
-
-An outcome score carries its sample and method: `score_method` is `estimate`,
-`survey`, or `import`, and `importance_n` / `satisfaction_n` hold how many people
-stand behind each dimension when known. Omitted counts stay unknown — the CLI and
-the opportunity landscape render them as `est.`, never `n=0`, and show both
-counts (`n=40/12 (survey)`) when the dimensions differ. An `estimate` claiming a
-count above one is rejected before the write.
-
-A recorded sample below the advisory threshold (`MIN_MEANINGFUL_N = 20`) is
-flagged, not hidden. One shared read decides it — `evaluation.n_advisory` in the
-core and `nAdvisory` in `lib/odi.ts` — so the CLI footer, the `desired-outcomes
-get` `advisory` line and the landscape's `n<20` chip word the warning
-identically: the count, the dimension that triggered it (the smaller of the two),
-and the threshold. The advisory is a statement about the data, never a verdict on
-the score, so the row still renders and still ranks; an estimate or an unknown
-count produces no advisory rather than a fabricated `n=0`.
-
-Each accepted score change is also recorded as a `ScoreSnapshot` in the same
-append-only event log, so a score's history replays with the store. The sidecar
-exposes it at `GET /api/outcomes/{outcome_id}/history`; `ScoreSnapshot` is
-exported from `types.ts` and read through `fetchOutcomeHistory`. A snapshot
-carries the score and its sample/method companions plus an optional `note`
-(max 500 chars) recording why the number was given. A rejected mutation writes
-no snapshot, so the history never shows a change that did not happen. The
-selected outcome's detail card reads this history and shows the most recent
-reason as a `note` line; the list cards do not, so a board does not issue one
-request per outcome.
-
-The signed change across that history is exposed separately at
-`GET /api/outcomes/{outcome_id}/delta` (`since` optional), so the history list
-keeps one shape across the local and MCP backends. The response carries the
-per-dimension and opportunity differences plus a `direction` (`up`/`down`/
-`flat`) taken from the opportunity sign — a consumer never infers an
-"improvement" from a bare number. A missing dimension stays `null`, not `0`.
-
-The alternatives inventory records what a customer uses today for each Job — a
-product, a service, a workaround, a manual process, or `nothing` — and rates each
-against an outcome with the customer's own `adequacy` (1–10). The sidecar exposes
-`GET /api/alternatives` (optionally `?job_id=`), `GET /api/alternatives/{id}`,
-`POST /api/alternatives`, `DELETE /api/alternatives/{id}`, plus the per-outcome
-link reads and writes at `GET /api/outcomes/{id}/alternatives`,
-`POST /api/outcomes/{id}/alternatives`, `DELETE /api/outcomes/{id}/alternatives/{alternative_id}`
-and `GET /api/outcomes/{id}/existing-solution`. `Alternative`, `AlternativeLink`,
-`ExistingSolution` and `OutcomeAlternative` are exported from `types.ts` and read
-through `fetchAlternatives` / `linkAlternative`. The `existing-solution` read
-returns the explicit three-state result `yes | no_linked_nothing | no_link_at_all`,
-so the outcome detail can distinguish "we asked and there is nothing" from "we
-have not asked" without inferring a solution from a score.
 
 The segment card is the answer to "who is this for?": the people, the job they
 are doing, the step their outcomes cluster on, and the verdict those outcomes
