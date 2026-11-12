@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -50,10 +51,23 @@ def _write(payload: dict[str, Any]) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         os.chmod(path.parent, stat.S_IRWXU)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload), encoding="utf-8")
-        os.chmod(tmp, stat.S_IRUSR | stat.S_IWUSR)
-        tmp.replace(path)
+        # A unique temporary file per write so concurrent writers cannot clobber
+        # each other's key: two writers sharing one tmp pathname could install
+        # the wrong key and report success for it. The destination is replaced
+        # only after the write completes, and the temp file is removed on any
+        # failure so a partial write can never be mistaken for the store.
+        fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as tmp:
+                tmp.write(json.dumps(payload))
+            os.chmod(tmp_name, stat.S_IRUSR | stat.S_IWUSR)
+            os.replace(tmp_name, path)
+        except BaseException:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
     except OSError as exc:
         raise SecretStoreError("The secret store is not writable.") from exc
 
