@@ -71,7 +71,8 @@ declare global {
   }
 }
 
-/** Force a theme before the app boots, the way the Settings panel would. */
+/** Force a theme before the app boots, the way the Settings panel would. The
+ *  settings blob here carries no key, so a stored object cannot leak one. */
 async function setTheme(page: Page, theme: Theme): Promise<void> {
   await page.addInitScript((value) => {
     const raw = window.localStorage.getItem("studio.settings");

@@ -33,7 +33,8 @@ describe("settings never keep the model key in the browser", () => {
     clearLegacyApiKey();
 
     const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}");
-    expect(stored.api_key).toBe("");
+    // The field is dropped, not blanked: nothing a script reads holds a key.
+    expect("api_key" in stored).toBe(false);
     expect(localStorage.getItem(SETTINGS_KEY)).not.toContain("sk-DO-NOT-LEAK");
     expect(stored.model_name).toBe("local-tools-model");
   });
