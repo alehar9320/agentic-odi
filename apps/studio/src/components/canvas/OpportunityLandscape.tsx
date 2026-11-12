@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 
-import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
+import { canvasHasRecords, canvasStatus, keptByBrowserCaption, savedCopyCaption } from "../../lib/canvasProvenance";
 import {
   formatAdvances,
   formatOpportunityScore,
@@ -70,6 +70,9 @@ export function OpportunityLandscape() {
   // say when it was saved. A warm reload with live data draws it too but gets
   // no caption, because that data is not a saved copy.
   const savedCaption = canvasCached && hasRecords ? savedCopyCaption(canvas) : null;
+  // A write the sidecar could not take was kept here. Say so rather than let the
+  // board read as though the server already holds it.
+  const keptCaption = keptByBrowserCaption(canvas);
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -217,6 +220,12 @@ export function OpportunityLandscape() {
       {savedCaption && showBoard ? (
         <p className="canvas-saved" role="status">
           {savedCaption}
+        </p>
+      ) : null}
+
+      {keptCaption && showBoard ? (
+        <p className="canvas-saved" role="status">
+          {keptCaption}
         </p>
       ) : null}
 
