@@ -5139,6 +5139,29 @@ details[open] summary {
   text-transform: uppercase;
 }
 
+/* What a note is about: the parent record, its id, and its title. */
+.memory-item__subject {
+  margin: 2px 0 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  text-align: left;
+  background: none;
+  border: none;
+}
+
+.memory-item__subject--link {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.memory-item__subject--link:hover {
+  color: var(--text);
+}
+
 .memory-item__text {
   margin: 0;
   font-size: 0.9rem;

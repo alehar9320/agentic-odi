@@ -569,6 +569,15 @@ Each note is `suggested` or `confirmed`. Suggested notes appear first under
 confirmed notes can be edited or forgotten. The PM can also add a note by hand.
 Nothing is silently promoted: the agent may propose, but the person decides.
 
+A note may also name a **subject**: the job, step, outcome, or evidence it is
+about (`subject_type` plus `subject_id`). The panel renders that as the record's
+own words — its parent job, its id, and its title — and clicking it focuses the
+record on the canvas. A note that names no subject says so, and one whose subject
+is no longer on the canvas says that instead of showing a bare id. Repeating a
+note with the same text and subject updates the existing row rather than adding a
+duplicate. `GET /api/memory/observations` accepts `subject_type` and `subject_id`
+to return only the notes about one record.
+
 The agent writes notes through a `remember` tool during a normal reply. The
 sidecar applies it, emits a `memory` SSE event, and the panel updates without a
 refresh. Memory writes are best-effort — a database failure never turns a good
