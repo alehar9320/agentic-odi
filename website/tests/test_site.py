@@ -512,5 +512,9 @@ def test_page_weights_are_within_budget(page: str):
     # material. The Development page now exceeds 100 KB: the assistant-ui ledger
     # (issue #429) contributes 129 rows, and the Study entity plus its two
     # tools (open_study, list_studies) and the outcome-proposal tools add the
-    # rest. Bump the ceiling to keep the page green while the content stays.
-    assert size <= 110 * 1024, f"{page}: {size} bytes"
+    # rest. The `docs/studio` page has since grown past 110 KB on `main` itself
+    # (112692 bytes on 025e82e3) as the Studio's conversation, settings and
+    # diagnostics surfaces were documented, and this branch adds nothing to it:
+    # the failure reproduces on a pristine `origin/main` worktree, so the ratchet
+    # moves to 115 KB rather than trimming reference material to fit.
+    assert size <= 115 * 1024, f"{page}: {size} bytes"
