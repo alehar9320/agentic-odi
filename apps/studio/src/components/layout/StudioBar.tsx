@@ -17,10 +17,12 @@ import {
   PlugIcon,
   PlusIcon,
   SettingsIcon,
+  SparkIcon,
   SunIcon,
 } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 import { StatusDot } from "../status/StatusDot";
+import { CapabilityPopover } from "../capabilities/CapabilityPopover";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
@@ -37,6 +39,8 @@ export function StudioBar({
   onChangelog: () => void;
 }) {
   const {
+    capabilities,
+    capabilitiesCheckedAt,
     conversationId,
     conversations,
     llmHealth,
@@ -62,7 +66,9 @@ export function StudioBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const capabilityRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
+  const [capabilityOpen, setCapabilityOpen] = useState(false);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [askOpen, setAskOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
@@ -169,6 +175,19 @@ export function StudioBar({
     }
   }, [historyOpen, reduceMotion]);
 
+  useEffect(() => {
+    if (!capabilityOpen) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (capabilityRef.current && !capabilityRef.current.contains(event.target as Node)) {
+        setCapabilityOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    return () => window.removeEventListener("mousedown", onPointerDown);
+  }, [capabilityOpen]);
+
   function toggleHistory() {
     setHistoryOpen((open) => {
       if (!open) {
@@ -258,6 +277,28 @@ export function StudioBar({
       </div>
 
       <div className="bar__right">
+        <div className="bar__capability" ref={capabilityRef}>
+          <button
+            type="button"
+            className="studio-pill pill-works"
+            onClick={() => setCapabilityOpen((open) => !open)}
+            aria-label="What works here"
+            aria-haspopup="dialog"
+            aria-expanded={capabilityOpen}
+            title="What works here — one answer for this device"
+          >
+            <SparkIcon size={15} />
+            What works here
+          </button>
+          <CapabilityPopover
+            capabilities={capabilities}
+            checkedAt={capabilitiesCheckedAt}
+            isOpen={capabilityOpen}
+            onClose={() => setCapabilityOpen(false)}
+            onOpenSettings={() => openPanel("settings")}
+          />
+        </div>
+
         <button
           type="button"
           className="studio-pill pill-customize"

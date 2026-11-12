@@ -344,6 +344,207 @@ a {
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
+/* The bar's "what works here" control: a quiet pill that names the question,
+   never the answer. It is the only control whose label changes with state and
+   still says the same thing — the wording stays, the device answers in the
+   popover it opens. */
+.bar__capability {
+  position: relative;
+  display: inline-flex;
+}
+
+.pill-works {
+  color: var(--text);
+}
+
+.pill-works:hover {
+  background: var(--surface-hover);
+}
+
+.capability-popover-wrap {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 300px;
+  max-width: min(360px, calc(100vw - 24px));
+}
+
+.capability-scrim {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.capability-popover {
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.5);
+  font-size: 0.82rem;
+}
+
+.capability-popover__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.capability-popover__badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.capability-popover__title {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.capability-popover__subtitle {
+  margin: 2px 0 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.capability-popover__close {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 2px;
+}
+
+.capability-popover__body {
+  padding: 10px 14px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.capability-popover__empty {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--muted);
+}
+
+.capability-popover__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.capability-popover__row + .capability-popover__row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.capability-popover__word {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.capability-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
+}
+
+.capability-dot--works {
+  background: var(--green, #4ade80);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12);
+}
+
+.capability-dot--sidecar {
+  background: var(--amber);
+  box-shadow: 0 0 0 3px rgba(240, 179, 74, 0.14);
+}
+
+.capability-dot--model {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(139, 140, 248, 0.12);
+}
+
+.capability-dot--unknown {
+  background: #5b616c;
+  box-shadow: none;
+}
+
+@media (forced-colors: active) {
+  .capability-dot {
+    border: 1px solid CanvasText;
+  }
+}
+
+.capability-popover__label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.capability-popover__description {
+  margin: 4px 0 0 17px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.capability-popover__state {
+  margin: 4px 0 0 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.capability-popover__reason {
+  margin: 2px 0 0 17px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.capability-popover__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.capability-popover__action {
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.capability-popover__action:hover {
+  background: var(--surface-hover);
+}
+
+.capability-popover__action--ghost {
+  background: transparent;
+}
+
+.capability-popover__action:not(.capability-popover__action--ghost) {
+  background: var(--accent);
+  color: var(--accent-contrast, var(--text));
+  border-color: transparent;
+}
+
 .bar__menu-item {
   display: block;
   width: 100%;

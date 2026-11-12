@@ -16,6 +16,8 @@ const stub = vi.hoisted(() => {
   const noop = () => {};
   return {
     studio: {
+      capabilities: [],
+      capabilitiesCheckedAt: null,
       llmHealth: { healthy: true, message: "ok" },
       probeRetry: { state: "closed", retryInMs: 0 },
       messages: [
@@ -78,4 +80,33 @@ it("asks before discarding a reply, and hangs below the control that opened it",
   await userEvent.click(screen.getByRole("button", { name: "Stop and start" }));
   await expect.element(ask).not.toBeInTheDocument();
   expect(onNew).toHaveBeenCalledWith({ stop: true });
+});
+
+it("offers a quiet What works here control that opens an honest list", async () => {
+  stub.studio.capabilities = [
+    {
+      id: "local-data",
+      label: "Local canvas data",
+      description: "Jobs, steps, and outcomes stored in your browser.",
+      status: "available",
+    },
+    {
+      id: "sidecar-mcp",
+      label: "Sidecar MCP",
+      description: "Runs MCP servers through the sidecar.",
+      status: "unavailable",
+    },
+  ];
+  const screen = await render(
+    <StudioBar onHome={vi.fn()} onNew={vi.fn()} onChangelog={vi.fn()} />,
+  );
+
+  const control = screen.getByRole("button", { name: "What works here" });
+  await expect.element(control).toBeVisible();
+  await userEvent.click(control);
+
+  const popover = screen.getByRole("dialog", { name: "What works here" });
+  await expect.element(popover).toBeVisible();
+  await expect.element(screen.getByText("Works here")).toBeVisible();
+  await expect.element(screen.getByText("Unknown — not checked yet")).toBeVisible();
 });
