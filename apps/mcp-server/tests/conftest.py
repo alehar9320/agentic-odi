@@ -9,6 +9,7 @@ from typing import Any  # noqa: E402
 
 import pytest  # noqa: E402
 from agentic_odi_mcp_server import (  # noqa: E402
+    candidates_db,
     customer_outcomes_db,
     evidence_db,
     jobs_db,
@@ -28,6 +29,7 @@ def reset_db() -> Generator[None, Any, None]:
     customer_outcomes_db.clear()
     evidence_db.clear()
     signals_db.clear()
+    candidates_db.clear()
     segments_db.clear()
     strategies_db.clear()
     yield

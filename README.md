@@ -193,6 +193,16 @@ disruptive for an overserved one, new-market for outcomes that map to no job in
 the store — recording the two it rejected. An outcome that joins no cluster is
 reported as unclustered, never inflated into a market.
 
+**See the loop in ninety seconds.** The
+[ninety-second tour](docs/tour/README.md) walks quote → candidate → outcome →
+brief on a labelled sample workspace, with a generated transcript and a
+committed terminal cast:
+
+```bash
+odi demo load                        # a labelled sample you can explore
+odi summary demo-job-1 --top 3       # the landscape
+```
+
 ## Connect your agent
 
 The server speaks the Model Context Protocol. Any MCP client can reach it:
@@ -217,9 +227,13 @@ soon". See [External Connectors](docs/connectors.md).
 | Guide | Contents |
 |---|---|
 | [The Living Studio](docs/living-studio.md) | The chat-first interface, first run, approvals, memory, and the desktop app |
+| [Interviews](docs/interviews.md) | Quote → candidate → outcome: propose, review, and accept |
+| [Scoring](docs/scoring.md) | The opportunity score, its basis, bands, and the landscape |
+| [Decisions](docs/decision.md) | Brief → decision → bet → measure, and the honest empty states |
 | [CLI Reference](docs/cli.md) | Backends, chat, entities, scoring, and environment variables |
 | [The Method, Stage by Stage](docs/method.md) | The eight job-map stages as a practitioner works them — what each is for, the mistakes, and the commands |
 | [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
+| [Integrate an Agent](docs/integration.md) | Connect an external agent over MCP: connect, read, write under consent, and errors |
 | [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
 | [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
 | [Reuse First](docs/architecture/reuse.md) | The ladder agents walk before writing code: reuse what exists, adopt what is declared, copy with provenance, then build |

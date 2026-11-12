@@ -25,7 +25,10 @@ CONNECTOR_TYPES_FILE = "packages/connectors/src/agentic_odi_connectors/models.py
 #: ``discriminator`` — the source record's stable key, used to deduplicate ingest
 #: and dropped when the draft becomes a stored record. Anything else that appears
 #: on only one side is drift and has to be added here on purpose.
-DOMAIN_ONLY = {"id"}
+#: ``origin`` records where a stored row came from (``user`` or the ``demo``
+#: corpus). The caller that persists the draft stamps it; a connector cannot know
+#: it, so it is declared here rather than invented on the transport shape.
+DOMAIN_ONLY = {"id", "origin"}
 DRAFT_ONLY = {"discriminator"}
 
 
