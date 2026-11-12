@@ -1,6 +1,35 @@
 import { Fragment } from "react";
 
 import { parseMarkdown, type MdBlock, type MdInline } from "../../lib/markdown";
+import { useCopyConfirmation } from "../../lib/useCopyConfirmation";
+import { CheckIcon, CopyIcon } from "../icons";
+
+/**
+ * A code block with a copy control that appears on hover and on focus-within.
+ *
+ * The control stays in the tab order — revealed by keyboard focus, not hidden
+ * from it — and writes the exact code, so a snippet can be taken without
+ * selecting it by hand. The tick holds for the shared confirmation window.
+ */
+export function CopyableCode({ code, className = "md-pre" }: { code: string; className?: string }) {
+  const { copied, copy } = useCopyConfirmation();
+  return (
+    <div className="code-block">
+      <pre className={className}>
+        <code>{code}</code>
+      </pre>
+      <button
+        type="button"
+        className="code-block__copy quiet-action"
+        aria-label={copied ? "Code copied" : "Copy code"}
+        onClick={() => void copy(code)}
+      >
+        {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </div>
+  );
+}
 
 function renderSpans(spans: MdInline[]) {
   return spans.map((span, index) => {
@@ -40,11 +69,7 @@ function Block({ block }: { block: MdBlock }) {
       return <Tag className="md-heading">{renderSpans(block.spans)}</Tag>;
     }
     case "code":
-      return (
-        <pre className="md-pre">
-          <code>{block.code}</code>
-        </pre>
-      );
+      return <CopyableCode code={block.code} />;
     case "list": {
       const items = block.items.map((item, index) => <li key={index}>{renderSpans(item)}</li>);
       return block.ordered ? (
