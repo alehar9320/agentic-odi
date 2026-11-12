@@ -14,8 +14,6 @@ interface ActivityCentreProps {
 const EMPTY_STATE_MESSAGE = "Nothing has happened yet in this workspace.";
 
 export function ActivityCentre({ isOpen, onClose }: ActivityCentreProps) {
-  if (!isOpen) return null;
-
   const { loadNotices, saveNotices } = useStudio();
   const [notices, setNotices] = useState<StoredNotice[]>([]);
   const [groups, setGroups] = useState<{ label: string; items: StoredNotice[] }[]>([]);
@@ -25,12 +23,13 @@ export function ActivityCentre({ isOpen, onClose }: ActivityCentreProps) {
 
   // Load notices when store is available
   useEffect(() => {
+    if (!isOpen) return;
     loadNotices().then((loaded) => {
       setNotices(loaded);
       setGroups(groupNoticesByDay(loaded));
       setUnreadCount(loaded.filter((n) => !n.dismissed).length);
     });
-  }, [loadNotices]);
+  }, [isOpen, loadNotices]);
 
   // Focus management
   useEffect(() => {

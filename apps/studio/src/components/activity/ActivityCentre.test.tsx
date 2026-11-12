@@ -10,6 +10,21 @@ vi.mock("../../state/StudioContext", () => ({
 
 import { useStudio } from "../../state/StudioContext";
 
+type StudioMock = {
+  store: object;
+  loadNotices: () => Promise<StoredNotice[]>;
+  saveNotices: (notices: StoredNotice[]) => Promise<void>;
+};
+
+function mockStudioContext(overrides: Partial<StudioMock> = {}) {
+  vi.mocked(useStudio).mockReturnValue({
+    store: {},
+    loadNotices: vi.fn().mockResolvedValue([]),
+    saveNotices: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  } as ReturnType<typeof useStudio>);
+}
+
 const mockNotices: StoredNotice[] = [
   {
     id: "notice-1",
@@ -46,6 +61,7 @@ describe("ActivityCentre", () => {
   });
 
   it("renders nothing when not open", () => {
+    mockStudioContext();
     const { queryByRole } = render(
       <ActivityCentre isOpen={false} onClose={vi.fn()} />,
     );
@@ -53,11 +69,9 @@ describe("ActivityCentre", () => {
   });
 
   it("renders empty state when no notices", async () => {
-    vi.mocked(useStudio).mockReturnValue({
-      store: {} as any,
+    mockStudioContext({
       loadNotices: vi.fn().mockResolvedValue([]),
-      saveNotices: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    });
 
     const { getByRole } = render(<ActivityCentre isOpen={true} onClose={vi.fn()} />);
 
@@ -69,11 +83,9 @@ describe("ActivityCentre", () => {
   });
 
   it("renders notices grouped by day", async () => {
-    vi.mocked(useStudio).mockReturnValue({
-      store: {} as any,
+    mockStudioContext({
       loadNotices: vi.fn().mockResolvedValue(mockNotices),
-      saveNotices: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    });
 
     const { getByRole } = render(<ActivityCentre isOpen={true} onClose={vi.fn()} />);
 
@@ -93,11 +105,9 @@ describe("ActivityCentre", () => {
   });
 
   it("shows severity labels", async () => {
-    vi.mocked(useStudio).mockReturnValue({
-      store: {} as any,
+    mockStudioContext({
       loadNotices: vi.fn().mockResolvedValue(mockNotices),
-      saveNotices: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    });
 
     render(<ActivityCentre isOpen={true} onClose={vi.fn()} />);
 
@@ -109,11 +119,9 @@ describe("ActivityCentre", () => {
   });
 
   it("shows Mark all read button when there are unread notices", async () => {
-    vi.mocked(useStudio).mockReturnValue({
-      store: {} as any,
+    mockStudioContext({
       loadNotices: vi.fn().mockResolvedValue(mockNotices),
-      saveNotices: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    });
 
     render(<ActivityCentre isOpen={true} onClose={vi.fn()} />);
 
@@ -124,11 +132,9 @@ describe("ActivityCentre", () => {
 
   it("does not show Mark all read button when all notices are dismissed", async () => {
     const allDismissed = mockNotices.map((n) => ({ ...n, dismissed: true }));
-    vi.mocked(useStudio).mockReturnValue({
-      store: {} as any,
+    mockStudioContext({
       loadNotices: vi.fn().mockResolvedValue(allDismissed),
-      saveNotices: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    });
 
     render(<ActivityCentre isOpen={true} onClose={vi.fn()} />);
 
@@ -139,11 +145,10 @@ describe("ActivityCentre", () => {
 
   it("dismisses a notice when dismiss button is clicked", async () => {
     const saveNotices = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(useStudio).mockReturnValue({
-      store: {} as any,
+    mockStudioContext({
       loadNotices: vi.fn().mockResolvedValue(mockNotices),
       saveNotices,
-    } as any);
+    });
 
     render(<ActivityCentre isOpen={true} onClose={vi.fn()} />);
 
@@ -155,18 +160,17 @@ describe("ActivityCentre", () => {
 
     await waitFor(() => {
       expect(saveNotices).toHaveBeenCalled();
-      const savedNotices = saveNotices.mock.calls[0][0];
-      expect(savedNotices.find((n: StoredNotice) => n.id === "notice-1")?.dismissed).toBe(true);
+      const savedNotices = vi.mocked(saveNotices).mock.calls[0][0];
+      expect(savedNotices.find((n) => n.id === "notice-1")?.dismissed).toBe(true);
     });
   });
 
   it("marks all as read when Mark all read is clicked", async () => {
     const saveNotices = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(useStudio).mockReturnValue({
-      store: {} as any,
+    mockStudioContext({
       loadNotices: vi.fn().mockResolvedValue(mockNotices),
       saveNotices,
-    } as any);
+    });
 
     render(<ActivityCentre isOpen={true} onClose={vi.fn()} />);
 
@@ -178,18 +182,16 @@ describe("ActivityCentre", () => {
 
     await waitFor(() => {
       expect(saveNotices).toHaveBeenCalled();
-      const savedNotices = saveNotices.mock.calls[0][0];
-      expect(savedNotices.every((n: StoredNotice) => n.dismissed)).toBe(true);
+      const savedNotices = vi.mocked(saveNotices).mock.calls[0][0];
+      expect(savedNotices.every((n) => n.dismissed)).toBe(true);
     });
   });
 
   it("closes on Escape key", async () => {
     const onClose = vi.fn();
-    vi.mocked(useStudio).mockReturnValue({
-      store: {} as any,
+    mockStudioContext({
       loadNotices: vi.fn().mockResolvedValue(mockNotices),
-      saveNotices: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    });
 
     render(<ActivityCentre isOpen={true} onClose={onClose} />);
 
@@ -206,11 +208,9 @@ describe("ActivityCentre", () => {
   });
 
   it("has close button", async () => {
-    vi.mocked(useStudio).mockReturnValue({
-      store: {} as any,
+    mockStudioContext({
       loadNotices: vi.fn().mockResolvedValue(mockNotices),
-      saveNotices: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    });
 
     render(<ActivityCentre isOpen={true} onClose={vi.fn()} />);
 
