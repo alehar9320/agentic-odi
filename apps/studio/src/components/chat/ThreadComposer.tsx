@@ -7,7 +7,13 @@
  * setup wizard's composer.
  */
 
-import { AuiIf, ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
+import {
+  AttachmentPrimitive,
+  AuiIf,
+  ComposerPrimitive,
+  useAui,
+  useAuiState,
+} from "@assistant-ui/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
@@ -42,7 +48,7 @@ const acceptedTextExtensions = acceptedAttachmentTypes.filter((type) => type.sta
 const acceptedImageTypes = acceptedAttachmentTypes
   .filter((type) => type.startsWith("image/"))
   .map((type) => type.slice("image/".length).toUpperCase());
-const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*), Word documents (.docx), and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text and Word files up to ${MAX_ATTACHMENT_CHARS.toLocaleString()} characters.`;
+const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*), Word documents (.docx), and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files up to ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")} characters, longer files are refused.`;
 
 /** The local preview for an image before it is ever sent. */
 function AttachmentThumb({ file }: { file?: File }) {
@@ -67,12 +73,7 @@ function AttachmentThumb({ file }: { file?: File }) {
   return <img className="attachment-chip__thumb" src={url} alt="" />;
 }
 
-function AttachmentRow({
-  onRemove,
-}: {
-  onRemove?: (index: number) => void;
-}) {
-  const aui = useAui();
+function AttachmentRow({ onRemove }: { onRemove?: () => void }) {
   const attachments = useAuiState((state) => state.composer.attachments);
 
   if (attachments.length === 0) {
@@ -84,39 +85,49 @@ function AttachmentRow({
       <p className="attachment-count" aria-live="polite">
         {attachments.length} of {MAX_ATTACHMENTS} files
       </p>
-      {attachments.map((attachment, index) => {
-        const failed =
-          attachment.status.type === "incomplete" && attachment.status.reason === "error";
-        const size = failed ? "" : formatFileSize(attachment.file?.size ?? 0);
-        return (
-          <span
-            className={`attachment-chip${failed ? " attachment-chip--failed" : ""}`}
-            role="listitem"
-            key={attachment.id}
-          >
-            <AttachmentThumb file={attachment.file} />
-            <span className="attachment-chip__meta">
-              <span className="attachment-chip__name">{attachment.name}</span>
-              {failed ? (
-                <span className="attachment-chip__failure">{ATTACHMENT_READ_FAILURE}</span>
-              ) : size ? (
-                <span className="attachment-chip__size">{size}</span>
-              ) : null}
-            </span>
-            <button
-              type="button"
-              className="attachment-chip__remove"
-              aria-label={`Remove ${attachment.name}`}
-              onClick={() => {
-                void aui.composer.attachment({ index }).remove();
-                onRemove?.(index);
-              }}
+      {/* `Attachments` scopes each chip to its own attachment, so `Root`,
+          `Name` and `Remove` read and act on the right one; the extraction
+          state, the refusal reason and the size ride inside `Root` as children. */}
+      <ComposerPrimitive.Attachments>
+        {({ attachment }) => {
+          const status = attachment.status;
+          const failed = status.type === "incomplete" && status.reason === "error";
+          const failureMessage =
+            status.type === "incomplete" && status.reason === "error" && status.message
+              ? status.message
+              : ATTACHMENT_READ_FAILURE;
+          const size = failed ? "" : formatFileSize(attachment.file?.size ?? 0);
+          return (
+            <AttachmentPrimitive.Root
+              className={`attachment-chip${failed ? " attachment-chip--failed" : ""}`}
+              role="listitem"
             >
-              ✕
-            </button>
-          </span>
-        );
-      })}
+              {isImageLike(attachment.contentType ?? "") ? (
+                <AttachmentPrimitive.unstable_Thumb>
+                  <AttachmentThumb file={attachment.file} />
+                </AttachmentPrimitive.unstable_Thumb>
+              ) : null}
+              <span className="attachment-chip__meta">
+                <span className="attachment-chip__name">
+                  <AttachmentPrimitive.Name />
+                </span>
+                {failed ? (
+                  <span className="attachment-chip__failure">{failureMessage}</span>
+                ) : size ? (
+                  <span className="attachment-chip__size">{size}</span>
+                ) : null}
+              </span>
+              <AttachmentPrimitive.Remove
+                className="attachment-chip__remove"
+                aria-label={`Remove ${attachment.name}`}
+                onClick={() => onRemove?.()}
+              >
+                ✕
+              </AttachmentPrimitive.Remove>
+            </AttachmentPrimitive.Root>
+          );
+        }}
+      </ComposerPrimitive.Attachments>
     </div>
   );
 }
