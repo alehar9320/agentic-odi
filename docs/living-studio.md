@@ -360,7 +360,12 @@ fixtures. Its real content is the store's signal inbox
 `/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
-already connected.
+already connected. When a capability the control needs is known to be absent,
+the control stays disabled and says why directly beneath it — one sentence and
+one real next action (`Start the local service`, `Add a model`), sourced from
+the single `blockedReason` table, with the reason tied to the control through
+`aria-describedby` rather than repeated as a global banner. A block is explained
+where the person pressed, not in a strip above the work.
 
 The Opportunity Matrix is held to the same rule. It plots a point only for an
 outcome the store actually scored — no default of 5 fills a missing importance

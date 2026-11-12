@@ -39,6 +39,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
   ({
     connectors: [],
     connectorsError: null,
+    capabilities: [],
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
     deleteConnector: vi.fn().mockResolvedValue(undefined),
     closeCustomize: vi.fn(),
@@ -222,5 +223,56 @@ describe("CustomizePage", () => {
 
     expect(screen.getByText("Needs a local runtime")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add" })).not.toBeInTheDocument();
+  });
+});
+
+describe("CustomizePage blocked install", () => {
+  it("explains a blocked install at the control, with one next action", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        capabilities: [
+          {
+            id: "sidecar-connectors",
+            label: "Sidecar connectors",
+            description: "Adds third-party data sources through the sidecar.",
+            status: "unavailable",
+            reason: "The sidecar did not answer.",
+          },
+        ],
+      }),
+    );
+
+    render(<CustomizePage />);
+
+    const add = screen.getAllByRole("button", { name: "Add" })[0];
+    expect(add).toBeDisabled();
+    const describedBy = add.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+
+    const note = document.getElementById(describedBy as string);
+    expect(note?.textContent).toContain("needs the local service");
+    expect(
+      screen.getAllByRole("button", { name: "Start the local service" }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("says nothing when the sidecar is available", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        capabilities: [
+          {
+            id: "sidecar-connectors",
+            label: "Sidecar connectors",
+            description: "Adds third-party data sources through the sidecar.",
+            status: "available",
+          },
+        ],
+      }),
+    );
+
+    render(<CustomizePage />);
+
+    expect(screen.getAllByRole("button", { name: "Add" })[0]).toBeEnabled();
+    expect(screen.queryByText(/needs the local service/)).toBeNull();
   });
 });

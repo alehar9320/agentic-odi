@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useStudio } from "../../state/StudioContext";
+import { useCapabilityGate } from "../../state/deviceStatus";
 import type { MarketplaceListing } from "../../types";
 import { FailurePanel } from "../FailurePanel";
+import { BlockedReasonNote } from "../BlockedReasonNote";
 import { ArrowLeftIcon, CheckIcon, CompassIcon, SearchIcon } from "../icons";
 
 /** A listing installs under its connector name, which can differ from its display name. */
@@ -278,6 +280,10 @@ function ListingCard({
   onInstall: () => void;
 }) {
   const name = listing.title ?? listing.name;
+  // Installing a connector is a sidecar write. When the capability model says
+  // the sidecar is absent, the button says why in place instead of failing.
+  const gate = useCapabilityGate(["sidecar-connectors"]);
+  const blockedId = `${useId()}-blocked`;
 
   return (
     <article className="connector-card">
@@ -319,7 +325,9 @@ function ListingCard({
           <button
             type="button"
             className="button connector-card__install"
-            disabled={installing}
+            disabled={installing || !gate.allowed}
+            aria-describedby={gate.allowed ? undefined : blockedId}
+            title={gate.allowed ? undefined : gate.reason ?? undefined}
             onClick={onInstall}
           >
             {installing ? "Adding…" : "Add"}
@@ -340,6 +348,9 @@ function ListingCard({
           </a>
         ) : null}
       </div>
+      {listing.installable && !gate.allowed ? (
+        <BlockedReasonNote capability="sidecar-connectors" id={blockedId} />
+      ) : null}
     </article>
   );
 }

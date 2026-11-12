@@ -7327,3 +7327,18 @@ textarea,
 [contenteditable="true"] {
   caret-color: var(--accent);
 }
+
+/* blocked actions */
+/* The reason sits under the control it explains, quieter than the control and
+   never a second alert: the person reads why at the moment they pressed. */
+.blocked-reason {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.blocked-reason__action {
+  color: var(--accent);
+  font-weight: 600;
+}
