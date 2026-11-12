@@ -63,6 +63,33 @@ test.describe("the workspace", () => {
     await expect(lens(page)).toBeHidden();
   });
 
+  test("says which conversation and which artifact the lens shows", async ({ page, request }) => {
+    await seedOutcomes(request, [OUTCOME]);
+    await openStudio(page);
+
+    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+
+    const crumb = lens(page).getByRole("navigation", { name: "Where you are" });
+    await expect(crumb).toBeVisible();
+    await expect(crumb.getByText("Landscape")).toHaveAttribute("aria-current", "page");
+  });
+
+  test("switches to a sibling view from the lens header", async ({ page, request }) => {
+    await seedOutcomes(request, [OUTCOME]);
+    await openStudio(page);
+
+    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+
+    const switcher = lens(page).getByRole("navigation", { name: "Workspace views" });
+    await switcher.getByRole("button", { name: /^Job map/ }).click();
+
+    await expect(lens(page)).toHaveAttribute("aria-label", "Universal job map");
+    await expect(switcher.getByRole("button", { name: /^Job map/ })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
   test("offers a way into the settings", async ({ page }) => {
     await openStudio(page);
 

@@ -5035,13 +5035,49 @@ details[open] summary {
 }
 
 .lens__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px 12px;
   flex: none;
-  padding: 16px 18px 14px;
+  padding: 14px 18px 12px;
   border-bottom: 1px solid var(--line);
+}
+
+/* Where you are: the thread, then the lens. Both are quiet — the heading below
+   carries the weight, and the crumb only answers "which conversation". */
+.lens__crumb {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.7rem;
+  color: var(--faint);
+}
+
+.lens__crumb-thread {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lens__crumb-sep {
+  flex: none;
+  opacity: 0.6;
+}
+
+.lens__crumb-view {
+  flex: none;
+  color: var(--muted);
+}
+
+.lens__headline {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
 }
 
 .lens__heading {
@@ -5049,6 +5085,74 @@ details[open] summary {
   align-items: flex-start;
   gap: 11px;
   min-width: 0;
+}
+
+/* Siblings of the open lens, each with the count the rail shows. It is a `nav`
+   of locations, not a tablist: picking one is going somewhere, not switching a
+   tab in place. */
+.lens__views {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.lens__views::-webkit-scrollbar {
+  display: none;
+}
+
+.lens__view {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.lens__view:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.lens__view:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.lens__view.is-current {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.lens__view-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--faint);
+}
+
+.lens__view.is-current .lens__view-icon {
+  color: var(--accent);
+}
+
+.lens__view-count {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.lens__close {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .lens__icon {

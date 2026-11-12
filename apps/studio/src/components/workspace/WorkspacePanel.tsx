@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
 import { useFocusTrap } from "../../lib/useFocusTrap";
 import { useStudio } from "../../state/StudioContext";
@@ -7,6 +7,7 @@ import { CloseIcon } from "../icons";
 import { PanelBoundary } from "./PanelBoundary";
 import type { WorkspacePanelId } from "../../types";
 import { findPanel, type PanelDefinition } from "./panels";
+import { deriveViewItems, viewItemIcon } from "./viewItems";
 
 const MOBILE_QUERY = "(max-width: 1023px)";
 
@@ -28,10 +29,30 @@ function PanelBody({ panel }: { panel: PanelDefinition }) {
  * closes it, and focus returns to whatever opened it.
  */
 export function WorkspacePanel() {
-  const { activePanel, closePanel, sendMessage } = useStudio();
+  const {
+    activePanel,
+    closePanel,
+    openPanel,
+    sendMessage,
+    canvas,
+    memory,
+    segments,
+    conversationId,
+    conversations,
+  } = useStudio();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const panel = activePanel ? findPanel(activePanel) : null;
   const panelId = panel?.id ?? null;
+  const views = useMemo(
+    () => deriveViewItems(canvas, memory, segments ?? []),
+    [canvas, memory, segments],
+  );
+  // The thread this lens belongs to. A lens on an unsaved thread still says
+  // where it is rather than showing a bare panel title.
+  const conversationName = conversationId
+    ? (conversations ?? []).find((item) => item.id === conversationId)?.title.trim() ||
+      "Untitled conversation"
+    : "New conversation";
   const panelRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -177,6 +198,16 @@ export function WorkspacePanel() {
     void sendMessage(panel.talk.intent);
   }
 
+  // A sibling is a different lens on the same thread, so it stays open where it
+  // is. Going through `openPanel` (not close-then-open) keeps the focus and the
+  // per-panel scroll memory working.
+  function switchView(id: WorkspacePanelId) {
+    if (id === panelId) {
+      return;
+    }
+    openPanel(id);
+  }
+
   return (
     <>
       {isMobile && (
@@ -197,20 +228,53 @@ export function WorkspacePanel() {
         key={panel.id}
       >
         <header className="lens__head">
-          <div className="lens__heading">
-            <span className="lens__icon" aria-hidden="true">
-              {panel.icon}
+          <nav className="lens__crumb" aria-label="Where you are">
+            <span className="lens__crumb-thread">{conversationName}</span>
+            <span className="lens__crumb-sep" aria-hidden="true">
+              ›
             </span>
-            <div>
-              <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
-                {panel.title}
-              </h2>
-              <p className="lens__blurb">{panel.blurb}</p>
+            <span className="lens__crumb-view" aria-current="page">
+              {panel.label}
+            </span>
+          </nav>
+          <div className="lens__headline">
+            <div className="lens__heading">
+              <span className="lens__icon" aria-hidden="true">
+                {panel.icon}
+              </span>
+              <div>
+                <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
+                  {panel.title}
+                </h2>
+                <p className="lens__blurb">{panel.blurb}</p>
+              </div>
             </div>
           </div>
+          {views.length > 1 && (
+            <nav className="lens__views" aria-label="Workspace views">
+              {views.map((item) => {
+                const open = item.id === panelId;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`lens__view${open ? " is-current" : ""}`}
+                    aria-current={open ? "page" : undefined}
+                    onClick={() => switchView(item.id)}
+                  >
+                    <span className="lens__view-icon" aria-hidden="true">
+                      {viewItemIcon(item.id, 13)}
+                    </span>
+                    {item.label}
+                    <span className="lens__view-count">{item.count}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
           <button
             type="button"
-            className="icon-button"
+            className="icon-button lens__close"
             aria-label="Close workspace view"
             title="Close"
             onClick={closePanel}

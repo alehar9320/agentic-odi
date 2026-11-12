@@ -6,7 +6,12 @@ const brokenPanel = vi.hoisted(() => ({ renders: 0, fail: true }));
 const studio = vi.hoisted(() => ({
   activePanel: "landscape" as string | null,
   closePanel: vi.fn(),
+  openPanel: vi.fn(),
   sendMessage: vi.fn(async () => undefined),
+  conversationId: "c-1" as string | null,
+  conversations: [{ id: "c-1", title: "Pricing research" }] as { id: string; title: string }[],
+  memory: [] as { id: string; text: string }[],
+  segments: [] as { id: string }[],
   canvas: {
     jobs: [],
     steps: [],
@@ -64,7 +69,12 @@ describe("WorkspacePanel", () => {
     brokenPanel.renders = 0;
     studio.activePanel = "landscape";
     studio.closePanel.mockClear();
+    studio.openPanel.mockClear();
     studio.sendMessage.mockClear();
+    studio.conversationId = "c-1";
+    studio.conversations = [{ id: "c-1", title: "Pricing research" }];
+    studio.memory = [];
+    studio.segments = [];
     studio.canvasState = {
       kind: "ready",
       data: {
@@ -159,6 +169,78 @@ describe("WorkspacePanel", () => {
     const { container } = render(<WorkspacePanel />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("names the conversation and the artifact in the header", () => {
+    render(<WorkspacePanel />);
+
+    const crumb = screen.getByRole("navigation", { name: /where you are/i });
+    expect(within(crumb).getByText("Pricing research")).toBeInTheDocument();
+    expect(within(crumb).getByText("Landscape")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("heading", { name: /opportunity landscape/i })).toBeInTheDocument();
+  });
+
+  it("says New conversation for a thread that is not saved yet", () => {
+    studio.conversationId = null;
+
+    render(<WorkspacePanel />);
+
+    const crumb = screen.getByRole("navigation", { name: /where you are/i });
+    expect(within(crumb).getByText("New conversation")).toBeInTheDocument();
+  });
+
+  it("offers the sibling views with their counts and switches to one", () => {
+    studio.canvas = {
+      jobs: [],
+      steps: [{ id: "S-1", name: "Setup" }],
+      outcomes: [{ id: "O-1", statement: "Ship faster" }],
+      source: "seed",
+    } as unknown as typeof studio.canvas;
+
+    render(<WorkspacePanel />);
+
+    const switcher = screen.getByRole("navigation", { name: /workspace views/i });
+    expect(within(switcher).getByRole("button", { name: /job map/i })).toBeInTheDocument();
+    expect(within(switcher).getByRole("button", { name: /landscape/i })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    fireEvent.click(within(switcher).getByRole("button", { name: /job map/i }));
+
+    expect(studio.openPanel).toHaveBeenCalledWith("jobmap");
+    expect(studio.closePanel).not.toHaveBeenCalled();
+  });
+
+  it("does not switch when the open view is picked again", () => {
+    studio.canvas = {
+      jobs: [],
+      steps: [{ id: "S-1", name: "Setup" }],
+      outcomes: [{ id: "O-1", statement: "Ship faster" }],
+      source: "seed",
+    } as unknown as typeof studio.canvas;
+
+    render(<WorkspacePanel />);
+
+    const switcher = screen.getByRole("navigation", { name: /workspace views/i });
+    fireEvent.click(within(switcher).getByRole("button", { name: /landscape/i }));
+
+    expect(studio.openPanel).not.toHaveBeenCalled();
+  });
+
+  it("keeps the close control last in the header's DOM order", () => {
+    studio.canvas = {
+      jobs: [],
+      steps: [{ id: "S-1", name: "Setup" }],
+      outcomes: [{ id: "O-1", statement: "Ship faster" }],
+      source: "seed",
+    } as unknown as typeof studio.canvas;
+
+    render(<WorkspacePanel />);
+
+    const head = document.querySelector(".lens__head") as HTMLElement;
+    const buttons = Array.from(head.querySelectorAll("button"));
+    expect(buttons[buttons.length - 1]).toHaveAccessibleName(/close workspace view/i);
   });
 });
 

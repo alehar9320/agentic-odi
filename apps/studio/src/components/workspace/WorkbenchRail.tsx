@@ -1,26 +1,10 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
-import { buildRecords } from "../../lib/records";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
-import {
-  ClusterIcon,
-  CompassIcon,
-  RouteIcon,
-  SignalIcon,
-  SparkIcon,
-  TableIcon,
-} from "../icons";
 import { findPanel } from "./panels";
-
-interface RailItem {
-  id: WorkspacePanelId;
-  label: string;
-  count: number;
-  noun: string;
-  icon: ReactNode;
-}
+import { deriveViewItems, viewItemIcon } from "./viewItems";
 
 /**
  * The artifacts the conversation has produced, sitting above the conversation.
@@ -35,69 +19,7 @@ export function WorkbenchRail() {
   // One tooltip at a time: the chip under the pointer or the keyboard (#696).
   const [openTip, setOpenTip] = useState<WorkspacePanelId | null>(null);
 
-  const items = useMemo<RailItem[]>(() => {
-    const outcomes = canvas?.outcomes ?? [];
-    const steps = canvas?.steps ?? [];
-    const evidence = outcomes.filter((outcome) => outcome.evidence?.trim()).length;
-    const records = buildRecords(canvas);
-
-    const rail: RailItem[] = [];
-    if (records.length > 0) {
-      rail.push({
-        id: "records",
-        label: "Records",
-        count: records.length,
-        noun: records.length === 1 ? "record" : "records",
-        icon: <TableIcon size={14} />,
-      });
-    }
-    if (outcomes.length > 0) {
-      rail.push({
-        id: "landscape",
-        label: "Landscape",
-        count: outcomes.length,
-        noun: outcomes.length === 1 ? "opportunity" : "opportunities",
-        icon: <CompassIcon size={14} />,
-      });
-    }
-    if (steps.length > 0) {
-      rail.push({
-        id: "jobmap",
-        label: "Job map",
-        count: steps.length,
-        noun: steps.length === 1 ? "step" : "steps",
-        icon: <RouteIcon size={14} />,
-      });
-    }
-    if (segments.length > 0) {
-      rail.push({
-        id: "segments",
-        label: "Segments",
-        count: segments.length,
-        noun: segments.length === 1 ? "segment" : "segments",
-        icon: <ClusterIcon size={14} />,
-      });
-    }
-    if (evidence > 0) {
-      rail.push({
-        id: "evidence",
-        label: "Evidence",
-        count: evidence,
-        noun: evidence === 1 ? "signal" : "signals",
-        icon: <SignalIcon size={14} />,
-      });
-    }
-    if (memory.length > 0) {
-      rail.push({
-        id: "memory",
-        label: "What I know",
-        count: memory.length,
-        noun: memory.length === 1 ? "note" : "notes",
-        icon: <SparkIcon size={14} />,
-      });
-    }
-    return rail;
-  }, [canvas, memory, segments]);
+  const items = useMemo(() => deriveViewItems(canvas, memory, segments), [canvas, memory, segments]);
 
   const status = canvasStatus(canvas);
 
@@ -149,7 +71,7 @@ export function WorkbenchRail() {
                 }}
               >
                 <span className="rail__icon" aria-hidden="true">
-                  {item.icon}
+                  {viewItemIcon(item.id, 14)}
                 </span>
                 {item.label}
                 <span className="rail__count">{item.count}</span>
