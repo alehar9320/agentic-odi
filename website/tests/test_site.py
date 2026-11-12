@@ -514,5 +514,7 @@ def test_page_weights_are_within_budget(page: str):
     # material. The Living Studio guide is now the long pole at ~111.5 KB: its
     # 15 reference tables (180 rows) and 512 inline code spans cover the studio
     # catalog, the ODI schema, and every agent surface, and it grows with each
-    # one. It is a coverage record, not decoration, so the ceiling moves again.
+    # one. Studio typography/font changes can also grow the built docs pages
+    # slightly. It is a coverage record, not decoration, so the ceiling moves
+    # again to keep the page green while the content stays.
     assert size <= 120 * 1024, f"{page}: {size} bytes"
