@@ -126,6 +126,14 @@ beforeEach(() => {
   ]) {
     window.localStorage.removeItem(key);
   }
+  // A draft (#701 D49) survives a reload by design, so it would otherwise leak
+  // from one shell test into the next; clear every draft slot here.
+  for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+    const key = window.localStorage.key(i);
+    if (key?.startsWith("studio.draft.")) {
+      window.localStorage.removeItem(key);
+    }
+  }
   // Shell tests are not about onboarding: keep the tour out of their way.
   window.localStorage.setItem("studio.flags.firstRunWizard", "off");
   // The old five-field panel is the subject of its own suite below.

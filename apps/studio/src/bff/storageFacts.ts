@@ -50,7 +50,7 @@ export const APP_STORAGE_KEYS: readonly string[] = [
 ];
 
 /** Keys the app writes under a namespace it does not enumerate in advance. */
-export const APP_STORAGE_PREFIXES: readonly string[] = ["studio.flags."];
+export const APP_STORAGE_PREFIXES: readonly string[] = ["studio.flags.", "studio.draft."];
 
 function isAppKey(key: string): boolean {
   return (

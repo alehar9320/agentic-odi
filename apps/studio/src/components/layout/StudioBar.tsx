@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
@@ -6,7 +6,7 @@ import { isEndpointConfiguredForSettings, endpointReachability, isPrivateHost } 
 import { formatRelativeTime, groupByDay } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
 import { formatRetryCountdown } from "../../state/probeBreaker";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useMediaQuery, usePrefersReducedMotion } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import {
@@ -63,7 +63,7 @@ export function StudioBar({
   const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
-  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reduceMotion = usePrefersReducedMotion();
   const [askOpen, setAskOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
@@ -187,12 +187,32 @@ export function StudioBar({
     }
   }
 
-  function exportConversation() {
+  const exportConversation = useCallback(() => {
     const exportedAt = new Date();
     downloadMarkdown(conversationToMarkdown(messages, exportedAt), exportFilename(exportedAt));
     setMenuOpen(false);
     pushToast("success", "Conversation exported as Markdown.");
-  }
+  }, [messages, pushToast]);
+
+  // The declared export shortcut (D46) has to actually fire, or the declaration
+  // is a lie. It reaches the same handler the menu item does and is inert when
+  // there is no thread to export.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === "e" &&
+        messages.length > 0
+      ) {
+        event.preventDefault();
+        exportConversation();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [messages, exportConversation]);
 
   // A measured answer outranks an inference from the settings. The shipped desktop
   // default points at the sidecar's own proxy — a loopback address the browser cannot
@@ -374,8 +394,10 @@ export function StudioBar({
                               it says nothing rather than "0 turns". */}
                           {conversation.turn_count > 0 ? (
                             <span className="bar__history-meta">
-                              {formatRelativeTime(conversation.updated_at)} ·{" "}
-                              {conversation.turn_count}{" "}
+                              <time dateTime={conversation.updated_at}>
+                                {formatRelativeTime(conversation.updated_at)}
+                              </time>{" "}
+                              · {conversation.turn_count}{" "}
                               {conversation.turn_count === 1 ? "turn" : "turns"}
                             </span>
                           ) : null}
@@ -479,6 +501,7 @@ export function StudioBar({
                 className="bar__menu-item"
                 onClick={exportConversation}
                 disabled={messages.length === 0}
+                aria-keyshortcuts="Meta+Shift+E"
               >
                 Export → Markdown
               </button>

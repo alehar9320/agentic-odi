@@ -29,6 +29,7 @@ import {
 import { dictationSupported } from "../../assistant/dictation";
 import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
+import { clearDraft, loadDraft, saveDraft } from "../../lib/composerDraft";
 import { registerComposer } from "../../lib/composerFocus";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
@@ -150,7 +151,7 @@ function ComposerBody({
   onClearAttachmentRefusal: () => void;
 }) {
   const aui = useAui();
-  const { llmHealth } = useStudio();
+  const { llmHealth, conversationId } = useStudio();
   const history = useComposerHistory();
   const [recall, setRecall] = useState("");
   // A page can mount more than one composer, so every id and description needs
@@ -202,6 +203,37 @@ function ComposerBody({
       }),
     [aui, inputId],
   );
+
+  // A draft survives a reload: what was being typed comes back when the thread
+  // reopens, and is dropped the moment the message goes out. The ref marks the
+  // conversation whose draft has already been restored, so switching threads
+  // never paints one thread's draft into another.
+  const restoredFor = useRef<string | null | undefined>(undefined);
+  // Set when a stored draft is painted in, so the save effect below does not
+  // run once against the still-empty text and delete what was just restored.
+  const skipNextSave = useRef(false);
+  useEffect(() => {
+    if (restoredFor.current === conversationId) {
+      return;
+    }
+    restoredFor.current = conversationId;
+    const stored = loadDraft(conversationId);
+    if (stored && aui.composer.getState().text === "") {
+      skipNextSave.current = true;
+      aui.composer.setText(stored);
+    }
+  }, [aui, conversationId]);
+
+  useEffect(() => {
+    if (restoredFor.current !== conversationId) {
+      return;
+    }
+    if (skipNextSave.current) {
+      skipNextSave.current = false;
+      return;
+    }
+    saveDraft(conversationId, text);
+  }, [conversationId, text]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     // An input method owns the keyboard while it composes: choosing a Japanese,
@@ -264,6 +296,7 @@ function ComposerBody({
       event.preventDefault();
       if (!readBlocked) {
         aui.composer.send({ steer: false });
+        clearDraft(conversationId);
       }
       return;
     }
@@ -333,6 +366,7 @@ function ComposerBody({
           className="composer__input"
           rows={1}
           autoFocus={autoFocus}
+          aria-keyshortcuts="Meta+K"
           placeholder={
             placeholder ??
             (offline
@@ -415,7 +449,9 @@ function ComposerBody({
             <ComposerPrimitive.Send
               className="composer__send"
               aria-label="Send message"
+              aria-keyshortcuts="Enter"
               disabled={readBlocked}
+              onClick={() => clearDraft(conversationId)}
             >
               <ArrowUpIcon size={18} />
             </ComposerPrimitive.Send>

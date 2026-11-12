@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { announce } from "../../lib/announce";
 import { RECORD_SECTIONS, score, text, type RecordKind, type RecordRow } from "../../lib/records";
 import { useStudio } from "../../state/StudioContext";
 
@@ -172,6 +173,7 @@ export function RecordDetail({ row, rows, onFilter, onClose }: RecordDetailProps
     try {
       await navigator.clipboard.writeText(row.id);
       setCopied(true);
+      announce("Record id copied");
       if (copyTimer.current !== null) {
         window.clearTimeout(copyTimer.current);
       }

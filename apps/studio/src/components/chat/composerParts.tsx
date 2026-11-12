@@ -13,7 +13,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useAuiState } from "@assistant-ui/react";
 
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { usePrefersReducedMotion } from "../../lib/useMediaQuery";
 import { useStudio } from "../../state/StudioContext";
 import { detectPlatform, shortcutLabels } from "../../updater/platform";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
@@ -96,7 +96,7 @@ function PaletteOption({
   onChoose: () => void;
 }) {
   const ref = useRef<HTMLButtonElement | null>(null);
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     if (!active) {
@@ -153,7 +153,13 @@ export function CommandPalette({
   }
 
   return (
-    <div className="palette" role="listbox" id={id} aria-label="Commands">
+    <div
+      className="palette"
+      role="listbox"
+      id={id}
+      aria-label="Commands"
+      aria-keyshortcuts="/"
+    >
       {matches.length ? (
         matches.map((command, index) => (
           <PaletteOption

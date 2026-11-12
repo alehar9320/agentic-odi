@@ -248,6 +248,36 @@ describe("StudioBar", () => {
     click.mockRestore();
   });
 
+  it("declares the export shortcut on the menu item and honours it", () => {
+    const createObjectURL = vi.fn(() => "blob:conversation");
+    Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        messages: [
+          { role: "user", content: "Show me the top outcomes." },
+          { role: "assistant", content: "Here they are." },
+        ],
+      }) as never,
+    );
+
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    // Declared, not just implemented.
+    expect(screen.getByRole("menuitem", { name: /export.*markdown/i })).toHaveAttribute(
+      "aria-keyshortcuts",
+      "Meta+Shift+E",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+
+    // The declared shortcut has to actually fire.
+    fireEvent.keyDown(window, { key: "e", metaKey: true, shiftKey: true });
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    click.mockRestore();
+  });
+
   it("puts the unread count in the bell's accessible name and opens the inbox", () => {
     const openPanel = vi.fn();
     vi.mocked(useStudio).mockReturnValue(
@@ -352,7 +382,11 @@ describe("StudioBar", () => {
     expect(refreshConversations).toHaveBeenCalledOnce();
     expect(within(menu).getByText("Where does onboarding leak?")).toBeInTheDocument();
     expect(within(menu).getByText("Price the churn spike")).toBeInTheDocument();
-    expect(within(menu).getByText(/Just now · 4 turns/)).toBeInTheDocument();
+    // The relative time is its own <time>, so it is read as a date, and the
+    // turn count rides alongside it rather than inside the element.
+    const when = within(menu).getByText("Just now");
+    expect(when.tagName).toBe("TIME");
+    expect(within(menu).getByText(/· 4 turns/)).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -669,7 +703,10 @@ describe("history says when and how much (#694 D12)", () => {
       ],
     });
 
-    expect(within(menu).getByText("2h ago · 6 turns")).toBeInTheDocument();
+    const when = within(menu).getByText("2h ago");
+    expect(when.tagName).toBe("TIME");
+    expect(when).toHaveAttribute("dateTime", new Date(2026, 9, 22, 8, 0).toISOString());
+    expect(within(menu).getByText(/· 6 turns/)).toBeInTheDocument();
   });
 
   it("gives a thread with no turns no meta line at all", () => {

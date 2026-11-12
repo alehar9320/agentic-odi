@@ -21,6 +21,7 @@ import {
 
 import { formatFileSize, preparedAttachmentById } from "../../assistant/attachments";
 import { CLAIMS_PART, SURFACE_PART } from "../../assistant/convert";
+import { announce } from "../../lib/announce";
 import {
   AssistantAvatar,
   ClaimsPart,
@@ -239,6 +240,7 @@ function AssistantMessage() {
             <ActionBarPrimitive.Copy
               className="quiet-action"
               aria-label={copied ? "Reply copied" : "Copy reply"}
+              onClick={() => announce("Reply copied")}
             >
               {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
               {copied ? "Copied" : "Copy"}
@@ -357,6 +359,7 @@ function UserMessage() {
         <ActionBarPrimitive.Copy
           className="quiet-action"
           aria-label={copied ? "Message copied" : "Copy message"}
+          onClick={() => announce("Message copied")}
         >
           {copied ? "Copied" : "Copy"}
         </ActionBarPrimitive.Copy>
