@@ -190,9 +190,10 @@ export function StudioBar({
 
   function exportConversation() {
     const exportedAt = new Date();
-    downloadMarkdown(conversationToMarkdown(messages, exportedAt), exportFilename(exportedAt));
+    const filename = exportFilename(exportedAt);
+    downloadMarkdown(conversationToMarkdown(messages, exportedAt), filename);
     setMenuOpen(false);
-    pushToast("success", "Conversation exported as Markdown.");
+    pushToast("success", `Exported ${filename}`);
   }
 
   // A measured answer outranks an inference from the settings. The shipped desktop
