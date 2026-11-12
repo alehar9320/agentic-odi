@@ -7,6 +7,14 @@ import type {
   Step,
 } from "../../types";
 
+export interface InterviewDraft {
+  id: string;
+  jobId: string;
+  answers: Record<string, string | number>;
+  index: number;
+  updatedAt: string;
+}
+
 export interface StoredJob extends Job {
   id: string;
   name: string;
@@ -174,6 +182,11 @@ export interface LocalStore {
   restore(snapshot: WorkspaceSnapshot): Promise<void>;
   clearAll(): Promise<void>;
   close(): void;
+
+  /** Interview draft persistence. */
+  putInterviewDraft(draft: InterviewDraft): Promise<void>;
+  getInterviewDraft(jobId: string): Promise<InterviewDraft | undefined>;
+  deleteInterviewDraft(jobId: string): Promise<void>;
 }
 
 export function bySeq<T extends { seq: number }>(left: T, right: T): number {

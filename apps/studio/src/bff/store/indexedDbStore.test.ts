@@ -209,7 +209,7 @@ describe("IndexedDbLocalStore", () => {
     second.close();
   });
 
-  it("migrates a seeded v1 database to v2 with every row and the schema intact", async () => {
+  it("migrates a seeded v1 database to v3 with every row and the schema intact", async () => {
     await seedV1();
 
     const before = await rowsOf(DB_NAME, 1);
@@ -223,16 +223,18 @@ describe("IndexedDbLocalStore", () => {
     }
     // The v2 outbox store is added, and it starts empty.
     expect(after.outbox).toEqual([]);
+    // The v3 interview_drafts store is added, and it starts empty.
+    expect(after.interview_drafts).toEqual([]);
     store.close();
 
-    // The migrated schema equals a fresh v2 database: same stores, key paths,
+    // The migrated schema equals a fresh v3 database: same stores, key paths,
     // auto-increment flags, and index names.
     const migrated = await schemaOf(DB_NAME, DB_VERSION);
     await clearDb();
     const fresh = await makeStore();
     fresh.close();
     expect(migrated).toEqual(await schemaOf(DB_NAME, DB_VERSION));
-    expect(migrated).toEqual(expectedV2Schema());
+    expect(migrated).toEqual(expectedV3Schema());
   });
 
   it("closes the old connection and flags a reload when another tab upgrades", async () => {
@@ -420,14 +422,20 @@ async function rowsOf(name: string, version: number) {
   return rows;
 }
 
-/** The v2 schema written out, so the migrated shape is asserted, not assumed. */
-function expectedV2Schema() {
+/** The v3 schema written out, so the migrated shape is asserted, not assumed. */
+function expectedV3Schema() {
   return [
     {
       store: "conversations",
       keyPath: "id",
       autoIncrement: false,
       indexes: ["by-updated"],
+    },
+    {
+      store: "interview_drafts",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-updated"],
     },
     {
       store: "jobs",
