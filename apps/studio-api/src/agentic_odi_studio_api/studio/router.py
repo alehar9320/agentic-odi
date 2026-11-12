@@ -8,6 +8,7 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from agentic_odi_connectors.catalog import UnknownPresetError
@@ -63,6 +64,7 @@ from agentic_odi_studio_api.studio.memory import (
     StudioMemory,
 )
 from agentic_odi_studio_api.studio.probes import (
+    DEFAULT_BASE_URL,
     defaults,
     is_endpoint_reachable,
     list_models,
@@ -398,12 +400,32 @@ def post_mcp_health(body: McpHealthRequest) -> dict:
     return {"reachable": is_endpoint_reachable(body.mcp_url)}
 
 
-def _with_stored_key(value: str) -> str:
-    """Fall back to the stored key when the client sent none.
+def _origin(base_url: str) -> str:
+    """Scheme + host of a base URL, used to compare provider origins."""
+    parsed = urlparse(base_url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _configured_provider_origin() -> str:
+    """Origin of the provider the sidecar is configured to talk to.
+
+    The stored key is a credential the sidecar holds, so it is only ever sent
+    back to the origin it was configured for. A custom or foreign provider URL
+    receives only a key the request itself supplies.
+    """
+    return _origin(defaults().get("base_url", DEFAULT_BASE_URL))
+
+
+def _with_stored_key(value: str, base_url: str) -> str:
+    """Fall back to the stored key only for the configured provider origin.
 
     The browser no longer holds the key, so a request that carries an empty one
     is answered with the key the sidecar holds: first the write-only store, then
-    the profile default an operator configured.
+    the profile default an operator configured. The stored key is attached only
+    when the resolved ``base_url`` origin matches the configured provider
+    origin; otherwise only a key supplied in the request is used, so a caller
+    cannot harvest the stored key by pointing ``base_url`` at a server it
+    controls.
     """
     if value:
         return value
@@ -411,7 +433,12 @@ def _with_stored_key(value: str) -> str:
         stored = load_model_key()
     except SecretStoreError:
         stored = None
-    return stored or defaults().get("api_key", "")
+    if not stored:
+        return defaults().get("api_key", "")
+    if _origin(base_url) == _configured_provider_origin():
+        return stored
+    # Custom or foreign origin: never send the stored key there.
+    return ""
 
 
 @router.post("/health/llm", response_model=LlmHealthResponse)
@@ -422,7 +449,7 @@ async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) ->
     bypasses the cache so a user-initiated "check now" is never stale.
     """
     result = await probe_llm_health(
-        body.base_url, _with_stored_key(body.api_key), body.model, fresh=fresh
+        body.base_url, _with_stored_key(body.api_key, body.base_url), body.model, fresh=fresh
     )
     return {
         "healthy": result["healthy"],
@@ -435,7 +462,7 @@ async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) ->
 @router.post("/models")
 async def post_models(body: ModelListRequest) -> dict:
     """The model ids this backend serves, for the composer's model picker."""
-    models, error = await list_models(body.base_url, _with_stored_key(body.api_key))
+    models, error = await list_models(body.base_url, _with_stored_key(body.api_key, body.base_url))
     return {"models": models, "error": error}
 
 
@@ -1427,7 +1454,7 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
     request_id = request_id_for(request)
     # The browser no longer holds the model key, so an empty one is filled from
     # the sidecar's write-only store before the turn is streamed.
-    body = body.model_copy(update={"api_key": _with_stored_key(body.api_key)})
+    body = body.model_copy(update={"api_key": _with_stored_key(body.api_key, body.base_url)})
     return StreamingResponse(
         stream_chat(
             body,
@@ -1521,7 +1548,7 @@ async def proxy_llm_chat(body: LlmProxyRequest) -> StreamingResponse:
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
-        stored_key = _with_stored_key(body.api_key)
+        stored_key = _with_stored_key(body.api_key, body.base_url)
         if stored_key:
             headers["Authorization"] = f"Bearer {stored_key}"
         payload: dict[str, Any] = {
@@ -1536,18 +1563,32 @@ async def proxy_llm_chat(body: LlmProxyRequest) -> StreamingResponse:
             try:
                 async with client.stream("POST", url, headers=headers, json=payload) as response:
                     if response.status_code >= 400:
-                        text = (await response.aread()).decode("utf-8", "replace")
+                        # Never echo the upstream body: a provider could reflect a
+                        # credential back in its error text, and the stored key is
+                        # the only secret this sidecar holds. Report the status,
+                        # never the body.
                         yield (
                             "event: error\n"
-                            + f"data: {json.dumps({'error': {'code': 'provider_error', 'message': text or f'HTTP {response.status_code}'}})}\n\n"
+                            + "data: "
+                            + json.dumps(
+                                {
+                                    "error": {
+                                        "code": "provider_error",
+                                        "message": f"Provider error (HTTP {response.status_code})",
+                                    }
+                                }
+                            )
+                            + "\n\n"
                         )
                         return
                     async for chunk in response.aiter_bytes():
                         yield chunk.decode("utf-8", "replace")
-            except Exception as exc:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 yield (
                     "event: error\n"
-                    + f"data: {json.dumps({'error': {'code': 'provider_error', 'message': str(exc)}})}\n\n"
+                    + "data: "
+                    + json.dumps({"error": {"code": "provider_error", "message": "Provider request failed"}})
+                    + "\n\n"
                 )
 
     return StreamingResponse(
