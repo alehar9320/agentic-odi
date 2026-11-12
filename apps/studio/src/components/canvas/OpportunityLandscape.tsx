@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchAlternativeLinks } from "../../api/studioApi";
-import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
+import { canvasHasRecords, canvasStatus, keptByBrowserCaption, savedCopyCaption } from "../../lib/canvasProvenance";
 import {
   confidenceClass,
   formatAdvances,
@@ -16,7 +16,7 @@ import {
   underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome, OutcomeAlternativeLink } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -87,6 +87,9 @@ export function OpportunityLandscape() {
   // say when it was saved. A warm reload with live data draws it too but gets
   // no caption, because that data is not a saved copy.
   const savedCaption = canvasCached && hasRecords ? savedCopyCaption(canvas) : null;
+  // A write the sidecar could not take was kept here. Say so rather than let the
+  // board read as though the server already holds it.
+  const keptCaption = keptByBrowserCaption(canvas);
 
   const jobIds = useMemo(
     () =>
@@ -301,6 +304,12 @@ export function OpportunityLandscape() {
       {savedCaption && showBoard ? (
         <p className="canvas-saved" role="status">
           {savedCaption}
+        </p>
+      ) : null}
+
+      {keptCaption && showBoard ? (
+        <p className="canvas-saved" role="status">
+          {keptCaption}
         </p>
       ) : null}
 
@@ -625,7 +634,7 @@ export function OpportunityPlot({
   const [showAll, setShowAll] = useState(false);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
   // The pulse is decoration; with reduce-motion the ring stays still.
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotion = useReducedMotion();
 
   const plotted: PlottedOutcome[] = outcomes
     .filter(

@@ -1037,12 +1037,32 @@ export function addEvidence(payload: {
   outcome_id?: string;
   mcp_url: string;
 }): Promise<{ ok: boolean }> {
-  return postJson<{ ok: boolean }>("/api/evidence", payload);
+  return queuedWrite<{ ok: boolean }>(
+    () => postJson<{ ok: boolean }>("/api/evidence", payload),
+    (bff) =>
+      bff
+        .addEvidence({
+          source_name: payload.source_name,
+          source_kind: payload.source_kind,
+          item_type: payload.item_type,
+          name: payload.name,
+          content: payload.content,
+          url: payload.url,
+          job_id: payload.job_id,
+          step_id: payload.step_id,
+          outcome_id: payload.outcome_id,
+        })
+        .then(() => ({ ok: true })),
+  );
 }
 
 export function deleteEvidence(evidenceId: string, mcpUrl: string): Promise<{ ok: boolean }> {
-  return deleteJson<{ ok: boolean }>(
-    `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ ok: boolean }>(
+    () =>
+      deleteJson<{ ok: boolean }>(
+        `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteEvidence(evidenceId).then(() => ({ ok: true })),
   );
 }
 
