@@ -60,7 +60,9 @@ def test_tauri_release_publishes_the_manifest_it_verifies() -> None:
     verify_job = workflow.split("\n  verify:\n", 1)[1]
     assert "needs: [build, manifest]" in verify_job, "verify must wait for the manifest"
     assert "release_manifest.py verify" in verify_job
-    assert "--release-please-manifest" in verify_job, "the tag is cross-checked against release-please"
+    assert "--release-please-manifest" in verify_job, (
+        "the tag is cross-checked against release-please"
+    )
 
 
 def test_release_please_workflow_guards_on_app_credentials() -> None:
