@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ATTACHMENT_READ_FAILURE, MAX_ATTACHMENT_CHARS, tooLargeMessage } from "../../assistant/attachments";
@@ -544,3 +544,127 @@ describe("ThreadComposer oversized attachments", () => {
     expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
   });
 });
+
+describe("ThreadComposer attachment tray", () => {
+  it("shows one row per file, in drop order, each with its state word", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [readableFile("first.md"), readableFile("second.md"), readableFile("third.md")]);
+
+    // Every row says what it is doing without relying on colour, and says it
+    // for its own file: three files, three Ready words, in drop order.
+    expect(await screen.findAllByText("Ready")).toHaveLength(3);
+    const rows = within(screen.getByRole("list", { name: "Attachments" })).getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.querySelector(".attachment-chip__name")?.textContent)).toEqual([
+      "first.md",
+      "second.md",
+      "third.md",
+    ]);
+    for (const row of rows) {
+      expect(within(row).getByText("Ready")).toBeInTheDocument();
+    }
+  });
+
+  it("holds Send while a file is still being read, and releases it when it is", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const { root, input } = composerWithFiles({ sendMessage });
+    let finishReading: (text: string) => void = () => {};
+    const slow = new File(["x"], "slow.md", { type: "text/markdown" });
+    Object.defineProperty(slow, "text", {
+      value: () =>
+        new Promise<string>((resolve) => {
+          finishReading = resolve;
+        }),
+    });
+
+    dropFiles(root, [slow]);
+
+    // The row appears before the text does, so a slow file is visible rather
+    // than a tray that looks empty — but the turn cannot carry a name and no
+    // text, so Send waits for the read.
+    const reading = await screen.findByText("Reading");
+    expect(reading.closest(".attachment-chip")).toHaveTextContent("slow.md");
+    expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: "Read this" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    finishReading("a thought worth sending");
+
+    await screen.findByText("Ready");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Send message" })).not.toBeDisabled(),
+    );
+  });
+
+  it("retries only the failed file, re-running extraction for it alone", async () => {
+    const { root } = composerWithFiles();
+    const retried = readableFile("later.md");
+    const text = vi.fn(() => Promise.resolve("a thought worth sending"));
+    Object.defineProperty(retried, "text", { value: text });
+    const brokenReads = vi.fn(() => Promise.reject(new Error("Read interrupted")));
+    const broken = new File(["x"], "notes.md", { type: "text/markdown" });
+    Object.defineProperty(broken, "text", { value: brokenReads });
+
+    dropFiles(root, [retried, broken]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+    expect(brokenReads).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(brokenReads).toHaveBeenCalledTimes(2));
+    // The other file was not read again: one bad file does not cost the good one.
+    expect(text).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the failure and re-enables Send when Retry succeeds", async () => {
+    const { root, input } = composerWithFiles();
+    let attempt = 0;
+    const flaky = new File(["x"], "notes.md", { type: "text/markdown" });
+    Object.defineProperty(flaky, "text", {
+      value: () => {
+        attempt += 1;
+        return attempt === 1
+          ? Promise.reject(new Error("Read interrupted"))
+          : Promise.resolve("a thought worth sending");
+      },
+    });
+
+    dropFiles(root, [flaky]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+    fireEvent.change(input, { target: { value: "Read this" } });
+    expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await screen.findByText("Ready");
+    await waitFor(() => expect(screen.queryByText(ATTACHMENT_READ_FAILURE)).toBeNull());
+    expect(screen.getByRole("button", { name: "Send message" })).not.toBeDisabled();
+  });
+
+  it("names the file and the count limit and never drops a file silently", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const { root, input } = composerWithFiles({ sendMessage });
+    const files = [1, 2, 3, 4, 5, 6].map(
+      (n) => new File(["x"], `notes-${n}.txt`, { type: "text/plain" }),
+    );
+
+    dropFiles(root, files);
+
+    await screen.findByText("notes-5.txt");
+    expect(screen.queryByText("notes-6.txt")).toBeNull();
+    expect(screen.getByText(/notes-6\.txt exceeds the 5-file attachment limit/)).toBeInTheDocument();
+
+    // A file refused for the count never becomes a row, so it holds nothing
+    // back: the message says what was left out and the turn still goes.
+    fireEvent.change(input, { target: { value: "Take these" } });
+    expect(screen.getByRole("button", { name: "Send message" })).not.toBeDisabled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    const [text] = sendMessage.mock.calls[0] as unknown as [string];
+    expect(text).toBe("Take these");
+  });
+});
+
