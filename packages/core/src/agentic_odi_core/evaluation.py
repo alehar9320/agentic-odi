@@ -50,13 +50,117 @@ _MAX_CHARS = 200
 _DIRECTIONS = ("minimize", "maximize")
 
 
+_RULE_REGISTRY: list[dict[str, Any]] = [
+    {
+        "id": "direction",
+        "label": "Leading direction",
+        "summary": "Statement must start with 'Minimize' or 'Maximize'.",
+        "fix": "Start with 'Minimize' or 'Maximize', e.g. 'Minimize the time it takes to...'.",
+        "examples": {
+            "good": "Minimize the time it takes to onboard a customer when they sign up",
+            "bad": "The time it takes to onboard a customer when they sign up",
+        },
+    },
+    {
+        "id": "unit_of_measure",
+        "label": "Unit of measure",
+        "summary": "Statement must contain a unit of measure (time, cost, number, frequency, rate, percentage, steps, attempts, or a digit).",
+        "fix": "Add a unit of measure, e.g. 'time', 'cost', or 'number of …'.",
+        "examples": {
+            "good": "Minimize the time it takes to onboard a customer when they sign up",
+            "bad": "Minimize the onboarding when they sign up",
+        },
+    },
+    {
+        "id": "object_of_control",
+        "label": "Object of control",
+        "summary": "Statement must name an object of control after 'the'.",
+        "fix": "Name the object, e.g. 'the time it takes to …'.",
+        "examples": {
+            "good": "Minimize the time it takes to onboard a customer when they sign up",
+            "bad": "Minimize time to onboard a customer when they sign up",
+        },
+    },
+    {
+        "id": "contextual_clarifier",
+        "label": "Contextual clarifier",
+        "summary": "Statement must state the context when it happens (when, while, before, after, during, if, as).",
+        "fix": "Add when it happens, e.g. '… when onboarding'.",
+        "examples": {
+            "good": "Minimize the time it takes to onboard a customer when they sign up",
+            "bad": "Minimize the time it takes to onboard a customer",
+        },
+    },
+    {
+        "id": "min_words",
+        "label": "Minimum length",
+        "summary": f"Statement must have at least {_MIN_WORDS} words.",
+        "fix": "Describe the metric, the object, and the context.",
+        "examples": {
+            "good": "Minimize the time it takes to onboard a customer when they sign up",
+            "bad": "Minimize the time",
+        },
+    },
+    {
+        "id": "max_chars",
+        "label": "Maximum length",
+        "summary": f"Statement must not exceed {_MAX_CHARS} characters.",
+        "fix": "Split broad statements into separate outcomes.",
+        "examples": {
+            "good": "Minimize the time it takes to onboard a customer when they sign up",
+            "bad": "Minimize the total elapsed time from a customer asking a question to a support engineer closing the loop while the account is in its first ninety days and the request spans more than one timezone while the team works across two continents",
+        },
+    },
+    {
+        "id": "vague_terms",
+        "label": "No vague terms",
+        "summary": "Statement must not contain vague terms (better, improve, optimize, faster, easier).",
+        "fix": "Use a metric such as time, cost, effort, errors, or likelihood.",
+        "examples": {
+            "good": "Minimize the time it takes to onboard a customer when they sign up",
+            "bad": "Make onboarding faster when they sign up",
+        },
+    },
+    {
+        "id": "solution_nouns",
+        "label": "No solution nouns",
+        "summary": "Statement must name a customer problem, not a solution (notification, dashboard, button, feature, screen, email, workflow, integration, report, toggle).",
+        "fix": "Name the customer's problem instead of a feature or product.",
+        "examples": {
+            "good": "Minimize the time it takes to onboard a customer when they sign up",
+            "bad": "I want a notification when onboarding finishes",
+        },
+    },
+]
+
+
+def outcome_rubric() -> dict[str, Any]:
+    """Return the ODI statement rubric with all rules, derived from validator constants.
+
+    The rubric is generated from the same constants that power
+    :func:`evaluate_outcome_statement`, so a constant edit cannot drift from the
+    published rules.
+    """
+    return {
+        "version": "1",
+        "rules": _RULE_REGISTRY,
+    }
+
+
 class OutcomeStatementError(ValidationError):
     """Raised when a statement fails the ODI format check."""
 
-    def __init__(self, verdict: dict[str, Any]) -> None:
+    #: The field the statement belongs to. A desired outcome is always a
+    #: statement, so callers default to ``"statement"`` and let a subclass
+    #: narrow it — e.g. a customer outcome's ``business_statement``.
+    field: str = "statement"
+
+    def __init__(self, verdict: dict[str, Any], field: str | None = None) -> None:
         self.verdict = verdict
         self.issues = verdict["issues"]
         self.suggestions = verdict["suggestions"]
+        if field is not None:
+            self.field = field
         super().__init__(
             "Outcome statement does not match the ODI format: " + " ".join(self.issues)
         )
@@ -135,26 +239,61 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
     padded = f" {lowered} "
     issues: list[str] = []
     suggestions: list[str] = []
+    checks: list[dict[str, Any]] = []
 
+    # Rule 1: direction
     direction = next((value for value in _DIRECTIONS if lowered.startswith(value)), None)
     if direction is None:
         issues.append("Statement must start with 'Minimize' or 'Maximize'.")
         suggestions.append(
             "Start with 'Minimize' or 'Maximize', e.g. 'Minimize the time it takes to...'."
         )
+        checks.append(
+            {
+                "id": "direction",
+                "ok": False,
+                "message": "Statement must start with 'Minimize' or 'Maximize'.",
+                "fix": "Start with 'Minimize' or 'Maximize', e.g. 'Minimize the time it takes to...'.",
+            }
+        )
+    else:
+        checks.append({"id": "direction", "ok": True, "message": "", "fix": ""})
 
+    # Rule 2: unit of measure
     unit_of_measure = _find_unit_of_measure(text)
     if unit_of_measure is None:
         issues.append(
             "Statement must contain a unit of measure (time, cost, number, frequency, rate, percentage, steps, attempts, or a digit)."
         )
         suggestions.append("Add a unit of measure, e.g. 'time', 'cost', or 'number of …'.")
+        checks.append(
+            {
+                "id": "unit_of_measure",
+                "ok": False,
+                "message": "Statement must contain a unit of measure (time, cost, number, frequency, rate, percentage, steps, attempts, or a digit).",
+                "fix": "Add a unit of measure, e.g. 'time', 'cost', or 'number of …'.",
+            }
+        )
+    else:
+        checks.append({"id": "unit_of_measure", "ok": True, "message": "", "fix": ""})
 
+    # Rule 3: object of control
     object_of_control = "the" if " the " in padded else None
     if object_of_control is None:
         issues.append("Statement must name an object of control after 'the'.")
         suggestions.append("Name the object, e.g. 'the time it takes to …'.")
+        checks.append(
+            {
+                "id": "object_of_control",
+                "ok": False,
+                "message": "Statement must name an object of control after 'the'.",
+                "fix": "Name the object, e.g. 'the time it takes to …'.",
+            }
+        )
+    else:
+        checks.append({"id": "object_of_control", "ok": True, "message": "", "fix": ""})
 
+    # Rule 4: contextual clarifier
     contextual_clarifier = next(
         (marker.strip() for marker in _CONTEXT_MARKERS if marker in padded), None
     )
@@ -163,29 +302,83 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
             "Statement must state the context when it happens (when, while, before, after, during, if, as)."
         )
         suggestions.append("Add when it happens, e.g. '… when onboarding'.")
+        checks.append(
+            {
+                "id": "contextual_clarifier",
+                "ok": False,
+                "message": "Statement must state the context when it happens (when, while, before, after, during, if, as).",
+                "fix": "Add when it happens, e.g. '… when onboarding'.",
+            }
+        )
+    else:
+        checks.append({"id": "contextual_clarifier", "ok": True, "message": "", "fix": ""})
 
+    # Rule 5: minimum words
     word_count = len(text.split())
     if word_count < _MIN_WORDS:
         issues.append(f"Statement is too short ({word_count} words); needs at least {_MIN_WORDS}.")
         suggestions.append("Describe the metric, the object, and the context.")
+        checks.append(
+            {
+                "id": "min_words",
+                "ok": False,
+                "message": f"Statement is too short ({word_count} words); needs at least {_MIN_WORDS}.",
+                "fix": "Describe the metric, the object, and the context.",
+            }
+        )
+    else:
+        checks.append({"id": "min_words", "ok": True, "message": "", "fix": ""})
 
+    # Rule 6: maximum characters
     if len(text) > _MAX_CHARS:
         issues.append(
             f"Statement is longer than {_MAX_CHARS} characters; keep it to one measurable outcome."
         )
         suggestions.append("Split broad statements into separate outcomes.")
+        checks.append(
+            {
+                "id": "max_chars",
+                "ok": False,
+                "message": f"Statement is longer than {_MAX_CHARS} characters; keep it to one measurable outcome.",
+                "fix": "Split broad statements into separate outcomes.",
+            }
+        )
+    else:
+        checks.append({"id": "max_chars", "ok": True, "message": "", "fix": ""})
 
+    # Rule 7: vague terms
     vague = [term for term in _VAGUE_TERMS if term in lowered]
     if vague:
         issues.append(f"Replace vague terms with a measurable metric: {', '.join(vague)}.")
         suggestions.append("Use a metric such as time, cost, effort, errors, or likelihood.")
+        checks.append(
+            {
+                "id": "vague_terms",
+                "ok": False,
+                "message": f"Replace vague terms with a measurable metric: {', '.join(vague)}.",
+                "fix": "Use a metric such as time, cost, effort, errors, or likelihood.",
+            }
+        )
+    else:
+        checks.append({"id": "vague_terms", "ok": True, "message": "", "fix": ""})
 
+    # Rule 8: solution nouns
     solution_found = [noun for noun in _SOLUTION_NOUNS if f" {noun} " in padded]
     if solution_found:
         issues.append(
             f"Statement names a solution ({', '.join(solution_found)}), not a customer problem."
         )
         suggestions.append("Name the customer's problem instead of a feature or product.")
+        checks.append(
+            {
+                "id": "solution_nouns",
+                "ok": False,
+                "message": f"Statement names a solution ({', '.join(solution_found)}), not a customer problem.",
+                "fix": "Name the customer's problem instead of a feature or product.",
+            }
+        )
+    else:
+        checks.append({"id": "solution_nouns", "ok": True, "message": "", "fix": ""})
 
     return {
         "statement": text,
@@ -196,14 +389,21 @@ def evaluate_outcome_statement(statement: str) -> dict[str, Any]:
         "unit_of_measure": unit_of_measure,
         "object_of_control": object_of_control,
         "contextual_clarifier": contextual_clarifier,
+        "checks": checks,
     }
 
 
-def require_outcome_statement(statement: str) -> dict[str, Any]:
-    """Validate a statement and raise :class:`OutcomeStatementError` if invalid."""
+def require_outcome_statement(statement: str, field: str = "statement") -> dict[str, Any]:
+    """Validate a statement and raise :class:`OutcomeStatementError` if invalid.
+
+    ``field`` names the input that holds the statement — a desired outcome's
+    statement, a customer outcome's ``business_statement``, and so on. It
+    travels onto the exception so a form can show the message next to the
+    field that needs it instead of on top of the whole form.
+    """
     verdict = evaluate_outcome_statement(statement)
     if not verdict["valid"]:
-        raise OutcomeStatementError(verdict)
+        raise OutcomeStatementError(verdict, field=field)
     return verdict
 
 

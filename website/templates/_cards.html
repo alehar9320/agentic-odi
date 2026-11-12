@@ -1,5 +1,5 @@
 {#
-  The fourteen ODI cards the agent may compose, rendered as the shipped catalog
+  The fifteen ODI cards the agent may compose, rendered as the shipped catalog
   renders them. These are the agent's closed catalog — a stable contract —
   not the Studio's canvas view names, which are in flux.
 #}
@@ -286,6 +286,22 @@
 </article>
 {% endmacro %}
 
+{% macro segment_card(data) %}
+<article class="surface" data-surface="segment-card">
+  <div class="surface__head">
+    <span class="surface__id">{{ data.id | default("SEG-1") }}</span>
+    <span class="pill">{{ data.verdict | default("Not enough signal") }}</span>
+  </div>
+  <p class="surface__statement">{{ data.name }}</p>
+  <div class="surface__scores">
+    <span>{{ data.people }}</span>
+    <span aria-hidden="true">&middot;</span>
+    <span>{{ data.outcomeIds | length }} outcomes</span>
+  </div>
+  <p class="surface__statement">{{ data.rationale }}</p>
+</article>
+{% endmacro %}
+
 {#
   Dispatch a card by its catalog type. Every type the catalog can produce
   has a macro above; anything unknown falls back to nothing rather than
@@ -306,5 +322,6 @@
   {% elif card.type == "outcome-compare" %}{{ outcome_compare(card.data) }}
   {% elif card.type == "roadmap" %}{{ roadmap(card.data) }}
   {% elif card.type == "strategy-card" %}{{ strategy_card(card.data) }}
+  {% elif card.type == "segment-card" %}{{ segment_card(card.data) }}
   {% endif %}
 {% endmacro %}

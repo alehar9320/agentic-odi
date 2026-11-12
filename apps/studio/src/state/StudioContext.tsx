@@ -69,6 +69,19 @@ import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import { deriveDeviceStatus, type DeviceStatus } from "./deviceStatus";
+import { isOnline } from "../lib/onlineStatus";
+import {
+  PROBE_SETTINGS_DEBOUNCE_MS,
+  createProbeScheduler,
+  type ProbeScheduler,
+} from "./scheduleProbe";
+import {
+  classifyProbeError,
+  createProbeBreaker,
+  type BreakerState,
+  type ProbeBreaker,
+  type ProbeOutcome,
+} from "./probeBreaker";
 import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
@@ -98,7 +111,6 @@ import type {
   StudioBrief,
   StudioConfig,
   StudioError,
-  StudioTheme,
   Thesis,
   ToolStatus,
   TurnNode,
@@ -106,8 +118,13 @@ import type {
 } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
-import { resolveTheme } from "../lib/theme";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
+import { SettingsProvider, useSettings, SETTINGS_KEY } from "./settings/SettingsContext";
+import {
+  NoticesProvider,
+  useNoticesActions,
+  type ToastKind,
+} from "./notices/NoticesContext";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -229,15 +246,10 @@ function readStudioError(raw: unknown): StudioError {
   return parsed;
 }
 
-const SETTINGS_KEY = "studio.settings";
 const CANVAS_KEY = "studio.canvas";
 const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
-const SIDECAR_NOTICE_DISMISSED_KEY = "studio.sidecarNoticeDismissed";
 const THESES_KEY = "studio.theses";
-
-/** How often the studio re-probes the model and the MCP server. */
-const HEALTH_POLL_INTERVAL_MS = 30_000;
 
 /** How often a focused window re-reads the signal inbox from the store. */
 const SIGNAL_POLL_INTERVAL_MS = 60_000;
@@ -255,23 +267,9 @@ const PANEL_FOR_SUBJECT: Partial<Record<SignalSubjectKind, WorkspacePanelId>> = 
   strategy: "segments",
 };
 
-export const EMPTY_CONFIG: StudioConfig = {
-  base_url: "http://localhost:8001/v1",
-  api_key: "local",
-  model_name: "local-tools-model",
-  mcp_url: "http://localhost:8000/mcp",
-};
-
-export type ToastKind = "success" | "error" | "info";
-
-export interface Toast {
-  id: number;
-  kind: ToastKind;
-  message: string;
-  /** One-off callback, for a toast that can hand back what it just took. */
-  action?: { label: string; run: () => void };
-  /** How long the toast stays up. Defaults to six seconds. */
-  durationMs?: number;
+export function writeReceipt(record: unknown, acknowledged: string): string {
+  const pending = (record as { pending?: boolean } | null | undefined)?.pending === true;
+  return pending ? "Saved on this device · will sync" : acknowledged;
 }
 
 /**
@@ -333,6 +331,12 @@ export interface StudioContextValue {
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
+  /**
+   * What the probe breaker is doing (#536): `state` is `closed`, `open`,
+   * `half-open`, or `degraded`, and `retryInMs` is how long until the next
+   * probe is allowed. The bar reads this to say "Retrying in N min".
+   */
+  probeRetry: { state: BreakerState; retryInMs: number };
   /** Model ids the configured endpoint publishes. Empty means "type one". */
   models: string[];
   modelsLoading: boolean;
@@ -442,7 +446,6 @@ export interface StudioContextValue {
   closePanel: () => void;
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
-  toasts: Toast[];
   pushToast: (
     kind: ToastKind,
     message: string,
@@ -453,8 +456,12 @@ export interface StudioContextValue {
   presets: ConnectorPreset[];
   /** The failure behind an unreachable connector catalog, if any. */
   presetError: StudioError | null;
+  /** True while the connector catalog is being (re)read. */
+  presetsLoading: boolean;
   /** The failure behind an unreachable connector list, if any. */
   connectorsError: StudioError | null;
+  /** True while the installed connector list is being (re)read. */
+  connectorsLoading: boolean;
   /** Probed availability of local and sidecar capabilities. */
   capabilities: Capability[];
   /** One answer for what works here, derived from `capabilities`. */
@@ -523,16 +530,17 @@ export interface StudioContextValue {
 
 const StudioContext = createContext<StudioContextValue | null>(null);
 
-function loadSettings(): StudioConfig {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) {
-      return { ...EMPTY_CONFIG, ...(JSON.parse(raw) as Partial<StudioConfig>) };
-    }
-  } catch {
-    /* ignore malformed cache */
-  }
-  return EMPTY_CONFIG;
+/**
+ * Whether an edit moved what the studio talks to. The theme is stored beside the
+ * endpoints but is not one of them, so switching it must not trigger a probe.
+ */
+function settingsTargetsChanged(a: StudioConfig, b: StudioConfig): boolean {
+  return (
+    a.base_url !== b.base_url ||
+    a.api_key !== b.api_key ||
+    a.model_name !== b.model_name ||
+    a.mcp_url !== b.mcp_url
+  );
 }
 
 function loadFocusedSubject(): FocusSubject | null {
@@ -570,14 +578,6 @@ function loadCanvasCache(): CanvasData | null {
     /* ignore malformed cache */
   }
   return null;
-}
-
-function loadSidecarNoticeDismissed(): boolean {
-  try {
-    return localStorage.getItem(SIDECAR_NOTICE_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
 }
 
 function loadDisplayName(): string {
@@ -627,12 +627,14 @@ function loadTheses(): Thesis[] {
   return [];
 }
 
-export function StudioProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<StudioConfig>(loadSettings);
-  // The stored choice, or the operating system when there is none — the same
-  // resolution the inline bootstrap in index.html runs before React, so the
-  // class it painted and the class the app keeps are the same one.
-  const theme: StudioTheme = resolveTheme(settings.theme);
+function StudioProviderInner({ children }: { children: ReactNode }) {
+  const { settings, saveSettings: persistSettings } = useSettings();
+  const {
+    pushToast,
+    dismissToast,
+    setDismissedSidecarNotice,
+    dismissedSidecarNotice,
+  } = useNoticesActions();
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   // The context conversation is never a gate. It opens from the stage, from a
@@ -648,13 +650,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     healthy: null,
     message: "Health not checked yet.",
   });
+  /**
+   * What the probe breaker is doing (#536): whether an endpoint has stopped
+   * answering, and how long until the next probe is allowed. The bar reads this
+   * to say "Retrying in N min" instead of showing a spinner forever.
+   */
+  const [probeRetry, setProbeRetry] = useState<{ state: BreakerState; retryInMs: number }>({
+    state: "closed",
+    retryInMs: 0,
+  });
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
-  const [dismissedSidecarNotice, setDismissedSidecarNotice] = useState<boolean>(loadSidecarNoticeDismissed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -664,11 +674,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
   const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
+  const [presetsLoading, setPresetsLoading] = useState(false);
   const [connectorsError, setConnectorsError] = useState<StudioError | null>(null);
+  const [connectorsLoading, setConnectorsLoading] = useState(false);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [capabilitiesCheckedAt, setCapabilitiesCheckedAt] = useState<string | null>(null);
   const [connectorSuggestions, setConnectorSuggestions] = useState<string[]>([]);
@@ -690,12 +701,39 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [featuredError, setFeaturedError] = useState<StudioError | null>(null);
   const [connectorModalDismissed, setConnectorModalDismissed] = useState(false);
   const [theses, setTheses] = useState<Thesis[]>(loadTheses);
-  const toastId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   /** The id of the newest turn on the wire; a steered cut-in takes it over (#410). */
   const liveTurnId = useRef<string | null>(null);
   /** The deferred connectivity probe, until the person speaks or the view unmounts. */
   const idleProbeRef = useRef<{ cancel: () => void } | null>(null);
+  /**
+   * The one thing that decides when the next probe runs. It reschedules itself
+   * from each result, so a refusal widens the gap and a wake does not stack a
+   * second timer on top of the first (#535).
+   */
+  const probeSchedulerRef = useRef<ProbeScheduler | null>(null);
+  /**
+   * The single-flight breaker every probe shares (#536): one probe on the wire
+   * at a time, and no probe at all while an endpoint keeps refusing.
+   */
+  const probeBreakerRef = useRef<ProbeBreaker | null>(null);
+  if (probeBreakerRef.current === null) {
+    probeBreakerRef.current = createProbeBreaker();
+  }
+
+  /** Publish the breaker's state so the bar can show a countdown while it is open. */
+  const publishProbeRetry = useCallback(() => {
+    const breaker = probeBreakerRef.current!;
+    setProbeRetry({ state: breaker.state(), retryInMs: breaker.retryInMs() });
+  }, []);
+  /** What a scheduled probe should run, kept current without re-creating the timer. */
+  const probeNowRef = useRef<() => Promise<boolean>>(async () => false);
+  /** Runs the debounced probe a connection-setting edit earns. */
+  const settingsProbeRef = useRef<() => void>(() => {});
+  /** The pending settings edit, so a burst of keystrokes earns one probe. */
+  const settingsProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The last written settings, so an edit can be compared without a stale closure. */
+  const settingsRef = useRef(settings);
 
   const signals = useMemo(
     () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
@@ -777,35 +815,6 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [refreshSignals, settings.mcp_url],
   );
 
-
-  const pushToast = useCallback(
-    (
-      kind: ToastKind,
-      message: string,
-      options?: { action?: { label: string; run: () => void }; durationMs?: number },
-    ) => {
-      const id = (toastId.current += 1);
-      setToasts((prev) => [
-        ...prev,
-        {
-          id,
-          kind,
-          message,
-          ...(options?.action ? { action: options.action } : {}),
-          ...(options?.durationMs ? { durationMs: options.durationMs } : {}),
-        },
-      ]);
-      window.setTimeout(() => {
-        setToasts((prev) => prev.filter((toast) => toast.id !== id));
-      }, options?.durationMs ?? 6000);
-      return id;
-    },
-    [],
-  );
-
-  const dismissToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
 
   const threadSnapshot = useRef<ThreadSnapshot | null>(null);
 
@@ -903,17 +912,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const refreshConnectors = useCallback(async () => {
     setConnectorsError(null);
+    setConnectorsLoading(true);
     try {
       setConnectors(await fetchConnectors());
     } catch (error) {
       // A list that could not be fetched is not an empty list.
       setConnectorsError(asStudioError(error));
       setConnectors([]);
+    } finally {
+      setConnectorsLoading(false);
     }
   }, []);
 
   const refreshPresets = useCallback(async () => {
     setPresetError(null);
+    setPresetsLoading(true);
     try {
       setPresets(await fetchConnectorCatalog());
     } catch (error) {
@@ -921,6 +934,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       // panel says so instead of offering a select with nothing in it.
       setPresetError(asStudioError(error));
       setPresets([]);
+    } finally {
+      setPresetsLoading(false);
     }
   }, []);
 
@@ -1073,45 +1088,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // The theme lives on <html> so every surface, portal, and native control
-  // follows one class instead of each component tracking its own copy.
-  const appliedTheme = useRef<StudioTheme | null>(null);
-  useEffect(() => {
-    const root = document.documentElement;
-    const previous = appliedTheme.current;
-    appliedTheme.current = theme;
-    root.classList.toggle("theme-light", theme === "light");
-    root.classList.toggle("theme-dark", theme === "dark");
-    root.style.colorScheme = theme;
-
-    // Only a change the person made cross-fades; the first paint is already the
-    // right colour (see index.html). Reduced motion swaps instantly, and the
-    // stylesheet's own reduce rule shortens the fade if it somehow runs.
-    if (previous === null || previous === theme) {
-      return;
-    }
-    const reduceMotion =
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) {
-      return;
-    }
-    root.classList.add("theme-fading");
-    const timer = window.setTimeout(() => root.classList.remove("theme-fading"), 140);
-    return () => {
-      window.clearTimeout(timer);
-      root.classList.remove("theme-fading");
-    };
-  }, [theme]);
-
-  const saveSettings = useCallback((config: StudioConfig) => {
-    setSettings(config);
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
+  const saveSettings = useCallback(
+    (config: StudioConfig) => {
+      // Only an edit that changes what the studio talks to is worth a probe: a
+      // theme change is a settings change too, but nothing about a connection
+      // moved, so it earns nothing. The timer is debounced, so typing a URL —
+      // many saves in a row — earns one probe once the typing stops.
+      if (settingsTargetsChanged(settingsRef.current, config)) {
+        if (settingsProbeTimerRef.current !== null) {
+          clearTimeout(settingsProbeTimerRef.current);
+        }
+        settingsProbeTimerRef.current = setTimeout(() => {
+          settingsProbeTimerRef.current = null;
+          settingsProbeRef.current();
+        }, PROBE_SETTINGS_DEBOUNCE_MS);
+      }
+      settingsRef.current = config;
+      persistSettings(config);
+    },
+    [persistSettings],
+  );
 
   const setDisplayName = useCallback((name: string) => {
     setDisplayNameState(name);
@@ -1154,6 +1150,59 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Measure the sidecar, the MCP server, and the model, keeping the failure that
+   * made a negative answer negative. The scheduled probe needs that failure to
+   * tell a flaky network from a rejected key (#536); a panel does not.
+   */
+  const measureConnections = useCallback(
+    async (
+      override: Partial<StudioConfig> = {},
+    ): Promise<{ report: ConnectionReport; failure: unknown }> => {
+      const target = { ...settings, ...override };
+      let failure: unknown = null;
+      const noteFailure = (error: unknown) => {
+        failure = failure ?? error;
+      };
+      const [sidecar, mcp, llm] = await Promise.all([
+        fetchConfig()
+          .then(() => true)
+          .catch((error: unknown) => {
+            noteFailure(error);
+            return false;
+          }),
+        healthMcp(target.mcp_url)
+          .then((result) => result.reachable)
+          .catch((error: unknown) => {
+            noteFailure(error);
+            return false;
+          }),
+        healthLlm({
+          base_url: target.base_url,
+          api_key: target.api_key,
+          model: target.model_name,
+        }).catch((error: unknown) => {
+          noteFailure(error);
+          return {
+            healthy: false,
+            message: (error as Error).message || "The model did not answer.",
+          };
+        }),
+      ]);
+      void refreshCapabilities();
+      return {
+        report: {
+          sidecarReachable: sidecar,
+          mcpReachable: mcp,
+          llmHealthy: llm.healthy,
+          llmMessage: llm.message,
+        },
+        failure,
+      };
+    },
+    [settings, refreshCapabilities],
+  );
+
+  /**
    * Measure the sidecar, the MCP server, and the model without recording the result.
    *
    * A panel that owes the person looking at it fresh numbers calls this. Nothing here
@@ -1162,36 +1211,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    */
   const surveyConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
-      const target = { ...settings, ...override };
-      const [sidecar, mcp, llm] = await Promise.all([
-        fetchConfig()
-          .then(() => true)
-          .catch(() => false),
-        healthMcp(target.mcp_url)
-          .then((result) => result.reachable)
-          .catch(() => false),
-        healthLlm({
-          base_url: target.base_url,
-          api_key: target.api_key,
-          model: target.model_name,
-        }).catch((error: unknown) => ({
-          healthy: false,
-          message: (error as Error).message || "The model did not answer.",
-        })),
-      ]);
-      void refreshCapabilities();
-      return {
-        sidecarReachable: sidecar,
-        mcpReachable: mcp,
-        llmHealthy: llm.healthy,
-        llmMessage: llm.message,
-      };
+      return (await measureConnections(override)).report;
     },
-    [settings, refreshCapabilities],
+    [measureConnections],
   );
 
   /**
-   * Probe the sidecar, MCP server, and model, and let the studio act on it.
+   * Record a survey's answer, and let the studio act on it.
    *
    * `mode` decides what a negative answer is allowed to do. "evidence" — what a
    * person gets when they asked, by pressing Recheck or walking the setup — records
@@ -1205,12 +1231,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    * appears on its own half a minute after the page loads blames their studio for
    * being offline when nothing they did needed it to be online.
    */
-  const checkConnections = useCallback(
-    async (
-      override: Partial<StudioConfig> = {},
-      mode: "evidence" | "recovery" = "evidence",
-    ): Promise<ConnectionReport> => {
-      const report = await surveyConnections(override);
+  const applyReport = useCallback(
+    (report: ConnectionReport, mode: "evidence" | "recovery"): ConnectionReport => {
       const sidecar = report.sidecarReachable;
       const llm = { healthy: report.llmHealthy, message: report.llmMessage };
 
@@ -1237,7 +1259,71 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
       return report;
     },
-    [surveyConnections],
+    [setDismissedSidecarNotice],
+  );
+
+  /**
+   * The browser has no network. Both the process and the model are unreachable
+   * for a reason that is neither's fault, so the studio says so once and stops
+   * asking until the network returns (#535).
+   */
+  const applyOffline = useCallback(() => {
+    setSidecarReachable(false);
+    setMcpReachable(false);
+    setLlmHealth({ healthy: false, message: "No network" });
+  }, []);
+
+  /**
+   * Probe the sidecar, MCP server, and model, and let the studio act on it.
+   *
+   * A probe a person asked for — Recheck, the setup walk, a settings edit —
+   * restarts the cadence, because the endpoint they just changed is not the one
+   * that kept failing.
+   */
+  /**
+   * One measurement through the shared breaker: the probe joins whatever is
+   * already on the wire, records the report for the caller, and classifies a
+   * negative answer so the breaker knows whether a retry is worth making (#536).
+   */
+  const probeOnce = useCallback(
+    async (
+      override: Partial<StudioConfig>,
+      mode: "evidence" | "recovery",
+    ): Promise<ConnectionReport | null> => {
+      const settled = await probeBreakerRef.current!.run(async () => {
+        const { report, failure } = await measureConnections(override);
+        applyReport(report, mode);
+        return {
+          outcome: (report.llmHealthy
+            ? "success"
+            : classifyProbeError(failure, report.llmMessage)) as ProbeOutcome,
+          value: report,
+        };
+      });
+      publishProbeRetry();
+      // A joined probe returns the other caller's promise, whose report is the
+      // one this call also wants: both measured the same endpoint. `null` means
+      // the breaker refused, so nothing was measured and nothing is reported.
+      return settled?.value ?? null;
+    },
+    [measureConnections, applyReport, publishProbeRetry],
+  );
+
+  const checkConnections = useCallback(
+    async (
+      override: Partial<StudioConfig> = {},
+      mode: "evidence" | "recovery" = "evidence",
+    ): Promise<ConnectionReport> => {
+      // A person asking restarts the cadence and closes the breaker: the endpoint
+      // they just edited is not the one that kept failing (#536). They still join
+      // a probe already in flight rather than starting a second one.
+      probeBreakerRef.current?.reset();
+      const report = await probeOnce(override, mode);
+      probeSchedulerRef.current?.reset();
+      // `reset` cleared the breaker, so this probe was allowed to run.
+      return report!;
+    },
+    [probeOnce],
   );
 
   // Re-probe after the user acted on the sidecar notice (e.g. started the
@@ -1245,6 +1331,30 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const recheckConnections = useCallback(async () => {
     await checkConnections();
   }, [checkConnections]);
+
+  /**
+   * One scheduled probe: it records what it finds, and it reports back whether
+   * the endpoint answered so the scheduler can widen or reset the gap. It does
+   * not reset the cadence itself — only a person asking does that.
+   *
+   * The breaker wraps the measurement, so an overlapping tick joins the probe
+   * already in flight and a streak of transport failures stops the requests
+   * rather than repeating them (#536).
+   */
+  const scheduledProbe = useCallback(async (): Promise<boolean> => {
+    if (!isOnline()) {
+      applyOffline();
+      return false;
+    }
+    const report = await probeOnce({}, "recovery");
+    return report?.llmHealthy ?? false;
+  }, [probeOnce, applyOffline]);
+
+  // Keep the scheduler pointed at the freshest probe without ever re-creating
+  // the timer: the ref is what the running scheduler reads on each tick.
+  useEffect(() => {
+    probeNowRef.current = scheduledProbe;
+  }, [scheduledProbe]);
 
   /**
    * Give up the probe scheduled at boot. A person who is already talking does not
@@ -1258,12 +1368,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const dismissSidecarNotice = useCallback(() => {
     setDismissedSidecarNotice(true);
-    try {
-      localStorage.setItem(SIDECAR_NOTICE_DISMISSED_KEY, "1");
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
+  }, [setDismissedSidecarNotice]);
 
   const refreshCanvas = useCallback(async () => {
     // The inbox is re-read alongside the board: every path that reaches this
@@ -1295,8 +1400,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
       try {
-        await apiAddStep({ ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Step added to Job Map!");
+        const step = await apiAddStep({ ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", writeReceipt(step, "Step added to Job Map!"));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Error adding step: ${(error as Error).message}`);
@@ -1308,9 +1413,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const addOutcome = useCallback(
     async (payload: Omit<AddOutcomePayload, "mcp_url">) => {
       // The form that asked for this shows the failure where the user typed
-      // it, so the error travels up instead of disappearing into a toast.
-      await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", "Outcome captured successfully!");
+      // it, so the error travels up instead of disappearing into a toast. A
+      // transport failure does not travel up: the write is queued locally and
+      // the receipt says where it lives.
+      const outcome = await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
+      pushToast("success", writeReceipt(outcome, "Outcome captured successfully!"));
       await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -1319,7 +1426,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
       const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", `Job created: ${payload.name}`);
+      pushToast("success", writeReceipt(job, `Job created: ${payload.name}`));
       await refreshCanvas();
       return job.id ?? null;
     },
@@ -1329,8 +1436,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const updateJob = useCallback(
     async (jobId: string, payload: { name?: string; description?: string }) => {
       try {
-        await apiUpdateJob(jobId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Job updated.");
+        const job = await apiUpdateJob(jobId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", writeReceipt(job, "Job updated."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the job: ${(error as Error).message}`);
@@ -1342,8 +1449,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const deleteJob = useCallback(
     async (jobId: string) => {
       try {
-        await apiDeleteJob(jobId, settings.mcp_url);
-        pushToast("success", "Job removed.");
+        const result = await apiDeleteJob(jobId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Job removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the job: ${(error as Error).message}`);
@@ -1355,8 +1462,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const updateStep = useCallback(
     async (stepId: string, payload: { name?: string; order?: number }) => {
       try {
-        await apiUpdateStep(stepId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Step updated.");
+        const step = await apiUpdateStep(stepId, { ...payload, mcp_url: settings.mcp_url });
+        pushToast("success", writeReceipt(step, "Step updated."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the step: ${(error as Error).message}`);
@@ -1368,8 +1475,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const deleteStep = useCallback(
     async (stepId: string) => {
       try {
-        await apiDeleteStep(stepId, settings.mcp_url);
-        pushToast("success", "Step removed.");
+        const result = await apiDeleteStep(stepId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Step removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the step: ${(error as Error).message}`);
@@ -1384,8 +1491,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       payload: { statement?: string; importance?: number; satisfaction?: number },
     ) => {
       try {
-        await apiUpdateOutcome(outcomeId, { ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", "Outcome updated.");
+        const outcome = await apiUpdateOutcome(outcomeId, {
+          ...payload,
+          mcp_url: settings.mcp_url,
+        });
+        pushToast("success", writeReceipt(outcome, "Outcome updated."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
@@ -1397,8 +1507,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const deleteOutcome = useCallback(
     async (outcomeId: string) => {
       try {
-        await apiDeleteOutcome(outcomeId, settings.mcp_url);
-        pushToast("success", "Outcome removed.");
+        const result = await apiDeleteOutcome(outcomeId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Outcome removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the outcome: ${(error as Error).message}`);
@@ -1410,8 +1520,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const deleteEvidence = useCallback(
     async (evidenceId: string) => {
       try {
-        await apiDeleteEvidence(evidenceId, settings.mcp_url);
-        pushToast("success", "Evidence removed.");
+        const result = await apiDeleteEvidence(evidenceId, settings.mcp_url);
+        pushToast("success", writeReceipt(result, "Evidence removed."));
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the evidence: ${(error as Error).message}`);
@@ -1433,8 +1543,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       },
     ) => {
       // The form keeps the error beside the quote it came from.
-      await apiPromoteEvidence(evidenceId, { ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", `Promoted the evidence to a ${payload.target}.`);
+      const result = await apiPromoteEvidence(evidenceId, {
+        ...payload,
+        mcp_url: settings.mcp_url,
+      });
+      pushToast("success", writeReceipt(result, `Promoted the evidence to a ${payload.target}.`));
       await refreshCanvas();
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -1638,11 +1751,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       // Writing here is the proof the new thread was wanted: Undo is spent.
       commitNewThread();
 
+      // One clock for the turn: the question and the reply it opens carry the
+      // same moment, which is what the transcript dates them by.
+      const startedAt = new Date().toISOString();
       const userMessage: ChatMessage = existingUserMessage ?? {
         id: crypto.randomUUID(),
         parentId: base.length ? base[base.length - 1].id : null,
         role: "user",
         content: trimmed,
+        createdAt: startedAt,
         ...(attachments.length ? { attachments } : {}),
       };
       const assistantId = crypto.randomUUID();
@@ -1655,7 +1772,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
       setMessages([
         ...history,
-        { id: assistantId, parentId: userMessage.id, role: "assistant", content: "", parts: [] },
+        {
+          id: assistantId,
+          parentId: userMessage.id,
+          role: "assistant",
+          content: "",
+          parts: [],
+          createdAt: startedAt,
+        },
       ]);
       setStreaming(true);
       setThinkingPhase("health_check");
@@ -2367,24 +2491,81 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Health polling: the studio must notice that the model or the MCP server
-  // came back without a reload, so the bar leaves "Local mode" on its own.
-  // Recovery-only: this may retire a warning, never raise one.
+  // Probing on a schedule that respects the person (#535). One scheduler owns
+  // the timer: 30 s while the tab is visible, doubling to a five-minute cap on
+  // consecutive failures, and nothing at all while the tab is hidden. On return
+  // it probes once, but only if the last answer has gone stale. This may retire
+  // a warning, never raise one.
   useEffect(() => {
-    const poll = () => {
-      if (document.visibilityState === "visible") {
-        void checkConnections({}, "recovery");
-      }
-    };
-
-    const timer = window.setInterval(poll, HEALTH_POLL_INTERVAL_MS);
-    document.addEventListener("visibilitychange", poll);
-
+    const scheduler = createProbeScheduler({
+      probe: () => probeNowRef.current(),
+    });
+    probeSchedulerRef.current = scheduler;
+    scheduler.start();
     return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", poll);
+      scheduler.stop();
+      probeSchedulerRef.current = null;
     };
-  }, [checkConnections]);
+  }, []);
+
+  // While the breaker is open the countdown is the only thing changing, so tick
+  // it once a second — the timer that carries it is separate from the probe
+  // schedule, and it stops the moment the breaker closes or is reset (#536).
+  useEffect(() => {
+    if (probeRetry.state !== "open") {
+      return;
+    }
+    const timer = window.setInterval(publishProbeRetry, 1_000);
+    return () => window.clearInterval(timer);
+  }, [probeRetry.state, publishProbeRetry]);
+
+  // A network that comes back is worth one probe; a network that goes away is
+  // worth one sentence and no further requests until it returns. The scheduler
+  // itself keeps running, so the timer resumes with the connection.
+  useEffect(() => {
+    const onOnline = () => {
+      probeSchedulerRef.current?.check();
+    };
+    const onOffline = () => {
+      applyOffline();
+    };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [applyOffline]);
+
+  // A settings edit that changes what the studio talks to is a person changing
+  // the endpoint, so it earns one probe — debounced, because typing a URL is
+  // many changes in a row, and restarting the cadence, because the endpoint
+  // that failed is not the one they just entered. The debounce timer lives on
+  // the ref and is scheduled by `saveSettings`, so a re-render that only swaps
+  // the probe's identity cannot cancel the probe it just promised.
+  useEffect(() => {
+    settingsProbeRef.current = () => {
+      if (!isOnline()) {
+        applyOffline();
+        return;
+      }
+      void surveyConnections({})
+        .then((report) => applyReport(report, "evidence"))
+        .then(() => probeSchedulerRef.current?.reset())
+        .catch(() => undefined);
+    };
+  }, [surveyConnections, applyReport, applyOffline]);
+
+  // Hand the pending settings probe back on unmount, and only on unmount.
+  useEffect(
+    () => () => {
+      if (settingsProbeTimerRef.current !== null) {
+        clearTimeout(settingsProbeTimerRef.current);
+        settingsProbeTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   // The inbox is server state, so it is re-read rather than remembered: every
   // minute the window is up, and the moment it comes back into focus.
@@ -2469,6 +2650,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      probeRetry,
       models,
       modelsLoading,
       modelsMessage,
@@ -2523,15 +2705,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       openPanel,
       closePanel,
       ask,
-      toasts,
       pushToast,
       dismissToast,
       connectors,
       connectorsError,
+      connectorsLoading,
       capabilities,
       deviceStatus,
       presets,
       presetError,
+      presetsLoading,
       refreshConnectors,
       refreshPresets,
       refreshCapabilities,
@@ -2593,6 +2776,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      probeRetry,
       models,
       modelsLoading,
       modelsMessage,
@@ -2647,15 +2831,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       openPanel,
       closePanel,
       ask,
-      toasts,
       pushToast,
       dismissToast,
       connectors,
       connectorsError,
+      connectorsLoading,
       capabilities,
       deviceStatus,
       presets,
       presetError,
+      presetsLoading,
       refreshConnectors,
       refreshPresets,
       refreshCapabilities,
@@ -2703,6 +2888,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
+}
+
+export function StudioProvider({ children }: { children: ReactNode }) {
+  return (
+    <SettingsProvider>
+      <NoticesProvider>
+        <StudioProviderInner>{children}</StudioProviderInner>
+      </NoticesProvider>
+    </SettingsProvider>
+  );
 }
 
 export function useStudio(): StudioContextValue {

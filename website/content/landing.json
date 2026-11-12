@@ -54,7 +54,7 @@
     "id": "surfaces",
     "eyebrow": "The surfaces",
     "title": "The agent composes, it does not describe.",
-    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Fourteen shapes, each one a thing you can act on.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Fifteen shapes, each one a thing you can act on.",
     "cards": [
       {
         "type": "outcome-card",
@@ -330,6 +330,27 @@
             }
           ]
         }
+      },
+      {
+        "type": "segment-card",
+        "title": "Segment",
+        "blurb": "A group of people and the job they are doing, with the verdict their scored outcomes support.",
+        "data": {
+          "id": "SEG-1",
+          "name": "Release engineers, the publish step",
+          "people": "the people working on the publish step",
+          "peopleInferred": true,
+          "jobStatement": "Publish a plugin",
+          "verdict": "underserved",
+          "confidence": 0.75,
+          "outcomeIds": [
+            "OUT-1",
+            "OUT-2"
+          ],
+          "rationale": "Both outcomes in this group are scored 13 or higher, so the gap is shared rather than one person's complaint.",
+          "missingMembers": 0,
+          "unclustered": []
+        }
       }
     ]
   },
@@ -369,6 +390,28 @@
         "label": "Prebuilt binary",
         "language": "bash",
         "code": "curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/install.sh | sh\nagentic-odi --version"
+      }
+    ],
+    "downloads": [
+      {
+        "label": "Download Linux",
+        "platform": "Linux",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz"
+      },
+      {
+        "label": "Download macOS Apple Silicon",
+        "platform": "macOS Apple Silicon",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz"
+      },
+      {
+        "label": "Download macOS Intel",
+        "platform": "macOS Intel",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz"
+      },
+      {
+        "label": "Download Windows",
+        "platform": "Windows",
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip"
       }
     ],
     "mcp_config": "{\n  \"mcpServers\": {\n    \"agentic-odi\": { \"url\": \"http://localhost:8000/mcp\" }\n  }\n}",

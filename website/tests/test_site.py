@@ -515,5 +515,6 @@ def test_page_weights_are_within_budget(page: str):
     # rest. The MCP reference carries one section per tool, and Pillar 3 adds
     # the decision, bet, roadmap, brief, compare, history and segment-profile
     # tools, so the ceiling moves with that reference too rather than trimming
-    # the signatures an agent reads before it calls them.
-    assert size <= 128 * 1024, f"{page}: {size} bytes"
+    # the signatures an agent reads before it calls them. The traceability
+    # tools add their own sections on top of that.
+    assert size <= 136 * 1024, f"{page}: {size} bytes"

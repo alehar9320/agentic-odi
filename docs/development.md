@@ -58,6 +58,13 @@ npm --prefix apps/studio run build       # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
+The build version is a single source of truth. `__STUDIO_VERSION__` is baked into
+the Vite build from `apps/studio/package.json` (`vite.config.ts`) and exposed
+through `src/lib/version.ts`; `src/lib/version.test.ts` fails if it drifts from
+`package.json` or `.release-please-manifest.json`. `Settings → About` renders it,
+and the diagnostics bundle records it together with its source (`build` or
+`desktop`).
+
 ### Visual tests
 
 `npm test` runs the jsdom suite and deliberately ignores `*.visual.test.tsx`.
@@ -109,6 +116,7 @@ the pure count arithmetic:
 | `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
 | `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | The segment board's members and basis (#559): each segment lists its member outcomes with their stored scores, the mean is over scored members only with "Not scored" for none, an inferred group is called a candidate, a missing member is dropped and counted, a member opens in the landscape by mouse and keyboard, and the empty state names the next step |
+| `apps/studio/src/components/canvas/OpportunityLandscape.test.tsx` | The landscape's honesty pass (#501): the plot draws a point only for a scored outcome, the underserved zone is sampled from `2 × importance − satisfaction > 10` (a boundary pair at one satisfaction lands on opposite sides), an unscored outcome appears under **Not scored (n)** with a **Score me** action that opens the score form without writing a rating |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
 | `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
 | `apps/studio/src/diagnostics/` | Recursive secret/URL/path redaction, 256 KiB cap, opt-in memory-only capture, local-only metadata fetch, and accessible diagnostics preview/export |
@@ -288,25 +296,52 @@ merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
 workflows and are deliberately left alone. The workflow is silent: it updates
 labels only and never posts PR comments.
 
+### Tiered Automated Triage (shift-left filtering)
+
+The same risk workflow runs a third job, **triage**, which decides whether a
+human may open the diff. It enforces the project's shift-left rule:
+
+> **Humans should never read an unvetted AI PR.**
+
+A pull request is vetted -- and becomes eligible for a human reviewer -- only
+when it carries the `ready for human review` gate label. The triage job applies
+it deterministically (no LLM, no PR code executed) from the provenance, risk
+tier, and size labels the `labels` and `pr-risk` jobs just computed:
+
+| Author | Risk tier | Gate decision | What a human sees |
+|---|---|---|---|
+| Human | any | `ready for human review` | The diff is open for review immediately. |
+| Agent | `safe to merge` (≤ 20) | `ready for human review` | Automated vet complete; fast path to review. |
+| Agent | `safe to merge` + `size/XL` | `needs human review` | Size alone warrants a first reviewer pass. |
+| Agent | `needs a look` (21–50) | `needs human review` | Awaits an assigned reviewer before anyone reads the diff. |
+| Agent | `danger zone` (≥ 51) | `deep dive` | Blocking deep-dive review; never auto-merged. |
+
+The triage job owns the gate labels (`ready for human review`, `needs human
+review`, `deep dive`) and manages them idempotently on every run, so re-pushing
+a branch re-triages the pull request. It creates its own labels (the `labels`
+job manages a different set), runs only on non-fork pull requests, and never
+executes pull request code.
+
+```bash
+python3 scripts/pr_triage.py --labels labels.txt   # print the triage decision
+```
+
 ## Testing
+
+See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
+
+```bash
+uv run python scripts/verify.py --changed   # fast gate on touched files (PR bar)
+uv run python scripts/verify.py --default   # adds mypy + vitest for touched areas
+uv run python scripts/verify.py --full      # full matrix (CI's job)
+```
+
+Per-command ceiling is 300s; designed for a 10–30 minute agent budget. CI owns
+`--full`. The PR body must list the tiers run and skipped.
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
 in-memory — no running server required. Tests live next to the package they
-cover, and every test runs from the repository root:
-
-```bash
-uv run pytest                        # everything
-uv run pytest apps/cli               # one app
-uv run pytest packages/core          # one package
-uv run pytest tests/contract         # cross-package contracts
-uv run pytest tests/scripts          # dev launcher
-```
-
-The pre-PR procedure is not "run everything". It is the **default** tier in
-[`.agents/workflows/test.md`](../.agents/workflows/test.md): the fast tier,
-plus type checking, plus the studio units. The full tier — the studio build
-and the browser e2e suite — is CI's job and is not asked of anyone before
-they open a pull request.
+cover.
 
 The MCP server contract test compares the live FastMCP registry with
 `packages/core/src/agentic_odi_core/contract.py`, so add or change a tool in
