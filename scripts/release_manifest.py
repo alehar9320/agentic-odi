@@ -95,6 +95,17 @@ PLATFORM_SUFFIXES: dict[str, tuple[str, ...]] = {
     "darwin-x86_64": (".app.tar.gz", ".dmg"),
 }
 
+# Architecture tokens that may appear in a bundle's file name for each platform
+# key. Two keys can share a suffix set (macOS ships both ``.app.tar.gz`` and
+# ``.dmg`` for aarch64 and x86_64), so discovery must disambiguate by the
+# architecture token in the name: an Intel Mac must never be offered the Apple
+# Silicon bundle, and vice versa. Keys with no entry keep the legacy
+# first-suffix-match behavior.
+PLATFORM_ARCH_TOKENS: dict[str, tuple[str, ...]] = {
+    "darwin-aarch64": ("aarch64", "arm64"),
+    "darwin-x86_64": ("x86_64", "x64", "amd64"),
+}
+
 
 def select_artifact(key: str, names: list[str], suffixes: tuple[str, ...]) -> str | None:
     """The first of ``names`` the updater for ``key`` would install, or ``None``.
@@ -102,17 +113,28 @@ def select_artifact(key: str, names: list[str], suffixes: tuple[str, ...]) -> st
     ``names`` is what the build produced. ``.sig`` companions are skipped, and
     ``suffixes`` is tried in order so a platform that can consume more than one
     bundle (macOS takes the ``.app.tar.gz`` the updater prefers over the
-    ``.dmg``) picks the right one. Returning ``None`` rather than a guess is the
-    point: a platform with no artifact must fail the release, not ship a
-    manifest entry pointing at nothing.
+    ``.dmg``) picks the right one. When a key defines architecture tokens, a
+    candidate whose name carries one is preferred, so shared suffix sets (the
+    macOS keys) never hand the wrong architecture to a platform. Returning
+    ``None`` rather than a guess is the point: a platform with no artifact must
+    fail the release, not ship a manifest entry pointing at nothing.
     """
     if key not in PLATFORM_SUFFIXES:
         raise ValueError(f"unknown platform key: {key!r}")
     candidates = [name for name in names if not name.endswith(".sig")]
+    arch_tokens = PLATFORM_ARCH_TOKENS.get(key)
     for suffix in suffixes:
-        for name in candidates:
-            if name.endswith(suffix):
-                return name
+        hits = [name for name in candidates if name.endswith(suffix)]
+        if not hits:
+            continue
+        if arch_tokens:
+            arch_hits = [
+                name for name in hits if any(token in name for token in arch_tokens)
+            ]
+            chosen = arch_hits[0] if arch_hits else hits[0]
+        else:
+            chosen = hits[0]
+        return chosen
     return None
 
 

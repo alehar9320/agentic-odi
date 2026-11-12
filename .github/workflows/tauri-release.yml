@@ -314,6 +314,13 @@ jobs:
             --out assets/latest.json
           cat assets/latest.json
 
+      - name: Set up Node for the Tauri signer
+        uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: apps/studio/package-lock.json
+
       - name: Sign the manifest itself with the project key
         working-directory: apps/studio
         env:
@@ -321,6 +328,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+          # The Tauri CLI is the locked one from apps/studio/package-lock.json,
+          # not whatever `npx` would pull from the network.
+          npm ci
           # The key is a string; write it to a file so the CLI cannot mistake it
           # for a path, and so its permissions are ours to set.
           key="$(mktemp)"
@@ -331,7 +341,15 @@ jobs:
             -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
             "../assets/latest.json"
           rm -f "$key"
-          test -f ../assets/latest.json.sig
+          sig="../assets/latest.json.sig"
+          test -s "$sig"
+          grep -q "untrusted comment" "$sig"
+          # NOTE: there is no committed updater public key in this repository
+          # (verify-desktop-update.sh generates a throwaway minisign key per run),
+          # so CI cannot yet cryptographically verify latest.json against
+          # latest.json.sig with a project key. That verification is tracked as a
+          # gap; this step confirms the signature file exists, is non-empty, and
+          # carries a minisign block before it is attached to the release.
 
       - name: Attach the manifest and its signature to the release
         env:
@@ -347,7 +365,7 @@ jobs:
   # artifact that is attached to the Release with its .sig twin, and every
   # advertised URL must actually resolve.
   verify:
-    needs: [build, manifest]
+    needs: [build, manifest, resolve]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -378,7 +396,7 @@ jobs:
       - name: Verify the signed updater manifest covers every platform
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
@@ -402,6 +420,7 @@ jobs:
             exit 1
           fi
           asset_names="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '[.assets[].name]')"
+          verified=0
           for key in linux-x86_64 windows-x86_64 darwin-aarch64 darwin-x86_64; do
             if ! jq -e --arg k "$key" '.platforms[$k].url and .platforms[$k].signature' "$manifest" > /dev/null; then
               echo "::error::latest.json is missing a signed $key artifact."
@@ -423,6 +442,29 @@ jobs:
               echo "::error::$key updater download does not resolve: $url"
               exit 1
             fi
+            # Download the advertised bytes and their .sig twin so the release is
+            # proved to serve real, retrievable artifacts (HEAD alone only proves
+            # the URL resolves). Cryptographic signature verification against a
+            # project public key is not yet possible: no updater public key is
+            # committed to this repository (verify-desktop-update.sh generates a
+            # throwaway minisign key per run). That gap is tracked separately.
+            sig_url="${url}.sig"
+            tmp="$(mktemp -d)"
+            if ! curl -fsS --retry 3 --retry-delay 5 --max-time 60 -o "$tmp/$name" "$url"; then
+              echo "::error::$key could not download the advertised bytes: $url"
+              exit 1
+            fi
+            if ! curl -fsS --retry 3 --retry-delay 5 --max-time 60 -o "$tmp/$name.sig" "$sig_url"; then
+              echo "::error::$key could not download its signature twin: $sig_url"
+              exit 1
+            fi
+            if [ ! -s "$tmp/$name" ] || [ ! -s "$tmp/$name.sig" ]; then
+              echo "::error::$key downloaded an empty artifact or signature: $url"
+              exit 1
+            fi
+            rm -rf "$tmp"
+            verified=$((verified + 1))
             echo "OK: $key -> \"$name\" is attached, signed, and downloadable"
           done
+          echo "OK: verified $verified of 4 platform artifacts over HTTP"
           echo "OK: $TAG publishes a signed updater manifest for every platform"

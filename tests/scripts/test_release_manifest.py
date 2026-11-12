@@ -203,6 +203,15 @@ def test_write_discovers_each_platforms_bundle_and_signature(tmp_path):
     assert manifest["platforms"]["linux-x86_64"]["signature"] == "sig-linux"
     assert manifest["platforms"]["windows-x86_64"]["signature"] == "sig-windows"
     assert manifest["platforms"]["linux-x86_64"]["url"].endswith("/studio_0.12.0_amd64.AppImage")
+    # Shared macOS suffixes must not hand the ARM bundle to Intel or vice versa.
+    assert manifest["platforms"]["darwin-aarch64"]["signature"] == "sig-mac-arm"
+    assert manifest["platforms"]["darwin-aarch64"]["url"].endswith(
+        "/studio_0.12.0_aarch64.app.tar.gz"
+    )
+    assert manifest["platforms"]["darwin-x86_64"]["signature"] == "sig-mac-x64"
+    assert manifest["platforms"]["darwin-x86_64"]["url"].endswith(
+        "/studio_0.12.0_x64.app.tar.gz"
+    )
 
 
 def test_write_discovery_fails_when_a_platform_has_no_bundle(tmp_path):

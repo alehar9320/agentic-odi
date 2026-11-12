@@ -58,7 +58,7 @@ def test_tauri_release_publishes_the_manifest_it_verifies() -> None:
     assert "latest.json.sig" in manifest_job
 
     verify_job = workflow.split("\n  verify:\n", 1)[1]
-    assert "needs: [build, manifest]" in verify_job, "verify must wait for the manifest"
+    assert "needs: [build, manifest, resolve]" in verify_job, "verify must wait for the manifest"
     assert "release_manifest.py verify" in verify_job
     assert "--release-please-manifest" in verify_job, (
         "the tag is cross-checked against release-please"
