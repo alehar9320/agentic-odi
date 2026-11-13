@@ -38,7 +38,13 @@ export interface InstallController {
   dispose(): void;
 }
 
-export const INSTALL_DISMISSED_KEY = "studio.pwa.installDismissed";
+/**
+ * The key a dismissal is remembered under. It is `main`'s shipped key, not this
+ * branch's earlier `studio.pwa.installDismissed`: a person who already dismissed
+ * the offer from Settings must not be asked again because the module was
+ * refactored underneath that record.
+ */
+export const INSTALL_DISMISSED_KEY = "studio.install.dismissed";
 
 type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
 
@@ -77,16 +83,23 @@ function readDismissed(storage: PreferenceStorage | null): boolean {
  * Chrome reports this through the `standalone` display mode; iOS Safari, which
  * has no `beforeinstallprompt`, reports it on `navigator.standalone`.
  */
+/** The display modes that mean the page is running as its own window. */
+const INSTALLED_DISPLAY_MODES = ["standalone", "minimal-ui", "fullscreen"] as const;
+
 export function isInstalled(targetWindow: Window | null = defaultWindow()): boolean {
   if (!targetWindow) {
     return false;
   }
-  const displayMode =
-    typeof targetWindow.matchMedia === "function" &&
-    targetWindow.matchMedia("(display-mode: standalone)").matches;
+  const win = targetWindow;
+  // Every mode that means "its own window", not only `standalone`: a desktop
+  // install may report `minimal-ui` or `fullscreen`, and treating those as a tab
+  // would offer an install the person already made (#800).
+  const byDisplayMode =
+    typeof win.matchMedia === "function" &&
+    INSTALLED_DISPLAY_MODES.some((mode) => win.matchMedia(`(display-mode: ${mode})`).matches);
   const iosStandalone =
-    (targetWindow.navigator as { standalone?: boolean } | undefined)?.standalone === true;
-  return displayMode || iosStandalone;
+    (win.navigator as { standalone?: boolean } | undefined)?.standalone === true;
+  return byDisplayMode || iosStandalone;
 }
 
 export function createInstallController(

@@ -7,7 +7,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import ValidationError as PydanticValidationError
 
@@ -18,6 +18,7 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.freshness import is_stale
 from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
@@ -68,6 +69,9 @@ from agentic_odi_core.traceability import (
     objective_key,
     objectives_from_v2mom,
 )
+
+#: The two artifacts that carry a derivation stamp and a read-time ``stale`` flag.
+_Artifact = TypeVar("_Artifact", Segment, Strategy)
 
 
 class JobNotFoundError(NotFoundError):
@@ -127,7 +131,15 @@ class EvidenceNotFoundError(NotFoundError, ValueError):
 
 
 class ValueOutOfRangeError(ValidationError):
-    pass
+    """A score fell outside the ODI range (1.0–10.0).
+
+    ``field`` names the field that was rejected, so the caller can show the
+    message next to it instead of on top of the whole form.
+    """
+
+    def __init__(self, message: str = "Value out of range.", field: str | None = None) -> None:
+        self.field = field
+        super().__init__(message)
 
 
 class SignalNotFoundError(NotFoundError):
@@ -438,9 +450,13 @@ class ODIService:
         importance = updates.get("importance", existing.importance)
         satisfaction = updates.get("satisfaction", existing.satisfaction)
         if importance is not None and not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "importance must be between 1.0 and 10.0", field="importance"
+            )
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "satisfaction must be between 1.0 and 10.0", field="satisfaction"
+            )
         require_outcome_statement(statement)
         if importance is not None and satisfaction is not None:
             updates = dict(updates)
@@ -532,7 +548,9 @@ class ODIService:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
         if not 1 <= order <= 8:
-            raise ValueOutOfRangeError("Step order must be between 1 and 8 (Ulwick's job map).")
+            raise ValueOutOfRangeError(
+                "Step order must be between 1 and 8 (Ulwick's job map).", field="order"
+            )
         existing_outcomes = self.repo.get_outcomes(job_id)
         existing_customer_outcomes = self.repo.list_customer_outcomes(job_id)
         if not existing_outcomes and not existing_customer_outcomes and not allow_empty_job_map:
@@ -577,9 +595,13 @@ class ODIService:
         if step_id is not None and self.repo.get_step(step_id) is None:
             raise StepNotFoundError(step_id)
         if importance is not None and not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "importance must be between 1.0 and 10.0", field="importance"
+            )
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
+            raise ValueOutOfRangeError(
+                "satisfaction must be between 1.0 and 10.0", field="satisfaction"
+            )
         if validate_statement:
             verdict = evaluate_outcome_statement(statement)
             if not verdict["valid"]:
@@ -1102,16 +1124,35 @@ class ODIService:
         strategy = self.segmentation or OutcomeClusterStrategy(
             steps=list(self.repo.steps.values()), people=people
         )
-        return [self.save_segment(item) for item in strategy.segment(jobs, outcomes)]
+        #: One read for the whole derivation: the revision the clusters were
+        #: computed from, stamped on every segment so a later outcome rescore
+        #: is what makes them stale — not the write of the segment itself.
+        stamp = self.repo.last_input_event_id()
+        return [
+            self.save_segment(item.model_copy(update={"computed_at_event_id": stamp}))
+            for item in strategy.segment(jobs, outcomes)
+        ]
 
     def list_segments(self, job_id: str | None = None) -> list[Segment]:
-        return self.repo.list_segments(job_id=job_id)
+        return [
+            self._label_freshness(segment) for segment in self.repo.list_segments(job_id=job_id)
+        ]
 
     def get_segment(self, segment_id: str) -> Segment:
         segment = self.repo.get_segment(segment_id)
         if segment is None:
             raise SegmentNotFoundError(segment_id, "run segment_market to produce segments")
-        return segment
+        return self._label_freshness(segment)
+
+    def _label_freshness(self, artifact: _Artifact) -> _Artifact:
+        """Stamp the read-time ``stale`` flag: derived, never written back.
+
+        The store revision the artifact was derived from is compared against the
+        input revision *now*, so a verdict computed after the latest outcome
+        rescore reads as current and one computed before it reads as stale.
+        """
+        stale = is_stale(artifact, self.repo.last_input_event_id())
+        return artifact.model_copy(update={"stale": stale})
 
     def save_segment(self, segment: Segment) -> Segment:
         """Persist one segment, rejecting one the store cannot vouch for."""
@@ -1129,7 +1170,8 @@ class ODIService:
         existing = self.repo.get_segment(segment.id)
         saved = (
             self.repo.update_segment(
-                segment.id, segment.model_dump(mode="json", exclude={"id", "created_at"})
+                segment.id,
+                segment.model_dump(mode="json", exclude={"id", "created_at", "stale"}),
             )
             if existing is not None
             else self.repo.add_segment(segment)
@@ -1137,7 +1179,7 @@ class ODIService:
         if saved is None:
             raise SegmentNotFoundError(segment.id)
         self._emit_segment_signal(saved, is_new=existing is None)
-        return saved
+        return self._label_freshness(saved)
 
     def _emit_segment_signal(self, segment: Segment, *, is_new: bool) -> None:
         severity = "notice" if segment.verdict is SegmentVerdict.UNDERSERVED else "info"
@@ -1175,6 +1217,9 @@ class ODIService:
         segments = self._segments_in_scope(segment_ids, job_id)
         jobs = self.repo.list_jobs()
         outcomes = list(self.repo.outcomes.values())
+        #: The revision the recommendation was computed from, read once and
+        #: stamped so a later score change is what makes it stale.
+        stamp = self.repo.last_input_event_id()
         strategy = build_strategy(segments, jobs, outcomes)
         if strategy is None:
             underserved = sum(1 for item in segments if item.verdict is SegmentVerdict.UNDERSERVED)
@@ -1188,7 +1233,7 @@ class ODIService:
                 f"{len(orphans)} outcome(s) outside a stored job, {leftover} unclustered. "
                 "Score outcomes against a job map before asking for a strategy."
             )
-        return self.save_strategy(strategy)
+        return self.save_strategy(strategy.model_copy(update={"computed_at_event_id": stamp}))
 
     def _segments_in_scope(
         self, segment_ids: list[str] | None, job_id: str | None = None
@@ -1198,12 +1243,15 @@ class ODIService:
         return [self.get_segment(segment_id) for segment_id in segment_ids]
 
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
-        return self.repo.list_strategies(segment_id=segment_id)
+        return [
+            self._label_freshness(strategy)
+            for strategy in self.repo.list_strategies(segment_id=segment_id)
+        ]
 
     def get_strategy(self) -> Strategy | None:
         """The most recently recorded strategy, or ``None``."""
         strategies = self.repo.list_strategies()
-        return strategies[-1] if strategies else None
+        return self._label_freshness(strategies[-1]) if strategies else None
 
     def save_strategy(self, strategy: Strategy) -> Strategy:
         """Persist a strategy, requiring the alternatives it beat."""
@@ -1217,7 +1265,8 @@ class ODIService:
         existing = self.repo.get_strategy(strategy.id)
         saved = (
             self.repo.update_strategy(
-                strategy.id, strategy.model_dump(mode="json", exclude={"id", "created_at"})
+                strategy.id,
+                strategy.model_dump(mode="json", exclude={"id", "created_at", "stale"}),
             )
             if existing is not None
             else self.repo.add_strategy(strategy)
@@ -1233,7 +1282,7 @@ class ODIService:
             detail=saved.thesis[:500],
             discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
         )
-        return saved
+        return self._label_freshness(saved)
 
     # -- Traceability: what an outcome advances ------------------------------
 

@@ -52,6 +52,20 @@ describe("ModelPicker", () => {
     );
   });
 
+  it("shows the selection as a check, not the word Current (D44)", async () => {
+    api.fetchModels.mockResolvedValue({ models: ["alpha", "beta"], error: null });
+    render(<ModelPicker />);
+
+    fireEvent.click(trigger());
+
+    const alpha = await screen.findByRole("option", { name: /alpha/ });
+    // The state rides aria-selected; the visible mark is a glyph so the menu
+    // does not reflow when the selection moves.
+    expect(alpha.querySelector(".model-picker__check")).not.toBeNull();
+    expect(alpha).not.toHaveTextContent("Current");
+    expect(screen.getByRole("option", { name: /beta/ }).querySelector(".model-picker__check")).toBeNull();
+  });
+
   it("saves the chosen model and closes the menu", async () => {
     api.fetchModels.mockResolvedValue({ models: ["alpha", "beta"], error: null });
     render(<ModelPicker />);
