@@ -7330,3 +7330,68 @@ textarea,
   color: var(--muted);
   font-size: 12.5px;
 }
+
+/* The "What works here" popover: one row per capability, each with the word for
+   its state and a one-line reason. No badge, no red dot — the state is text. */
+.capability-popover {
+  width: min(320px, calc(100vw - 32px));
+  padding: 12px;
+}
+
+.capability-popover__title {
+  margin: 0 0 8px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.capability-popover__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capability-popover__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+}
+
+.capability-popover__label {
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.capability-popover__word {
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.capability-popover__reason {
+  grid-column: 1 / -1;
+  color: var(--faint);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.capability-popover__action {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.capability-popover__action:hover {
+  background: var(--surface-hover);
+}

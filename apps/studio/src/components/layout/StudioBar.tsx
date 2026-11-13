@@ -21,6 +21,7 @@ import {
   SunIcon,
 } from "../icons";
 import { OdiMascot } from "../OdiMascot";
+import { CapabilityPopover } from "../capabilities/CapabilityPopover";
 import { StatusDot } from "../status/StatusDot";
 
 /**
@@ -415,6 +416,8 @@ export function StudioBar({
           <BellIcon size={17} />
           {unreadSignalCount > 0 && <span className="bell-badge">{unreadSignalCount}</span>}
         </button>
+
+        <CapabilityPopover />
 
         <button
           type="button"

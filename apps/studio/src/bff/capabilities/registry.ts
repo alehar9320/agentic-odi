@@ -90,6 +90,15 @@ const localStatuses: Record<CapabilityId, Capability> = {
   },
 };
 
+/**
+ * The capability vocabulary, in a stable order, for a surface that must name
+ * every capability the registry knows — including one a probe has not reached
+ * yet, which has no `Capability` object of its own. This is the single source
+ * of the labels and descriptions the "What works here" control renders.
+ */
+export const capabilityCatalogue: ReadonlyArray<Pick<Capability, "id" | "label" | "description">> =
+  Object.values(localStatuses).map(({ id, label, description }) => ({ id, label, description }));
+
 function isBrowserModelAvailable(): boolean {
   const ai = (globalThis as { ai?: { languageModel?: unknown } }).ai;
   return Boolean(ai && typeof ai.languageModel === "function");
