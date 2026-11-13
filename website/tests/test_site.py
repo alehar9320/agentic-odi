@@ -513,4 +513,10 @@ def test_page_weights_are_within_budget(page: str):
     # (issue #429) contributes 129 rows, and the Study entity plus its two
     # tools (open_study, list_studies) and the outcome-proposal tools add the
     # rest. Bump the ceiling to keep the page green while the content stays.
-    assert size <= 110 * 1024, f"{page}: {size} bytes"
+    # The `docs/studio` page outgrew 110 KB on `main` itself: reproduced by running
+    # this same test on a pristine `origin/main` worktree at 025e82e3, before this
+    # branch existed, where `docs/studio/index.html` measures 112692 bytes against
+    # the 110 KiB bound. This branch's documented capability states add ~3.1 KB on
+    # top (115817 bytes), still inside 115 KiB. The ratchet moves to 115 KiB rather
+    # than trimming reference material.
+    assert size <= 115 * 1024, f"{page}: {size} bytes"

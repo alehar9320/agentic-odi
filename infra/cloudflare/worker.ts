@@ -120,6 +120,12 @@ interface StudioError {
   suggestion?: string;
   retryable?: boolean;
   request_id?: string | null;
+  /**
+   * Always `"proxy"`: this body was produced by the Worker, not the sidecar.
+   * The client uses it to tell a Worker-originated transport failure from a
+   * sidecar's own structured application error, even when both are a 502.
+   */
+  origin?: "proxy";
 }
 
 /**
@@ -143,6 +149,7 @@ function sidecarError(
         suggestion: error.suggestion ?? null,
         retryable: error.retryable ?? false,
         request_id: requestId,
+        origin: "proxy",
       },
     },
     init,
