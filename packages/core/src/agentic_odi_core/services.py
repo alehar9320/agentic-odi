@@ -5,10 +5,12 @@ from __future__ import annotations
 import hashlib
 import os
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, TypeVar
 
+from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
 from agentic_odi_core.errors import NotFoundError, ValidationError
@@ -39,6 +41,7 @@ from agentic_odi_core.models import (
     EvidenceItemType,
     Job,
     JobStage,
+    Origin,
     Outcome,
     OutcomeAlignment,
     ScheduledWork,
@@ -292,6 +295,32 @@ def _first_line(text: str) -> str:
     return ""
 
 
+_Row = TypeVar("_Row", bound=BaseModel)
+
+
+def upsert_by_id(
+    row: _Row,
+    existing: _Row | None,
+    add: Callable[[_Row], _Row],
+    update: Callable[[str, dict[str, Any]], _Row | None],
+) -> _Row:
+    """Write one row by id: unchanged values are left alone, changed ones updated.
+
+    ``odi demo load`` is meant to be re-run, so writing the same row a second
+    time must neither duplicate it nor append an event that says nothing.
+    """
+    if existing is None:
+        return add(row)
+    fields = row.model_dump()
+    updates = {key: value for key, value in fields.items() if key != "id"}
+    if existing.model_dump(exclude={"id"}) == updates:
+        return existing
+    updated = update(fields["id"], updates)
+    #: ``None`` means the row went away between the read and the write; the
+    #: caller asked for this row to exist, so create it.
+    return updated if updated is not None else add(row)
+
+
 def _opportunity_crossing(before: float | None, after: float | None) -> tuple[str, str] | None:
     """Did the opportunity score enter or leave the underserved bucket?
 
@@ -391,9 +420,17 @@ class ODIService:
     def count_unread_signals(self) -> int:
         return self.repo.count_unread_signals()
 
-    def add_job(self, name: str, description: str | None = None) -> Job:
-        job = Job(name=name, description=description)
-        job = self.repo.add_job(job)
+    def add_job(
+        self,
+        name: str,
+        description: str | None = None,
+        *,
+        id: str | None = None,
+        origin: Origin = "user",
+    ) -> Job:
+        job = Job(id=id or str(uuid.uuid4()), name=name, description=description, origin=origin)
+        existing = self.repo.get_job(id) if id is not None else None
+        job = upsert_by_id(job, existing, self.repo.add_job, self.repo.update_job)
         self.record_signal(
             SignalKind.JOB_ADDED,
             f'Job added: "{job.name}"',
@@ -544,6 +581,9 @@ class ODIService:
         order: int,
         stage: JobStage | None = None,
         allow_empty_job_map: bool = False,
+        *,
+        id: str | None = None,
+        origin: Origin = "user",
     ) -> Step:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -561,14 +601,20 @@ class ODIService:
             )
         stage_index = JOB_STAGE_INDEX.get(stage) if stage is not None else None
         step = Step(
-            id=str(uuid.uuid4()),
+            id=id or str(uuid.uuid4()),
             job_id=job_id,
             name=name,
             order=order,
             stage=stage,
             stage_index=stage_index,
+            origin=origin,
         )
-        step = self.repo.add_step(step)
+        step = upsert_by_id(
+            step,
+            self.repo.get_step(id) if id is not None else None,
+            self.repo.add_step,
+            self.repo.update_step,
+        )
         self._emit_job_map_completed(job_id)
         return step
 
@@ -588,6 +634,9 @@ class ODIService:
         satisfaction: float | None = None,
         step_id: str | None = None,
         validate_statement: bool = True,
+        *,
+        id: str | None = None,
+        origin: Origin = "user",
         claim_check: ClaimCheck | dict[str, Any] | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
@@ -614,17 +663,24 @@ class ODIService:
         else:
             opportunity_score = None
         outcome = Outcome(
-            id=str(uuid.uuid4()),
+            id=id or str(uuid.uuid4()),
             job_id=job_id,
             step_id=step_id,
             statement=statement,
             importance=importance,
             satisfaction=satisfaction,
             opportunity_score=opportunity_score,
+            origin=origin,
             claim_check=check,
         )
-        created = self.repo.add_outcome(outcome)
-        self._count_outcome_milestones(created)
+        created = upsert_by_id(
+            outcome,
+            self.repo.get_outcome(id) if id is not None else None,
+            self.repo.add_outcome,
+            self.repo.update_outcome,
+        )
+        if id is None:
+            self._count_outcome_milestones(created)
         return created
 
     def get_outcomes(
@@ -770,6 +826,9 @@ class ODIService:
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
+        *,
+        id: str | None = None,
+        origin: Origin = "user",
     ) -> Evidence:
         resolved_job_id = job_id
         if step_id is not None:
@@ -793,7 +852,7 @@ class ODIService:
         if resolved_job_id is not None and self.repo.get_job(resolved_job_id) is None:
             raise JobNotFoundError(resolved_job_id)
         evidence = Evidence(
-            id=str(uuid.uuid4()),
+            id=id or str(uuid.uuid4()),
             source_name=source_name,
             source_kind=source_kind,
             item_type=item_type,
@@ -804,20 +863,29 @@ class ODIService:
             job_id=resolved_job_id,
             step_id=step_id,
             outcome_id=outcome_id,
+            origin=origin,
         )
-        #: Dedupe: the same quote imported twice must not become two evidence
-        #: records. Return the existing record instead of appending.
-        duplicate = self.repo.get_evidence_by_fingerprint(
-            evidence.source_kind,
-            evidence.source_name,
-            evidence.name,
-            evidence.content,
-            evidence.url,
-            evidence.raw,
-        )
-        if duplicate is not None:
-            return duplicate
-        evidence = self.repo.add_evidence(evidence)
+        if id is not None:
+            evidence = upsert_by_id(
+                evidence,
+                self.repo.get_evidence(id),
+                self.repo.add_evidence,
+                self.repo.update_evidence,
+            )
+        else:
+            #: Dedupe: the same quote imported twice must not become two
+            #: evidence records. Return the existing record instead of appending.
+            duplicate = self.repo.get_evidence_by_fingerprint(
+                evidence.source_kind,
+                evidence.source_name,
+                evidence.name,
+                evidence.content,
+                evidence.url,
+                evidence.raw,
+            )
+            if duplicate is not None:
+                return duplicate
+            evidence = self.repo.add_evidence(evidence)
         self.record_signal(
             SignalKind.EVIDENCE_INGESTED,
             f'Evidence from "{evidence.source_name}": {evidence.name[:60]}',

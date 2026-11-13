@@ -129,6 +129,7 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 Checks that span the workspace rather than one distribution:
 
 - `tests/contract/test_mcp_contract.py` — live FastMCP names, argument names, and required fields match `agentic_odi_core.contract.TOOL_SPECS`.
+- `tests/contract/test_contract_snapshot.py` — the published contract, pinned: the declared `TOOL_SPECS`, the input schemas the live registry serves, and `odi_schema()` for every entity. CI runs it with no flag, so a rename, a requiredness or type change, a missing or extra live tool, or a drifted entity field fails with a readable diff. Re-pin deliberately after an intended change with `uv run pytest tests/contract/test_contract_snapshot.py --inline-snapshot=update`.
 - `tests/contract/test_cli_contract.py` — the CLI local-handler keys are a subset of `TOOL_NAMES`.
 - `tests/test_architecture.py` — the package diagram in the [architecture index](README.md#dependency-direction), the `[project] dependencies` each member declares, and the imports the source actually contains must all agree. It also checks the four groups inside `packages/core`: persistence imports no methodology, and every core module belongs to exactly one group ([the layer table](README.md#inside-packagescore)).
 - `tests/test_worker_security_headers.py` — the Living Studio Worker sends its security headers.
