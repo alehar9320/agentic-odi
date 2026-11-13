@@ -66,8 +66,11 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      // The screenshot spec is for human review, not a gate. Ignoring it here
+      // keeps `npm run test:e2e` with exactly the coverage it had before; the
+      // `pr-screenshots` workflow runs it through the project below.
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /mcp-backend\.spec\.ts/,
+      testIgnore: [/mcp-backend\.spec\.ts/, /pr-screenshots\.spec\.ts/],
     },
     {
       // The same Studio against its MCP passthrough backend, which talks to
@@ -78,6 +81,19 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], baseURL: MCP_BACKED_ORIGIN },
       testMatch: /mcp-backend\.spec\.ts/,
     },
+    // Product screenshots for human review, not a gate. The project is added
+    // only when `PR_SCREENSHOTS=1`, so `npm run test:e2e` keeps its current
+    // coverage; the `pr-screenshots` workflow sets the variable and runs the
+    // `screenshots` project explicitly.
+    ...(process.env.PR_SCREENSHOTS === "1"
+      ? [
+          {
+            name: "screenshots",
+            use: { ...devices["Desktop Chrome"] },
+            testMatch: /pr-screenshots\.spec\.ts/,
+          },
+        ]
+      : []),
   ],
 
   webServer: [
