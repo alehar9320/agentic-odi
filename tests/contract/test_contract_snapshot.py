@@ -1427,6 +1427,10 @@ def test_entity_schema_is_pinned() -> None:
                     }
                 },
                 "properties": {
+                    "computed_at_event_id": {
+                        "anyOf": [{"type": "integer"}, {"type": "null"}],
+                        "default": None,
+                    },
                     "confidence": {"maximum": 1.0, "minimum": 0.0, "type": "number"},
                     "created_at": {"format": "date-time", "type": "string"},
                     "id": {"type": "string"},
@@ -1437,6 +1441,7 @@ def test_entity_schema_is_pinned() -> None:
                     "people": {"type": "string"},
                     "people_inferred": {"default": False, "type": "boolean"},
                     "rationale": {"type": "string"},
+                    "stale": {"anyOf": [{"type": "boolean"}, {"type": "null"}], "default": None},
                     "verdict": {
                         "anyOf": [{"$ref": "#/$defs/SegmentVerdict"}, {"type": "null"}],
                         "default": None,
@@ -1490,6 +1495,10 @@ def test_entity_schema_is_pinned() -> None:
                 },
                 "properties": {
                     "bets": {"items": {"type": "string"}, "type": "array"},
+                    "computed_at_event_id": {
+                        "anyOf": [{"type": "integer"}, {"type": "null"}],
+                        "default": None,
+                    },
                     "created_at": {"format": "date-time", "type": "string"},
                     "id": {"type": "string"},
                     "kind": {"$ref": "#/$defs/StrategyKind"},
@@ -1501,6 +1510,7 @@ def test_entity_schema_is_pinned() -> None:
                         "anyOf": [{"type": "string"}, {"type": "null"}],
                         "default": None,
                     },
+                    "stale": {"anyOf": [{"type": "boolean"}, {"type": "null"}], "default": None},
                     "thesis": {"type": "string"},
                 },
                 "required": ["kind", "thesis"],
