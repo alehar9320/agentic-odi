@@ -610,6 +610,13 @@ conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
 
+The history list is also where a thread gets its name. **Rename** on any row swaps
+the row into a field holding the current name: Enter or leaving the field commits
+it, Escape puts the old name back, and a blank name is refused without a request.
+The name is stored with the conversation, so it survives a reload. Renaming never
+opens the thread it renames and never touches the branch that was visible — a
+name is not a reason to move the person off the reply they were reading.
+
 ### Printing and export
 
 The bar's overflow menu has **Export → Markdown**. The file labels every

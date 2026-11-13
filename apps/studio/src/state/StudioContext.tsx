@@ -51,6 +51,7 @@ import {
   healthLlm,
   healthMcp,
   listConversations as apiListConversations,
+  renameConversation as apiRenameConversation,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
@@ -400,6 +401,11 @@ export interface StudioContextValue {
   conversations: ConversationSummary[];
   /** Re-read the history list; called when it opens and after a turn persists. */
   refreshConversations: () => Promise<void>;
+  /**
+   * Rename a thread in place. The open thread, its messages, and any reply still
+   * streaming are untouched: a name is not a reason to leave what you are doing.
+   */
+  renameConversation: (conversationId: string, title: string) => Promise<void>;
   /** Open a past thread by loading its turns; never a conversation without them. */
   openConversation: (conversationId: string) => Promise<void>;
   memory: Observation[];
@@ -2401,6 +2407,54 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [refreshConversations],
   );
 
+  /**
+   * Rename a thread without opening it.
+   *
+   * The list shows the new name the moment it is committed, because the person
+   * is looking at it; a failure puts the old name back rather than leaving a lie
+   * on screen. Nothing else moves — not the open thread, not a streaming reply.
+   */
+  const renameConversation = useCallback(
+    async (targetId: string, title: string) => {
+      const cleaned = title.trim();
+      if (!cleaned) {
+        throw new Error("A conversation needs a name.");
+      }
+      const previous = conversations.find(
+        (conversation) => conversation.id === targetId,
+      );
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === targetId
+            ? { ...conversation, title: cleaned }
+            : conversation,
+        ),
+      );
+      try {
+        const updated = await apiRenameConversation(targetId, cleaned);
+        setConversations((current) =>
+          current.map((conversation) =>
+            conversation.id === targetId
+              ? { ...conversation, title: updated.title }
+              : conversation,
+          ),
+        );
+      } catch (error) {
+        if (previous) {
+          setConversations((current) =>
+            current.map((conversation) =>
+              conversation.id === targetId
+                ? { ...conversation, title: previous.title }
+                : conversation,
+            ),
+          );
+        }
+        throw error;
+      }
+    },
+    [conversations],
+  );
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -2705,6 +2759,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2837,6 +2892,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,
