@@ -239,6 +239,12 @@ Every guide is also published on the
 these files. The site adds a quick start, a generated MCP tool reference, the
 connector catalog, and client-side search over every page (`Ctrl`/`Cmd`+`K`).
 
+Shorter than reading: [the 90-second tour](docs/tour/README.md) is a recording of a
+real terminal session — a study goes in, a strategy comes out — played with
+`asciinema play docs/tour/tour.cast`. It runs against generated sample data and no
+model, and it is captured from the CLI itself, so it cannot show a command that no
+longer works.
+
 ## Community & Support
 
 - **Questions and bugs.** [Open an issue](https://github.com/alehar9320/agentic-odi/issues)

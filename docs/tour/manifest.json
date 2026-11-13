@@ -1,0 +1,36 @@
+{
+  "cast": {
+    "height": 24,
+    "title": "The agentic-odi loop in 90 seconds",
+    "width": 90
+  },
+  "commands": [
+    "uv run python scripts/gen_corpus.py --out \"$TOUR_DB\" --outcomes 48 --jobs 2",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" health",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" jobs list",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" summary JOB-0000",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" steps list --job-id JOB-0000",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" desired-outcomes list --job-id JOB-0000 --step-id STP-0000-2",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" score 8 3",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" evidence list --outcome-id OUT-00016",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" segments run --job JOB-0000",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" strategy propose --job JOB-0000",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" strategy show",
+    "uv run agentic-odi --no-update --db \"$TOUR_DB\" data-export --output \"$TOUR_OUT/study.json\""
+  ],
+  "generated_by": "scripts/tour.py",
+  "pacing": {
+    "hold_seconds_per_step": 4.0,
+    "intro_seconds": 2.0,
+    "type_seconds": 0.35
+  },
+  "playback_budget_seconds": 90,
+  "playback_seconds": 54.2,
+  "sample_data": true,
+  "script": "docs/tour/script.md",
+  "sha256": {
+    "README.md": "631b254e3d23a154107e3646d105cee34d793963a5a8ca24eeebabe785022f68",
+    "tour.cast": "5a88bb3769b74d8525706af2b4fa088931dd0128e54f1f436fc4439d43b276d2"
+  },
+  "steps": 12
+}
