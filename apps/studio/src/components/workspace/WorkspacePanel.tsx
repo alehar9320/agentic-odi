@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { useFocusTrap } from "../../lib/useFocusTrap";
+import { isEditableTarget } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { CloseIcon } from "../icons";
@@ -78,7 +79,7 @@ export function WorkspacePanel() {
     if (!panelId) {
       const target = returnFocusRef.current;
       returnFocusRef.current = null;
-      if (target?.isConnected) {
+      if (target?.isConnected && !isEditableTarget(target)) {
         target.focus();
       }
       return;
