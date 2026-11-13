@@ -50,7 +50,9 @@ it("adds the detail, the suggestion, and a retry", async () => {
     </Frame>,
   );
 
-  await expect.element(screen.getByText("Details")).toBeVisible();
+  // D8 added a "Copy details" control beside the disclosure, so a substring
+  // match on "Details" would resolve to both; the summary is the exact match.
+  await expect.element(screen.getByText("Details", { exact: true })).toBeVisible();
   await expect
     .element(screen.getByText("Start the sidecar with `python -m agentic_odi_studio_api.main`."))
     .toBeVisible();
