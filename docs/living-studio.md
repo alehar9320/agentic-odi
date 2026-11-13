@@ -884,9 +884,14 @@ Releases are published by `.github/workflows/tauri-release.yml`. It starts when
 a GitHub release is **published**, and on a `v*` tag push for hand-cut tags.
 The published release is what matters: release-please creates releases through
 the API, which never emits a tag-push event, so a tag-only trigger would leave
-every release without binaries. A `verify` job fails the release unless
-`latest.json` advertises the release version and carries a signed artifact for
-Linux, Windows, and both macOS architectures.
+every release without binaries. Once the build has attached the bundles, a
+`manifest` job runs `scripts/release_manifest.py write`: it discovers each
+platform's bundle among the attached assets, copies that bundle's `.sig` into
+the manifest's `signature` verbatim, signs `latest.json` with the project key,
+and attaches both. A `verify` job then fails the release unless `latest.json`
+advertises the release version (cross-checked against
+`.release-please-manifest.json`), carries a signed artifact for Linux, Windows,
+and both macOS architectures, and every advertised URL resolves.
 
 `release-please` bumps the desktop app version from `extra-files`
 (`apps/studio/package.json`, `apps/studio/src-tauri/tauri.conf.json`, and
