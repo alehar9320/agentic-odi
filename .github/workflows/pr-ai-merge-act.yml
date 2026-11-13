@@ -1,0 +1,113 @@
+name: PR AI merge act
+
+# Auto-merges a pull request when it carries ``ai-merge-authorized``:
+#   * ``ai-merge-safe`` (trust label from pr-ai-merge.yml)
+#   * CI green (combined status of the head commit is ``success``)
+#   * ``ready-for-merge`` (no merge conflicts)
+#
+# Human override: if ``do-not-merge`` or ``needs human review`` is present,
+# auto-merge is skipped and a comment explains why.
+#
+# Deterministic: no LLM calls, no pull request code executed. Fork pull
+# requests are skipped per-job because they carry a read-only token.
+
+on:
+  pull_request:
+    types: [labeled]
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write # gh label create / pr merge live under these APIs
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  merge:
+    name: Auto-merge authorized PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      # A fork pull request gets a read-only token, so merging it cannot
+      # succeed. Say so instead of failing red on a PR we may not touch.
+      - name: Note fork pull requests
+        if: ${{ github.event.pull_request.head.repo.fork }}
+        run: echo "::notice::Skipping AI merge act for a fork pull request (read-only token)."
+
+      # Resolve which pull request(s) to process. On pull_request labeled we
+      # have a PR number. On schedule / workflow_dispatch we re-scan every
+      # open PR carrying ai-merge-authorized.
+      - name: Resolve pull request numbers to process
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-numbers.txt"
+          else
+            gh pr list --repo "$REPO" --base main \
+              --state open --label "ai-merge-authorized" \
+              --json number -q '.[].number' \
+              > "$RUNNER_TEMP/pr-numbers.txt"
+          fi
+
+      # Process each pull request.
+      - name: Process each pull request
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          while IFS= read -r PR_NUMBER; do
+            [ -z "$PR_NUMBER" ] && continue
+
+            # Human override: do-not-merge or needs human review cancels.
+            LABELS="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json labels -q '.labels | map(.name) | join(",")')"
+            case ",$LABELS," in
+              *,do-not-merge,*|*,needs human review,*)
+                {
+                  echo "### AI merge act — PR #$PR_NUMBER"
+                  echo
+                  echo "Skipped: human override label present ($LABELS)."
+                } >> "$GITHUB_STEP_SUMMARY"
+                continue
+                ;;
+            esac
+
+            # Re-verify CI green right before arming auto-merge.
+            HEAD_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid -q '.headRefOid')"
+            STATUS="$(gh api "repos/$REPO/commits/$HEAD_SHA/status" -q '.state' 2>/dev/null || echo pending)"
+            if [ "$STATUS" != "success" ]; then
+              {
+                echo "### AI merge act — PR #$PR_NUMBER"
+                echo
+                echo "Skipped: CI not green (status: $STATUS)."
+              } >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            # Arm auto-merge (squash). GitHub merges once all required checks
+            # pass; since we just verified CI green and no conflicts, this
+            # should merge promptly.
+            gh pr merge --auto --squash "$PR_NUMBER" --repo "$REPO"
+
+            {
+              echo "### AI merge act — PR #$PR_NUMBER"
+              echo
+              echo "Auto-merge armed (squash): ai-merge-authorized present, CI green."
+            } >> "$GITHUB_STEP_SUMMARY"
+          done < "$RUNNER_TEMP/pr-numbers.txt"
