@@ -53,13 +53,13 @@ export function SuggestionPills() {
     jobs > 0 && llmHealth.healthy === false
       ? {
           id: "capture",
-          label: "Capture what you heard",
+          label: "Add what you heard",
           icon: <CaptureIcon size={15} />,
           run: () => openPanel("capture"),
         }
       : {
           id: "landscape",
-          label: "Opportunity landscape",
+          label: "Where to focus",
           icon: <CompassIcon size={15} />,
           run: () => openPanel("landscape"),
         },

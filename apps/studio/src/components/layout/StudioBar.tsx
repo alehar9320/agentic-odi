@@ -406,10 +406,10 @@ export function StudioBar({
           className="icon-button bar__bell"
           aria-label={
             unreadSignalCount > 0
-              ? `Signal inbox: ${unreadSignalCount} unread`
-              : "Signal inbox: no unread signals"
+              ? `What changed: ${unreadSignalCount} unread`
+              : "What changed: no unread signals"
           }
-          title="Signals from the store"
+          title="What changed"
           onClick={() => openPanel("catchup")}
         >
           <BellIcon size={17} />

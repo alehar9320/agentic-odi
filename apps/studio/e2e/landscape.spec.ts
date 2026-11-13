@@ -30,8 +30,8 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    const landscape = page.getByRole("complementary", { name: "Where to focus" });
     await expect(landscape).toBeVisible();
 
     await expect(landscape.getByText("Active Job Map Contexts")).toBeVisible();
@@ -43,8 +43,8 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    const landscape = page.getByRole("complementary", { name: "Where to focus" });
 
     // The cards view shows every outcome, unlike the matrix, which shows one
     // at a time.
@@ -60,8 +60,8 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    const landscape = page.getByRole("complementary", { name: "Where to focus" });
 
     // The table view lists each outcome by statement.
     await landscape.getByRole("button", { name: "📋 Table View" }).click();
@@ -78,8 +78,8 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    const landscape = page.getByRole("complementary", { name: "Where to focus" });
 
     await expect(landscape.getByRole("button", { name: "📊 Matrix" })).toBeVisible();
 

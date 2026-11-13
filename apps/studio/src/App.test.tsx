@@ -155,7 +155,7 @@ describe("studio shell", () => {
       screen.getByRole("button", { name: /turn 40 interview notes into one bet/i }),
     ).toBeInTheDocument();
     // The classic UI is secondary: no workspace surface until you ask for one.
-    expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /where to focus/i })).toBeNull();
   });
 
   it("sends the runtime prompt when a contextual starter card is selected", async () => {
@@ -188,10 +188,10 @@ describe("studio shell", () => {
   it("opens a workspace view beside the conversation and keeps the composer", async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^where to focus, \d/i }));
 
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to focus/i }),
     ).toBeInTheDocument();
     // The conversation keeps the stage: the composer never leaves.
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
@@ -199,7 +199,7 @@ describe("studio shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /close workspace view/i }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /where to focus/i })).toBeNull();
     });
     expect(screen.getByRole("textbox", { name: /message the studio/i })).toBeInTheDocument();
   });
@@ -212,10 +212,10 @@ describe("studio shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
     await screen.findByText("Where do I start?");
 
-    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^where to focus, \d/i }));
 
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to focus/i }),
     ).toBeInTheDocument();
     // The lens makes room; it never hides what the user was reading.
     expect(screen.getByText("Where do I start?")).toBeInTheDocument();
@@ -226,7 +226,7 @@ describe("studio shell", () => {
     const { updateOutcome } = await import("./api/studioApi");
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^where to focus, \d/i }));
     fireEvent.click(await screen.findByRole("button", { name: /adjust scores/i }));
     fireEvent.click(screen.getByRole("button", { name: /save scores/i }));
 
@@ -261,9 +261,9 @@ describe("studio shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
     await screen.findByText("Where do I start?");
 
-    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^where to focus, \d/i }));
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to focus/i }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /go to home/i }));
@@ -271,7 +271,7 @@ describe("studio shell", () => {
     // Home closes what is open; the transcript is the other control's to
     // discard, and only after asking what is being lost.
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /where to focus/i })).toBeNull();
     });
     expect(screen.getByText("Where do I start?")).toBeInTheDocument();
   });
@@ -283,7 +283,7 @@ describe("studio shell", () => {
     fireEvent.change(composer, { target: { value: "/" } });
 
     expect(await screen.findByRole("listbox", { name: /commands/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("option", { name: /capture an outcome/i }));
+    fireEvent.click(screen.getByRole("option", { name: /add what you heard/i }));
 
     // Capture is a sentence, not a form: the request lands in the transcript.
     expect(
@@ -409,9 +409,9 @@ describe("studio shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
     await screen.findByRole("button", { name: /stop generating/i });
 
-    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^where to focus, \d/i }));
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to focus/i }),
     ).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Escape" });
@@ -419,12 +419,12 @@ describe("studio shell", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
     });
-    expect(screen.getByRole("heading", { name: /opportunity landscape/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /where to focus/i })).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Escape" });
 
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /where to focus/i })).toBeNull();
     });
   });
 
@@ -643,9 +643,9 @@ describe("first run", () => {
       await screen.findByText("What are you building?", { selector: "strong" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^where to focus, \d/i }));
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to focus/i }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /close workspace view/i }));
@@ -896,9 +896,9 @@ describe("composer shortcuts (#692)", () => {
   it("closes an open lens on Escape without also moving the caret", async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^where to focus, \d/i }));
     expect(
-      await screen.findByRole("heading", { name: /opportunity landscape/i }),
+      await screen.findByRole("heading", { name: /where to focus/i }),
     ).toBeInTheDocument();
     const composer = screen.getByRole("textbox", { name: /message the studio/i });
     const close = screen.getByRole("button", { name: /close workspace view/i });
@@ -907,7 +907,7 @@ describe("composer shortcuts (#692)", () => {
     fireEvent.keyDown(window, { key: "Escape" });
 
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /where to focus/i })).toBeNull();
     });
     expect(composer).not.toHaveFocus();
   });

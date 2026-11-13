@@ -76,9 +76,11 @@ describe("WorkbenchRail", () => {
 
     render(<WorkbenchRail />);
 
-    expect(screen.getByRole("button", { name: "Landscape, 2 opportunities" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Job map, 1 step" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Evidence, 1 signal" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Where to focus, 2 opportunities" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Steps in the job, 1 step" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "What customers said, 1 signal" }),
+    ).toBeInTheDocument();
   });
 
   it("takes focus when it is activated, so the lens it opens can give it back (#810)", () => {
@@ -90,7 +92,7 @@ describe("WorkbenchRail", () => {
     document.body.append(elsewhere);
     elsewhere.focus();
 
-    const chip = screen.getByRole("button", { name: "Landscape, 1 opportunity" });
+    const chip = screen.getByRole("button", { name: "Where to focus, 1 opportunity" });
     fireEvent.click(chip);
 
     expect(studio.openPanel).toHaveBeenCalledWith("landscape");
@@ -117,7 +119,7 @@ describe("WorkbenchRail", () => {
 
     render(<WorkbenchRail />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Segments, 3 segments" }));
+    fireEvent.click(screen.getByRole("button", { name: "Who this is for, 3 segments" }));
     expect(studio.openPanel).toHaveBeenCalledWith("segments");
   });
 
@@ -126,8 +128,8 @@ describe("WorkbenchRail", () => {
 
     render(<WorkbenchRail />);
 
-    expect(screen.queryByRole("button", { name: /job map/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /evidence/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /steps in the job/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /what customers said/i })).toBeNull();
   });
 
   it("labels a seed canvas as sample data", () => {
@@ -215,14 +217,14 @@ describe("WorkbenchRail", () => {
     studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
 
     const { rerender } = render(<WorkbenchRail />);
-    fireEvent.click(screen.getByRole("button", { name: /^landscape/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^where to focus/i }));
 
     expect(studio.openPanel).toHaveBeenCalledWith("landscape");
 
     studio.activePanel = "landscape";
     rerender(<WorkbenchRail />);
 
-    const chip = screen.getByRole("button", { name: /^landscape/i });
+    const chip = screen.getByRole("button", { name: /^where to focus/i });
     expect(chip).toHaveAttribute("aria-current", "page");
     fireEvent.click(chip);
 
@@ -232,7 +234,7 @@ describe("WorkbenchRail", () => {
     studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
     render(<WorkbenchRail />);
 
-    const chip = screen.getByRole("button", { name: /^landscape/i });
+    const chip = screen.getByRole("button", { name: /^where to focus/i });
     fireEvent.mouseEnter(chip);
 
     expect(screen.getByRole("tooltip")).toHaveTextContent(
@@ -247,11 +249,11 @@ describe("WorkbenchRail", () => {
     studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
     render(<WorkbenchRail />);
 
-    const chip = screen.getByRole("button", { name: "Landscape, 1 opportunity" });
+    const chip = screen.getByRole("button", { name: "Where to focus, 1 opportunity" });
     fireEvent.focus(chip);
 
     expect(screen.getByRole("tooltip")).toHaveTextContent(/every outcome scored/i);
-    expect(chip).toHaveAccessibleName("Landscape, 1 opportunity");
+    expect(chip).toHaveAccessibleName("Where to focus, 1 opportunity");
 
     fireEvent.blur(chip);
     expect(screen.queryByRole("tooltip")).toBeNull();
@@ -262,9 +264,9 @@ describe("WorkbenchRail", () => {
     studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
     render(<WorkbenchRail />);
 
-    fireEvent.mouseEnter(screen.getByRole("button", { name: /^landscape/i }));
+    fireEvent.mouseEnter(screen.getByRole("button", { name: /^where to focus/i }));
 
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Landscape$/);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Where to focus$/);
   });
 
 });

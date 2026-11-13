@@ -257,7 +257,7 @@ describe("StudioBar", () => {
       <StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />
     );
 
-    const bell = getByRole("button", { name: "Signal inbox: 3 unread" });
+    const bell = getByRole("button", { name: "What changed: 3 unread" });
     expect(bell.textContent).toContain("3");
     expect(bell.querySelector(".bell-badge")?.getAttribute("aria-hidden")).toBeNull();
     fireEvent.click(bell);
@@ -269,7 +269,7 @@ describe("StudioBar", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 0 }) as never);
     render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
 
-    const bell = screen.getByRole("button", { name: "Signal inbox: no unread signals" });
+    const bell = screen.getByRole("button", { name: "What changed: no unread signals" });
     expect(bell.querySelector(".bell-badge")).toBeNull();
   });
 
