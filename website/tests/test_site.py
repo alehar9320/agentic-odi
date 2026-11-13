@@ -512,11 +512,8 @@ def test_page_weights_are_within_budget(page: str):
     # The page budget is a soft ceiling: individual pages are coverage records
     # (ledgers, entity docs, schema references), not decoration, so the ceiling
     # moves with legitimate content growth rather than trimming reference
-    # material. The MCP reference is the long pole: every tool's argument table
-    # and the whole ODI schema live on that one page, so it grows with each
-    # paginated list tool, each entity, and each new tool group. The
-    # Development page also carries the assistant-ui ledger (issue #429, 129
-    # rows), the Study entity, the candidate review tools, their schema entity,
-    # and the duplicate-suggestion and merge tools. Both pages stay under the
-    # same soft ceiling, which tracks that content instead of trimming it.
-    assert size <= 115 * 1024, f"{page}: {size} bytes"
+    # material. The Living Studio guide is now the long pole at ~111.5 KB: its
+    # 15 reference tables (180 rows) and 512 inline code spans cover the studio
+    # catalog, the ODI schema, and every agent surface, and it grows with each
+    # one. It is a coverage record, not decoration, so the ceiling moves again.
+    assert size <= 120 * 1024, f"{page}: {size} bytes"

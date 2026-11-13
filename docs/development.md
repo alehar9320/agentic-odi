@@ -335,6 +335,72 @@ executes pull request code.
 python3 scripts/pr_triage.py --labels labels.txt   # print the triage decision
 ```
 
+## AI merge trust and authorization labels
+
+Two labels work together to let an AI agent merge safe pull requests without
+human review:
+
+| Label | Meaning | Set by |
+|-------|---------|--------|
+| `ai-merge-safe` | The PR is non-disruptive and non-sensitive (AND-gated on risk, size, telemetry, sensitive areas, hygiene). | `pr-ai-merge.yml` |
+| `ai-merge-authorized` | CI is green and the PR carries `ai-merge-safe` + `ready-for-merge`; an AI agent may auto-merge it. | `pr-ai-authorize.yml` |
+
+### `ai-merge-safe` (labelling only — humans still merge)
+
+The [PR AI merge trust workflow](.github/workflows/pr-ai-merge.yml) applies
+`ai-merge-safe` only when every gate passes, and removes it when any gate
+fails. Deterministic — no LLM calls, no network beyond the GitHub API, no pull
+request code executed. Fork pull requests are skipped per-job.
+
+| Gate | Requirement |
+|------|-------------|
+| Low disruption | `safe to merge` (risk score ≤ 20) |
+| CI green, no conflicts | `ready-for-merge` |
+| Small enough | `size/XS` or `size/S` (< 250 lines changed) |
+| Clean telemetry | none of `breaking change`, `needs deep dive`, `telemetry invalid` |
+| Non-sensitive areas | no CI/infra/release path, no deleted protected file, no dependency change |
+| Hygiene | open, non-draft PR targeting `main` |
+
+```bash
+python3 scripts/pr_ai_merge.py --facts facts.json   # print the label or nothing
+python3 scripts/pr_ai_merge.py --managed            # list owned labels
+```
+
+### `ai-merge-authorized` (CI green → AI agent may auto-merge)
+
+The [PR AI merge authorize workflow](.github/workflows/pr-ai-authorize.yml)
+applies `ai-merge-authorized` only when the PR carries `ai-merge-safe`, the
+combined status of the head commit is `success` (CI green), `ready-for-merge`
+is present (no merge conflicts), and hygiene passes (open, non-draft, targets
+`main`). It is removed when any gate fails.
+
+```bash
+python3 scripts/pr_ai_authorize.py --facts facts.json   # print the label or nothing
+python3 scripts/pr_ai_authorize.py --managed            # list owned labels
+```
+
+### Auto-merge (Phase 2)
+
+The [PR AI merge act workflow](.github/workflows/pr-ai-merge-act.yml) arms
+`gh pr merge --auto --squash` on any open PR carrying `ai-merge-authorized`,
+re-verifying CI green immediately before arming. Human override: `do-not-merge`
+or `needs human review` cancels auto-merge and a comment explains why.
+
+### Branch protection (enforced on `main`)
+
+Labeling is advisory; branch protection makes it enforceable. The
+`main-requires-ci-green` ruleset on branch `main` must require all three:
+
+| Check / requirement | Purpose |
+|---------------------|---------|
+| `CI green` status check | Full CI matrix passes |
+| `PR guardrails` status check | Diff-shape, body-truth, and fabrication gates pass |
+| Label: `ai-merge-safe` | PR is non-disruptive and non-sensitive |
+
+This is a GitHub Settings change (Settings → Branches → branch protection
+rules); it cannot be enforced from repo files. See [issue #956](https://github.com/alehar9320/agentic-odi/issues/956)
+for the tracking issue and the exact rule to configure.
+
 ## Testing
 
 See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
