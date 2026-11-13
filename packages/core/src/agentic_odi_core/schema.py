@@ -22,6 +22,7 @@ from agentic_odi_core.models import (
     Job,
     Outcome,
     OutcomeAlignment,
+    OutcomeCandidate,
     ScheduledWork,
     Segment,
     Step,
@@ -47,6 +48,7 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "ScheduledWork": ScheduledWork,
     "Interview": Interview,
     "InterviewQuote": InterviewQuote,
+    "OutcomeCandidate": OutcomeCandidate,
 }
 
 

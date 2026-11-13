@@ -18,6 +18,7 @@ import pytest
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
+    CandidateStatus,
     CustomerOutcome,
     CustomerValue,
     Direction,
@@ -26,6 +27,7 @@ from agentic_odi_core.models import (
     InterviewQuote,
     Job,
     Outcome,
+    OutcomeCandidate,
     Step,
 )
 from agentic_odi_core.repository import InMemoryRepository, Repository
@@ -60,6 +62,10 @@ def _snapshot(repo: Repository) -> Snapshot:
         ),
         "quotes": sorted(
             (q.model_dump() for i in repo.list_interviews("job-1") for q in repo.list_quotes(i.id)),
+            key=lambda d: d["id"],
+        ),
+        "candidates": sorted(
+            (c.model_dump(mode="json") for c in repo.list_candidates()),
             key=lambda d: d["id"],
         ),
     }
@@ -126,6 +132,16 @@ def _seed(repo: Repository) -> None:
             ordinal=0,
         )
     )
+    repo.add_candidate(
+        OutcomeCandidate(
+            id="candidate-1",
+            interview_id="interview-1",
+            quote_id="quote-1",
+            statement="Minimize the time it takes to get set up when onboarding",
+            confidence=0.6,
+            status=CandidateStatus.PROPOSED,
+        )
+    )
 
 
 def test_in_memory_and_sqlite_agree_on_a_full_seed(tmp_path) -> None:
@@ -172,6 +188,8 @@ def test_interview_delete_cascade_survives_replay(tmp_path) -> None:
     # The other interview and its quote are untouched.
     assert repo.get_quote("quote-3") is not None
     assert repo.get_interview("interview-2") is not None
+    # The candidate belonged to the deleted interview.
+    assert repo.get_candidate("candidate-1") is None
 
 
 def test_job_delete_cascades_interviews_and_quotes(tmp_path) -> None:
@@ -181,6 +199,7 @@ def test_job_delete_cascades_interviews_and_quotes(tmp_path) -> None:
         assert repo.get_interview("interview-1") is None
         assert repo.get_quote("quote-1") is None
         assert repo.list_interviews() == []
+        assert repo.list_candidates() == []
 
 
 @pytest.mark.parametrize(
@@ -193,6 +212,7 @@ def test_job_delete_cascades_interviews_and_quotes(tmp_path) -> None:
         "evidence",
         "interviews",
         "quotes",
+        "candidates",
     ],
 )
 def test_every_entity_round_trips(tmp_path, entity: str) -> None:

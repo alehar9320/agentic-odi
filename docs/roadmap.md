@@ -49,6 +49,7 @@ counted as done.
 - [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
 - [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
 - [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
+- [ ] **Extract candidate outcomes from a quote** — `odi extract` proposes ODI-shaped candidates from one interview quote and `odi candidates` reads, decides, and removes them ([PR #282](https://github.com/alehar9320/agentic-odi/pull/282)).
 - [ ] **Interviews and quotes, persisted** — research enters the product as an interview and its verbatim quotes (ALH-6 · ALH-14, [PR #279](https://github.com/alehar9320/agentic-odi/pull/279)).
 - [ ] **Import a transcript as an interview** — a Markdown, text, VTT, or SRT file becomes one interview and its ordered quotes (ALH-6 · A2, [PR #280](https://github.com/alehar9320/agentic-odi/pull/280)).
 - [ ] **Outcome-based segments and the strategy they imply** — the scored outcomes group into segments, and the recorded path names the ones it beat ([PR #367](https://github.com/alehar9320/agentic-odi/pull/367)).
