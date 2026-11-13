@@ -70,7 +70,8 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_server_tools.py` — server-level tool registration and transport wiring.
 - `test_tool_spec_validation.py` — startup refuses a contract/registry mismatch.
 - `test_health.py` — the `get_health` tool reports accessible and degraded stores.
-- `conftest.py` — sets `AGENTIC_ODI_DB=:memory:` before the server imports.
+- `test_server_import.py` — importing the server and `--help` build no store; a subprocess proves it.
+- `conftest.py` — pins `AGENTIC_ODI_DB=:memory:` and hands each test its own `InMemoryRepository` through `create_server()`.
 
 ### `apps/studio-api/tests/`
 
@@ -150,7 +151,7 @@ Checks that span the workspace rather than one distribution:
 ## Isolation Rules
 
 - Use `InMemoryRepository` in tests. `create_app(InMemoryRepository())` keeps the Studio API off the real `~/.agentic-odi/odi.db`.
-- The MCP server uses `build_repository()`; tests set `AGENTIC_ODI_DB=:memory:` before import and call tools through `Client(mcp)` without HTTP.
+- The MCP server builds its store in `create_server()`, which `main()` calls at process start; tests call `create_server(repository=InMemoryRepository())` and call tools through `Client(mcp)` without HTTP. Importing `agentic_odi_mcp_server.mcp_server` touches no filesystem, and `test_server_import.py` holds it to that.
 - Async tests use `@pytest.mark.asyncio` (strict mode).
 
 ## Coverage

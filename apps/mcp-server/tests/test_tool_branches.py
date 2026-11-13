@@ -6,7 +6,6 @@ import json
 import re
 
 import pytest
-from agentic_odi_mcp_server import mcp
 from agentic_odi_mcp_server import mcp_server as server
 from fastmcp import Client
 from mcp.types import TextContent
@@ -62,7 +61,9 @@ async def _create_customer_outcome(client: Client) -> str:
 
 
 @pytest.mark.asyncio
-async def test_assistant_prompt_is_registered() -> None:
+async def test_assistant_prompt_is_registered(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         prompts = await client.list_prompts()
         result = await client.get_prompt("odi_assistant_prompt")
@@ -72,7 +73,9 @@ async def test_assistant_prompt_is_registered() -> None:
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_rejects_out_of_range_scores() -> None:
+async def test_add_outcome_rejects_out_of_range_scores(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Onboard"})
         jobs = json.loads(_text(await client.call_tool("get_jobs", {})))
@@ -94,7 +97,9 @@ async def test_add_outcome_rejects_out_of_range_scores() -> None:
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_rejects_a_skip_without_a_reason() -> None:
+async def test_add_outcome_rejects_a_skip_without_a_reason(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Onboard"})
         jobs = json.loads(_text(await client.call_tool("get_jobs", {})))
@@ -120,7 +125,9 @@ async def test_add_outcome_rejects_a_skip_without_a_reason() -> None:
 
 
 @pytest.mark.asyncio
-async def test_add_customer_outcome_reports_validation_errors() -> None:
+async def test_add_customer_outcome_reports_validation_errors(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Onboard"})
         jobs = json.loads(_text(await client.call_tool("get_jobs", {})))
@@ -140,7 +147,9 @@ async def test_add_customer_outcome_reports_validation_errors() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_customer_outcome_reports_missing_ids() -> None:
+async def test_update_customer_outcome_reports_missing_ids(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         result = await client.call_tool(
             "update_customer_outcome", {"outcome_id": "missing", "importance": 9.0}
@@ -152,7 +161,9 @@ async def test_update_customer_outcome_reports_missing_ids() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_customer_outcome_applies_every_field() -> None:
+async def test_update_customer_outcome_applies_every_field(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         outcome_id = await _create_customer_outcome(client)
 
@@ -193,7 +204,9 @@ async def test_update_customer_outcome_applies_every_field() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_customer_outcome_reports_validation_errors() -> None:
+async def test_update_customer_outcome_reports_validation_errors(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         outcome_id = await _create_customer_outcome(client)
 
@@ -208,7 +221,9 @@ async def test_update_customer_outcome_reports_validation_errors() -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_customer_outcome_reports_missing_ids() -> None:
+async def test_delete_customer_outcome_reports_missing_ids(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         result = await client.call_tool("delete_customer_outcome", {"outcome_id": "missing"})
 
@@ -230,6 +245,9 @@ def _capture_uvicorn(monkeypatch) -> list[dict]:
         lambda app, **kwargs: calls.append({"app": app, **kwargs}),
     )
     monkeypatch.setattr(server, "_configured_token", lambda: "test-token")
+    # The merged entry point builds its own store (ADR 0006); the test serves the
+    # module's server so no repository is opened on disk.
+    monkeypatch.setattr(server, "create_server", lambda: server.mcp)
     return calls
 
 
@@ -254,7 +272,9 @@ def test_main_passes_an_explicit_port_through(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_open_study_reports_a_missing_job_as_an_envelope() -> None:
+async def test_open_study_reports_a_missing_job_as_an_envelope(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         result = await client.call_tool(
             "open_study", {"job_id": "missing", "name": "Q3 sweep", "wave": 1}
@@ -263,3 +283,22 @@ async def test_open_study_reports_a_missing_job_as_an_envelope() -> None:
     text = _text(result)
     assert failure(text).code.value == "not_found"
     assert sentence(text) == "Job not found: missing"
+
+
+def test_main_builds_the_store_before_serving(mcp, monkeypatch) -> None:
+    """The entry point is where the store is built (ADR 0006), before validation."""
+    calls: list[object] = []
+
+    def _create_server() -> object:
+        calls.append("create")
+        return mcp
+
+    monkeypatch.setattr(server, "create_server", _create_server)
+    monkeypatch.setattr(server, "validate_at_startup", lambda *_: calls.append("validate"))
+    monkeypatch.setattr(server, "setup_graceful_shutdown", lambda: None)
+    monkeypatch.setattr(server.uvicorn, "run", lambda app, **kwargs: calls.append("run"))
+    monkeypatch.setattr(server, "_configured_token", lambda: "")
+
+    server.main([])
+
+    assert calls == ["create", "validate", "run"]

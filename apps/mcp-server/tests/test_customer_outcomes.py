@@ -3,12 +3,13 @@
 import json
 
 import pytest
-from agentic_odi_mcp_server.mcp_server import mcp
 from fastmcp import Client
 
 
 @pytest.mark.asyncio
-async def test_add_customer_outcome_creates_and_computes_opportunity_score():
+async def test_add_customer_outcome_creates_and_computes_opportunity_score(
+    mcp,
+):
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Onboard", "description": "Dev onboarding"})
         jobs_result = await client.call_tool("get_jobs", {})
@@ -36,7 +37,9 @@ async def test_add_customer_outcome_creates_and_computes_opportunity_score():
 
 
 @pytest.mark.asyncio
-async def test_add_customer_outcome_job_not_found_returns_error():
+async def test_add_customer_outcome_job_not_found_returns_error(
+    mcp,
+):
     async with Client(mcp) as client:
         cv = {
             "direction": "minimize",
@@ -55,7 +58,9 @@ async def test_add_customer_outcome_job_not_found_returns_error():
 
 
 @pytest.mark.asyncio
-async def test_get_list_update_delete_flow():
+async def test_get_list_update_delete_flow(
+    mcp,
+):
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Onboard"})
         jobs = json.loads((await client.call_tool("get_jobs", {})).content[0].text)  # type: ignore[index]
@@ -98,14 +103,18 @@ async def test_get_list_update_delete_flow():
 
 
 @pytest.mark.asyncio
-async def test_compute_opportunity_tool():
+async def test_compute_opportunity_tool(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool("compute_opportunity", {"importance": 8, "satisfaction": 2})
         assert "14.00" in str(res.content[0].text)
 
 
 @pytest.mark.asyncio
-async def test_get_capabilities_mentions_customer_outcomes():
+async def test_get_capabilities_mentions_customer_outcomes(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool("get_capabilities", {})
         text = res.content[0].text  # type: ignore[index]
@@ -114,14 +123,18 @@ async def test_get_capabilities_mentions_customer_outcomes():
 
 
 @pytest.mark.asyncio
-async def test_compute_opportunity_out_of_range():
+async def test_compute_opportunity_out_of_range(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool("compute_opportunity", {"importance": 11, "satisfaction": 5})
         assert "Error" in res.content[0].text  # type: ignore[index]
 
 
 @pytest.mark.asyncio
-async def test_update_partial_merge():
+async def test_update_partial_merge(
+    mcp,
+):
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Job"})
         jobs = json.loads((await client.call_tool("get_jobs", {})).content[0].text)  # type: ignore[index]

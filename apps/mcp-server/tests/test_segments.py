@@ -4,7 +4,6 @@ import json
 from typing import Any
 
 import pytest
-from agentic_odi_mcp_server import mcp
 from fastmcp import Client
 from mcp_failures import failure, sentence
 
@@ -68,7 +67,9 @@ async def _seed_underserved_job(client: Client) -> str:
 
 
 @pytest.mark.asyncio
-async def test_segment_market_clusters_scored_outcomes_by_step() -> None:
+async def test_segment_market_clusters_scored_outcomes_by_step(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         job_id = await _seed_underserved_job(client)
         assert _payload(await client.call_tool("get_segments", {})) == []
@@ -86,7 +87,9 @@ async def test_segment_market_clusters_scored_outcomes_by_step() -> None:
 
 
 @pytest.mark.asyncio
-async def test_re_running_updates_the_same_segment_instead_of_stacking() -> None:
+async def test_re_running_updates_the_same_segment_instead_of_stacking(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         job_id = await _seed_underserved_job(client)
         first = _payload(await client.call_tool("segment_market", {"job_id": job_id}))
@@ -98,7 +101,9 @@ async def test_re_running_updates_the_same_segment_instead_of_stacking() -> None
 
 
 @pytest.mark.asyncio
-async def test_an_unknown_job_is_reported_not_segmented() -> None:
+async def test_an_unknown_job_is_reported_not_segmented(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         text = _text(await client.call_tool("segment_market", {"job_id": "nope"}))
 
@@ -107,7 +112,9 @@ async def test_an_unknown_job_is_reported_not_segmented() -> None:
 
 
 @pytest.mark.asyncio
-async def test_propose_strategy_returns_one_path_with_the_paths_it_beat() -> None:
+async def test_propose_strategy_returns_one_path_with_the_paths_it_beat(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         job_id = await _seed_underserved_job(client)
         # A served outcome on the same job gives the differentiated path something to borrow.
@@ -141,7 +148,9 @@ async def test_propose_strategy_returns_one_path_with_the_paths_it_beat() -> Non
 
 
 @pytest.mark.asyncio
-async def test_get_strategy_answers_null_until_stage_6_runs() -> None:
+async def test_get_strategy_answers_null_until_stage_6_runs(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         text = _text(await client.call_tool("get_strategy", {}))
 
@@ -149,7 +158,9 @@ async def test_get_strategy_answers_null_until_stage_6_runs() -> None:
 
 
 @pytest.mark.asyncio
-async def test_propose_strategy_refuses_without_evidence_rather_than_inventing_a_bet() -> None:
+async def test_propose_strategy_refuses_without_evidence_rather_than_inventing_a_bet(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         await client.call_tool("add_job", {"name": "Rotate a leaked secret"})
         text = _text(await client.call_tool("propose_strategy", {}))

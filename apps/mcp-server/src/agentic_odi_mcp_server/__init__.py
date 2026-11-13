@@ -1,27 +1,8 @@
 """Agentic ODI MCP Server package."""
 
-from agentic_odi_mcp_server.mcp_server import (
-    compute_opportunity,
-    customer_outcomes_db,
-    evidence_db,
-    jobs_db,
-    mcp,
-    outcomes_db,
-    segments_db,
-    signals_db,
-    steps_db,
-    strategies_db,
-)
+from agentic_odi_mcp_server.mcp_server import compute_opportunity, create_server
 
 __all__ = [
     "compute_opportunity",
-    "customer_outcomes_db",
-    "evidence_db",
-    "jobs_db",
-    "mcp",
-    "outcomes_db",
-    "segments_db",
-    "signals_db",
-    "steps_db",
-    "strategies_db",
+    "create_server",
 ]
