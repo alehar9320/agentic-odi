@@ -24,6 +24,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   conversationId: null,
   conversations: [],
   llmHealth: { healthy: true, message: "ok" },
+  probeRetry: { state: "closed", retryInMs: 0 },
   messages: [],
   openConversation: vi.fn(),
   refreshConversations: vi.fn(),
@@ -125,6 +126,20 @@ describe("StudioBar", () => {
 
     expect(
       screen.getByRole("button", { name: /model status: live\. qwen3 is answering\./i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a retry countdown, not a spinner, while the breaker is open (#536)", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        llmHealth: { healthy: false, message: "The model did not answer." },
+        probeRetry: { state: "open", retryInMs: 240_000 },
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(
+      screen.getByRole("button", { name: /model status: retrying in 4 min\./i }),
     ).toBeInTheDocument();
   });
 
