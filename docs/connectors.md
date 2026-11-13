@@ -21,8 +21,8 @@ python -m agentic_odi_cli connectors catalog --json
 | Voice of customer & qualitative research (`voice-of-customer`) | `notion`, `gong`, `fireflies`, `intercom`, `confluence` |
 | Quantitative data & opportunity scoring (`quantitative-data`) | `posthog`, `amplitude`, `mixpanel` |
 | Market & competitive intelligence (`market-intelligence`) | `exa`, `tavily` |
-| Product strategy & backlog alignment (`strategy-alignment`) | `linear`, `github`, `jira`, `miro`, `figma` |
-| Strategy & knowledge management output (`knowledge-output`) | `slack` |
+| Product strategy & backlog alignment (`strategy-alignment`) | `linear`, `github`, `jira`, `miro`, `figma`, `composio` |
+| Strategy & knowledge management output (`knowledge-output`) | `context7`, `slack` |
 
 `docs/connectors-catalog.json` is the catalog as JSON, committed so a drift shows
 up in review. `packages/connectors/tests/test_catalog.py` fails when it stops
@@ -44,6 +44,7 @@ python -m agentic_odi_cli connectors list-presets   # markdown table of built-in
 
 # OAuth-based preset: the browser consent flow starts on first use
 python -m agentic_odi_cli connectors add mcp --preset notion
+python -m agentic_odi_cli connectors add mcp --preset composio
 ```
 
 Credentials never enter the registry. Presets that use API keys store `${VAR}`
@@ -74,6 +75,41 @@ so it can gate a deployment.
 > OAuth tokens are cached in memory for the life of one CLI process, so an OAuth
 > preset may ask for consent again on the next `connectors health` or
 > `connectors ingest`. Prefer a token-based preset where the server offers one.
+
+> [!NOTE]
+> **Composio is optional, and the CLI is fail-open.** Health and ingest are
+> per-connector, so a missing, unreachable, or rate-limited Composio endpoint
+> reports unhealthy for `composio` only and never blocks another connector, the
+> `connectors health` table, or any default flow. Adding the `composio` preset
+> changes behavior for no workspace that does not configure it. If Composio is
+> down or runs out, keep using the other connectors and the AI flow; it is
+> designed to keep working.
+
+## Adding Composio as an integration
+
+Composio is a managed MCP hub for 1000+ apps (GitHub, Slack, Linear, Notion,
+Jira, ...). It is wired up like any other preset, and it is **optional**:
+nothing in the CLI or the default flow requires it.
+
+```bash
+# Register the preset (OAuth consent starts on first health/ingest call)
+python -m agentic_odi_cli connectors add mcp --preset composio
+
+# Check it independently; a down or rate-limited endpoint reports unhealthy
+# for composio only and exits cleanly for that connector
+python -m agentic_odi_cli connectors health --name composio
+
+# Ingest is per-connector and opt-in; another connector's ingest is unaffected
+python -m agentic_odi_cli connectors ingest --name composio --job-id job_123
+```
+
+The preset shape lives in
+`packages/connectors/src/agentic_odi_connectors/catalog.py`. To add it to
+another project, copy the `composio` entry (id, label, area, summary, url,
+auth, docs, `is_recommended: false`), regenerate the catalog JSON, and update
+the presets table. Because health and ingest are per-connector, a missing or
+unreachable Composio endpoint never breaks another connector or the CLI —
+verify that in the host project before shipping.
 
 ## Ingest behavior
 

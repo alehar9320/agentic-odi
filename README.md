@@ -205,7 +205,7 @@ The server speaks the Model Context Protocol. Any MCP client can reach it:
 }
 ```
 
-Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) on the
+Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub, Composio) on the
 Studio's **Customize** page — installed connectors first, then a trusted vendor
 marketplace, then conversationally, or via `agentic-odi connectors add <preset>`.
 A listing that needs a token names the environment variable to set; no credential

@@ -1,8 +1,13 @@
-"""Generate the committed social art: website/assets/og.png and favicon.png.
+"""Generate the site's social art: the committed og.png and favicon.png, and
+one card per page.
 
 Run from the repo root:
 
     uv run python website/tools/make_og.py
+
+``render_card`` is the per-page shape: a page's own title, its section, and -
+only when the page renders one - a single figure. The site build calls it for
+every page, so a new page cannot be published without a card.
 
 Output is deterministic - fixed palette, fixed positions, no timestamps, PNG
 encoded with compress_level=9 and optimize=True - so website/tests/test_make_og.py
@@ -12,7 +17,10 @@ can assert the committed PNGs are pixel-identical to a fresh render.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
+import re
+import unicodedata
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -242,6 +250,185 @@ def main(argv: list[str] | None = None) -> int:
     for path in write(args.out):
         print(f"wrote {path}")
     return 0
+
+
+# --- one card per page -------------------------------------------------------
+
+CARD_TITLE_SIZES = (72, 64, 56, 48, 42)
+CARD_TITLE_LINES = 3
+CARD_TITLE_Y = 196
+CARD_FIGURE_Y = 440
+CARD_STEM_MAX = 80
+
+# Punctuation the built-in font has no glyph for, mapped to the ASCII it stands
+# for. Dropping these would run words together, which changes what a title says.
+_CARD_PUNCT = str.maketrans(
+    {
+        "\u2010": "-",
+        "\u2011": "-",
+        "\u2012": "-",
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2015": "-",
+        "\u2212": "-",
+        "\u00b7": "-",
+        "\u2022": "-",
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201b": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2039": "'",
+        "\u203a": "'",
+        "\u2026": "...",
+        "\u2192": "->",
+        "\u00a9": "(c)",
+        "\u00ae": "(r)",
+        "\u2122": "TM",
+        "\u00a0": " ",
+        "\u2007": " ",
+        "\u2009": " ",
+        "\u200a": " ",
+        "\u202f": " ",
+        "\u200b": "",
+    }
+)
+
+
+def _card_text(value: str) -> str:
+    """Fold a page's own text into what the built-in font can draw.
+
+    Pillow's scalable default has no non-ASCII glyphs, so an accented letter
+    would render as a tofu box. NFKD first keeps the letter and drops the mark:
+    the card reads as the page reads. Punctuation the font lacks is mapped to
+    the ASCII it stands for rather than dropped, so a dash keeps its words
+    apart. A title with nothing left falls back to the wordmark.
+    """
+    folded = unicodedata.normalize("NFKD", value.translate(_CARD_PUNCT))
+    return " ".join(folded.encode("ascii", "ignore").decode().split()) or WORDMARK
+
+
+def card_pill(section: str) -> str | None:
+    """The section label to draw, or ``None`` when it would add nothing.
+
+    The landing page's section is the site itself, and the wordmark is already
+    on the card; repeating it as a label says nothing a reader cannot see.
+    """
+    label = _card_text(section) if section.strip() else ""
+    return label if label and label != WORDMARK else None
+
+
+def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
+    """The site canvas: both washes and the hairline frame."""
+    width, height = OG_SIZE
+    image = Image.new("RGB", OG_SIZE, CANVAS)
+    for color, center, radius, strength in (
+        (ACCENT_STRONG, (0.50, 1.08), 0.62, 26),
+        (ACCENT_STRONG, (0.68, -0.12), 0.72, 22),
+    ):
+        layer, mask, offset = _wash(OG_SIZE, color, center, radius, strength)
+        image.paste(layer, offset, mask)
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((24, 24, width - 25, height - 25), radius=28, outline=HAIRLINE, width=1)
+    return image, draw
+
+
+def render_card(title: str, section: str, figure: str | None = None) -> bytes:
+    """Render one page's 1200x630 card: its title, its section, its own figure.
+
+    ``figure`` is a number the page itself displays. Leaving it out draws the
+    section card with no number at all - a missing figure is not a zero.
+    """
+    width, height = OG_SIZE
+    image, draw = _canvas()
+
+    mark_size = 44
+    _draw_mark(draw, (MARGIN, MARGIN, MARGIN + mark_size - 1, MARGIN + mark_size - 1), 3)
+    middle_y = MARGIN + mark_size // 2
+    draw.text(
+        (MARGIN + mark_size + 16, middle_y),
+        WORDMARK,
+        font=ImageFont.load_default(size=30),
+        fill=TEXT,
+        anchor="lm",
+    )
+    pill = card_pill(section)
+    if pill:
+        _draw_pill(draw, pill, right=width - MARGIN, cy=middle_y)
+
+    text_width = width - 2 * MARGIN
+    folded_title = _card_text(title)
+    for size in CARD_TITLE_SIZES:
+        font = ImageFont.load_default(size=size)
+        lines = _wrap(draw, folded_title, font, text_width)
+        if len(lines) <= CARD_TITLE_LINES or size == CARD_TITLE_SIZES[-1]:
+            break
+    y = CARD_TITLE_Y
+    for line in lines[:CARD_TITLE_LINES]:
+        draw.text((MARGIN, y), line, font=font, fill=TEXT)
+        y += round(size * 1.22)
+
+    if figure:
+        draw.text(
+            (MARGIN, CARD_FIGURE_Y),
+            _card_text(figure),
+            font=ImageFont.load_default(size=58),
+            fill=ACCENT,
+        )
+
+    draw.text(
+        (MARGIN, height - MARGIN),
+        DEFAULT_URL,
+        font=ImageFont.load_default(size=26),
+        fill=MUTED,
+        anchor="ld",
+    )
+    return _to_png(image)
+
+
+def _card_stem(page_path: str) -> str:
+    """A page's card name: its whole path, folded into one safe slug."""
+    stem = page_path[: -len("index.html")] if page_path.endswith("index.html") else page_path
+    stem = stem.rstrip("/")
+    folded = unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode().lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", folded).strip("-") or "home"
+    if len(slug) > CARD_STEM_MAX:
+        digest = hashlib.sha256(stem.encode("utf-8")).hexdigest()[:8]
+        slug = f"{slug[:CARD_STEM_MAX]}-{digest}"
+    return slug
+
+
+def card_names(page_paths: list[str]) -> dict[str, str]:
+    """Map every page path to its card path, one file per page, no collisions.
+
+    The whole page path feeds the name, so ``docs/mcp/`` and ``mcp/`` cannot
+    land on the same file; a fold that still collides gets a numeric suffix in
+    path order, which keeps the mapping reproducible.
+    """
+    names: dict[str, str] = {}
+    used: set[str] = set()
+    for page in sorted(page_paths):
+        stem = _card_stem(page)
+        candidate = stem
+        suffix = 2
+        while candidate in used:
+            candidate = f"{stem}-{suffix}"
+            suffix += 1
+        used.add(candidate)
+        names[page] = f"og/{candidate}.png"
+    return names
+
+
+def write_cards(pages: list[dict], out_dir: Path) -> dict[str, Path]:
+    """Write one card per page into ``out_dir`` and return page path -> file."""
+    names = card_names([page["path"] for page in pages])
+    written: dict[str, Path] = {}
+    for page in pages:
+        target = out_dir / names[page["path"]]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(render_card(page["title"], page["section"], page.get("figure")))
+        written[page["path"]] = target
+    return written
 
 
 if __name__ == "__main__":
