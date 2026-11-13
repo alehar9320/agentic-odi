@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { LogicalSize } from "@tauri-apps/api/dpi";
+
 import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge";
 import { BannerProvider, useBanner } from "./banners/BannerProvider";
 import { BannerStack } from "./banners/BannerStack";
@@ -17,6 +20,7 @@ import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { dialogOpen, focusComposer, startComposerCommand } from "./lib/composerFocus";
 import { isEditableTarget } from "./lib/commands";
 import { sharedTokenFromPath } from "./lib/share";
+import { isTauri } from "./bridge/desktopBridge";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
@@ -119,6 +123,42 @@ function StudioShell() {
   // beforeinstallprompt event is not missed before Settings is opened.
   useEffect(() => {
     initInstall();
+  }, []);
+
+  // Remember the window size across desktop sessions so the app reopens at the
+  // size the person last chose, like Linear / Copilot. No-op in the browser
+  // and in tests (isTauri is false there).
+  useEffect(() => {
+    if (!isTauri()) return;
+    const win = getCurrentWebviewWindow();
+    let unlisten: (() => void) | undefined;
+
+    const save = () => {
+      win.innerSize().then(({ width, height }) => {
+        try {
+          localStorage.setItem("studio:window-size", JSON.stringify({ width, height }));
+        } catch { /* ignored: storage may be unavailable or quota-full */ }
+      }).catch(() => {});
+    };
+
+    (async () => {
+      try {
+        const raw = localStorage.getItem("studio:window-size");
+        if (raw) {
+          const { width, height } = JSON.parse(raw);
+          await win.setSize(new LogicalSize(width, height));
+        }
+      } catch { /* ignored: malformed stored size or tauri unavailable */ }
+      const un = await win.listen("tauri://resize", () => save());
+      unlisten = un;
+    })();
+
+    window.addEventListener("beforeunload", save);
+
+    return () => {
+      unlisten?.();
+      window.removeEventListener("beforeunload", save);
+    };
   }, []);
 
   // A damaged database is not a broken screen: the file is intact on disk and
