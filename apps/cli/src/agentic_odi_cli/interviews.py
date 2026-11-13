@@ -9,11 +9,12 @@ store or a remote MCP server without a second code path.
 from __future__ import annotations
 
 import json
+import sys
 from typing import Any
 
 import typer
 
-from agentic_odi_cli.backend import run_tool
+from agentic_odi_cli.backend import BackendError, call_tool, run_tool
 from agentic_odi_cli.render import (
     render_candidate,
     render_candidate_acceptance,
@@ -24,6 +25,8 @@ from agentic_odi_cli.render import (
     render_interview,
     render_interview_list,
     render_quote_list,
+    render_review_prompt,
+    render_review_summary,
     render_saved,
 )
 
@@ -50,7 +53,6 @@ def import_transcript(
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Import a transcript from a file (or stdin) as one interview."""
-    import sys
     from pathlib import Path
 
     display = "stdin" if path == "-" else path
@@ -338,3 +340,284 @@ def merge_candidates(
             as_json=json_output,
         )
     )
+
+
+class _EndOfInput(Exception):
+    """Raised when the review loop reaches end-of-input instead of a key."""
+
+
+def _read_line(label: str, *, quiet: bool = False) -> str:
+    """Prompt with ``label`` and read one line, or raise on end-of-input.
+
+    ``quiet`` suppresses the prompt (``--json`` mode emits only the JSON summary
+    on stdout, so the prompts would corrupt it). A blank line is an empty
+    string; end-of-input is distinct so the loop can treat it as a quit rather
+    than a skip.
+    """
+    if not quiet:
+        typer.echo(label, nl=False, err=True)
+    raw = sys.stdin.readline()
+    if raw == "":
+        raise _EndOfInput
+    return raw.rstrip("\n")
+
+
+def _read_score(label: str, provided: float | None, *, quiet: bool = False) -> float:
+    """Read a 1–10 score, or return the value the caller already supplied."""
+    if provided is not None:
+        return provided
+    return float(_read_line(f"{label} (1.0-10.0): ", quiet=quiet).strip())
+
+
+def _proposed_candidates(interview_id: str) -> list[dict[str, Any]]:
+    candidates = call_tool("list_candidates", {"interview_id": interview_id, "status": "proposed"})
+    return candidates if isinstance(candidates, list) else []
+
+
+def _quote_index(interview_id: str) -> dict[str, dict[str, Any]]:
+    quotes = call_tool("list_quotes", {"interview_id": interview_id})
+    if not isinstance(quotes, list):
+        return {}
+    return {quote["id"]: quote for quote in quotes}
+
+
+def _accept_one(
+    candidate_id: str,
+    *,
+    importance: float,
+    satisfaction: float,
+    statement: str | None = None,
+) -> str | None:
+    """Accept one candidate; return the server's reason on refusal, else None."""
+    args: dict[str, Any] = {
+        "candidate_id": candidate_id,
+        "importance": importance,
+        "satisfaction": satisfaction,
+    }
+    if statement is not None:
+        args["statement"] = statement
+    try:
+        call_tool("accept_candidate", args)
+    except BackendError as exc:
+        return str(exc)
+    return None
+
+
+@interviews_app.command("review")
+def review(
+    interview_id: str = typer.Argument(..., help="Interview ID to review"),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Accept every proposed candidate without prompting (for scripts)",
+    ),
+    importance: float | None = typer.Option(
+        None, help="Importance for --yes acceptance, 1.0 to 10.0"
+    ),
+    satisfaction: float | None = typer.Option(
+        None, help="Satisfaction for --yes acceptance, 1.0 to 10.0"
+    ),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Work an interview's proposed candidates at the keyboard.
+
+    Keys: ``a`` accept, ``e`` edit-and-accept, ``m`` merge into an accepted
+    outcome, ``r`` reject with a reason, ``s`` skip, ``q`` quit. Each prompt
+    shows the statement beside the quote it came from. Every decision goes
+    through the same service the API uses, so a keypress and a click cannot
+    diverge. Skip, quit, and end-of-input preserve every remaining candidate;
+    nothing is accepted on ``q``.
+
+    ``--yes`` is explicit human-issued batch consent: it accepts only the
+    candidates still ``proposed``, needs ``--importance`` and ``--satisfaction``
+    (scores are never invented), and reports the success and failure counts.
+    """
+    if yes and (importance is None or satisfaction is None):
+        typer.secho(
+            "Error: --yes needs --importance and --satisfaction; scores are never invented.",
+            fg="red",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    proposed = _proposed_candidates(interview_id)
+    if not proposed:
+        message = f"Nothing to review: no proposed candidates for interview {interview_id}."
+        if json_output:
+            typer.echo(
+                json.dumps(
+                    {
+                        "interview_id": interview_id,
+                        "accepted": 0,
+                        "merged": 0,
+                        "rejected": 0,
+                        "skipped": 0,
+                        "failed": 0,
+                        "results": [],
+                        "message": message,
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            typer.echo(message)
+        return
+
+    quotes = _quote_index(interview_id)
+    summary: dict[str, Any] = {
+        "interview_id": interview_id,
+        "accepted": 0,
+        "merged": 0,
+        "rejected": 0,
+        "skipped": 0,
+        "failed": 0,
+        "results": [],
+    }
+
+    if yes:
+        for candidate in proposed:
+            candidate_id = candidate["id"]
+            reason = _accept_one(
+                candidate_id,
+                importance=importance,  # type: ignore[arg-type]
+                satisfaction=satisfaction,  # type: ignore[arg-type]
+            )
+            if reason is None:
+                summary["accepted"] += 1
+                summary["results"].append({"id": candidate_id, "action": "accepted"})
+            else:
+                summary["failed"] += 1
+                summary["results"].append(
+                    {"id": candidate_id, "action": "failed", "reason": reason}
+                )
+        _emit_review(summary, as_json=json_output)
+        return
+
+    total = len(proposed)
+    quiet = json_output
+    for position, candidate in enumerate(proposed, start=1):
+        candidate_id = candidate["id"]
+        quote = quotes.get(candidate.get("quote_id", ""))
+        if not quiet:
+            typer.echo(render_review_prompt(position, total, candidate, quote), err=True)
+        try:
+            action = _review_one(
+                candidate,
+                importance=importance,
+                satisfaction=satisfaction,
+                quiet=quiet,
+            )
+        except _EndOfInput:
+            summary["skipped"] += total - position + 1
+            break
+        if action == "quit":
+            summary["skipped"] += total - position + 1
+            break
+        if action == "accepted":
+            summary["accepted"] += 1
+        elif action == "merged":
+            summary["merged"] += 1
+        elif action == "rejected":
+            summary["rejected"] += 1
+        else:
+            summary["skipped"] += 1
+        summary["results"].append({"id": candidate_id, "action": action})
+
+    _emit_review(summary, as_json=json_output)
+
+
+def _warn(message: str, *, quiet: bool) -> None:
+    """Show a refusal to the person, unless ``--json`` must keep stdout clean."""
+    if not quiet:
+        typer.secho(message, fg="red", err=True)
+
+
+def _review_one(
+    candidate: dict[str, Any],
+    *,
+    importance: float | None,
+    satisfaction: float | None,
+    quiet: bool = False,
+) -> str:
+    """Prompt for one candidate's decision until it is made or the person quits.
+
+    A refused decision shows the server's reason and re-prompts, so a blank
+    reject reason or an invalid edit stays for correction rather than silently
+    dropping the candidate.
+    """
+    candidate_id = candidate["id"]
+    while True:
+        key = (
+            _read_line("a=accept  e=edit  m=merge  r=reject  s=skip  q=quit › ", quiet=quiet)
+            .strip()
+            .lower()
+        )
+        if key == "":
+            key = "s"
+        if key in {"q", "quit"}:
+            return "quit"
+        if key in {"s", "skip"}:
+            return "skipped"
+        if key in {"a", "accept"}:
+            if _do_accept(candidate_id, importance, satisfaction, statement=None, quiet=quiet):
+                return "accepted"
+            continue
+        if key in {"e", "edit"}:
+            edited = _read_line("new statement: ", quiet=quiet).strip()
+            if not edited:
+                _warn("Error: a statement must not be blank.", quiet=quiet)
+                continue
+            if _do_accept(candidate_id, importance, satisfaction, statement=edited, quiet=quiet):
+                return "accepted"
+            continue
+        if key in {"r", "reject"}:
+            reason = _read_line("reason: ", quiet=quiet).strip()
+            try:
+                call_tool("reject_candidate", {"candidate_id": candidate_id, "reason": reason})
+            except BackendError as exc:
+                _warn(f"Error: {exc}", quiet=quiet)
+                continue
+            return "rejected"
+        if key in {"m", "merge"}:
+            target = _read_line("merge into outcome id: ", quiet=quiet).strip()
+            if not target:
+                _warn("Error: a merge needs an explicit target outcome.", quiet=quiet)
+                continue
+            try:
+                call_tool("merge_candidates", {"target_id": target, "merged_ids": [candidate_id]})
+            except BackendError as exc:
+                _warn(f"Error: {exc}", quiet=quiet)
+                continue
+            return "merged"
+        _warn(f"Unknown key: {key!r}. Use a, e, m, r, s, or q.", quiet=quiet)
+
+
+def _do_accept(
+    candidate_id: str,
+    importance: float | None,
+    satisfaction: float | None,
+    *,
+    statement: str | None,
+    quiet: bool = False,
+) -> bool:
+    """Accept one candidate, showing the server's reason and returning success."""
+    try:
+        imp = _read_score("importance", importance, quiet=quiet)
+        sat = _read_score("satisfaction", satisfaction, quiet=quiet)
+    except ValueError:
+        _warn("Error: scores must be numbers between 1.0 and 10.0.", quiet=quiet)
+        return False
+    reason = _accept_one(candidate_id, importance=imp, satisfaction=sat, statement=statement)
+    if reason is not None:
+        _warn(f"Error: {reason}", quiet=quiet)
+        return False
+    return True
+
+
+def _emit_review(summary: dict[str, Any], *, as_json: bool) -> None:
+    if as_json:
+        typer.echo(json.dumps(summary, indent=2, ensure_ascii=False))
+    else:
+        typer.echo(render_review_summary(summary))
