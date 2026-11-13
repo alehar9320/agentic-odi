@@ -389,6 +389,18 @@ line — so the region a point sits in and `isUnderserved` never disagree. The
 pill follows suit: a score the store never computed reads **Not scored**, never
 **Served**.
 
+A score that was computed also says how well it is backed. The card and the
+landscape's **Backed by** column read one derived helper, `scoreConfidence`, over
+the `claim_check` behind the score and the evidence records linked to it, and
+name one of three levels: **Verified** when every asked question was answered,
+**Partly verified** when answers exist but a question was skipped, and
+**Hypothesis** when there is no check or no answer — with a one-line basis
+(answered count, quote count, and the distinct sources). No confidence number is
+invented: the level is a function of records the store already holds, and a bare
+number with nothing behind it says so rather than borrowing a measured claim's
+look. On the card the indicator is itself the control that reveals the linked
+quotes, through the same reveal path the **Evidence** button drives.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront
