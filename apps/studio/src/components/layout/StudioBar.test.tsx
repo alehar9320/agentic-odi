@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -216,7 +216,7 @@ describe("StudioBar", () => {
     expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "light" }));
   });
 
-  it("exports the conversation as Markdown from the overflow menu", () => {
+  it("exports the conversation as Markdown from the overflow menu", async () => {
     const createObjectURL = vi.fn(() => "blob:conversation");
     const revokeObjectURL = vi.fn();
     Object.defineProperty(URL, "createObjectURL", {
@@ -244,7 +244,9 @@ describe("StudioBar", () => {
 
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:conversation");
+    // The shared download helper releases the blob URL on the next tick, after the
+    // browser has taken it.
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:conversation"));
     click.mockRestore();
   });
 

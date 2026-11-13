@@ -45,6 +45,7 @@ missing.
 | HTTP with retries | `packages/connectors/src/agentic_odi_connectors/http.py` | `urllib.request.urlopen` in `rest/connector.py` and `marketplace.py` |
 | HTTP from the CLI | `httpx` (declared by `apps/cli`) | `urllib.request.urlopen` in `apps/cli/src/agentic_odi_cli/update.py` |
 | ISO-8601 timestamps | `datetime.isoformat()` | `strftime("%Y-%m-%dT%H:%M:%SZ")` in `apps/cli/src/agentic_odi_cli/profile.py` and `apps/cli/src/agentic_odi_cli/flags.py` |
+| Handing a file to the browser's save dialog | `downloadFile` in `apps/studio/src/lib/export.ts` | the inline blob-and-anchor `save` in `apps/studio/src/diagnostics/DiagnosticsModal.tsx`, which revokes its object URL in the same turn as the click |
 | Structural rules for artifact HTML | `scripts/artifact_a11y.py` (stdlib `html.parser`, six rules) with its inventory in `scripts/artifact_renderers.py` | none left — the four heading, anchor and decorative-svg regexes in `website/tests/test_site.py` were folded in rather than kept as a second opinion |
 
 These rows are the record of an audit, not a to-do list with a deadline. Fixing them

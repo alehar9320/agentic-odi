@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ChatMessage } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec, type UiNode } from "../ui/protocol";
-import { conversationToMarkdown, exportFilename } from "./export";
+import {
+  conversationToMarkdown,
+  downloadFile,
+  downloadMarkdown,
+  exportFilename,
+} from "./export";
 
 const exportedAt = new Date("2026-10-24T12:00:00Z");
 
@@ -456,5 +461,55 @@ describe("conversationToMarkdown", () => {
     expect(exportFilename(exportedAt)).toBe(
       "agentic-odi-conversation-2026-10-24.md",
     );
+  });
+});
+
+describe("downloadFile", () => {
+  let createObjectURL: ReturnType<typeof vi.fn>;
+  let revokeObjectURL: ReturnType<typeof vi.fn>;
+  let click: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    createObjectURL = vi.fn(() => "blob:export");
+    revokeObjectURL = vi.fn();
+    Object.defineProperty(window, "URL", {
+      value: { ...window.URL, createObjectURL, revokeObjectURL },
+      configurable: true,
+    });
+    click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function released() {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  it("hands the text over under the name and type the caller asks for", async () => {
+    downloadFile("Name\r\nJobs", "table.csv", "text/csv;charset=utf-8");
+
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe("text/csv;charset=utf-8");
+    expect(await blob.text()).toBe("Name\r\nJobs");
+    const anchor = click.mock.contexts[0] as HTMLAnchorElement;
+    expect(anchor.download).toBe("table.csv");
+    expect(anchor.isConnected).toBe(false);
+
+    await released();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:export");
+  });
+
+  // Two surfaces already hand-rolled this dance. One behaviour means one function, so the
+  // Markdown export the bar has always done now goes through the same door.
+  it("is the download that downloadMarkdown performs", async () => {
+    downloadMarkdown("# thread", "agentic-odi-conversation-2026-10-24.md");
+
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe("text/markdown;charset=utf-8");
+    expect(await blob.text()).toBe("# thread");
+    const anchor = click.mock.contexts[0] as HTMLAnchorElement;
+    expect(anchor.download).toBe("agentic-odi-conversation-2026-10-24.md");
   });
 });
