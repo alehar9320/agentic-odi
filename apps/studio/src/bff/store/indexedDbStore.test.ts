@@ -437,6 +437,12 @@ function expectedSchema() {
       indexes: ["by-job", "by-seq"],
     },
     {
+      store: "feedback",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-message"],
+    },
+    {
       store: "jobs",
       keyPath: "id",
       autoIncrement: false,

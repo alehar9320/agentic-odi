@@ -147,9 +147,12 @@ export function toThreadMessageLike(message: ChatMessage): ThreadMessageLike {
           },
         }
       : {}),
-    ...(failed || message.retryText
+    ...(failed || message.retryText || message.rating
       ? {
           metadata: {
+            ...(message.rating
+              ? { submittedFeedback: { type: message.rating } }
+              : {}),
             custom: {
               ...(message.error ? { error: message.error } : {}),
               ...(message.retryText ? { retryText: message.retryText } : {}),

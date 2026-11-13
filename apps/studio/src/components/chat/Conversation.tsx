@@ -273,6 +273,21 @@ function AssistantMessage() {
             <ActionBarPrimitive.Reload className="quiet-action" aria-label="Regenerate reply">
               Regenerate
             </ActionBarPrimitive.Reload>
+            {/* One verdict per reply, restored across a reload. The accessible
+                name changes once a verdict is submitted, so a reader hears the
+                state rather than a control that looks the same either way. */}
+            <ActionBarPrimitive.FeedbackPositive
+              className="quiet-action"
+              aria-label="Rate this answer helpful"
+            >
+              Helpful
+            </ActionBarPrimitive.FeedbackPositive>
+            <ActionBarPrimitive.FeedbackNegative
+              className="quiet-action"
+              aria-label="Rate this answer not helpful"
+            >
+              Not helpful
+            </ActionBarPrimitive.FeedbackNegative>
           </ActionBarPrimitive.Root>
         ) : null}
       </div>

@@ -12,7 +12,7 @@
  */
 
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import { AssistantRuntimeProvider, useExternalStoreRuntime } from "@assistant-ui/react";
 
@@ -21,6 +21,7 @@ import type { ChatMessage } from "../types";
 import { createAttachmentAdapter, preparedAttachments } from "./attachments";
 import { textOf, toThreadMessageLike } from "./convert";
 import { createDictationAdapter } from "./dictation";
+import { createFeedbackAdapter } from "./feedback";
 import { textWithQuote, type ComposerQuote } from "./quote";
 import { createSpeechAdapter } from "./speech";
 
@@ -143,9 +144,25 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
     respondToApproval,
     stopStreaming,
     queue,
+    conversationId,
+    pushToast,
   } = useStudio();
 
   const attachments = useMemo(() => createAttachmentAdapter(), []);
+  // The adapter reads the live conversation id at submit time, so a rating on
+  // a reply never closes over a stale thread.
+  const conversationIdRef = useRef<string | null>(conversationId);
+  conversationIdRef.current = conversationId;
+  // The rating the person leaves is written to the local store; a refusal is
+  // one quiet notice and never rolls the reply back.
+  const feedback = useMemo(
+    () =>
+      createFeedbackAdapter({
+        conversationId: () => conversationIdRef.current,
+        onError: (message) => pushToast("error", message),
+      }),
+    [pushToast],
+  );
   // Null where speech recognition is missing, so the composer shows no mic.
   const dictation = useMemo(() => createDictationAdapter(), []);
   // Null in a shell without Web Speech, so no Speak control is ever rendered
@@ -168,6 +185,7 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
     queue: queue ?? undefined,
     adapters: {
       attachments,
+      feedback,
       ...(dictation ? { dictation } : {}),
       ...(speech ? { speech } : {}),
     },

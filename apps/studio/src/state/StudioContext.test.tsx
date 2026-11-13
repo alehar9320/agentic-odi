@@ -15,7 +15,7 @@ import {
   typeIntoComposer,
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
-import { StudioProvider, useStudio } from "./StudioContext";
+import { StudioProvider, turnsToMessages, useStudio } from "./StudioContext";
 import { useToasts } from "./notices/NoticesContext";
 import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
 
@@ -2809,5 +2809,27 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+});
+
+describe("turnsToMessages restores a reply's rating", () => {
+  it("attaches the stored verdict to the message it belongs to", () => {
+    const nodes = [
+      { id: "m-1", parent_id: null, role: "user", content: "hi", created_at: "2026-01-01T00:00:00Z" },
+      { id: "m-2", parent_id: "m-1", role: "assistant", content: "hello", created_at: "2026-01-01T00:00:01Z" },
+    ];
+    const ratings = new Map<string, "positive" | "negative">([["m-2", "positive"]]);
+
+    const messages = turnsToMessages(nodes, "m-2", ratings);
+    expect(messages.map((message) => message.rating)).toEqual([undefined, "positive"]);
+  });
+
+  it("leaves every reply unrated when nothing was stored", () => {
+    const nodes = [
+      { id: "m-1", parent_id: null, role: "user", content: "hi", created_at: "2026-01-01T00:00:00Z" },
+      { id: "m-2", parent_id: "m-1", role: "assistant", content: "hello", created_at: "2026-01-01T00:00:01Z" },
+    ];
+    const messages = turnsToMessages(nodes, "m-2");
+    expect(messages.every((message) => message.rating === undefined)).toBe(true);
   });
 });

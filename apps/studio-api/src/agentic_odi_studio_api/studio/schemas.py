@@ -558,3 +558,27 @@ class SharedArtifactResponse(BaseModel):
     artifact_kind: str
     artifact: dict[str, Any]
     evidence: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class FeedbackRequest(BaseModel):
+    """One verdict on one reply. `message_id` is the reply's stable client id."""
+
+    conversation_id: str = Field(min_length=1)
+    message_id: str = Field(min_length=1)
+    type: Literal["positive", "negative"]
+    comment: str | None = Field(default=None, max_length=500)
+
+
+class FeedbackResponse(BaseModel):
+    feedback: dict[str, Any]
+
+
+class FeedbackListResponse(BaseModel):
+    feedback: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class FeedbackSummaryResponse(BaseModel):
+    """Counts by verdict, computed from stored rows for the current month."""
+
+    positive: int = 0
+    negative: int = 0

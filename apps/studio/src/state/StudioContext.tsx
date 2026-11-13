@@ -41,6 +41,7 @@ import {
   fetchConversationTree,
   fetchFeatured,
   fetchLatestConversation,
+  listFeedback as apiListFeedback,
   fetchMarketplace,
   fetchMemory,
   fetchModels,
@@ -150,10 +151,16 @@ export function pathToHead(nodes: TurnNode[], headId: string | null): TurnNode[]
   return path.reverse();
 }
 
-/** Persisted turns as the thread renders them. */
+/**
+ * Persisted turns as the thread renders them.
+ *
+ * `ratings` carries the local verdict per message id, so a reload restores the
+ * rating the person left instead of showing every reply as unrated.
+ */
 export function turnsToMessages(
   nodes: TurnNode[],
   headId: string | null,
+  ratings: Map<string, "positive" | "negative"> = new Map(),
 ): ChatMessage[] {
   return pathToHead(nodes, headId).flatMap((node) => {
     if (node.role !== "user" && node.role !== "assistant") {
@@ -161,6 +168,7 @@ export function turnsToMessages(
     }
     const content = node.content ?? "";
     const claims = node.claims ?? [];
+    const rating = ratings.get(node.id);
     return [
       {
         id: node.id,
@@ -172,9 +180,23 @@ export function turnsToMessages(
           : content
             ? [{ kind: "text" as const, text: content }]
             : [],
+        ...(rating ? { rating } : {}),
       },
     ];
   });
+}
+
+/** The stored verdict per message id for one conversation, so a reload restores it. */
+async function ratingsFor(conversationId: string): Promise<Map<string, "positive" | "negative">> {
+  const map = new Map<string, "positive" | "negative">();
+  try {
+    for (const row of await apiListFeedback(conversationId)) {
+      map.set(row.message_id, row.type);
+    }
+  } catch {
+    // A missing feedback store must never block opening a thread.
+  }
+  return map;
 }
 
 const CLAIM_STATUSES = new Set<ClaimStatus>(["cited", "hypothesis", "uncited"]);
@@ -2394,8 +2416,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       // the branch that was visible when it was left. A conversation is never
       // opened without its turns.
       const tree = await fetchConversationTree(targetId);
+      const ratings = await ratingsFor(targetId);
       setConversationId(targetId);
-      setMessages(turnsToMessages(tree.messages, tree.head_id));
+      setMessages(turnsToMessages(tree.messages, tree.head_id, ratings));
       void refreshConversations();
     },
     [refreshConversations],
@@ -2450,10 +2473,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       // The tree, not the flat turn list: a conversation with branches
       // must open on the branch that was visible when it was left.
       const tree = await fetchConversationTree(conversation.id);
+      const ratings = await ratingsFor(conversation.id);
       if (cancelled) {
         return;
       }
-      setMessages(turnsToMessages(tree.messages, tree.head_id));
+      setMessages(turnsToMessages(tree.messages, tree.head_id, ratings));
     };
     void loadLocalData().catch(() => undefined);
 

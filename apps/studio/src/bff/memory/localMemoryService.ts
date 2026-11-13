@@ -2,7 +2,9 @@ import type {
   Conversation,
   ConversationSummary,
   ConversationTurn,
+  FeedbackSummary,
   LatestConversation,
+  MessageFeedback,
   Observation,
   ObservationKind,
   ObservationStatus,
@@ -10,7 +12,12 @@ import type {
 } from "../../types";
 import { notFound, validation } from "../errors";
 import { newId, nowIso } from "../id";
-import type { LocalStore, StoredConversation, StoredTurn } from "../store/types";
+import type {
+  LocalStore,
+  StoredConversation,
+  StoredFeedback,
+  StoredTurn,
+} from "../store/types";
 
 const OBSERVATION_KINDS = new Set<ObservationKind>([
   "career",
@@ -44,6 +51,12 @@ const MAX_CONTEXT_CHARS = 4000;
 const MAX_SUGGESTED_IN_CONTEXT = 10;
 /** How many threads the history list carries; the switcher UI (#408) owns paging. */
 const MAX_CONVERSATIONS = 20;
+
+/** Midnight UTC on the first of the current month, as an ISO string. */
+function monthStart(): string {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
 
 function cleanText(text: string): string {
   const cleaned = text.trim();
@@ -258,6 +271,61 @@ export class LocalMemoryService {
     headId: string | null,
   ): Promise<Conversation> {
     return this.store.setConversationHead(id, headId);
+  }
+
+  /** The verdicts stored for one conversation, newest first. */
+  async listFeedback(conversationId?: string): Promise<MessageFeedback[]> {
+    const rows = await this.store.listFeedback();
+    const scoped = conversationId
+      ? rows.filter((row) => row.conversation_id === conversationId)
+      : rows;
+    return scoped.sort((left, right) => right.created_at.localeCompare(left.created_at));
+  }
+
+  /**
+   * Store one verdict on one reply, replacing any earlier verdict for that
+   * reply. `message_id` is unique, so a second rating overwrites the first.
+   */
+  async recordFeedback(input: {
+    conversation_id: string;
+    message_id: string;
+    type: "positive" | "negative";
+    comment?: string | null;
+  }): Promise<MessageFeedback> {
+    const conversation = await this.store.getConversation(input.conversation_id);
+    if (!conversation) {
+      throw notFound("Conversation", input.conversation_id);
+    }
+    if (input.type !== "positive" && input.type !== "negative") {
+      throw validation(`Unknown feedback type: ${String(input.type)}.`);
+    }
+    const existing = (await this.store.listFeedback()).find(
+      (row) => row.message_id === input.message_id,
+    );
+    const comment = input.comment?.trim() ? input.comment.trim().slice(0, MAX_CONTEXT_TEXT) : null;
+    const feedback: StoredFeedback = {
+      id: existing?.id ?? newId(),
+      conversation_id: input.conversation_id,
+      message_id: input.message_id,
+      type: input.type,
+      comment,
+      created_at: nowIso(),
+    };
+    await this.store.putFeedback(feedback);
+    return feedback;
+  }
+
+  /** Counts by verdict for the current month, computed from rows only. */
+  async feedbackSummary(since?: string): Promise<FeedbackSummary> {
+    const start = since ?? monthStart();
+    const rows = await this.store.listFeedback();
+    const summary: FeedbackSummary = { positive: 0, negative: 0 };
+    for (const row of rows) {
+      if (row.created_at >= start) {
+        summary[row.type] += 1;
+      }
+    }
+    return summary;
   }
 
   async latestConversation(): Promise<LatestConversation> {
