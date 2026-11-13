@@ -163,6 +163,8 @@ the pure count arithmetic:
 | `apps/studio/src/lib/intro.test.ts` | Introduction turns, parsing under empty, very long, and multi-fact replies, the proposed defaults, draft storage, and one-shot migration |
 | `apps/studio/src/components/setup/IntroConversation.test.tsx` | Five turns, skip, Escape, in-place summary edits, and the accepted brief with role, team, and evidence |
 | `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | The summary card as one Chromatic snapshot |
+| `apps/studio/src/components/OdiMascot.test.tsx` | The home mark is the vector chrome mark — drawn shapes, not a 32-unit pixel grid — and stays hidden from assistive technology |
+| `apps/studio/src/components/OdiMascot.visual.test.tsx` | The home mark in its bar slot on both themes as two Chromatic snapshots |
 
 ## Website Checks (GitHub Pages)
 
