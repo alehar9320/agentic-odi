@@ -2132,6 +2132,18 @@ a {
   border-bottom: none;
 }
 
+/* A task list reads as a list of statements, not as a row of empty bullets. */
+.md-list .task-list-item {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.md-list .task-list-item > input {
+  margin-top: 3px;
+}
+
 /* Panel content primitives */
 .stack {
   display: flex;
