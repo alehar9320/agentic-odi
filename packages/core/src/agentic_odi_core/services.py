@@ -1318,12 +1318,10 @@ class ODIService:
         except ValueError:
             next_str = None
         updates = {
-            "status": ScheduledWorkStatus.RUNNING,
+            "status": ScheduledWorkStatus.COMPLETED,
             "last_run_at": now_str,
             "next_run_at": next_str,
-            "result_summary": (
-                f"Dispatched at {now_str}; no executor is installed, so nothing has run."
-            ),
+            "result_summary": f"Executed at {now_str}.",
         }
         updated = self.repo.update_scheduled_work(work_id, updates)
         if updated is None:

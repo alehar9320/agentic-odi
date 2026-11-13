@@ -324,9 +324,7 @@ export function FilePart() {
   );
 }
 
-function toolLabel(name: string): string {
-  return name.replace(/_/g, " ");
-}
+export const toolLabel = (name: string): string => name.replace(/_/g, " ");
 
 /**
  * A tool call, and the one question the agent is not allowed to answer itself:
