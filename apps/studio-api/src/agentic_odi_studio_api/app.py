@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import hmac
 import os
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -21,7 +24,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from agentic_odi_studio_api.studio.approvals import ApprovalRegistry
 from agentic_odi_studio_api.studio.connectors import ConnectorService
@@ -47,6 +51,89 @@ CORS_ORIGINS = [
 ]
 
 DEFAULT_BACKEND = "local"
+
+CSP_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self'; "
+    "img-src 'self' data:; "
+    "connect-src 'self' http://localhost:5173 http://127.0.0.1:5173 "
+    "http://localhost:8100 http://127.0.0.1:8100 ws://localhost:5173; "
+    "font-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "frame-ancestors 'none'"
+)
+
+
+#: The one document that has to stay self-contained. `/offline.html` is served
+#: from the service worker's cache when there is no network at all (#546), so its
+#: theme script and styles cannot become separate files without a request that
+#: would fail too. Those exact blocks are named by hash instead: a hash admits
+#: that markup and nothing else, so the policy still refuses inline script and
+#: inline style everywhere a reply could be injected.
+OFFLINE_DOCUMENT = "offline.html"
+_INLINE_BLOCK = re.compile(
+    r"<(script|style)\b[^>]*>(?P<body>.*?)</\1>",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def offline_inline_hashes(spa_dist: Path) -> list[str]:
+    """CSP source expressions for the offline document's inline blocks."""
+    try:
+        markup = (spa_dist / OFFLINE_DOCUMENT).read_text(encoding="utf-8")
+    except OSError:
+        return []
+    hashes = []
+    for match in _INLINE_BLOCK.finditer(markup):
+        digest = hashlib.sha256(match.group("body").encode("utf-8")).digest()
+        hashes.append("'sha256-" + base64.b64encode(digest).decode("ascii") + "'")
+    return hashes
+
+
+def content_security_policy(spa_dist: Path | None = None) -> str:
+    """``CSP_POLICY``, plus the hashes the offline document needs.
+
+    The hashes go into both ``script-src`` and ``style-src``: the browser checks
+    the directive that matches the element, not the file the element came from,
+    and the offline document has one block of each.
+    """
+    hashes = offline_inline_hashes(SPA_DIST if spa_dist is None else spa_dist)
+    if not hashes:
+        return CSP_POLICY
+    allowance = " " + " ".join(hashes)
+    return CSP_POLICY.replace("script-src 'self';", f"script-src 'self'{allowance};").replace(
+        "style-src 'self';", f"style-src 'self'{allowance};"
+    )
+
+
+class CSPMiddleware:
+    """Attach a strict Content-Security-Policy to every HTTP response.
+
+    The policy refuses inline script, eval, and wildcard script sources so a
+    prompt-injected reply cannot execute in the served shell or the Tauri
+    window. Localhost origins are the development-only exception for the Vite
+    dev server and the sidecar itself; production serves from 'self'.
+    """
+
+    def __init__(self, app: ASGIApp, policy: str) -> None:
+        self.app = app
+        self.policy = policy
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_csp(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                if "content-security-policy" not in headers:
+                    headers.append("content-security-policy", self.policy)
+            await send(message)
+
+        await self.app(scope, receive, send_with_csp)
 
 
 class _AuthMiddleware:
@@ -242,6 +329,7 @@ def create_app(
     # so the request id is assigned before the boot check reads it.
     app.middleware("http")(_refuse_when_boot_failed)
     app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(CSPMiddleware, policy=content_security_policy())
     register_error_handlers(app)
 
     @app.get("/health")

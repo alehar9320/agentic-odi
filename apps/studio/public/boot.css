@@ -1,0 +1,40 @@
+/*
+ * Boot shell: paint before the bundle parses. A file, not an inline <style>,
+ * because the app is served under `style-src 'self'` (see bootShell.test.ts).
+ * The colours copy --bg/--line from src/styles/theme.css, the source of truth.
+ */
+:root {
+  --boot-bg: #0a0b0e;
+  --boot-line: rgba(255, 255, 255, 0.07);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  html:not(.theme-dark) {
+    --boot-bg: #f5f6f8;
+    --boot-line: rgba(15, 23, 42, 0.09);
+    color-scheme: light;
+  }
+}
+html.theme-light {
+  --boot-bg: #f5f6f8;
+  --boot-line: rgba(15, 23, 42, 0.09);
+  color-scheme: light;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--boot-bg);
+}
+.boot-shell {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 56px 34px 1fr;
+  background: var(--boot-bg);
+}
+.boot-shell__bar {
+  border-bottom: 1px solid var(--boot-line);
+}
