@@ -339,6 +339,12 @@ export type ChatPart =
       name: string;
       status: ToolStatus;
       preview?: string;
+      /**
+       * Epoch milliseconds the store recorded when the running call arrived, so
+       * a pending row can show a real elapsed time without inventing one. Absent
+       * on a turn restored from history, where the store never saw it start.
+       */
+      startedAt?: number;
       /** Present while the runtime is waiting for the user's answer. */
       approval?: ToolApproval;
     }
@@ -543,6 +549,9 @@ export type ObservationKind =
 
 export type ObservationStatus = "suggested" | "confirmed" | "dismissed";
 
+/** What an observation may be about. A note may also be unattached. */
+export type ObservationSubjectType = "job" | "step" | "outcome" | "evidence";
+
 /** One thing the agent believes about the PM, shown for correction. */
 export interface Observation {
   id: string;
@@ -552,6 +561,9 @@ export interface Observation {
   status: ObservationStatus;
   confidence: number;
   source_turn: number | null;
+  /** The record this note is about, when it is attached to one. */
+  subject_type?: ObservationSubjectType | null;
+  subject_id?: string | null;
   created_at: string;
   updated_at: string;
 }
