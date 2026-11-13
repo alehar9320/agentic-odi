@@ -418,6 +418,20 @@ def _verdict(segment: dict[str, Any]) -> str:
     return f"{verdict} (confidence {_num(segment.get('confidence', ''))})"
 
 
+def _freshness(artifact: dict[str, Any]) -> str:
+    """Whether the store has moved on since this was derived.
+
+    ``stale`` is computed when the record is read, so it is absent from a record
+    an older backend returned. That absence reads as "unknown", never "current".
+    """
+    stale = artifact.get("stale")
+    if stale is True:
+        return "stale — re-run"
+    if stale is False:
+        return "current"
+    return "unknown"
+
+
 def render_segment_list(segments: Any, *, as_json: bool) -> str:
     """Render segments as a table where every verdict carries its confidence."""
     if not isinstance(segments, list):
@@ -425,7 +439,7 @@ def render_segment_list(segments: Any, *, as_json: bool) -> str:
     if as_json:
         return _json(segments)
     return _table(
-        ("id", "people", "job_id", "outcomes", "verdict"),
+        ("id", "people", "job_id", "outcomes", "verdict", "freshness"),
         [
             (
                 _cell(item, "id"),
@@ -433,6 +447,7 @@ def render_segment_list(segments: Any, *, as_json: bool) -> str:
                 _cell(item, "job_id"),
                 str(len(item.get("outcome_ids") or [])),
                 _verdict(item),
+                _freshness(item),
             )
             for item in segments
         ],
@@ -457,6 +472,7 @@ def render_segment(segment: Any, *, as_json: bool) -> str:
                     ("inferred", _cell(segment, "people_inferred")),
                     ("job", _cell(segment, "job_statement")),
                     ("verdict", _verdict(segment)),
+                    ("freshness", _freshness(segment)),
                     ("evidence", f"{len(outcome_ids)} outcomes"),
                 ]
             ),
@@ -575,6 +591,7 @@ def render_strategy(strategy: Any, *, as_json: bool) -> str:
                 ("path", _cell(strategy, "kind")),
                 ("segment", _cell(strategy, "segment_id") or "—"),
                 ("bets", str(len(strategy.get("bets") or []))),
+                ("freshness", _freshness(strategy)),
             ]
         ),
         "",
