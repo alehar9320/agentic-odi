@@ -14,6 +14,7 @@ flowchart LR
         CLI["CLI: agentic-odi"]
         SPA["Studio SPA: browser or Tauri webview"]
         SHELL["Tauri shell: spawns the sidecar, self-updates"]
+        BFF["Local BFF: IndexedDB (primary data path)"]
         MCP["MCP server — :8000/mcp, loopback, unauthenticated"]
         SIDECAR["Studio API sidecar — 127.0.0.1:8100, loopback, unauthenticated"]
         ODI[("odi.db — event log + snapshots")]
@@ -24,7 +25,8 @@ flowchart LR
         CLI -->|"--backend mcp"| MCP
         CLI --> CFG
         MCP --> ODI
-        SPA -->|"/api/*, SSE"| SIDECAR
+        SPA -->|"local BFF (primary)"| BFF
+        SPA -.->|"optional, when reachable"| SIDECAR
         SHELL -.->|launches| SIDECAR
         SHELL -.->|loads| SPA
         SIDECAR --> ODI
@@ -87,6 +89,8 @@ graph BT
     agentic_odi_cli --> agentic_odi_core
     agentic_odi_cli --> agentic_odi_connectors
 ```
+
+The Studio SPA may run with zero sidecar reachable. Its local BFF is the primary data path for reads and writes; the sidecar is consulted only for sidecar-owned capabilities (LLM proxy, connectors, MCP passthrough, desktop shell). Any SPA-to-sidecar edge is optional runtime communication, not a compile-time workspace dependency.
 
 This picture is a contract, not an illustration. `tests/test_architecture.py`
 reads the arrows above and asserts they equal both the `[project] dependencies`
