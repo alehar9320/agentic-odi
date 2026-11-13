@@ -27,10 +27,20 @@ def test_tokens_come_from_the_studio_theme():
 
 
 def test_easings_come_from_the_studio_theme():
+    """The canonical curves, and the legacy names the site's CSS still uses.
+
+    The Studio owns one easing scale (#336). The site's `style.css` was written
+    against the older `--ease-apple-*` / `--ease-tactile` names, so the theme
+    keeps them as aliases to the canonical tokens rather than a second literal
+    copy that could drift.
+    """
     easings = extract.read_easings(STUDIO_THEME)
-    assert easings["--ease-apple-out"] == "cubic-bezier(0.16, 1, 0.3, 1)"
-    assert easings["--ease-apple-spring"] == "cubic-bezier(0.175, 0.885, 0.32, 1.22)"
-    assert easings["--ease-tactile"] == "cubic-bezier(0.2, 0.8, 0.2, 1)"
+    assert easings["--ease-out"] == "cubic-bezier(0.16, 1, 0.3, 1)"
+    assert easings["--ease-spring"] == "cubic-bezier(0.175, 0.885, 0.32, 1.22)"
+    assert easings["--ease-in-out"] == "cubic-bezier(0.2, 0.8, 0.2, 1)"
+    assert easings["--ease-apple-out"] == "var(--ease-out)"
+    assert easings["--ease-apple-spring"] == "var(--ease-spring)"
+    assert easings["--ease-tactile"] == "var(--ease-in-out)"
 
 
 def test_site_css_has_no_hardcoded_hex():
