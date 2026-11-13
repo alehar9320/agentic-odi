@@ -518,4 +518,4 @@ def test_page_weights_are_within_budget(page: str):
     # rows), the Study entity, the candidate review tools, their schema entity,
     # and the duplicate-suggestion and merge tools. Both pages stay under the
     # same soft ceiling, which tracks that content instead of trimming it.
-    assert size <= 110 * 1024, f"{page}: {size} bytes"
+    assert size <= 115 * 1024, f"{page}: {size} bytes"
