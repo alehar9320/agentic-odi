@@ -146,6 +146,51 @@ describe("toThreadMessageLike", () => {
     expect(part.result).toBeUndefined();
   });
 
+  it("carries the model's arguments onto the pending call's args", () => {
+    const message = toThreadMessageLike(
+      assistant({
+        parts: [
+          {
+            kind: "tool",
+            id: "call-1",
+            name: "add_job",
+            status: "running",
+            approval: {
+              id: "apv_1",
+              prompt: "Allow the assistant to add job?",
+              arguments: { name: "Retention", description: "Keep accounts" },
+            },
+          },
+        ],
+      }),
+    );
+
+    const part = (
+      message.content as unknown as { args?: Record<string, unknown>; argsText?: string }[]
+    )[0];
+    expect(part.args).toEqual({ name: "Retention", description: "Keep accounts" });
+    expect(part.argsText).toBe('{"name":"Retention","description":"Keep accounts"}');
+  });
+
+  it("sends an empty args object when the gate carried no arguments", () => {
+    const message = toThreadMessageLike(
+      assistant({
+        parts: [
+          {
+            kind: "tool",
+            id: "call-1",
+            name: "add_job",
+            status: "running",
+            approval: { id: "apv_1", prompt: "Allow?" },
+          },
+        ],
+      }),
+    );
+
+    const part = (message.content as unknown as { args?: Record<string, unknown> }[])[0];
+    expect(part.args).toEqual({});
+  });
+
   it("maps a source to a document citation", () => {
     const message = toThreadMessageLike(
       assistant({

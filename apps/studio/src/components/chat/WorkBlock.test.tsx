@@ -215,6 +215,12 @@ describe("the run row", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Don't allow/ }));
     });
+    // "Don't allow" opens the optional reason first; the refusal is sent when
+    // the person confirms, so the click above records nothing on its own.
+    expect(harness.state.respondToApproval).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Send refusal/ }));
+    });
     expect(harness.state.respondToApproval.mock.calls[0].slice(0, 2)).toEqual(["ap-2", false]);
   });
 

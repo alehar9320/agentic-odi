@@ -26,6 +26,11 @@ const TOOL_RESULT: Record<string, Record<string, unknown>> = {
   declined: { status: "declined" },
 };
 
+/** Whether a value is a plain object of tool arguments worth showing. */
+export function isArguments(raw: unknown): raw is Record<string, unknown> {
+  return raw !== null && typeof raw === "object" && !Array.isArray(raw);
+}
+
 function toPart(part: ChatPart): LikePart | null {
   switch (part.kind) {
     case "text":
@@ -63,8 +68,11 @@ function toPart(part: ChatPart): LikePart | null {
           type: "tool-call",
           toolCallId: part.id,
           toolName: part.name,
-          args: {},
-          argsText: "{}",
+          // The model's arguments are the arguments of the call itself, so they
+          // travel on `args` — the field the runtime already keeps — rather than
+          // on the approval, which carries only the question.
+          args: approval.arguments ?? {},
+          argsText: JSON.stringify(approval.arguments ?? {}),
           approval: { id: approval.id, prompt: approval.prompt },
         };
       }
@@ -221,7 +229,17 @@ export function toChatMessage(
                 ? "declined"
                 : "ok",
           ...(result?.preview ? { preview: result.preview } : {}),
-          ...(awaiting ? { approval: { id: approval.id, prompt: approval.prompt ?? "" } } : {}),
+          ...(awaiting
+            ? {
+                approval: {
+                  id: approval.id,
+                  prompt: approval.prompt ?? "",
+                  ...(isArguments(part.args) && Object.keys(part.args).length
+                    ? { arguments: part.args }
+                    : {}),
+                },
+              }
+            : {}),
         });
         break;
       }

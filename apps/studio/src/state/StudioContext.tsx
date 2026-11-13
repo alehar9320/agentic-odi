@@ -223,6 +223,15 @@ function readClaims(raw: unknown): Claim[] {
   return claims;
 }
 
+/**
+ * Whether an SSE `approval` frame carried usable arguments. The gate shows
+ * them as given; a malformed payload is dropped rather than rendered as
+ * machine text, and the card falls back to the tool name alone.
+ */
+function isArguments(raw: unknown): raw is Record<string, unknown> {
+  return raw !== null && typeof raw === "object" && !Array.isArray(raw);
+}
+
 /** Read the failure the sidecar reported on an SSE `error` event. */
 function readStudioError(raw: unknown): StudioError {
   if (raw && typeof raw === "object" && "code" in raw) {
@@ -1963,6 +1972,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
                 approval: {
                   id: approvalId,
                   prompt: String(event.data.prompt ?? "Allow this change?"),
+                  ...(isArguments(event.data.arguments)
+                    ? { arguments: event.data.arguments }
+                    : {}),
                 },
               },
             ];

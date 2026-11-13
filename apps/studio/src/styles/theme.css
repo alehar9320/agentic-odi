@@ -5603,6 +5603,7 @@ details[open] summary {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
+  min-height: 44px;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
   background: var(--surface);
@@ -5626,6 +5627,116 @@ details[open] summary {
 .approval__deny:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.approval__consequence {
+  margin: -4px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.approval__arguments {
+  margin: 0 0 10px;
+}
+
+.approval__argument-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  /* Six rows is what fits without pushing the buttons out of reach; past that
+     the list scrolls rather than hiding an argument the person is approving. */
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.approval__argument {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.4fr) 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+
+.approval__argument-key {
+  color: var(--muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+}
+
+.approval__argument-value {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.approval__raw-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.approval__raw-toggle:hover {
+  color: var(--text);
+}
+
+.approval__raw-chevron {
+  transition: transform 120ms ease;
+}
+
+.approval__raw-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.approval__raw {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approval__reason {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+
+.approval__reason-label {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.approval__reason-input {
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.approval__reason-count {
+  align-self: flex-end;
+  color: var(--faint);
+  font-size: 11.5px;
 }
 
 .branch-picker {
