@@ -85,10 +85,11 @@ The project card, rendered from the committed source by
 
 ## Supported platforms
 
-[![Linux](https://img.shields.io/badge/Linux-x86__64-blue?logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
-[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
-[![macOS Intel](https://img.shields.io/badge/macOS-Intel-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
-[![Windows](https://img.shields.io/badge/Windows-x86__64-blue?logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+[![Download Linux AppImage](https://img.shields.io/badge/download-Linux%20AppImage-blue?logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/Agentic.ODI.Living.Studio_0.14.0_amd64.AppImage)
+[![Download Linux .deb](https://img.shields.io/badge/download-Linux%20.deb-blue?logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/Agentic.ODI.Living.Studio_0.14.0_amd64.deb)
+[![Download macOS Apple Silicon](https://img.shields.io/badge/download-macOS%20Apple%20Silicon-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/Agentic.ODI.Living.Studio_0.14.0_aarch64.dmg)
+[![Download macOS Intel](https://img.shields.io/badge/download-macOS%20Intel-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/Agentic.ODI.Living.Studio_0.14.0_x86_64.dmg)
+[![Download Windows](https://img.shields.io/badge/download-Windows%20x64-blue?logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/Agentic.ODI.Living.Studio_0.14.0_x64-setup.exe)
 
 ## Install
 
