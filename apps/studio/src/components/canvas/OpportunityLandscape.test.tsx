@@ -1,7 +1,13 @@
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { isUnderserved, opportunityScore, UNDERSERVED_THRESHOLD } from "../../lib/odi";
+import {
+  isUnderserved,
+  isUnderservedPoint,
+  opportunityScore,
+  underservedBoundaryImportance,
+  UNDERSERVED_THRESHOLD,
+} from "../../lib/odi";
 import type { CanvasState } from "../../types";
 import { OpportunityLandscape, OpportunityPlot, plotX, plotY } from "./OpportunityLandscape";
 
@@ -25,6 +31,10 @@ const harness = vi.hoisted(() => ({
     openPanel: vi.fn(),
     sendMessage: vi.fn(),
     pushToast: vi.fn(),
+    updateOutcome: vi.fn(),
+    deleteOutcome: vi.fn(),
+    saveThesis: vi.fn(),
+    ask: vi.fn(),
     theses: [],
     deleteThesis: vi.fn(),
     focusedSubject: null as { kind: string; id: string } | null,
@@ -416,6 +426,55 @@ describe("OpportunityLandscape stored versus displayed score", () => {
   });
 });
 
+describe("OpportunityLandscape advances column", () => {
+  beforeEach(() => {
+    harness.state.canvasState = { kind: "ready", data: mockCanvasData } as unknown as CanvasState;
+    harness.state.focusedSubject = null;
+  });
+
+  it("shows the objective an outcome advances, in the table view", () => {
+    renderWith([
+      {
+        id: "O-101",
+        statement: "Minimize time spent syncing secrets",
+        importance: 9,
+        satisfaction: 2,
+        opportunity_score: 16,
+        trace: [{ field: "method", key: "abc123", text: "Cut release time in half" }],
+      },
+    ]);
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText(/Advances Cut release time in half \(method\)/i)).toBeInTheDocument();
+  });
+
+  it("says plainly that an unlinked outcome advances nothing yet", () => {
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getAllByText("Advances nothing yet").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the frozen text of a reworded vision as drift evidence", () => {
+    renderWith([
+      {
+        id: "O-101",
+        statement: "Minimize time spent syncing secrets",
+        importance: 9,
+        satisfaction: 2,
+        opportunity_score: 16,
+        trace: [{ field: "method", key: "old-key", text: "Old objective wording" }],
+      },
+    ]);
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    expect(screen.getByText(/Old objective wording \(method\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/new objective/i)).toBeNull();
+  });
+});
+
 describe("OpportunityLandscape motion preference", () => {
   function stubMotion(reduced: boolean) {
     vi.stubGlobal("matchMedia", (query: string) => ({
@@ -601,6 +660,59 @@ describe("OpportunityLandscape score rendering", () => {
     expect(within(rows[0]).getByText("16.0")).toBeInTheDocument();
     expect(within(rows[0]).getByText("UNDERSERVED")).toBeInTheDocument();
   });
+
+  // The matrix draws a point only for an outcome the store actually scored. An
+  // unscored outcome used to be placed at (5,5) with a computed fallback score.
+  it("plots no point for an unscored outcome", () => {
+    renderWith([
+      { id: "O-SCORED", statement: "Scored outcome", importance: 9, satisfaction: 2, opportunity_score: 16 },
+      { id: "O-UNSCORED", statement: "Unscored outcome", importance: null, satisfaction: null, opportunity_score: null },
+    ]);
+    const { container } = render(<OpportunityLandscape />);
+
+    const nodes = container.querySelectorAll(".matrix-node");
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toHaveAccessibleName(/^O-SCORED,/);
+    // The summary counts only the plotted points, so it cannot claim two.
+    expect(container.querySelector("#opportunity-map-desc")?.textContent).toMatch(/^1 outcomes,/);
+  });
+
+  it("lists unscored outcomes below the matrix with a Score me action", () => {
+    renderWith([
+      { id: "O-SCORED", statement: "Scored outcome", importance: 9, satisfaction: 2, opportunity_score: 16 },
+      { id: "O-UNSCORED", statement: "Minimize the time to answer a ticket", importance: null, satisfaction: null, opportunity_score: null },
+    ]);
+    render(<OpportunityLandscape />);
+
+    const list = screen.getByRole("region", { name: "Not scored outcomes" });
+    expect(within(list).getByText("Not scored (1)")).toBeInTheDocument();
+    expect(
+      within(list).getByText("Minimize the time to answer a ticket"),
+    ).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "Score me" })).toBeInTheDocument();
+  });
+
+  it("opens the score form when Score me is pressed, without inventing a rating", () => {
+    harness.state.focusSubject.mockClear();
+    renderWith([
+      { id: "O-SCORED", statement: "Scored outcome", importance: 9, satisfaction: 2, opportunity_score: 16 },
+      { id: "O-UNSCORED", statement: "Minimize the time to answer a ticket", importance: null, satisfaction: null, opportunity_score: null },
+    ]);
+    render(<OpportunityLandscape />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Score me" }));
+
+    // The scoring affordance opens for that outcome, and nothing is written:
+    // opening the form is not a score.
+    expect(screen.getByRole("button", { name: "Save scores" })).toBeInTheDocument();
+    expect(harness.state.focusSubject).toHaveBeenCalledWith("outcome", "O-UNSCORED");
+    expect(harness.state.updateOutcome).not.toHaveBeenCalled();
+  });
+
+  it("hides the Not scored list when every outcome carries a score", () => {
+    render(<OpportunityLandscape />);
+    expect(screen.queryByRole("region", { name: "Not scored outcomes" })).toBeNull();
+  });
 });
 
 describe("OpportunityLandscape underserved boundary", () => {
@@ -628,11 +740,28 @@ describe("OpportunityLandscape underserved boundary", () => {
     return inside;
   }
 
-  it("renders the underserved polygon derived from the score formula", () => {
+  it("renders the underserved polygon sampled from the score formula", () => {
     const { container } = render(<OpportunityLandscape />);
     const polygon = container.querySelector("polygon");
     expect(polygon).not.toBeNull();
-    expect(polygon?.getAttribute("points")).toBe("40,20 40,180 480,40 480,20");
+    // Every boundary vertex sits on `importance = (10 + satisfaction) / 2`, the
+    // solution of `2 × importance − satisfaction = 10` for importance, so the
+    // drawn zone cannot drift from `isUnderserved(opportunityScore(...))`.
+    const vertices = (polygon?.getAttribute("points") ?? "")
+      .split(" ")
+      .map((pair) => pair.split(",").map(Number));
+    const boundary = vertices.slice(1, -1); // drop the two top-of-plot corners
+    expect(boundary.length).toBe(11);
+    boundary.forEach(([x, y], step) => {
+      const satisfaction = (step / (boundary.length - 1)) * 10;
+      expect(x).toBeCloseTo(plotX(satisfaction), 3);
+      expect(y).toBeCloseTo(plotY(Math.min(underservedBoundaryImportance(satisfaction), 10)), 3);
+    });
+    // The fixed four-point polygon this replaced used to end at (480,40); the
+    // sampled path now closes the region across the whole satisfaction domain.
+    expect(polygon?.getAttribute("points")).toBe(
+      "40,20 40,180 84,166 128,152 172,138 216,124 260,110 304,96 348,82 392,68 436,54 480,40 480,20",
+    );
   });
 
   it("keeps the underserved zone label truthful", () => {
@@ -666,6 +795,18 @@ describe("OpportunityLandscape underserved boundary", () => {
     const points = polygon.getAttribute("points")!;
     expect(pointInPolygon(plotX(2), plotY(9), points)).toBe(true);
     expect(pointInPolygon(plotX(8), plotY(3), points)).toBe(false);
+  });
+
+  // The shaded region is a half-plane above `importance = (10 + satisfaction) / 2`,
+  // so a pair straddling that line at one satisfaction must land on opposite
+  // sides. At satisfaction 8.6 the boundary is importance 9.3.
+  it("straddles the boundary at a fixed satisfaction", () => {
+    const { container } = render(<OpportunityLandscape />);
+    const points = container.querySelector("polygon")!.getAttribute("points")!;
+    expect(pointInPolygon(plotX(8.6), plotY(9.4), points)).toBe(true);
+    expect(pointInPolygon(plotX(8.6), plotY(9.2), points)).toBe(false);
+    expect(isUnderservedPoint(9.4, 8.6)).toBe(true);
+    expect(isUnderservedPoint(9.2, 8.6)).toBe(false);
   });
 
   it("offers the decision brief in the header", () => {

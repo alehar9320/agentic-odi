@@ -397,7 +397,7 @@ function EditComposer() {
 }
 
 export function Conversation() {
-  const { sendMessage, streaming, thinkingPhase, messages } = useStudio();
+  const { sendMessage, streaming, thinkingPhase, messages, openDetail } = useStudio();
 
   // Only the newest reply is announcement-worthy. Keeping it out of the log
   // means a reader can move through history without every delta replaying it.
@@ -426,7 +426,11 @@ export function Conversation() {
 
   return (
     <UiActionContext.Provider
-      value={{ onIntent: (intent) => void sendMessage(intent), busy: streaming }}
+      value={{
+        onIntent: (intent) => void sendMessage(intent),
+        onDetail: (target) => openDetail(target.panel, target.subject),
+        busy: streaming,
+      }}
     >
       {/* The phase lives outside the log: the streaming reply is `aria-busy`,
           and a status message inside it would not be announced until the
