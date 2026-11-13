@@ -341,6 +341,32 @@ export async function fetchConfig(): Promise<StudioConfig> {
   }
 }
 
+/** Whether the sidecar holds a model key, and when it was set. Never the value. */
+export interface ModelKeyStatus {
+  configured: boolean;
+  set_at: string | null;
+}
+
+export function fetchModelKeyStatus(): Promise<ModelKeyStatus> {
+  return getJson<ModelKeyStatus>("/api/settings/model-key");
+}
+
+/** Store a model key once. The response reports its state, not its value. */
+export async function saveModelKey(value: string): Promise<ModelKeyStatus> {
+  const response = await fetch(apiUrl("/api/settings/model-key"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
+    body: JSON.stringify({ value }),
+  });
+  if (!response.ok) {
+    const error = await studioError(response);
+    recordStudioError(error.error, "/api/settings/model-key");
+    throw error;
+  }
+  ensureApiPayload(response);
+  return (await response.json()) as ModelKeyStatus;
+}
+
 export interface SidecarDiagnostics {
   version: string;
   python: string;

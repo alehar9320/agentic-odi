@@ -1,10 +1,17 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../../onboarding/OnboardingProvider";
 import { UpdateProvider, createUpdateService } from "../../updater";
 import type { UpdateTransport } from "../../updater/types";
 import { SettingsPanel } from "../SettingsPanel";
+import { saveModelKey } from "../../api/studioApi";
+
+vi.mock("../../api/studioApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api/studioApi")>()),
+  fetchModelKeyStatus: vi.fn().mockResolvedValue({ configured: false, set_at: null }),
+  saveModelKey: vi.fn().mockResolvedValue({ configured: true, set_at: "2026-01-01T00:00:00Z" }),
+}));
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: vi.fn(),
@@ -161,17 +168,19 @@ describe("Settings saves per field", () => {
     expect(screen.getByText("Saved")).toBeInTheDocument();
   });
 
-  it("saves a changed API key on blur without validating it", () => {
+  it("writes a new API key to the sidecar, not to settings", async () => {
     const saveSettings = vi.fn();
     vi.mocked(useStudio).mockReturnValue(stubContext({ saveSettings }));
 
     renderPanel();
 
+    fireEvent.click(await screen.findByRole("button", { name: /replace key/i }));
     const apiKey = screen.getByLabelText("API key");
     fireEvent.change(apiKey, { target: { value: "sk-live-123" } });
-    fireEvent.blur(apiKey);
+    fireEvent.click(screen.getByRole("button", { name: /save key/i }));
 
-    expect(saveSettings).toHaveBeenCalledTimes(1);
-    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ api_key: "sk-live-123" }));
+    await waitFor(() => expect(saveModelKey).toHaveBeenCalledWith("sk-live-123"));
+    // The key is the sidecar's to hold; settings never carries it.
+    expect(saveSettings).not.toHaveBeenCalled();
   });
 });

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import socket
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from agentic_odi_core import InMemoryRepository, ODIService
 from agentic_odi_studio_api.app import create_app
+from agentic_odi_studio_api.studio.router import _with_stored_key
 from fastapi.testclient import TestClient
 
 OFFLINE = {
@@ -90,7 +92,10 @@ def _stream(path: str, payload: dict[str, Any]) -> dict[str, list[str]]:
 # ---------------------------------------------------------------------------
 
 
-def test_config_returns_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_config_returns_env_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Isolate the per-user secret store so this assertion does not depend on a
+    # key the developer happens to have saved (atomic-test rule in AGENTS.md).
+    monkeypatch.setenv("AGENTIC_ODI_STUDIO_SECRETS", str(tmp_path / "studio-secrets.json"))
     monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://llm:9999/v1")
     monkeypatch.setenv("AGENTIC_ODI_API_KEY", "secret-key")
     monkeypatch.setenv("AGENTIC_ODI_MODEL", "my-model")
@@ -99,12 +104,16 @@ def test_config_returns_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     response = _client().get("/api/config")
 
     assert response.status_code == 200
+    # The endpoint and model are defaults; the key is not: it is held by the
+    # sidecar's write-only store and reported only as a state.
     assert response.json()["defaults"] == {
         "base_url": "http://llm:9999/v1",
-        "api_key": "secret-key",
+        "api_key": "",
         "model_name": "my-model",
         "mcp_url": "http://mcp:9999/mcp",
     }
+    assert "secret-key" not in response.text
+    assert response.json()["model_key"] == {"configured": False, "set_at": None}
 
 
 def test_config_uses_streamlit_compatible_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,10 +129,58 @@ def test_config_uses_streamlit_compatible_fallbacks(monkeypatch: pytest.MonkeyPa
 
     assert defaults == {
         "base_url": "http://localhost:8001/v1",
-        "api_key": "local",
+        "api_key": "",
         "model_name": "local-tools-model",
         "mcp_url": "http://localhost:8000/mcp",
     }
+
+
+def _patch_load_model_key(monkeypatch: pytest.MonkeyPatch, value):
+    monkeypatch.setattr(
+        "agentic_odi_studio_api.studio.router.load_model_key",
+        lambda: value,
+    )
+
+
+def test_with_stored_key_uses_stored_key_for_configured_origin(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    _patch_load_model_key(monkeypatch, "sk-stored")
+    assert _with_stored_key("", "http://configured:9/v1") == "sk-stored"
+
+
+def test_with_stored_key_withholds_stored_key_for_foreign_origin(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    _patch_load_model_key(monkeypatch, "sk-stored")
+    # A custom or foreign origin must never receive the stored key.
+    assert _with_stored_key("", "http://evil:1/v1") == ""
+
+
+def test_with_stored_key_uses_request_key_when_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    _patch_load_model_key(monkeypatch, "sk-stored")
+    assert _with_stored_key("sk-client", "http://evil:1/v1") == "sk-client"
+
+
+def test_with_stored_key_falls_back_to_default_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    _patch_load_model_key(monkeypatch, None)
+    # No stored key: fall back to the profile default api key ("local").
+    assert _with_stored_key("", "http://configured:9/v1") == "local"
+
+
+def test_with_stored_key_treats_store_failure_as_no_stored_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+
+    from agentic_odi_studio_api.studio.secrets import SecretStoreError
+
+    # The throw happens inside the lambda body, so it is raised when
+    # load_model_key is called, not when it is patched.
+    monkeypatch.setattr(
+        "agentic_odi_studio_api.studio.router.load_model_key",
+        lambda: (_ for _ in ()).throw(SecretStoreError("unwritable")),
+    )
+    # Store failure is treated as no stored key: fall back to the default.
+    assert _with_stored_key("", "http://configured:9/v1") == "local"
 
 
 # ---------------------------------------------------------------------------
