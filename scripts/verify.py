@@ -129,8 +129,9 @@ def map_files_to_targets(files: list[str]) -> dict[str, set[str]]:
             targets["tests_root"] = True
             mapped = True
             continue
-        if path == "pyproject.toml" or path == "uv.lock" or path.startswith(".github/"):
-            # affects everything - map to all packages for --changed to be safe
+        if path in {"pyproject.toml", "uv.lock", "codecov.yml"} or path.startswith(".github/"):
+            # CI and coverage configuration affects everything - map to all
+            # packages for --changed to be safe
             for member in WORKSPACE_MEMBERS:
                 targets["python_packages"].add(member)
             targets["studio"] = True
