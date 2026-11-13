@@ -378,6 +378,21 @@ The [PR AI merge act workflow](.github/workflows/pr-ai-merge-act.yml) arms
 re-verifying CI green immediately before arming. Human override: `do-not-merge`
 or `needs human review` cancels auto-merge and a comment explains why.
 
+### Branch protection (enforced on `main`)
+
+Labeling is advisory; branch protection makes it enforceable. The
+`main-requires-ci-green` ruleset on branch `main` must require all three:
+
+| Check / requirement | Purpose |
+|---------------------|---------|
+| `CI green` status check | Full CI matrix passes |
+| `PR guardrails` status check | Diff-shape, body-truth, and fabrication gates pass |
+| Label: `ai-merge-safe` | PR is non-disruptive and non-sensitive |
+
+This is a GitHub Settings change (Settings → Branches → branch protection
+rules); it cannot be enforced from repo files. See [issue #956](https://github.com/alehar9320/agentic-odi/issues/956)
+for the tracking issue and the exact rule to configure.
+
 ## Testing
 
 See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
