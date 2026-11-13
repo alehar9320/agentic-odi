@@ -28,7 +28,7 @@ export function createInterviewConductor(
   persistence: InterviewPersistence,
   initialState?: Partial<InterviewConductorState>,
 ): InterviewConductor {
-  let state: InterviewConductorState = {
+  const state: InterviewConductorState = {
     id: crypto.randomUUID(),
     jobId,
     state: "idle",
@@ -38,7 +38,7 @@ export function createInterviewConductor(
     ...initialState,
   };
 
-  let listeners = new Set<() => void>();
+  const listeners = new Set<() => void>();
 
   function notify() {
     for (const listener of listeners) {

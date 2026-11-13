@@ -6,6 +6,7 @@ import type {
   InterviewDraft,
   OutboxRecord,
   StoredConversation,
+  StoredEvidence,
   StoredJob,
   StoredOutcome,
   StoredStep,
@@ -19,7 +20,7 @@ export const DB_NAME = "agentic-odi-studio";
  * `MIGRATIONS` entry is caught by `migrations.test.ts`, so a release can never
  * ship a bump that would throw `ConstraintError` on an existing database.
  */
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export type MetaValue = number | DrainLease;
 
@@ -39,6 +40,11 @@ export interface StudioDb extends DBSchema {
   outcomes: {
     key: string;
     value: StoredOutcome;
+    indexes: { "by-job": string; "by-seq": number };
+  };
+  evidence: {
+    key: string;
+    value: StoredEvidence;
     indexes: { "by-job": string; "by-seq": number };
   };
   observations: {
@@ -108,6 +114,16 @@ export const MIGRATIONS: Record<number, Migration> = {
     outbox.createIndex("by-created", "created_at");
   },
   3: (db) => {
+    // Evidence gets its own store so a capture survives a transport failure
+    // like every other canvas write (#512). Ordered by `seq` for the capture
+    // order the stream renders until the user reorders it.
+    const evidence = db.createObjectStore("evidence", { keyPath: "id" });
+    evidence.createIndex("by-job", "job_id");
+    evidence.createIndex("by-seq", "seq");
+  },
+  4: (db) => {
+    // Interview drafts persist the conductor's answers so a half-answered
+    // interview resumes at the same question after a reload (#402).
     const drafts = db.createObjectStore("interview_drafts", { keyPath: "id" });
     drafts.createIndex("by-job", "jobId");
     drafts.createIndex("by-updated", "updatedAt");

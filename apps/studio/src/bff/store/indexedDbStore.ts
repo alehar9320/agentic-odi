@@ -17,6 +17,7 @@ import {
   type LocalStore,
   type OutboxRecord,
   type StoredConversation,
+  type StoredEvidence,
   type StoredJob,
   type StoredOutcome,
   type StoredStep,
@@ -142,6 +143,25 @@ export class IndexedDbLocalStore implements LocalStore {
 
   async deleteOutcome(id: string): Promise<void> {
     await this.db.delete("outcomes", id);
+  }
+
+  async listEvidence(jobId?: string): Promise<StoredEvidence[]> {
+    const evidence = jobId
+      ? await this.db.getAllFromIndex("evidence", "by-job", jobId)
+      : await this.db.getAll("evidence");
+    return evidence.sort(bySeq);
+  }
+
+  async getEvidence(id: string): Promise<StoredEvidence | undefined> {
+    return this.db.get("evidence", id);
+  }
+
+  async putEvidence(evidence: StoredEvidence): Promise<void> {
+    await this.db.put("evidence", evidence);
+  }
+
+  async deleteEvidence(id: string): Promise<void> {
+    await this.db.delete("evidence", id);
   }
 
   async listObservations(): Promise<Observation[]> {
@@ -324,13 +344,15 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async snapshot(): Promise<WorkspaceSnapshot> {
-    const [jobs, steps, outcomes, observations, conversations] = await Promise.all([
-      this.listJobs(),
-      this.listSteps(),
-      this.listOutcomes(),
-      this.listObservations(),
-      this.listConversations(),
-    ]);
+    const [jobs, steps, outcomes, evidence, observations, conversations] =
+      await Promise.all([
+        this.listJobs(),
+        this.listSteps(),
+        this.listOutcomes(),
+        this.listEvidence(),
+        this.listObservations(),
+        this.listConversations(),
+      ]);
     const turnLists = await Promise.all(
       conversations.map((conversation) => this.listTurns(conversation.id)),
     );
@@ -340,6 +362,7 @@ export class IndexedDbLocalStore implements LocalStore {
       jobs,
       steps,
       outcomes,
+      evidence,
       observations,
       conversations,
       turns,
@@ -353,6 +376,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "jobs",
         "steps",
         "outcomes",
+        "evidence",
         "observations",
         "conversations",
         "turns",
@@ -363,6 +387,9 @@ export class IndexedDbLocalStore implements LocalStore {
       ...snapshot.jobs.map((job) => tx.objectStore("jobs").put(job)),
       ...snapshot.steps.map((step) => tx.objectStore("steps").put(step)),
       ...snapshot.outcomes.map((outcome) => tx.objectStore("outcomes").put(outcome)),
+      ...(snapshot.evidence ?? []).map((record) =>
+        tx.objectStore("evidence").put(record),
+      ),
       ...snapshot.observations.map((observation) =>
         tx.objectStore("observations").put(observation),
       ),
@@ -381,6 +408,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "jobs",
         "steps",
         "outcomes",
+        "evidence",
         "observations",
         "outbox",
         "conversations",
@@ -393,6 +421,7 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("jobs").clear(),
       tx.objectStore("steps").clear(),
       tx.objectStore("outcomes").clear(),
+      tx.objectStore("evidence").clear(),
       tx.objectStore("observations").clear(),
       tx.objectStore("outbox").clear(),
       tx.objectStore("conversations").clear(),

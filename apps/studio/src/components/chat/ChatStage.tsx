@@ -11,7 +11,7 @@ import {
   isSlashCommand,
   type StudioCommand,
 } from "../../lib/commands";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { IntroConversation } from "../setup/IntroConversation";
@@ -53,7 +53,7 @@ function LatestMessageButton({ messageCount }: { messageCount: number }) {
   const scrollToBottom = useThreadViewport((state) => state.scrollToBottom);
   // A reader who asked for less motion should land on the newest reply, not
   // watch the transcript animate past everything in between.
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotion = useReducedMotion();
 
   // The transcript length last seen from the bottom. It only advances while the
   // reader is at the bottom, so a scroll up freezes it and the difference is

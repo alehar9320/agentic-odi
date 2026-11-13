@@ -1,6 +1,7 @@
 import type {
   Conversation,
   ConversationTurn,
+  Evidence,
   Job,
   Observation,
   Outcome,
@@ -42,6 +43,13 @@ export interface StoredOutcome extends Outcome {
   satisfaction: number | null;
   opportunity_score: number | null;
   step_id: string | null;
+  seq: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoredEvidence extends Evidence {
+  id: string;
   seq: number;
   created_at: string;
   updated_at: string;
@@ -103,6 +111,7 @@ export interface WorkspaceSnapshot {
   jobs: StoredJob[];
   steps: StoredStep[];
   outcomes: StoredOutcome[];
+  evidence: StoredEvidence[];
   observations: Observation[];
   conversations: StoredConversation[];
   turns: StoredTurn[];
@@ -141,6 +150,10 @@ export interface LocalStore {
   getOutcome(id: string): Promise<StoredOutcome | undefined>;
   putOutcome(outcome: StoredOutcome): Promise<void>;
   deleteOutcome(id: string): Promise<void>;
+  listEvidence(jobId?: string): Promise<StoredEvidence[]>;
+  getEvidence(id: string): Promise<StoredEvidence | undefined>;
+  putEvidence(evidence: StoredEvidence): Promise<void>;
+  deleteEvidence(id: string): Promise<void>;
   listObservations(): Promise<Observation[]>;
   putObservation(observation: Observation): Promise<void>;
   deleteObservation(id: string): Promise<void>;

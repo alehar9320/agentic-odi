@@ -209,7 +209,7 @@ describe("IndexedDbLocalStore", () => {
     second.close();
   });
 
-  it("migrates a seeded v1 database to v3 with every row and the schema intact", async () => {
+  it("migrates a seeded v1 database to the current version with every row and the schema intact", async () => {
     await seedV1();
 
     const before = await rowsOf(DB_NAME, 1);
@@ -221,20 +221,21 @@ describe("IndexedDbLocalStore", () => {
     for (const name of Object.keys(before)) {
       expect(after[name], `rows in ${name}`).toEqual(before[name]);
     }
-    // The v2 outbox store is added, and it starts empty.
+    // The later stores are added, and they start empty.
     expect(after.outbox).toEqual([]);
-    // The v3 interview_drafts store is added, and it starts empty.
+    expect(after.evidence).toEqual([]);
+    // The interview_drafts store is added, and it starts empty.
     expect(after.interview_drafts).toEqual([]);
     store.close();
 
-    // The migrated schema equals a fresh v3 database: same stores, key paths,
+    // The migrated schema equals a fresh database: same stores, key paths,
     // auto-increment flags, and index names.
     const migrated = await schemaOf(DB_NAME, DB_VERSION);
     await clearDb();
     const fresh = await makeStore();
     fresh.close();
     expect(migrated).toEqual(await schemaOf(DB_NAME, DB_VERSION));
-    expect(migrated).toEqual(expectedV3Schema());
+    expect(migrated).toEqual(expectedSchema());
   });
 
   it("closes the old connection and flags a reload when another tab upgrades", async () => {
@@ -422,14 +423,20 @@ async function rowsOf(name: string, version: number) {
   return rows;
 }
 
-/** The v3 schema written out, so the migrated shape is asserted, not assumed. */
-function expectedV3Schema() {
+/** The current schema written out, so the migrated shape is asserted, not assumed. */
+function expectedSchema() {
   return [
     {
       store: "conversations",
       keyPath: "id",
       autoIncrement: false,
       indexes: ["by-updated"],
+    },
+    {
+      store: "evidence",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-seq"],
     },
     {
       store: "interview_drafts",
