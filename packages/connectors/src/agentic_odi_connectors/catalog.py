@@ -220,6 +220,18 @@ PRESETS: tuple[ConnectorPreset, ...] = (
         auth="oauth",
         docs="https://developers.figma.com/docs/figma-mcp-server/",
     ),
+    ConnectorPreset(
+        id="composio",
+        label="Composio",
+        area="strategy-alignment",
+        summary=(
+            "Managed MCP hub for 1000+ apps (GitHub, Slack, Linear, Notion, Jira, …) "
+            "to pull backlog and tool context into ODI."
+        ),
+        url="https://connect.composio.dev/mcp",
+        auth="oauth",
+        docs="https://docs.composio.dev/docs/composio-connect",
+    ),
     # 5. Strategy & knowledge management output
     ConnectorPreset(
         id="slack",
@@ -229,6 +241,16 @@ PRESETS: tuple[ConnectorPreset, ...] = (
         url="https://mcp.slack.com/mcp",
         auth="oauth",
         docs="https://docs.slack.dev/ai/",
+    ),
+    ConnectorPreset(
+        id="context7",
+        label="Context7",
+        area="knowledge-output",
+        summary="Up-to-date library documentation for coding agents.",
+        url="https://mcp.context7.com/mcp/oauth",
+        auth="oauth",
+        docs="https://context7.com/docs/",
+        tools=["resolve-library-id", "query-docs"],
     ),
 )
 

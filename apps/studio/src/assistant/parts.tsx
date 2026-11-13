@@ -25,6 +25,7 @@ import {
   type ClaimSegment,
 } from "./claims";
 import { CLAIMS_PART, SURFACE_PART } from "./convert";
+import { ClaimCitation } from "../components/chat/ClaimCitation";
 
 /** Prose. The existing renderer, so the transcript reads exactly as before. */
 export function TextPart() {
@@ -93,7 +94,7 @@ export function ClaimText({ content, claims }: { content: string; claims: Claim[
       }
       return (
         <span key={index} className="claim claim--cited">
-          {claim.text}
+          <ClaimCitation claim={claim} onOpenRecord={focusEvidence} />
           {claim.evidence.map((citation) => {
             const label = citation.source_name
               ? `${citation.source_name} · ${citation.name}`

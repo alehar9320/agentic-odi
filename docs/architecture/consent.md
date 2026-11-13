@@ -1,8 +1,8 @@
 # Consent and approvals
 
-An agent that can write should ask first. This document records how the Studio
-does that today, where the gate lives, and — honestly — what it does not cover
-yet.
+Approval prompts gate acting tool calls in the Studio sidecar; the MCP server
+and `odi chat` do not prompt today. This document records what that gate does,
+where it lives, and — honestly — what it does not cover.
 
 ## What it is
 
