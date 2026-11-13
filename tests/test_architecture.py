@@ -204,6 +204,7 @@ CORE_LAYERS: dict[str, tuple[str, ...]] = {
         "evaluation",
         "mapping",
         "corpus",
+        "transcript",
         "schedule",
         "traceability",
         "freshness",

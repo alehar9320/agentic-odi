@@ -225,6 +225,7 @@ export interface StudioError {
    * failure is not field-specific — a client can tell "no field" from "the
    * field is the whole form" rather than guessing at a default. */
   field?: string | null;
+
 }
 
 /** The one artifact a shared link carries. More kinds are additive. */

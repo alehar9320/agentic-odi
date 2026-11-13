@@ -282,11 +282,10 @@ def add_outcome(
     """
     if service.get_job(job_id) is None:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
-    for score, name in ((importance, "importance"), (satisfaction, "satisfaction")):
+    for score in (importance, satisfaction):
         if score is not None and not (1.0 <= score <= 10.0):
             return _fail(
-                ValueOutOfRangeError(f"{name} must be between 1.0 and 10.0", field=name),
-                f"Error: {name} must be between 1.0 and 10.0",
+                ValueOutOfRangeError("importance and satisfaction must be between 1.0 and 10.0")
             )
     scored = importance is not None or satisfaction is not None
     if scored and claim_check is None:
@@ -748,6 +747,43 @@ def list_quotes(interview_id: str) -> str:
     """List an interview's quotes in ordinal order."""
     items = service.list_quotes(interview_id)
     return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def import_transcript(
+    text: str,
+    title: str,
+    participant_label: str,
+    filename: str | None = None,
+    format: str | None = None,
+    job_id: str | None = None,
+    participant_role: str | None = None,
+    conducted_at: str | None = None,
+) -> str:
+    """Parse a transcript and persist it as one interview with its quotes.
+
+    ``format`` is one of ``md``, ``txt``, ``vtt``, or ``srt``; omit it to detect
+    from ``filename`` and the content. A malformed transcript is refused before
+    anything is written, so a failure leaves no partial interview.
+    """
+    from agentic_odi_core.transcript import TranscriptFormatError
+
+    try:
+        interview, quotes = service.import_transcript(
+            text,
+            title=title,
+            participant_label=participant_label,
+            filename=filename,
+            fmt=format,
+            job_id=job_id,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    except (TranscriptFormatError, OdiError, ValueError) as exc:
+        return _fail(exc)
+    return json.dumps({"interview": interview.model_dump(), "quote_count": len(quotes)})
 
 
 @mcp.tool
