@@ -471,9 +471,10 @@ npm --prefix apps/studio run test:e2e
 npm --prefix apps/studio run test:e2e:ui   # the Playwright UI
 ```
 
-The first run needs the browser once:
+Install test tooling and the browser when running e2e/visual suites:
 
 ```bash
+npm --prefix apps/studio run install:test-tooling
 npx --prefix apps/studio playwright install chromium
 ```
 

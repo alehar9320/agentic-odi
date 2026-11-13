@@ -62,6 +62,8 @@ ready for review.
 The browser-level end-to-end suite and the production build are **not** part
 of this tier. They live in the full tier on purpose: they need a browser
 download and a running sidecar, and they are CI's job.
+**Optional test tooling (e2e/visual):** install with `npm --prefix apps/studio run install:test-tooling` and browsers with `npx --prefix apps/studio playwright install chromium`.
+
 
 ## 3. Full tier — CI's job
 
