@@ -1,6 +1,6 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import { newId, nowIso } from "./id";
-import type { CanvasData, ChangelogData, Job, Observation, Outcome, Step } from "../types";
+import type { CanvasData, ChangelogData, Evidence, Job, Observation, Outcome, Step } from "../types";
 import type { LocalStore, OutboxEntity, OutboxKind, OutboxRecord } from "./store/types";
 import { authHeaders } from "../api/studioApi";
 import type { WorkspaceSnapshot } from "./store/types";
@@ -172,6 +172,48 @@ export class StudioBff {
       kind: "delete",
       entity: "outcome",
       local_id: outcomeId,
+      payload: {},
+    });
+    return result;
+  }
+
+  async addEvidence(input: {
+    source_name?: string;
+    source_kind?: string;
+    item_type?: string;
+    name: string;
+    content: string;
+    url?: string;
+    job_id?: string;
+    step_id?: string;
+    outcome_id?: string;
+  }): Promise<Evidence> {
+    const record = await this.data.addEvidence(input);
+    await this.enqueue({
+      kind: "create",
+      entity: "evidence",
+      local_id: record.id ?? null,
+      payload: {
+        source_name: input.source_name,
+        source_kind: input.source_kind,
+        item_type: input.item_type,
+        name: record.name,
+        content: record.content,
+        url: input.url,
+        job_id: input.job_id ?? null,
+        step_id: input.step_id ?? null,
+        outcome_id: input.outcome_id ?? null,
+      },
+    });
+    return record;
+  }
+
+  async deleteEvidence(evidenceId: string): Promise<{ deleted: string }> {
+    const result = await this.data.deleteEvidence(evidenceId);
+    await this.enqueue({
+      kind: "delete",
+      entity: "evidence",
+      local_id: evidenceId,
       payload: {},
     });
     return result;
