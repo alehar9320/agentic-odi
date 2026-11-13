@@ -27,6 +27,7 @@ import type {
   Observation,
   ObservationKind,
   ObservationStatus,
+  ObservationSubjectType,
   Outcome,
   OutcomeAlternative,
   OutcomeAlternativeLink,
@@ -848,13 +849,24 @@ export async function proposeStrategy(mcpUrl: string, jobId?: string): Promise<S
 }
 
 
-export async function fetchMemory(): Promise<Observation[]> {
+export async function fetchMemory(subject?: {
+  subject_type?: string;
+  subject_id?: string;
+}): Promise<Observation[]> {
+  const query = new URLSearchParams();
+  if (subject?.subject_type) {
+    query.set("subject_type", subject.subject_type);
+  }
+  if (subject?.subject_id) {
+    query.set("subject_id", subject.subject_id);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
   return withLocal(
     () =>
-      getJson<{ observations: Observation[] }>("/api/memory/observations").then(
-        (body) => body.observations,
-      ),
-    (bff) => bff.memory.listObservations(),
+      getJson<{ observations: Observation[] }>(
+        `/api/memory/observations${suffix}`,
+      ).then((body) => body.observations),
+    (bff) => bff.memory.listObservations(false, subject),
   );
 }
 
@@ -864,6 +876,8 @@ export interface AddObservationPayload {
   data?: Record<string, unknown>;
   confidence?: number;
   confirmed?: boolean;
+  subject_type?: ObservationSubjectType | null;
+  subject_id?: string | null;
 }
 
 export async function addObservation(payload: AddObservationPayload): Promise<Observation> {
