@@ -1,12 +1,14 @@
 import { useState } from "react";
 
 import {
+  confidencePill,
   formatAdvances,
   formatOpportunityScore,
   hasScore,
   isUnderserved,
   opportunityPill,
   opportunityScore,
+  scoreConfidence,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
@@ -46,23 +48,33 @@ export function OutcomeCard({
     ? opportunityPill(opp)
     : { label: "Not scored — no ratings recorded", variant: "blue" };
 
-  // The interview behind the number. A score the reader cannot interrogate is the
-  // one thing this card must not present as settled, so an unverified score is
-  // marked apart and a bare number says plainly that nothing was asked.
+  // The interview behind the number, and what stands behind it. A score the
+  // reader cannot interrogate is the one thing this card must not present as
+  // settled, so the level is derived (verified / partly verified / hypothesis)
+  // and the indicator itself is the control that reveals the linked quotes.
   const check = outcome.claim_check ?? null;
-  const asked = check?.asked ?? [];
-  const answers = check?.answers ?? [];
-  const skips = check?.skips ?? [];
-  const verified = check?.verified === true;
-  // Sample rows are already badged as not the reader's work; a by-hand notice
+  const confidence = scoreConfidence(outcome, linkedEvidence);
+  const confidenceBadge = confidencePill(confidence);
+  // Sample rows are already badged as not the reader's work; a backing notice
   // belongs to the numbers they are being asked to trust.
-  const bareNumber = scored && check === null && !sample;
+  const showConfidence = scored && !sample;
 
   return (
     <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>
       <header className="card__head">
         <span className="card__id">{outcomeId}</span>
         <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
+        {showConfidence && (
+          <button
+            type="button"
+            className={`badge badge--${confidenceBadge.variant} badge--button`}
+            aria-expanded={showEvidence}
+            title={`${confidence.label} — ${confidence.basis}. Show the evidence behind this score.`}
+            onClick={() => setShowEvidence((prev) => !prev)}
+          >
+            {confidence.label}
+          </button>
+        )}
         {sample ? (
           <span
             className="badge badge--amber"
@@ -85,50 +97,32 @@ export function OutcomeCard({
 
       <p className="card__advances">{formatAdvances(outcome)}</p>
 
-      {(check || bareNumber) && (
-        <div className={`claim-check${verified ? "" : " claim-check--unverified"}`}>
+      {showConfidence && (
+        <div className={`claim-check claim-check--${confidence.level}`}>
+          <p className="claim-check__head">{confidence.basis}</p>
           {check ? (
-            <>
-              <p className="claim-check__head">
-                <b>{verified ? "Verified" : "Unverified"}</b>
-                <span aria-hidden="true"> · </span>
-                {answers.length} of {asked.length} answered
-                {skips.length > 0 && (
-                  <>
-                    <span aria-hidden="true"> · </span>
-                    {skips.length} skipped
-                  </>
-                )}
-              </p>
-              <ul className="claim-check__list">
-                <li className="claim-check__group">Asked</li>
-                {asked.map((question) => (
-                  <li key={question} className="claim-check__item">
-                    {question}
-                  </li>
-                ))}
-                <li className="claim-check__group">Answered</li>
-                {answers.map((answer) => (
-                  <li key={answer} className="claim-check__item">
-                    {answer}
-                  </li>
-                ))}
-                <li className="claim-check__group">Skipped</li>
-                {skips.map((skip) => (
-                  <li key={skip.question} className="claim-check__item">
-                    {skip.question}
-                    <em>{skip.reason}</em>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <p className="claim-check__head">
-              <b>Unverified</b>
-              <span aria-hidden="true"> · </span>
-              <span>No questions recorded behind this score</span>
-            </p>
-          )}
+            <ul className="claim-check__list">
+              <li className="claim-check__group">Asked</li>
+              {(check.asked ?? []).map((question) => (
+                <li key={question} className="claim-check__item">
+                  {question}
+                </li>
+              ))}
+              <li className="claim-check__group">Answered</li>
+              {(check.answers ?? []).map((answer) => (
+                <li key={answer} className="claim-check__item">
+                  {answer}
+                </li>
+              ))}
+              <li className="claim-check__group">Skipped</li>
+              {(check.skips ?? []).map((skip) => (
+                <li key={skip.question} className="claim-check__item">
+                  {skip.question}
+                  <em>{skip.reason}</em>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       )}
 

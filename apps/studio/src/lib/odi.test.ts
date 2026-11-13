@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  confidencePill,
   formatMemberMean,
   formatOpportunityScore,
   hasScore,
@@ -13,6 +14,7 @@ import {
   isUnderservedPoint,
   opportunityPill,
   opportunityScore,
+  scoreConfidence,
   scoredAverage,
   segmentBasisLine,
   summarizeMemberScores,
@@ -277,5 +279,150 @@ describe("segmentBasisLine", () => {
 
   it("claims only that the people were named when they were", () => {
     expect(segmentBasisLine(false)).toBe("People named from your evidence.");
+  });
+});
+
+describe("scoreConfidence", () => {
+  const base = {
+    id: "O-101",
+    statement: "Minimize the time to sync secrets when a deployment starts.",
+    importance: 9,
+    satisfaction: 2,
+    opportunity_score: 16,
+  };
+
+  const quote = (id: string, source_name?: string) => ({
+    id,
+    outcome_id: "O-101",
+    content: `A customer quote ${id}`,
+    source_name,
+  });
+
+  it("reads a fully answered, verified check as verified", () => {
+    const outcome = {
+      ...base,
+      claim_check: {
+        asked: ["How often?", "What today?"],
+        answers: ["Every week.", "A script."],
+        skips: [],
+        verified: true,
+      },
+    };
+    const result = scoreConfidence(outcome, [quote("E-1", "Linear")]);
+
+    expect(result.level).toBe("verified");
+    expect(result.label).toBe("Verified");
+    expect(result.basis).toContain("2 of 2 answered");
+    expect(result.quotes).toBe(1);
+    expect(result.sources).toEqual(["Linear"]);
+  });
+
+  it("reads a verified check with a skipped question as partly verified", () => {
+    const outcome = {
+      ...base,
+      claim_check: {
+        asked: ["How often?", "What today?", "What does it cost?"],
+        answers: ["Every week.", "A script."],
+        skips: [{ question: "What does it cost?", reason: "never measured" }],
+        verified: true,
+      },
+    };
+    const result = scoreConfidence(outcome, []);
+
+    expect(result.level).toBe("partial");
+    expect(result.label).toBe("Partly verified");
+    expect(result.basis).toContain("2 of 3 answered");
+    expect(result.basis).toContain("1 skipped");
+  });
+
+  it("reads a score with no check as a hypothesis, never a midpoint", () => {
+    const result = scoreConfidence(base, []);
+
+    expect(result.level).toBe("hypothesis");
+    expect(result.label).toBe("Hypothesis");
+    expect(result.basis).toBe("nothing backs this yet");
+    expect(result.quotes).toBe(0);
+    expect(result.sources).toEqual([]);
+  });
+
+  it("reads a check with no answers as a hypothesis", () => {
+    const outcome = {
+      ...base,
+      claim_check: { asked: ["How often?"], answers: [], skips: [], verified: false },
+    };
+    const result = scoreConfidence(outcome, []);
+
+    expect(result.level).toBe("hypothesis");
+    expect(result.basis).toContain("0 of 1 answered");
+    expect(result.basis).toContain("no quotes linked");
+  });
+
+  it("counts quotes even when the check itself is unverified", () => {
+    const outcome = {
+      ...base,
+      claim_check: { asked: ["How often?"], answers: [], skips: [], verified: false },
+    };
+    const result = scoreConfidence(outcome, [quote("E-1", "Zendesk"), quote("E-2", "Zendesk")]);
+
+    expect(result.level).toBe("hypothesis");
+    expect(result.quotes).toBe(2);
+    // A repeated source counts once.
+    expect(result.sources).toEqual(["Zendesk"]);
+    expect(result.basis).toContain("2 quotes from Zendesk");
+  });
+
+  it("names several distinct sources, ignoring blanks", () => {
+    const outcome = {
+      ...base,
+      claim_check: {
+        asked: ["How often?"],
+        answers: ["Every week."],
+        skips: [],
+        verified: true,
+      },
+    };
+    const result = scoreConfidence(outcome, [
+      quote("E-1", "Linear"),
+      quote("E-2", "Zendesk"),
+      quote("E-3", "  "),
+      quote("E-4"),
+    ]);
+
+    expect(result.level).toBe("verified");
+    expect(result.quotes).toBe(4);
+    expect(result.sources).toEqual(["Linear", "Zendesk"]);
+    expect(result.basis).toContain("4 quotes from Linear, Zendesk");
+  });
+
+  it("says quotes were captured by hand when none names a source", () => {
+    const outcome = {
+      ...base,
+      claim_check: {
+        asked: ["How often?"],
+        answers: ["Every week."],
+        skips: [],
+        verified: true,
+      },
+    };
+    const result = scoreConfidence(outcome, [quote("E-1")]);
+
+    expect(result.basis).toContain("1 quote captured by hand");
+  });
+});
+
+describe("confidencePill", () => {
+  it("reads verified as settled, partial as caution, and hypothesis as neutral", () => {
+    expect(
+      confidencePill({ level: "verified", label: "Verified", basis: "", quotes: 0, sources: [] })
+        .variant,
+    ).toBe("green");
+    expect(
+      confidencePill({ level: "partial", label: "Partly verified", basis: "", quotes: 0, sources: [] })
+        .variant,
+    ).toBe("amber");
+    expect(
+      confidencePill({ level: "hypothesis", label: "Hypothesis", basis: "", quotes: 0, sources: [] })
+        .variant,
+    ).toBe("blue");
   });
 });

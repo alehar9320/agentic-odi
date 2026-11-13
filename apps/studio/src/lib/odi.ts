@@ -1,4 +1,4 @@
-import type { Outcome } from "../types";
+import type { Evidence, Outcome } from "../types";
 export interface PillDescriptor {
   label: string;
   variant: "amber" | "green" | "blue";
@@ -147,5 +147,112 @@ export function formatAdvances(outcome: Outcome): string {
   }
   const parts = links.map((link) => `${link.text} (${link.field})`);
   return `Advances ${parts.join(" · ")}`;
+}
+
+/** How well a stored score is backed, without inventing a number. */
+export type ScoreConfidenceLevel = "verified" | "partial" | "hypothesis";
+
+/**
+ * What stands behind a score: the interview that produced it and the customer
+ * quotes linked to it. Every field is derived from records that already exist —
+ * nothing here is a judgement the store cannot justify.
+ */
+export interface ScoreConfidence {
+  level: ScoreConfidenceLevel;
+  /** A short phrase for the badge: "Verified", "Partly verified", "Hypothesis". */
+  label: string;
+  /** One human sentence of the basis, e.g. "3 of 3 answered · 2 quotes from Linear". */
+  basis: string;
+  /** How many customer quotes are linked to the outcome. */
+  quotes: number;
+  /** The distinct, non-empty source names those quotes came from. */
+  sources: string[];
+}
+
+/**
+ * Read how strongly an outcome's score is backed.
+ *
+ * The level is a function of two records only: the `claim_check` behind the
+ * score (was the score verified, and was every question answered) and the
+ * evidence records linked to the outcome. A score with no check and no linked
+ * evidence is a hypothesis and says so — never a fake midpoint. A score whose
+ * every asked question was answered is verified; one with answers but gaps is
+ * only partly verified.
+ */
+export function scoreConfidence(
+  outcome: Outcome,
+  linkedEvidence: ReadonlyArray<Evidence>,
+): ScoreConfidence {
+  const check = outcome.claim_check ?? null;
+  const asked = check?.asked ?? [];
+  const answers = check?.answers ?? [];
+  const skips = check?.skips ?? [];
+
+  const quotes = linkedEvidence.length;
+  const sources: string[] = [];
+  for (const item of linkedEvidence) {
+    const name = item.source_name?.trim();
+    if (name && !sources.includes(name)) {
+      sources.push(name);
+    }
+  }
+
+  let level: ScoreConfidenceLevel;
+  if (!check || answers.length === 0) {
+    level = "hypothesis";
+  } else if (check.verified === true && skips.length === 0 && answers.length >= asked.length) {
+    level = "verified";
+  } else {
+    level = "partial";
+  }
+
+  const label =
+    level === "verified" ? "Verified" : level === "partial" ? "Partly verified" : "Hypothesis";
+
+  return { level, label, basis: confidenceBasis(level, check, asked.length, answers.length, skips.length, quotes, sources), quotes, sources };
+}
+
+function confidenceBasis(
+  level: ScoreConfidenceLevel,
+  check: Outcome["claim_check"],
+  askedCount: number,
+  answeredCount: number,
+  skippedCount: number,
+  quotes: number,
+  sources: string[],
+): string {
+  // Nothing was asked and nothing is linked: the one sentence that says so.
+  if (level === "hypothesis" && !check && quotes === 0) {
+    return "nothing backs this yet";
+  }
+
+  const answered = check ? `${answeredCount} of ${askedCount} answered` : "no questions recorded";
+  const skipped = skippedCount > 0 ? ` · ${skippedCount} skipped` : "";
+
+  let evidence: string;
+  if (quotes === 0) {
+    evidence = "no quotes linked";
+  } else if (sources.length === 0) {
+    evidence = `${quotes} ${quotes === 1 ? "quote" : "quotes"} captured by hand`;
+  } else {
+    evidence = `${quotes} ${quotes === 1 ? "quote" : "quotes"} from ${sources.join(", ")}`;
+  }
+
+  return `${answered}${skipped} · ${evidence}`;
+}
+
+/**
+ * The badge for a confidence level. A verified score reads settled (green), a
+ * partly verified one is amber, and a hypothesis borrows the neutral blue that
+ * "Not scored" uses — it is the one level that must never read as settled.
+ */
+export function confidencePill(confidence: ScoreConfidence): PillDescriptor {
+  if (confidence.level === "verified") {
+    return { label: confidence.label, variant: "green" };
+  }
+  if (confidence.level === "partial") {
+    return { label: confidence.label, variant: "amber" };
+  }
+  return { label: confidence.label, variant: "blue" };
 }
 
