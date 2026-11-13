@@ -11,8 +11,10 @@ import {
   AttachmentPrimitive,
   AuiIf,
   ComposerPrimitive,
+  unstable_useTriggerPopoverAriaProps,
   useAui,
   useAuiState,
+  type TriggerAdapter,
 } from "@assistant-ui/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
@@ -28,6 +30,7 @@ import {
 } from "../../assistant/attachments";
 import { dictationSupported } from "../../assistant/dictation";
 import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
+import { mentionFormatter, toMentionItems } from "../../assistant/mentions";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
 import { registerComposer } from "../../lib/composerFocus";
 import { useStudio } from "../../state/StudioContext";
@@ -150,7 +153,7 @@ function ComposerBody({
   onClearAttachmentRefusal: () => void;
 }) {
   const aui = useAui();
-  const { llmHealth } = useStudio();
+  const { canvas, llmHealth } = useStudio();
   const history = useComposerHistory();
   const [recall, setRecall] = useState("");
   // A page can mount more than one composer, so every id and description needs
@@ -179,6 +182,28 @@ function ComposerBody({
   const open = paletteOpenFor(text) && dismissedFor !== text;
   const activeIndex = Math.min(highlight, Math.max(matches.length - 1, 0));
   const activeCommand = matches[activeIndex];
+  // The `@` popover is the library's; it owns the keyboard while it is open, so
+  // the composer must know to stand back. `aria-expanded` is set only when a
+  // trigger popover is open, which is exactly that condition. `ThreadComposer`
+  // mounts the `TriggerPopoverRoot` this reads from.
+  const triggerAria = unstable_useTriggerPopoverAriaProps();
+  const mentionOpen = triggerAria["aria-expanded"] === true;
+  // Fed from the canvas, never from a list this file invents: an unknown `@id`
+  // is sent as typed and the agent resolves it or says it does not exist.
+  const mentionAdapter: TriggerAdapter = useMemo(
+    () => ({
+      categories: () => [],
+      categoryItems: () => [],
+      search: (query) =>
+        toMentionItems(canvas, query).map((item) => ({
+          id: item.id,
+          type: item.kind,
+          label: item.label,
+          description: item.hint,
+        })),
+    }),
+    [canvas],
+  );
 
   function choose(command: StudioCommand) {
     aui.composer.setText("");
@@ -209,6 +234,14 @@ function ComposerBody({
     // recall history, or send. `keyCode === 229` covers WebKit shells that leave
     // `isComposing` unset on the keydown that commits the candidate.
     if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+      return;
+    }
+
+    // The `@` popover owns the keyboard while it is open: the library moves its
+    // highlight on the arrows, selects on Enter, and closes on Escape. Standing
+    // back here keeps a mention from being sent as prose or stealing a key the
+    // popover needs.
+    if (mentionOpen) {
       return;
     }
 
@@ -300,6 +333,29 @@ function ComposerBody({
       <ContextChip />
       <QueueLane />
       <AttachmentRow onRemove={onClearAttachmentRefusal} />
+      {/* `@` names a real canvas record: the popover reads its items from the
+          canvas and inserts the record's own id, so the agent resolves the id
+          or says it does not know it. An unknown `@id` is sent as typed. */}
+      <ComposerPrimitive.TriggerPopover char="@" adapter={mentionAdapter} aria-label="Records">
+        <ComposerPrimitive.TriggerPopover.Directive formatter={mentionFormatter} />
+        <ComposerPrimitive.TriggerPopoverItems>
+          {(items) =>
+            items.map((item, index) => (
+              <ComposerPrimitive.TriggerPopoverItem
+                key={`${item.type}:${item.id}`}
+                item={item}
+                index={index}
+                className="palette__item"
+              >
+                <span className="palette__text">
+                  <span className="palette__label">{item.label}</span>
+                  <span className="palette__description">{item.description}</span>
+                </span>
+              </ComposerPrimitive.TriggerPopoverItem>
+            ))
+          }
+        </ComposerPrimitive.TriggerPopoverItems>
+      </ComposerPrimitive.TriggerPopover>
       {attachmentRefusal && (
         <p className="attachment-refusal" role="status" aria-live="polite">
           {attachmentRefusal}
@@ -469,48 +525,50 @@ export function ThreadComposer(props: {
   }
 
   return (
-    <ComposerPrimitive.Root
-      className={`composer${dragging ? " is-dragging" : ""}`}
-      onDragEnter={(event) => {
-        if (!hasFiles(event)) {
-          return;
-        }
-        event.preventDefault();
-        dragDepth.current += 1;
-        setDragging(true);
-      }}
-      onDragOver={(event) => {
-        if (!hasFiles(event)) {
-          return;
-        }
-        // Without this the browser opens the dropped file instead.
-        event.preventDefault();
-      }}
-      onDragLeave={() => {
-        // Leave events often carry no types, so this only ever removes depth we
-        // added on a file drag.
-        dragDepth.current = Math.max(dragDepth.current - 1, 0);
-        if (dragDepth.current === 0) {
+    <ComposerPrimitive.TriggerPopoverRoot>
+      <ComposerPrimitive.Root
+        className={`composer${dragging ? " is-dragging" : ""}`}
+        onDragEnter={(event) => {
+          if (!hasFiles(event)) {
+            return;
+          }
+          event.preventDefault();
+          dragDepth.current += 1;
+          setDragging(true);
+        }}
+        onDragOver={(event) => {
+          if (!hasFiles(event)) {
+            return;
+          }
+          // Without this the browser opens the dropped file instead.
+          event.preventDefault();
+        }}
+        onDragLeave={() => {
+          // Leave events often carry no types, so this only ever removes depth we
+          // added on a file drag.
+          dragDepth.current = Math.max(dragDepth.current - 1, 0);
+          if (dragDepth.current === 0) {
+            setDragging(false);
+          }
+        }}
+        onDrop={(event) => {
+          if (!hasFiles(event)) {
+            return;
+          }
+          event.preventDefault();
+          dragDepth.current = 0;
           setDragging(false);
-        }
-      }}
-      onDrop={(event) => {
-        if (!hasFiles(event)) {
-          return;
-        }
-        event.preventDefault();
-        dragDepth.current = 0;
-        setDragging(false);
-        attachFiles(Array.from(event.dataTransfer.files));
-      }}
-    >
-      {dragging ? <p className="composer__drop-hint">Drop to attach</p> : null}
-      <ComposerBody
-        {...props}
-        onFiles={attachFiles}
-        attachmentRefusal={refusal}
-        onClearAttachmentRefusal={() => setRefusal(null)}
-      />
-    </ComposerPrimitive.Root>
+          attachFiles(Array.from(event.dataTransfer.files));
+        }}
+      >
+        {dragging ? <p className="composer__drop-hint">Drop to attach</p> : null}
+        <ComposerBody
+          {...props}
+          onFiles={attachFiles}
+          attachmentRefusal={refusal}
+          onClearAttachmentRefusal={() => setRefusal(null)}
+        />
+      </ComposerPrimitive.Root>
+    </ComposerPrimitive.TriggerPopoverRoot>
   );
 }
