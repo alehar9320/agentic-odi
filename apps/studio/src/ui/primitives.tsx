@@ -32,7 +32,11 @@ export function ActionRow({ actions }: { actions: UiAction[] }) {
           type="button"
           className={`ui-action ui-action--${action.tone}`}
           disabled={dispatcher.busy}
-          onClick={() => dispatcher.onIntent(action.intent)}
+          onClick={() =>
+            action.kind === "detail"
+              ? dispatcher.onDetail(action.target)
+              : dispatcher.onIntent(action.intent)
+          }
         >
           {action.label}
         </button>
