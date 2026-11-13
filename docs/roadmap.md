@@ -35,6 +35,10 @@ Open pull requests that change a capability this milestone cares about. Each
 links to the pull request; a red or draft entry is stated as such rather than
 counted as done.
 
+- [ ] **`odi doctor`** — one read-only report that explains a Studio that will not start, with a remedy per failure ([PR #421](https://github.com/alehar9320/agentic-odi/pull/421)).
+
+- [ ] **Resume the last job, step, or outcome after a reload** — the Studio keeps its place in browser storage ([PR #299](https://github.com/alehar9320/agentic-odi/pull/299)).
+
 - [ ] **A study, and the waves inside it** — a named pass over a job with a unique wave per `(job, name)`; outcomes scope to a study of their own job, and legacy rows keep belonging to no study (this change).
 - [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
 - [ ] **The database checks itself on boot and closes cleanly** — a bounded `PRAGMA quick_check` at open, a `store_corrupt` failure page that names the file and the last backup and never touches the damaged file, a WAL checkpoint on idle and on clean shutdown, and a SIGTERM stop that leaves no `-wal` behind ([#598](https://github.com/alehar9320/agentic-odi/issues/598), part of [#348](https://github.com/alehar9320/agentic-odi/issues/348)).
