@@ -1,8 +1,9 @@
-"""Router tests for candidate review decisions (A5.1a).
+"""Router tests for candidate review decisions (A5.1a) and merges (A5.1b).
 
 The router owns the reviewer's decision: accept writes exactly one outcome with
-the quote as evidence, reject keeps the candidate and its reason, and an
-unknown candidate is a not-found error rather than a 500.
+the quote as evidence, reject keeps the candidate and its reason, merge folds a
+near-duplicate's quote into an accepted outcome without creating a second one,
+and an unknown candidate is a not-found error rather than a 500.
 """
 
 from __future__ import annotations
@@ -154,3 +155,85 @@ def test_patch_an_unknown_candidate_is_a_not_found_error() -> None:
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
+
+
+PARAPHRASES = [
+    "Minimize the time it takes to onboard when a new hire starts",
+    "Minimize the time it takes to onboard when a new hire joins",
+    "Minimize the time it takes to onboard when a new hire arrives",
+    "Minimize the time it takes to onboard when a new hire onboards",
+    "Minimize the time it takes to onboard when a new hire starts work",
+]
+
+
+def _client_with_paraphrases() -> tuple[TestClient, ODIService, list[str]]:
+    repo = InMemoryRepository()
+    service = ODIService(repo)
+    client = TestClient(create_app(repo, backend="local"))
+    job = service.add_job("Onboard")
+    interview = service.add_interview(
+        title="Ana onboarding", participant_label="Ana", job_id=job.id
+    )
+    quote = service.add_quote(interview_id=interview.id, text=QUOTE_TEXT)
+    candidates = service.extract_candidates(
+        quote.id, ScriptedExtractor([Proposal(statement, 0.9) for statement in PARAPHRASES])
+    )
+    return client, service, [candidate.id for candidate in candidates]
+
+
+def test_get_duplicate_candidates_groups_without_writing() -> None:
+    client, service, candidate_ids = _client_with_paraphrases()
+
+    before = [c.status for c in service.list_candidates()]
+    response = client.get("/api/candidates/duplicates")
+    after = [c.status for c in service.list_candidates()]
+
+    assert response.status_code == 200, response.text
+    groups = response.json()["result"]["groups"]
+    assert len(groups) == 1
+    assert sorted(groups[0]) == sorted(candidate_ids)
+    assert before == after
+
+
+def test_patch_merges_a_candidate_into_an_accepted_outcome() -> None:
+    client, service, candidate_ids = _client_with_paraphrases()
+    target, *sources = candidate_ids
+    accepted = client.patch(
+        f"/api/candidates/{target}",
+        json={"status": "accepted", "importance": 8.0, "satisfaction": 3.0},
+    ).json()
+    outcome_id = accepted["outcome"]["id"]
+
+    response = client.patch(
+        f"/api/candidates/{sources[0]}", json={"status": "merged", "merged_into": outcome_id}
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["result"]["status"] == "merged"
+    assert body["result"]["merged_into"] == outcome_id
+    assert body["outcome"]["id"] == outcome_id
+    assert len(service.list_evidence(outcome_id=outcome_id)) == 2
+    assert len(service.get_outcomes(accepted["outcome"]["job_id"])) == 1
+
+
+def test_patch_merge_without_a_target_is_refused() -> None:
+    client, service, candidate_ids = _client_with_paraphrases()
+
+    response = client.patch(f"/api/candidates/{candidate_ids[1]}", json={"status": "merged"})
+
+    assert response.status_code == 422
+    unchanged = service.get_candidate(candidate_ids[1])
+    assert unchanged is not None
+    assert unchanged.status is CandidateStatus.PROPOSED
+
+
+def test_patch_merge_into_an_unknown_outcome_is_a_not_found_error() -> None:
+    client, _, candidate_ids = _client_with_paraphrases()
+
+    response = client.patch(
+        f"/api/candidates/{candidate_ids[1]}",
+        json={"status": "merged", "merged_into": "missing"},
+    )
+
+    assert response.status_code == 404

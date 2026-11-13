@@ -9,6 +9,11 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections.abc import Iterable
+
+# Above this score two statements are close enough to *suggest* as duplicates.
+# It is a suggestion, never a decision: a person chooses the merge target.
+DUPLICATE_THRESHOLD = 0.82
 
 # Pinned vocabulary. Changing this list changes what counts as a duplicate, so
 # it is treated as a contract: add words deliberately, with a test that shows
@@ -93,3 +98,64 @@ def similar(left: str, right: str) -> float:
     overlap = len(left_tokens & right_tokens) / len(union) if union else 0.0
     ratio = difflib.SequenceMatcher(None, left_normalized, right_normalized).ratio()
     return (overlap + ratio) / 2
+
+
+def find_duplicate_groups(
+    candidates: Iterable[object], threshold: float = DUPLICATE_THRESHOLD
+) -> list[list[str]]:
+    """Group near-duplicate candidates by id, without writing anything.
+
+    ``candidates`` is anything with ``id`` and ``statement`` attributes (an
+    :class:`~agentic_odi_core.models.OutcomeCandidate` qualifies). Two
+    candidates are linked when :func:`similar` scores at or above ``threshold``;
+    groups are the transitive closure of those links, so paraphrases that only
+    match a neighbour still end up together.
+
+    Only groups of two or more are returned, each sorted by id, and the groups
+    are ordered by their smallest id — the same input always yields the same
+    output. A match is a *suggestion*: the caller decides the merge target.
+    """
+    items = [(candidate.id, candidate.statement) for candidate in candidates]  # type: ignore[attr-defined]
+    parent = {candidate_id: candidate_id for candidate_id, _ in items}
+
+    def find(candidate_id: str) -> str:
+        while parent[candidate_id] != candidate_id:
+            parent[candidate_id] = parent[parent[candidate_id]]
+            candidate_id = parent[candidate_id]
+        return candidate_id
+
+    def union(left: str, right: str) -> None:
+        left_root, right_root = find(left), find(right)
+        if left_root != right_root:
+            # Point the larger id at the smaller one so roots stay stable.
+            low, high = sorted((left_root, right_root))
+            parent[high] = low
+
+    for index, (left_id, left_statement) in enumerate(items):
+        for right_id, right_statement in items[index + 1 :]:
+            if similar(left_statement, right_statement) >= threshold:
+                union(left_id, right_id)
+
+    groups: dict[str, list[str]] = {}
+    for candidate_id, _ in items:
+        groups.setdefault(find(candidate_id), []).append(candidate_id)
+    return sorted(
+        (sorted(group) for group in groups.values() if len(group) > 1),
+        key=lambda group: group[0],
+    )
+
+
+def duplicate_suggestions(
+    candidates: Iterable[object], threshold: float = DUPLICATE_THRESHOLD
+) -> list[tuple[str, list[str]]]:
+    """For each candidate with near-duplicates, its id and the other ids.
+
+    A flat, per-candidate view of :func:`find_duplicate_groups` for callers that
+    want to show "this one looks like these" beside a single row. Only the
+    other members of a candidate's group are listed, never the candidate itself.
+    """
+    return [
+        (candidate_id, [other for other in group if other != candidate_id])
+        for group in find_duplicate_groups(candidates, threshold)
+        for candidate_id in group
+    ]

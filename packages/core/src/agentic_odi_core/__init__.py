@@ -137,6 +137,13 @@ from agentic_odi_core.services import (
     manual_claim_check,
     require_claim_check,
 )
+from agentic_odi_core.similarity import (
+    DUPLICATE_THRESHOLD,
+    duplicate_suggestions,
+    find_duplicate_groups,
+    normalize,
+    similar,
+)
 from agentic_odi_core.steve_jobs import (
     format_opportunity_score_insight,
     generate_steve_jobs_response,
@@ -186,10 +193,15 @@ __all__ = [
     "ClaimCheckError",
     "ClaimSkip",
     "ConflictError",
+    "DUPLICATE_THRESHOLD",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
     "Direction",
+    "duplicate_suggestions",
+    "find_duplicate_groups",
+    "normalize",
+    "similar",
     "Evidence",
     "EvidenceItemType",
     "EvidenceNotFoundError",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from agentic_odi_cli.backend import LocalBackend
 from agentic_odi_cli.cli import app
 from typer.testing import CliRunner
 
@@ -30,8 +31,6 @@ def _interview_with_quote(runner: CliRunner, db: str) -> tuple[str, str]:
         ],
     )
     interview_id = json.loads(interview.output)["id"]
-    from agentic_odi_cli.backend import LocalBackend
-
     backend = LocalBackend(db_path=db)
     quote_id = backend.call("add_quote", {"interview_id": interview_id, "text": QUOTE})["id"]
     return interview_id, quote_id
@@ -192,3 +191,161 @@ def test_reject_candidate_without_a_reason_fails(tmp_path):
 
     assert result.exit_code != 0
     assert "reason is required" in result.output.lower()
+
+
+PARAPHRASE_QUOTES = [
+    "Onboarding takes too long when a new hire starts.",
+    "Onboarding takes too long when a new hire joins.",
+    "Onboarding takes too long when a new hire arrives.",
+    "Onboarding takes too long when a new hire begins.",
+    "Onboarding takes too long when a new hire is hired.",
+]
+
+
+def _paraphrase_candidates(runner: CliRunner, db: str) -> list[dict]:
+    """One interview with five paraphrased quotes, one candidate each."""
+    job = runner.invoke(app, ["--db", db, "jobs", "add", "--name", "Onboard", "--json"])
+    job_id = json.loads(job.output)["id"]
+    interview = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "interviews",
+            "add",
+            "--title",
+            "T",
+            "--participant",
+            "Ana",
+            "--job-id",
+            job_id,
+            "--json",
+        ],
+    )
+    interview_id = json.loads(interview.output)["id"]
+    backend = LocalBackend(db_path=db)
+    candidates: list[dict] = []
+    for text in PARAPHRASE_QUOTES:
+        quote_id = backend.call("add_quote", {"interview_id": interview_id, "text": text})["id"]
+        candidates.extend(backend.call("extract_candidates", {"quote_id": quote_id}))
+    return candidates
+
+
+def test_duplicates_groups_paraphrases_without_writing(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    candidates = _paraphrase_candidates(runner, db)
+
+    before = runner.invoke(app, ["--db", db, "candidates", "list", "--json"])
+    result = runner.invoke(app, ["--db", db, "candidates", "duplicates", "--json"])
+    after = runner.invoke(app, ["--db", db, "candidates", "list", "--json"])
+
+    assert result.exit_code == 0, result.output
+    groups = json.loads(result.output)["groups"]
+    assert len(groups) == 1
+    assert sorted(groups[0]) == sorted(c["id"] for c in candidates)
+    assert json.loads(before.output) == json.loads(after.output)
+
+
+def test_merge_absorbs_evidence_into_one_outcome(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    candidates = _paraphrase_candidates(runner, db)
+    accepted = json.loads(
+        runner.invoke(
+            app,
+            [
+                "--db",
+                db,
+                "candidates",
+                "accept",
+                candidates[0]["id"],
+                "--importance",
+                "8",
+                "--satisfaction",
+                "3",
+                "--json",
+            ],
+        ).output
+    )
+    outcome_id = accepted["outcome"]["id"]
+    merged_ids = [c["id"] for c in candidates[1:]]
+
+    merged = runner.invoke(
+        app,
+        ["--db", db, "candidates", "merge", outcome_id, *merged_ids, "--json"],
+    )
+
+    assert merged.exit_code == 0, merged.output
+    payload = json.loads(merged.output)
+    assert payload["outcome"]["id"] == outcome_id
+    assert [c["status"] for c in payload["merged"]] == ["merged"] * len(merged_ids)
+
+    evidence = runner.invoke(
+        app, ["--db", db, "evidence", "list", "--outcome-id", outcome_id, "--json"]
+    )
+    outcomes = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "desired-outcomes",
+            "list",
+            "--job-id",
+            accepted["outcome"]["job_id"],
+            "--json",
+        ],
+    )
+    assert len(json.loads(outcomes.output)) == 1
+    assert len(json.loads(evidence.output)) == 5
+
+
+def test_merge_is_idempotent(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    candidates = _paraphrase_candidates(runner, db)
+    accepted = json.loads(
+        runner.invoke(
+            app,
+            [
+                "--db",
+                db,
+                "candidates",
+                "accept",
+                candidates[0]["id"],
+                "--importance",
+                "8",
+                "--satisfaction",
+                "3",
+                "--json",
+            ],
+        ).output
+    )
+    outcome_id = accepted["outcome"]["id"]
+    args = [
+        "--db",
+        db,
+        "candidates",
+        "merge",
+        outcome_id,
+        *[c["id"] for c in candidates[1:]],
+        "--json",
+    ]
+
+    runner.invoke(app, args)
+    second = json.loads(runner.invoke(app, args).output)
+
+    assert second["evidence"] == []
+    assert second["merged"] == []
+
+
+def test_merge_into_unknown_outcome_fails(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    candidates = _paraphrase_candidates(runner, db)
+
+    result = runner.invoke(
+        app, ["--db", db, "candidates", "merge", "no-such-outcome", candidates[0]["id"]]
+    )
+
+    assert result.exit_code != 0
