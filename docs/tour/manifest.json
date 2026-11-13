@@ -30,7 +30,7 @@
   "script": "docs/tour/script.md",
   "sha256": {
     "README.md": "631b254e3d23a154107e3646d105cee34d793963a5a8ca24eeebabe785022f68",
-    "tour.cast": "99de507c88d193a95c21ac784ab41494e1d3997bd3658a8707b9f00074e307d8"
+    "tour.cast": "5a88bb3769b74d8525706af2b4fa088931dd0128e54f1f436fc4439d43b276d2"
   },
   "steps": 12
 }
