@@ -67,7 +67,10 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /mcp-backend\.spec\.ts/,
+      // The no-sidecar suite needs its own harness — `vite preview`, no sidecar,
+      // and every `/api/**` request answered 503 — so it runs under
+      // `playwright.no-sidecar.config.ts` and never in this sidecar-backed one.
+      testIgnore: [/mcp-backend\.spec\.ts/, /no-sidecar\//],
     },
     {
       // The same Studio against its MCP passthrough backend, which talks to

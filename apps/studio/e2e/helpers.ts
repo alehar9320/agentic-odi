@@ -18,12 +18,12 @@ export const CONVERSATION = "Conversation";
  * Open the Studio with the first-run wizard and the setup conversation out of
  * the way.
  *
- * The wizard is a full-screen modal that auto-opens on a fresh browser, and
+ * The tour never opens by itself (`OnboardingProvider` starts it closed), and
  * the setup conversation replaces the chat until the Studio has a context.
  * Neither is what these tests are about, and both would hide the surfaces
- * under test, so they are switched off the way a QA engineer would: the
- * wizard through its documented query flag, the setup conversation through the
- * same `localStorage` key `closeSetup()` writes.
+ * under test, so they are switched off: the setup conversation through the
+ * same `localStorage` key `closeSetup()` writes, and the wizard flag stays as a
+ * harmless belt-and-braces guard for a build that did auto-open it.
  *
  * A fresh studio with no connectors also offers one in a modal. That is real
  * product behavior, so it is dismissed the way a user would.
