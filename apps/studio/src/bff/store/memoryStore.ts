@@ -8,6 +8,7 @@ import {
   type OutboxRecord,
   type StoredConversation,
   type StoredEvidence,
+  type StoredFeedback,
   type StoredJob,
   type StoredOutcome,
   type StoredStep,
@@ -26,6 +27,7 @@ export class MemoryLocalStore implements LocalStore {
   private readonly evidence = new Map<string, StoredEvidence>();
   private readonly observations = new Map<string, Observation>();
   private readonly conversations = new Map<string, StoredConversation>();
+  private readonly feedback = new Map<string, StoredFeedback>();
   private readonly turns: StoredTurn[] = [];
   private readonly outbox = new Map<string, OutboxRecord>();
   private lease: DrainLease | null = null;
@@ -268,6 +270,18 @@ export class MemoryLocalStore implements LocalStore {
     }
   }
 
+  async listFeedback(): Promise<StoredFeedback[]> {
+    return [...this.feedback.values()];
+  }
+
+  async putFeedback(entry: StoredFeedback): Promise<void> {
+    this.feedback.set(entry.id, entry);
+  }
+
+  async deleteFeedback(id: string): Promise<void> {
+    this.feedback.delete(id);
+  }
+
   async snapshot(): Promise<WorkspaceSnapshot> {
     const jobs = await this.listJobs();
     const steps = await this.listSteps();
@@ -335,6 +349,7 @@ export class MemoryLocalStore implements LocalStore {
     this.observations.clear();
     this.conversations.clear();
     this.turns.length = 0;
+    this.feedback.clear();
     this.outbox.clear();
     this.lease = null;
     this.seq = 0;

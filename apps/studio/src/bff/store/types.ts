@@ -1,5 +1,6 @@
 import type {
   Conversation,
+  MessageFeedback,
   ConversationTurn,
   Evidence,
   Job,
@@ -55,6 +56,9 @@ export interface StoredTurn extends ConversationTurn {
   message_id: string | null;
   parent_id: string | null;
 }
+
+/** One verdict on one reply, as it sits in the store. */
+export type StoredFeedback = MessageFeedback;
 
 export type OutboxKind = "create" | "update" | "delete";
 export type OutboxEntity = "job" | "step" | "outcome" | "evidence";
@@ -181,6 +185,9 @@ export interface LocalStore {
     messages: StoredTurn[];
     head_id: string | null;
   }>;
+  listFeedback(): Promise<StoredFeedback[]>;
+  putFeedback(feedback: StoredFeedback): Promise<void>;
+  deleteFeedback(id: string): Promise<void>;
   /** Serialize every stored workspace record for export. */
   snapshot(): Promise<WorkspaceSnapshot>;
   /** Replace every stored workspace record with the imported snapshot. */

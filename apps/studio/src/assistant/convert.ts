@@ -158,9 +158,12 @@ export function toThreadMessageLike(message: ChatMessage): ThreadMessageLike {
           },
         }
       : {}),
-    ...(failed || message.retryText || message.createdAt
+    ...(failed || message.retryText || message.rating || message.createdAt
       ? {
           metadata: {
+            ...(message.rating
+              ? { submittedFeedback: { type: message.rating } }
+              : {}),
             custom: {
               ...(message.error ? { error: message.error } : {}),
               ...(message.retryText ? { retryText: message.retryText } : {}),
