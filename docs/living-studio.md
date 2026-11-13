@@ -295,7 +295,13 @@ nothing on screen can claim otherwise before the person has asked for something.
 - The **sidecar isn't running** strip is for the loss of a sidecar this session
   was talking to: the assistant paused and live data froze is only said when both
   are true. It offers **Recheck** and **Start the sidecar**, is dismissible for
-  the session, and clears itself the moment the sidecar answers.
+  the session, and clears itself the moment the sidecar answers. A studio that
+  never had one raises nothing.
+- **No model is not an error.** Without a model the studio still opens, still
+  reads and writes your canvas, and still answers — the turn is carried by the
+  browser and labelled for what it is. So no strip announces it: the capability
+  control is where you read what works here, and a blocked action explains itself
+  on the control you tried.
 - The canvas keeps showing the last thing it drew instead of going blank; a failed
   canvas is a failure panel with Retry, not an empty board. **Settings → About →
   Diagnostics** creates an opt-in, in-memory-only local bundle. It previews the
@@ -609,6 +615,13 @@ turns, and continues with the same `conversation_id` on the next message. **New
 conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
+
+The history list is also where a thread gets its name. **Rename** on any row swaps
+the row into a field holding the current name: Enter or leaving the field commits
+it, Escape puts the old name back, and a blank name is refused without a request.
+The name is stored with the conversation, so it survives a reload. Renaming never
+opens the thread it renames and never touches the branch that was visible — a
+name is not a reason to move the person off the reply they were reading.
 
 ### Printing and export
 

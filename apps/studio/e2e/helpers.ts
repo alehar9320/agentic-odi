@@ -57,17 +57,17 @@ export function lens(page: Page) {
 }
 
 /**
- * The offline notice, which offers the by-hand routes when no model is
- * reachable.
+ * Open the Capture-by-hand panel from the composer's command palette.
  *
- * It is a live region — `status` while the notice is quiet, `alert` once the
- * banner system marks it urgent — and it is the only place outside the hero
- * that offers "Capture an outcome", so scoping to it keeps the two apart.
+ * The strip that used to offer this button was deleted with #507: a studio with
+ * no model is working, not failing, so a supported state raises no notice. The
+ * palette is the door that exists on an empty repository, where the rail does
+ * not render yet.
  */
-export function offlineNotice(page: Page) {
-  // Radix also mirrors toast text into a hidden live region, so match the
-  // rendered banner itself rather than any element that carries the words.
-  return page.locator(".banner").filter({ hasText: "Working by hand" });
+export async function openCapture(page: Page): Promise<void> {
+  const composer = page.getByRole("textbox", { name: COMPOSER });
+  await composer.fill("/capture");
+  await composer.press("Enter");
 }
 
 /** Send a message through the composer and wait for the reply to land. */

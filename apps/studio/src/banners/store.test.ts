@@ -8,26 +8,36 @@ import {
   selectBanners,
 } from "./store";
 
+/** The five persistent top strips the cap and ordering rules are proved with.
+ * Distinct `key`s are distinct banners even when they share a kind. */
+const FIVE_TOP_STRIPS = [
+  { kind: "write-rejected", key: "a" },
+  { kind: "write-rejected", key: "b" },
+  { kind: "offline" },
+  { kind: "update-available" },
+  { kind: "update-ready" },
+] as const;
+
 describe("raiseBanner", () => {
   it("adds a banner resolved from its kind", () => {
-    const state = raiseBanner(EMPTY_BANNER_STATE, { kind: "sidecar-down" });
+    const state = raiseBanner(EMPTY_BANNER_STATE, { kind: "write-rejected" });
     expect(state.banners).toHaveLength(1);
     expect(state.banners[0].severity).toBe("critical");
-    expect(state.banners[0].id).toBe("sidecar-down");
+    expect(state.banners[0].id).toBe("write-rejected");
   });
 
   it("updates in place when the same persistent kind is raised twice", () => {
-    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "sidecar-down", body: "First." }, 100);
-    state = raiseBanner(state, { kind: "sidecar-down", body: "Second." }, 200);
+    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "write-rejected", body: "First." }, 100);
+    state = raiseBanner(state, { kind: "write-rejected", body: "Second." }, 200);
     expect(state.banners).toHaveLength(1);
     expect(state.banners[0].body).toBe("Second.");
   });
 
   it("reappears when a dismissed kind is raised again", () => {
-    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "sidecar-down" }, 100);
-    state = dismissBanner(state, "sidecar-down");
+    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "write-rejected" }, 100);
+    state = dismissBanner(state, "write-rejected");
     expect(state.banners).toHaveLength(0);
-    state = raiseBanner(state, { kind: "sidecar-down" }, 300);
+    state = raiseBanner(state, { kind: "write-rejected" }, 300);
     expect(state.banners).toHaveLength(1);
   });
 });
@@ -49,8 +59,8 @@ describe("transient banners stack", () => {
 
 describe("resolveBanner", () => {
   it("removes the banner for a kind", () => {
-    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "sidecar-down" });
-    state = resolveBanner(state, "sidecar-down");
+    let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "offline" });
+    state = resolveBanner(state, "offline");
     expect(state.banners).toHaveLength(0);
   });
 });
@@ -58,21 +68,15 @@ describe("resolveBanner", () => {
 describe("selectBanners", () => {
   it("orders by severity, critical first", () => {
     let state = raiseBanner(EMPTY_BANNER_STATE, { kind: "success" }, 1);
-    state = raiseBanner(state, { kind: "sidecar-down" }, 2);
+    state = raiseBanner(state, { kind: "write-rejected" }, 2);
     const { visible } = selectBanners(state);
     expect(visible[0].severity).toBe("critical");
   });
 
   it("caps a dock's visible set and counts the rest as overflow", () => {
     let state = EMPTY_BANNER_STATE;
-    for (const kind of [
-      "sidecar-down",
-      "model-offline",
-      "update-available",
-      "update-ready",
-      "write-rejected",
-    ] as const) {
-      state = raiseBanner(state, { kind });
+    for (const spec of FIVE_TOP_STRIPS) {
+      state = raiseBanner(state, { kind: spec.kind, ...("key" in spec ? { key: spec.key } : {}) });
     }
     const { visible, overflow } = selectBanners(state, 3);
     expect(visible).toHaveLength(3);
@@ -81,14 +85,8 @@ describe("selectBanners", () => {
 
   it("caps each dock on its own, so top strips never hide corner notices", () => {
     let state = EMPTY_BANNER_STATE;
-    for (const kind of [
-      "sidecar-down",
-      "model-offline",
-      "update-available",
-      "update-ready",
-      "write-rejected",
-    ] as const) {
-      state = raiseBanner(state, { kind });
+    for (const spec of FIVE_TOP_STRIPS) {
+      state = raiseBanner(state, { kind: spec.kind, ...("key" in spec ? { key: spec.key } : {}) });
     }
     state = raiseBanner(state, { kind: "success", body: "Saved." });
     const { visible } = selectBanners(state, 3);
@@ -98,18 +96,11 @@ describe("selectBanners", () => {
 
   it("keeps the critical banners visible when a success banner would displace them", () => {
     let state = EMPTY_BANNER_STATE;
-    for (const kind of [
-      "update-ready",
-      "update-available",
-      "model-offline",
-      "sidecar-down",
-      "write-rejected",
-    ] as const) {
-      state = raiseBanner(state, { kind });
+    for (const spec of FIVE_TOP_STRIPS) {
+      state = raiseBanner(state, { kind: spec.kind, ...("key" in spec ? { key: spec.key } : {}) });
     }
     const { visible, overflow } = selectBanners(state, 3);
     const kinds = visible.map((banner) => banner.kind);
-    expect(kinds).toContain("sidecar-down");
     expect(kinds).toContain("write-rejected");
     expect(kinds).not.toContain("update-ready");
     expect(overflow).toBe(2);

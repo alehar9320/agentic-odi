@@ -260,6 +260,11 @@ export class LocalMemoryService {
     return this.store.setConversationHead(id, headId);
   }
 
+  /** Rename a thread without opening it; the store keeps the trim and the cap. */
+  async renameConversation(id: string, title: string): Promise<Conversation> {
+    return this.store.renameConversation(id, title);
+  }
+
   async latestConversation(): Promise<LatestConversation> {
     const conversations = await this.store.listConversations();
     const conversation = conversations[0] ?? null;

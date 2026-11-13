@@ -110,6 +110,12 @@ export interface WorkspaceSnapshot {
 }
 
 /**
+ * The sidecar's cap on a conversation title (`UpdateConversationRequest`). The
+ * client applies the same number so a name is never silently cut in transit.
+ */
+export const MAX_CONVERSATION_TITLE = 200;
+
+/**
  * The persistence boundary for local-first studio data.
  *
  * Implementations own ordering metadata (`seq`) so the service can mirror the
@@ -171,6 +177,8 @@ export interface LocalStore {
   getConversation(id: string): Promise<StoredConversation | undefined>;
   putConversation(conversation: StoredConversation): Promise<void>;
   setConversationHead(id: string, headId: string | null): Promise<StoredConversation>;
+  /** Name a conversation without touching its branch; a blank name is refused. */
+  renameConversation(id: string, title: string): Promise<StoredConversation>;
   listTurns(conversationId: string): Promise<ConversationTurn[]>;
   /** How much a conversation holds, without reading every turn. */
   countTurns(conversationId: string): Promise<number>;
