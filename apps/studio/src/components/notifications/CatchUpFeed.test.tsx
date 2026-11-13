@@ -57,6 +57,7 @@ const api = vi.hoisted(() => ({
   streamChat: vi.fn(async () => undefined),
   fetchSignals: vi.fn(async () => []),
   fetchUnreadSignalCount: vi.fn(async () => 0),
+  fetchChangelog: vi.fn(async () => ({ releases: [] })),
   markSignalRead: vi.fn(async () => ({ id: "sig-1" })),
   dismissSignal: vi.fn(async () => ({ id: "sig-1" })),
 }));

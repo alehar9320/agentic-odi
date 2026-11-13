@@ -34,6 +34,8 @@ const harness = vi.hoisted(() => ({
     dismissConnectorSuggestion: vi.fn(),
     refreshConnectors: vi.fn(),
     pushToast: vi.fn(),
+    restoringThread: false,
+    restoreFailed: false,
   },
 }));
 
@@ -71,7 +73,53 @@ describe("ChatStage", () => {
   afterEach(() => {
     harness.state.messages = [];
     harness.state.streaming = false;
+    harness.state.restoringThread = false;
+    harness.state.restoreFailed = false;
     vi.restoreAllMocks();
+  });
+
+  it("does not paint the welcome screen while a stored thread is still being restored (#695)", () => {
+    harness.state.restoringThread = true;
+    const { container } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    expect(container.querySelector(".chat__welcome")).toBeNull();
+    expect(container.querySelector("section")).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("paints home once the restore has settled with nothing to reopen (#695)", () => {
+    harness.state.restoringThread = true;
+    const { container, rerender } = render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+    expect(container.querySelector(".chat__welcome")).toBeNull();
+
+    harness.state.restoringThread = false;
+    rerender(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    expect(container.querySelector(".chat__welcome")).not.toBeNull();
+  });
+
+  it("says once that the thread could not be reopened, without a second welcome (#695)", () => {
+    harness.state.restoreFailed = true;
+    render(
+      <StudioRuntimeProvider>
+        <ChatStage />
+      </StudioRuntimeProvider>,
+    );
+
+    // The composer owns its own status region; this line is the one saying the
+    // restore failed, and it appears exactly once.
+    expect(screen.getAllByText("That thread couldn't be reopened.")).toHaveLength(1);
   });
 
   it("shows a jump-to-latest control when the viewport is detached during a run", async () => {

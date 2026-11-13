@@ -116,6 +116,17 @@ export function CaptureIcon(props: IconProps) {
   );
 }
 
+/** Export: an arrow leaving a tray, so it reads as "out", not "download". */
+export function ExportIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5v10.5" />
+      <path d="M8.5 7 12 3.5 15.5 7" />
+      <path d="M5 14.5v4A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-4" />
+    </Icon>
+  );
+}
+
 export function SettingsIcon(props: IconProps) {
   return (
     <Icon {...props}>

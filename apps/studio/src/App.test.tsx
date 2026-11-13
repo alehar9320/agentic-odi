@@ -6,6 +6,7 @@ import { fetchConfig, healthLlm } from "./api/studioApi";
 import { PROBE_BASE_MS, PROBE_JITTER } from "./state/scheduleProbe";
 
 vi.mock("./api/studioApi", () => ({
+  fetchChangelog: vi.fn(async () => ({ releases: [] })),
   fetchConfig: vi.fn(async () => ({
     base_url: "http://localhost:8001/v1",
     api_key: "local",
@@ -72,7 +73,6 @@ vi.mock("./api/studioApi", () => ({
       retryable: false,
     };
   },
-  fetchChangelog: vi.fn(async () => ({ releases: [] })),
   fetchLatestConversation: vi.fn(async () => ({ conversation: null, turns: [] })),
   listConversations: vi.fn(async () => []),
   createConversation: vi.fn(async () => ({

@@ -496,6 +496,13 @@ a {
   padding-bottom: max(56px, 14vh);
 }
 
+/* The restore failed: one quiet line under the welcome, not a second screen. */
+.chat__restore-note {
+  margin: -12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .chat__transcript {
   position: relative;
   display: flex;
@@ -6987,6 +6994,21 @@ details[open] summary {
   margin: 0;
   font-size: 0.8rem;
   color: var(--amber);
+}
+
+/* The What's New dot: one accent mark, never a number (#695). */
+.pill-changelog {
+  position: relative;
+}
+
+.pill-changelog__dot {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent-strong);
 }
 
 /* ------------------------------------------------------------------ */

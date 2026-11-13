@@ -19,6 +19,7 @@ import { isEditableTarget } from "./lib/commands";
 import { sharedTokenFromPath } from "./lib/share";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
+import { studioWindowTitle } from "./lib/brand";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 import { UpdateBanner, UpdateProvider } from "./updater";
 import { initInstall } from "./install";
@@ -43,6 +44,10 @@ function StudioShell() {
     stopStreaming,
     bootError,
     recheckBoot,
+    messages,
+    conversations,
+    conversationId,
+    unreadSignalCount,
   } = useStudio();
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
@@ -62,6 +67,15 @@ function StudioShell() {
     closeSetup();
     closeCustomize();
   }
+
+  // The window title follows the work: the thread on the stage, the count of
+  // signals nobody has read yet, and home when the stage is home. Reading it
+  // from the same state the bar reads keeps one answer for both.
+  const threadTitle =
+    messages.length > 0 ? (conversations.find((item) => item.id === conversationId)?.title ?? "") : "";
+  useEffect(() => {
+    document.title = studioWindowTitle({ threadTitle, unreadSignals: unreadSignalCount });
+  }, [threadTitle, unreadSignalCount]);
 
   // One listener for the keys the whole room shares. The composer registers
   // how to take the caret (lib/composerFocus), so this is installed once for
