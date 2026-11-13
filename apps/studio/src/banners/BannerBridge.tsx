@@ -18,12 +18,7 @@ import type { BannerActionId } from "./types";
  */
 export function BannerBridge() {
   const { raise, resolve } = useBanner();
-  const {
-    sidecarReachable,
-    dismissedSidecarNotice,
-    llmHealth,
-    streaming,
-  } = useStudio();
+  const { streaming } = useStudio();
   const online = useOnlineStatus();
   const appUpdate = useAppUpdate();
 
@@ -49,24 +44,9 @@ export function BannerBridge() {
     }
   }, [appUpdate.ready, appUpdate.dismissed, streaming, raise, resolve]);
 
-  useEffect(() => {
-    // The offline strip is the one line while the browser has no network: this
-    // strip's Recheck and Start-the-sidecar actions could not succeed anyway.
-    if (sidecarReachable === false && !dismissedSidecarNotice && online) {
-      raise({ kind: "sidecar-down" });
-    } else {
-      resolve("sidecar-down");
-    }
-  }, [sidecarReachable, dismissedSidecarNotice, online, raise, resolve]);
-
-  useEffect(() => {
-    // Same reason as the sidecar strip: the offline line says what still works.
-    if (llmHealth.healthy === false && online) {
-      raise({ kind: "model-offline" });
-    } else {
-      resolve("model-offline");
-    }
-  }, [llmHealth.healthy, online, raise, resolve]);
+  // A missing sidecar or model is a supported state, not an outage: the
+  // browser-only studio works by design, so nothing here announces it. The
+  // capability control (#509) is where a person reads what works on request.
 
   return null;
 }
@@ -83,28 +63,10 @@ export function useBannerActionDispatcher(): {
   onDismiss: (id: string) => void;
 } {
   const { dismiss } = useBanner();
-  const {
-    recheckConnections,
-    openSetup,
-    openPanel,
-    dismissSidecarNotice,
-    ask,
-  } = useStudio();
+  const { ask } = useStudio();
 
   function onAction(action: BannerActionId) {
     switch (action) {
-      case "recheck-sidecar":
-        void recheckConnections();
-        break;
-      case "open-setup":
-        openSetup();
-        break;
-      case "open-capture":
-        openPanel("capture");
-        break;
-      case "open-jobmap":
-        openPanel("jobmap");
-        break;
       case "install-update":
       case "restart":
         // The desktop updater is not wired to banners yet. Nothing is claimed
@@ -119,11 +81,6 @@ export function useBannerActionDispatcher(): {
   }
 
   function onDismiss(id: string) {
-    // Dismissing the sidecar strip is a session-long choice, not just a hidden
-    // row: it must survive the next failed probe, or the strip would return.
-    if (id === "sidecar-down") {
-      dismissSidecarNotice();
-    }
     // The update offer is once per page: dismissing it must not bring it back on
     // the next render, and it must never loop.
     if (id === "app-update-ready") {

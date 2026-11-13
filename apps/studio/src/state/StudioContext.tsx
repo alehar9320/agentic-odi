@@ -354,11 +354,8 @@ export interface StudioContextValue {
   bootError: StudioError | null;
   /** Re-probe after a backup is restored; clears `bootError` on a clean answer. */
   recheckBoot: () => Promise<void>;
-  /** Whether the user has dismissed this session's sidecar-down notice. */
-  dismissedSidecarNotice: boolean;
   /** Probe again now, e.g. after the user started the sidecar. */
   recheckConnections: () => Promise<void>;
-  dismissSidecarNotice: () => void;
   /** Probe the sidecar, MCP server, and model. Optionally against unsaved config. */
   checkConnections: (override?: Partial<StudioConfig>) => Promise<ConnectionReport>;
   /** Measure the same three connections for one panel, without changing what the studio believes. */
@@ -642,12 +639,7 @@ function loadTheses(): Thesis[] {
 
 function StudioProviderInner({ children }: { children: ReactNode }) {
   const { settings, saveSettings: persistSettings } = useSettings();
-  const {
-    pushToast,
-    dismissToast,
-    setDismissedSidecarNotice,
-    dismissedSidecarNotice,
-  } = useNoticesActions();
+  const { pushToast, dismissToast } = useNoticesActions();
   const [displayName, setDisplayNameState] = useState<string>(loadDisplayName);
   const [brief, setBrief] = useState<StudioBrief | null>(loadBrief);
   // The context conversation is never a gate. It opens from the stage, from a
@@ -1274,12 +1266,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       } else {
         setLlmHealth((previous) => (previous.healthy === true ? llm : previous));
       }
-      if (sidecar) {
-        setDismissedSidecarNotice(false);
-      }
       return report;
     },
-    [setDismissedSidecarNotice],
+    [],
   );
 
   /**
@@ -1385,10 +1374,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     idleProbeRef.current = null;
     handle?.cancel();
   }, []);
-
-  const dismissSidecarNotice = useCallback(() => {
-    setDismissedSidecarNotice(true);
-  }, [setDismissedSidecarNotice]);
 
   const refreshCanvas = useCallback(async () => {
     // The inbox is re-read alongside the board: every path that reaches this
@@ -2683,8 +2668,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sidecarReachable,
       bootError,
       recheckBoot,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
       recheckConnections,
       checkConnections,
       surveyConnections,
@@ -2815,8 +2798,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sidecarReachable,
       bootError,
       recheckBoot,
-      dismissedSidecarNotice,
-      dismissSidecarNotice,
       recheckConnections,
       checkConnections,
       surveyConnections,

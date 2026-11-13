@@ -8,12 +8,7 @@ import { BannerStack } from "./BannerStack";
 const studio = vi.hoisted(() => ({
   sidecarReachable: true as boolean | null,
   llmHealth: { healthy: true as boolean | null, message: "" },
-  dismissedSidecarNotice: false,
   streaming: false,
-  dismissSidecarNotice: vi.fn(),
-  recheckConnections: vi.fn(),
-  openSetup: vi.fn(),
-  openPanel: vi.fn(),
   ask: vi.fn(),
 }));
 
@@ -85,7 +80,6 @@ describe("BannerBridge", () => {
   beforeEach(() => {
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: true, message: "" };
-    studio.dismissedSidecarNotice = false;
     studio.streaming = false;
     swUpdate.ready = false;
     swUpdate.dismissed = false;
@@ -103,111 +97,27 @@ describe("BannerBridge", () => {
     studio.sidecarReachable = true;
     studio.llmHealth = { healthy: true, message: "" };
     renderShell();
-    expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".banner")).toHaveLength(0);
   });
 
   it("raises nothing while reachability is still unknown", () => {
     studio.sidecarReachable = null;
     studio.llmHealth = { healthy: null, message: "" };
     renderShell();
-    expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".banner")).toHaveLength(0);
   });
 
-  it("raises a strip when the sidecar is down", () => {
+  it("raises nothing for a supported browser-only state", () => {
+    // #507: no sidecar and no model is the browser-only build working as
+    // designed, so the bridge must not announce it. This is the rule that fails
+    // if a supported-state banner ever returns.
     studio.sidecarReachable = false;
-    studio.llmHealth = { healthy: true, message: "" };
-    renderShell();
-    expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
-  });
-
-  it("clears the strip when the sidecar comes back", () => {
-    studio.sidecarReachable = false;
-    studio.llmHealth = { healthy: true, message: "" };
-    const { rerender } = renderShell();
-    expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
-
-    studio.sidecarReachable = true;
-    rerender(
-      <BannerProvider>
-        <BannerBridge />
-        <Shell />
-      </BannerProvider>,
-    );
-    expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-  });
-
-  it("does not raise the strip once the user dismissed it this session", () => {
-    studio.sidecarReachable = false;
-    studio.dismissedSidecarNotice = true;
-    studio.llmHealth = { healthy: true, message: "" };
-    renderShell();
-    expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-  });
-
-  it("raises a working-by-hand strip when no model is reachable", () => {
-    studio.sidecarReachable = true;
     studio.llmHealth = { healthy: false, message: "no model" };
     renderShell();
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
+    expect(document.querySelectorAll(".banner")).toHaveLength(0);
   });
 
-  it("rechecks the sidecar through the real dispatcher", () => {
-    studio.sidecarReachable = false;
-    studio.llmHealth = { healthy: true, message: "" };
-    studio.recheckConnections.mockClear();
-    renderShell();
-
-    act(() => {
-      screen.getByRole("button", { name: "Recheck" }).click();
-    });
-
-    expect(studio.recheckConnections).toHaveBeenCalledTimes(1);
-  });
-
-  it("opens setup through the real dispatcher", () => {
-    studio.sidecarReachable = false;
-    studio.llmHealth = { healthy: true, message: "" };
-    studio.openSetup.mockClear();
-    renderShell();
-
-    act(() => {
-      screen.getByRole("button", { name: "Start the sidecar" }).click();
-    });
-
-    expect(studio.openSetup).toHaveBeenCalledTimes(1);
-  });
-
-  it("clears the strip from the store when the user dismisses it", () => {
-    studio.sidecarReachable = false;
-    studio.dismissedSidecarNotice = false;
-    studio.llmHealth = { healthy: true, message: "" };
-    renderShell();
-    expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
-
-    act(() => {
-      screen.getByRole("button", { name: "Dismiss" }).click();
-    });
-
-    expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-  });
-
-  it("persists the sidecar dismissal, so the strip does not come back", () => {
-    studio.sidecarReachable = false;
-    studio.dismissedSidecarNotice = false;
-    studio.llmHealth = { healthy: true, message: "" };
-    studio.dismissSidecarNotice.mockClear();
-    renderShell();
-
-    act(() => {
-      screen.getByRole("button", { name: "Dismiss" }).click();
-    });
-
-    expect(studio.dismissSidecarNotice).toHaveBeenCalledTimes(1);
-  });
-
-  it("says one line naming what still works when the browser goes offline", () => {
+  it("still raises the offline line when the browser has no network", () => {
     renderShell();
     expect(screen.queryByText(/you're offline/i)).not.toBeInTheDocument();
 
@@ -234,43 +144,6 @@ describe("BannerBridge", () => {
     goOnline();
 
     expect(screen.queryByText(/you're offline/i)).not.toBeInTheDocument();
-  });
-
-  it("says offline rather than working-by-hand while the browser has no network", () => {
-    // One condition, one line: the offline strip already names what still works,
-    // so the model strip would only repeat it.
-    studio.llmHealth = { healthy: false, message: "no model" };
-    renderShell();
-    goOffline();
-
-    expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
-  });
-
-  it("brings back the working-by-hand line once the browser is back online", () => {
-    studio.llmHealth = { healthy: false, message: "no model" };
-    renderShell();
-    goOffline();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
-
-    goOnline();
-
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
-  });
-
-  it("keeps the offline line alone while the browser has no network", () => {
-    // The sidecar strip's Recheck and Start actions could not succeed offline,
-    // so it waits until the connection is back.
-    studio.sidecarReachable = false;
-    renderShell();
-    goOffline();
-
-    expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
-    expect(screen.queryByText(/sidecar isn't running/i)).not.toBeInTheDocument();
-
-    goOnline();
-
-    expect(screen.getByText(/sidecar isn't running/i)).toBeInTheDocument();
   });
 
   it("offers a reload once, never a forced one, when a new build is staged", () => {

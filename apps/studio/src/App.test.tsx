@@ -364,9 +364,10 @@ describe("studio shell", () => {
     }
   });
 
-  it("does say so when a sidecar it had been reaching stops answering", async () => {
-    // The control for the two tests above: the strips are deferred, never missing. A
-    // studio that was talking to a sidecar and then was not has a real outage to name.
+  it("stays quiet when a sidecar it had been reaching stops answering", async () => {
+    // #507: a sidecar that goes away is a supported browser-only state, not an
+    // outage. The studio keeps working on the device and announces nothing; the
+    // capability control (#509) is where a person reads the state on request.
     vi.useFakeTimers();
     try {
       render(<App />);
@@ -382,9 +383,7 @@ describe("studio shell", () => {
         await vi.advanceTimersByTimeAsync(PROBE_BASE_MS * (1 + PROBE_JITTER) + 5_000);
       });
 
-      const banners = document.querySelectorAll(".banner");
-      expect(banners.length).toBeGreaterThan(0);
-      expect(banners[0].textContent).toMatch(/sidecar/i);
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }

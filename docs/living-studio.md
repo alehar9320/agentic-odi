@@ -236,12 +236,13 @@ Studio says so in one place and keeps going:
   store across restarts — plus the settings keys in `localStorage` by name and
   size, never by value, since one of them holds your model key. See
   [Data flow → Storage facts](architecture/data-flow.md).
-- A warning strip appears only for something that actually broke: a model or
-  sidecar that this session reached and then lost, or a check you asked for by
-  pressing **Recheck** or running the tour's live step. Opening Settings measures
-  the connections for its own rows and keeps the answer to itself — reading a
-  settings panel is not an outage to announce across the window. Background health
-  polls may retire a warning, never raise one.
+- A warning strip appears only for something that actually broke — a failed
+  request, a refused write, a lost connection the browser can name. Opening
+  Settings measures the connections for its own rows and keeps the answer to
+  itself: reading a settings panel is not an outage to announce across the
+  window. Background health polls may retire a warning, never raise one. A model
+  or sidecar this session reached and then lost is a supported state, not an
+  outage: it raises nothing, and **What works here** is where you read it.
 - Settings → Base URL and Model reconnect the assistant whenever you are ready.
   Each field saves when it is left, and the section says **Saved** once an edit
   lands; a value the studio cannot use (a URL that is not an address, an empty
@@ -292,10 +293,11 @@ nothing on screen can claim otherwise before the person has asked for something.
   rather than failing on the first try. An endpoint that *did* answer badly (a
   rejected key) is reported, not hidden behind a local draft that looks like the
   model you asked for.
-- The **sidecar isn't running** strip is for the loss of a sidecar this session
-  was talking to: the assistant paused and live data froze is only said when both
-  are true. It offers **Recheck** and **Start the sidecar**, is dismissible for
-  the session, and clears itself the moment the sidecar answers.
+- A missing sidecar or model is a supported state, not an error. The
+  browser-only build works exactly as designed, so the app raises no banner for
+  it: it never apologises for working. There is nothing to recheck and nothing to
+  dismiss, because nothing is wrong. What works here is read on request from the
+  **What works here** capability control (#509), not announced at you on arrival.
 - The canvas keeps showing the last thing it drew instead of going blank; a failed
   canvas is a failure panel with Retry, not an empty board. **Settings → About →
   Diagnostics** creates an opt-in, in-memory-only local bundle. It previews the

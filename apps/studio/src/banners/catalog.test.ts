@@ -4,8 +4,6 @@ import { BANNER_CATALOG, resolveSpec, severityWeight } from "./catalog";
 import type { BannerKind } from "./types";
 
 const ALL_KINDS: BannerKind[] = [
-  "sidecar-down",
-  "model-offline",
   "offline",
   "app-update-ready",
   "update-available",
@@ -29,21 +27,6 @@ describe("BANNER_CATALOG", () => {
       expect(entry.life, kind).toMatch(/^(persistent|transient)$/);
       expect(entry.dock, kind).toMatch(/^(top|corner)$/);
     }
-  });
-
-  it("treats the sidecar being down as a critical, persistent, top strip", () => {
-    const entry = BANNER_CATALOG["sidecar-down"];
-    expect(entry.severity).toBe("critical");
-    expect(entry.life).toBe("persistent");
-    expect(entry.dock).toBe("top");
-    expect(entry.dismissible).toBe(true);
-  });
-
-  it("treats a missing model as a warning strip that cannot be dismissed away", () => {
-    const entry = BANNER_CATALOG["model-offline"];
-    expect(entry.severity).toBe("warning");
-    expect(entry.life).toBe("persistent");
-    expect(entry.dismissible).toBe(false);
   });
 
   it("names what still works when the browser is offline, without claiming sync", () => {
@@ -90,7 +73,7 @@ describe("severityWeight", () => {
 
 describe("resolveSpec", () => {
   it("fills the defaults from the kind", () => {
-    const resolved = resolveSpec({ kind: "sidecar-down" });
+    const resolved = resolveSpec({ kind: "write-rejected" });
     expect(resolved.severity).toBe("critical");
     expect(resolved.life).toBe("persistent");
     expect(resolved.dock).toBe("top");
