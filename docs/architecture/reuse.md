@@ -42,6 +42,7 @@ missing.
 | Which host the app is running in | `apps/studio/src/bridge/runtime.ts` (`detectRuntime`, `runtimeFacts`) | `isTauri()`/`isInstalled()` read directly by a caller that then re-derives host or install state |
 | The build version on screen | `apps/studio/src/lib/version.ts` (`STUDIO_VERSION`, `versionLabel`) | any component carrying its own version literal |
 | Id minting | `apps/studio/src/bff/id.ts` | inline id construction in `apps/studio/src/state/StudioContext.tsx` |
+| Capability ids, labels, descriptions, groups | `apps/studio/src/bff/capabilities/catalog.ts` (data-only, imported by both the SPA and the Worker) | hand-written manifests in `infra/cloudflare/worker.ts` and `apps/studio-api/.../studio/router.py` (the sidecar keeps its own availability answers but must not invent ids) |
 | HTTP with retries | `packages/connectors/src/agentic_odi_connectors/http.py` | `urllib.request.urlopen` in `rest/connector.py` and `marketplace.py` |
 | HTTP from the CLI | `httpx` (declared by `apps/cli`) | `urllib.request.urlopen` in `apps/cli/src/agentic_odi_cli/update.py` |
 | ISO-8601 timestamps | `datetime.isoformat()` | `strftime("%Y-%m-%dT%H:%M:%SZ")` in `apps/cli/src/agentic_odi_cli/profile.py` and `apps/cli/src/agentic_odi_cli/flags.py` |

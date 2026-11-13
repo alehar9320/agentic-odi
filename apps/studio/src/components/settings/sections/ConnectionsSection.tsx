@@ -143,7 +143,11 @@ export function ConnectionsSection({
             <StatusDot tone={capability.status === "available" ? "ok" : "warn"} />
             <span>{capability.label}</span>
             <span className="connection-list__value">
-              {capability.status === "available" ? "available" : "unavailable"}
+              {capability.status === "available"
+                ? "available"
+                : capability.status === "downloadable"
+                  ? "needs setup"
+                  : "unavailable"}
               {capability.reason ? ` — ${capability.reason}` : ""}
             </span>
           </li>

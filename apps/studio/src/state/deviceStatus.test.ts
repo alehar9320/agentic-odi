@@ -33,7 +33,7 @@ function probed(available: CapabilityId[]): Capability[] {
   return ids.map((id) => capability(id, available.includes(id) ? "available" : "unavailable"));
 }
 
-const LOCAL: CapabilityId[] = ["local-data", "local-memory"];
+const LOCAL: CapabilityId[] = ["local-data", "local-memory", "deterministic-assistant"];
 const MODEL: CapabilityId[] = ["endpoint-model"];
 const SIDECAR: CapabilityId[] = ["sidecar-mcp"];
 const CHECKED = "2026-11-06T00:00:00.000Z";
@@ -81,6 +81,51 @@ describe("deriveDeviceStatus", () => {
     expect(status.local).toBe("ready");
     expect(status.model).toBe("ready");
     expect(status.sidecar).toBe("ready");
+  });
+
+  it("reports a downloadable browser model as a setup state, not ready or absent", () => {
+    const rows: Capability[] = [
+      capability("local-data", "available"),
+      capability("local-memory", "available"),
+      capability("deterministic-assistant", "available"),
+      capability("browser-model", "downloadable", "The browser can download this model."),
+      capability("endpoint-model", "unavailable"),
+      capability("sidecar-llm", "unavailable"),
+      capability("sidecar-connectors", "unavailable"),
+      capability("sidecar-mcp", "unavailable"),
+      capability("sidecar-import", "unavailable"),
+    ];
+    const status = deriveDeviceStatus(rows, CHECKED);
+    expect(status.model).toBe("setup");
+    expect(status.sidecar).toBe("absent");
+  });
+
+  it("prefers ready over setup when any model capability is available", () => {
+    const rows: Capability[] = [
+      capability("browser-model", "downloadable"),
+      capability("endpoint-model", "available"),
+      capability("sidecar-llm", "unavailable"),
+    ];
+    expect(deriveDeviceStatus(rows, CHECKED).model).toBe("ready");
+  });
+
+  it("derives group membership from the catalog, not a hand-kept id list", () => {
+    // sidecar-llm is a model-group capability, so an available sidecar-llm
+    // alone makes the model group ready while the sidecar group stays absent.
+    const rows: Capability[] = [
+      capability("local-data", "available"),
+      capability("local-memory", "available"),
+      capability("deterministic-assistant", "available"),
+      capability("browser-model", "unavailable"),
+      capability("endpoint-model", "unavailable"),
+      capability("sidecar-llm", "available"),
+      capability("sidecar-connectors", "unavailable"),
+      capability("sidecar-mcp", "unavailable"),
+      capability("sidecar-import", "unavailable"),
+    ];
+    const status = deriveDeviceStatus(rows, CHECKED);
+    expect(status.model).toBe("ready");
+    expect(status.sidecar).toBe("absent");
   });
 
   it("treats an unavailable local capability as absent", () => {
