@@ -35,7 +35,7 @@ missing.
 
 | Concern | Owner | Known stray copies |
 | --- | --- | --- |
-| Markdown rendering | `react-markdown` + `remark-gfm` behind `apps/studio/src/components/chat/Markdown.tsx` (the `@assistant-ui/react-markdown` primitive is declared but binds to the message-part store, so it cannot serve the standalone callers) | none left — the hand-written parser in `apps/studio/src/lib/markdown.ts` was retired in #394 |
+| Markdown rendering | `react-markdown` + `remark-gfm` behind `apps/studio/src/components/chat/Markdown.tsx` (the `@assistant-ui/react-markdown` primitive is declared but binds to the message-part store, so it cannot serve the standalone callers) | none left — the hand-written parser was retired in #394 |
 | Dialog, focus trap, dismissal | `radix-ui` (declared; used only under `src/vendor`) | `apps/studio/src/lib/useFocusTrap.ts`, four hand-built `role="dialog"` surfaces |
 | Opportunity score wording | `apps/studio/src/lib/odi.ts` (`formatOpportunityScore`, `isUnderserved`, `UNDERSERVED_THRESHOLD`) | `apps/studio/src/lib/records.ts` prints the stored number as-is, on purpose — that table reports what the store returned |
 | Number clamping | `apps/studio/src/ui/primitives.tsx` | `apps/studio/src/ui/cards.tsx`, `apps/studio/src/components/canvas/OpportunityLandscape.tsx` |
