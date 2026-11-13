@@ -85,10 +85,13 @@ The project card, rendered from the committed source by
 
 ## Supported platforms
 
-[![Linux](https://img.shields.io/badge/Linux-x86__64-blue?logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
-[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
-[![macOS Intel](https://img.shields.io/badge/macOS-Intel-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
-[![Windows](https://img.shields.io/badge/Windows-x86__64-blue?logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+Grab a prebuilt archive for your machine — each one clicks straight to
+`releases/latest/download/<asset>`:
+
+[![Download Linux](https://img.shields.io/badge/Download-Linux-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz)
+[![Download macOS Apple Silicon](https://img.shields.io/badge/Download-macOS%20Apple%20Silicon-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz)
+[![Download macOS Intel](https://img.shields.io/badge/Download-macOS%20Intel-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz)
+[![Download Windows](https://img.shields.io/badge/Download-Windows-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip)
 
 ## Install
 
@@ -205,7 +208,7 @@ The server speaks the Model Context Protocol. Any MCP client can reach it:
 }
 ```
 
-Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) on the
+Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub, Composio) on the
 Studio's **Customize** page — installed connectors first, then a trusted vendor
 marketplace, then conversationally, or via `agentic-odi connectors add <preset>`.
 A listing that needs a token names the environment variable to set; no credential
