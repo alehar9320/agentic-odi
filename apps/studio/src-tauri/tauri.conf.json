@@ -14,10 +14,10 @@
       {
         "label": "main",
         "title": "Living Studio",
-        "width": 1440,
-        "height": 960,
-        "minWidth": 1024,
-        "minHeight": 720,
+        "width": 1100,
+        "height": 760,
+        "minWidth": 900,
+        "minHeight": 600,
         "resizable": true
       }
     ],
