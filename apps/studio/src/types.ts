@@ -36,6 +36,15 @@ export interface ClaimCheck {
   verified?: boolean;
 }
 
+export interface OutcomeAlignment {
+  /** Which V2MOM list the objective lives in: "method" or "measure". */
+  field: string;
+  /** Frozen content key for the objective text, computed when the link was made. */
+  key: string;
+  /** The objective text as it read when the link was made. */
+  text: string;
+}
+
 export interface Outcome {
   id?: string;
   job_id?: string;
@@ -46,6 +55,8 @@ export interface Outcome {
   claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
+  /** The V2MOM methods and measures this outcome advances. Empty means the outcome is unlinked. */
+  trace?: OutcomeAlignment[];
   /** True while the write is queued locally and the sidecar has not acknowledged it. */
   pending?: boolean;
 }
@@ -62,6 +73,8 @@ export interface Evidence {
   job_id?: string | null;
   step_id?: string | null;
   outcome_id?: string | null;
+  /** True while the write is queued locally and the sidecar has not acknowledged it. */
+  pending?: boolean;
 }
 
 export interface Thesis {
@@ -159,6 +172,11 @@ export interface CanvasProvenance {
     outcomes: number;
     evidence: number;
   };
+  /**
+   * True when at least one write on this canvas was kept by the browser store
+   * because the sidecar was unreachable, so the board says who holds the record.
+   */
+  kept_by_browser?: boolean;
 }
 
 export interface CanvasData {
@@ -197,10 +215,16 @@ export interface StudioError {
   suggestion?: string | null;
   retryable: boolean;
   request_id?: string | null;
-  //: Which outcome field the failure belongs to, so the form can render it
-  //: beside the statement or rating the person mistyped. Absent when the
-  //: failure cannot be attributed to a single field.
-  field?: "statement" | "importance" | "satisfaction" | null;
+  /**
+   * Set to `"proxy"` when the Worker, not the sidecar, produced the body. A
+   * Worker-generated 502 is a transport failure even though it arrives
+   * structured, so the client falls back to the local BFF for it.
+   */
+  origin?: "proxy";
+  /** The input field that failed, when the failure names one. Omitted when the
+   * failure is not field-specific — a client can tell "no field" from "the
+   * field is the whole form" rather than guessing at a default. */
+  field?: string | null;
 }
 
 /** The one artifact a shared link carries. More kinds are additive. */
@@ -315,6 +339,12 @@ export type ChatPart =
       name: string;
       status: ToolStatus;
       preview?: string;
+      /**
+       * Epoch milliseconds the store recorded when the running call arrived, so
+       * a pending row can show a real elapsed time without inventing one. Absent
+       * on a turn restored from history, where the store never saw it start.
+       */
+      startedAt?: number;
       /** Present while the runtime is waiting for the user's answer. */
       approval?: ToolApproval;
     }
@@ -354,6 +384,12 @@ export interface ChatMessage {
   error?: StudioError;
   /** The question this turn answered, kept so a failed turn can be retried. */
   retryText?: string;
+  /**
+   * When the turn was written, ISO 8601. Optional because a thread saved before
+   * this field existed replays without it: the transcript then shows no clock
+   * rather than an invented one.
+   */
+  createdAt?: string;
 }
 
 /**
@@ -513,6 +549,9 @@ export type ObservationKind =
 
 export type ObservationStatus = "suggested" | "confirmed" | "dismissed";
 
+/** What an observation may be about. A note may also be unattached. */
+export type ObservationSubjectType = "job" | "step" | "outcome" | "evidence";
+
 /** One thing the agent believes about the PM, shown for correction. */
 export interface Observation {
   id: string;
@@ -522,6 +561,9 @@ export interface Observation {
   status: ObservationStatus;
   confidence: number;
   source_turn: number | null;
+  /** The record this note is about, when it is attached to one. */
+  subject_type?: ObservationSubjectType | null;
+  subject_id?: string | null;
   created_at: string;
   updated_at: string;
 }

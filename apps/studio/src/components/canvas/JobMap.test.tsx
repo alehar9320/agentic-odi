@@ -106,6 +106,28 @@ describe("JobMap Interactive Visualization", () => {
     expect(mocks.focusSubject).toHaveBeenCalledWith("job", "JOB-2");
   });
 
+  it("names the job a destructive control would delete (D43)", () => {
+    render(<JobMap />);
+
+    expect(screen.getByRole("button", { name: "Delete “Deploy Service”" })).toBeInTheDocument();
+  });
+
+  it("falls back to a plain label when the job has no name (D43)", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [{ id: "JOB-1", name: "   " }],
+        steps: [],
+        outcomes: [],
+        source: "seed" as const,
+      },
+    };
+
+    render(<JobMap />);
+
+    expect(screen.getByRole("button", { name: "Delete this job" })).toBeInTheDocument();
+  });
+
   it("names the Ulwick phase on each step row", () => {
     render(<JobMap />);
 

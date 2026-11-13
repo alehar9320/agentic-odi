@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { JOB_STAGES, type JobStage } from "../../domain/jobStages";
-import { canvasHasRecords, savedCopyCaption } from "../../lib/canvasProvenance";
+import { canvasHasRecords, keptByBrowserCaption, savedCopyCaption } from "../../lib/canvasProvenance";
 import { WALK_THE_JOB_INTENT } from "../../lib/commands";
 import { useStudio } from "../../state/StudioContext";
 import { FailurePanel } from "../FailurePanel";
@@ -55,6 +55,10 @@ export function JobMap() {
       : undefined;
   const activeJob = focusedJob ?? jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
   const activeJobId = activeJob?.id ?? "";
+  // A destructive control names what it destroys; an unnamed job says so
+  // rather than printing an empty pair of quotes.
+  const activeJobName = activeJob?.name?.trim();
+  const deleteJobLabel = activeJobName ? `Delete “${activeJobName}”` : "Delete this job";
   const steps = (canvas?.steps ?? []).filter(
     (step) => !activeJobId || !step.job_id || step.job_id === activeJobId,
   );
@@ -148,6 +152,7 @@ export function JobMap() {
   // warm reload (previous data, not from cache) draws it too, but captions
   // nothing, because that data is live rather than a saved copy.
   const savedCaption = canvasCached && hasRecords ? savedCopyCaption(canvas) : null;
+  const keptCaption = keptByBrowserCaption(canvas);
 
   if (canvasState.kind === "error") {
     // A failed canvas must not render as eight empty phases.
@@ -173,6 +178,11 @@ export function JobMap() {
       {savedCaption ? (
         <p className="canvas-saved" role="status">
           {savedCaption}
+        </p>
+      ) : null}
+      {keptCaption ? (
+        <p className="canvas-saved" role="status">
+          {keptCaption}
         </p>
       ) : null}
 
@@ -556,7 +566,7 @@ export function JobMap() {
                 void deleteJob(activeJobId);
               }}
             >
-              {confirmDelete ? "Confirm delete job" : "Delete job"}
+              {confirmDelete ? "Confirm delete job" : deleteJobLabel}
             </button>
           </div>
         </details>

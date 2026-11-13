@@ -4,6 +4,7 @@ import { useOnboarding } from "../onboarding/context";
 import { useStudio, type ConnectionReport } from "../state/StudioContext";
 import { AboutSection } from "./settings/sections/AboutSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
+import { ContextSection } from "./settings/sections/ContextSection";
 import { DataSection } from "./settings/sections/DataSection";
 import { InstallSection } from "./settings/sections/InstallSection";
 import { ModelSection } from "./settings/sections/ModelSection";
@@ -76,7 +77,7 @@ export function SettingsPanel() {
 
   return (
     <div className="settings">
-      <DataSection
+      <ContextSection
         brief={brief}
         openSetup={openSetup}
         displayName={displayName}
@@ -85,6 +86,8 @@ export function SettingsPanel() {
         clearChat={clearChat}
         refreshCanvas={refreshCanvas}
       />
+
+      <DataSection sidecarReachable={sidecarReachable} />
 
       <ModelSection
         settings={settings}

@@ -14,7 +14,7 @@ import { useAuiState } from "@assistant-ui/react";
 
 import { LOCAL_MODE_LABEL } from "../../lib/brand";
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
 import { detectPlatform, shortcutLabels } from "../../updater/platform";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
@@ -97,7 +97,7 @@ function PaletteOption({
   onChoose: () => void;
 }) {
   const ref = useRef<HTMLButtonElement | null>(null);
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (!active) {

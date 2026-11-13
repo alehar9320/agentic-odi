@@ -1,6 +1,6 @@
 import { apiUrl } from "../bridge/desktopBridge";
 import { newId, nowIso } from "./id";
-import type { CanvasData, ChangelogData, Job, Observation, Outcome, Step } from "../types";
+import type { CanvasData, ChangelogData, Evidence, Job, Observation, Outcome, Step } from "../types";
 import type { LocalStore, OutboxEntity, OutboxKind, OutboxRecord } from "./store/types";
 import { authHeaders } from "../api/studioApi";
 import type { WorkspaceSnapshot } from "./store/types";
@@ -10,6 +10,7 @@ import { LocalMemoryService } from "./memory/localMemoryService";
 import { ChatOrchestrator } from "./chat/orchestrator";
 import { CapabilityRegistry, capabilityRegistry } from "./capabilities/registry";
 import { BffError } from "./errors";
+import { storageFacts } from "./storageFacts";
 
 /** One queued write, as the caller describes it before the store assigns an id. */
 interface QueuedWriteInput {
@@ -46,6 +47,11 @@ export class StudioBff {
   /** The queued writes still waiting for the sidecar, oldest first. */
   async listOutbox(): Promise<OutboxRecord[]> {
     return this.store.listOutbox();
+  }
+
+  /** Storage facts for the local store. */
+  async storageFacts(): Promise<Awaited<ReturnType<typeof storageFacts>>> {
+    return storageFacts(this.store);
   }
 
   private async enqueue(input: QueuedWriteInput): Promise<OutboxRecord> {
@@ -171,6 +177,48 @@ export class StudioBff {
     return result;
   }
 
+  async addEvidence(input: {
+    source_name?: string;
+    source_kind?: string;
+    item_type?: string;
+    name: string;
+    content: string;
+    url?: string;
+    job_id?: string;
+    step_id?: string;
+    outcome_id?: string;
+  }): Promise<Evidence> {
+    const record = await this.data.addEvidence(input);
+    await this.enqueue({
+      kind: "create",
+      entity: "evidence",
+      local_id: record.id ?? null,
+      payload: {
+        source_name: input.source_name,
+        source_kind: input.source_kind,
+        item_type: input.item_type,
+        name: record.name,
+        content: record.content,
+        url: input.url,
+        job_id: input.job_id ?? null,
+        step_id: input.step_id ?? null,
+        outcome_id: input.outcome_id ?? null,
+      },
+    });
+    return record;
+  }
+
+  async deleteEvidence(evidenceId: string): Promise<{ deleted: string }> {
+    const result = await this.data.deleteEvidence(evidenceId);
+    await this.enqueue({
+      kind: "delete",
+      entity: "evidence",
+      local_id: evidenceId,
+      payload: {},
+    });
+    return result;
+  }
+
   /**
    * The changelog comes from the sidecar's release data. Without it there is
    * nothing honest to show, so return an empty list rather than inventing notes.
@@ -287,6 +335,8 @@ export class StudioBff {
         data: observation.data ?? {},
         confidence: observation.confidence ?? 0.5,
         confirmed: observation.status === "confirmed",
+        subject_type: observation.subject_type ?? null,
+        subject_id: observation.subject_id ?? null,
       });
     }
 
