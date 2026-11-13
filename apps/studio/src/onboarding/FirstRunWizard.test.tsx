@@ -164,12 +164,17 @@ describe("FirstRunWizard", () => {
     );
     expect(studio.openPanel).not.toHaveBeenCalled();
     expect(studio.openSetup).not.toHaveBeenCalled();
-    expect(stored()).toMatchObject({
-      status: "done",
-      step: 3,
-      goal: "find-opportunity",
-      version: 1,
-    });
+    // "Start your own job" clears the sample before it finishes the tour, so
+    // the dialog can close a tick before the completed state is written. Wait
+    // for the write rather than sampling it the moment the dialog goes away.
+    await waitFor(() =>
+      expect(stored()).toMatchObject({
+        status: "done",
+        step: 3,
+        goal: "find-opportunity",
+        version: 1,
+      }),
+    );
   });
 
   it("lands on the outcome, then starts the conversation from the chosen door", async () => {
