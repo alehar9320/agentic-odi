@@ -596,7 +596,18 @@ Storage is a separate SQLite file from the ODI repository:
 | `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |
 | `DELETE` | `/api/memory/observations/{id}` | Forget one note |
 | `DELETE` | `/api/memory` | Forget all notes and conversations |
+| `POST` | `/api/feedback` | Rate one reply helpful or not helpful |
+| `GET` | `/api/conversations/{id}/feedback` | The verdicts stored for one thread |
+| `GET` | `/api/feedback/summary` | Counts by verdict for the current month |
 | `GET` | `/api/diagnostics` | App/runtime and database metadata/counts only; never config, database paths, or row contents |
+
+**Rating a reply** is local-only: each reply's Helpful / Not helpful control
+writes one verdict keyed by the reply's message id, so rating the same reply
+again replaces the first verdict rather than stacking a second. The verdict
+lives in the browser's own store (and the sidecar's `message_feedback` table
+when a sidecar is present), and `turnsToMessages` carries it back onto the reply
+when a thread is reopened, so the rating survives a reload. The summary counts
+stored rows only — an empty store reads zero, never a guess.
 
 **Forget everything** is a two-step confirmation and also clears the visible
 thread, because the server deletes the conversations behind it.
