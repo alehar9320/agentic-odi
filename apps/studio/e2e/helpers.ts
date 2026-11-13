@@ -27,11 +27,21 @@ export const CONVERSATION = "Conversation";
  *
  * A fresh studio with no connectors also offers one in a modal. That is real
  * product behavior, so it is dismissed the way a user would.
+ *
+ * `keepFirstRunDoor` leaves the stage's "start with you and your team" offer
+ * standing, for a test that has to finish the context wizard itself. The
+ * `firstRunWizard:off` flag still applies, so nothing auto-opens over it.
  */
-export async function openStudio(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    window.localStorage.setItem("studio.setupDismissed", "1");
-  });
+export async function openStudio(
+  page: Page,
+  options: { keepFirstRunDoor?: boolean } = {},
+): Promise<void> {
+  const dismissSetup = !options.keepFirstRunDoor;
+  await page.addInitScript((dismiss) => {
+    if (dismiss) {
+      window.localStorage.setItem("studio.setupDismissed", "1");
+    }
+  }, dismissSetup);
   await page.goto("/?flags=firstRunWizard:off");
   // The composer is present in both the empty and the active conversation
   // states, so it is the one landmark that means the Studio is ready.

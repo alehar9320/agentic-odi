@@ -186,7 +186,11 @@ export interface CanvasData {
   /** Captured research records, in capture order until the user reorders them. */
   evidence?: Evidence[];
   scheduled_work?: ScheduledWork[];
-  source: "mcp" | "seed" | "local";
+  /**
+   * Who is keeping this board. `local` is the sidecar's own repository;
+   * `browser` is the store inside this tab, with nobody else holding a copy.
+   */
+  source: "mcp" | "seed" | "local" | "browser";
   /** Why the board is not what the server actually holds, when the sidecar knows. */
   warnings?: string[];
   provenance?: CanvasProvenance;

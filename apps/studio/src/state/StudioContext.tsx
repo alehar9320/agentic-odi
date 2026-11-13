@@ -70,6 +70,7 @@ import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
 import { deriveDeviceStatus, type DeviceStatus } from "./deviceStatus";
+import { LOCAL_BOARD_NOTE, isBrowserCanvas } from "../lib/canvasProvenance";
 import { isOnline } from "../lib/onlineStatus";
 import {
   PROBE_SETTINGS_DEBOUNCE_MS,
@@ -330,6 +331,8 @@ export interface StudioContextValue {
   canvasState: CanvasState;
   /** The failure behind `canvasState.kind === "error"`, if any. */
   canvasError: StudioError | null;
+  /** True when the board lives in this browser and no server holds a copy. */
+  boardStoredLocally: boolean;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
   /**
@@ -659,6 +662,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     return cached ? { kind: "loading", data: cached } : { kind: "loading", data: null };
   });
   const [canvasCached, setCanvasCached] = useState(() => loadCanvasCache() !== null);
+  // Which store is keeping this board. On the hosted studio nothing else holds
+  // a copy, so a receipt that just says "saved" promises a server that isn't
+  // there — and a person who next opens the studio somewhere else reads it as
+  // their work going missing.
+  const boardStoredLocally = isBrowserCanvas(canvasState.data);
   const [llmHealth, setLlmHealth] = useState<{ healthy: boolean | null; message: string }>({
     healthy: null,
     message: "Health not checked yet.",
@@ -1421,13 +1429,21 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
       try {
         const step = await apiAddStep({ ...payload, mcp_url: settings.mcp_url });
-        pushToast("success", writeReceipt(step, "Step added to Job Map!"));
+        pushToast(
+          "success",
+          writeReceipt(
+            step,
+            boardStoredLocally
+              ? `Step added to your board. ${LOCAL_BOARD_NOTE}`
+              : "Step added to Job Map!",
+          ),
+        );
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Error adding step: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, boardStoredLocally],
   );
 
   const addOutcome = useCallback(
@@ -1437,20 +1453,36 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       // transport failure does not travel up: the write is queued locally and
       // the receipt says where it lives.
       const outcome = await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", writeReceipt(outcome, "Outcome captured successfully!"));
+      pushToast(
+        "success",
+        writeReceipt(
+          outcome,
+          boardStoredLocally
+            ? `Outcome captured. ${LOCAL_BOARD_NOTE}`
+            : "Outcome captured successfully!",
+        ),
+      );
       await refreshCanvas();
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, boardStoredLocally],
   );
 
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
       const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
-      pushToast("success", writeReceipt(job, `Job created: ${payload.name}`));
+      pushToast(
+        "success",
+        writeReceipt(
+          job,
+          boardStoredLocally
+            ? `Job created: ${payload.name}. ${LOCAL_BOARD_NOTE}`
+            : `Job created: ${payload.name}`,
+        ),
+      );
       await refreshCanvas();
       return job.id ?? null;
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, boardStoredLocally],
   );
 
   const updateJob = useCallback(
@@ -2672,6 +2704,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       canvasCached,
       canvasState,
       canvasError,
+      boardStoredLocally,
       refreshCanvas,
       llmHealth,
       probeRetry,
@@ -2791,6 +2824,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     }),
     [
       settings,
+      boardStoredLocally,
       saveSettings,
       displayName,
       setDisplayName,
