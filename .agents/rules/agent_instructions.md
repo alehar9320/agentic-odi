@@ -256,7 +256,7 @@ approval prompts beside it.
 - **Atomic Tests**: Each test must verify exactly one specific behavior with clear intent in test names and assertions. Avoid multi-behavior tests.
 - **In-Memory Testing (Preferred)**: Favor testing functionality deterministically by passing the `FastMCP` server directly into the `Client(server)` instance. This runs in-memory without network overhead for deterministic and lightning-fast execution.
 - **Transport Testing (When Needed)**: For HTTP/SSE network transport tests, prefer the isolated in-process `fastmcp.utilities.tests.run_server_async(server)` context manager over subprocess testing (which uses `run_server_in_process` and is slower to debug).
-- **Data Assertions**: Utilize `inline-snapshot` (`snapshot()`) for assessing complex data structures like tool API JSON schemas or expected responses.
+- **Data Assertions**: Utilize `inline-snapshot` (`snapshot()`) for assessing complex data structures like tool API JSON schemas or expected responses. It is declared in the root `[dependency-groups] dev`, and `tests/contract/test_contract_snapshot.py` is the working example. Pin structure (names, requiredness, types), not wording: a reworded docstring is not a contract change. `--inline-snapshot=create` rewrites a test file, so it stays a deliberate local command and never enters a workflow.
 
 ### 7. Workspace Boundaries And The Diagram
 - **The diagram is a contract**: `docs/architecture/README.md` has a mermaid diagram under **Dependency Direction** that states which workspace package may import which. `tests/test_architecture.py` asserts it equals both the `[project] dependencies` each member declares and the imports the source actually contains.
