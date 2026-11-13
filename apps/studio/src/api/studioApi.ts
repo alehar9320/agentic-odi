@@ -243,7 +243,7 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
+async function sendJson<T>(method: "POST" | "PATCH" | "PUT", path: string, body: unknown): Promise<T> {
   const response = await fetch(apiUrl(path), {
     method,
     headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
@@ -809,6 +809,30 @@ export function fetchLatestConversation(): Promise<LatestConversation> {
   return withLocal(
     () => getJson<LatestConversation>("/api/conversations/latest"),
     async (bff) => bff.memory.latestConversation(),
+  );
+}
+
+/** The active thread remembered by the sidecar, or this browser's IndexedDB BFF. */
+export async function fetchActiveConversationId(): Promise<string | null> {
+  const result = await withLocal(
+    () => getJson<{ conversation_id: string | null }>("/api/session/conversation"),
+    async (bff) => ({
+      conversation_id: await bff.store.getPreference("active_conversation_id"),
+    }),
+  );
+  return result.conversation_id;
+}
+
+/** Remember the active thread for all clients using this sidecar. */
+export async function setActiveConversationId(conversationId: string | null): Promise<void> {
+  await withLocal(
+    () => sendJson<{ conversation_id: string | null }>("PUT", "/api/session/conversation", {
+      conversation_id: conversationId,
+    }),
+    async (bff) => {
+      await bff.store.setPreference("active_conversation_id", conversationId);
+      return { conversation_id: conversationId };
+    },
   );
 }
 

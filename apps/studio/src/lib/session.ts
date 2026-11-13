@@ -11,6 +11,7 @@ export interface StudioSession {
 }
 
 export const SESSION_KEY = "studio.session";
+export const CONVERSATION_KEY = "studio.session.conversation";
 
 function asId(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
@@ -42,6 +43,29 @@ export function saveSession(session: StudioSession): void {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
+/** The last active thread is a hint; the sidecar's preference is authoritative. */
+export function loadConversationId(): string | null {
+  try {
+    return asId(localStorage.getItem(CONVERSATION_KEY));
+  } catch {
+    // A denied browser store can still use the IndexedDB BFF preference.
+    return null;
+  }
+}
+
+export function saveConversationId(conversationId: string | null): void {
+  try {
+    if (asId(conversationId)) {
+      localStorage.setItem(CONVERSATION_KEY, conversationId as string);
+    } else {
+      localStorage.removeItem(CONVERSATION_KEY);
+    }
+  } catch {
+    // The server or IndexedDB preference remains available when storage is denied.
+  }
+}
+
 export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(CONVERSATION_KEY);
 }

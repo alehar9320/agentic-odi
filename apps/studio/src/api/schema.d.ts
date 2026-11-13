@@ -166,7 +166,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Post Llm Health */
+        /**
+         * Post Llm Health
+         * @description Probe the configured LLM endpoint, cached per (endpoint, model).
+         *
+         *     Concurrent tabs within the TTL cause a single upstream probe. ``?fresh=true``
+         *     bypasses the cache so a user-initiated "check now" is never stale.
+         */
         post: operations["post_llm_health_api_health_llm_post"];
         delete?: never;
         options?: never;
@@ -589,6 +595,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/traceability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Traceability
+         * @description Orphans, unfunded objectives, and links the vision dropped.
+         *
+         *     Read-only. With no objectives defined the report carries
+         *     ``objectives_defined: false`` and a message, not three empty sections that
+         *     would read as a clean bill of health.
+         */
+        get: operations["get_traceability_api_traceability_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Alignments
+         * @description The V2MOM links recorded on outcomes, optionally for one outcome.
+         */
+        get: operations["get_alignments_api_alignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/alignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Outcome Alignment
+         * @description Link an outcome to one method or measure the vision currently holds.
+         */
+        post: operations["post_outcome_alignment_api_outcomes__outcome_id__alignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outcomes/{outcome_id}/alignments/{field}/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Outcome Alignment
+         * @description Remove one recorded link. Removing a link that is not there is a no-op.
+         */
+        delete: operations["delete_outcome_alignment_api_outcomes__outcome_id__alignments__field___key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/customer-outcomes": {
         parameters: {
             query?: never;
@@ -728,6 +818,30 @@ export interface paths {
         /** Latest Conversation */
         get: operations["latest_conversation_api_conversations_latest_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/session/conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Active Conversation
+         * @description Return the active thread remembered by this local Studio sidecar.
+         */
+        get: operations["get_active_conversation_api_session_conversation_get"];
+        /**
+         * Put Active Conversation
+         * @description Remember or clear the active thread for clients of this sidecar.
+         */
+        put: operations["put_active_conversation_api_session_conversation_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1012,15 +1126,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/{full_path}": {
+    "/api/share": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Spa Fallback */
-        get: operations["spa_fallback__full_path__get"];
+        /**
+         * List Shares
+         * @description The owner's links, without tokens: id, artifact, and the key dates.
+         */
+        get: operations["list_shares_api_share_get"];
+        put?: never;
+        /**
+         * Mint Share
+         * @description Mint a scoped, expiring, read-only link for one artifact.
+         *
+         *     The raw token is returned exactly once; only its hash is stored. Creation
+         *     happens through this route only, so the token is never minted by a page.
+         */
+        post: operations["mint_share_api_share_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/share/{share_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Share
+         * @description Revoke a link. Effective immediately, and idempotent.
+         */
+        delete: operations["revoke_share_api_share__share_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/share/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Shared
+         * @description Read exactly the one artifact a token names, and its own evidence.
+         *
+         *     A malformed, unknown, expired, or revoked token is the same ``404``; the
+         *     response never says which. There is no list and no canvas here.
+         */
+        get: operations["read_shared_api_share__token__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1392,6 +1559,16 @@ export interface components {
             /** Head Id */
             head_id?: string | null;
         };
+        /** ConversationPreferenceResponse */
+        ConversationPreferenceResponse: {
+            /** Conversation Id */
+            conversation_id?: string | null;
+        };
+        /** ConversationPreferenceUpdate */
+        ConversationPreferenceUpdate: {
+            /** Conversation Id */
+            conversation_id?: string | null;
+        };
         /** ConversationResponse */
         ConversationResponse: {
             conversation: components["schemas"]["ConversationModel"];
@@ -1507,6 +1684,27 @@ export interface components {
             /** Turns */
             turns?: components["schemas"]["TurnModel"][];
         };
+        /**
+         * LinkOutcomeRequest
+         * @description Link an outcome to one V2MOM method or measure.
+         *
+         *     ``text`` must match an entry the vision currently holds; unknown text is
+         *     refused rather than guessed.
+         */
+        LinkOutcomeRequest: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "method" | "measure";
+            /** Text */
+            text: string;
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
         /** LlmHealthRequest */
         LlmHealthRequest: {
             /** Base Url */
@@ -1521,6 +1719,17 @@ export interface components {
              * @default
              */
             model: string;
+        };
+        /** LlmHealthResponse */
+        LlmHealthResponse: {
+            /** Healthy */
+            healthy: boolean;
+            /** Message */
+            message: string;
+            /** Checked At */
+            checked_at: string;
+            /** Cached */
+            cached: boolean;
         };
         /** LlmProxyMessage */
         LlmProxyMessage: {
@@ -1916,6 +2125,30 @@ export interface components {
             core_problem: string;
             v2mom?: components["schemas"]["V2MOM"] | null;
         };
+        /**
+         * TraceabilityReportResponse
+         * @description The three failures: orphans, unfunded objectives, and drift.
+         */
+        TraceabilityReportResponse: {
+            /** Objectives Defined */
+            objectives_defined: boolean;
+            /** Message */
+            message?: string | null;
+            /** Orphans */
+            orphans?: string[];
+            /** Unfunded */
+            unfunded?: {
+                [key: string]: string;
+            }[];
+            /** Drift */
+            drift?: {
+                [key: string]: string;
+            }[];
+            /** Counts */
+            counts?: {
+                [key: string]: number;
+            };
+        };
         /** TurnModel */
         TurnModel: {
             /** Id */
@@ -2275,7 +2508,9 @@ export interface operations {
     };
     post_llm_health_api_health_llm_post: {
         parameters: {
-            query?: never;
+            query?: {
+                fresh?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2292,9 +2527,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["LlmHealthResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3315,6 +3548,145 @@ export interface operations {
             };
         };
     };
+    get_traceability_api_traceability_get: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraceabilityReportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_alignments_api_alignments_get: {
+        parameters: {
+            query?: {
+                outcome_id?: string | null;
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_outcome_alignment_api_outcomes__outcome_id__alignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outcome_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_outcome_alignment_api_outcomes__outcome_id__alignments__field___key__delete: {
+        parameters: {
+            query?: {
+                mcp_url?: string | null;
+            };
+            header?: never;
+            path: {
+                outcome_id: string;
+                field: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_customer_outcomes_api_customer_outcomes_get: {
         parameters: {
             query?: {
@@ -3791,6 +4163,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LatestConversationResponse"];
+                };
+            };
+        };
+    };
+    get_active_conversation_api_session_conversation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationPreferenceResponse"];
+                };
+            };
+        };
+    };
+    put_active_conversation_api_session_conversation_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationPreferenceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationPreferenceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4341,12 +4766,67 @@ export interface operations {
             };
         };
     };
-    spa_fallback__full_path__get: {
+    list_shares_api_share_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    mint_share_api_share_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MintShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareMintResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_share_api_share__share_id__delete: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                full_path: string;
+                share_id: string;
             };
             cookie?: never;
         };
@@ -4358,7 +4838,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_shared_api_share__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedArtifactResponse"];
                 };
             };
             /** @description Validation Error */

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { SESSION_KEY, clearSession, loadSession, saveSession } from "./session";
+import { CONVERSATION_KEY, SESSION_KEY, clearSession, loadConversationId, loadSession, saveConversationId, saveSession } from "./session";
 
 describe("studio session", () => {
   beforeEach(() => {
@@ -31,9 +31,19 @@ describe("studio session", () => {
 
   it("clears the stored session", () => {
     saveSession({ job_id: "JOB-1", step_id: null, outcome_id: null });
+    saveConversationId("conversation-1");
 
     clearSession();
 
     expect(loadSession()).toBeNull();
+    expect(loadConversationId()).toBeNull();
+  });
+
+  it("round-trips the active conversation id and ignores blanks", () => {
+    saveConversationId(" conversation-1 ");
+    expect(loadConversationId()).toBe(" conversation-1 ");
+
+    localStorage.setItem(CONVERSATION_KEY, "  ");
+    expect(loadConversationId()).toBeNull();
   });
 });

@@ -371,6 +371,14 @@ class ConversationResponse(BaseModel):
     conversation: ConversationModel
 
 
+class ConversationPreferenceUpdate(BaseModel):
+    conversation_id: str | None = None
+
+
+class ConversationPreferenceResponse(BaseModel):
+    conversation_id: str | None = None
+
+
 class ClaimCitationOut(BaseModel):
     """The record label a claim carries, snapshotted when the turn was stored."""
 

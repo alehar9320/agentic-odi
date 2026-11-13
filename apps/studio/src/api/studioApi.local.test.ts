@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioApiError, addEvidence, addOutcome, addStep, createJob, deleteEvidence, fetchCanvas, fetchMemory, isTransportFailure, listConversations, streamChat } from "./studioApi";
+import { StudioApiError, addEvidence, addOutcome, addStep, createJob, deleteEvidence, fetchActiveConversationId, fetchCanvas, fetchMemory, isTransportFailure, listConversations, setActiveConversationId, streamChat } from "./studioApi";
 import type { OutboxRecord } from "../bff/store/types";
 
 const outbox: OutboxRecord[] = [];
@@ -8,6 +8,7 @@ const outbox: OutboxRecord[] = [];
 const bff = {
   data: { fetchCanvas: vi.fn() },
   memory: { listObservations: vi.fn(), listConversations: vi.fn() },
+  store: { getPreference: vi.fn(), setPreference: vi.fn() },
   chat: { stream: vi.fn() },
   createJob: vi.fn(),
   addStep: vi.fn(),
@@ -70,12 +71,27 @@ beforeEach(() => {
   vi.mocked(bff.data.fetchCanvas).mockReset();
   vi.mocked(bff.memory.listObservations).mockReset();
   vi.mocked(bff.memory.listConversations).mockReset();
+  vi.mocked(bff.store.getPreference).mockReset();
+  vi.mocked(bff.store.setPreference).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
   vi.mocked(bff.createJob).mockReset();
   vi.mocked(bff.addStep).mockReset();
   vi.mocked(bff.addOutcome).mockReset();
   vi.mocked(bff.addEvidence).mockReset();
   vi.mocked(bff.deleteEvidence).mockReset();
+});
+
+describe("active conversation preference fallback", () => {
+  it("reads and writes the preference in IndexedDB when the sidecar is offline", async () => {
+    vi.mocked(fetch).mockResolvedValue(offlineResponse());
+    vi.mocked(bff.store.getPreference).mockResolvedValue("c-1");
+
+    await expect(fetchActiveConversationId()).resolves.toBe("c-1");
+    await setActiveConversationId("c-2");
+
+    expect(bff.store.getPreference).toHaveBeenCalledWith("active_conversation_id");
+    expect(bff.store.setPreference).toHaveBeenCalledWith("active_conversation_id", "c-2");
+  });
 });
 
 afterEach(() => {
