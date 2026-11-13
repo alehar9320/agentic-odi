@@ -1887,6 +1887,38 @@ a {
   border-top: 1px solid var(--line);
 }
 
+/* GFM tables: the same hairline as the rest of the surface, never a grid. */
+.md-table {
+  width: 100%;
+  margin: 0 0 10px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.md-table__cell {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-table__head {
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 600;
+}
+
+/* A task list reads as a list of statements, not as a row of empty bullets. */
+.md-list .task-list-item {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.md-list .task-list-item > input {
+  margin-top: 3px;
+}
+
 /* Panel content primitives */
 .stack {
   display: flex;

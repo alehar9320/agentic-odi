@@ -210,7 +210,8 @@ approval prompts beside it.
 
 - **Markdown is a dependency, not a file.** `@assistant-ui/react-markdown` is
   declared in `apps/studio/package.json` and imported nowhere, while
-  `apps/studio/src/lib/markdown.ts` hand-parses a subset for the transcript. That
+  `apps/studio/src/components/chat/Markdown.tsx` (backed by `react-markdown` +
+  `remark-gfm`) hand-parses a subset for the transcript. That
   is the shape the reuse ladder forbids: a paid-for dependency plus a second
   implementation beside it. New rendering work goes through the library;
   collapsing the existing parser is its own task, not a reason to add a third.
