@@ -541,3 +541,85 @@ describe("ThreadComposer oversized attachments", () => {
     expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
   });
 });
+
+const mentionCanvas = {
+  jobs: [{ id: "J-1", name: "Reconcile a payment" }],
+  steps: [{ id: "S-1", job_id: "J-1", name: "Find the failure" }],
+  outcomes: [{ id: "O-1", job_id: "J-1", statement: "Minimize the time to reconcile" }],
+  evidence: [{ id: "E-1", name: "Grain call", source_name: "Grain" }],
+  source: "mcp" as const,
+};
+
+function mentionComposer(overrides: Record<string, unknown> = {}) {
+  vi.mocked(useStudio).mockReturnValue(context([], { canvas: mentionCanvas, ...overrides }));
+  render(
+    <StudioRuntimeProvider>
+      <ThreadComposer onCommand={() => {}} />
+    </StudioRuntimeProvider>,
+  );
+  return screen.getByRole("textbox", { name: "Message the studio" }) as HTMLTextAreaElement;
+}
+
+describe("ThreadComposer @ mentions", () => {
+  it("names the canvas records when @ is typed", async () => {
+    const input = mentionComposer();
+
+    fireEvent.change(input, { target: { value: "@" } });
+
+    expect(await screen.findByRole("listbox", { name: "Records" })).toBeInTheDocument();
+    const labels = screen.getAllByRole("option").map((node) => node.textContent ?? "");
+    expect(labels.some((text) => text.includes("Reconcile a payment"))).toBe(true);
+    expect(labels.some((text) => text.includes("Grain call"))).toBe(true);
+  });
+
+  it("inserts the record's own id, not its statement", async () => {
+    const input = mentionComposer();
+
+    fireEvent.change(input, { target: { value: "@minimize" } });
+    const option = await screen.findByRole("option", { name: /Minimize the time to reconcile/ });
+    fireEvent.click(option);
+
+    await waitFor(() => expect(input.value).toContain("@O-1"));
+    expect(input.value).not.toContain("Minimize the time to reconcile");
+  });
+
+  it("offers nothing to name when the canvas is empty", async () => {
+    const input = mentionComposer({ canvas: null });
+
+    fireEvent.change(input, { target: { value: "@" } });
+
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
+
+  it("sends an unknown @word as typed rather than inventing a record", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = mentionComposer({ sendMessage });
+
+    fireEvent.change(input, { target: { value: "@nobody please look" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(sendMessage).toHaveBeenCalledWith("@nobody please look", expect.anything());
+  });
+
+  it("leaves @ inside a word alone", async () => {
+    const input = mentionComposer();
+
+    fireEvent.change(input, { target: { value: "user@example.com" } });
+
+    expect(screen.queryByRole("listbox", { name: "Records" })).not.toBeInTheDocument();
+  });
+
+  it("closes on Escape without sending", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = mentionComposer({ sendMessage });
+
+    fireEvent.change(input, { target: { value: "@" } });
+    await screen.findByRole("listbox", { name: "Records" });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("listbox", { name: "Records" })).not.toBeInTheDocument(),
+    );
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
