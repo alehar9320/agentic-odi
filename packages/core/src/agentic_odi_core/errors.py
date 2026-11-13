@@ -63,6 +63,15 @@ class StoreError(OdiError):
     """The persistence layer could not complete the operation."""
 
 
+class SchemaVersionError(StoreError):
+    """The store's schema version is incompatible with this build.
+
+    Always names both versions (on disk and supported) and the supported
+    upgrade path, so the refusal is actionable rather than a bare
+    "incompatible".
+    """
+
+
 class StoreCorrupt(StoreError):
     """The database failed its integrity check and must not be read or written.
 
