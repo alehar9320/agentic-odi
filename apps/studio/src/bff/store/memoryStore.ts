@@ -10,6 +10,7 @@ import {
   type StoredEvidence,
   type StoredJob,
   type StoredOutcome,
+  type StoredReceipt,
   type StoredStep,
   type StoredTurn,
   type WorkspaceSnapshot,
@@ -28,6 +29,7 @@ export class MemoryLocalStore implements LocalStore {
   private readonly conversations = new Map<string, StoredConversation>();
   private readonly turns: StoredTurn[] = [];
   private readonly outbox = new Map<string, OutboxRecord>();
+  private readonly receipts = new Map<string, StoredReceipt>();
   private lease: DrainLease | null = null;
 
   // A Map-backed store has no second connection to lose, so it never asks for a
@@ -129,6 +131,22 @@ export class MemoryLocalStore implements LocalStore {
 
   async clearObservations(): Promise<void> {
     this.observations.clear();
+  }
+
+  async listReceipts(): Promise<StoredReceipt[]> {
+    return [...this.receipts.values()].sort(bySeq);
+  }
+
+  async getReceipt(recordId: string): Promise<StoredReceipt | undefined> {
+    return this.receipts.get(recordId);
+  }
+
+  async putReceipt(receipt: StoredReceipt): Promise<void> {
+    this.receipts.set(receipt.recordId, receipt);
+  }
+
+  async deleteReceipt(recordId: string): Promise<void> {
+    this.receipts.delete(recordId);
   }
 
   async enqueueOutbox(record: OutboxRecord): Promise<void> {

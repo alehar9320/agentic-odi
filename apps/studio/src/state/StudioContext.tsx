@@ -64,6 +64,14 @@ import {
   type UpdateObservationPayload,
 } from "../api/studioApi";
 import type { RawSseEvent } from "../api/sse";
+import { getStudioBff } from "../bff";
+import type { OutboxEntity } from "../bff/store/types";
+import { announce } from "../lib/announce";
+import {
+  receiptAnnouncement,
+  receiptFor,
+  type ReceiptState,
+} from "../lib/receipts";
 import { preparedAttachments } from "../assistant/attachments";
 import { textOf } from "../assistant/convert";
 import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
@@ -1417,17 +1425,45 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     }
   }, [settings.mcp_url, refreshSignals, refreshSegments]);
 
+  /**
+   * Persist and announce one write receipt. The store keeps the outcome; the
+   * live region says it once. Both are best-effort: a store that will not open
+   * must never block the write the person asked for.
+   */
+  const recordReceipt = useCallback(
+    async (
+      recordId: string | null | undefined,
+      kind: OutboxEntity,
+      state: ReceiptState,
+      error: string | null = null,
+    ) => {
+      if (!recordId) {
+        return;
+      }
+      try {
+        const bff = await getStudioBff();
+        const previous = receiptFor(await bff.receipts.list(), recordId);
+        const next = await bff.receipts.record(recordId, kind, state, error);
+        announce(receiptAnnouncement(previous, next));
+      } catch {
+        /* a receipt is a courtesy; the write itself has already happened */
+      }
+    },
+    [],
+  );
+
   const addStep = useCallback(
     async (payload: Omit<AddStepPayload, "mcp_url">) => {
       try {
         const step = await apiAddStep({ ...payload, mcp_url: settings.mcp_url });
         pushToast("success", writeReceipt(step, "Step added to Job Map!"));
+        await recordReceipt(step.id, "step", "saved");
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Error adding step: ${(error as Error).message}`);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const addOutcome = useCallback(
@@ -1438,19 +1474,21 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       // the receipt says where it lives.
       const outcome = await apiAddOutcome({ ...payload, mcp_url: settings.mcp_url });
       pushToast("success", writeReceipt(outcome, "Outcome captured successfully!"));
+      await recordReceipt(outcome.id, "outcome", "saved");
       await refreshCanvas();
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const createJob = useCallback(
     async (payload: { name: string; description?: string }): Promise<string | null> => {
       const job = await apiCreateJob({ ...payload, mcp_url: settings.mcp_url });
       pushToast("success", writeReceipt(job, `Job created: ${payload.name}`));
+      await recordReceipt(job.id, "job", "saved");
       await refreshCanvas();
       return job.id ?? null;
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const updateJob = useCallback(
@@ -1458,12 +1496,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       try {
         const job = await apiUpdateJob(jobId, { ...payload, mcp_url: settings.mcp_url });
         pushToast("success", writeReceipt(job, "Job updated."));
+        await recordReceipt(job.id, "job", "saved");
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the job: ${(error as Error).message}`);
+        await recordReceipt(jobId, "job", "failed", (error as Error).message);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const deleteJob = useCallback(
@@ -1471,12 +1511,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       try {
         const result = await apiDeleteJob(jobId, settings.mcp_url);
         pushToast("success", writeReceipt(result, "Job removed."));
+        await recordReceipt(jobId, "job", "saved");
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the job: ${(error as Error).message}`);
+        await recordReceipt(jobId, "job", "failed", (error as Error).message);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const updateStep = useCallback(
@@ -1484,12 +1526,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       try {
         const step = await apiUpdateStep(stepId, { ...payload, mcp_url: settings.mcp_url });
         pushToast("success", writeReceipt(step, "Step updated."));
+        await recordReceipt(step.id, "step", "saved");
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the step: ${(error as Error).message}`);
+        await recordReceipt(stepId, "step", "failed", (error as Error).message);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const deleteStep = useCallback(
@@ -1497,12 +1541,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       try {
         const result = await apiDeleteStep(stepId, settings.mcp_url);
         pushToast("success", writeReceipt(result, "Step removed."));
+        await recordReceipt(stepId, "step", "saved");
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the step: ${(error as Error).message}`);
+        await recordReceipt(stepId, "step", "failed", (error as Error).message);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const updateOutcome = useCallback(
@@ -1516,12 +1562,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           mcp_url: settings.mcp_url,
         });
         pushToast("success", writeReceipt(outcome, "Outcome updated."));
+        await recordReceipt(outcome.id, "outcome", "saved");
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
+        await recordReceipt(outcomeId, "outcome", "failed", (error as Error).message);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const deleteOutcome = useCallback(
@@ -1529,12 +1577,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       try {
         const result = await apiDeleteOutcome(outcomeId, settings.mcp_url);
         pushToast("success", writeReceipt(result, "Outcome removed."));
+        await recordReceipt(outcomeId, "outcome", "saved");
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the outcome: ${(error as Error).message}`);
+        await recordReceipt(outcomeId, "outcome", "failed", (error as Error).message);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const deleteEvidence = useCallback(
@@ -1542,12 +1592,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       try {
         const result = await apiDeleteEvidence(evidenceId, settings.mcp_url);
         pushToast("success", writeReceipt(result, "Evidence removed."));
+        await recordReceipt(evidenceId, "evidence", "saved");
         await refreshCanvas();
       } catch (error) {
         pushToast("error", `Could not remove the evidence: ${(error as Error).message}`);
+        await recordReceipt(evidenceId, "evidence", "failed", (error as Error).message);
       }
     },
-    [settings.mcp_url, pushToast, refreshCanvas],
+    [settings.mcp_url, pushToast, refreshCanvas, recordReceipt],
   );
 
   const promoteEvidence = useCallback(

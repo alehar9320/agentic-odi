@@ -6,6 +6,7 @@ import { authHeaders } from "../api/studioApi";
 import type { WorkspaceSnapshot } from "./store/types";
 import { openLocalStore } from "./store/openStore";
 import { LocalDataService } from "./data/localDataService";
+import { ReceiptService } from "./data/receiptService";
 import { LocalMemoryService } from "./memory/localMemoryService";
 import { ChatOrchestrator } from "./chat/orchestrator";
 import { CapabilityRegistry, capabilityRegistry } from "./capabilities/registry";
@@ -23,6 +24,7 @@ interface QueuedWriteInput {
 export class StudioBff {
   readonly store: LocalStore;
   readonly data: LocalDataService;
+  readonly receipts: ReceiptService;
   readonly memory: LocalMemoryService;
   readonly chat: ChatOrchestrator;
   readonly capabilities: CapabilityRegistry;
@@ -30,6 +32,7 @@ export class StudioBff {
   constructor(store: LocalStore) {
     this.store = store;
     this.data = new LocalDataService(store);
+    this.receipts = new ReceiptService(store);
     this.memory = new LocalMemoryService(store);
     this.chat = new ChatOrchestrator(store, this.data, this.memory);
     this.capabilities = capabilityRegistry;

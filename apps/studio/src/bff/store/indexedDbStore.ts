@@ -19,6 +19,7 @@ import {
   type StoredEvidence,
   type StoredJob,
   type StoredOutcome,
+  type StoredReceipt,
   type StoredStep,
   type StoredTurn,
   type WorkspaceSnapshot,
@@ -161,6 +162,23 @@ export class IndexedDbLocalStore implements LocalStore {
 
   async deleteEvidence(id: string): Promise<void> {
     await this.db.delete("evidence", id);
+  }
+
+  async listReceipts(): Promise<StoredReceipt[]> {
+    const receipts = await this.db.getAll("receipts");
+    return receipts.sort(bySeq);
+  }
+
+  async getReceipt(recordId: string): Promise<StoredReceipt | undefined> {
+    return this.db.get("receipts", recordId);
+  }
+
+  async putReceipt(receipt: StoredReceipt): Promise<void> {
+    await this.db.put("receipts", receipt);
+  }
+
+  async deleteReceipt(recordId: string): Promise<void> {
+    await this.db.delete("receipts", recordId);
   }
 
   async listObservations(): Promise<Observation[]> {
@@ -410,6 +428,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "evidence",
         "observations",
         "outbox",
+        "receipts",
         "conversations",
         "turns",
       ],
@@ -423,6 +442,7 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("evidence").clear(),
       tx.objectStore("observations").clear(),
       tx.objectStore("outbox").clear(),
+      tx.objectStore("receipts").clear(),
       tx.objectStore("conversations").clear(),
       tx.objectStore("turns").clear(),
     ]);
