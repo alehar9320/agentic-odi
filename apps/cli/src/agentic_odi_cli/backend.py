@@ -735,11 +735,14 @@ class LocalBackend(Backend):
 
     def _link_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
 
         try:
             outcome = self.service.link_outcome(args["outcome_id"], args["field"], args["text"])
         except OutcomeNotFoundError:
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
         return outcome.model_dump(mode="json")
 
     def _unlink_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
