@@ -104,9 +104,9 @@ def _stub(routes: dict[tuple[str, str], Answer]):
         server.server_close()
 
 
-def _probe(base_url: str, *extra: str) -> subprocess.CompletedProcess[str]:
+def _probe(base_url: str, *extra: str, wait: str = "2") -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["bash", str(SCRIPT), "--base-url", base_url, "--wait", "2", "--interval", "1", *extra],
+        ["bash", str(SCRIPT), "--base-url", base_url, "--wait", wait, "--interval", "1", *extra],
         capture_output=True,
         text=True,
         timeout=90,
@@ -259,7 +259,9 @@ def test_a_deploy_that_is_still_coming_up_is_waited_for_not_judged() -> None:
     routes = _good_routes({("GET", "/api/deploy"): not_yet})
 
     with _stub(routes) as url:
-        result = _probe(url, "--commit", _DEPLOY["commit"])
+        #: Wide enough that a slow machine still gets the third poll; the point of
+        #: the test is the polling, not how many attempts fit in two seconds.
+        result = _probe(url, "--commit", _DEPLOY["commit"], wait="10")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "waiting" in result.stdout.lower()
