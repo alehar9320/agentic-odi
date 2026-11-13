@@ -735,6 +735,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/assistant/extract/docx.test.ts` | `apps/studio/src/assistant/extract/common.ts`<br>`apps/studio/src/assistant/extract/docx.ts` |
 | `apps/studio/src/assistant/parts.test.tsx` | `apps/studio/src/assistant/parts.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/assistant/pending.test.ts` | `apps/studio/src/assistant/pending.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/assistant/plan.test.ts` | `apps/studio/src/assistant/plan.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/assistant/queue.test.ts` | `apps/studio/src/assistant/queue.ts` |
 | `apps/studio/src/assistant/quote.test.ts` | `apps/studio/src/assistant/quote.ts` |
 | `apps/studio/src/assistant/speech.test.ts` | `apps/studio/src/assistant/speech.ts` |
@@ -785,6 +786,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/components/chat/Dictation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | `apps/studio/src/components/chat/ModelPicker.tsx` |
 | `apps/studio/src/components/chat/PendingCalls.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/components/chat/PendingCalls.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/PlanPanel.test.tsx` | `apps/studio/src/components/chat/PlanPanel.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/chat/QueueLane.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/components/chat/QueueLane.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/SelectionToolbar.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/SelectionToolbar.tsx` |
 | `apps/studio/src/components/chat/Speech.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/types.ts` |
@@ -876,7 +878,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/updater/machine.test.ts` | `apps/studio/src/updater/machine.ts`<br>`apps/studio/src/updater/types.ts` |
 | `apps/studio/src/updater/service.test.ts` | `apps/studio/src/updater/service.ts`<br>`apps/studio/src/updater/types.ts` |
 | `apps/studio/src/updater/transport.test.ts` | `apps/studio/src/updater/transport.ts`<br>`apps/studio/src/updater/types.ts` |
-| `apps/studio/src/vendor/boundary.test.ts` | `apps/studio/src/vendor/boundary.ts`<br>`apps/studio/src/vendor/lib/utils.ts` |
+| `apps/studio/src/vendor/boundary.test.ts` | `apps/studio/src/assistant/plan.ts`<br>`apps/studio/src/vendor/boundary.ts`<br>`apps/studio/src/vendor/lib/utils.ts` |
 | `apps/studio/src/vendor/ledger.test.ts` | — no direct source pair |
 | `apps/studio/src/vendor/vendor.test.tsx` | — no direct source pair |
 | `apps/studio-api/tests/test_api.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
@@ -962,6 +964,7 @@ the code disagree, so do not edit it by hand — run
 | `packages/core/tests/test_repository_factory.py` | `packages/core/src/agentic_odi_core/sqlite_repository.py` |
 | `packages/core/tests/test_repository_health.py` | `packages/core/src/agentic_odi_core/factory.py` |
 | `packages/core/tests/test_router.py` | `packages/core/src/agentic_odi_core/router.py`<br>`packages/core/src/agentic_odi_core/steve_jobs.py` |
+| `packages/core/tests/test_schedule.py` | `packages/core/src/agentic_odi_core/schedule.py` |
 | `packages/core/tests/test_scheduled_work.py` | — no direct source pair |
 | `packages/core/tests/test_schema.py` | `packages/core/src/agentic_odi_core/schema.py` |
 | `packages/core/tests/test_segmentation.py` | `packages/core/src/agentic_odi_core/segmentation.py` |
@@ -991,6 +994,10 @@ the code disagree, so do not edit it by hand — run
 | `tests/scripts/test_gen_job_stages.py` | `scripts/gen_job_stages.py` |
 | `tests/scripts/test_hosted_first_run_workflow.py` | — no direct source pair |
 | `tests/scripts/test_label_merge_conflicts.py` | `scripts/pr_labels.py` |
+| `tests/scripts/test_pr_ai_authorize.py` | `scripts/pr_ai_authorize.py` |
+| `tests/scripts/test_pr_ai_merge.py` | `scripts/pr_ai_merge.py` |
+| `tests/scripts/test_pr_ai_merge_act.py` | — no direct source pair |
+| `tests/scripts/test_pr_ai_merge_workflow.py` | — no direct source pair |
 | `tests/scripts/test_pr_body_gate.py` | — no direct source pair |
 | `tests/scripts/test_pr_guards.py` | `scripts/pr_guards.py` |
 | `tests/scripts/test_pr_labeler_workflow.py` | — no direct source pair |
