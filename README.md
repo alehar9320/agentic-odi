@@ -105,6 +105,13 @@ curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/in
 iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
 ```
 
+**Direct download buttons.** One-click links to the latest platform assets:
+
+[![Download Linux](https://img.shields.io/badge/Linux-odi__latest__linux__x86__64.tar.gz-blue?logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_linux_x86_64.tar.gz)
+[![Download macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_macos_arm64.tar.gz)
+[![Download macOS Intel](https://img.shields.io/badge/macOS-Intel-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_macos_x86_64.tar.gz)
+[![Download Windows](https://img.shields.io/badge/Windows-odi__latest__windows__x86__64.zip-blue?logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_windows_x86_64.zip)
+
 **Per-platform archives.** Every
 [release](https://github.com/alehar9320/agentic-odi/releases/latest) also carries
 a direct build with a SHA-256 checksum. Pick the one for your machine:

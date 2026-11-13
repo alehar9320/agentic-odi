@@ -323,7 +323,9 @@
         <h3 class="run__label">Download a prebuilt archive</h3>
         <div class="run__download-list">
           {% for download in landing.run.downloads %}
-          <a class="btn btn--ghost" href="{{ download.url }}">{{ download.label }}</a>
+          <a class="btn btn--ghost badge-link" href="{{ download.url }}" aria-label="{{ download.label }}">
+            <img src="{{ download.badge_url }}" alt="{{ download.label }}">
+          </a>
           {% endfor %}
         </div>
       </div>

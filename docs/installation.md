@@ -28,6 +28,13 @@ uses `~\AppData\Local\agentic-odi\` and copies `.exe` files to
 Prefer a direct archive? Pick the build for your machine and expand it. Every
 release carries each of these with a SHA-256 checksum in `checksums.txt`:
 
+**Direct download buttons:**
+
+[![Download Linux](https://img.shields.io/badge/Linux-odi__latest__linux__x86__64.tar.gz-blue?logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_linux_x86_64.tar.gz)
+[![Download macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_macos_arm64.tar.gz)
+[![Download macOS Intel](https://img.shields.io/badge/macOS-Intel-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_macos_x86_64.tar.gz)
+[![Download Windows](https://img.shields.io/badge/Windows-odi__latest__windows__x86__64.zip-blue?logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_windows_x86_64.zip)
+
 | Platform | Archive |
 |---|---|
 | Linux (x86_64) | [`odi_0.14.0_linux_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz) |
