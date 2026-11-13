@@ -6,7 +6,8 @@ import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
 import type { StudioCommand } from "../../lib/commands";
 import { focusableWithin } from "../../lib/useFocusTrap";
 import type { StudioContextValue } from "../../state/StudioContext";
-import type { ChatMessage } from "../../types";
+import type { CanvasData, ChatMessage } from "../../types";
+import { MAX_MENTIONS, mentionFormatter, toMentionItems } from "../../assistant/mentions";
 import { ThreadComposer } from "./ThreadComposer";
 
 vi.mock("../../state/StudioContext", () => ({ useStudio: vi.fn() }));
@@ -542,5 +543,217 @@ describe("ThreadComposer oversized attachments", () => {
 
     expect(sendMessage).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
+  });
+});
+
+const mentionCanvas = {
+  jobs: [{ id: "J-1", name: "Reconcile a payment" }],
+  steps: [{ id: "S-1", job_id: "J-1", name: "Find the failure" }],
+  outcomes: [{ id: "O-1", job_id: "J-1", statement: "Minimize the time to reconcile" }],
+  evidence: [{ id: "E-1", name: "Grain call", source_name: "Grain" }],
+  source: "mcp" as const,
+};
+
+function mentionComposer(overrides: Record<string, unknown> = {}) {
+  vi.mocked(useStudio).mockReturnValue(context([], { canvas: mentionCanvas, ...overrides }));
+  render(
+    <StudioRuntimeProvider>
+      <ThreadComposer onCommand={() => {}} />
+    </StudioRuntimeProvider>,
+  );
+  return screen.getByRole("textbox", { name: "Message the studio" }) as HTMLTextAreaElement;
+}
+
+describe("ThreadComposer @ mentions", () => {
+  it("names the canvas records when @ is typed", async () => {
+    const input = mentionComposer();
+
+    fireEvent.change(input, { target: { value: "@" } });
+
+    expect(await screen.findByRole("listbox", { name: "Records" })).toBeInTheDocument();
+    const labels = screen.getAllByRole("option").map((node) => node.textContent ?? "");
+    expect(labels.some((text) => text.includes("Reconcile a payment"))).toBe(true);
+    expect(labels.some((text) => text.includes("Grain call"))).toBe(true);
+  });
+
+  it("inserts the record's own id, not its statement", async () => {
+    const input = mentionComposer();
+
+    fireEvent.change(input, { target: { value: "@minimize" } });
+    const option = await screen.findByRole("option", { name: /Minimize the time to reconcile/ });
+    fireEvent.click(option);
+
+    await waitFor(() => expect(input.value).toContain("@O-1"));
+    expect(input.value).not.toContain("Minimize the time to reconcile");
+  });
+
+  it("offers nothing to name when the canvas is empty", async () => {
+    const input = mentionComposer({ canvas: null });
+
+    fireEvent.change(input, { target: { value: "@" } });
+
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
+
+  it("sends an unknown @word as typed rather than inventing a record", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = mentionComposer({ sendMessage });
+
+    fireEvent.change(input, { target: { value: "@nobody please look" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(sendMessage).toHaveBeenCalledWith("@nobody please look", expect.anything());
+  });
+
+  it("leaves @ inside a word alone", async () => {
+    const input = mentionComposer();
+
+    fireEvent.change(input, { target: { value: "user@example.com" } });
+
+    expect(screen.queryByRole("listbox", { name: "Records" })).not.toBeInTheDocument();
+  });
+
+  it("closes on Escape without sending", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const input = mentionComposer({ sendMessage });
+
+    fireEvent.change(input, { target: { value: "@" } });
+    await screen.findByRole("listbox", { name: "Records" });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("listbox", { name: "Records" })).not.toBeInTheDocument(),
+    );
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("ThreadComposer / commands", () => {
+  it("leaves a slash inside a word as ordinary text", () => {
+    const input = renderComposer();
+
+    fireEvent.change(input, { target: { value: "team/channel" } });
+
+    expect(screen.queryByRole("listbox", { name: "Commands" })).not.toBeInTheDocument();
+  });
+
+  it("exposes slash results through the composer trigger and runs the same command", async () => {
+    const onCommand = vi.fn();
+    const input = renderComposer({}, onCommand);
+
+    fireEvent.change(input, { target: { value: "/sta" } });
+
+    const listbox = await screen.findByRole("listbox", { name: "Commands" });
+    expect(input).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(await screen.findByRole("option", { name: /\/status/ }));
+
+    expect(onCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "status" }));
+    await waitFor(() => expect(input.value).toBe(""));
+    expect(listbox).not.toBeInTheDocument();
+  });
+});
+
+describe("canvas mentions", () => {
+  const data: CanvasData = {
+    jobs: [
+      { id: "J-1", name: "Reconcile a payment" },
+      { id: "J-2", name: "Onboard a teammate" },
+    ],
+    steps: [{ id: "S-1", job_id: "J-1", name: "Find the failure", order: 1 }],
+    outcomes: [
+      {
+        id: "O-1",
+        job_id: "J-1",
+        statement: "Minimize the time to reconcile",
+        opportunity_score: 12.3,
+      },
+      { id: "O-2", job_id: "J-2", statement: "Minimize the time to get help" },
+    ],
+    evidence: [
+      { id: "E-1", name: "Grain call", source_name: "Grain", content: "We wait hours" },
+      { id: "E-2", source_name: "Support", content: "A quote with no name" },
+    ],
+    source: "mcp",
+  };
+
+  it("returns no candidates when the canvas is unavailable", () => {
+    expect(toMentionItems(null)).toEqual([]);
+    expect(toMentionItems(undefined)).toEqual([]);
+  });
+
+  it("names jobs, steps, outcomes, and evidence using their stored ids", () => {
+    const items = toMentionItems(data);
+    expect(new Set(items.map((item) => item.kind))).toEqual(
+      new Set(["job", "step", "outcome", "evidence"]),
+    );
+    expect(items.map((item) => item.id)).toEqual(expect.arrayContaining(["J-1", "S-1", "O-1", "E-1"]));
+  });
+
+  it("does not invent ids for records with empty ids", () => {
+    const noIds: CanvasData = {
+      ...data,
+      jobs: [{ id: "", name: "No id here" }],
+      outcomes: [{ id: "", statement: "Also no id" }],
+      evidence: [{ id: "", name: "Empty id" }],
+    };
+    expect(toMentionItems(noIds)).toEqual([]);
+  });
+
+  it("uses a plain label for unnamed records", () => {
+    const unnamed: CanvasData = {
+      ...data,
+      jobs: [{ id: "J-9" }],
+      outcomes: [{ id: "O-9" }],
+    };
+    const labels = toMentionItems(unnamed).map((item) => item.label);
+    expect(labels).toContain("Untitled job");
+    expect(labels).toContain("Untitled outcome");
+  });
+
+  it("shows the record kind and owning job in the hint", () => {
+    const outcome = toMentionItems(data).find((item) => item.id === "O-1");
+    expect(outcome?.hint).toContain("Outcome");
+    expect(outcome?.hint).toContain("Reconcile a payment");
+    expect(outcome?.hint).toContain("12.3");
+  });
+
+  it("uses canvas recency when there is no search query", () => {
+    const ids = toMentionItems(data).map((item) => item.id);
+    expect(ids.indexOf("E-2")).toBeLessThan(ids.indexOf("J-1"));
+  });
+
+  it("ranks an exact id match first", () => {
+    expect(toMentionItems(data, "O-2")[0]?.id).toBe("O-2");
+  });
+
+  it("ranks label prefixes ahead of other matches", () => {
+    expect(toMentionItems(data, "minimize").slice(0, 2).map((item) => item.id).sort()).toEqual([
+      "O-1",
+      "O-2",
+    ]);
+  });
+
+  it("caps the unfiltered list", () => {
+    const many: CanvasData = {
+      ...data,
+      jobs: Array.from({ length: MAX_MENTIONS + 20 }, (_, index) => ({
+        id: `J-${index}`,
+        name: `Job ${index}`,
+      })),
+    };
+    expect(toMentionItems(many)).toHaveLength(MAX_MENTIONS);
+  });
+
+  it("inserts a selected mention as its literal id", () => {
+    expect(
+      mentionFormatter.serialize({ id: "O-1", type: "outcome", label: "Minimize the time" }),
+    ).toBe("@O-1");
+  });
+
+  it("leaves unknown ids and surrounding text as ordinary prose", () => {
+    expect(mentionFormatter.parse("@O-1 please look")).toEqual([
+      { kind: "text", text: "@O-1 please look" },
+    ]);
+    expect(mentionFormatter.parse("")).toEqual([]);
   });
 });

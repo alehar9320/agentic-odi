@@ -11,8 +11,11 @@ import {
   AttachmentPrimitive,
   AuiIf,
   ComposerPrimitive,
+  unstable_useTriggerPopoverAriaProps,
+  unstable_useSlashCommandAdapter,
   useAui,
   useAuiState,
+  type TriggerAdapter,
 } from "@assistant-ui/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
@@ -28,17 +31,16 @@ import {
 } from "../../assistant/attachments";
 import { dictationSupported } from "../../assistant/dictation";
 import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
-import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
+import { mentionFormatter, toMentionItems } from "../../assistant/mentions";
+import { isSlashCommand, STUDIO_COMMANDS, type StudioCommand } from "../../lib/commands";
 import { registerComposer } from "../../lib/composerFocus";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import {
-  CommandPalette,
   ComposerHint,
   ConnectorChips,
   ContextChip,
   SuggestionPills,
-  paletteOpenFor,
 } from "./composerParts";
 import { QueueLane } from "./QueueLane";
 import { ModelPicker } from "./ModelPicker";
@@ -150,14 +152,13 @@ function ComposerBody({
   onClearAttachmentRefusal: () => void;
 }) {
   const aui = useAui();
-  const { llmHealth } = useStudio();
+  const { canvas, llmHealth } = useStudio();
   const history = useComposerHistory();
   const [recall, setRecall] = useState("");
   // A page can mount more than one composer, so every id and description needs
   // to be unique per instance rather than a fixed string in the document.
   const attachmentHelpId = useId();
   const inputId = useId();
-  const paletteId = useId();
   const text = useAuiState((state) => state.composer.text);
   const running = useAuiState((state) => state.thread.isRunning);
   // A file whose bytes never became content has to be dealt with before the
@@ -169,23 +170,36 @@ function ComposerBody({
         attachment.status.type === "incomplete" && attachment.status.reason === "error",
     ),
   );
-  const [highlight, setHighlight] = useState(0);
-  // Remember which draft was dismissed, so typing again re-opens the palette
-  // without an effect that writes state on every keystroke.
-  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
-
   const offline = llmHealth.healthy === false;
-  const matches = useMemo(() => (paletteOpenFor(text) ? matchCommands(text) : []), [text]);
-  const open = paletteOpenFor(text) && dismissedFor !== text;
-  const activeIndex = Math.min(highlight, Math.max(matches.length - 1, 0));
-  const activeCommand = matches[activeIndex];
-
-  function choose(command: StudioCommand) {
-    aui.composer.setText("");
-    setHighlight(0);
-    setDismissedFor("");
-    onCommand(command);
-  }
+  // Both trigger popovers are owned by assistant-ui. The active ARIA state
+  // tells the input which listbox is open and when the library owns its keys.
+  const triggerAria = unstable_useTriggerPopoverAriaProps();
+  const mentionOpen = triggerAria["aria-expanded"] === true;
+  // Fed from the canvas, never from a list this file invents: an unknown `@id`
+  // is sent as typed and the agent resolves it or says it does not exist.
+  const mentionAdapter: TriggerAdapter = useMemo(
+    () => ({
+      categories: () => [],
+      categoryItems: () => [],
+      search: (query) =>
+        toMentionItems(canvas, query).map((item) => ({
+          id: item.id,
+          type: item.kind,
+          label: item.label,
+          description: item.hint,
+        })),
+    }),
+    [canvas],
+  );
+  const slashAdapter = unstable_useSlashCommandAdapter({
+    commands: STUDIO_COMMANDS.map((command) => ({
+      id: command.id,
+      label: command.name,
+      description: command.description,
+      execute: () => onCommand(command),
+    })),
+    removeOnExecute: true,
+  });
 
   // The runtime owns the textarea, so the shell's shortcuts reach it through
   // the id this composer already gives its input and label.
@@ -195,8 +209,6 @@ function ComposerBody({
         focus: () => document.getElementById(inputId)?.focus(),
         startCommand: () => {
           aui.composer.setText("/");
-          setHighlight(0);
-          setDismissedFor("");
           document.getElementById(inputId)?.focus();
         },
       }),
@@ -212,32 +224,13 @@ function ComposerBody({
       return;
     }
 
-    if (open) {
-      if (event.nativeEvent.isComposing || event.keyCode === 229) {
-        return;
-      }
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        if (!matches.length) {
-          return;
-        }
-        const delta = event.key === "ArrowDown" ? 1 : -1;
-        setHighlight((index) => (index + delta + matches.length) % matches.length);
-        return;
-      }
-      if ((event.key === "Enter" || event.key === "Tab") && activeCommand) {
-        event.preventDefault();
-        choose(activeCommand);
-        return;
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setDismissedFor(text);
-        return;
-      }
+    // Either trigger popover owns the keyboard while it is open. The library
+    // moves the highlight, selects on Enter, and closes on Escape.
+    if (mentionOpen) {
+      return;
     }
 
-    // A command typed straight through — palette closed or never opened — is
+    // A command typed straight through — popover closed or never opened — is
     // still a command, and must never be sent to the model as prose.
     if (
       event.key === "Enter" &&
@@ -248,7 +241,6 @@ function ComposerBody({
     ) {
       event.preventDefault();
       aui.composer.setText("");
-      setDismissedFor("");
       onSlashCommand(text);
       return;
     }
@@ -268,8 +260,8 @@ function ComposerBody({
       return;
     }
 
-    // The palette owns the arrows while it is open; history must not fight it.
-    if (open || event.defaultPrevented) {
+    // A popover may have handled the key already; history must not fight it.
+    if (event.defaultPrevented) {
       return;
     }
 
@@ -288,18 +280,57 @@ function ComposerBody({
         {recall}
       </p>
       <SuggestionPills />
-      <CommandPalette
-        id={paletteId}
-        open={open}
-        matches={matches}
-        activeIndex={activeIndex}
-        onHover={setHighlight}
-        onChoose={choose}
-      />
       <ConnectorChips />
       <ContextChip />
       <QueueLane />
       <AttachmentRow onRemove={onClearAttachmentRefusal} />
+      {/* `@` names a real canvas record: the popover reads its items from the
+          canvas and inserts the record's own id, so the agent resolves the id
+          or says it does not know it. An unknown `@id` is sent as typed. */}
+      <ComposerPrimitive.TriggerPopover char="@" adapter={mentionAdapter} aria-label="Records">
+        <ComposerPrimitive.TriggerPopover.Directive formatter={mentionFormatter} />
+        <ComposerPrimitive.TriggerPopoverItems>
+          {(items) =>
+            items.map((item, index) => (
+              <ComposerPrimitive.TriggerPopoverItem
+                key={`${item.type}:${item.id}`}
+                item={item}
+                index={index}
+                className="palette__item"
+              >
+                <span className="palette__text">
+                  <span className="palette__label">{item.label}</span>
+                  <span className="palette__description">{item.description}</span>
+                </span>
+              </ComposerPrimitive.TriggerPopoverItem>
+            ))
+          }
+        </ComposerPrimitive.TriggerPopoverItems>
+      </ComposerPrimitive.TriggerPopover>
+      <ComposerPrimitive.TriggerPopover
+        char="/"
+        adapter={slashAdapter.adapter}
+        aria-label="Commands"
+      >
+        <ComposerPrimitive.TriggerPopover.Action {...slashAdapter.action} />
+        <ComposerPrimitive.TriggerPopoverItems>
+          {(items) =>
+            items.map((item, index) => (
+              <ComposerPrimitive.TriggerPopoverItem
+                key={item.id}
+                item={item}
+                index={index}
+                className="palette__item"
+              >
+                <span className="palette__text">
+                  <span className="palette__label">{item.label}</span>
+                  <span className="palette__description">{item.description}</span>
+                </span>
+              </ComposerPrimitive.TriggerPopoverItem>
+            ))
+          }
+        </ComposerPrimitive.TriggerPopoverItems>
+      </ComposerPrimitive.TriggerPopover>
       {attachmentRefusal && (
         <p className="attachment-refusal" role="status" aria-live="polite">
           {attachmentRefusal}
@@ -341,7 +372,7 @@ function ComposerBody({
           }
           aria-autocomplete="list"
           aria-haspopup="listbox"
-          aria-controls={open ? paletteId : undefined}
+          {...triggerAria}
           onKeyDown={onKeyDown}
           // This composer owns pasting: the library's built-in handler would
           // preventDefault whenever the clipboard carries a file, which is the
@@ -469,48 +500,50 @@ export function ThreadComposer(props: {
   }
 
   return (
-    <ComposerPrimitive.Root
-      className={`composer${dragging ? " is-dragging" : ""}`}
-      onDragEnter={(event) => {
-        if (!hasFiles(event)) {
-          return;
-        }
-        event.preventDefault();
-        dragDepth.current += 1;
-        setDragging(true);
-      }}
-      onDragOver={(event) => {
-        if (!hasFiles(event)) {
-          return;
-        }
-        // Without this the browser opens the dropped file instead.
-        event.preventDefault();
-      }}
-      onDragLeave={() => {
-        // Leave events often carry no types, so this only ever removes depth we
-        // added on a file drag.
-        dragDepth.current = Math.max(dragDepth.current - 1, 0);
-        if (dragDepth.current === 0) {
+    <ComposerPrimitive.TriggerPopoverRoot>
+      <ComposerPrimitive.Root
+        className={`composer${dragging ? " is-dragging" : ""}`}
+        onDragEnter={(event) => {
+          if (!hasFiles(event)) {
+            return;
+          }
+          event.preventDefault();
+          dragDepth.current += 1;
+          setDragging(true);
+        }}
+        onDragOver={(event) => {
+          if (!hasFiles(event)) {
+            return;
+          }
+          // Without this the browser opens the dropped file instead.
+          event.preventDefault();
+        }}
+        onDragLeave={() => {
+          // Leave events often carry no types, so this only ever removes depth we
+          // added on a file drag.
+          dragDepth.current = Math.max(dragDepth.current - 1, 0);
+          if (dragDepth.current === 0) {
+            setDragging(false);
+          }
+        }}
+        onDrop={(event) => {
+          if (!hasFiles(event)) {
+            return;
+          }
+          event.preventDefault();
+          dragDepth.current = 0;
           setDragging(false);
-        }
-      }}
-      onDrop={(event) => {
-        if (!hasFiles(event)) {
-          return;
-        }
-        event.preventDefault();
-        dragDepth.current = 0;
-        setDragging(false);
-        attachFiles(Array.from(event.dataTransfer.files));
-      }}
-    >
-      {dragging ? <p className="composer__drop-hint">Drop to attach</p> : null}
-      <ComposerBody
-        {...props}
-        onFiles={attachFiles}
-        attachmentRefusal={refusal}
-        onClearAttachmentRefusal={() => setRefusal(null)}
-      />
-    </ComposerPrimitive.Root>
+          attachFiles(Array.from(event.dataTransfer.files));
+        }}
+      >
+        {dragging ? <p className="composer__drop-hint">Drop to attach</p> : null}
+        <ComposerBody
+          {...props}
+          onFiles={attachFiles}
+          attachmentRefusal={refusal}
+          onClearAttachmentRefusal={() => setRefusal(null)}
+        />
+      </ComposerPrimitive.Root>
+    </ComposerPrimitive.TriggerPopoverRoot>
   );
 }

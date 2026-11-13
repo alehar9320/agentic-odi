@@ -95,6 +95,13 @@ npm --prefix apps/studio run build       # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
+`src/components/chat/ThreadComposer.test.tsx` covers `/` command selection,
+`@` record lookup, and the popovers' keyboard ownership:
+
+```bash
+npm --prefix apps/studio test -- --run src/components/chat/ThreadComposer.test.tsx
+```
+
 The build version is a single source of truth. `__STUDIO_VERSION__` is baked into
 the Vite build from `apps/studio/package.json` (`vite.config.ts`) and exposed
 through `src/lib/version.ts`; `src/lib/version.test.ts` fails if it drifts from
