@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ThreadPrimitive, useThreadViewport } from "@assistant-ui/react";
 
@@ -21,6 +21,9 @@ import { GuidanceHint } from "./GuidanceHint";
 import { Hero } from "./Hero";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { ThreadComposer } from "./ThreadComposer";
+import { getStudioBff } from "../../bff/index";
+import { InterviewPersistence } from "../../assistant/interview/persistence";
+import { restoreInterviewConductor } from "../../assistant/interview/conductor";
 
 const VIEW_COMMANDS = new Set<string>([
   "records",
@@ -97,9 +100,41 @@ export function ChatStage() {
     settings,
     mcpReachable,
     llmHealth,
+    focusedJobId,
   } = useStudio();
 
   const empty = messages.length === 0;
+
+  // Restore interview draft on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreDraft() {
+      try {
+        const bff = await getStudioBff();
+        const persistence = new InterviewPersistence(bff.store);
+        // Prefer the brief's job_id, fall back to focusedJobId
+        const jobId = brief?.job_id ?? focusedJobId;
+        if (!jobId) {
+          return;
+        }
+        const conductor = await restoreInterviewConductor(jobId, persistence);
+        if (conductor && !cancelled) {
+          // Draft restored successfully. The conductor holds the restored state.
+          // When the interview UI is implemented (#396, #397), it will use this conductor.
+          console.debug("[Interview] Restored draft for job", jobId, conductor.state);
+        }
+      } catch (error) {
+        // Fail soft: a storage failure never blocks the interview.
+        console.debug("[Interview] Failed to restore draft:", error);
+      }
+    }
+
+    restoreDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [brief?.job_id, focusedJobId]);
 
   function runCommand(command: StudioCommand) {
     if (VIEW_COMMANDS.has(command.id)) {

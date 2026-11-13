@@ -13,6 +13,7 @@ import {
   byCreated,
   bySeq,
   type DrainLease,
+  type InterviewDraft,
   type LocalStore,
   type OutboxRecord,
   type StoredConversation,
@@ -431,6 +432,26 @@ export class IndexedDbLocalStore implements LocalStore {
 
   close(): void {
     this.db.close();
+  }
+
+  async putInterviewDraft(draft: InterviewDraft): Promise<void> {
+    await this.db.put("interview_drafts", draft);
+  }
+
+  async getInterviewDraft(jobId: string): Promise<InterviewDraft | undefined> {
+    const drafts = await this.db.getAllFromIndex("interview_drafts", "by-job", jobId);
+    if (drafts.length === 0) {
+      return undefined;
+    }
+    // Return the most recently updated draft
+    return drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  }
+
+  async deleteInterviewDraft(jobId: string): Promise<void> {
+    const drafts = await this.db.getAllFromIndex("interview_drafts", "by-job", jobId);
+    const tx = this.db.transaction("interview_drafts", "readwrite");
+    await Promise.all(drafts.map((draft) => tx.store.delete(draft.id)));
+    await tx.done;
   }
 }
 

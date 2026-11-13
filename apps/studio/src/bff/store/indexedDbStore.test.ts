@@ -224,6 +224,8 @@ describe("IndexedDbLocalStore", () => {
     // The later stores are added, and they start empty.
     expect(after.outbox).toEqual([]);
     expect(after.evidence).toEqual([]);
+    // The interview_drafts store is added, and it starts empty.
+    expect(after.interview_drafts).toEqual([]);
     store.close();
 
     // The migrated schema equals a fresh database: same stores, key paths,
@@ -435,6 +437,12 @@ function expectedSchema() {
       keyPath: "id",
       autoIncrement: false,
       indexes: ["by-job", "by-seq"],
+    },
+    {
+      store: "interview_drafts",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-updated"],
     },
     {
       store: "jobs",

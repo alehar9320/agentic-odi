@@ -4,6 +4,7 @@ import {
   byCreated,
   bySeq,
   type DrainLease,
+  type InterviewDraft,
   type LocalStore,
   type OutboxRecord,
   type StoredConversation,
@@ -28,6 +29,7 @@ export class MemoryLocalStore implements LocalStore {
   private readonly conversations = new Map<string, StoredConversation>();
   private readonly turns: StoredTurn[] = [];
   private readonly outbox = new Map<string, OutboxRecord>();
+  private readonly interviewDrafts = new Map<string, InterviewDraft>();
   private lease: DrainLease | null = null;
 
   // A Map-backed store has no second connection to lose, so it never asks for a
@@ -336,9 +338,32 @@ export class MemoryLocalStore implements LocalStore {
     this.conversations.clear();
     this.turns.length = 0;
     this.outbox.clear();
+    this.interviewDrafts.clear();
     this.lease = null;
     this.seq = 0;
     this.turnId = 0;
+  }
+
+  async putInterviewDraft(draft: InterviewDraft): Promise<void> {
+    this.interviewDrafts.set(draft.id, draft);
+  }
+
+  async getInterviewDraft(jobId: string): Promise<InterviewDraft | undefined> {
+    const drafts = [...this.interviewDrafts.values()].filter(
+      (draft) => draft.jobId === jobId,
+    );
+    if (drafts.length === 0) {
+      return undefined;
+    }
+    return drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  }
+
+  async deleteInterviewDraft(jobId: string): Promise<void> {
+    for (const [id, draft] of this.interviewDrafts.entries()) {
+      if (draft.jobId === jobId) {
+        this.interviewDrafts.delete(id);
+      }
+    }
   }
 
   close(): void {
