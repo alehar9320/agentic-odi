@@ -126,6 +126,7 @@ the pure count arithmetic:
 | `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
 | `apps/studio/src/assistant/quote.test.ts`, `src/components/chat/SelectionToolbar.test.tsx` | Quoting a passage verbatim with its attribution, one copy only, and no toolbar until text is selected |
 | `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
+| `apps/studio/src/assistant/pending.test.ts`, `src/components/chat/PendingCalls.test.tsx` | The pending-call strip (#390): only running and awaiting-approval calls appear, in transcript order, a settled call leaves the strip for the transcript, a clock is shown only when the store recorded a start, and the strip is never a second live region |
 | `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
 | `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
 | `apps/studio/src/assistant/speech.test.ts`, `src/components/chat/Speech.test.tsx` | The speech support gate, speaking a settled reply, stopping on request and on Escape, and the absence of the control where the API is missing |
@@ -175,6 +176,14 @@ uv run --directory website pytest tests/
 
 The site is generated at CI time and never committed. CI runs `build_site.py` to
 produce `_site` and uploads it as the `website-site` artifact for review.
+
+Every page that uses the shared shell gets **its own social card**: `build_site.py`
+calls `make_og.render_card()` with the page's own `og:title`, the docs nav group it
+sits under, and the one number the page itself renders (the landing page's stat, the
+MCP reference's tool count). Nothing is invented - a page with no number of its own
+is drawn without one - and a page that ends up with no card fails the build with
+`MissingCardError`. The cards land in the build output under `og/`, never in git.
+`website/tests/test_og_pages.py` asserts the contract.
 
 The landing page's primary call to action points at the **sample workspace**,
 `website/sample/index.html`. Unlike the rest of the site it *is* committed, so
@@ -659,6 +668,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/assistant/extract/common.test.ts` | `apps/studio/src/assistant/extract/common.ts` |
 | `apps/studio/src/assistant/extract/docx.test.ts` | `apps/studio/src/assistant/extract/common.ts`<br>`apps/studio/src/assistant/extract/docx.ts` |
 | `apps/studio/src/assistant/parts.test.tsx` | `apps/studio/src/assistant/parts.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/assistant/pending.test.ts` | `apps/studio/src/assistant/pending.ts`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/assistant/queue.test.ts` | `apps/studio/src/assistant/queue.ts` |
 | `apps/studio/src/assistant/quote.test.ts` | `apps/studio/src/assistant/quote.ts` |
 | `apps/studio/src/assistant/speech.test.ts` | `apps/studio/src/assistant/speech.ts` |
@@ -708,6 +718,7 @@ the code disagree, so do not edit it by hand — run
 | `apps/studio/src/components/chat/Conversation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/lib/relativeTime.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
 | `apps/studio/src/components/chat/Dictation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/ModelPicker.test.tsx` | `apps/studio/src/components/chat/ModelPicker.tsx` |
+| `apps/studio/src/components/chat/PendingCalls.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/components/chat/PendingCalls.tsx`<br>`apps/studio/src/types.ts` |
 | `apps/studio/src/components/chat/QueueLane.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/components/chat/QueueLane.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
 | `apps/studio/src/components/chat/SelectionToolbar.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/SelectionToolbar.tsx` |
 | `apps/studio/src/components/chat/Speech.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/types.ts` |
@@ -948,6 +959,7 @@ the code disagree, so do not edit it by hand — run
 | `website/tests/test_docs_render.py` | `scripts/artifact_a11y.py`<br>`website/tools/build_site.py`<br>`website/tools/markdown_render.py` |
 | `website/tests/test_generated.py` | `website/tools/build_site.py`<br>`website/tools/extract.py` |
 | `website/tests/test_make_og.py` | `website/tools/make_og.py` |
+| `website/tests/test_og_pages.py` | `website/tools/build_site.py`<br>`website/tools/make_og.py` |
 | `website/tests/test_pages_deploy.py` | — no direct source pair |
 | `website/tests/test_site.py` | `scripts/artifact_a11y.py`<br>`website/tools/extract.py` |
 | `website/tests/test_theme.py` | — no direct source pair |

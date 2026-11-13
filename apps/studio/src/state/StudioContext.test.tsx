@@ -1561,9 +1561,11 @@ describe("StudioContext probe scheduling", () => {
     });
     expect(llmHealthFetches).toBe(afterBoot);
 
-    // ...and one has fired by the longest.
+    // ...and one has fired by the longest. The margin covers the boot settle:
+    // the timer can be armed after the mount (a boot report re-arms it), so the
+    // wait is anchored on the longest delay plus the boot's own 2.5 s.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(longest - shortest + 2_000);
+      await vi.advanceTimersByTimeAsync(longest - shortest + 5_000);
     });
     expect(llmHealthFetches).toBeGreaterThan(afterBoot);
   });
