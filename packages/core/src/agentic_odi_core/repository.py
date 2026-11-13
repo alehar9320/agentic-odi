@@ -221,6 +221,8 @@ class Repository(Protocol):
 
     def last_event_id(self) -> int: ...
 
+    def last_input_event_id(self) -> int: ...
+
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -248,6 +250,7 @@ class InMemoryRepository:
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
         self._last_event_id = 0
+        self._last_input_event_id = 0
 
     def last_event_id(self) -> int:
         """Id of the most recent stored write, 0 before any.
@@ -258,9 +261,25 @@ class InMemoryRepository:
         """
         return self._last_event_id
 
+    def last_input_event_id(self) -> int:
+        """Id of the most recent write that is an input to derivation.
+
+        Segments and strategies are derived *from* the store, so writing one is
+        not a change to the inputs a later derivation would read. Counting only
+        the non-derived writes is what lets a freshly derived artifact read as
+        current while a later outcome rescore makes it stale.
+        """
+        return self._last_input_event_id
+
     def _append_event(self) -> None:
         #: Spend an id only where the event-sourced store would append an event:
         #: a write that found nothing to change must not look like a new change.
+        self._last_event_id += 1
+        self._last_input_event_id += 1
+
+    def _append_derived_event(self) -> None:
+        #: A derived write spends an event id but leaves the input revision
+        #: where it was, so deriving twice from the same inputs reads as fresh.
         self._last_event_id += 1
 
     def add_job(self, job: Job) -> Job:
@@ -539,7 +558,7 @@ class InMemoryRepository:
         return new_evidence
 
     def add_signal(self, signal: Signal) -> Signal:
-        self._append_event()
+        self._append_derived_event()
         self.signals[signal.id] = signal
         return signal
 
@@ -559,7 +578,7 @@ class InMemoryRepository:
         if signal is None:
             return None
         if signal.read_at is None:
-            self._append_event()
+            self._append_derived_event()
             signal.read_at = datetime.now(timezone.utc)
         return signal
 
@@ -568,7 +587,7 @@ class InMemoryRepository:
         if signal is None:
             return None
         if signal.dismissed_at is None:
-            self._append_event()
+            self._append_derived_event()
             signal.dismissed_at = datetime.now(timezone.utc)
         return signal
 
@@ -612,7 +631,7 @@ class InMemoryRepository:
         return False
 
     def add_segment(self, segment: Segment) -> Segment:
-        self._append_event()
+        self._append_derived_event()
         self.segments[segment.id] = segment
         return segment
 
@@ -629,7 +648,7 @@ class InMemoryRepository:
         segment = self.segments.get(segment_id)
         if segment is None:
             return None
-        self._append_event()
+        self._append_derived_event()
         current = segment.model_dump(exclude_unset=True)
         current.update(updates)
         new_segment = segment.model_validate(current)
@@ -662,7 +681,7 @@ class InMemoryRepository:
         return new_study
 
     def add_strategy(self, strategy: Strategy) -> Strategy:
-        self._append_event()
+        self._append_derived_event()
         self.strategies[strategy.id] = strategy
         return strategy
 
@@ -679,7 +698,7 @@ class InMemoryRepository:
         strategy = self.strategies.get(strategy_id)
         if strategy is None:
             return None
-        self._append_event()
+        self._append_derived_event()
         current = strategy.model_dump(exclude_unset=True)
         current.update(updates)
         new_strategy = strategy.model_validate(current)
@@ -697,6 +716,7 @@ class InMemoryRepository:
         #: The event-sourced store empties its log and restarts numbering, so the
         #: counter starts over with it.
         self._last_event_id = 0
+        self._last_input_event_id = 0
         self.jobs.clear()
         self.scheduled_work.clear()
         self.steps.clear()
