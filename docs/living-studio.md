@@ -81,7 +81,7 @@ handled in the SPA and never call the model, so they work when it is offline.
 | `/new` | New conversation |
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
-| `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/settings` | Open that lens beside the conversation |
+| `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/dashboard`, `/settings` | Open that lens beside the conversation |
 | `/brief` | Open the decision brief — the document a review reads, ready to download or print |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
