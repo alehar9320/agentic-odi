@@ -6,9 +6,12 @@
   --bg-raised: #0e1014;
   --text: #f1f2f4;
   --muted: #a2a7b3;
-  --faint: #7d828c;
+  --faint: #9096a2;
   --accent: #8b8cf8;
   --accent-strong: #6366f1;
+  /* The ink that sits on an accent fill. Dark theme accents are light, so the
+     readable ink is dark; the light theme flips it back to white. */
+  --accent-contrast: #05060a;
   --green: #4ade80;
   --amber: #f0b34a;
   --red: #f87171;
@@ -85,11 +88,12 @@ html.theme-light {
   --bg-raised: #ffffff;
   --text: #15171c;
   --muted: #565d6b;
-  --faint: #687080;
-  --accent: #5b5bd6;
+  --faint: #5f6675;
+  --accent: #4a4ac0;
   --accent-strong: #4f46e5;
+  --accent-contrast: #ffffff;
   --green: #15803d;
-  --amber: #b45309;
+  --amber: #9a4a06;
   --red: #b91c1c;
   --line: rgba(15, 23, 42, 0.09);
   --line-strong: rgba(15, 23, 42, 0.18);
@@ -3061,7 +3065,7 @@ button.message__tag:hover {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--accent-strong);
-  color: #ffffff;
+  color: var(--accent-contrast);
   font-size: 0.62rem;
   font-weight: 700;
   box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
@@ -3371,7 +3375,7 @@ html.theme-fading *::after {
 
 .studio-button--primary {
   background: linear-gradient(135deg, var(--studio-indigo) 0%, var(--studio-indigo-strong) 100%);
-  color: #ffffff;
+  color: var(--accent-contrast);
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
@@ -3858,7 +3862,7 @@ html.theme-fading *::after {
 .ui-action--primary {
   background: var(--studio-indigo-strong);
   border-color: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .ui-action--primary:hover {
@@ -4258,18 +4262,18 @@ html.theme-fading *::after {
 /* Discrete Changelog Modal (Steve Jobs Quality)                     */
 /* ------------------------------------------------------------------ */
 .pill-changelog {
-  background: rgba(129, 140, 248, 0.18);
-  color: #a5b4fc;
-  border: 1px solid rgba(129, 140, 248, 0.4);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   cursor: pointer;
   transition: all var(--motion-base) ease;
 }
 
 .pill-changelog:hover {
-  background: rgba(129, 140, 248, 0.3);
-  border-color: #818cf8;
-  color: #ffffff;
-  box-shadow: 0 0 12px rgba(129, 140, 248, 0.25);
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .changelog-overlay {
@@ -4318,7 +4322,7 @@ html.theme-fading *::after {
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.1em;
-  color: #818cf8;
+  color: var(--accent);
   margin-bottom: 4px;
 }
 
@@ -4328,7 +4332,7 @@ html.theme-fading *::after {
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--accent-strong);
-  color: #ffffff;
+  color: var(--accent-contrast);
   font-size: 0.68rem;
   font-weight: 700;
 }
@@ -4339,7 +4343,7 @@ html.theme-fading *::after {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #818cf8;
+  color: var(--accent);
 }
 
 .changelog-modal__title {
@@ -5032,7 +5036,7 @@ details[open] summary {
   gap: 8px;
   padding: 12px 18px 16px;
   border-top: 1px solid var(--line);
-  background: linear-gradient(to top, rgba(10, 11, 14, 0.9), transparent);
+  background: linear-gradient(to top, var(--bg) 90%, transparent);
 }
 
 .lens__note {
@@ -5614,7 +5618,7 @@ details[open] summary {
 .approval__allow {
   background: var(--accent-strong);
   border-color: transparent;
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .approval__allow:hover:not(:disabled),
@@ -6116,7 +6120,7 @@ details[open] summary {
 .banner__action--primary {
   border-color: transparent;
   background: var(--accent-strong);
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .banner__dismiss {
@@ -6644,7 +6648,7 @@ details[open] summary {
 
 .suggestion-modal__primary {
   background: var(--accent-strong);
-  color: #ffffff;
+  color: var(--accent-contrast);
 }
 
 /* ------------------------------------------------------------------ */
@@ -7099,7 +7103,7 @@ details[open] summary {
 
 .share-sheet__primary {
   background: var(--accent-strong);
-  color: #ffffff;
+  color: var(--accent-contrast);
 }
 
 .share-sheet__note {
