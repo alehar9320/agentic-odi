@@ -12,10 +12,11 @@ import {
 import { DiagnosticsModal } from "../../../diagnostics/DiagnosticsModal";
 import { PRODUCT_NAME } from "../../../lib/brand";
 import { resolveTheme } from "../../../lib/theme";
-import type { StudioConfig } from "../../../types";
-import { useUpdateService, useUpdateSnapshot } from "../../../updater";
-import { detectPlatform } from "../../../updater/platform";
 import { versionLabel } from "../../../lib/version";
+import { useOnboarding } from "../../../onboarding/context";
+import type { StudioConfig } from "../../../types";
+import { useUpdateSnapshot } from "../../../updater";
+import { detectPlatform } from "../../../updater/platform";
 
 const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
   macos: "macOS",
@@ -24,6 +25,11 @@ const PLATFORM_LABELS: Record<ReturnType<typeof detectPlatform>, string> = {
   unknown: "Desktop",
 };
 
+/** The product essay that used to sit behind "How the studio works". */
+const PRODUCT_ESSAY =
+  "Backlogs and ticket accounting give way to a canvas of human intent. Point at an outcome, " +
+  "then talk about it: every bet traces back to evidence, and impact is simulated before code " +
+  "gets written.";
 /**
  * One honest line for a support thread: which host, how it reaches home, and
  * whether the offline shell is on. No URL and no key — this is the same fact
@@ -41,14 +47,20 @@ interface AboutSectionProps {
 }
 
 /**
- * The honest facts about this build: which version, cut when, for which
- * platform, and what the updater thinks. Read-only — the controls live in
- * the Software update section above.
+ * The honest facts about this build: which version, which commit, cut when, and
+ * for which platform — plus the essay about what the studio is and the one way
+ * to start the tour. Read-only: the updater's state and its action live in
+ * Updates, so nothing here repeats them.
+ *
+ * The version is never a literal. `versionLabel` takes the desktop updater's
+ * running version when it has one and falls back to the version baked in from
+ * `apps/studio/package.json`, which release-please bumps alongside
+ * `_build_info.py`.
  */
 export function AboutSection({ settings, capabilities }: AboutSectionProps) {
-  const service = useUpdateService();
   const snapshot = useUpdateSnapshot();
   const platform = detectPlatform();
+  const { enabled: tourEnabled, openTour } = useOnboarding();
   const facts = runtimeFacts();
   const label = versionLabel(snapshot.currentVersion);
   const [diagnosticsJson, setDiagnosticsJson] = useState<string | null>(null);
@@ -67,7 +79,7 @@ export function AboutSection({ settings, capabilities }: AboutSectionProps) {
     const bundle = createDiagnosticsBundle({
       version: label.version,
       versionSource: label.source,
-      build: __STUDIO_BUILD_DATE__,
+      build: `${__STUDIO_BUILD_DATE__} (${__STUDIO_BUILD_COMMIT__})`,
       platform: PLATFORM_LABELS[platform],
       theme: resolveTheme(settings.theme),
       reachable,
@@ -98,18 +110,26 @@ export function AboutSection({ settings, capabilities }: AboutSectionProps) {
         About
       </h3>
       <p className="muted">{PRODUCT_NAME} is a local-first workspace for outcome-driven work.</p>
+      <p className="muted">{PRODUCT_ESSAY}</p>
       <dl>
         <dt>Version</dt>
         <dd>v{label.version}</dd>
-        <dt>Build</dt>
+        <dt>Commit</dt>
+        <dd>{__STUDIO_BUILD_COMMIT__}</dd>
+        <dt>Build date</dt>
         <dd>{__STUDIO_BUILD_DATE__}</dd>
         <dt>Runtime</dt>
         <dd>{runtimeLine(facts)}</dd>
         <dt>Platform</dt>
         <dd>{PLATFORM_LABELS[platform]}</dd>
-        <dt>Updates</dt>
-        <dd>{service.statusLine()}</dd>
       </dl>
+      {tourEnabled ? (
+        <p className="settings__tour">
+          <button type="button" className="settings__tour-link" onClick={openTour}>
+            Take the tour
+          </button>
+        </p>
+      ) : null}
       <div className="diagnostics-about">
         <h4>Diagnostics</h4>
         <p className="muted">
