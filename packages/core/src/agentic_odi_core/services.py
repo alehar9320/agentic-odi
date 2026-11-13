@@ -18,7 +18,6 @@ from agentic_odi_core.evaluation import (
     evaluate_outcome_statement,
     require_outcome_statement,
 )
-from agentic_odi_core.messages import candidate_reason_required
 from agentic_odi_core.freshness import is_stale
 from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
 from agentic_odi_core.mapping import (
@@ -27,6 +26,7 @@ from agentic_odi_core.mapping import (
     ProposalStatus,
     ProposalStrategy,
 )
+from agentic_odi_core.messages import candidate_reason_required
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
@@ -44,8 +44,8 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
-    OutcomeCandidate,
     OutcomeAlignment,
+    OutcomeCandidate,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -1171,7 +1171,8 @@ class ODIService:
                 "outcome_id": outcome.id,
             },
         )
-        assert accepted is not None  # the candidate existed a moment ago
+        if accepted is None:  # the candidate existed a moment ago
+            raise CandidateNotFoundError(candidate.id)
         return accepted, outcome, evidence
 
     def reject_candidate(self, candidate_id: str, *, reason: str) -> OutcomeCandidate:
@@ -1195,7 +1196,8 @@ class ODIService:
             candidate_id,
             {"status": CandidateStatus.REJECTED, "decision_reason": cleaned},
         )
-        assert rejected is not None
+        if rejected is None:
+            raise CandidateNotFoundError(candidate_id)
         return rejected
 
     def _candidate_evidence(self, candidate: OutcomeCandidate) -> Evidence:

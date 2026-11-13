@@ -612,6 +612,7 @@ def render_funnel_summary(counts: Any, conversions: Any, *, as_json: bool) -> st
         empty="Nothing counted yet — this store has no funnel events.",
     )
 
+
 def render_interview(item: Any, *, as_json: bool) -> str:
     """Render one interview as a labelled block or JSON."""
     if not isinstance(item, dict):
@@ -629,6 +630,7 @@ def render_interview(item: Any, *, as_json: bool) -> str:
             ("source_kind", item.get("source_kind", "")),
         ]
     )
+
 
 def render_interview_list(items: Any, *, as_json: bool) -> str:
     """Render interviews as an aligned table or JSON."""
@@ -650,6 +652,7 @@ def render_interview_list(items: Any, *, as_json: bool) -> str:
         empty="No interviews found.",
     )
 
+
 def render_quote_list(items: Any, *, as_json: bool) -> str:
     """Render quotes as an aligned table or JSON, with ordinal and speaker."""
     if not isinstance(items, list):
@@ -669,6 +672,7 @@ def render_quote_list(items: Any, *, as_json: bool) -> str:
         empty="No quotes found.",
     )
 
+
 def render_candidate(item: Any, *, as_json: bool) -> str:
     """Render one outcome candidate as a labelled block or JSON."""
     if not isinstance(item, dict):
@@ -686,6 +690,7 @@ def render_candidate(item: Any, *, as_json: bool) -> str:
             ("outcome_id", item.get("outcome_id") or ""),
         ]
     )
+
 
 def render_candidate_list(items: Any, *, as_json: bool) -> str:
     """Render outcome candidates as an aligned table or JSON."""
@@ -705,6 +710,7 @@ def render_candidate_list(items: Any, *, as_json: bool) -> str:
         ],
         empty="No outcome candidates found.",
     )
+
 
 def render_candidate_acceptance(result: Any, *, as_json: bool) -> str:
     """Render an acceptance: the new outcome, its score, and the evidence quote."""

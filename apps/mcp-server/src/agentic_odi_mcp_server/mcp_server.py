@@ -19,14 +19,11 @@ from agentic_odi_core import (
     TOOL_SPECS,
     CandidateNotFoundError,
     CandidateStatus,
-    CustomerOutcomeNotFoundError,
-    EvidenceItemType,
-    EvidenceNotFoundError,
-    InterviewNotFoundError,
     ClaimCheckError,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
+    InterviewNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
     JobStage,
@@ -34,8 +31,8 @@ from agentic_odi_core import (
     ODIService,
     OutcomeNotFoundError,
     OutcomeStatementError,
-    QuoteNotFoundError,
     ProposalStatus,
+    QuoteNotFoundError,
     ScheduledWorkNotFoundError,
     SignalNotFoundError,
     StepNotFoundError,
@@ -833,7 +830,10 @@ def list_candidates(
     try:
         resolved = CandidateStatus(status) if status is not None else None
     except ValueError:
-        return _fail(ValueError(f"unknown candidate status: {status}"), f"Error: unknown candidate status: {status}")
+        return _fail(
+            ValueError(f"unknown candidate status: {status}"),
+            f"Error: unknown candidate status: {status}",
+        )
     items = service.list_candidates(
         interview_id=interview_id, status=resolved, limit=limit, offset=offset
     )
@@ -862,7 +862,10 @@ def update_candidate(
         try:
             updates["status"] = CandidateStatus(status)
         except ValueError:
-            return _fail(ValueError(f"unknown candidate status: {status}"), f"Error: unknown candidate status: {status}")
+            return _fail(
+                ValueError(f"unknown candidate status: {status}"),
+                f"Error: unknown candidate status: {status}",
+            )
     if statement is not None:
         updates["statement"] = statement
     if decision_reason is not None:

@@ -9,8 +9,8 @@ from typing import Any, Protocol, TypeVar
 
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
-    CandidateStatus,
     V2MOM,
+    CandidateStatus,
     CustomerOutcome,
     Evidence,
     Interview,
@@ -832,6 +832,7 @@ class InMemoryRepository:
 
     def delete_candidate(self, candidate_id: str) -> bool:
         return self.candidates.pop(candidate_id, None) is not None
+
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
         self.v2mom[V2MOM_ID] = v2mom
         return v2mom
