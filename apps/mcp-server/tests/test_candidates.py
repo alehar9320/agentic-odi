@@ -18,6 +18,17 @@ def _text(result) -> str:
     return content.text
 
 
+def _human(result) -> str:
+    """The sentence a text-only client reads: the envelope's message, else the raw text."""
+    text = _text(result)
+    if text.startswith("{"):
+        try:
+            return json.loads(text)["message"]
+        except (ValueError, KeyError):
+            return text
+    return text
+
+
 def _json_after_prefix(text: str) -> dict:
     """The tools prefix success messages; take the JSON object that follows."""
     return json.loads(text[text.index("{") :])
@@ -86,7 +97,7 @@ async def test_update_candidate_reports_unknown_status() -> None:
         result = await client.call_tool(
             "update_candidate", {"candidate_id": candidates[0]["id"], "status": "sideways"}
         )
-    assert _text(result) == "Error: unknown candidate status: sideways"
+    assert _human(result) == "Error: unknown candidate status: sideways"
 
 
 @pytest.mark.asyncio
@@ -113,7 +124,7 @@ async def test_get_and_delete_candidate() -> None:
 async def test_list_candidates_rejects_unknown_status() -> None:
     async with Client(mcp) as client:
         result = await client.call_tool("list_candidates", {"status": "nope"})
-    assert _text(result) == "Error: unknown candidate status: nope"
+    assert _human(result) == "Error: unknown candidate status: nope"
 
 
 @pytest.mark.asyncio
@@ -192,7 +203,7 @@ async def test_reject_candidate_requires_a_reason_and_keeps_the_candidate() -> N
             _text(await client.call_tool("get_candidate", {"candidate_id": candidate_id}))
         )
 
-    assert _text(refused).startswith("Error: A rejection reason is required")
+    assert _human(refused).startswith("Error: A rejection reason is required")
     assert rejected["status"] == "rejected"
     assert rejected["decision_reason"] == "not a need"
     assert kept["quote_id"] == candidates[0]["quote_id"]

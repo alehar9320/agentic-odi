@@ -25,6 +25,17 @@ def _text(result) -> str:
     return content.text
 
 
+def _human(result) -> str:
+    """The sentence a text-only client reads: the envelope's message, else the raw text."""
+    text = _text(result)
+    if text.startswith("{"):
+        try:
+            return json.loads(text)["message"]
+        except (ValueError, KeyError):
+            return text
+    return text
+
+
 @pytest.mark.asyncio
 async def test_import_transcript_creates_interview_and_quotes() -> None:
     async with Client(mcp) as client:
@@ -67,7 +78,7 @@ async def test_import_transcript_reports_malformed_input() -> None:
             },
         )
 
-    assert _text(result).startswith("Error: ")
+    assert _human(result).startswith("Error: ")
     assert "cue timing" in _text(result)
 
 

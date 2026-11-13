@@ -292,6 +292,93 @@ When no path has evidence, `strategy propose` exits non-zero and says what is
 missing rather than inventing a bet. Until one exists, `strategy show` prints
 "No strategy recorded" and points at `strategy propose`.
 
+## Interviews
+
+An interview records who took part, when, and the job it informs. Its quotes
+are the verbatim sentences the research is built from — the unit the Listen
+pillar works on.
+
+```bash
+# Record an interview
+agentic-odi interviews add \
+  --title "Ana — onboarding" --participant "Ana" \
+  --role "Ops lead" --job-id <job-id>
+
+# Read and delete
+agentic-odi interviews list --job-id <job-id>
+agentic-odi interviews list --json
+agentic-odi interviews get <interview-id>
+agentic-odi interviews quotes <interview-id>
+agentic-odi interviews delete <interview-id> --yes
+```
+
+### Import a transcript
+
+`interviews import` turns a transcript file into one interview plus its quotes
+in a single step. The format is detected from the extension and the content, or
+set with `--format md|txt|vtt|srt`. A malformed transcript is refused before
+anything is written, so a failure never leaves a half-imported interview.
+
+```bash
+agentic-odi interviews import session.vtt \
+  --title "Ana — onboarding" --participant "Ana" --job-id <job-id>
+cat session.vtt | agentic-odi interviews import - \
+  --title "Ana — onboarding" --participant "Ana"
+```
+
+In a cue file (`.vtt`/`.srt`) each cue becomes one quote with its start and end
+times; `<v Speaker>` voice tags become the quote's speaker. In markdown, each
+`**Speaker:**` block becomes one quote; wrapped lines fold into it. In plain
+text, each paragraph becomes one quote with no speaker.
+
+`participant_label` is free text such as `"Ana"` or `"Participant 3"` — never a
+real name, email, or company. Quotes are ordered by a service-assigned ordinal;
+deleting an interview removes its quotes and nothing else.
+
+### Extract candidate outcomes
+
+`interviews extract` turns one quote into candidate desired-outcome statements.
+It never writes an Outcome: a valid proposal is stored `proposed`, and a
+proposal that fails the ODI statement check is stored `rejected` with the
+validator's reason, so a bad extractor is visible rather than silent. Running it
+again adds nothing and never resets a decision.
+
+```bash
+agentic-odi interviews extract <quote-id>
+agentic-odi candidates list --status proposed
+agentic-odi candidates list --interview-id <interview-id> --json
+agentic-odi candidates get <candidate-id>
+agentic-odi candidates accept <candidate-id> --importance 8 --satisfaction 3
+agentic-odi candidates reject <candidate-id> --reason "not a real need"
+agentic-odi candidates delete <candidate-id> --yes
+```
+
+Deleting an interview removes its candidates along with its quotes.
+
+### Accept or reject a candidate
+
+`candidates accept` turns one proposed candidate into exactly one Outcome. The
+statement is validated before anything is written; the verbatim quote is then
+stored as an `Evidence` row with `source_kind="interview"` and
+`raw={interview_id, quote_id}`, so the number travels with the sentence that
+produced it. Accepting twice returns the first outcome — a retry never
+duplicates the outcome or its evidence.
+
+The interview must be linked to a job (`interviews add --job-id`) so the new
+outcome has somewhere to live; an unlinked interview is refused rather than
+guessed at. Pass `--statement` to edit the wording first, and `--step-id` to
+place the outcome on a job-map step.
+
+`candidates reject` keeps the candidate and requires a nonblank `--reason`, so
+a decision is defensible later. Rejecting an accepted candidate is refused: it
+would orphan the outcome the acceptance produced.
+
+```bash
+agentic-odi candidates accept <candidate-id> --importance 8 --satisfaction 3
+agentic-odi candidates accept <candidate-id> --statement "Minimize the time to onboard" \
+  --importance 8 --satisfaction 3 --json
+agentic-odi candidates reject <candidate-id> --reason "covered by another outcome"
+```
 ## Studies and waves
 
 A study is one named pass over a job — its interviews, its outcomes, its dates.
