@@ -324,6 +324,39 @@ describe("memory", () => {
     expect(fetch).toHaveBeenCalledWith("/api/memory/observations", expect.objectContaining({ headers: expect.any(Object) }));
   });
 
+  it("fetchMemory filters by subject when asked", async () => {
+    mockJson({ observations: [] });
+    await fetchMemory({ subject_type: "outcome", subject_id: "O-12" });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/memory/observations?subject_type=outcome&subject_id=O-12",
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+  });
+
+  it("addObservation carries a subject when given", async () => {
+    mockJson({ observation });
+    await addObservation({
+      kind: "opportunity",
+      text: "Activation is stuck.",
+      confirmed: true,
+      subject_type: "outcome",
+      subject_id: "O-12",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/memory/observations",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          kind: "opportunity",
+          text: "Activation is stuck.",
+          confirmed: true,
+          subject_type: "outcome",
+          subject_id: "O-12",
+        }),
+      }),
+    );
+  });
+
   it("addObservation posts the observation", async () => {
     mockJson({ observation });
     await expect(
@@ -494,18 +527,12 @@ describe("typed failures", () => {
   it("classifies an empty 502 response as mcp_unreachable", async () => {
     mockFailure(502, {});
 
-    await expect(
-      addOutcome({
-        mcp_url: "u",
-        job_id: "JOB-402",
-        statement: "Minimize time",
-        importance: 5,
-        satisfaction: 3,
-      }),
-     ).rejects.toMatchObject({
-       error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
-     });
-   });
+    // A canvas write now falls back to the browser store, so the classification
+    // is checked on an endpoint that has no local answer.
+    await expect(healthMcp("http://mcp")).rejects.toMatchObject({
+      error: { code: "mcp_unreachable", retryable: true, suggestion: expect.stringContaining("uv run python scripts/dev.py") },
+    });
+  });
 
    it("classifies an empty 404 response as not_found", async () => {
     mockFailure(404, {});

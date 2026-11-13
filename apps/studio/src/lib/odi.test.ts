@@ -1,3 +1,8 @@
+/// <reference types="node" />
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,13 +10,90 @@ import {
   formatOpportunityScore,
   hasScore,
   isUnderserved,
+  isUnderservedPoint,
   opportunityPill,
   opportunityScore,
   scoredAverage,
   segmentBasisLine,
   summarizeMemberScores,
+  underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
 } from "./odi";
+
+// The fixture is the contract between the Python service and the TypeScript
+// client. It lives in `packages/core/tests/fixtures/opportunity-score.json` and
+// is read by both languages; neither side may re-derive its expected values.
+const FIXTURE_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../packages/core/tests/fixtures/opportunity-score.json",
+);
+
+function loadScoreFixture() {
+  return JSON.parse(readFileSync(FIXTURE_PATH, "utf8")) as {
+    formula: string;
+    cases: Array<{
+      id: string;
+      importance: number | null;
+      satisfaction: number | null;
+      score: number | null;
+    }>;
+  };
+}
+
+describe("the shared scoring fixture", () => {
+  it("is valid JSON with the documented formula and no comments", () => {
+    const fixture = loadScoreFixture();
+    expect(fixture.formula).toBe("importance + max(importance - satisfaction, 0)");
+    expect(Array.isArray(fixture.cases)).toBe(true);
+    expect(fixture.cases.length).toBeGreaterThan(0);
+    // A comment would make the file invalid JSON, so parsing it is the check.
+    expect(() => JSON.parse(readFileSync(FIXTURE_PATH, "utf8"))).not.toThrow();
+  });
+
+  it("covers importance 0-20, satisfaction above, equal and below, plus a null pair", () => {
+    const fixture = loadScoreFixture();
+    const importances = fixture.cases
+      .map((c) => c.importance)
+      .filter((v): v is number => v !== null);
+    expect(Math.min(...importances)).toBe(0);
+    expect(Math.max(...importances)).toBe(20);
+    expect(fixture.cases.some((c) => c.importance === null && c.satisfaction === null)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! > c.satisfaction!)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! < c.satisfaction!)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! === c.satisfaction!)).toBe(true);
+  });
+
+  it("agrees with the shared function on every scored case", () => {
+    const fixture = loadScoreFixture();
+    for (const c of fixture.cases) {
+      if (c.importance === null || c.satisfaction === null) {
+        expect(c.score).toBeNull();
+        continue;
+      }
+      expect(opportunityScore(c.importance, c.satisfaction)).toBeCloseTo(c.score ?? 0, 5);
+    }
+  });
+
+  it("fails when the fixture's expected value drifts from the function", () => {
+    // The fixture is the contract: editing a case's `score` must break this
+    // assertion, so the two sides cannot drift apart while each keeps passing.
+    const fixture = loadScoreFixture();
+    const drifted = {
+      ...fixture,
+      cases: fixture.cases.map((c) =>
+        c.importance !== null && c.satisfaction !== null && c.score !== null
+          ? { ...c, score: c.score + 1 }
+          : c,
+      ),
+    };
+    expect(() => {
+      for (const c of drifted.cases) {
+        if (c.importance === null || c.satisfaction === null || c.score === null) continue;
+        expect(opportunityScore(c.importance, c.satisfaction)).toBeCloseTo(c.score, 5);
+      }
+    }).toThrow();
+  });
+});
 
 describe("opportunityScore", () => {
   it("computes importance + max(importance - satisfaction, 0)", () => {
@@ -75,11 +157,44 @@ describe("opportunityPill", () => {
     });
   });
 
-  it("marks served outcomes green and never crashes on null", () => {
-    expect(opportunityPill(null)).toEqual({
-      label: "✓ Served (Opp: N/A)",
+  it("marks served outcomes green", () => {
+    expect(opportunityPill(8)).toEqual({
+      label: "✓ Served (Opp: 8.0)",
       variant: "green",
     });
+  });
+
+  // A missing score is not a verdict. The pill must not read "Served", and it
+  // must not print "N/A" inside a sentence that claims something about the outcome.
+  it("returns a neutral Not scored descriptor for a missing score", () => {
+    expect(opportunityPill(null)).toEqual({ label: "Not scored", variant: "blue" });
+    expect(opportunityPill(undefined)).toEqual({ label: "Not scored", variant: "blue" });
+    expect(opportunityPill(null).label).not.toContain("Served");
+    expect(opportunityPill(null).label).not.toContain("N/A");
+  });
+});
+
+describe("the underserved boundary", () => {
+  it("solves 2·importance − satisfaction = 10 for importance", () => {
+    expect(underservedBoundaryImportance(0)).toBe(5);
+    expect(underservedBoundaryImportance(4.9)).toBeCloseTo(7.45, 5);
+    expect(underservedBoundaryImportance(10)).toBe(10);
+  });
+
+  it("agrees with isUnderserved at and around the boundary", () => {
+    // At satisfaction 8 the boundary importance is (10 + 8) / 2 = 9, and the
+    // values are exactly representable so the two rules cannot diverge on
+    // floating-point noise rather than on the boundary itself.
+    const cases: Array<[number, number, boolean]> = [
+      [4, 8, false], // score 4 -> served
+      [9, 8, false], // score 10 -> on the line, not underserved
+      [9.5, 8, true], // score 11 -> underserved
+      [5.5, 0, true], // score 11 -> underserved
+    ];
+    for (const [importance, satisfaction, expected] of cases) {
+      expect(isUnderservedPoint(importance, satisfaction)).toBe(expected);
+      expect(isUnderserved(opportunityScore(importance, satisfaction))).toBe(expected);
+    }
   });
 });
 

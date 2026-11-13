@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { ATTACHMENT_READ_FAILURE, MAX_ATTACHMENT_CHARS, tooLargeMessage } from "../../assistant/attachments";
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
 import type { StudioCommand } from "../../lib/commands";
+import { focusableWithin } from "../../lib/useFocusTrap";
 import type { StudioContextValue } from "../../state/StudioContext";
 import type { ChatMessage } from "../../types";
 import { ThreadComposer } from "./ThreadComposer";
@@ -373,5 +375,169 @@ describe("ThreadComposer mixed clipboard paste", () => {
     paste(input, { text: "inserted", files: [image] });
 
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A file the browser hands over by name but gives nothing back for: a locked
+ * transcript, a disk hiccup, a tab that lost the handle.
+ */
+function unreadableFile(name: string): File {
+  const file = new File(["x"], name, { type: "text/markdown" });
+  Object.defineProperty(file, "text", {
+    value: () => Promise.reject(new Error("Read interrupted")),
+  });
+  return file;
+}
+
+function readableFile(name: string): File {
+  return new File(["a thought worth sending"], name, { type: "text/markdown" });
+}
+
+function composerWithFiles(overrides: Record<string, unknown> = {}) {
+  vi.mocked(useStudio).mockReturnValue(context([], overrides));
+  const { container } = render(
+    <StudioRuntimeProvider>
+      <ThreadComposer onCommand={() => {}} />
+    </StudioRuntimeProvider>,
+  );
+  return {
+    root: container.querySelector(".composer") as HTMLElement,
+    input: screen.getByRole("textbox", { name: "Message the studio" }) as HTMLTextAreaElement,
+  };
+}
+
+function dropFiles(root: HTMLElement, files: File[]) {
+  fireEvent.dragEnter(root, { dataTransfer: { types: ["Files"], files } });
+  fireEvent.drop(root, { dataTransfer: { types: ["Files"], files } });
+}
+
+describe("ThreadComposer unreadable attachments", () => {
+  it("names the file and says it could not be read", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [unreadableFile("notes.md")]);
+
+    const failure = await screen.findByText(ATTACHMENT_READ_FAILURE);
+    expect(failure.closest(".attachment-chip")).toHaveTextContent("notes.md");
+  });
+
+  it("keeps the draft and the readable file beside a failed one", async () => {
+    const { root, input } = composerWithFiles();
+    fireEvent.change(input, { target: { value: "a draft in progress" } });
+
+    dropFiles(root, [readableFile("good.md"), unreadableFile("notes.md")]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+
+    expect(screen.getByText("good.md")).toBeInTheDocument();
+    expect(input.value).toBe("a draft in progress");
+  });
+
+  it("leaves the failed chip on the tab path so it can be removed", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [unreadableFile("notes.md")]);
+
+    const remove = await screen.findByRole("button", { name: "Remove notes.md" });
+    expect(focusableWithin(root)).toContain(remove);
+
+    fireEvent.click(remove);
+
+    await waitFor(() => expect(screen.queryByText(ATTACHMENT_READ_FAILURE)).toBeNull());
+  });
+
+  it("holds the turn back while a file could not be read", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const { root, input } = composerWithFiles({ sendMessage });
+
+    dropFiles(root, [readableFile("good.md"), unreadableFile("notes.md")]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+
+    fireEvent.change(input, { target: { value: "Read these" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
+  });
+
+  it("sends once the failed file is gone, and with only the readable one", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const { root, input } = composerWithFiles({ sendMessage });
+
+    dropFiles(root, [readableFile("good.md"), unreadableFile("notes.md")]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove notes.md" }));
+    await waitFor(() => expect(screen.queryByText(ATTACHMENT_READ_FAILURE)).toBeNull());
+
+    fireEvent.change(input, { target: { value: "Read these" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    const [text, attachments] = sendMessage.mock.calls[0] as unknown as [
+      string,
+      { name: string }[],
+    ];
+    expect(text).toBe("Read these");
+    expect(attachments.map((attachment) => attachment.name)).toEqual(["good.md"]);
+  });
+});
+
+/**
+ * A text file long enough to exceed the per-file character cap, so the adapter
+ * refuses it instead of quietly shortening what the model would receive.
+ */
+function oversizedFile(name: string): File {
+  return new File(["a".repeat(MAX_ATTACHMENT_CHARS + 5)], name, { type: "text/markdown" });
+}
+
+describe("ThreadComposer oversized attachments", () => {
+  it("names the file and the limit on the chip instead of pretending it was sent", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [oversizedFile("interview.md")]);
+
+    const failure = await screen.findByText(tooLargeMessage("interview.md"));
+    const chip = failure.closest(".attachment-chip");
+    expect(chip).toHaveTextContent("interview.md");
+    expect(chip).toHaveTextContent("20,000");
+  });
+
+  it("keeps the draft and the readable file beside an oversized one", async () => {
+    const { root, input } = composerWithFiles();
+    fireEvent.change(input, { target: { value: "a draft in progress" } });
+
+    dropFiles(root, [readableFile("good.md"), oversizedFile("interview.md")]);
+    await screen.findByText(tooLargeMessage("interview.md"));
+
+    expect(screen.getByText("good.md")).toBeInTheDocument();
+    expect(input.value).toBe("a draft in progress");
+  });
+
+  it("leaves the chip reachable by keyboard and lets the remove control clear it", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [oversizedFile("interview.md")]);
+
+    const remove = await screen.findByRole("button", { name: "Remove interview.md" });
+    expect(focusableWithin(root)).toContain(remove);
+
+    fireEvent.click(remove);
+
+    await waitFor(() => expect(screen.queryByText(tooLargeMessage("interview.md"))).toBeNull());
+  });
+
+  it("holds the turn back while an oversized file is attached", async () => {
+    const sendMessage = vi.fn(async () => {});
+    const { root, input } = composerWithFiles({ sendMessage });
+
+    dropFiles(root, [oversizedFile("interview.md")]);
+    await screen.findByText(tooLargeMessage("interview.md"));
+
+    fireEvent.change(input, { target: { value: "Read this" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
   });
 });

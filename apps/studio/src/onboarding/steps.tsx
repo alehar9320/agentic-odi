@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from "react";
 
 import { BoltIcon, CompassIcon, SignalIcon, SparkIcon } from "../components/icons";
-import { GOALS, type GoalIconName, type GoalId, type OnboardingGoal } from "./content";
+import { GOALS, type GoalIconName, type GoalId } from "./content";
 
 /* ------------------------------------------------------------------ */
 /* Shared                                                             */
@@ -268,30 +268,5 @@ export function ReadinessStep({
         </div>
       )}
     </>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Step 4 — first move                                                */
-/* ------------------------------------------------------------------ */
-
-export function LaunchStep({ goal }: { goal: OnboardingGoal }) {
-  return (
-    <div className="wizard-launch">
-      <div className="wizard-choice">
-        <GoalIcon name={goal.icon} />
-        <span>
-          <span className="wizard-choice__title">{goal.title}</span>
-          <span className="wizard-choice__result">{goal.result}</span>
-        </span>
-      </div>
-
-      <div className="wizard-destination">
-        <p className="wizard-destination__label">Where this goes</p>
-        <p className="wizard-destination__detail">{goal.destinationLabel}</p>
-      </div>
-
-      <p className="wizard-hint">Replay this tour from Settings whenever you want.</p>
-    </div>
   );
 }

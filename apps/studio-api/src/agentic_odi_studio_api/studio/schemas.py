@@ -124,6 +124,29 @@ class V2MOM(BaseModel):
     measures: list[str] = Field(default_factory=list)
 
 
+class LinkOutcomeRequest(BaseModel):
+    """Link an outcome to one V2MOM method or measure.
+
+    ``text`` must match an entry the vision currently holds; unknown text is
+    refused rather than guessed.
+    """
+
+    field: Literal["method", "measure"]
+    text: str = Field(min_length=1)
+    mcp_url: str = ""
+
+
+class TraceabilityReportResponse(BaseModel):
+    """The three failures: orphans, unfunded objectives, and drift."""
+
+    objectives_defined: bool
+    message: str | None = None
+    orphans: list[str] = Field(default_factory=list)
+    unfunded: list[dict[str, str]] = Field(default_factory=list)
+    drift: list[dict[str, str]] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+
+
 class AddCustomerOutcomeRequest(BaseModel):
     mcp_url: str = ""
     job_id: str
@@ -284,6 +307,7 @@ ObservationKind = Literal[
     "preference",
 ]
 ObservationStatus = Literal["suggested", "confirmed", "dismissed"]
+ObservationSubjectType = Literal["job", "step", "outcome", "evidence"]
 
 
 class ObservationModel(BaseModel):
@@ -294,6 +318,8 @@ class ObservationModel(BaseModel):
     status: str
     confidence: float
     source_turn: int | None = None
+    subject_type: str | None = None
+    subject_id: str | None = None
     created_at: str
     updated_at: str
 
@@ -312,6 +338,8 @@ class ObservationCreateRequest(BaseModel):
     data: dict[str, Any] | None = None
     confidence: float = Field(default=0.6, ge=0, le=1)
     confirmed: bool = False
+    subject_type: ObservationSubjectType | None = None
+    subject_id: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class ObservationUpdateRequest(BaseModel):
