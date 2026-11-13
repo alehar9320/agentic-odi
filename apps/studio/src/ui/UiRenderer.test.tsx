@@ -350,7 +350,7 @@ describe("candidate review queue", () => {
 
   it("distinguishes loading, empty, and failed", () => {
     const { unmount } = render(
-      <UiActionContext.Provider value={{ onIntent: vi.fn(), busy: false }}>
+      <UiActionContext.Provider value={{ onIntent: vi.fn(), onDetail: vi.fn(), busy: false }}>
         <UiRenderer node={nodeOf({ type: "candidate-queue", props: { state: "loading" } })} />
       </UiActionContext.Provider>,
     );
@@ -358,7 +358,7 @@ describe("candidate review queue", () => {
     unmount();
 
     const empty = render(
-      <UiActionContext.Provider value={{ onIntent: vi.fn(), busy: false }}>
+      <UiActionContext.Provider value={{ onIntent: vi.fn(), onDetail: vi.fn(), busy: false }}>
         <UiRenderer node={nodeOf({ type: "candidate-queue", props: { state: "empty" } })} />
       </UiActionContext.Provider>,
     );
