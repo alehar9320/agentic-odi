@@ -17,6 +17,7 @@ import type {
 } from "@assistant-ui/react";
 
 import { focusLabel, focusPointer } from "../lib/focus";
+import { useRegionState, type Detail } from "./regions";
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -441,6 +442,18 @@ export interface StudioContextValue {
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
+  /**
+   * The right region's one detail (#735). `openDetail` is the single entry;
+   * `openPanel` is the one-hop alias that remains during transition.
+   */
+  detail: Detail | null;
+  openDetail: (panel: WorkspacePanelId, subject?: { kind: string; id: string }) => void;
+  closeDetail: () => void;
+  /** The left drawer, whose accessible name the rail helper reuses. */
+  drawerOpen: boolean;
+  toggleDrawer: () => void;
+  /** The left drawer's collapsed state. */
+  collapsed: boolean;
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
   pushToast: (
@@ -665,7 +678,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
-  const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
+  // The three-region contract (#735), declared once in its own module so this
+  // provider's in-flight splits (#345, #506) do not collide with it. The right
+  // region's `detail` is the single source of truth: `activePanel` is derived
+  // from it, and `openPanel` is the one-hop alias that writes through.
+  const regions = useRegionState();
+  // The right region holds exactly one detail; its panel id is what the lens
+  // renders. Kept derived so no caller can set one without the other.
+  const activePanel: WorkspacePanelId | null = regions.detail?.panel ?? null;
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
@@ -1121,9 +1141,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   const openSetup = useCallback(() => {
-    setActivePanel(null);
+    regions.closeDetail();
     setSetupOpen(true);
-  }, []);
+  }, [regions.closeDetail]);
 
   const closeSetup = useCallback(() => {
     setSetupOpen(false);
@@ -1537,16 +1557,16 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
-  const closePanel = useCallback(() => setActivePanel(null), []);
+  const closePanel = useCallback(() => regions.closeDetail(), [regions.closeDetail]);
 
   const openPanel = useCallback(
     (panel: WorkspacePanelId) => {
       if (setupOpen) {
         closeSetup();
       }
-      setActivePanel(panel);
+      regions.openDetail(panel);
     },
-    [setupOpen, closeSetup],
+    [setupOpen, closeSetup, regions.openDetail],
   );
 
   /**
@@ -2266,10 +2286,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   /** The single conversational exit from any lens. */
   const ask = useCallback(
     (intent: string) => {
-      setActivePanel(null);
+      regions.closeDetail();
       void sendMessage(intent);
     },
-    [sendMessage],
+    [sendMessage, regions.closeDetail],
   );
 
   const refreshMemory = useCallback(async () => {
@@ -2741,6 +2761,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      detail: regions.detail,
+      openDetail: regions.openDetail,
+      closeDetail: regions.closeDetail,
+      drawerOpen: regions.drawerOpen,
+      toggleDrawer: regions.toggleDrawer,
+      collapsed: regions.collapsed,
     }),
     [
       settings,
@@ -2865,6 +2891,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      regions.detail,
+      regions.openDetail,
+      regions.closeDetail,
+      regions.drawerOpen,
+      regions.toggleDrawer,
+      regions.collapsed,
     ],
   );
 
