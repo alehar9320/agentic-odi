@@ -20,21 +20,19 @@ import { UiRenderer } from "../ui/UiRenderer";
 import {
   buildClaimBlocks,
   citedCount,
-  hideMarkers,
   rememberClaimChip,
   type ClaimSegment,
 } from "./claims";
 import { CLAIMS_PART, SURFACE_PART } from "./convert";
 import { ClaimCitation } from "../components/chat/ClaimCitation";
 
-/** Prose. The existing renderer, so the transcript reads exactly as before. */
+/** Prose. The shared Markdown engine, so the transcript reads like every other surface. */
 export function TextPart() {
   const text = useAuiState((state) => (state.part.type === "text" ? state.part.text : null));
   if (text === null) {
     return null;
   }
-  // A marker is syntax, not prose: hide it even while the reply streams.
-  return <Markdown source={hideMarkers(text)} />;
+  return <Markdown source={text} />;
 }
 
 /**

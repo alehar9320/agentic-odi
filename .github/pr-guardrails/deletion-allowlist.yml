@@ -13,6 +13,12 @@
 - path: "apps/studio/src/components/chat/OfflineNotice.tsx"
   issue: 264
   reason: "Replaced by the unified banner system in PR #264."
+- path: "apps/studio/src/lib/markdown.ts"
+  issue: 394
+  reason: "Replaced by the react-markdown renderer in apps/studio/src/components/chat/Markdown.tsx."
+- path: "apps/studio/src/lib/markdown.test.ts"
+  issue: 394
+  reason: "Behaviours ported to apps/studio/src/components/chat/Markdown.test.tsx."
 - path: "apps/studio/src/components/notices/SidecarNotice.test.tsx"
   issue: 264
   reason: "Replaced by banner bridge tests in PR #264."
