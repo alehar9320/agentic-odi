@@ -42,6 +42,9 @@ jobs:
       pull-requests: write
       issues: write
     steps:
+      # Check out the repository so scripts/pr_ai_authorize.py is available.
+      - uses: actions/checkout@v7
+
       # A fork pull request gets a read-only token, so labeling it cannot
       # succeed. Say so instead of failing red on a PR we may not touch.
       - name: Note fork pull requests

@@ -229,8 +229,10 @@ describe("StudioBar", () => {
     });
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
+    const pushToast = vi.fn();
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
+        pushToast,
         messages: [
           { role: "user", content: "Show me the top outcomes." },
           { role: "assistant", content: "Here they are." },
@@ -245,6 +247,11 @@ describe("StudioBar", () => {
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:conversation");
+    // The confirmation names the file that was written, dated to the export day.
+    expect(pushToast).toHaveBeenCalledWith(
+      "success",
+      `Exported agentic-odi-conversation-${new Date().toISOString().slice(0, 10)}.md`,
+    );
     click.mockRestore();
   });
 

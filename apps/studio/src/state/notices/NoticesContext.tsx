@@ -69,9 +69,14 @@ export function NoticesProvider({ children }: { children: ReactNode }) {
           ...(options?.durationMs ? { durationMs: options.durationMs } : {}),
         },
       ]);
-      window.setTimeout(() => {
-        setToasts((prev) => prev.filter((toast) => toast.id !== id));
-      }, options?.durationMs ?? 6000);
+      // A failure stays until the person dismisses it: an error that vanishes
+      // while it is being read is the same as no error at all. Success and info
+      // still expire on their own.
+      if (kind !== "error") {
+        window.setTimeout(() => {
+          setToasts((prev) => prev.filter((toast) => toast.id !== id));
+        }, options?.durationMs ?? 6000);
+      }
       return id;
     },
     [],

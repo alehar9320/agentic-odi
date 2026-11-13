@@ -100,11 +100,10 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
   },
   error: {
     severity: "critical",
-    life: "transient",
+    life: "persistent",
     dock: "corner",
     title: "",
     body: "",
-    durationMs: DEFAULT_DURATION_MS,
     dismissible: true,
   },
 };

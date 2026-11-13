@@ -88,6 +88,7 @@ export function useBannerActionDispatcher(): {
     openSetup,
     openPanel,
     dismissSidecarNotice,
+    dismissToast,
     ask,
   } = useStudio();
 
@@ -128,6 +129,12 @@ export function useBannerActionDispatcher(): {
     // the next render, and it must never loop.
     if (id === "app-update-ready") {
       dismissAppUpdate();
+    }
+    // An error banner is a toast the person chose to close. Clearing only the
+    // banner would leave the toast alive, so the bridge would raise it again on
+    // the next render and the dismissal would not stick.
+    if (id.startsWith("toast-")) {
+      dismissToast(Number(id.slice("toast-".length)));
     }
     dismiss(id);
   }

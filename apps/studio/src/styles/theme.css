@@ -7330,3 +7330,29 @@ textarea,
   color: var(--muted);
   font-size: 12.5px;
 }
+
+/* ------------------------------------------------------------------ */
+/* Code blocks: every snippet can be copied, revealed on hover/focus   */
+/* ------------------------------------------------------------------ */
+.code-block {
+  position: relative;
+}
+
+.code-block__copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+/* Kept focusable rather than display:none, so a keyboard user can reach it —
+   focusing the control is what reveals it. */
+.code-block:hover .code-block__copy,
+.code-block:focus-within .code-block__copy {
+  opacity: 1;
+}
