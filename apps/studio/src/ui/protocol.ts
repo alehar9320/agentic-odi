@@ -28,6 +28,8 @@ export interface UiPropSchema {
   minimum?: number;
   maximum?: number;
   items?: UiPropSchema;
+  /** An item may take any one of these shapes (#735: an action is an intent or a detail). */
+  anyOf?: readonly UiPropSchema[];
   properties?: Record<string, UiPropSchema>;
   required?: readonly string[];
   minItems?: number;
@@ -80,6 +82,16 @@ const INVALID: ValueResult = { ok: false };
 
 function validateValue(raw: unknown, schema: UiPropSchema, depth: number): ValueResult {
   if (depth > UI_LIMITS.maxDepth + 4) {
+    return INVALID;
+  }
+
+  if (schema.anyOf) {
+    for (const option of schema.anyOf) {
+      const attempt = validateValue(raw, option, depth);
+      if (attempt.ok) {
+        return attempt;
+      }
+    }
     return INVALID;
   }
 
