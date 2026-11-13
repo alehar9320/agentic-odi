@@ -15,12 +15,14 @@ import { describe, expect, it } from "vitest";
 import briefCss from "./brief.css?raw";
 
 // Vitest runs with the studio package as its working directory.
-const entry = readFileSync(join(process.cwd(), "src/main.tsx"), "utf8");
+const entryCss = readFileSync(join(process.cwd(), "src/styles/entry.css"), "utf8");
 const lens = readFileSync(join(process.cwd(), "src/components/brief/BriefLens.tsx"), "utf8");
 
 describe("brief stylesheet", () => {
-  it("is loaded by the studio entry", () => {
-    expect(entry).toContain('"./styles/brief.css"');
+  it("is loaded by the entry cascade, in the product layer", () => {
+    // `entry.css` is the only file that orders the cascade (issue #384), so a
+    // sheet imported anywhere else would land unlayered and outrank everything.
+    expect(entryCss).toContain('@import "./brief.css" layer(product)');
   });
 
   it("defines a rule for every class the lens renders", () => {
