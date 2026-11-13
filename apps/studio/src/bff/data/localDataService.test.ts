@@ -135,5 +135,50 @@ describe("row provenance", () => {
 
     expect(canvas.jobs[0].origin).toBe("demo");
     expect(canvas.steps[0].origin).toBe("user");
+describe("evidence", () => {
+  it("stores a capture and returns it on the canvas", async () => {
+    const store = makeStore();
+    const service = new LocalDataService(store);
+    const job = await service.createJob({ name: "Job" });
+    const record = await service.addEvidence({
+      source_name: "Support inbox",
+      name: "Call notes",
+      content: "They churn on deploy time",
+      job_id: job.id,
+    });
+
+    expect(record.name).toBe("Call notes");
+    expect(record.job_id).toBe(job.id);
+
+    const canvas = await service.fetchCanvas();
+    expect(canvas.evidence?.map((item) => item.id)).toEqual([record.id]);
+    expect(canvas.provenance?.record_counts?.evidence).toBe(1);
+  });
+
+  it("rejects a capture with a blank name", async () => {
+    const service = new LocalDataService(makeStore());
+    await expect(
+      service.addEvidence({ name: "  ", content: "x" }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects a capture for a job that does not exist", async () => {
+    const service = new LocalDataService(makeStore());
+    await expect(
+      service.addEvidence({ name: "Call notes", content: "x", job_id: "j-missing" }),
+    ).rejects.toThrow();
+  });
+
+  it("deletes a capture and forgets it on the canvas", async () => {
+    const service = new LocalDataService(makeStore());
+    const record = await service.addEvidence({ name: "Call notes", content: "x" });
+    await service.deleteEvidence(record.id);
+    const canvas = await service.fetchCanvas();
+    expect(canvas.evidence).toEqual([]);
+  });
+
+  it("refuses to delete a capture that is not there", async () => {
+    const service = new LocalDataService(makeStore());
+    await expect(service.deleteEvidence("e-missing")).rejects.toThrow();
   });
 });
