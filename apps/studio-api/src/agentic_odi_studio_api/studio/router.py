@@ -1161,8 +1161,19 @@ async def get_evidence(
 
 
 @router.get("/memory/observations", response_model=ObservationListResponse)
-def list_observations(request: Request) -> ObservationListResponse:
-    observations = _memory(request).list_observations()
+def list_observations(
+    request: Request,
+    subject_type: str | None = None,
+    subject_id: str | None = None,
+) -> ObservationListResponse:
+    try:
+        observations = _memory(request).list_observations(
+            subject_type=subject_type, subject_id=subject_id
+        )
+    except ValueError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
+        ) from exc
     return ObservationListResponse(
         observations=[observation.to_dict() for observation in observations]
     )
@@ -1177,6 +1188,8 @@ def create_observation(body: ObservationCreateRequest, request: Request) -> Obse
             data=body.data,
             status="confirmed" if body.confirmed else "suggested",
             confidence=body.confidence,
+            subject_type=body.subject_type,
+            subject_id=body.subject_id,
         )
     except ValueError as exc:
         raise StudioHTTPError(
