@@ -203,6 +203,19 @@
     "is_recommended": false
   },
   {
+    "id": "composio",
+    "label": "Composio",
+    "area": "strategy-alignment",
+    "summary": "Managed MCP hub for 1000+ apps (GitHub, Slack, Linear, Notion, Jira, \u2026) to pull backlog and tool context into ODI.",
+    "url": "https://connect.composio.dev/mcp",
+    "auth": "oauth",
+    "env_vars": [],
+    "headers": {},
+    "docs": "https://docs.composio.dev/docs/composio-connect",
+    "tools": [],
+    "is_recommended": false
+  },
+  {
     "id": "slack",
     "label": "Slack",
     "area": "knowledge-output",
