@@ -951,6 +951,97 @@ def reject_proposal(proposal_id: str) -> str:
 
 
 @mcp.tool
+def add_theme(
+    name: str,
+    job_id: str | None = None,
+    parent_id: str | None = None,
+    description: str | None = None,
+    ordinal: int = 0,
+) -> str:
+    """Name a group of related desired outcomes (M2-01).
+
+    A theme is a folder over the outcome library: two levels at most, and scoped
+    to one job — omit job_id for a workspace theme that outcomes of any job may
+    join.
+    """
+    try:
+        theme = service.add_theme(
+            name=name,
+            job_id=job_id,
+            parent_id=parent_id,
+            description=description,
+            ordinal=ordinal,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps(theme.model_dump(mode="json"))
+
+
+@mcp.tool
+def rename_theme(
+    theme_id: str,
+    name: str | None = None,
+    description: str | None = None,
+    ordinal: int | None = None,
+    parent_id: str | None = None,
+) -> str:
+    """Rename a theme, edit its description or ordinal, or move it under another parent.
+
+    Omitted arguments stay unchanged; a theme that still has children cannot be
+    moved under a new parent, because that would bury them a third level down.
+    """
+    try:
+        theme = service.rename_theme(
+            theme_id, name=name, description=description, ordinal=ordinal, parent_id=parent_id
+        )
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps(theme.model_dump(mode="json"))
+
+
+@mcp.tool
+def delete_theme(theme_id: str) -> str:
+    """Delete a theme; its children move up and outcomes keep their other memberships."""
+    try:
+        return json.dumps(service.delete_theme(theme_id))
+    except OdiError as exc:
+        return _fail(exc)
+
+
+@mcp.tool
+def list_themes(job_id: str | None = None) -> str:
+    """List themes for a job, plus workspace themes that span jobs."""
+    themes = service.list_themes(job_id=job_id)
+    return json.dumps([theme.model_dump(mode="json") for theme in themes])
+
+
+@mcp.tool
+def assign_theme(outcome_ids: list[str], theme_id: str) -> str:
+    """File outcomes under a theme; the whole call is refused if any outcome is unknown.
+
+    Every outcome must belong to the theme's job, unless the theme is a
+    workspace theme with no job of its own.
+    """
+    try:
+        outcomes = service.assign_theme(outcome_ids, theme_id)
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps([outcome.model_dump(mode="json") for outcome in outcomes])
+
+
+@mcp.tool
+def unassign_theme(outcome_ids: list[str], theme_id: str) -> str:
+    """Remove a theme from outcomes; their other memberships stay."""
+    try:
+        outcomes = service.unassign_theme(outcome_ids, theme_id)
+    except OdiError as exc:
+        return _fail(exc)
+    return json.dumps([outcome.model_dump(mode="json") for outcome in outcomes])
+
+
+@mcp.tool
 def link_outcome(outcome_id: str, field: str, text: str) -> str:
     """Link an Outcome to the V2MOM method or measure it advances.
 

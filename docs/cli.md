@@ -292,6 +292,28 @@ When no path has evidence, `strategy propose` exits non-zero and says what is
 missing rather than inventing a bet. Until one exists, `strategy show` prints
 "No strategy recorded" and points at `strategy propose`.
 
+## Themes
+
+A theme is a named folder over the desired-outcome library: two levels at most,
+scoped to one job, or workspace-wide (no `--job`) so outcomes of any job can
+join. Deleting a theme moves its children up and leaves every other membership
+intact — a theme never owns an outcome.
+
+```bash
+agentic-odi themes add --name "Cash timing" --job <job-id>
+agentic-odi themes add --name "Payment windows" --job <job-id> --parent <theme-id>
+agentic-odi themes list
+agentic-odi themes list --job <job-id> --json
+agentic-odi themes rename <theme-id> --name "Payment timing"
+agentic-odi themes delete <theme-id>
+agentic-odi themes assign --theme <theme-id> --outcome <outcome-id> --outcome <outcome-id>
+agentic-odi themes unassign --theme <theme-id> --outcome <outcome-id>
+```
+
+`themes assign` files every outcome or none: an unknown outcome, or one from a
+different job under a job-scoped theme, refuses the whole call before anything
+is written.
+
 ## Studies and waves
 
 A study is one named pass over a job — its interviews, its outcomes, its dates.

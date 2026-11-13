@@ -870,6 +870,29 @@ async def get_segments(
     ]
 
 
+@router.get("/themes", response_model=list[dict[str, Any]])
+async def get_themes(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """M2's theme tree, same records under both backends.
+
+    Empty until the agent has run ``add_theme``: a theme names groups of
+    outcomes, it is never typed into the canvas.
+    """
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_THEMES.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return [theme.model_dump(mode="json") for theme in _service(request).list_themes(job_id=job_id)]
+
+
 @router.get("/studies", response_model=list[dict[str, Any]])
 async def get_studies(
     request: Request,
