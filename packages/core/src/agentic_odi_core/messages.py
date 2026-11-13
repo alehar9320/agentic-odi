@@ -70,6 +70,14 @@ Follow this sequence when guiding a user through the ODI process:
 - `get_strategy()` reads back the recorded path. When no path has evidence, `propose_strategy`
   refuses and reports what is missing — say so instead of inventing a bet.
 
+### Stage 7: Review the Decision (the loop closes)
+- **When**: A recorded decision is older than a quarter. Offer the review; do not run it unasked.
+- **Ask the user**: 'This decision is more than a quarter old — want me to check it against today's numbers?'
+- **Tools to use**:
+  - `review_decision(decision_id, today)` — compares each chosen outcome's score at decision time with the latest, and reports `improved`, `degraded`, `no change`, `no evidence`, or `orphaned`. A missing measurement is `no evidence`, never `no change`.
+  - `get_outcome_history(outcome_id)` / `get_outcome_delta(outcome_id, since?)` — the score snapshots behind the review.
+  - `record_bet(decision_id, outcome_id, hypothesis, target, measure_by)` — turn a decision into a bet with its baseline captured now, then `advance_bet` it through planned → running → measured.
+
 ### General Rule
 Never skip stages. Always confirm the user has a Job defined (Stage 1) before capturing Outcomes (Stage 2), always capture Outcomes (Stage 2) before building the Job Map (Stage 3), and always score outcomes (Stage 2) before computing opportunity (Stage 4). If a tool rejects a write, read the message, fix the statement or the numbers, and try once. Do not retry the same call unchanged."""
 
@@ -106,6 +114,20 @@ def evidence_not_found(evidence_id: str | None, hint: str | None = None) -> str:
 
 def scheduled_work_not_found(work_id: str | None, hint: str | None = None) -> str:
     message = f"Scheduled work not found: {work_id}"
+    if hint:
+        message = f"{message}. {hint}"
+    return message
+
+
+def segment_not_found(segment_id: str | None, hint: str | None = None) -> str:
+    message = f"Segment not found: {segment_id}"
+    if hint:
+        message = f"{message}. {hint}"
+    return message
+
+
+def strategy_not_found(strategy_id: str | None, hint: str | None = None) -> str:
+    message = f"Strategy not found: {strategy_id}"
     if hint:
         message = f"{message}. {hint}"
     return message

@@ -38,7 +38,7 @@ def test_the_stages_are_stated_in_order() -> None:
     guidelines = messages.get_odi_framework_guidelines()
     headings = [line for line in guidelines.splitlines() if line.startswith("### Stage ")]
     assert [heading.split(":")[0] for heading in headings] == [
-        f"### Stage {number}" for number in range(1, 7)
+        f"### Stage {number}" for number in range(1, 8)
     ]
 
 

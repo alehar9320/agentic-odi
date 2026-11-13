@@ -52,6 +52,9 @@ export interface Outcome {
   importance?: number | null;
   satisfaction?: number | null;
   opportunity_score?: number | null;
+  importance_n?: number | null;
+  satisfaction_n?: number | null;
+  score_method?: ScoreMethod;
   claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
@@ -75,6 +78,122 @@ export interface Evidence {
   outcome_id?: string | null;
   /** True while the write is queued locally and the sidecar has not acknowledged it. */
   pending?: boolean;
+}
+
+export interface DecisionRejection {
+  outcome_id: string;
+  reason: string;
+}
+
+/** A recorded choice: what was chosen, what was rejected, and why. */
+export interface Decision {
+  id: string;
+  job_id: string;
+  chosen_outcome_ids: string[];
+  rejected: DecisionRejection[];
+  rationale: string;
+  decided_by: string;
+  decided_at: string;
+  confidence: "low" | "medium" | "high";
+  superseded_at?: string | null;
+  superseded_by?: string | null;
+}
+
+export type ScoreMethod = "estimate" | "survey" | "import";
+
+/** One accepted score state, captured on every score-mutating path (B6). */
+export interface ScoreSnapshot {
+  id: string;
+  outcome_id: string;
+  at: string;
+  importance: number | null;
+  satisfaction: number | null;
+  opportunity_score: number | null;
+  importance_n: number | null;
+  satisfaction_n: number | null;
+  score_method: ScoreMethod;
+  note?: string | null;
+}
+
+/** The signed change for an outcome. A missing metric is null, never 0. */
+export interface OutcomeDelta {
+  importance: number | null;
+  satisfaction: number | null;
+  opportunity: number | null;
+  direction: "improved" | "degraded" | "no_evidence";
+}
+
+export type OutcomeReviewState =
+  | "improved"
+  | "degraded"
+  | "no change"
+  | "no_evidence"
+  | "orphaned";
+
+export interface OutcomeReview {
+  outcome_id: string;
+  statement: string | null;
+  state: OutcomeReviewState;
+  satisfaction_change: number | null;
+  importance_change: number | null;
+  opportunity_change: number | null;
+}
+
+/** A past decision re-examined against today's numbers (C8). */
+export interface DecisionReview {
+  decision_id: string;
+  job_id: string;
+  decided_at: string;
+  days_elapsed: number;
+  stale: boolean;
+  summary: string;
+  outcomes: OutcomeReview[];
+}
+
+export type BetStatus = "planned" | "running" | "measured" | "abandoned";
+
+/** A recorded expectation, with its baseline captured at creation (E1). */
+export interface Bet {
+  id: string;
+  decision_id: string;
+  outcome_id: string;
+  hypothesis: string;
+  baseline: number;
+  target: number;
+  measure_by: string;
+  status: BetStatus;
+  measured_at?: string | null;
+}
+
+export type OpportunityBand = "underserved" | "appropriate" | "overserved" | "unscored";
+
+/** One member of a segment profile, carrying its own measured band. */
+export interface SegmentOutcome {
+  outcome_id: string;
+  statement: string;
+  score: number | null;
+  band: OpportunityBand;
+}
+
+/**
+ * A segment's servability. ``measured_ratio`` is ``null`` when nothing is
+ * measured — never ``0`` — so "we did not look" cannot read as "we looked and
+ * found none". ``gaps`` names what is missing rather than hiding it.
+ */
+export interface SegmentProfile {
+  segment_id: string;
+  segment_name: string;
+  total_members: number;
+  measured_count: number;
+  unscored_count: number;
+  missing_count: number;
+  underserved_count: number;
+  appropriate_count: number;
+  overserved_count: number;
+  top_underserved: SegmentOutcome[];
+  top_overserved: SegmentOutcome[];
+  measured_ratio: number | null;
+  gaps: string[];
 }
 
 export interface Thesis {
