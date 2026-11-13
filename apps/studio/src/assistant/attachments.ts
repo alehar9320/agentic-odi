@@ -87,10 +87,10 @@ export function isImageLike(contentType: string): boolean {
 export function attachmentRejection(file: File): string | null {
   if (isImageLike(file.type)) {
     if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
-      return `${file.name} is not an image the studio can read (PNG, JPEG, WebP, GIF).`;
+      return `${file.name} is not an image the studio can read — send a PNG, JPEG, WebP, or GIF up to ${imageLimit()}.`;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      return `${file.name} is larger than ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB.`;
+      return `${file.name} is larger than the ${imageLimit()} limit for PNG, JPEG, WebP, and GIF images.`;
     }
     return null;
   }
@@ -99,14 +99,28 @@ export function attachmentRejection(file: File): string | null {
   }
   if (isDocxLike(file.name, file.type)) {
     if (file.size > MAX_DOCUMENT_BYTES) {
-      return `${file.name} is larger than ${Math.floor(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB.`;
+      return `${file.name} is larger than the ${documentLimit()} limit for Word (.docx) files.`;
     }
     return null;
   }
   if (isTextLike(file.name, file.type)) {
     return null;
   }
-  return `${file.name} is not a text, Word, or image file the studio can read.`;
+  // A refusal is an instruction, not a verdict: name what can be sent and the
+  // limits that apply, so the next attempt has somewhere to go (#698 D31).
+  return `${file.name} is not a file the studio can read. Send text, Markdown, CSV, JSON, YAML, a .docx, or an image — text up to ${textLimit()}, images up to ${imageLimit()}, Word files up to ${documentLimit()}.`;
+}
+
+function imageLimit(): string {
+  return `${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB`;
+}
+
+function documentLimit(): string {
+  return `${Math.floor(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB`;
+}
+
+function textLimit(): string {
+  return `${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")} characters`;
 }
 
 /** A short size for an attachment chip; empty when there is nothing to say. */

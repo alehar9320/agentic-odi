@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JOB_STAGES } from "../../domain/jobStages";
+import { WALK_THE_JOB_INTENT } from "../../lib/commands";
 import { JobMap } from "./JobMap";
 
 const mockCanvasData = {
@@ -28,6 +29,7 @@ const harness = vi.hoisted(() => ({
     canvasCached: false,
     refreshCanvas: vi.fn(),
     openPanel: vi.fn(),
+    sendMessage: vi.fn(),
     addStep: vi.fn(),
     focusedJobId: null as string | null,
     ...mocks,
@@ -317,5 +319,19 @@ describe("JobMap canvas cache", () => {
     expect(screen.getByText("No saved copy on this device")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /capture what you know/i }));
     expect(harness.state.openPanel).toHaveBeenCalledWith("capture");
+  });
+
+  it("offers the action that fills an empty job map (#698 D32)", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: { ...mockCanvasData, steps: [] },
+    };
+
+    render(<JobMap />);
+
+    const walk = screen.getByRole("button", { name: "Walk me through the job" });
+    fireEvent.click(walk);
+
+    expect(harness.state.sendMessage).toHaveBeenCalledWith(WALK_THE_JOB_INTENT);
   });
 });
