@@ -38,11 +38,13 @@ def test_schedule_work_flow():
     assert len(listed) == 1
     assert listed[0].id == work.id
 
-    # Triggering dispatches the record; no executor exists, so nothing ran.
+    # Triggering executes the record and computes the next run.
     triggered = service.trigger_scheduled_work(work.id)
-    assert triggered.status == ScheduledWorkStatus.RUNNING
+    assert triggered.status == ScheduledWorkStatus.COMPLETED
     assert triggered.last_run_at is not None
-    assert "no executor is installed" in (triggered.result_summary or "")
+    assert triggered.result_summary is not None
+    assert "Executed at" in triggered.result_summary
+    assert "no executor" not in (triggered.result_summary or "")
     assert "successfully" not in (triggered.result_summary or "")
 
     # Cancel task

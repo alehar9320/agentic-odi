@@ -8,6 +8,7 @@ import {
   type LocalStore,
   type OutboxRecord,
   type StoredConversation,
+  type StoredEvidence,
   type StoredJob,
   type StoredOutcome,
   type StoredStep,
@@ -23,6 +24,7 @@ export class MemoryLocalStore implements LocalStore {
   private readonly jobs = new Map<string, StoredJob>();
   private readonly steps = new Map<string, StoredStep>();
   private readonly outcomes = new Map<string, StoredOutcome>();
+  private readonly evidence = new Map<string, StoredEvidence>();
   private readonly observations = new Map<string, Observation>();
   private readonly conversations = new Map<string, StoredConversation>();
   private readonly turns: StoredTurn[] = [];
@@ -92,6 +94,24 @@ export class MemoryLocalStore implements LocalStore {
 
   async deleteOutcome(id: string): Promise<void> {
     this.outcomes.delete(id);
+  }
+
+  async listEvidence(jobId?: string): Promise<StoredEvidence[]> {
+    return [...this.evidence.values()]
+      .filter((record) => !jobId || record.job_id === jobId)
+      .sort(bySeq);
+  }
+
+  async getEvidence(id: string): Promise<StoredEvidence | undefined> {
+    return this.evidence.get(id);
+  }
+
+  async putEvidence(evidence: StoredEvidence): Promise<void> {
+    this.evidence.set(evidence.id, evidence);
+  }
+
+  async deleteEvidence(id: string): Promise<void> {
+    this.evidence.delete(id);
   }
 
   async listObservations(): Promise<Observation[]> {
@@ -274,6 +294,7 @@ export class MemoryLocalStore implements LocalStore {
     const jobs = await this.listJobs();
     const steps = await this.listSteps();
     const outcomes = await this.listOutcomes();
+    const evidence = await this.listEvidence();
     const observations = await this.listObservations();
     const conversations = await this.listConversations();
     return {
@@ -281,6 +302,7 @@ export class MemoryLocalStore implements LocalStore {
       jobs,
       steps,
       outcomes,
+      evidence,
       observations,
       conversations,
       turns: [...this.turns],
@@ -299,6 +321,10 @@ export class MemoryLocalStore implements LocalStore {
     this.outcomes.clear();
     for (const outcome of snapshot.outcomes) {
       this.outcomes.set(outcome.id, outcome);
+    }
+    this.evidence.clear();
+    for (const record of snapshot.evidence ?? []) {
+      this.evidence.set(record.id, record);
     }
     this.observations.clear();
     for (const observation of snapshot.observations) {
@@ -327,6 +353,7 @@ export class MemoryLocalStore implements LocalStore {
     this.jobs.clear();
     this.steps.clear();
     this.outcomes.clear();
+    this.evidence.clear();
     this.observations.clear();
     this.conversations.clear();
     this.turns.length = 0;
