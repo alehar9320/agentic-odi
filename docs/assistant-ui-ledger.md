@@ -1,9 +1,10 @@
 # The assistant-ui ledger
 
 The Studio runs on assistant-ui, and "we use assistant-ui" is not a coverage
-claim. This is. One hundred and twenty-nine relevant capabilities from
-`@assistant-ui/react@0.15.31` and `@assistant-ui/core@0.3.32` (read from the
-published type definitions, not from docs prose), each in exactly one state,
+claim. This is. One hundred and thirty relevant capabilities from
+`@assistant-ui/react@0.15.31`, `@assistant-ui/core@0.3.31`, and
+`@assistant-ui/react-markdown@0.14.24` (read from the published type
+definitions, not from docs prose), each in exactly one state,
 each Adopted row citing the issue or PR that put it in a person's hands. The
 surface areas `@assistant-ui/vue`, `/ink`, `/native`, `cli`, and `cloud` are
 out of scope by platform, not by judgement: this is a React app with a local
@@ -45,7 +46,7 @@ by the presence of one handler.
 | `onReload` (regenerate) | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `regenerateFrom`. |
 | `onCancel` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `stopStreaming`. |
 | `onRespondToToolApproval` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `respondToApproval`, the write gate. |
-| `adapters.attachments` | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text capped at 20k chars, images at 5 MB, refusals explained. |
+| `adapters.attachments` | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text refused above 20k chars (not shortened, #652), images at 5 MB, refusals explained. |
 | runtime `suggestions` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `suggestionsFor`, computed from canvas state. |
 | `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | `apps/studio/src/state/StudioContext.tsx` | — | Branching works through `setMessages` and `head_id`; the dedicated adapter is unused, so the runtime infers branches from parent ids. |
 | `queue` adapter | Adopted | `apps/studio/src/assistant/queue.ts` | #410 | Keeps a follow-up while a reply runs. |
@@ -97,6 +98,67 @@ by the presence of one handler.
 | `MessagePartPrimitive.Messages` | Rejected | — | — | Nested conversations are not a Studio surface. |
 | `useMessagePartText/Reasoning/Source/File/Image/Data` | Rejected | — | — | The `components` map already receives exactly these props. |
 
+## Markdown rendering
+
+The Studio renders prose through its own parser (`apps/studio/src/components/chat/Markdown.tsx`
+→ `apps/studio/src/lib/markdown.ts`), not through `@assistant-ui/react-markdown`, which
+is declared in `package.json` and imported nowhere. The package is the canonical owner of
+markdown rendering per `docs/architecture/reuse.md`; the rows below are the decision to
+not adopt it yet, not a silence. A row becomes *Adopted* when prose renders through
+`MarkdownTextPrimitive`, with the file that does it and the PR that landed it.
+
+| Capability | Status | File | Delivered | Where / why |
+|---|---|---|---|---|
+| `MarkdownTextPrimitive` (`preprocess`, `remarkPlugins`, `rehypeComponents`, `components`, `componentsByLanguage`, `smooth`, `defer`) | Decision | — | — | The prose primitive. Our `Markdown.tsx` is hand-rolled over `parseMarkdown` because the ODI method needs claim chips and extraction state inside the text, which a generic renderer cannot see. Revisit when prose outgrows the hand-rolled parser. |
+| `memoizeMarkdownComponents` | Decision | — | — | Only meaningful with `MarkdownTextPrimitive`; follows the same question. |
+| `useIsMarkdownCodeBlock` | Decision | — | — | Drives the code-header affordance; ours is in `Markdown.tsx`. |
+| `CodeHeader` | Decision | — | — | Copy-language labels and the copy button. Not yet shipped on our code blocks. |
+| `SyntaxHighlighter` | Decision | — | — | Shiki-backed highlighting. Our code blocks are plain `<pre><code>`; syntax highlighting is not a Studio need today. |
+| `StreamdownTextPrimitive` | Decision | — | — | The streaming variant of `MarkdownTextPrimitive`. Deferred until prose rendering moves to the library. |
+| Security posture (no `rehype-raw`, link allowlist) | Decision | — | — | Enforced by the hand-rolled renderer rather than adopted from the library: `rehype-raw` is never loaded, and `renderSpans` admits only `https?://` links and email addresses. Revisit if prose rendering moves to `MarkdownTextPrimitive`, where this becomes an Adopted row with a file and a PR. |
+
+## Copy-in Elements
+
+The library ships roughly 151 copy-in Elements — shadcn and Tailwind components over
+the primitives (`markdown-text`, `thread`, `composer`, `attachment`, `tool-fallback`, and
+the rest). Copying one in is a `src/vendor/` decision under `docs/architecture/vendor.md`,
+so a page that audits the library must say which were considered. The honest default for
+an unexamined element is *Decision* with a named vendor question, not silence; an element
+that was looked at and declined is *Rejected* with the reason.
+
+| Capability | Status | File | Delivered | Where / why |
+|---|---|---|---|---|
+| `markdown-text` Element | Decision | — | — | The prose Element. Declined in favour of the hand-rolled `Markdown.tsx`, which carries claim chips and extraction state the Element cannot see. Vendor question: when prose outgrows the hand-rolled parser, does the Element carry product state, or does the state live in a wrapper? |
+| `thread` Element | Decision | — | — | The thread layout Element. The Studio's transcript is `ThreadPrimitive` directly, because the arrival count, the branch picker, and the part renderers are product concerns the Element would not carry. Vendor question: what does the Element own that we would lose by keeping the primitives? |
+| `composer` Element | Decision | — | — | The composer Element. Our composer is `ThreadComposer.tsx`, built on the primitives because the quote, the attachment adapter, and the queue lane are ours. Vendor question: does the Element's defaults match the attachment accept rules? |
+| `attachment` Element | Decision | — | — | The attachment chip Element. Declined: our chip shows extraction state and the reason a file was refused, which the Element does not. Vendor question: can the Element render a refusal? |
+| `tool-fallback` Element | Decision | — | — | The tool-fallback Element. Our tool parts render through `tools: { Fallback: ToolPart }` in `parts.tsx`, which carries the ODI failure language. Vendor question: does the Element expose the metadata the failure panel reads? |
+| `threadlist-sidebar` Element | Decision | — | — | The thread-list sidebar Element. Deferred with the thread list (#408), which owns the switcher. Vendor question: does the Element carry timestamps, which the sidecar does not yet provide? |
+| `quote` Element | Decision | — | — | The quote Element. Our quote renders through `MessagePrimitive.Quote` in `quote.tsx` and persists in turn metadata. Vendor question: does the Element persist, or only display? |
+| `reasoning` Element | Decision | — | — | The reasoning Element. Our reasoning folds into `GroupedParts` with `workGrouping`, which ends a run at an unanswered approval. Vendor question: does the Element know an approval is still asking? |
+| `button` Element | Adopted | `apps/studio/src/vendor/components/ui/button.tsx` | #383 | The one copy-in. Carries a provenance header and an entry in `vendor.lock.json`; the class-merger import is local. |
+
+## Templates
+
+The library ships templates (`default`, `minimal`, `cloud`, `cloud-clerk`, `cloud-harness`,
+`langchain`, `mcp`, `eve`, `nuxt`, `vscode`) and more. Some are clearly irrelevant — the
+cloud runtimes are already rejected — and some are not, notably the `default` thread layout.
+Right now they are not declined; they are unmentioned, and a page that audits the library
+must not leave them so.
+
+| Capability | Status | File | Delivered | Where / why |
+|---|---|---|---|---|
+| `default` template | Decision | — | — | The thread layout template. The closest thing to our transcript, and the one that would most tempt a copy-in. Vendor question: does it carry the arrival count, the branch picker, and the part renderers we need, or are those ours to add? |
+| `minimal` template | Rejected | — | — | A stripped thread with no canvas, no sidecar integration, and no ODI surfaces. The Studio is not a thin wrapper. |
+| `cloud` template | Rejected | — | — | Cloud runtime. The app is local-first with no account and no outbound thread sync (`useRemoteThreadListRuntime` is already rejected). |
+| `cloud-clerk` template | Rejected | — | — | Cloud runtime with Clerk auth. Same as `cloud`, plus an auth provider the app does not have. |
+| `cloud-harness` template | Rejected | — | — | Cloud runtime with the agent harness. Same as `cloud`. |
+| `langchain` template | Rejected | — | — | LangChain runtime. The sidecar owns the agent loop; a second runtime would double-write. |
+| `mcp` template | Rejected | — | — | MCP-only template. The Studio is an MCP *client*, not an MCP server surface; this template is the wrong shape. |
+| `eve` template | Rejected | — | — | A runtime we do not run. No path to the sidecar's store. |
+| `nuxt` template | Rejected | — | — | Vue, not React. The Studio is React; adopting a Vue template would mean a second component model. |
+| `vscode` template | Rejected | — | — | A VS Code extension, not a web or desktop app. Out of scope by platform. |
+
 ## Composer
 
 | Capability | Status | File | Delivered | Where / why |
@@ -110,7 +172,7 @@ by the presence of one handler.
 | `ComposerPrimitive.Resume` | Planned | — | #424 | Appears only with a checkpoint. |
 | `ComposerPrimitive.TriggerPopover` (and its `Root`/`Items`/`Item`/`Categories`/`CategoryItem`/`Back`) | Planned | — | #426 | `@` mentions and `/` commands. |
 | `ComposerPrimitive.If` | Decision | — | — | `AuiIf` is the idiom already in use. |
-| `ComposerPrimitive.AttachmentByIndex` | Rejected | — | — | Attachment chips iterate their own list. |
+| `ComposerPrimitive.AttachmentByIndex` | Rejected | — | — | The composer renders chips through `ComposerPrimitive.Attachments`, which scopes each to its attachment; the bare by-index form stays unused. |
 | `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | `quote` and `dictation` are read today; `queue` arrives with #410, and `submission`/`inTransit` matter to that issue's honesty: a sent message the thread does not show yet must not look lost. |
 
 ## Action bar
@@ -118,7 +180,7 @@ by the presence of one handler.
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
 | `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | The reply's own controls. |
-| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Planned | — | #412 | Read a reply aloud. |
+| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #432 | Read a reply aloud, and **Stop reading** while it speaks. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken; a streaming reply is never spoken and speech is never persisted. |
 | `ActionBarPrimitive.FeedbackPositive` / `.FeedbackNegative` | Planned | — | #414 | Local-only rating. |
 | `ActionBarPrimitive.ExportMarkdown` | Partial | `apps/studio/src/lib/export.ts` | — | Whole-conversation Markdown export exists and also serialises generated surfaces. Adopting the primitive for one reply would produce a second, weaker export format. |
 | `ActionBarMorePrimitive` | Decision | — | — | An overflow menu earns its place only when the action row exceeds ~5 buttons; #412 and #414 add two. Revisit after both land. |
@@ -133,9 +195,9 @@ by the presence of one handler.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction capped at 20k chars, images capped at 5 MB, refusals explained. |
+| Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction refused above 20k chars (not shortened, #652), images capped at 5 MB, refusals explained. |
 | Drop and paste | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer follows the same accept rules as the input. |
-| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Rejected | — | — | The current chip shows extraction state and the reason a file was refused. The primitive would show a name and a thumbnail, which is less than the person needs. |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`, which scopes each chip to its own attachment; the extraction state, the refusal reason and the size ride inside `Root` as children, so the primitive shows more than a name. The sent-turn chip in `parts.tsx` still writes its own `attachment-chip` markup, so this is a partial slice of #859. |
 
 ## Thread list
 
@@ -170,8 +232,10 @@ only the surface is missing.
 |---|---|---|---|---|
 | `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Rejected | — | — | Checked against the installed 0.15.31 rather than the docs: `groupMessageParts` starts a run at any adjacent `tool-call` or `reasoning` part, so its one disclosure would gather a write that is still asking. `GroupedParts` with `workGrouping` ends a run at an unanswered approval. |
 | Pending approvals inside a group | Rejected | — | — | A pending write is a question, not history. It stays ungrouped and visible, always. |
-| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. |
+| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. The pending strip (#390) counts from a start the store stamps when the call arrives, so it also shows nothing on a restored turn. |
 | `useMessageTiming` | Decision | — | — | Tokens/second is engineering telemetry. Useful to us, not to the PM; expose it only behind a diagnostics toggle if at all. |
+| `useAuiState((s) => s.thread.messages)` for liveness | Rejected | — | — | On the external-store path every part status normalizes to `complete` (`thread-message-client` only keeps a part `running` while its own message is), so the runtime cannot tell a live call from a settled one here. The store's `ChatPart.status` is the honest source, and `pending.ts` reads that instead. |
+| Pending-call strip | Adopted | `apps/studio/src/components/chat/PendingCalls.tsx` | #390 | The running and awaiting-approval calls, below the last message. A summary, never a queue: no speculative "up next" rows. |
 
 ## Selection and quote
 
@@ -257,15 +321,15 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 45 |
-| Partial | 9 |
-| Planned | 14 |
-| Decision | 26 |
-| Rejected | 35 |
-| Total | 129 |
+| Adopted | 48 |
+| Partial | 10 |
+| Planned | 13 |
+| Decision | 42 |
+| Rejected | 44 |
+| Total | 157 |
 
-Read it as: **52** of the library's 129 relevant capabilities already deliver
-something a person can use, **20** more are carried by open issues, **26** rows
-wait on a named decision, and **31** are rejected with a reason. Every row is
+Read it as: **58** of the library's 157 relevant capabilities already deliver
+something a person can use, **13** more are carried by open issues, **42** rows
+wait on a named decision, and **44** are rejected with a reason. Every row is
 accounted for — that is the whole point of the page.
 
