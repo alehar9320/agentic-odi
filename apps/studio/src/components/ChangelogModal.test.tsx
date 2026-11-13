@@ -145,4 +145,42 @@ describe("ChangelogModal", () => {
 
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("makes the page behind the dialog inert and restores it on close", async () => {
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValue({ releases: [] });
+
+    const { unmount } = render(
+      <div className="studio-app">
+        <ChangelogModal isOpen={true} onClose={vi.fn()} />
+      </div>,
+    );
+
+    const shell = document.querySelector(".studio-app");
+    await waitFor(() => expect(shell).toHaveAttribute("inert"));
+
+    unmount();
+    expect(shell).not.toHaveAttribute("inert");
+  });
+
+  it("announces how many releases were marked read without shifting the footer", async () => {
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValue(TWO_RELEASES);
+
+    render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+    await screen.findByText("v0.9.0");
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+
+    expect(screen.getByText("2 releases marked read")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark all read" })).toBeDisabled();
+  });
+
+  it("makes each release date an interrogable <time>", async () => {
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValue(TWO_RELEASES);
+
+    render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+
+    const date = await screen.findByText("2026-10-22", { selector: "time" });
+    expect(date).toHaveAttribute("dateTime", "2026-10-22");
+    expect(date.getAttribute("title")).toBeTruthy();
+  });
 });

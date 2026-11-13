@@ -2,14 +2,25 @@ const DISMISSED_KEY = "studio.install.dismissed";
 
 let deferredPrompt: Event | null = null;
 
-/** True when the app is already running as an installed PWA. */
+/** The display modes that mean the page is running as its own window. */
+const INSTALLED_DISPLAY_MODES = ["standalone", "minimal-ui", "fullscreen"] as const;
+
+/**
+ * True when the app is already running as an installed PWA.
+ *
+ * This answers "is it installed?", so it must not be coupled to whether an
+ * install prompt is pending: a browser that can still offer to install reports
+ * "not installed" even in standalone mode otherwise. The display-mode queries
+ * cover a desktop install; `navigator.standalone` covers iOS Safari.
+ */
 export function isInstalled(): boolean {
   try {
-    return (
-      (typeof window.matchMedia === "function" &&
-        window.matchMedia("(display-mode: standalone)").matches) ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true
-    ) && !deferredPrompt;
+    const byDisplayMode =
+      typeof window.matchMedia === "function" &&
+      INSTALLED_DISPLAY_MODES.some((mode) => window.matchMedia(`(display-mode: ${mode})`).matches);
+    const byNavigator =
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    return byDisplayMode || byNavigator;
   } catch {
     return false;
   }
