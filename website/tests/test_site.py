@@ -512,11 +512,12 @@ def test_page_weights_are_within_budget(page: str):
     # (ledgers, entity docs, schema references), not decoration, so the ceiling
     # moves with legitimate content growth rather than trimming reference
     # material. The Studio guide (docs/studio/index.html, rendered from
-    # docs/living-studio.md) is now the long pole at 114,078 bytes, up from
-    # 110,152 before the memory, three-region and capture sections (#552, #735,
-    # #512) landed; those sections are the guide's content, not padding. The
-    # Development page also exceeds 100 KB: the assistant-ui ledger (issue #429)
-    # contributes 129 rows, and the Study entity plus its two tools (open_study,
-    # list_studies) and the outcome-proposal tools add the rest. Bump the
-    # ceiling to keep both green while the content stays.
+    # docs/living-studio.md) is the long pole at 114,171 bytes on main at
+    # 3c8e4625, up from 110,152 before the memory, three-region and capture
+    # sections (#552, #735, #512) and the per-page social cards and
+    # broken-reference check (#742, #794) landed; that is the guide's content,
+    # not padding. The Development page also exceeds 100 KB: the assistant-ui
+    # ledger (issue #429) contributes 129 rows, and the Study entity plus its
+    # two tools (open_study, list_studies) and the outcome-proposal tools add
+    # the rest. Bump the ceiling to keep both green while the content stays.
     assert size <= 120 * 1024, f"{page}: {size} bytes"
