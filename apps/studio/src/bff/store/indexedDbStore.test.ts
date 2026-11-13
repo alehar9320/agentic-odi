@@ -7,6 +7,7 @@ import { IndexedDbLocalStore } from "./indexedDbStore";
 import { DB_NAME, DB_VERSION } from "./migrations";
 import { MemoryLocalStore } from "./memoryStore";
 import type { LocalStore, StoredJob, StoredOutcome, StoredStep, StoredTurn } from "./types";
+import type { Notice } from "../../notices/types";
 
 async function makeStore() {
   const store = await IndexedDbLocalStore.open();
@@ -224,6 +225,7 @@ describe("IndexedDbLocalStore", () => {
     // The later stores are added, and they start empty.
     expect(after.outbox).toEqual([]);
     expect(after.evidence).toEqual([]);
+    expect(after.notices).toEqual([]);
     store.close();
 
     // The migrated schema equals a fresh database: same stores, key paths,
@@ -293,6 +295,46 @@ describe("IndexedDbLocalStore", () => {
       "c-last",
       "c-middle",
       "c-first",
+    ]);
+    indexed.close();
+  });
+
+  it("keeps the notice history across store instances, newest first", async () => {
+    const first = await makeStore();
+    await first.putNotices([
+      { id: "n-old", severity: "info", title: "Old", detail: "", context: "Banner: x", at: 1_000, read: true },
+      { id: "n-new", severity: "critical", title: "New", detail: "", context: "Banner: y", at: 2_000, read: false },
+    ]);
+    first.close();
+
+    const second = await makeStore();
+    const notices = await second.listNotices();
+    expect(notices.map((notice) => notice.id)).toEqual(["n-new", "n-old"]);
+    // A dismissal is a rewrite of the whole list, so it must survive a reopen.
+    await second.putNotices(notices.filter((notice) => notice.id !== "n-new"));
+    second.close();
+
+    const third = await makeStore();
+    expect((await third.listNotices()).map((notice) => notice.id)).toEqual(["n-old"]);
+    third.close();
+  });
+
+  it("orders notices the same way the in-memory store does", async () => {
+    const rows: Notice[] = [
+      { id: "n-middle", severity: "info", title: "M", detail: "", context: "c", at: 5, read: false },
+      { id: "n-last", severity: "warning", title: "L", detail: "", context: "c", at: 9, read: false },
+      { id: "n-first", severity: "success", title: "F", detail: "", context: "c", at: 1, read: true },
+    ];
+    const indexed = await makeStore();
+    const inMemory = new MemoryLocalStore();
+    await indexed.putNotices(rows);
+    await inMemory.putNotices(rows);
+
+    expect(await indexed.listNotices()).toEqual(await inMemory.listNotices());
+    expect((await indexed.listNotices()).map((notice) => notice.id)).toEqual([
+      "n-last",
+      "n-middle",
+      "n-first",
     ]);
     indexed.close();
   });
@@ -447,6 +489,12 @@ function expectedSchema() {
       keyPath: "key",
       autoIncrement: false,
       indexes: [],
+    },
+    {
+      store: "notices",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-at"],
     },
     {
       store: "observations",

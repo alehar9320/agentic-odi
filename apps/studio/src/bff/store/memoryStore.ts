@@ -1,3 +1,4 @@
+import type { Notice } from "../../notices/types";
 import type { Observation } from "../../types";
 import { nowIso } from "../id";
 import {
@@ -29,6 +30,7 @@ export class MemoryLocalStore implements LocalStore {
   private readonly turns: StoredTurn[] = [];
   private readonly outbox = new Map<string, OutboxRecord>();
   private lease: DrainLease | null = null;
+  private notices: Notice[] = [];
 
   // A Map-backed store has no second connection to lose, so it never asks for a
   // reload. The accessors exist to satisfy `LocalStore`.
@@ -268,6 +270,14 @@ export class MemoryLocalStore implements LocalStore {
     }
   }
 
+  async listNotices(): Promise<Notice[]> {
+    return [...this.notices].sort((left, right) => right.at - left.at);
+  }
+
+  async putNotices(notices: Notice[]): Promise<void> {
+    this.notices = [...notices];
+  }
+
   async snapshot(): Promise<WorkspaceSnapshot> {
     const jobs = await this.listJobs();
     const steps = await this.listSteps();
@@ -337,6 +347,7 @@ export class MemoryLocalStore implements LocalStore {
     this.turns.length = 0;
     this.outbox.clear();
     this.lease = null;
+    this.notices = [];
     this.seq = 0;
     this.turnId = 0;
   }
