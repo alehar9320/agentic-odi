@@ -17,8 +17,20 @@ export function focusableWithin(container: HTMLElement): HTMLElement[] {
  * Keep Tab and Shift+Tab inside a dialog for as long as it is open, and give
  * focus back to whatever held it before. A dialog that lets focus escape is a
  * keyboard trap in the wrong direction: the user tabs into the page behind it.
+ *
+ * When `inertPage` is set, the app shell behind the dialog is also made
+ * `inert` — unreachable by Tab and by assistive technology, not merely covered
+ * — and restored on close. The dialog must be rendered outside the shell (a
+ * portal to `document.body`); `inert` on an ancestor cannot be undone by a
+ * descendant. Applying `inert` blurs a control focused inside the shell, so
+ * the opener is captured before it is applied and refocused after it is
+ * removed.
  */
-export function useFocusTrap(ref: RefObject<HTMLElement | null>, active: boolean): void {
+export function useFocusTrap(
+  ref: RefObject<HTMLElement | null>,
+  active: boolean,
+  inertPage = false,
+): void {
   useEffect(() => {
     if (!active) {
       return;
@@ -31,6 +43,13 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>, active: boolean
     const containerEl: HTMLElement = container;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     focusableWithin(containerEl)[0]?.focus();
+
+    const shell = inertPage
+      ? document.querySelector<HTMLElement>(".studio-app")
+      : null;
+    const shellEl = shell && !shell.contains(containerEl) ? shell : null;
+    const shellWasInert = shellEl?.hasAttribute("inert") ?? false;
+    shellEl?.setAttribute("inert", "");
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Tab") {
@@ -59,7 +78,10 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>, active: boolean
     containerEl.addEventListener("keydown", onKeyDown);
     return () => {
       containerEl.removeEventListener("keydown", onKeyDown);
+      if (shellEl && !shellWasInert) {
+        shellEl.removeAttribute("inert");
+      }
       previouslyFocused?.focus();
     };
-  }, [ref, active]);
+  }, [ref, active, inertPage]);
 }
