@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, TypeVar
@@ -458,11 +459,13 @@ class ODIService:
                 "satisfaction must be between 1.0 and 10.0", field="satisfaction"
             )
         require_outcome_statement(statement)
+        updates = dict(updates)
+        trace = self._resolve_objective_links(updates.pop("objectives", None))
+        if trace is not None:
+            updates["trace"] = trace
         if importance is not None and satisfaction is not None:
-            updates = dict(updates)
             updates["opportunity_score"] = compute_opportunity_score(importance, satisfaction)
         else:
-            updates = dict(updates)
             updates["opportunity_score"] = None
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
@@ -589,6 +592,7 @@ class ODIService:
         step_id: str | None = None,
         validate_statement: bool = True,
         claim_check: ClaimCheck | dict[str, Any] | None = None,
+        objectives: Sequence[Mapping[str, str]] | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -607,6 +611,7 @@ class ODIService:
             if not verdict["valid"]:
                 raise InvalidOutcomeStatementError(verdict)
         check = require_claim_check(claim_check)
+        trace = self._resolve_objective_links(objectives) or []
         #: Unscored outcomes stay legal: a score is optional, and an outcome
         #: without one carries no opportunity_score to stand behind.
         if importance is not None and satisfaction is not None:
@@ -621,6 +626,7 @@ class ODIService:
             importance=importance,
             satisfaction=satisfaction,
             opportunity_score=opportunity_score,
+            trace=trace,
             claim_check=check,
         )
         created = self.repo.add_outcome(outcome)
@@ -1361,6 +1367,34 @@ class ODIService:
         says so rather than returning three empty sections.
         """
         return compute_traceability_report(self.repo.get_v2mom(), list(self.repo.outcomes.values()))
+
+    def _resolve_objective_links(
+        self, objectives: Sequence[Mapping[str, str]] | None
+    ) -> list[dict[str, str]] | None:
+        """Resolve a list of ``{field, text}`` links against the stored vision.
+
+        Every entry must name a method or measure the vision holds *now*; an
+        unknown one is a validation error naming the entries that do exist,
+        never a fuzzy match. ``None`` means "leave the links untouched"; an
+        empty list means "this outcome advances nothing", which is legal and
+        reported as an orphan rather than refused.
+        """
+        if objectives is None:
+            return None
+        resolved: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for entry in objectives:
+            field = str(entry["field"])
+            objective = self._resolve_objective(field, str(entry["text"]))
+            if (objective.field, objective.key) in seen:
+                continue
+            seen.add((objective.field, objective.key))
+            resolved.append(
+                OutcomeAlignment(field=field, key=objective.key, text=objective.text).model_dump(
+                    mode="json"
+                )
+            )
+        return resolved
 
     def _resolve_objective(self, field: str, text: str) -> Objective:
         """Find the current objective named by ``text``, or refuse.
