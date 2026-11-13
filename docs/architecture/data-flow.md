@@ -87,6 +87,16 @@ and stops there. `APP_STORAGE_KEYS` and `APP_STORAGE_PREFIXES` are that
 inventory, and a test fails when a writer uses a `studio.*` or `agentic-odi.*`
 key that the inventory does not cover.
 
+A full origin is a fourth fact, and it changes the write path rather than the
+inventory. `apps/studio/src/bff/store/storageFull.ts` wraps every store write;
+the first `QuotaExceededError` (or the Firefox `NS_ERROR_DOM_QUOTA_REACHED`)
+becomes one `StorageFullError`, and the guard pauses every later write before it
+reaches IndexedDB. Reads are not routed through the guard, so the work already
+stored stays readable and exportable, and the Studio raises one `storage-full`
+notice whose only action is Export. Nothing is cleared to make room, and a quota
+failure is never retried on a timer — the pause clears when the person frees
+space or takes the work with them.
+
 ## Runtime facts
 
 `apps/studio/src/bridge/runtime.ts` answers "which host am I in?" from one pure

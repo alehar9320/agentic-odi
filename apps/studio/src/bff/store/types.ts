@@ -119,6 +119,14 @@ export interface WorkspaceSnapshot {
 export interface LocalStore {
   readonly durable: boolean;
   /**
+   * True once a write was refused for lack of space. While it holds, a write
+   * throws before it touches the store; reads keep working, so the work that is
+   * already there stays exportable.
+   */
+  readonly storageFull: boolean;
+  /** Called when `storageFull` flips. Returns the unsubscribe function. */
+  subscribeStorageFull(listener: () => void): () => void;
+  /**
    * True once another tab has upgraded the schema past what this page can
    * write, or the browser dropped the connection. The app must reload before
    * using the store again; a memory-only store never needs a reload.
