@@ -17,6 +17,7 @@ import type {
 } from "@assistant-ui/react";
 
 import { focusLabel, focusPointer } from "../lib/focus";
+import { useRegionState, type Detail } from "./regions";
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -75,6 +76,13 @@ import {
   createProbeScheduler,
   type ProbeScheduler,
 } from "./scheduleProbe";
+import {
+  classifyProbeError,
+  createProbeBreaker,
+  type BreakerState,
+  type ProbeBreaker,
+  type ProbeOutcome,
+} from "./probeBreaker";
 import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
@@ -324,6 +332,12 @@ export interface StudioContextValue {
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
+  /**
+   * What the probe breaker is doing (#536): `state` is `closed`, `open`,
+   * `half-open`, or `degraded`, and `retryInMs` is how long until the next
+   * probe is allowed. The bar reads this to say "Retrying in N min".
+   */
+  probeRetry: { state: BreakerState; retryInMs: number };
   /** Model ids the configured endpoint publishes. Empty means "type one". */
   models: string[];
   modelsLoading: boolean;
@@ -431,6 +445,18 @@ export interface StudioContextValue {
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
+  /**
+   * The right region's one detail (#735). `openDetail` is the single entry;
+   * `openPanel` is the one-hop alias that remains during transition.
+   */
+  detail: Detail | null;
+  openDetail: (panel: WorkspacePanelId, subject?: { kind: string; id: string }) => void;
+  closeDetail: () => void;
+  /** The left drawer, whose accessible name the rail helper reuses. */
+  drawerOpen: boolean;
+  toggleDrawer: () => void;
+  /** The left drawer's collapsed state. */
+  collapsed: boolean;
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
   pushToast: (
@@ -637,6 +663,15 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     healthy: null,
     message: "Health not checked yet.",
   });
+  /**
+   * What the probe breaker is doing (#536): whether an endpoint has stopped
+   * answering, and how long until the next probe is allowed. The bar reads this
+   * to say "Retrying in N min" instead of showing a spinner forever.
+   */
+  const [probeRetry, setProbeRetry] = useState<{ state: BreakerState; retryInMs: number }>({
+    state: "closed",
+    retryInMs: 0,
+  });
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
@@ -651,7 +686,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
-  const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
+  // The three-region contract (#735), declared once in its own module so this
+  // provider's in-flight splits (#345, #506) do not collide with it. The right
+  // region's `detail` is the single source of truth: `activePanel` is derived
+  // from it, and `openPanel` is the one-hop alias that writes through.
+  const regions = useRegionState();
+  // The right region holds exactly one detail; its panel id is what the lens
+  // renders. Kept derived so no caller can set one without the other.
+  const activePanel: WorkspacePanelId | null = regions.detail?.panel ?? null;
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
@@ -690,6 +732,20 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * second timer on top of the first (#535).
    */
   const probeSchedulerRef = useRef<ProbeScheduler | null>(null);
+  /**
+   * The single-flight breaker every probe shares (#536): one probe on the wire
+   * at a time, and no probe at all while an endpoint keeps refusing.
+   */
+  const probeBreakerRef = useRef<ProbeBreaker | null>(null);
+  if (probeBreakerRef.current === null) {
+    probeBreakerRef.current = createProbeBreaker();
+  }
+
+  /** Publish the breaker's state so the bar can show a countdown while it is open. */
+  const publishProbeRetry = useCallback(() => {
+    const breaker = probeBreakerRef.current!;
+    setProbeRetry({ state: breaker.state(), retryInMs: breaker.retryInMs() });
+  }, []);
   /** What a scheduled probe should run, kept current without re-creating the timer. */
   const probeNowRef = useRef<() => Promise<boolean>>(async () => false);
   /** Runs the debounced probe a connection-setting edit earns. */
@@ -1093,9 +1149,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   const openSetup = useCallback(() => {
-    setActivePanel(null);
+    regions.closeDetail();
     setSetupOpen(true);
-  }, []);
+  }, [regions.closeDetail]);
 
   const closeSetup = useCallback(() => {
     setSetupOpen(false);
@@ -1114,6 +1170,59 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Measure the sidecar, the MCP server, and the model, keeping the failure that
+   * made a negative answer negative. The scheduled probe needs that failure to
+   * tell a flaky network from a rejected key (#536); a panel does not.
+   */
+  const measureConnections = useCallback(
+    async (
+      override: Partial<StudioConfig> = {},
+    ): Promise<{ report: ConnectionReport; failure: unknown }> => {
+      const target = { ...settings, ...override };
+      let failure: unknown = null;
+      const noteFailure = (error: unknown) => {
+        failure = failure ?? error;
+      };
+      const [sidecar, mcp, llm] = await Promise.all([
+        fetchConfig()
+          .then(() => true)
+          .catch((error: unknown) => {
+            noteFailure(error);
+            return false;
+          }),
+        healthMcp(target.mcp_url)
+          .then((result) => result.reachable)
+          .catch((error: unknown) => {
+            noteFailure(error);
+            return false;
+          }),
+        healthLlm({
+          base_url: target.base_url,
+          api_key: target.api_key,
+          model: target.model_name,
+        }).catch((error: unknown) => {
+          noteFailure(error);
+          return {
+            healthy: false,
+            message: (error as Error).message || "The model did not answer.",
+          };
+        }),
+      ]);
+      void refreshCapabilities();
+      return {
+        report: {
+          sidecarReachable: sidecar,
+          mcpReachable: mcp,
+          llmHealthy: llm.healthy,
+          llmMessage: llm.message,
+        },
+        failure,
+      };
+    },
+    [settings, refreshCapabilities],
+  );
+
+  /**
    * Measure the sidecar, the MCP server, and the model without recording the result.
    *
    * A panel that owes the person looking at it fresh numbers calls this. Nothing here
@@ -1122,32 +1231,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    */
   const surveyConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
-      const target = { ...settings, ...override };
-      const [sidecar, mcp, llm] = await Promise.all([
-        fetchConfig()
-          .then(() => true)
-          .catch(() => false),
-        healthMcp(target.mcp_url)
-          .then((result) => result.reachable)
-          .catch(() => false),
-        healthLlm({
-          base_url: target.base_url,
-          api_key: target.api_key,
-          model: target.model_name,
-        }).catch((error: unknown) => ({
-          healthy: false,
-          message: (error as Error).message || "The model did not answer.",
-        })),
-      ]);
-      void refreshCapabilities();
-      return {
-        sidecarReachable: sidecar,
-        mcpReachable: mcp,
-        llmHealthy: llm.healthy,
-        llmMessage: llm.message,
-      };
+      return (await measureConnections(override)).report;
     },
-    [settings, refreshCapabilities],
+    [measureConnections],
   );
 
   /**
@@ -1214,16 +1300,50 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * restarts the cadence, because the endpoint they just changed is not the one
    * that kept failing.
    */
+  /**
+   * One measurement through the shared breaker: the probe joins whatever is
+   * already on the wire, records the report for the caller, and classifies a
+   * negative answer so the breaker knows whether a retry is worth making (#536).
+   */
+  const probeOnce = useCallback(
+    async (
+      override: Partial<StudioConfig>,
+      mode: "evidence" | "recovery",
+    ): Promise<ConnectionReport | null> => {
+      const settled = await probeBreakerRef.current!.run(async () => {
+        const { report, failure } = await measureConnections(override);
+        applyReport(report, mode);
+        return {
+          outcome: (report.llmHealthy
+            ? "success"
+            : classifyProbeError(failure, report.llmMessage)) as ProbeOutcome,
+          value: report,
+        };
+      });
+      publishProbeRetry();
+      // A joined probe returns the other caller's promise, whose report is the
+      // one this call also wants: both measured the same endpoint. `null` means
+      // the breaker refused, so nothing was measured and nothing is reported.
+      return settled?.value ?? null;
+    },
+    [measureConnections, applyReport, publishProbeRetry],
+  );
+
   const checkConnections = useCallback(
     async (
       override: Partial<StudioConfig> = {},
       mode: "evidence" | "recovery" = "evidence",
     ): Promise<ConnectionReport> => {
-      const report = applyReport(await surveyConnections(override), mode);
+      // A person asking restarts the cadence and closes the breaker: the endpoint
+      // they just edited is not the one that kept failing (#536). They still join
+      // a probe already in flight rather than starting a second one.
+      probeBreakerRef.current?.reset();
+      const report = await probeOnce(override, mode);
       probeSchedulerRef.current?.reset();
-      return report;
+      // `reset` cleared the breaker, so this probe was allowed to run.
+      return report!;
     },
-    [surveyConnections, applyReport],
+    [probeOnce],
   );
 
   // Re-probe after the user acted on the sidecar notice (e.g. started the
@@ -1236,15 +1356,19 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * One scheduled probe: it records what it finds, and it reports back whether
    * the endpoint answered so the scheduler can widen or reset the gap. It does
    * not reset the cadence itself — only a person asking does that.
+   *
+   * The breaker wraps the measurement, so an overlapping tick joins the probe
+   * already in flight and a streak of transport failures stops the requests
+   * rather than repeating them (#536).
    */
   const scheduledProbe = useCallback(async (): Promise<boolean> => {
     if (!isOnline()) {
       applyOffline();
       return false;
     }
-    const report = applyReport(await surveyConnections({}), "recovery");
-    return report.llmHealthy;
-  }, [surveyConnections, applyReport, applyOffline]);
+    const report = await probeOnce({}, "recovery");
+    return report?.llmHealthy ?? false;
+  }, [probeOnce, applyOffline]);
 
   // Keep the scheduler pointed at the freshest probe without ever re-creating
   // the timer: the ref is what the running scheduler reads on each tick.
@@ -1448,16 +1572,16 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
-  const closePanel = useCallback(() => setActivePanel(null), []);
+  const closePanel = useCallback(() => regions.closeDetail(), [regions.closeDetail]);
 
   const openPanel = useCallback(
     (panel: WorkspacePanelId) => {
       if (setupOpen) {
         closeSetup();
       }
-      setActivePanel(panel);
+      regions.openDetail(panel);
     },
-    [setupOpen, closeSetup],
+    [setupOpen, closeSetup, regions.openDetail],
   );
 
   /**
@@ -2177,10 +2301,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   /** The single conversational exit from any lens. */
   const ask = useCallback(
     (intent: string) => {
-      setActivePanel(null);
+      regions.closeDetail();
       void sendMessage(intent);
     },
-    [sendMessage],
+    [sendMessage, regions.closeDetail],
   );
 
   const refreshMemory = useCallback(async () => {
@@ -2404,6 +2528,17 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // While the breaker is open the countdown is the only thing changing, so tick
+  // it once a second — the timer that carries it is separate from the probe
+  // schedule, and it stops the moment the breaker closes or is reset (#536).
+  useEffect(() => {
+    if (probeRetry.state !== "open") {
+      return;
+    }
+    const timer = window.setInterval(publishProbeRetry, 1_000);
+    return () => window.clearInterval(timer);
+  }, [probeRetry.state, publishProbeRetry]);
+
   // A network that comes back is worth one probe; a network that goes away is
   // worth one sentence and no further requests until it returns. The scheduler
   // itself keeps running, so the timer resumes with the connection.
@@ -2535,6 +2670,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      probeRetry,
       models,
       modelsLoading,
       modelsMessage,
@@ -2642,6 +2778,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      detail: regions.detail,
+      openDetail: regions.openDetail,
+      closeDetail: regions.closeDetail,
+      drawerOpen: regions.drawerOpen,
+      toggleDrawer: regions.toggleDrawer,
+      collapsed: regions.collapsed,
     }),
     [
       settings,
@@ -2660,6 +2802,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       canvasError,
       refreshCanvas,
       llmHealth,
+      probeRetry,
       models,
       modelsLoading,
       modelsMessage,
@@ -2767,6 +2910,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      regions.detail,
+      regions.openDetail,
+      regions.closeDetail,
+      regions.drawerOpen,
+      regions.toggleDrawer,
+      regions.collapsed,
     ],
   );
 
