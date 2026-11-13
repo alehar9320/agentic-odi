@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 
 import {
+  CandidateQueue,
   DecisionRecord,
   EvidenceQuote,
   ImpactSimulation,
@@ -49,4 +50,5 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
   "decision-record": DecisionRecord,
   "segment-card": SegmentCard,
   "strategy-card": StrategyCard,
+  "candidate-queue": CandidateQueue,
 };

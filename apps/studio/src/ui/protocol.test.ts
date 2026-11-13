@@ -15,6 +15,7 @@ const DOMAIN_CARDS = [
   "decision-record",
   "segment-card",
   "strategy-card",
+  "candidate-queue",
 ];
 
 function expectOk(spec: unknown) {

@@ -168,6 +168,25 @@
   has a macro above; anything unknown falls back to nothing rather than
   rendering a broken card.
 #}
+{% macro candidate_queue(data) %}
+<article class="surface" data-surface="candidate-queue">
+  <div class="surface__head">
+    <span class="surface__id">Review queue</span>
+    <span class="pill pill--accent">{{ data.candidates | length }} candidates</span>
+  </div>
+  <ol class="queue">
+    {% for candidate in data.candidates %}
+    <li class="queue__item">
+      <p class="surface__statement">{{ candidate.statement }}</p>
+      <blockquote class="evidence__quote">{{ candidate.quote }}</blockquote>
+      <p class="evidence__meta">From {{ candidate.source }}</p>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="evidence__meta">Decisions stay in the store; the card never removes a row on a click.</p>
+</article>
+{% endmacro %}
+
 {% macro render_card(card) %}
   {% if card.type == "outcome-card" %}{{ outcome_card(card.data) }}
   {% elif card.type == "opportunity-board" %}{{ opportunity_board(card.data) }}
@@ -178,5 +197,6 @@
   {% elif card.type == "decision-record" %}{{ decision_record(card.data) }}
   {% elif card.type == "segment-card" %}{{ segment_card(card.data) }}
   {% elif card.type == "strategy-card" %}{{ strategy_card(card.data) }}
+  {% elif card.type == "candidate-queue" %}{{ candidate_queue(card.data) }}
   {% endif %}
 {% endmacro %}
