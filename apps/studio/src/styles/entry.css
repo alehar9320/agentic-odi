@@ -17,4 +17,5 @@
 @import "./theme.css" layer(product);
 @import "./records.css" layer(product);
 @import "./brief.css" layer(product);
+@import "./interview.css" layer(product);
 @import "../vendor/index.css";
