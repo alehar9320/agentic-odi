@@ -102,11 +102,32 @@ character standing on its own. Both share the identical head.
 
 ---
 
+## Fidelities
+
+Odi is one character in two media, and the generator owns both. The `mark`
+above is pixel art; the Studio bar is not.
+
+| Fidelity | Source | Rendered as | Where |
+|---|---|---|---|
+| pixel 32-grid | `mark_raster()` / `bust_raster()` | one `<rect>` per art unit | favicon, desktop icon, CLI banner, OG card, README hero |
+| vector chrome mark | `chrome_mark_shapes()` / `chrome_mark_svg()` | smooth shapes from the same constants | the Studio bar (`.brand__mark`) |
+
+The pixel mark is the right medium where the grid *is* the medium: a 16 px
+favicon, an OS icon, a terminal banner. It is the wrong medium for a 32 px
+button in a 2× or 1.25× UI, where each art unit becomes a fractional device
+block and the one-unit glasses, nose, and eye highlight cannot resolve. The
+chrome mark draws the same head — same `PALETTE`, same golden-ratio geometry —
+as shapes, so it stays sharp at any size and any device-pixel ratio.
+`apps/studio/src/components/OdiMascot.tsx` is generated from
+`chrome_mark_shapes()`, so the two fidelities cannot drift.
+
+---
+
 ## Files
 
 ```text
 brand/
-  assets/        the committed artwork (generated)
+  assets/        the committed artwork (generated), including odi-chrome-mark.svg
   src/           the generator — the single source of truth
   tests/         the asset contract and the drift check
   tools/render.py  regenerates everything
@@ -132,9 +153,10 @@ the code that made it.
 
 ## Usage rules
 
-- **Never scale the art to a non-integer size.** The master grid is 32 × 32.
-  Render it at 16, 32, 64, 128, 256, 512, or 1024 — a 28-pixel slot would
-  scale the grid by 0.875 and blur it.
+- **Never scale the pixel art to a non-integer size.** The master grid is
+  32 × 32. Render it at 16, 32, 64, 128, 256, 512, or 1024 — a 28-pixel slot
+  would scale the grid by 0.875 and blur it. This rule governs the *pixel*
+  mark; the vector chrome mark may render at any size.
 - **Never recolour `odi-ink`.** The outline is the character's structure.
 - **Never place the head on a background other than `odi-tile`** in the `mark`
   variant. The bust is transparent and may sit on any dark surface.
