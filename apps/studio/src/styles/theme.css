@@ -2010,8 +2010,8 @@ a {
   font-weight: 600;
 }
 
-/* The interview behind the number. Verified reads as settled; an unverified
-   score is dashed and amber, so a guess never borrows a measured claim's look. */
+/* The interview behind the number. Verified reads as settled; a hypothesis is
+   dashed and amber, so a guess never borrows a measured claim's look. */
 .claim-check {
   margin: 0 0 8px;
   padding-left: 10px;
@@ -2021,20 +2021,13 @@ a {
   line-height: 1.45;
 }
 
-.claim-check--unverified {
+.claim-check--hypothesis,
+.claim-check--partial {
   border-left-style: dashed;
 }
 
 .claim-check__head {
   margin: 0 0 4px;
-}
-
-.claim-check__head b {
-  color: var(--muted);
-}
-
-.claim-check--unverified .claim-check__head b {
-  color: var(--amber);
 }
 
 .claim-check__list {
@@ -2098,6 +2091,22 @@ a {
   border-color: rgba(139, 140, 248, 0.3);
   background: rgba(99, 102, 241, 0.12);
   color: var(--accent);
+}
+
+/* A badge that is also a control: it reveals the evidence behind a score, so
+   it must read as pressable without losing the badge's shape. */
+.badge--button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.badge--button:hover {
+  filter: brightness(1.15);
+}
+
+.badge--button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* Job map */
