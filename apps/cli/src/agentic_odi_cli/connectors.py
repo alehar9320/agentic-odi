@@ -219,8 +219,10 @@ def _mcp_connector_config(
     url: str | None,
     preset_id: str | None,
     tools: list[str] | None,
+    headers: dict[str, str] | None = None,
 ) -> ConnectorConfig:
     from agentic_odi_connectors.catalog import (
+        ENV_VAR_PATTERN,
         UnknownPresetError,
         connector_config_from_preset,
         get_preset,
@@ -243,6 +245,13 @@ def _mcp_connector_config(
     settings: dict[str, object] = {"url": url}
     if tools:
         settings["tools"] = tools
+    if headers:
+        settings["headers"] = headers
+    referenced = set(ENV_VAR_PATTERN.findall(url))
+    for value in (headers or {}).values():
+        referenced.update(ENV_VAR_PATTERN.findall(value))
+    if referenced:
+        settings["env_vars"] = sorted(referenced)
     return ConnectorConfig(name=name, kind="mcp", settings=settings)
 
 
@@ -287,7 +296,13 @@ def add_connector(
         typer.echo("Error: --preset is only supported for MCP connectors.", err=True)
         raise typer.Exit(code=1)
     if kind == "mcp":
-        connector_config = _mcp_connector_config(name=name, url=url, preset_id=preset, tools=tool)
+        connector_config = _mcp_connector_config(
+            name=name,
+            url=url,
+            preset_id=preset,
+            tools=tool,
+            headers=_parse_headers(header),
+        )
     elif kind in {"rest", "webhook"}:
         if not name:
             typer.echo("Error: --name is required.", err=True)
