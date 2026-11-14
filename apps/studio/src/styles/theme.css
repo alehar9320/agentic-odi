@@ -716,7 +716,7 @@ a {
   padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--surface);
   color: var(--muted);
   font-size: 0.775rem;
   cursor: pointer;
