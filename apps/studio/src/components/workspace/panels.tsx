@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import type { WorkspacePanelId } from "../../types";
 import { BriefLens } from "../brief/BriefLens";
+import { Dashboard } from "../canvas/Dashboard";
 import { DirectCapture } from "../canvas/DirectCapture";
 import { EvidenceStream } from "../canvas/EvidenceStream";
 import { JobMap } from "../canvas/JobMap";
@@ -49,6 +50,18 @@ export interface PanelDefinition {
  * them owns an input the agent could take more naturally as a message.
  */
 export const WORKSPACE_PANELS: PanelDefinition[] = [
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    title: "Dashboard",
+    blurb: "Where your attention should go: the headline numbers and how they moved.",
+    icon: <TableIcon />,
+    render: () => <Dashboard />,
+    talk: {
+      label: "Ask what to look at",
+      intent: "Looking at my dashboard, where should my attention go next, and why?",
+    },
+  },
   {
     id: "records",
     label: "Records",
