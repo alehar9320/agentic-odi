@@ -764,6 +764,7 @@ class InMemoryRepository:
         return new_strategy
 
     def add_interview(self, interview: Interview) -> Interview:
+        self._append_event()
         self.interviews[interview.id] = interview
         return interview
 
@@ -786,6 +787,7 @@ class InMemoryRepository:
         interview = self.interviews.get(interview_id)
         if not interview:
             return None
+        self._append_event()
         current = interview.model_dump(exclude_unset=True)
         current.update(updates)
         new_interview = interview.model_validate(current)
@@ -796,6 +798,7 @@ class InMemoryRepository:
         """Delete an interview and cascade its quotes; return the removed quote ids."""
         if interview_id not in self.interviews:
             return []
+        self._append_event()
         del self.interviews[interview_id]
         removed = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
         for quote_id in removed:
@@ -803,6 +806,7 @@ class InMemoryRepository:
         return removed
 
     def add_quote(self, quote: InterviewQuote) -> InterviewQuote:
+        self._append_event()
         self.quotes[quote.id] = quote
         return quote
 
