@@ -309,6 +309,8 @@ export interface Claim {
 export interface ToolApproval {
   id: string;
   prompt: string;
+  /** The arguments the model supplied, so the gate can show what will run. */
+  arguments?: Record<string, unknown>;
 }
 
 /** What goes on the wire with a turn: the sidecar's snake-case shape. */
