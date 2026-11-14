@@ -213,6 +213,18 @@ describe("Conversation", () => {
     );
   });
 
+  it("renders transcript messages through MessagePrimitive.Root wrappers", () => {
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "Check this bet" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "A useful reply." },
+      { id: "s-1", parentId: "a-1", role: "system", content: "Notice" },
+    ]);
+
+    expect(container.querySelector('.message--user[data-message-id="u-1"]')).not.toBeNull();
+    expect(container.querySelector('.message--assistant[data-message-id="a-1"]')).not.toBeNull();
+    expect(container.querySelector('.message--notice[data-message-id="s-1"]')).not.toBeNull();
+  });
+
   it("renders a source chip for what the turn read", () => {
     const { container } = renderTurn([
       {

@@ -87,7 +87,7 @@ by the presence of one handler.
 |---|---|---|---|---|
 | `MessagePrimitive.Parts` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | With the `components` map. |
 | `MessagePrimitive.Attachments` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | User turns show what was sent. |
-| `MessagePrimitive.Root` | Partial | `apps/studio/src/components/chat/Conversation.tsx` | — | The message wrapper is a hand-written article carrying `aria-busy` and the assistant avatar. |
+| `MessagePrimitive.Root` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #994 | User, assistant, and notice messages render through `MessagePrimitive.Root`, preserving existing classes, accessible labels, and behavior. |
 | `MessagePrimitive.Quote` | Adopted | `apps/studio/src/assistant/quote.ts` | #435 | Renders the quoted passage on a sent turn. |
 | `MessagePrimitive.Error` / `ErrorPrimitive` | Rejected | — | — | `FailurePanel` already renders the structured error, the retry copy, and the Try again action from `metadata.custom.error`. Swapping adds nothing and loses the ODI failure language. |
 | `GenerativeUIRender` / `MessagePrimitive.GenerativeUI` | Decision | — | — | Would let a model emit UI we did not validate. The ODI catalog is schema-validated; revisit only if validation moves server-side. |
