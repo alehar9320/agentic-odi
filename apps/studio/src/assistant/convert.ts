@@ -7,6 +7,7 @@
  * an unknown part must never reach the screen as machine text.
  */
 
+import type { ReadonlyJSONObject } from "assistant-stream/utils";
 import type { ThreadMessage, ThreadMessageLike } from "@assistant-ui/react";
 
 import type { ChatAttachment, ChatMessage, ChatPart, Claim, StudioError } from "../types";
@@ -70,8 +71,10 @@ function toPart(part: ChatPart): LikePart | null {
           toolName: part.name,
           // The model's arguments are the arguments of the call itself, so they
           // travel on `args` — the field the runtime already keeps — rather than
-          // on the approval, which carries only the question.
-          args: approval.arguments ?? {},
+          // on the approval, which carries only the question. `approval.arguments`
+          // is `Record<string, unknown>` while assistant-ui's `args` expects a
+          // `ReadonlyJSONObject`, so the JSON object is asserted to that shape.
+          args: (approval.arguments ?? {}) as ReadonlyJSONObject,
           argsText: JSON.stringify(approval.arguments ?? {}),
           approval: { id: approval.id, prompt: approval.prompt },
         };
