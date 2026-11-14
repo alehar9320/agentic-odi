@@ -89,27 +89,80 @@ so it can gate a deployment.
 
 Composio is a managed MCP hub for 1000+ apps (GitHub, Slack, Linear, Notion,
 Jira, ...). It is wired up like any other preset, and it is **optional**:
-nothing in the CLI or the default flow requires it.
+nothing in the CLI or the default flow requires it. Composio documents two
+connection modes, and this guide covers both without adding a dependency.
+
+### Shared endpoint (recommended for most teams)
+
+`https://connect.composio.dev/mcp` is Composio's hosted MCP URL for an MCP
+client that authorizes in the browser. The preset carries that static URL and
+`auth: "oauth"`, with no credential in the registry:
 
 ```bash
-# Register the preset (OAuth consent starts on first health/ingest call)
+# Register the preset; the browser consent flow starts on the first health/ingest call
 python -m agentic_odi_cli connectors add mcp --preset composio
 
 # Check it independently; a down or rate-limited endpoint reports unhealthy
-# for composio only and exits cleanly for that connector
+# for composio only
 python -m agentic_odi_cli connectors health --name composio
 
 # Ingest is per-connector and opt-in; another connector's ingest is unaffected
 python -m agentic_odi_cli connectors ingest --name composio --job-id job_123
 ```
 
+A generic MCP client that cannot run the browser consent flow can send
+Composio's consumer key header instead. The `${VAR}` placeholder is resolved
+from the environment when a connection is opened, so the key never enters the
+registry:
+
+```bash
+export COMPOSIO_CONSUMER_KEY=your-consumer-key
+python -m agentic_odi_cli connectors add mcp --name composio \
+  --url https://connect.composio.dev/mcp \
+  --header "x-consumer-api-key=${COMPOSIO_CONSUMER_KEY}"
+```
+
+### Per-user toolkits (session-scoped)
+
+When each person needs their own toolkits and connected accounts, Composio
+issues a session-scoped MCP URL. There is no static per-user URL to hardcode:
+create a session with the Composio API, then read `mcp.url` and `mcp.headers`
+from the response.
+
+```bash
+export COMPOSIO_API_KEY=your-api-key
+curl -sS -X POST https://backend.composio.dev/api/v3.1/tool_router/session \
+  -H "x-api-key: $COMPOSIO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "user_123"}' | jq -r '.mcp.url'
+```
+
+Register that URL for the user. `--header` is repeatable and interpolates
+`${VAR}` from the environment; use the header name Composio returns in
+`session.mcp.headers` (`x-api-key` in the documented flow):
+
+```bash
+python -m agentic_odi_cli connectors add mcp --name composio-user_123 \
+  --url "https://backend.composio.dev/..." \
+  --header "x-api-key=${COMPOSIO_API_KEY}"
+```
+
+Both modes are strictly optional and fail-open. `connectors health` and
+`connectors ingest` are per-connector, so a missing, unreachable, or
+rate-limited Composio endpoint reports unhealthy for `composio` only and never
+blocks another connector, the `connectors health` table, or any default flow.
+Adding the `composio` preset changes behavior for no workspace that does not
+configure it.
+
 The preset shape lives in
 `packages/connectors/src/agentic_odi_connectors/catalog.py`. To add it to
 another project, copy the `composio` entry (id, label, area, summary, url,
 auth, docs, `is_recommended: false`), regenerate the catalog JSON, and update
-the presets table. Because health and ingest are per-connector, a missing or
-unreachable Composio endpoint never breaks another connector or the CLI —
-verify that in the host project before shipping.
+the presets table. The shared URL is static; the session URL is per user and
+comes from the API response, so copy the recipe rather than the URL. Because
+health and ingest are per-connector, a missing or unreachable Composio endpoint
+never breaks another connector or the CLI — verify that in the host project
+before shipping.
 
 ## Ingest behavior
 
