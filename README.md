@@ -77,18 +77,22 @@ The project card, rendered from the committed source by
 - **The agent knows what you are looking at.** Select a job, step, outcome, or
   evidence record and the Studio tells the sidecar only *which* record — kind and
   id — never what it says.
-- **A desktop app and an offline shell.** Tauri 2 desktop builds update
-  themselves in the background, and a service worker precaches the built shell so
-  the Studio opens with no network.
+- **A desktop app and an offline shell.** Tauri 2 desktop builds open in a
+  focused window that remembers its size and place, update themselves in the
+  background, and a service worker precaches the built shell so the Studio opens
+  with no network.
 - **Odi the Otter.** The mascot appears in the CLI, the Studio, the desktop icon,
   and this page. See [Brand](#brand).
 
 ## Supported platforms
 
-[![Linux](https://img.shields.io/badge/Linux-x86__64-blue?logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
-[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
-[![macOS Intel](https://img.shields.io/badge/macOS-Intel-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
-[![Windows](https://img.shields.io/badge/Windows-x86__64-blue?logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+Grab a prebuilt archive for your machine — each one clicks straight to
+`releases/latest/download/<asset>`:
+
+[![Download Linux](https://img.shields.io/badge/Download-Linux-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz)
+[![Download macOS Apple Silicon](https://img.shields.io/badge/Download-macOS%20Apple%20Silicon-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz)
+[![Download macOS Intel](https://img.shields.io/badge/Download-macOS%20Intel-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz)
+[![Download Windows](https://img.shields.io/badge/Download-Windows-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip)
 
 ## Install
 
@@ -155,10 +159,14 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   sidecar-owned transcript, with attachments, tool traces under one foldable
   work row per turn, opt-in approvals for
   chat writes and unknown tools, and branch-aware editing and regeneration.
-  Settings → About says where the app is running — desktop app, installed web
-  app, or browser tab — and whether the offline shell is on, and offers an
-  opt-in, redacted local diagnostics preview; no report is uploaded. See
-  [The Living Studio](docs/living-studio.md).
+  Every turn says who said it and when: your own turn carries a name, an
+  initial, and a time, the agent's carries its sparkle avatar, and a restored
+  turn keeps the moment it was written while a turn with no time shows none.
+  The thread sits under a title bar that names the inquiry and quietly flags a
+  sample or offline canvas. Settings → About says where the app is running —
+  desktop app, installed web app, or browser tab — and whether the offline
+  shell is on, and offers an opt-in, redacted local diagnostics preview; no
+  report is uploaded. See [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
 ```bash
@@ -205,7 +213,7 @@ The server speaks the Model Context Protocol. Any MCP client can reach it:
 }
 ```
 
-Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) on the
+Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub, Composio) on the
 Studio's **Customize** page — installed connectors first, then a trusted vendor
 marketplace, then conversationally, or via `agentic-odi connectors add <preset>`.
 A listing that needs a token names the environment variable to set; no credential

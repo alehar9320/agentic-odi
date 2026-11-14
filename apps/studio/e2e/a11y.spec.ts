@@ -160,12 +160,13 @@ test("the gate fails on a deliberately low-contrast class", async ({ page, reque
   await openStudio(page);
 
   const findings = await page.evaluate(() => {
-    const style = document.createElement("style");
-    style.textContent =
-      ".deliberately-unreadable { color: #9aa0aa; background-color: #a2a7b3; }";
-    document.head.appendChild(style);
     const bad = document.createElement("p");
     bad.className = "deliberately-unreadable";
+    // Colours go on through the CSSOM, not a <style> element: the Studio is
+    // served under a strict `style-src 'self'` CSP, which refuses an injected
+    // stylesheet, and the gate must not depend on the policy the app forbids.
+    bad.style.color = "#9aa0aa";
+    bad.style.backgroundColor = "#a2a7b3";
     bad.textContent = "Deliberately unreadable caption";
     document.body.appendChild(bad);
     return window.__odiContrastScan(document.body, "injected", "dark");
