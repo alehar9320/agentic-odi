@@ -863,13 +863,30 @@ npm --prefix apps/studio run tauri dev     # dev window
 npm --prefix apps/studio run tauri build   # bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)
 ```
 
-The window opens at 1100 × 760 — a focused first frame rather than a
-full-desktop canvas — with a usable floor of 900 × 600 and `resizable: true`, so
-the person grows it rather than shrinking it. Size, position, and the maximized
-flag are restored on the next launch by `tauri-plugin-window-state`, so the
-small default only applies to the first run. Only those three are restored:
-decorations, fullscreen, and visibility stay the shell's business, and a stale
-`visible: false` would open a window nobody can see.
+### The launch splash (#963)
+
+The desktop app opens on a branded splash — Odi the otter, the *Living Studio*
+wordmark, and a short status line — then hands over to the main window. It
+follows Tauri's splash pattern: `tauri.conf.json` declares two windows, `main`
+with `visible: false` and a `splashscreen` window shown at `splashscreen.html`.
+When the frontend has committed and finished first-boot work it calls the
+`set_complete` command; the Rust shell reveals `main`, focuses it, and closes the
+splash.
+
+Three details keep the splash from becoming a boot tax:
+
+- **A short minimum display.** The splash stays up for at least 900 ms so a fast
+  boot cannot blink it past, but a boot under 250 ms skips the wait entirely.
+- **Two independent ways out.** The frontend bounds its call with a 2 s timeout,
+  and the shell runs an 8 s watchdog, so a bundle that fails to load or a
+  renderer that crashes still gets a window instead of a splash that never
+  leaves.
+- **An opt-out.** `AGENTIC_ODI_SPLASH=off` (or `0`) launches straight into `main`
+  with no splash window at all.
+
+The splash is a desktop window only. The browser build never renders it and keeps
+its existing boot shell in `index.html`; the handover helper
+(`src/lib/splash.ts`) is a no-op where Tauri is absent.
 
 > [!NOTE]
 > **Tauri prerequisites.** The desktop build needs the WebKitGTK toolchain and
