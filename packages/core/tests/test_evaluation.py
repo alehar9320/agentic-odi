@@ -109,6 +109,13 @@ def test_blank_input_reports_every_missing_part() -> None:
     assert result["statement"] == ""
 
 
+def test_outcome_rubric_is_exported_from_the_package_root() -> None:
+    """The rubric is part of the public interface, not an internal helper."""
+    import agentic_odi_core
+
+    assert agentic_odi_core.outcome_rubric is outcome_rubric
+
+
 def test_outcome_rubric_returns_all_eight_rules() -> None:
     rubric = outcome_rubric()
 
