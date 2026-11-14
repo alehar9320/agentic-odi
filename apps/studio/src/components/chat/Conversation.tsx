@@ -138,7 +138,7 @@ function AssistantMessage() {
             className="message__tag"
             onClick={() => openPanel("settings")}
           >
-            Local draft, no model connected
+            Built-in assistant
           </button>
         ) : null}
 

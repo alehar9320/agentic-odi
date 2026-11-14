@@ -68,6 +68,7 @@ let canvasRecords: Record<string, unknown> = {};
 let bootCorrupt = false;
 let chatAborts = false;
 let chatFailure: Error | null = null;
+let chatHttpError: { status: number; body?: Record<string, unknown> } | null = null;
 let chatHangs = false;
 let releaseChat: (() => void) | null = null;
 let connectorFetches = 0;
@@ -165,6 +166,12 @@ function route(
     }
     if (chatFailure) {
       throw chatFailure;
+    }
+    if (chatHttpError) {
+      return new Response(
+        JSON.stringify(chatHttpError.body ?? { detail: "Error" }),
+        { status: chatHttpError.status, headers: { "Content-Type": "application/json" } }
+      );
     }
     if (chatHangs) {
       // A reply still in the air. A browser's fetch rejects on abort, so the
@@ -975,6 +982,73 @@ describe("StudioContext first run in a browser with no server", () => {
     // The reply says where it came from, on the reply — not in a strip above.
     expect(result.current.offlineReplyFor).toBe(last?.id);
     expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
+  });
+
+  it("falls back to the built-in assistant on transport failure (503)", async () => {
+    // A sidecar that answers 503 (service unavailable) is a transport failure.
+    // The request falls through to the local BFF, which answers deterministically.
+    chatHttpError = { status: 503, body: { detail: "Service unavailable" } };
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.sendMessage("what should I work on first?");
+    });
+
+    await waitFor(() => {
+      expect((result.current.messages.at(-1)?.content ?? "").trim().length).toBeGreaterThan(0);
+    });
+
+    const last = result.current.messages.at(-1);
+    expect(last?.role).toBe("assistant");
+    expect(last?.error).toBeUndefined();
+    expect(last?.content.trim().length).toBeGreaterThan(0);
+    // The reply carries the inline marker instead of a banner.
+    expect(result.current.offlineReplyFor).toBe(last?.id);
+    expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
+
+    chatHttpError = null;
+  });
+
+  it("surfaces a genuine application error (401) instead of falling back", async () => {
+    // A 401 from the sidecar means the credentials were rejected — this is an
+    // application error, not a transport failure. The fallback must not hide it.
+    chatHttpError = { status: 401, body: { detail: "Invalid API key" } };
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.sendMessage("what should I work on first?");
+    });
+
+    await waitFor(() => {
+      const last = result.current.messages.at(-1);
+      expect(last?.error).toBeDefined();
+      expect(last?.error?.code).toBe("unauthorized");
+    });
+
+    // The error is surfaced on the reply; no fallback answer appears.
+    const last = result.current.messages.at(-1);
+    expect(last?.error).toBeDefined();
+    expect(last?.content.trim().length).toBe(0);
+    expect(result.current.offlineReplyFor).toBeNull();
+    expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
+
+    chatHttpError = null;
   });
 
   it("calls nothing broken until the person asks", async () => {

@@ -324,7 +324,7 @@ describe("Conversation offline context", () => {
 
     const chips = container.querySelectorAll("button.message__tag");
     expect(chips).toHaveLength(1);
-    expect(chips[0]).toHaveTextContent("Local draft, no model connected");
+    expect(chips[0]).toHaveTextContent("Built-in assistant");
 
     fireEvent.click(chips[0] as HTMLButtonElement);
     expect(harness.state.openPanel).toHaveBeenCalledWith("settings");
