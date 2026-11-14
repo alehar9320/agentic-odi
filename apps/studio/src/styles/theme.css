@@ -1,5 +1,24 @@
 @import "./print.css";
 
+/* The Studio's display face, self-hosted so the shell opens with no network
+   (see #545) and the Tauri build works offline. Source Serif 4, SIL OFL 1.1;
+   the licence sits beside the files in public/fonts/. */
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-latin-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-latin-600.woff2") format("woff2");
+}
+
 :root {
   color-scheme: dark;
   --bg: #0a0b0e;
@@ -18,6 +37,43 @@
   --surface-hover: rgba(255, 255, 255, 0.06);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  /* The display voice: the self-hosted serif plus a system-serif fallback, so a
+     heading keeps its weight before the face loads and when it never does. */
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", Times, serif;
+
+  /* One type scale. Existing declarations keep their literal sizes until a
+     later, separately-labelled pass adopts these names component by component. */
+  --text-2xs: 0.64rem;
+  --text-xs: 0.72rem;
+  --text-sm: 0.78rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.15rem;
+  --text-2xl: 1.4rem;
+  --text-3xl: 1.8rem;
+  --text-4xl: 2.25rem;
+
+  /* One spacing scale, on a 4px grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* One corner scale, replacing the 23 one-off radii as rules adopt it. */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* One leading scale. */
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
 
   /* Canvas components were written against the original palette; the aliases
      keep them on the live tokens so both themes stay in step. */
@@ -610,6 +666,7 @@ a {
   margin: 0;
   min-height: 2.34em;
   max-width: 24ch;
+  font-family: var(--font-display);
   font-size: clamp(1.55rem, 3.4vw, 2.25rem);
   font-weight: 600;
   line-height: 1.17;
@@ -3758,6 +3815,7 @@ html.theme-fading *::after {
 
 .ui-stat__value {
   margin-top: 3px;
+  font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -4785,6 +4843,7 @@ details[open] summary {
 
 .brand__wordmark {
   color: var(--muted);
+  font-family: var(--font-display);
   font-size: 0.88rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -5009,6 +5068,7 @@ details[open] summary {
 
 .lens__title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: -0.01em;
