@@ -1,5 +1,5 @@
 /**
- * Route table for The the studio.
+ * Route table for the studio.
  *
  * One pure module owns parsing and formatting. Panel ids are exactly
  * `WorkspacePanelId`; subject kinds are exactly `SignalSubjectKind`.
