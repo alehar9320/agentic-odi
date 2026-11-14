@@ -62,4 +62,75 @@ describe("SuggestionPills starters", () => {
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sendMessage).toHaveBeenCalledWith(NOTES_PROMPT);
   });
+
+  it("renders the starters as one list of three cards", () => {
+    const { container } = renderPills();
+
+    const list = screen.getByRole("list");
+    const cards = list.querySelectorAll("li > button");
+    expect(cards).toHaveLength(3);
+    // The wrapping pill row is gone; the grid is the only container.
+    expect(container.querySelector(".composer__pills")).toBeNull();
+  });
+
+  it("gives every card an icon, a title, an artifact preview, and one action", () => {
+    const { container } = renderPills();
+
+    for (const card of container.querySelectorAll(".starter")) {
+      expect(card.querySelector(".starter__icon")).not.toBeNull();
+      expect(card.querySelector(".starter__title")?.textContent).toBeTruthy();
+      expect(card.querySelector(".starter__artifact")?.textContent).toBeTruthy();
+      expect(card.querySelectorAll(".starter__action")).toHaveLength(1);
+    }
+  });
+
+  it("describes each card with its artifact preview", () => {
+    const { container } = renderPills();
+
+    for (const card of container.querySelectorAll(".starter")) {
+      const artifact = card.querySelector(".starter__artifact");
+      expect(artifact).not.toBeNull();
+      expect(card.getAttribute("aria-describedby")).toBe(artifact?.id);
+    }
+  });
+
+  it("never nests an interactive element inside a card", () => {
+    const { container } = renderPills();
+
+    for (const card of container.querySelectorAll(".starter")) {
+      expect(card.querySelector("button, a[href]")).toBeNull();
+    }
+  });
+
+  it("names the artifact's shape without a count, price, or date", () => {
+    const { container } = renderPills();
+
+    for (const artifact of container.querySelectorAll(".starter__artifact")) {
+      // Drop the decorative "Produces" label, then hold the copy to a shape.
+      const text = (artifact.textContent ?? "").replace(/^Produces/, "");
+      expect(text).not.toMatch(/\d/);
+      expect(text).not.toMatch(/[€$£]|%|price|per (month|year|seat)/i);
+    }
+  });
+
+  it("keeps the panel opener out of the card list", () => {
+    const { container } = renderPills();
+
+    const aside = screen.getByRole("button", { name: "Opportunity landscape" });
+    expect(aside.classList.contains("composer__starter-aside")).toBe(true);
+    expect(container.querySelector(".starter-grid")?.contains(aside)).toBe(false);
+    // No card carries the landscape label.
+    for (const card of container.querySelectorAll(".starter")) {
+      expect(card.textContent).not.toContain("Opportunity landscape");
+    }
+  });
+
+  it("marks the first card as recommended exactly once", () => {
+    const { container } = renderPills();
+
+    expect(container.querySelectorAll(".starter__recommended")).toHaveLength(1);
+    expect(container.querySelector(".starter__recommended")?.closest(".starter")).toBe(
+      container.querySelector(".starter"),
+    );
+  });
 });
