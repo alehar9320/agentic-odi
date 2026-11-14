@@ -31,3 +31,4 @@ decisions.
 | [0003](0003-consent-on-the-domain-path.md) | Put consent on the domain path, not the Studio's chat loop | proposed |
 | [0004](0004-two-stores-one-reference.md) | Two stores stay two stores; the reference between them becomes honest | proposed |
 | [0005](0005-core-layers-and-the-contract-split.md) | Name core's four layers; do not split `contract.py` out yet | accepted |
+| [0006](0006-browser-first-studio-sidecar-optional.md) | Browser-first, sidecar-optional Studio | proposed |
