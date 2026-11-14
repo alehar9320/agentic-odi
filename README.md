@@ -77,9 +77,10 @@ The project card, rendered from the committed source by
 - **The agent knows what you are looking at.** Select a job, step, outcome, or
   evidence record and the Studio tells the sidecar only *which* record — kind and
   id — never what it says.
-- **A desktop app and an offline shell.** Tauri 2 desktop builds update
-  themselves in the background, and a service worker precaches the built shell so
-  the Studio opens with no network.
+- **A desktop app and an offline shell.** Tauri 2 desktop builds open in a
+  focused window that remembers its size and place, update themselves in the
+  background, and a service worker precaches the built shell so the Studio opens
+  with no network.
 - **Odi the Otter.** The mascot appears in the CLI, the Studio, the desktop icon,
   and this page. See [Brand](#brand).
 
@@ -158,10 +159,14 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   sidecar-owned transcript, with attachments, tool traces under one foldable
   work row per turn, opt-in approvals for
   chat writes and unknown tools, and branch-aware editing and regeneration.
-  Settings → About says where the app is running — desktop app, installed web
-  app, or browser tab — and whether the offline shell is on, and offers an
-  opt-in, redacted local diagnostics preview; no report is uploaded. See
-  [The Living Studio](docs/living-studio.md).
+  Every turn says who said it and when: your own turn carries a name, an
+  initial, and a time, the agent's carries its sparkle avatar, and a restored
+  turn keeps the moment it was written while a turn with no time shows none.
+  The thread sits under a title bar that names the inquiry and quietly flags a
+  sample or offline canvas. Settings → About says where the app is running —
+  desktop app, installed web app, or browser tab — and whether the offline
+  shell is on, and offers an opt-in, redacted local diagnostics preview; no
+  report is uploaded. See [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
   `odi demo load` fills the store with a complete study — eight job-map steps,
   forty scored outcomes, twelve evidence rows — every one labeled `origin:

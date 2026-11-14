@@ -19,6 +19,9 @@ const PRECACHE_EXTENSIONS = new Set([
   ".svg",
   ".ico",
   ".webmanifest",
+  // The display face is self-hosted (#734) so the shell renders its headings
+  // offline; without this the fallback serif is all a cold start can show.
+  ".woff2",
 ]);
 
 /**
