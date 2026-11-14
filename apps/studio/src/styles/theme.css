@@ -1,5 +1,33 @@
 @import "./print.css";
 
+/* The display serif. Self-hosted in `public/fonts/` with `font-display: swap`
+   and a system fallback stack, so the shell opens with no network and the
+   Tauri build works offline. EB Garamond is a revival of Claude Garamont's
+   mid-16th-century humanist face — the same lineage as the reference mock's
+   wordmark — and its open-source weights read as well at 2.25rem as they do
+   at 0.88rem, which is why it suits both the brand and the numerals. */
+@font-face {
+  font-family: "EB Garamond";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("/fonts/eb-garamond-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "EB Garamond";
+  font-style: italic;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("/fonts/eb-garamond-latin-wght-italic.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   color-scheme: dark;
   --bg: #0a0b0e;
@@ -18,6 +46,50 @@
   --surface-hover: rgba(255, 255, 255, 0.06);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Display face: the serif for what matters. Self-hosted (see the @font-face
+     block below), so the shell opens with no network and the Tauri build works
+     offline. Body copy stays on --font; only the four sites below touch this. */
+  --font-display: "EB Garamond", "Iowan Old Style", "Palatino Linotype", "Palatino", "URW Palladio L", "P0520-Palladio", Georgia, "Times New Roman", serif;
+
+  /* Type scale. Every size in the stylesheet is one of these; a later pass
+     migrates the 296 hard-coded font-size declarations to them, component by
+     component. This issue introduces the scale only. */
+  --text-2xs: 0.64rem;
+  --text-xs: 0.72rem;
+  --text-sm: 0.78rem;
+  --text-base: 0.88rem;
+  --text-md: 1rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.65rem;
+  --text-3xl: 2.05rem;
+  --text-4xl: 2.6rem;
+
+  /* Spacing scale. Eight steps; nothing in the file invents a value outside
+     them, so two comparable gaps cannot drift apart. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+
+  /* Radius scale. One token per class of surface, so a card and a panel can
+     never disagree about how much they round. */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Line-height scale, keyed to the type scale above. */
+  --leading-tight: 1.1;
+  --leading-snug: 1.2;
+  --leading-normal: 1.4;
+  --leading-relaxed: 1.55;
+  --leading-loose: 1.7;
 
   /* Canvas components were written against the original palette; the aliases
      keep them on the live tokens so both themes stay in step. */
@@ -610,6 +682,7 @@ a {
   margin: 0;
   min-height: 2.34em;
   max-width: 24ch;
+  font-family: var(--font-display);
   font-size: clamp(1.55rem, 3.4vw, 2.25rem);
   font-weight: 600;
   line-height: 1.17;
@@ -3749,6 +3822,7 @@ html.theme-fading *::after {
 
 .ui-stat__value {
   margin-top: 3px;
+  font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -4776,6 +4850,7 @@ details[open] summary {
 
 .brand__wordmark {
   color: var(--muted);
+  font-family: var(--font-display);
   font-size: 0.88rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -5000,6 +5075,7 @@ details[open] summary {
 
 .lens__title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: -0.01em;
