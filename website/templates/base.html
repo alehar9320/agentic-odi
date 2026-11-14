@@ -18,8 +18,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{% block twitter_title %}{{ page.title }}{% endblock %}">
   <meta name="twitter:description" content="{% block twitter_description %}{{ page.description }}{% endblock %}">
-  <meta name="twitter:image" content="{{ og_image }}">
-  <meta name="twitter:image:alt" content="{{ page.title }}">
+  <meta name="twitter:image" content="{{ pages_url }}assets/og.png">
 
   <link rel="canonical" href="{{ pages_url }}{{ page.path if page.path != 'index.html' else '' }}">
   <script src="{{ prefix }}assets/theme.js"></script>

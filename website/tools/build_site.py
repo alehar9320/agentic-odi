@@ -218,17 +218,6 @@ def _load_json(name: str) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _og_image(path: str) -> str:
-    """The absolute URL of a page's own social card.
-
-    The landing page keeps the committed, hand-reviewed card at assets/og.png;
-    every other page gets the card generated from its own title and figure.
-    """
-    if path == "index.html":
-        return f"{PAGES_URL}assets/og.png"
-    return f"{PAGES_URL}assets/og/{make_og.og_name(path)}"
-
-
 def _page_context(**extra: Any) -> dict[str, Any]:
     """The context every page receives."""
     context: dict[str, Any] = {
@@ -237,9 +226,6 @@ def _page_context(**extra: Any) -> dict[str, Any]:
         "depth": 0,
         "prefix": "",
         "year": "2026",
-        # The generic card is the fallback; every real page overrides it with
-        # its own card, which the build generates from the page's content.
-        "og_image": f"{PAGES_URL}assets/og.png",
     }
     context.update(extra)
     return context
@@ -343,7 +329,6 @@ def _render_docs(env: Environment, nav: dict[str, Any], context: dict[str, Any])
         page_context["page"]["has_diagram"] = 'class="mermaid"' in body
         page_context["page"]["toc"] = toc
         page_context["prefix"] = "../../"
-        page_context["og_image"] = _og_image(output)
         rendered[output] = env.get_template("doc.html").render(**page_context)
 
     return rendered
@@ -370,7 +355,6 @@ def _render_docs_index(env: Environment, nav: dict[str, Any], context: dict[str,
         "toc": [],
     }
     page_context["prefix"] = "../"
-    page_context["og_image"] = _og_image("docs/index.html")
     return env.get_template("docs_index.html").render(**page_context)
 
 
@@ -431,7 +415,6 @@ def _render_pages(env: Environment) -> dict[str, str]:
         "path": "index.html",
         "depth": 0,
     }
-    landing_context["og_image"] = _og_image("index.html")
     rendered["index.html"] = env.get_template("landing.html").render(**landing_context)
 
     rendered["docs/index.html"] = _render_docs_index(env, nav, context)
