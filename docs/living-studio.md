@@ -851,6 +851,31 @@ npm --prefix apps/studio run tauri dev     # dev window
 npm --prefix apps/studio run tauri build   # bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)
 ```
 
+### The launch splash (#963)
+
+The desktop app opens on a branded splash — Odi the otter, the *Living Studio*
+wordmark, and a short status line — then hands over to the main window. It
+follows Tauri's splash pattern: `tauri.conf.json` declares two windows, `main`
+with `visible: false` and a `splashscreen` window shown at `splashscreen.html`.
+When the frontend has committed and finished first-boot work it calls the
+`set_complete` command; the Rust shell reveals `main`, focuses it, and closes the
+splash.
+
+Three details keep the splash from becoming a boot tax:
+
+- **A short minimum display.** The splash stays up for at least 900 ms so a fast
+  boot cannot blink it past, but a boot under 250 ms skips the wait entirely.
+- **Two independent ways out.** The frontend bounds its call with a 2 s timeout,
+  and the shell runs an 8 s watchdog, so a bundle that fails to load or a
+  renderer that crashes still gets a window instead of a splash that never
+  leaves.
+- **An opt-out.** `AGENTIC_ODI_SPLASH=off` (or `0`) launches straight into `main`
+  with no splash window at all.
+
+The splash is a desktop window only. The browser build never renders it and keeps
+its existing boot shell in `index.html`; the handover helper
+(`src/lib/splash.ts`) is a no-op where Tauri is absent.
+
 > [!NOTE]
 > **Tauri prerequisites.** The desktop build needs the WebKitGTK toolchain and
 > Rust 1.90+. On Debian/Ubuntu:

@@ -270,6 +270,7 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_CONNECTOR_TIMEOUT` | connector health/ingest calls | `30` seconds |
 | `AGENTIC_ODI_STUDIO_DIST` | Studio API, dev launcher | `apps/studio/dist` |
 | `AGENTIC_ODI_REPO_ROOT` | Tauri shell | auto-detected |
+| `AGENTIC_ODI_SPLASH` | Tauri shell | `on` (`off`/`0` skips the launch splash) |
 | `AGENTIC_ODI_BASE_URL` | CLI chat, Studio chat | `http://localhost:8001/v1` |
 | `AGENTIC_ODI_MODEL` | CLI chat, Studio chat | `local-tools-model` |
 | `AGENTIC_ODI_API_KEY` | CLI chat, Studio chat | `local` |

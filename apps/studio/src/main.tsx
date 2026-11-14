@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { installDiagnosticsConsoleCapture } from "./diagnostics/bundle";
 import { removeBootShell } from "./lib/boot";
+import { signalSplashComplete } from "./lib/splash";
 import { initServiceWorker } from "./lib/swUpdate";
 import "./styles/theme.css";
 import "./styles/records.css";
@@ -45,10 +46,19 @@ if (!rootElement) {
  * or focusable once the app is up. Removing it here — after the commit that
  * replaces the container — keeps the shell on screen until React has something
  * to show, so the handover is one colour and no blank frame.
+ *
+ * The same commit is what the desktop splash waits for (#963): the shell reveals
+ * `main` and closes the splash when this reports in. It is sent on the frame
+ * after the commit, so the window never appears half-painted, and it is a no-op
+ * in the browser, which keeps this boot shell.
  */
 function Boot() {
   useEffect(() => {
     removeBootShell();
+    const frame = requestAnimationFrame(() => {
+      void signalSplashComplete();
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
   return <App />;
 }
