@@ -1,6 +1,6 @@
 import { createRef } from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { StudioContextValue } from "../../state/StudioContext";
@@ -244,7 +244,11 @@ describe("ThreadComposer attachments", () => {
     await screen.findByText("notes-1.txt");
     await screen.findByText("notes-5.txt");
     expect(screen.queryByText("notes-6.txt")).toBeNull();
-    expect(await screen.findAllByRole("listitem")).toHaveLength(5);
+    // Count the attachment chips, not the starter cards, which are also list
+    // items (#317).
+    expect(
+      within(screen.getByRole("list", { name: "Attachments" })).getAllByRole("listitem"),
+    ).toHaveLength(5);
 
     expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("notes-6.txt"));
     expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("5-file"));

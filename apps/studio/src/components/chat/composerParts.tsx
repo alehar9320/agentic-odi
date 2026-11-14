@@ -16,18 +16,23 @@ import { isCommandDraft, type StudioCommand } from "../../lib/commands";
 import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
 import { detectPlatform, shortcutLabels } from "../../updater/platform";
-import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
+import { BoltIcon, CaptureIcon, SparkIcon } from "../icons";
 
-const PILL_ICONS: ReactNode[] = [
-  <SparkIcon size={15} key="spark" />,
-  <BoltIcon size={15} key="bolt" />,
-  <CaptureIcon size={15} key="capture" />,
+const STARTER_ICONS: ReactNode[] = [
+  <SparkIcon size={16} key="spark" />,
+  <BoltIcon size={16} key="bolt" />,
+  <CaptureIcon size={16} key="capture" />,
 ];
 
-interface QuickPill {
+interface StarterCard {
   id: string;
-  label: string;
+  title: string;
+  /** The one action line: what a click does. */
+  action: string;
+  /** The shape of what comes back, e.g. "A job map · steps · what is still a guess". */
+  artifact?: string;
   icon: ReactNode;
+  recommended: boolean;
   run: () => void;
 }
 
@@ -35,6 +40,11 @@ interface QuickPill {
  * The runtime's suggestions, pinned to the composer so they stay reachable
  * once the thread starts. What is offered here and what the thread knows are
  * the same store, so they cannot drift apart.
+ *
+ * Each starter is a card with one anatomy — icon, title, artifact preview, one
+ * action — in a grid that never wraps mid-set (#317). The panel opener
+ * ("Opportunity landscape", or the capture fallback) is a quiet text action
+ * under the grid, never a fourth card.
  */
 export function SuggestionPills() {
   const { canvas, llmHealth, openPanel, sendMessage } = useStudio();
@@ -42,37 +52,58 @@ export function SuggestionPills() {
 
   const jobs = canvas?.jobs.length ?? 0;
 
-  const pills: QuickPill[] = suggestions.map((suggestion, index) => ({
+  const cards: StarterCard[] = suggestions.map((suggestion, index) => ({
     id: `suggestion-${index}`,
-    label: suggestion.title ?? suggestion.prompt,
-    icon: PILL_ICONS[index % PILL_ICONS.length],
+    title: suggestion.title ?? suggestion.prompt,
+    action: suggestion.label ?? "",
+    artifact: (suggestion as { artifact?: string }).artifact,
+    icon: STARTER_ICONS[index % STARTER_ICONS.length],
+    recommended: index === 0,
     run: () => void sendMessage(suggestion.prompt),
   }));
 
-  pills.push(
+  const aside =
     jobs > 0 && llmHealth.healthy === false
-      ? {
-          id: "capture",
-          label: "Capture what you heard",
-          icon: <CaptureIcon size={15} />,
-          run: () => openPanel("capture"),
-        }
-      : {
-          id: "landscape",
-          label: "Opportunity landscape",
-          icon: <CompassIcon size={15} />,
-          run: () => openPanel("landscape"),
-        },
-  );
+      ? { label: "Capture what you heard", run: () => openPanel("capture") }
+      : { label: "Opportunity landscape", run: () => openPanel("landscape") };
 
   return (
-    <div className="composer__pills" aria-label="Suggested next steps">
-      {pills.map((pill) => (
-        <button key={pill.id} type="button" className="suggestion" onClick={pill.run}>
-          {pill.icon}
-          {pill.label}
-        </button>
-      ))}
+    <div className="composer__starters" aria-label="Suggested next steps">
+      <ul className="starter-grid" role="list">
+        {cards.map((card) => (
+          <li key={card.id} className="starter-item">
+            <button
+              type="button"
+              className="starter"
+              onClick={card.run}
+              aria-label={card.title}
+              aria-describedby={card.artifact ? `${card.id}-artifact` : undefined}
+            >
+              <span className="starter__head">
+                <span className="starter__icon" aria-hidden="true">
+                  {card.icon}
+                </span>
+                {card.recommended && (
+                  <span className="starter__recommended" aria-hidden="true">
+                    Recommended
+                  </span>
+                )}
+              </span>
+              <span className="starter__title">{card.title}</span>
+              {card.artifact && (
+                <span className="starter__artifact" id={`${card.id}-artifact`}>
+                  <span className="starter__artifact-label">Produces</span>
+                  {card.artifact}
+                </span>
+              )}
+              {card.action && <span className="starter__action">{card.action}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="composer__starter-aside" onClick={aside.run}>
+        {aside.label}
+      </button>
     </div>
   );
 }

@@ -327,7 +327,9 @@ describe("ThreadComposer mixed clipboard paste", () => {
     paste(input, { text: "inserted" });
 
     expect(input.value).toBe("first lineinserted\nsecond line");
-    expect(screen.queryByRole("listitem")).toBeNull();
+    // No attachment chips: the starters are a list of their own (#317), so ask
+    // for the attachments list specifically rather than any list item.
+    expect(screen.queryByRole("list", { name: "Attachments" })).toBeNull();
   });
 
   it("attaches an image-only paste and inserts no text", async () => {
