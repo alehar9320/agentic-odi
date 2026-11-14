@@ -37,7 +37,7 @@ def _quote(service: ODIService, job_id: str, content: str, *, name: str = "quote
 
 
 def test_normalization_ignores_case_whitespace_quotes_and_punctuation() -> None:
-    assert normalize_quote_text('  “Lost   2 hours on deploy.” ') == normalize_quote_text(
+    assert normalize_quote_text("  “Lost   2 hours on deploy.” ") == normalize_quote_text(
         "lost 2 hours on deploy"
     )
 

@@ -148,9 +148,7 @@ def compute_promotion_fingerprint(source_kind: str, source_name: str, content: s
     relabel records and payloads carry fetch timestamps, so including them
     would let one quote become several opportunities.
     """
-    payload = "\x1f".join(
-        [source_kind or "", source_name or "", normalize_quote_text(content)]
-    )
+    payload = "\x1f".join([source_kind or "", source_name or "", normalize_quote_text(content)])
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
