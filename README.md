@@ -77,9 +77,10 @@ The project card, rendered from the committed source by
 - **The agent knows what you are looking at.** Select a job, step, outcome, or
   evidence record and the Studio tells the sidecar only *which* record — kind and
   id — never what it says.
-- **A desktop app and an offline shell.** Tauri 2 desktop builds update
-  themselves in the background, and a service worker precaches the built shell so
-  the Studio opens with no network.
+- **A desktop app and an offline shell.** Tauri 2 desktop builds open in a
+  focused window that remembers its size and place, update themselves in the
+  background, and a service worker precaches the built shell so the Studio opens
+  with no network.
 - **Odi the Otter.** The mascot appears in the CLI, the Studio, the desktop icon,
   and this page. See [Brand](#brand).
 

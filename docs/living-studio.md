@@ -851,6 +851,14 @@ npm --prefix apps/studio run tauri dev     # dev window
 npm --prefix apps/studio run tauri build   # bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)
 ```
 
+The window opens at 1100 × 760 — a focused first frame rather than a
+full-desktop canvas — with a usable floor of 900 × 600 and `resizable: true`, so
+the person grows it rather than shrinking it. Size, position, and the maximized
+flag are restored on the next launch by `tauri-plugin-window-state`, so the
+small default only applies to the first run. Only those three are restored:
+decorations, fullscreen, and visibility stay the shell's business, and a stale
+`visible: false` would open a window nobody can see.
+
 > [!NOTE]
 > **Tauri prerequisites.** The desktop build needs the WebKitGTK toolchain and
 > Rust 1.90+. On Debian/Ubuntu:
