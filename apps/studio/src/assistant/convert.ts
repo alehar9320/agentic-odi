@@ -147,12 +147,16 @@ export function toThreadMessageLike(message: ChatMessage): ThreadMessageLike {
           },
         }
       : {}),
-    ...(failed || message.retryText
+    ...(failed || message.retryText || message.createdAt
       ? {
           metadata: {
             custom: {
               ...(message.error ? { error: message.error } : {}),
               ...(message.retryText ? { retryText: message.retryText } : {}),
+              // The moment travels with the message so a branch switch or an
+              // edit, which round-trip through the runtime, does not lose the
+              // clock the transcript reads (#737).
+              ...(message.createdAt ? { createdAt: message.createdAt } : {}),
             },
           },
         }
@@ -270,6 +274,7 @@ export function toChatMessage(
     ...(attachments ? { attachments } : {}),
     ...(custom.error ? { error: custom.error as StudioError } : {}),
     ...(custom.retryText ? { retryText: String(custom.retryText) } : {}),
+    ...(custom.createdAt ? { createdAt: String(custom.createdAt) } : {}),
   };
 }
 
