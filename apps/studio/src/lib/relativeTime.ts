@@ -5,12 +5,11 @@
  * the same way. A value that will not parse is "Recently" rather than a crash
  * or a bare "NaN ago".
  */
-export function formatRelativeTime(isoString: string): string {
+export function formatRelativeTime(isoString: string, now: Date = new Date()): string {
   const date = new Date(isoString);
   if (Number.isNaN(date.getTime())) {
     return "Recently";
   }
-  const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMins / 60);
@@ -160,4 +159,24 @@ export function formatExactTime(isoString: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+/** How recent a turn must be to read as "Just now" rather than as a wall clock. */
+const RECENT_TURN_MS = 60 * 60 * 1000;
+
+/**
+ * How a turn dates itself: a summary for something still happening ("14m ago"),
+ * the wall clock for anything older. A moment that will not parse, or one in
+ * the future, falls back to the clock rather than inventing a relation.
+ */
+export function formatTurnTime(isoString: string, now: Date = new Date()): string {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const elapsed = now.getTime() - date.getTime();
+  if (elapsed >= 0 && elapsed < RECENT_TURN_MS) {
+    return formatRelativeTime(isoString, now);
+  }
+  return formatClockTime(isoString);
 }

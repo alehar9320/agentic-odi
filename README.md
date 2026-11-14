@@ -159,10 +159,14 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   sidecar-owned transcript, with attachments, tool traces under one foldable
   work row per turn, opt-in approvals for
   chat writes and unknown tools, and branch-aware editing and regeneration.
-  Settings → About says where the app is running — desktop app, installed web
-  app, or browser tab — and whether the offline shell is on, and offers an
-  opt-in, redacted local diagnostics preview; no report is uploaded. See
-  [The Living Studio](docs/living-studio.md).
+  Every turn says who said it and when: your own turn carries a name, an
+  initial, and a time, the agent's carries its sparkle avatar, and a restored
+  turn keeps the moment it was written while a turn with no time shows none.
+  The thread sits under a title bar that names the inquiry and quietly flags a
+  sample or offline canvas. Settings → About says where the app is running —
+  desktop app, installed web app, or browser tab — and whether the offline
+  shell is on, and offers an opt-in, redacted local diagnostics preview; no
+  report is uploaded. See [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
 ```bash

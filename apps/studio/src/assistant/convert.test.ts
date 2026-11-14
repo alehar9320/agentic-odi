@@ -34,6 +34,19 @@ function assistant(overrides: Partial<ChatMessage> = {}): ChatMessage {
 }
 
 describe("toThreadMessageLike", () => {
+  it("carries the moment into the runtime metadata so a branch switch keeps it (#737)", () => {
+    const at = "2026-10-22T09:30:00.000Z";
+    const message = toThreadMessageLike(assistant({ content: "Hello.", createdAt: at }));
+
+    expect(message.metadata?.custom?.createdAt).toBe(at);
+  });
+
+  it("sends no timestamp metadata for a turn that has none", () => {
+    const message = toThreadMessageLike(assistant({ content: "Hello." }));
+
+    expect(message.metadata?.custom?.createdAt).toBeUndefined();
+  });
+
   it("maps prose to a text part", () => {
     const message = toThreadMessageLike(assistant({ content: "Hello." }));
 
