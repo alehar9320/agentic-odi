@@ -747,3 +747,24 @@ describe("history is grouped by day (#694 D13)", () => {
     expect(screen.queryByRole("group", { name: "Earlier" })).toBeNull();
   });
 });
+
+describe("the bar answers what works here (#509)", () => {
+  it("puts one quiet control in the bar that opens the capability list", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        capabilities: [
+          { id: "local-data", label: "Local canvas data", description: "Local.", status: "available" },
+          { id: "sidecar-mcp", label: "Sidecar MCP", description: "MCP.", status: "unavailable" },
+        ],
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    const control = screen.getByRole("button", { name: "What works here" });
+    fireEvent.click(control);
+
+    const dialog = screen.getByRole("dialog", { name: "What works here" });
+    expect(within(dialog).getByText("Works here")).toBeInTheDocument();
+    expect(within(dialog).getByText("Needs the local service")).toBeInTheDocument();
+  });
+});
