@@ -49,6 +49,7 @@ statement that the suite passes — it is a statement about the changed slice.
 ## 2. Default tier — the bar for opening a PR
 
 ```bash
+npm --prefix apps/studio ci                     # install (skips the optional tooling)
 uv run pytest                # all Python tests
 uv run --directory website pytest tests/
 npm --prefix apps/studio test -- --run          # studio units (jsdom)
@@ -66,6 +67,7 @@ download and a running sidecar, and they are CI's job.
 ## 3. Full tier — CI's job
 
 ```bash
+npm --prefix apps/studio run tooling:install  # Playwright, Chromatic, Tauri CLI
 npm --prefix apps/studio run build
 npm --prefix apps/studio run test:e2e
 ```

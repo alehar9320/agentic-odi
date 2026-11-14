@@ -50,13 +50,25 @@ The coverage table has its own page, [The assistant-ui ledger](assistant-ui-ledg
 The SPA and Tauri shell mirror their CI jobs locally:
 
 ```bash
-npm --prefix apps/studio run lint        # ESLint
-npm --prefix apps/studio run typecheck   # tsc --noEmit
-npm --prefix apps/studio test -- --run   # Vitest on jsdom (run once)
-npm --prefix apps/studio run test:visual # Vitest Browser Mode → Chromatic archives
-npm --prefix apps/studio run build       # production build → apps/studio/dist
+npm --prefix apps/studio ci               # install (skips the optional tooling)
+npm --prefix apps/studio run lint         # ESLint
+npm --prefix apps/studio run typecheck    # tsc --noEmit
+npm --prefix apps/studio test -- --run    # Vitest on jsdom (run once)
+npm --prefix apps/studio run tooling:install # Playwright, Chromatic, Tauri CLI
+npm --prefix apps/studio run test:visual  # Vitest Browser Mode → Chromatic archives
+npm --prefix apps/studio run build        # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
+
+Playwright, Chromatic, and the Tauri CLI are **optional tooling**: a default
+`npm ci` skips them so a clone, a lint-only job, and a restricted agent sandbox
+do not download a browser they will never use. Install them with
+`npm --prefix apps/studio run tooling:install`, which reads
+`apps/studio/package.tooling.json` and installs with `--no-save` so
+`package.json` and `package-lock.json` stay the single source of truth. The
+`test:e2e`, `test:visual`, `chromatic`, and `tauri` scripts each call
+`tooling:check` first, so a missing browser fails with a named error instead of
+a silent skip.
 
 The build version is a single source of truth. `__STUDIO_VERSION__` is baked into
 the Vite build from `apps/studio/package.json` (`vite.config.ts`) and exposed
