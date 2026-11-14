@@ -1,0 +1,14 @@
+{
+  "entryBytes": 427915,
+  "entryKb": 417.9,
+  "coldBytes": 1380256,
+  "coldKb": 1347.9,
+  "entryFile": "assets/index-B7sirB1R.js",
+  "coldChunks": [
+    "assets/assistant-DTrkDW0A.js",
+    "assets/index-B7sirB1R.js",
+    "assets/rolldown-runtime-Bjp52BOI.js",
+    "assets/tauri-D8ecW3kn.js",
+    "assets/vendor-2b5uScpD.js"
+  ]
+}
