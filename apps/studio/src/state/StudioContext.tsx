@@ -377,6 +377,13 @@ export interface StudioContextValue {
   regenerateFrom: (messageId: string | null) => Promise<void>;
   /** Replace the user turn before `messageId`, as a sibling branch. */
   editFrom: (messageId: string | null, text: string, attachments?: ChatAttachment[]) => Promise<void>;
+  /**
+   * Forget a failed send (#405). `messageId` is the failed reply; the question
+   * it answered and any notices that hung off it go with it, so the row leaves
+   * the transcript instead of sitting there unretryable forever. The text is
+   * the caller's to restore to the composer.
+   */
+  dismissFailedTurn: (messageId: string | null) => void;
   /** Take the branch the runtime switched to as the visible conversation. */
   switchBranch: (messages: ChatMessage[]) => void;
   /** Answer a paused write. The turn resumes on its own stream. */
@@ -2262,6 +2269,47 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [messages, runTurn, streaming],
   );
 
+  /**
+   * Drop a failed send from the transcript (#405).
+   *
+   * A failed reply is a row the person can retry; it is also a row they should
+   * be able to put down. Today the only way out is to send something new, so the
+   * dead row and its question stay on screen forever. This removes the failed
+   * reply and the user turn it answered together — the pair is one send — plus
+   * any notice that hung off the reply, so the thread reads as though the send
+   * never left. It never touches a turn that did not fail, and it never touches
+   * the composer: the caller decides whether to offer the text back.
+   */
+  const dismissFailedTurn = useCallback(
+    (messageId: string | null) => {
+      if (!messageId) {
+        return;
+      }
+      setMessages((prev) => {
+        const failed = prev.find((message) => message.id === messageId);
+        if (!failed || failed.role !== "assistant" || !failed.error) {
+          return prev;
+        }
+        const doomed = new Set<string>([messageId]);
+        // The question this reply answered is part of the same send.
+        if (failed.parentId) {
+          const question = prev.find((message) => message.id === failed.parentId);
+          if (question?.role === "user") {
+            doomed.add(question.id);
+          }
+        }
+        // Notices the reply produced are commentary on it, not history.
+        for (const message of prev) {
+          if (message.role === "notice" && message.parentId && doomed.has(message.parentId)) {
+            doomed.add(message.id);
+          }
+        }
+        return prev.filter((message) => !doomed.has(message.id));
+      });
+    },
+    [],
+  );
+
   const switchBranch = useCallback(
     (next: ChatMessage[]) => {
       setMessages(next);
@@ -2695,6 +2743,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sendMessage,
       regenerateFrom,
       editFrom,
+      dismissFailedTurn,
       switchBranch,
       respondToApproval,
       stopStreaming,
@@ -2827,6 +2876,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sendMessage,
       regenerateFrom,
       editFrom,
+      dismissFailedTurn,
       switchBranch,
       respondToApproval,
       stopStreaming,

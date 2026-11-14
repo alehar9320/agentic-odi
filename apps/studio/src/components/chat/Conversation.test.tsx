@@ -23,6 +23,7 @@ const harness = vi.hoisted(() => ({
     respondToApproval: vi.fn(),
     stopStreaming: vi.fn(),
     sendMessage: vi.fn<(text: string) => Promise<void>>(),
+    dismissFailedTurn: vi.fn<(messageId: string | null) => void>(),
   },
 }));
 
@@ -432,6 +433,34 @@ describe("Conversation failures", () => {
     fireEvent.click(retry);
 
     expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
+  });
+
+  it("offers a Delete on a failed send that names the failed reply (#405)", () => {
+    harness.state.dismissFailedTurn = vi.fn<(messageId: string | null) => void>();
+    const { container } = renderTurn([
+      { id: "m-1", parentId: null, role: "user", content: "list the jobs" },
+      {
+        id: "m-2",
+        parentId: "m-1",
+        role: "assistant",
+        content: "",
+        parts: [],
+        error: {
+          code: "internal",
+          message: "The assistant stopped before answering.",
+          suggestion: "Try again — your question is still here.",
+          retryable: true,
+        },
+        retryText: "list the jobs",
+      },
+    ]);
+
+    const del = screen.getByRole("button", { name: /delete/i });
+    fireEvent.click(del);
+
+    // The control asks the store to forget this reply, by id — not a blanket clear.
+    expect(harness.state.dismissFailedTurn).toHaveBeenCalledWith("m-2");
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
   });
   it("clamps a pasted document behind a keyboard-reachable Show more (#696)", () => {
     Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
