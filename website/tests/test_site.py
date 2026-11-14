@@ -51,6 +51,7 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://pypi.org/project/",
     "https://codecov.io",
     "https://developers.cloudflare.com",
+    "https://img.shields.io",
     "https://docs.entire.io",
     "https://www.chromatic.com",
     "https://playwright.dev",
