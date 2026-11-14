@@ -1600,7 +1600,9 @@ async def proxy_llm_chat(body: LlmProxyRequest) -> StreamingResponse:
                 yield (
                     "event: error\n"
                     + "data: "
-                    + json.dumps({"error": {"code": "provider_error", "message": "Provider request failed"}})
+                    + json.dumps(
+                        {"error": {"code": "provider_error", "message": "Provider request failed"}}
+                    )
                     + "\n\n"
                 )
 

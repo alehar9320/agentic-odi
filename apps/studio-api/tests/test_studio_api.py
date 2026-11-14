@@ -142,13 +142,17 @@ def _patch_load_model_key(monkeypatch: pytest.MonkeyPatch, value):
     )
 
 
-def test_with_stored_key_uses_stored_key_for_configured_origin(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_with_stored_key_uses_stored_key_for_configured_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
     _patch_load_model_key(monkeypatch, "sk-stored")
     assert _with_stored_key("", "http://configured:9/v1") == "sk-stored"
 
 
-def test_with_stored_key_withholds_stored_key_for_foreign_origin(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_with_stored_key_withholds_stored_key_for_foreign_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
     _patch_load_model_key(monkeypatch, "sk-stored")
     # A custom or foreign origin must never receive the stored key.
@@ -168,7 +172,9 @@ def test_with_stored_key_falls_back_to_default_api_key(monkeypatch: pytest.Monke
     assert _with_stored_key("", "http://configured:9/v1") == "local"
 
 
-def test_with_stored_key_treats_store_failure_as_no_stored_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_with_stored_key_treats_store_failure_as_no_stored_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
 
     from agentic_odi_studio_api.studio.secrets import SecretStoreError

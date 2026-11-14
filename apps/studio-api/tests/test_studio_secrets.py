@@ -100,7 +100,9 @@ def test_unwritable_store_fails_closed(tmp_path: Path, monkeypatch: pytest.Monke
         secrets.set_model_key("sk-DO-NOT-LEAK")
 
 
-def test_unwritable_store_routes_return_500(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unwritable_store_routes_return_500(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # A store path inside a file cannot be created, so the write route must fail
     # closed with a 500 rather than pretend the key was handled.
     blocker = tmp_path / "blocker"
@@ -118,7 +120,9 @@ def test_unwritable_store_routes_return_500(tmp_path: Path, monkeypatch: pytest.
     assert read.json() == {"configured": False, "set_at": None}
 
 
-def test_unreadable_store_route_returns_500(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unreadable_store_route_returns_500(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # A store file that exists but cannot be parsed makes the read route fail
     # closed with a 500 (covers the get_model_key error branch).
     store = tmp_path / "studio-secrets.json"
@@ -130,7 +134,9 @@ def test_unreadable_store_route_returns_500(tmp_path: Path, monkeypatch: pytest.
     assert read.status_code == 500, read.text
 
 
-def test_load_model_key_ignores_non_dict_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_model_key_ignores_non_dict_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # A stored entry that is not an object is treated as no key at all.
     store = tmp_path / "studio-secrets.json"
     store.write_text(json.dumps({"model_key": "not-a-dict"}), encoding="utf-8")
@@ -140,7 +146,9 @@ def test_load_model_key_ignores_non_dict_entry(tmp_path: Path, monkeypatch: pyte
     assert secrets.model_key_status() == {"configured": False, "set_at": None}
 
 
-def test_unique_temp_file_per_write_does_not_clobber_concurrent_writer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unique_temp_file_per_write_does_not_clobber_concurrent_writer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Two concurrent writers must each install their own key: a shared tmp
     # pathname would let one clobber the other and report success for the wrong
     # key. Unique temp files make each write land under its own name.
@@ -156,7 +164,9 @@ def test_unique_temp_file_per_write_does_not_clobber_concurrent_writer(tmp_path:
         except secrets.SecretStoreError:
             results.append("error")
 
-    threads = [threading.Thread(target=write, args=(key,)) for key in ("sk-writer-a", "sk-writer-b")]
+    threads = [
+        threading.Thread(target=write, args=(key,)) for key in ("sk-writer-a", "sk-writer-b")
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
