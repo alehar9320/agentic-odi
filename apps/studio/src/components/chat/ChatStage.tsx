@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ThreadPrimitive, useThreadViewport } from "@assistant-ui/react";
 
 import { isFeatureEnabled } from "../../features/flags";
+import { canvasStatus } from "../../lib/canvasProvenance";
 import { arrivalAnnouncement, arrivalLabel, arrivedSince } from "./arrivalCount";
 import {
   HELP_TEXT,
@@ -11,7 +12,7 @@ import {
   isSlashCommand,
   type StudioCommand,
 } from "../../lib/commands";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { IntroConversation } from "../setup/IntroConversation";
@@ -50,7 +51,7 @@ function LatestMessageButton({ messageCount }: { messageCount: number }) {
   const scrollToBottom = useThreadViewport((state) => state.scrollToBottom);
   // A reader who asked for less motion should land on the newest reply, not
   // watch the transcript animate past everything in between.
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotion = useReducedMotion();
 
   // The transcript length last seen from the bottom. It only advances while the
   // reader is at the bottom, so a scroll up freezes it and the difference is
@@ -100,6 +101,9 @@ export function ChatStage() {
   } = useStudio();
 
   const empty = messages.length === 0;
+  // The provenance chip the rail already shows, reused here so the inquiry's
+  // own bar says whether the board it describes is real or a sample (#737).
+  const provenance = canvasStatus(canvas);
 
   function runCommand(command: StudioCommand) {
     if (VIEW_COMMANDS.has(command.id)) {
@@ -214,6 +218,19 @@ export function ChatStage() {
       {/* Outside the viewport, so the toolbar is never clipped by the scroll
           frame; absent on the empty stage because there is nothing to quote. */}
       <SelectionToolbar />
+      <header className="mainstage__bar">
+        <h2 className="mainstage__title">
+          {brief?.product_name || brief?.job_statement || "This conversation"}
+        </h2>
+        {provenance ? (
+          <span
+            className={`mainstage__provenance${provenance.label === "OFFLINE" ? " is-offline" : ""}`}
+            title={provenance.detail}
+          >
+            {provenance.label}
+          </span>
+        ) : null}
+      </header>
       <div className="chat__transcript">
         <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
           <div className="chat__thread">

@@ -1,18 +1,20 @@
 import { useMemo, useRef, useState } from "react";
 
-import { canvasHasRecords, canvasStatus, savedCopyCaption } from "../../lib/canvasProvenance";
+import { canvasHasRecords, canvasStatus, keptByBrowserCaption, savedCopyCaption } from "../../lib/canvasProvenance";
 import {
+  confidencePill,
   formatAdvances,
   formatOpportunityScore,
   hasScore,
   isUnderserved,
   scoredAverage,
+  scoreConfidence,
   underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome } from "../../types";
+import type { Evidence, Outcome } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import { ShareAction } from "../ShareAction";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
@@ -70,6 +72,9 @@ export function OpportunityLandscape() {
   // say when it was saved. A warm reload with live data draws it too but gets
   // no caption, because that data is not a saved copy.
   const savedCaption = canvasCached && hasRecords ? savedCopyCaption(canvas) : null;
+  // A write the sidecar could not take was kept here. Say so rather than let the
+  // board read as though the server already holds it.
+  const keptCaption = keptByBrowserCaption(canvas);
 
   const underservedCount = outcomes.filter((outcome) =>
     isUnderserved(outcome.opportunity_score),
@@ -220,6 +225,12 @@ export function OpportunityLandscape() {
         </p>
       ) : null}
 
+      {keptCaption && showBoard ? (
+        <p className="canvas-saved" role="status">
+          {keptCaption}
+        </p>
+      ) : null}
+
       {canvasState.kind === "error" ? (
         <FailurePanel
           error={canvasState.error}
@@ -348,6 +359,7 @@ export function OpportunityLandscape() {
       ) : viewMode === "table" ? (
         <OpportunityTableView
           outcomes={sortedOutcomes}
+          evidence={evidence}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
         />
@@ -522,7 +534,7 @@ export function OpportunityPlot({
   const [showAll, setShowAll] = useState(false);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
   // The pulse is decoration; with reduce-motion the ring stays still.
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotion = useReducedMotion();
 
   const plotted: PlottedOutcome[] = outcomes
     .filter(
@@ -891,10 +903,12 @@ export function OpportunityPlot({
 
 function OpportunityTableView({
   outcomes,
+  evidence,
   selectedOutcomeId,
   onSelectOutcome,
 }: {
   outcomes: Outcome[];
+  evidence: Evidence[];
   selectedOutcomeId: string | null;
   onSelectOutcome: (id: string) => void;
 }) {
@@ -909,6 +923,7 @@ function OpportunityTableView({
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Satisfaction</th>
             <th style={{ padding: "10px 14px", textAlign: "right" }}>Opp. Score</th>
             <th style={{ padding: "10px 14px", textAlign: "center" }}>Status</th>
+            <th style={{ padding: "10px 14px" }}>Backed by</th>
             <th style={{ padding: "10px 14px" }}>Advances</th>
           </tr>
         </thead>
@@ -917,6 +932,8 @@ function OpportunityTableView({
             const scored = hasScore(outcome.opportunity_score);
             const underserved = scored && isUnderserved(outcome.opportunity_score);
             const isSelected = selectedOutcomeId === outcome.id;
+            const linkedEvidence = evidence.filter((item) => item.outcome_id === outcome.id);
+            const confidence = scoreConfidence(outcome, linkedEvidence);
 
             return (
               <tr
@@ -974,6 +991,18 @@ function OpportunityTableView({
                   >
                     {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : "Not scored"}
                   </span>
+                </td>
+                <td style={{ padding: "10px 14px" }}>
+                  {scored ? (
+                    <span
+                      className={`badge badge--${confidencePill(confidence).variant}`}
+                      title={confidence.basis}
+                    >
+                      {confidence.label}
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--studio-muted)" }}>—</span>
+                  )}
                 </td>
                 <td style={{ padding: "10px 14px", color: "var(--studio-muted)", fontSize: "0.82rem" }}>
                   {formatAdvances(outcome)}
