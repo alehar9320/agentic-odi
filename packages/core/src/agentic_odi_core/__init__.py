@@ -19,6 +19,7 @@ from agentic_odi_core.contract import (
     capability_summary,
 )
 from agentic_odi_core.errors import (
+    AlreadyPromotedError,
     ConflictError,
     NotFoundError,
     OdiError,
@@ -104,7 +105,12 @@ from agentic_odi_core.remote import (
     parse_tool_result,
     tool_result_text,
 )
-from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.repository import (
+    InMemoryRepository,
+    Repository,
+    compute_promotion_fingerprint,
+    normalize_quote_text,
+)
 from agentic_odi_core.router import LocalOpenAIEngine, ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.segmentation import (
@@ -194,6 +200,7 @@ __all__ = [
     "ClaimSkip",
     "ConflictError",
     "DUPLICATE_THRESHOLD",
+    "AlreadyPromotedError",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
@@ -262,6 +269,8 @@ __all__ = [
     "capability_manifest",
     "capability_summary",
     "compute_traceability_report",
+    "compute_promotion_fingerprint",
+    "normalize_quote_text",
     "normalize_objective",
     "objective_key",
     "objectives_from_v2mom",
