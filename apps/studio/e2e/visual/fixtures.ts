@@ -59,7 +59,13 @@ export async function seedCanvas(
 
   for (const step of job.steps ?? []) {
     const stepRes = await request.post("/api/steps", {
-      data: { mcp_url: "", job_id: jobId, name: step.name, order: step.order },
+      data: {
+        mcp_url: "",
+        job_id: jobId,
+        name: step.name,
+        order: step.order,
+        allow_empty_job_map: false,
+      },
     });
     expect(stepRes.ok()).toBeTruthy();
   }
