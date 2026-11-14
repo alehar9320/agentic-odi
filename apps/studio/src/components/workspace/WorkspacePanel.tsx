@@ -87,7 +87,10 @@ export function WorkspacePanel() {
     return () => document.removeEventListener("click", rememberOpener, true);
   }, []);
 
-  useFocusTrap(panelRef, isMobile && Boolean(panel));
+  // The sheet is keyed by lens, so switching siblings swaps the element under
+  // this same ref. `panelId` is the trap's scope: it rebinds the Tab handler to
+  // the sheet now on screen and moves focus into it.
+  useFocusTrap(panelRef, isMobile && Boolean(panel), false, panelId);
 
   // On a wide screen the lens opens under the keyboard, so focus goes to the
   // heading and comes back to the control that opened it. The composer is
@@ -260,6 +263,7 @@ export function WorkspacePanel() {
                     type="button"
                     className={`lens__view${open ? " is-current" : ""}`}
                     aria-current={open ? "page" : undefined}
+                    aria-label={`${item.label}, ${item.count} ${item.noun}`}
                     onClick={() => switchView(item.id)}
                   >
                     <span className="lens__view-icon" aria-hidden="true">

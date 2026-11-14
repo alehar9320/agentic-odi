@@ -200,7 +200,8 @@ describe("WorkspacePanel", () => {
     render(<WorkspacePanel />);
 
     const switcher = screen.getByRole("navigation", { name: /workspace views/i });
-    expect(within(switcher).getByRole("button", { name: /job map/i })).toBeInTheDocument();
+    // Same accessible name as the rail chip: label, count, noun.
+    expect(within(switcher).getByRole("button", { name: "Job map, 1 step" })).toBeInTheDocument();
     expect(within(switcher).getByRole("button", { name: /landscape/i })).toHaveAttribute(
       "aria-current",
       "page",
@@ -297,6 +298,25 @@ describe("WorkspacePanel as a mobile sheet", () => {
     first.focus();
     fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
     expect(last).toHaveFocus();
+  });
+
+  it("rebinds the sheet's focus trap when a sibling view replaces the open one", () => {
+    const { rerender } = render(<WorkspacePanel />);
+
+    studio.activePanel = "jobmap";
+    rerender(<WorkspacePanel />);
+
+    const sheet = screen.getByRole("dialog", { name: /universal job map/i });
+    // The exchanged sheet gets the trap and the initial focus, not the detached
+    // one that was on screen a moment ago.
+    expect(sheet.contains(document.activeElement)).toBe(true);
+
+    const buttons = within(sheet).getAllByRole("button");
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+    last.focus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(first).toHaveFocus();
   });
 
   it("closes on Escape before the app's global handler can stop a reply", () => {
