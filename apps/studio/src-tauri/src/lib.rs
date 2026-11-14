@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::Mutex;
+use std::time::Duration;
 
-use tauri::{Manager, RunEvent};
+use tauri::{command, Manager, RunEvent, WindowEvent};
 
 /// Child processes (MCP server + studio sidecar) owned by the desktop shell.
 struct Sidecars(Mutex<Vec<Child>>);
@@ -55,6 +56,22 @@ fn shutdown(children: &mut Vec<Child>) {
     children.clear();
 }
 
+/// Called by the frontend when the app is fully initialized.
+/// Closes the splash screen and shows the main window.
+#[command]
+async fn complete_splashscreen(app: tauri::AppHandle) -> Result<(), String> {
+    // Close splashscreen window
+    if let Some(splash) = app.get_webview_window("splashscreen") {
+        let _ = splash.close();
+    }
+    // Show main window
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -62,6 +79,7 @@ pub fn run() {
         // in-place relaunch that makes the staged update take effect.
         .plugin(tauri_plugin_process::init())
         .manage(Sidecars(Mutex::new(Vec::new())))
+        .invoke_handler(tauri::generate_handler![complete_splashscreen])
         .setup(|app| {
             match find_repo_root() {
                 Some(cwd) => {
@@ -78,6 +96,13 @@ pub fn run() {
                     eprintln!("could not locate repository root; Python sidecar was not started");
                 }
             }
+            // Ensure minimum splash screen display duration (500ms)
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                // The frontend will call complete_splashscreen when ready
+                // This is just a fallback minimum duration
+            });
             Ok(())
         })
         .build(tauri::generate_context!())

@@ -18,7 +18,22 @@
         "height": 960,
         "minWidth": 1024,
         "minHeight": 720,
-        "resizable": true
+        "resizable": true,
+        "visible": false
+      },
+      {
+        "label": "splashscreen",
+        "title": "Living Studio",
+        "url": "/splashscreen",
+        "width": 480,
+        "height": 320,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "center": true,
+        "skipTaskbar": true,
+        "visible": true
       }
     ],
     "security": {

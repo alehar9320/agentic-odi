@@ -49,6 +49,14 @@ if (!rootElement) {
 function Boot() {
   useEffect(() => {
     removeBootShell();
+    // In Tauri desktop, notify the splash screen that the app is ready
+    if (import.meta.env.TAURI) {
+      import("@tauri-apps/api/core").then(({ invoke }) => {
+        invoke("complete_splashscreen").catch((err) => {
+          console.warn("Failed to complete splash screen:", err);
+        });
+      });
+    }
   }, []);
   return <App />;
 }

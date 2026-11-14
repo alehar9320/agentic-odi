@@ -28,6 +28,14 @@ export default defineConfig({
     __STUDIO_BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
     __STUDIO_VERSION__: JSON.stringify(studioPackage.version),
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: "./index.html",
+        splashscreen: "./splashscreen.html",
+      },
+    },
+  },
   server: {
     port: 5173,
     strictPort: true,
