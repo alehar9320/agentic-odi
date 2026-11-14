@@ -1647,6 +1647,8 @@ async def promote_evidence(
             args["importance"] = body.importance
         if body.satisfaction is not None:
             args["satisfaction"] = body.satisfaction
+        if body.force:
+            args["force"] = True
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.PROMOTE_EVIDENCE.value,
@@ -1662,6 +1664,7 @@ async def promote_evidence(
             name=body.name,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            force=body.force,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
