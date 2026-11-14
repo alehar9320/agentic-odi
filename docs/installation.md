@@ -35,6 +35,13 @@ release carries each of these with a SHA-256 checksum in `checksums.txt`:
 | macOS (Intel) | [`odi_0.14.0_macos_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz) |
 | Windows (x86_64) | [`odi_0.14.0_windows_x86_64.zip`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip) |
 
+Or grab one directly — each link goes to `releases/latest/download/<asset>`:
+
+[Download Linux](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz)
+[Download macOS Apple Silicon](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz)
+[Download macOS Intel](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz)
+[Download Windows](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip)
+
 ## Update
 
 By default, `odi` auto-checks for updates once every 24 hours and applies the
