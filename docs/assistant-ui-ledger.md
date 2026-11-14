@@ -181,7 +181,7 @@ must not leave them so.
 |---|---|---|---|---|
 | `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | The reply's own controls. |
 | `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #432 | Read a reply aloud, and **Stop reading** while it speaks. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken; a streaming reply is never spoken and speech is never persisted. |
-| `ActionBarPrimitive.FeedbackPositive` / `.FeedbackNegative` | Planned | — | #414 | Local-only rating. |
+| `ActionBarPrimitive.FeedbackPositive` / `.FeedbackNegative` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #414 | Local-only rating. |
 | `ActionBarPrimitive.ExportMarkdown` | Partial | `apps/studio/src/lib/export.ts` | — | Whole-conversation Markdown export exists and also serialises generated surfaces. Adopting the primitive for one reply would produce a second, weaker export format. |
 | `ActionBarMorePrimitive` | Decision | — | — | An overflow menu earns its place only when the action row exceeds ~5 buttons; #412 and #414 add two. Revisit after both land. |
 
@@ -321,9 +321,9 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 48 |
+| Adopted | 49 |
 | Partial | 10 |
-| Planned | 13 |
+| Planned | 12 |
 | Decision | 42 |
 | Rejected | 44 |
 | Total | 157 |

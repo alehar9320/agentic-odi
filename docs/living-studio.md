@@ -478,6 +478,7 @@ cites the issue or PR that landed it.
 | `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | Quote, dictation, and queue state are read today — the follow-up lane is `composer.queue`; in-transit state arrives later. | — |
 | `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | The reply's own controls. | #238 |
 | `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | **Read aloud** on a settled reply with prose, **Stop reading** while it speaks. Starting another reply stops the first; Stop reading, Escape inside the thread, and leaving the conversation end it. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken. A streaming reply is never spoken and speech is never persisted. | #432 |
+| `ActionBarPrimitive.FeedbackPositive` / `.FeedbackNegative` | Adopted | **Helpful** / **Not helpful** on each reply, stored locally and restored across a reload. | #414 |
 | `ActionBarPrimitive.ExportMarkdown` | Partial | Whole-conversation export is stronger than the per-reply primitive. | — |
 | `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | Alternative N of M, shown only when a branch exists. | #238 |
 | Attachment adapter (`AttachmentAdapter`) | Adopted | Browser-side extraction; nothing is stored server-side. | #238 |
@@ -596,7 +597,18 @@ Storage is a separate SQLite file from the ODI repository:
 | `PATCH` | `/api/memory/observations/{id}` | Edit text, confidence, or status |
 | `DELETE` | `/api/memory/observations/{id}` | Forget one note |
 | `DELETE` | `/api/memory` | Forget all notes and conversations |
+| `POST` | `/api/feedback` | Rate one reply helpful or not helpful |
+| `GET` | `/api/conversations/{id}/feedback` | The verdicts stored for one thread |
+| `GET` | `/api/feedback/summary` | Counts by verdict for the current month |
 | `GET` | `/api/diagnostics` | App/runtime and database metadata/counts only; never config, database paths, or row contents |
+
+**Rating a reply** is local-only: each reply's Helpful / Not helpful control
+writes one verdict keyed by the reply's message id, so rating the same reply
+again replaces the first verdict rather than stacking a second. The verdict
+lives in the browser's own store (and the sidecar's `message_feedback` table
+when a sidecar is present), and `turnsToMessages` carries it back onto the reply
+when a thread is reopened, so the rating survives a reload. The summary counts
+stored rows only — an empty store reads zero, never a guess.
 
 **Forget everything** is a two-step confirmation and also clears the visible
 thread, because the server deletes the conversations behind it.

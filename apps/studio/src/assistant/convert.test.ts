@@ -245,3 +245,28 @@ describe("textOf", () => {
     expect(textOf({ content: "  hi  " })).toBe("hi");
   });
 });
+
+describe("a reply's local rating", () => {
+  it("reaches assistant-ui as submitted feedback, so the control shows pressed", () => {
+    const like = toThreadMessageLike({
+      id: "m-2",
+      parentId: "m-1",
+      role: "assistant",
+      content: "here they are",
+      rating: "positive",
+    });
+    expect(
+      (like.metadata as { submittedFeedback?: { type: string } }).submittedFeedback,
+    ).toEqual({ type: "positive" });
+  });
+
+  it("is absent when the reply is unrated, so no verdict is invented", () => {
+    const like = toThreadMessageLike({
+      id: "m-2",
+      parentId: "m-1",
+      role: "assistant",
+      content: "here they are",
+    });
+    expect(like.metadata?.submittedFeedback).toBeUndefined();
+  });
+});

@@ -390,6 +390,11 @@ export interface ChatMessage {
    * rather than an invented one.
    */
   createdAt?: string;
+  /**
+   * Assistant turns only: the local verdict this reply was given, so a reload
+   * restores the rating the person left. Absent means unrated — never assumed.
+   */
+  rating?: "positive" | "negative";
 }
 
 /**
@@ -599,6 +604,22 @@ export interface ConversationTurn {
 export interface LatestConversation {
   conversation: Conversation | null;
   turns: ConversationTurn[];
+}
+
+/** One person's verdict on one reply. Local only; never sent to a model. */
+export interface MessageFeedback {
+  id: string;
+  conversation_id: string;
+  message_id: string;
+  type: "positive" | "negative";
+  comment: string | null;
+  created_at: string;
+}
+
+/** Counts by verdict for the current month, computed from stored rows only. */
+export interface FeedbackSummary {
+  positive: number;
+  negative: number;
 }
 
 export interface CreateJobPayload {

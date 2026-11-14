@@ -5,6 +5,7 @@ import type {
   DrainLease,
   OutboxRecord,
   StoredConversation,
+  StoredFeedback,
   StoredEvidence,
   StoredJob,
   StoredOutcome,
@@ -19,7 +20,7 @@ export const DB_NAME = "agentic-odi-studio";
  * `MIGRATIONS` entry is caught by `migrations.test.ts`, so a release can never
  * ship a bump that would throw `ConstraintError` on an existing database.
  */
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export type MetaValue = number | DrainLease;
 
@@ -65,6 +66,11 @@ export interface StudioDb extends DBSchema {
     key: number;
     value: StoredTurn;
     indexes: { "by-conversation": string };
+  };
+  feedback: {
+    key: string;
+    value: StoredFeedback;
+    indexes: { "by-message": string };
   };
 }
 
@@ -114,6 +120,13 @@ export const MIGRATIONS: Record<number, Migration> = {
     const evidence = db.createObjectStore("evidence", { keyPath: "id" });
     evidence.createIndex("by-job", "job_id");
     evidence.createIndex("by-seq", "seq");
+  },
+  4: (db) => {
+    // A verdict on a reply is its own store so it survives a reload (#414).
+    // `by-message` lets the adapter find the verdict for one reply without
+    // reading every row.
+    const feedback = db.createObjectStore("feedback", { keyPath: "id" });
+    feedback.createIndex("by-message", "message_id");
   },
 };
 

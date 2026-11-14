@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from pathlib import Path
@@ -59,6 +60,7 @@ from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.mcp_data import call_mcp_tool, fetch_canvas, fetch_local_canvas
 from agentic_odi_studio_api.studio.memory import (
     ConversationNotFoundError,
+    MemoryError,
     ObservationNotFoundError,
     StudioMemory,
 )
@@ -87,6 +89,10 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
+    FeedbackListResponse,
+    FeedbackRequest,
+    FeedbackResponse,
+    FeedbackSummaryResponse,
     LatestConversationResponse,
     LinkOutcomeRequest,
     LlmHealthRequest,
@@ -1336,6 +1342,63 @@ def patch_conversation(
             )
         ) from exc
     return ConversationResponse(conversation=conversation.to_dict())
+
+
+def _month_start() -> str:
+    """Midnight UTC on the first of the current month, as an ISO string."""
+    now = datetime.now(timezone.utc)
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+
+@router.post("/feedback", response_model=FeedbackResponse)
+def record_feedback(body: FeedbackRequest, request: Request) -> FeedbackResponse:
+    """Store one verdict on one reply. A later verdict on the same reply replaces it."""
+    memory = _memory(request)
+    if memory.get_conversation(body.conversation_id) is None:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {body.conversation_id} not found",
+            )
+        )
+    try:
+        feedback = memory.record_feedback(
+            conversation_id=body.conversation_id,
+            message_id=body.message_id,
+            type=body.type,
+            comment=body.comment,
+        )
+    except MemoryError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
+        ) from exc
+    return FeedbackResponse(feedback=feedback.to_dict())
+
+
+@router.get("/conversations/{conversation_id}/feedback", response_model=FeedbackListResponse)
+def list_conversation_feedback(conversation_id: str, request: Request) -> FeedbackListResponse:
+    """The stored verdicts for one conversation, newest first."""
+    memory = _memory(request)
+    if memory.get_conversation(conversation_id) is None:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+            )
+        )
+    return FeedbackListResponse(
+        feedback=[row.to_dict() for row in memory.list_feedback(conversation_id)]
+    )
+
+
+@router.get("/feedback/summary", response_model=FeedbackSummaryResponse)
+def feedback_summary(request: Request) -> FeedbackSummaryResponse:
+    """Counts by verdict for the current month, computed from stored rows only."""
+    counts = _memory(request).feedback_summary(since=_month_start())
+    return FeedbackSummaryResponse(
+        positive=counts.get("positive", 0),
+        negative=counts.get("negative", 0),
+    )
 
 
 @router.post("/approvals/{approval_id}", response_model=ApprovalDecisionResponse)

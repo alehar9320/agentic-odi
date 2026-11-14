@@ -46,6 +46,8 @@ OBSERVATION_STATUSES: frozenset[str] = frozenset({"suggested", "confirmed", "dis
 #: it is a note about the person or the work as a whole.
 OBSERVATION_SUBJECT_TYPES: frozenset[str] = frozenset({"job", "step", "outcome", "evidence"})
 TURN_ROLES: frozenset[str] = frozenset({"user", "assistant", "system", "tool"})
+#: The two verdicts a person can give a reply.
+FEEDBACK_TYPES: frozenset[str] = frozenset({"positive", "negative"})
 
 MAX_TEXT = 2_000
 MAX_CONTEXT_TEXT = 500
@@ -235,6 +237,28 @@ class Share:
         }
 
 
+@dataclass
+class Feedback:
+    """One person's verdict on one reply. Local only, never sent anywhere."""
+
+    id: str
+    conversation_id: str
+    message_id: str
+    type: str
+    comment: str | None
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "conversation_id": self.conversation_id,
+            "message_id": self.message_id,
+            "type": self.type,
+            "comment": self.comment,
+            "created_at": self.created_at,
+        }
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
@@ -295,6 +319,17 @@ CREATE TABLE IF NOT EXISTS shares (
 );
 
 CREATE INDEX IF NOT EXISTS shares_by_hash ON shares(token_hash);
+
+CREATE TABLE IF NOT EXISTS message_feedback (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    message_id TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL,
+    comment TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS feedback_by_created ON message_feedback(created_at);
 """
 
 
@@ -340,6 +375,12 @@ def _validate_status(status: str) -> str:
     if status not in OBSERVATION_STATUSES:
         raise MemoryError(f"unknown observation status: {status}")
     return status
+
+
+def _validate_feedback_type(kind: str) -> str:
+    if kind not in FEEDBACK_TYPES:
+        raise MemoryError(f"unknown feedback type: {kind}")
+    return kind
 
 
 def _validate_confidence(confidence: float) -> float:
@@ -834,7 +875,94 @@ class StudioMemory:
             self._connection.execute("DELETE FROM turn_citations")
             self._connection.execute("DELETE FROM turns")
             self._connection.execute("DELETE FROM observations")
+            self._connection.execute("DELETE FROM message_feedback")
             self._connection.execute("DELETE FROM conversations")
+
+    # -- message feedback --------------------------------------------------
+
+    def record_feedback(
+        self,
+        *,
+        conversation_id: str,
+        message_id: str,
+        type: str,
+        comment: str | None = None,
+    ) -> Feedback:
+        """Store one verdict on one reply, replacing any earlier verdict.
+
+        ``message_id`` is unique, so rating a reply a second time overwrites the
+        first verdict rather than stacking a second row.
+        """
+        clean_type = _validate_feedback_type(type)
+        clean_comment = None
+        if comment is not None:
+            stripped = comment.strip()
+            clean_comment = stripped[:MAX_CONTEXT_TEXT] if stripped else None
+        feedback = Feedback(
+            id=uuid.uuid4().hex,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            type=clean_type,
+            comment=clean_comment,
+            created_at=_now(),
+        )
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT OR REPLACE INTO message_feedback "
+                "(id, conversation_id, message_id, type, comment, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    feedback.id,
+                    feedback.conversation_id,
+                    feedback.message_id,
+                    feedback.type,
+                    feedback.comment,
+                    feedback.created_at,
+                ),
+            )
+        return feedback
+
+    def list_feedback(self, conversation_id: str | None = None) -> list[Feedback]:
+        """The stored verdicts, newest first, optionally for one conversation."""
+        query = "SELECT * FROM message_feedback"
+        params: tuple[Any, ...] = ()
+        if conversation_id is not None:
+            query += " WHERE conversation_id = ?"
+            params = (conversation_id,)
+        query += " ORDER BY created_at DESC, rowid DESC"
+        with self._lock:
+            rows = self._connection.execute(query, params).fetchall()
+        return [self._feedback_from_row(row) for row in rows]
+
+    @staticmethod
+    def _feedback_from_row(row: sqlite3.Row) -> Feedback:
+        return Feedback(
+            id=row["id"],
+            conversation_id=row["conversation_id"],
+            message_id=row["message_id"],
+            type=row["type"],
+            comment=row["comment"],
+            created_at=row["created_at"],
+        )
+
+    def feedback_summary(self, since: str | None = None) -> dict[str, int]:
+        """Counts by verdict, from rows only — never estimated.
+
+        The summary is computed over stored rows; an empty store yields zeroes
+        for both verdicts rather than a guess.
+        """
+        query = "SELECT type, COUNT(*) AS count FROM message_feedback"
+        params: tuple[Any, ...] = ()
+        if since is not None:
+            query += " WHERE created_at >= ?"
+            params = (since,)
+        query += " GROUP BY type"
+        counts = {kind: 0 for kind in FEEDBACK_TYPES}
+        with self._lock:
+            rows = self._connection.execute(query, params).fetchall()
+        for row in rows:
+            counts[row["type"]] = int(row["count"])
+        return counts
 
     # -- shares ------------------------------------------------------------
 

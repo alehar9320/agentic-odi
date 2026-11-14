@@ -275,3 +275,65 @@ describe("LocalMemoryService conversations", () => {
     expect(listed.map((item) => item.id)).not.toContain("c-4");
   });
 });
+
+describe("LocalMemoryService feedback", () => {
+  it("keeps one verdict per reply, replacing an earlier one", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    await seed(store, "c-1", "Thread", "2026-01-02T00:00:00Z");
+
+    await memory.recordFeedback({
+      conversation_id: "c-1",
+      message_id: "m-2",
+      type: "positive",
+    });
+    const replaced = await memory.recordFeedback({
+      conversation_id: "c-1",
+      message_id: "m-2",
+      type: "negative",
+    });
+
+    const stored = await memory.listFeedback("c-1");
+    expect(stored).toHaveLength(1);
+    expect(stored[0]!.id).toBe(replaced.id);
+    expect(stored[0]!.type).toBe("negative");
+  });
+
+  it("refuses a verdict for a conversation that is not there", async () => {
+    const memory = new LocalMemoryService(makeStore());
+    await expect(
+      memory.recordFeedback({ conversation_id: "nope", message_id: "m-1", type: "positive" }),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it("counts the current month from stored rows only", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    await seed(store, "c-1", "Thread", "2026-01-02T00:00:00Z");
+
+    await memory.recordFeedback({
+      conversation_id: "c-1",
+      message_id: "m-1",
+      type: "positive",
+    });
+    const summary = await memory.feedbackSummary();
+    expect(summary).toEqual({ positive: 1, negative: 0 });
+
+    const empty = await memory.feedbackSummary("2999-01-01T00:00:00.000Z");
+    expect(empty).toEqual({ positive: 0, negative: 0 });
+  });
+
+  it("caps a stored comment", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    await seed(store, "c-1", "Thread", "2026-01-02T00:00:00Z");
+
+    const stored = await memory.recordFeedback({
+      conversation_id: "c-1",
+      message_id: "m-1",
+      type: "negative",
+      comment: "x".repeat(900),
+    });
+    expect(stored.comment).toHaveLength(500);
+  });
+});
