@@ -76,6 +76,26 @@ filename instead of running every test in a browser. Browser mode needs Chromium
 locally: `npx playwright install chromium`. See
 [Deployment](deployment.md) for the project setup and budget rules.
 
+### The cold-start bundle budget
+
+The first screen must not wait on everything the app can do, so the Vite build
+splits the assistant runtime, the markdown renderer, and the Tauri API out of the
+entry chunk with `build.rolldownOptions.output.codeSplitting` groups
+(`vite.config.ts`), and emits `dist/.vite/manifest.json` so the budget script can
+find the entry by role rather than by a hashed name.
+
+`scripts/check_bundle_budget.mjs` measures the entry chunk and every chunk a cold
+load pulls statically, and fails when the entry grows past the recorded baseline
+in `scripts/bundle-budget.json` plus a 20% tolerance. CI runs it right after
+`npm run build` in the `studio` job. After a deliberate change, re-record the
+baseline and say why in the pull request:
+
+```bash
+npm --prefix apps/studio run build
+node scripts/check_bundle_budget.mjs           # check
+node scripts/check_bundle_budget.mjs --update  # re-record the baseline
+```
+
 ### Copied components (`src/vendor`)
 
 Tailwind v4 styles `src/vendor/**` and nothing else (issue #385). The stylesheet
