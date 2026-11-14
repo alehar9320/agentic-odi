@@ -348,13 +348,13 @@ describe("ThreadComposer mixed clipboard paste", () => {
     const input = renderComposer({ pushToast });
     fireEvent.change(input, { target: { value: draft } });
     input.setSelectionRange(10, 10);
-    const pdf = new File(["x"], "deck.pdf", { type: "application/pdf" });
+    const zip = new File(["x"], "archive.zip", { type: "application/zip" });
 
-    paste(input, { text: "inserted", files: [pdf] });
+    paste(input, { text: "inserted", files: [zip] });
 
     expect(input.value).toBe("first lineinserted\nsecond line");
-    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("deck.pdf"));
-    expect(screen.queryByText("deck.pdf")).toBeNull();
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("archive.zip"));
+    expect(screen.queryByText("archive.zip")).toBeNull();
   });
 
   it("inserts multiline unicode text verbatim", () => {

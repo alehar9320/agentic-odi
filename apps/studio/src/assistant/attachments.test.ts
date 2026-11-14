@@ -29,6 +29,11 @@ const docxFixture = (name: string): File =>
     type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   });
 
+const pdfFixture = (name: string): File =>
+  new File([readFileSync(`src/assistant/extract/__fixtures__/${name}`)], name, {
+    type: "application/pdf",
+  });
+
 describe("attachmentRejection", () => {
   it("accepts a text file by extension even when the browser reports no type", () => {
     expect(attachmentRejection(fileOf("notes.md", ""))).toBeNull();
@@ -69,8 +74,15 @@ describe("attachmentRejection", () => {
     expect(rejection).toContain("5 MB");
   });
 
-  it("rejects a file the studio cannot read", () => {
-    expect(attachmentRejection(fileOf("deck.pdf", "application/pdf"))).toContain("deck.pdf");
+  it("accepts a .pdf by name and by the PDF content type", () => {
+    expect(attachmentRejection(fileOf("deck.pdf", ""))).toBeNull();
+    expect(attachmentRejection(fileOf("deck", "application/pdf"))).toBeNull();
+  });
+
+  it("refuses a .pdf over the size limit before it is ever read", () => {
+    const rejection = attachmentRejection(fileOf("huge.pdf", "application/pdf", MAX_DOCUMENT_BYTES + 1));
+    expect(rejection).toContain("huge.pdf");
+    expect(rejection).toContain("25 MB");
   });
 
   it("rejects an image format the model cannot be sent", () => {
@@ -102,6 +114,42 @@ describe("prepareAttachment", () => {
     await expect(prepareAttachment(docxFixture("legacy.doc"))).rejects.toBeInstanceOf(
       AttachmentReadError,
     );
+  });
+});
+
+describe("prepareAttachment with a PDF", () => {
+  it("gives a .pdf the same shape of record as a text file", async () => {
+    const text = await prepareAttachment(fileOf("notes.md", "text/markdown"));
+    const pdf = await prepareAttachment(pdfFixture("two-page.pdf"));
+    expect(Object.keys(pdf).sort()).toEqual(Object.keys(text).sort());
+    expect(pdf).toMatchObject({ name: "two-page.pdf" });
+    expect(pdf.text).toContain("[page 1]");
+    expect(pdf.text).toContain("The onboarding step takes far too long today.");
+  });
+
+  it("keeps whole pages and announces the cut in the extracted text", async () => {
+    const pdf = await prepareAttachment(pdfFixture("long.pdf"));
+    expect(pdf.text).toContain("[Truncated:");
+    expect(pdf.text).toMatch(/\[Truncated: \d+ pages were left out/);
+  });
+
+  it("refuses a PDF with no text layer with a sentence, not a blank attachment", async () => {
+    const failure = await prepareAttachment(pdfFixture("no-text-layer.pdf")).catch(
+      (error) => error,
+    );
+    expect(failure).toBeInstanceOf(AttachmentReadError);
+    expect((failure as AttachmentReadError).code).toBe("refused");
+    expect((failure as AttachmentReadError).message).toContain("no text layer");
+  });
+
+  it("hands the composer a failed chip carrying the PDF's own reason", async () => {
+    const states = await addedStates(createAttachmentAdapter(), pdfFixture("encrypted.pdf"));
+
+    expect(states).toHaveLength(1);
+    const status = states[0]!.status;
+    expect(status.type).toBe("incomplete");
+    expect(status).toMatchObject({ reason: "error" });
+    expect((status as { message?: string }).message).toContain("password");
   });
 });
 
