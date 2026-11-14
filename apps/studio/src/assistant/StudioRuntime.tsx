@@ -12,7 +12,7 @@
  */
 
 import type { ReactNode } from "react";
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 
 import { AssistantRuntimeProvider, useExternalStoreRuntime } from "@assistant-ui/react";
 
@@ -149,19 +149,17 @@ export function StudioRuntimeProvider({ children }: { children: ReactNode }) {
   } = useStudio();
 
   const attachments = useMemo(() => createAttachmentAdapter(), []);
-  // The adapter reads the live conversation id at submit time, so a rating on
-  // a reply never closes over a stale thread.
-  const conversationIdRef = useRef<string | null>(conversationId);
-  conversationIdRef.current = conversationId;
   // The rating the person leaves is written to the local store; a refusal is
-  // one quiet notice and never rolls the reply back.
+  // one quiet notice and never rolls the reply back. Closing over the current
+  // conversationId (recreated when it changes) keeps the verdict on the right
+  // thread without touching a ref during render.
   const feedback = useMemo(
     () =>
       createFeedbackAdapter({
-        conversationId: () => conversationIdRef.current,
+        conversationId: () => conversationId,
         onError: (message) => pushToast("error", message),
       }),
-    [pushToast],
+    [conversationId, pushToast],
   );
   // Null where speech recognition is missing, so the composer shows no mic.
   const dictation = useMemo(() => createDictationAdapter(), []);
