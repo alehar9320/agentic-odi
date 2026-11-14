@@ -278,7 +278,8 @@ Two practical consequences:
 - Read `AGENTS.md` and `.agents/rules/agent_instructions.md` before writing code.
   Kiro additionally reads `.kiro/steering/`; Qoder Action reads `AGENTS.md`.
 - Never push to `main` and never merge. Agents open pull requests; a human merges.
-  The `main-requires-ci-green` ruleset requires `CI green` and `PR guardrails`.
+  The `main-requires-ci-green` ruleset requires `CI green`, `PR guardrails`, and
+  the `ai-merge-safe` label before a merge to `main` can complete.
 - Fill in the pull request template truthfully, including the machine-readable
   diff summary and the `AGENT_METADATA` block. The guardrails compare the claims
   with the actual diff.
