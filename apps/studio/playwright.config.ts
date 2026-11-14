@@ -67,7 +67,7 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /mcp-backend\.spec\.ts/,
+      testIgnore: /mcp-backend\.spec\.ts|pr-screenshots\.spec\.ts/,
     },
     {
       // The same Studio against its MCP passthrough backend, which talks to
@@ -77,6 +77,13 @@ export default defineConfig({
       name: "mcp-backend",
       use: { ...devices["Desktop Chrome"], baseURL: MCP_BACKED_ORIGIN },
       testMatch: /mcp-backend\.spec\.ts/,
+    },
+    {
+      // Advisory PR screenshots — invoked explicitly by the pr-screenshots
+      // workflow, not part of the regular e2e suite.
+      name: "pr-screenshots",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: /pr-screenshots\.spec\.ts/,
     },
   ],
 

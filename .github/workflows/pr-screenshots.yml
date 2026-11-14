@@ -1,0 +1,118 @@
+name: PR screenshots
+
+# Advisory full-product screenshots posted to the pull request. This job
+# must never block a merge: it is not in ci-green's needs and uses
+# continue-on-error so a capture failure leaves CI green.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# A newer push supersedes the previous run for the same branch.
+concurrency:
+  group: pr-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  screenshots:
+    name: Product screenshots
+    if: ${{ vars.AGENTIC_ODI_PR_SCREENSHOTS != 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: apps/studio/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/studio
+        run: npm ci
+
+      - name: Build the Studio
+        working-directory: apps/studio
+        run: npm run build
+
+      - name: Install the browser
+        working-directory: apps/studio
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture product screenshots
+        id: capture
+        working-directory: apps/studio
+        run: |
+          mkdir -p pr-screenshots
+          npx playwright test --project=pr-screenshots pr-screenshots.spec.ts
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-screenshots
+          path: apps/studio/pr-screenshots
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-screenshots-report
+          path: apps/studio/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Note fork PRs
+        if: ${{ always() && github.event.pull_request.head.repo.fork == true }}
+        run: |
+          echo "::notice::Fork pull requests get a read-only token; product screenshots were captured (if successful) but cannot be posted as a PR comment."
+
+      - name: Publish screenshots comment
+        if: ${{ always() && github.event.pull_request.head.repo.fork == false }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+        run: |
+          marker="<!-- pr-screenshots -->"
+          message="$RUNNER_TEMP/pr-screenshots.md"
+          {
+            echo "$marker"
+            echo "## Product screenshots (advisory)"
+            echo
+            if [ "$CAPTURE_OUTCOME" = "success" ]; then
+              echo "Screenshots of the running Studio (full product, seeded backend) for commit \`${GITHUB_SHA:0:7}\`."
+            else
+              echo "Screenshot capture did not complete for commit \`${GITHUB_SHA:0:7}\`. This job is advisory and does not block merge."
+            fi
+            echo
+            echo "Artifact: [\`pr-screenshots\`](${RUN_URL}) (retention 1 day). Open the run and download **pr-screenshots** for \`01-home.png\`–\`06-brief.png\`, or **pr-screenshots-report** for diagnostics."
+            echo
+            echo "_Key screens: home, chat, job map, landscape, segments, brief. Posted by the \`pr-screenshots\` workflow; not a required check._"
+          } > "$message"
+
+          comment_id="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq '.[] | select(.body | contains("<!-- pr-screenshots -->")) | .id' |
+            head -n 1)"
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$comment_id" \
+              -F body=@"$message" >/dev/null
+          else
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$message"
+          fi
