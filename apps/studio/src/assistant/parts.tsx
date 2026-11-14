@@ -26,7 +26,6 @@ import {
 } from "./claims";
 import { CLAIMS_PART, SURFACE_PART, isArguments } from "./convert";
 import { describeConsequence } from "./consequence";
-import { ClaimCitation } from "../components/chat/ClaimCitation";
 
 /** Prose. The existing renderer, so the transcript reads exactly as before. */
 export function TextPart() {
