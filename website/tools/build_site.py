@@ -26,11 +26,13 @@ import posixpath
 import re
 import shutil
 import sys
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import build_sample
 import extract
+import make_og
 import markdown_render
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
@@ -44,6 +46,9 @@ OUT_DIR = SITE / "dist"
 # and served at /sample/ so the landing page's primary call to action points at
 # a page that keeps working when the API is down.
 SAMPLE_OUTPUT = "sample/index.html"
+# The two pages that are deliberately self-contained - no shared shell, no
+# network - keep the committed site card instead of a card of their own.
+CARDLESS_PAGES = frozenset({"404.html", SAMPLE_OUTPUT})
 
 # The generated pages the repository tracks, so a source edit that is not
 # regenerated can be caught. Everything else the build writes is published at
@@ -403,6 +408,96 @@ def _render_pages(env: Environment) -> dict[str, str]:
     return rendered
 
 
+# A page's own words for its card: the title the share target reads, the part of
+# the site it belongs to, and the one number the page actually renders.
+_CARD_META = re.compile(r'(<meta (?:property="og:image"|name="twitter:image") content=")[^"]*(")')
+_STAT_VALUE = re.compile(r'<span class="statline__value">(.*?)</span>', re.DOTALL)
+_LEDE_FIGURE = re.compile(r'<p class="doc__lede">\s*([0-9][0-9,]* tools)\.')
+
+
+class MissingCardError(RuntimeError):
+    """A page would ship without the card it advertises."""
+
+
+@lru_cache(maxsize=1)
+def _guide_groups() -> dict[str, str]:
+    """Guide page path -> the title of the nav group it sits under."""
+    nav = _load_json("nav.json")
+    return {
+        f"docs/{guide['slug']}/index.html": group["title"]
+        for group in nav.get("groups", [])
+        for guide in group.get("guides", [])
+    }
+
+
+def page_title(html: str) -> str:
+    """A page's own title, as it advertises it to a share target."""
+    match = re.search(r'<meta property="og:title" content="([^"]*)"', html)
+    return html_module.unescape(match.group(1)) if match else SITE_NAME
+
+
+def page_section(page_path: str) -> str:
+    """The part of the site a page belongs to, in the words the page uses."""
+    if page_path == "index.html":
+        return SITE_NAME
+    if page_path == "docs/index.html":
+        return "Documentation"
+    return _guide_groups().get(page_path, "Documentation")
+
+
+def page_figure(page_path: str, html: str) -> str | None:
+    """The one number this page renders, or ``None``.
+
+    A card may only repeat a figure the page itself displays, so the claim is
+    read back out of the built HTML rather than authored here. A page with
+    nothing to show gets no number at all - never a ``0`` standing in for one.
+    """
+    stat = _STAT_VALUE.search(html)
+    if stat:
+        number = re.match(r"[0-9][0-9,]*%?", _plain_text(stat.group(1)))
+        return number.group(0) if number else None
+    lede = _LEDE_FIGURE.search(html)
+    return lede.group(1) if lede else None
+
+
+def og_plan(pages: list[str]) -> dict[str, str]:
+    """Every page's card path, assigned by :func:`make_og.card_names`."""
+    return make_og.card_names(pages)
+
+
+def _point_at_card(html: str, url: str) -> tuple[str, int]:
+    """Rewrite the two card tags to ``url``, reporting how many were found."""
+    return _CARD_META.subn(lambda match: f"{match.group(1)}{url}{match.group(2)}", html)
+
+
+def _attach_cards(rendered: dict[str, str]) -> tuple[dict[str, str], dict[str, bytes]]:
+    """Return the site's HTML with each page pointing at its own card, plus the PNGs.
+
+    The page list is the build's own, so a page missing from the plan is a bug
+    in the plan, not a page to skip: the build fails rather than ship a stale or
+    absent image. Standalone pages keep the committed site card.
+    """
+    pages = sorted(name for name in rendered if name not in CARDLESS_PAGES)
+    plan = og_plan(pages)
+    html_pages: dict[str, str] = {
+        name: html for name, html in rendered.items() if name in CARDLESS_PAGES
+    }
+    cards: dict[str, bytes] = {}
+    for page in pages:
+        card = plan.get(page)
+        if card is None:
+            raise MissingCardError(f"{page} has no card in the plan")
+        html = rendered[page]
+        cards[card] = make_og.render_card(
+            page_title(html), page_section(page), page_figure(page, html)
+        )
+        html, hits = _point_at_card(html, f"{PAGES_URL}{card}")
+        if hits != 2:
+            raise MissingCardError(f"{page} carries {hits} card tags, expected 2")
+        html_pages[page] = html
+    return html_pages, cards
+
+
 def _page_url(name: str) -> str:
     """A page's path relative to the site root, without a leading slash."""
     if name == "index.html":
@@ -599,13 +694,16 @@ def _render_site() -> dict[str, bytes]:
     """Every file a fresh build produces, keyed by its path from the site root."""
     env = environment()
     rendered = _render_pages(env)
+    html_pages, cards = _attach_cards(rendered)
 
     # The committed sample page has a twin on disk that a test compares byte for
-    # byte, so it ships exactly as build_sample.py rendered it.
+    # byte, so it ships exactly as build_sample.py rendered it. Cards are the
+    # only bytes that never go through the compactor.
     files: dict[str, bytes] = {
         name: (html if name == SAMPLE_OUTPUT else compact_html(html)).encode("utf-8")
-        for name, html in rendered.items()
+        for name, html in html_pages.items()
     }
+    files.update(cards)
     urls = ["/"]
     for name in sorted(rendered):
         if name in {"index.html", "404.html"}:
