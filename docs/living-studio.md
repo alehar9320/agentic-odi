@@ -389,6 +389,18 @@ line — so the region a point sits in and `isUnderserved` never disagree. The
 pill follows suit: a score the store never computed reads **Not scored**, never
 **Served**.
 
+A score that was computed also says how well it is backed. The card and the
+landscape's **Backed by** column read one derived helper, `scoreConfidence`, over
+the `claim_check` behind the score and the evidence records linked to it, and
+name one of three levels: **Verified** when every asked question was answered,
+**Partly verified** when answers exist but a question was skipped, and
+**Hypothesis** when there is no check or no answer — with a one-line basis
+(answered count, quote count, and the distinct sources). No confidence number is
+invented: the level is a function of records the store already holds, and a bare
+number with nothing behind it says so rather than borrowing a measured claim's
+look. On the card the indicator is itself the control that reveals the linked
+quotes, through the same reveal path the **Evidence** button drives.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront
@@ -415,10 +427,10 @@ without giving up the message model the sidecar already understands.
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
 | **Work** | What a turn did folds into one row: *Working… · 3 calls* while it runs, then *Worked for 12s · 3 calls*, closed and reopenable. Opening it is the turn's own record, not a paraphrase — the same reasoning disclosure and trace chips, in the order they arrived. A turn the browser did not watch from the start shows its calls with no duration. |
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
-| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. The ask is never folded into the work row — a question is not history. |
+| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Don't allow**. The card names the action, not the tool: one sentence of consequence (*This creates a job.*) from the pure map in `assistant/consequence.ts`, the model's arguments as a key/value list that scrolls past six rows with the raw JSON behind a **Raw arguments** disclosure, and — after **Don't allow** — an optional reason (280 characters) that travels with the refusal so the model can propose something else. A decline is a tool result, not an error. The ask is never folded into the work row — a question is not history. |
 | **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
 | **Claims** | Each declarative sentence ends with an evidence marker, and the reply arrives with a validated claim list. A chip names the source and the record (`Gong · Call with Acme`), never the tool; `Hypothesis` tags an ungrounded guess; an unmarked sentence keeps its place with a dotted underline and the accessible name *Uncited claim*. A chip opens that row in the Evidence lens, and Escape returns focus to the chip. Claims are stored with the turn, so they survive a reload; a record deleted later keeps its snapshot label and stops being a link. A seeded demo reply labels its chips **Sample** and does not count as cited. |
-| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. A turn carries at most five attachments, counting text and images together; a sixth is refused, naming the file and the limit, before the turn is sent. Chips show a name, size, an image preview, and a remove control. A file that is accepted by name but whose bytes never become content — an interrupted read, a `.docx` that will not unpack — is reported before the turn is sent: the chip keeps its name, says "Could not read this file", and send stays disabled until that chip is removed, leaving the draft and every other attachment in place. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter — and the per-file limit is 20,000 characters: a text-like file longer than that is refused, not silently shortened, with the chip naming the file and the limit (a `.docx` over the cap has its cut announced in the extracted text instead). Nothing is stored server-side. |
+| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), PDFs (`.pdf`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. A turn carries at most five attachments, counting text and images together; a sixth is refused, naming the file and the limit, before the turn is sent. Chips show a name, size, an image preview, and a remove control. A file that is accepted by name but whose bytes never become content — an interrupted read, a `.docx` that will not unpack, a `.pdf` whose text layer is missing or locked — is reported before the turn is sent: the chip keeps its name, says why (a scanned PDF names the missing text layer, an encrypted one names the password), and send stays disabled until that chip is removed, leaving the draft and every other attachment in place. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter, and `.pdf` through `pdfjs-dist`'s text layer, with each page marked `[page N]` — and the per-file limit is 20,000 characters: a text-like file longer than that is refused, not silently shortened, with the chip naming the file and the limit (a `.docx` or `.pdf` over the cap has its cut announced in the extracted text instead, a PDF dropping whole pages so no sentence stops mid-thought). Nothing is stored server-side. |
 | **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
@@ -851,6 +863,14 @@ npm --prefix apps/studio run tauri dev     # dev window
 npm --prefix apps/studio run tauri build   # bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)
 ```
 
+The window opens at 1100 × 760 — a focused first frame rather than a
+full-desktop canvas — with a usable floor of 900 × 600 and `resizable: true`, so
+the person grows it rather than shrinking it. Size, position, and the maximized
+flag are restored on the next launch by `tauri-plugin-window-state`, so the
+small default only applies to the first run. Only those three are restored:
+decorations, fullscreen, and visibility stay the shell's business, and a stale
+`visible: false` would open a window nobody can see.
+
 > [!NOTE]
 > **Tauri prerequisites.** The desktop build needs the WebKitGTK toolchain and
 > Rust 1.90+. On Debian/Ubuntu:
@@ -949,7 +969,7 @@ Each row below names a state to reach and what is worth your own eyes.
 | Reasoning | A backend that streams `reasoning_content` or `reasoning` | The disclosure opens while it is written, settles to *Thought for Ns*, reopens on click, and never repeats the answer |
 | Work row | A model that emits real `tool_calls`, then a page reload | The row reads *Working… · N calls* while the turn runs and *Worked for Ns · N calls* at rest; opening it lists the calls in the order they arrived without shifting the answer; the same turn reopened from the store counts its calls and invents no duration |
 | Tool trace and sources | A model that emits real `tool_calls` | The dot pulses while the tool runs, the chip previews what came back, and the source names the tool the turn actually read |
-| Approval | The same, asking it to write ("add a step to …") | The turn pauses for **Allow**/**Decline**, the ask is never folded into the work row, a decline reads as a tool result and not an error, and a double click runs the tool once |
+| Approval | The same, asking it to write ("add a step to …") | The turn pauses on a card that states the consequence and lists the arguments; **Don't allow** offers an optional reason that reaches the model; the ask is never folded into the work row, a decline reads as a tool result and not an error, and a double click runs the tool once |
 | Model picker | **Model** in the hint row; open it twice; narrow the window first | The list matches the backend, the configured id stays selectable, arrows/Home/End/Enter/Escape work, an offline backend explains itself and its Settings button is reachable from the keyboard, and it probes once per backend |
 | Attachments | Paperclip, drag a file onto the composer, paste a screenshot, then drop a `.exe`; a read failure shows on the chip when the browser hands over a file it will not open (a locked transcript, or one the tab lost the handle to) | Thumbnail, name, size, and remove on the chip; the refused file never becomes a chip; the unreadable one stays as a chip marked *Could not read this file* with send disabled until it is removed, and the draft and any other attachment survive it; the sent turn shows the same; the paperclip has a visible focus ring |
 | Branches | Edit your own turn, then regenerate a reply | **Alternative N of M** with `‹`/`›`, and a reload reopens the branch you were reading |
