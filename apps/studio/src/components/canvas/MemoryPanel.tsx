@@ -2,7 +2,14 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import { useStudio } from "../../state/StudioContext";
 import { GhostMemory } from "../Skeletons";
-import type { Observation, ObservationKind, ObservationStatus } from "../../types";
+import { buildRecords, recordTitle } from "../../lib/records";
+import type {
+  CanvasData,
+  Observation,
+  ObservationKind,
+  ObservationStatus,
+  ObservationSubjectType,
+} from "../../types";
 
 const KIND_LABELS: Record<ObservationKind, string> = {
   career: "Your role",
@@ -13,6 +20,44 @@ const KIND_LABELS: Record<ObservationKind, string> = {
   evidence: "Evidence",
   preference: "How you work",
 };
+
+const SUBJECT_KIND_LABELS: Record<ObservationSubjectType, string> = {
+  job: "job",
+  step: "step",
+  outcome: "outcome",
+  evidence: "evidence",
+};
+
+/**
+ * What a note is about, in the store's own words: the parent job, the record's
+ * id, and its title. A subject that cannot be named is said to be missing
+ * rather than reduced to a bare id the person cannot place.
+ */
+export function subjectLabel(canvas: CanvasData | null, observation: Observation): string {
+  const kind = observation.subject_type;
+  const id = observation.subject_id;
+  if (!kind || !id) {
+    return "Not attached";
+  }
+  const rows = buildRecords(canvas);
+  const row = rows.find((candidate) => candidate.kind === kind && candidate.id === id);
+  if (!row) {
+    return `About a ${SUBJECT_KIND_LABELS[kind]} that is no longer on this canvas · ${id}`;
+  }
+  const parent = row.parentId
+    ? rows.find((candidate) => candidate.kind === "job" && candidate.id === row.parentId)
+    : undefined;
+  const segments: string[] = [];
+  if (parent) {
+    segments.push(recordTitle(parent));
+  }
+  segments.push(id);
+  const title = recordTitle(row);
+  if (title && title !== "—") {
+    segments.push(title);
+  }
+  return `About ${segments.join(" · ")}`;
+}
 
 function byStatus(a: Observation, b: Observation): number {
   if (a.status !== b.status) {
@@ -35,6 +80,8 @@ export function MemoryPanel() {
     updateObservation,
     deleteObservation,
     clearMemory,
+    canvas,
+    focusSubject,
   } = useStudio();
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -114,6 +161,32 @@ export function MemoryPanel() {
     return <p className="memory-item__text">{observation.text}</p>;
   }
 
+  function subjectRow(observation: Observation) {
+    const kind = observation.subject_type;
+    const id = observation.subject_id;
+    const attached = Boolean(kind && id);
+    const resolvable = attached
+      ? buildRecords(canvas).some((row) => row.kind === kind && row.id === id)
+      : false;
+    const label = subjectLabel(canvas, observation);
+    if (resolvable && kind && id) {
+      return (
+        <button
+          type="button"
+          className="memory-item__subject memory-item__subject--link"
+          onClick={() => focusSubject(kind, id)}
+        >
+          {label}
+        </button>
+      );
+    }
+    return (
+      <p className="memory-item__subject" title={attached ? id ?? undefined : undefined}>
+        {label}
+      </p>
+    );
+  }
+
   return (
     <div className="stack memory-panel">
       {memoryLoading && items.length === 0 && <GhostMemory />}
@@ -135,6 +208,7 @@ export function MemoryPanel() {
             {suggested.map((observation) => (
               <li key={observation.id} className="memory-item memory-item--suggested">
                 <p className="memory-item__kind">{KIND_LABELS[observation.kind]}</p>
+                {subjectRow(observation)}
                 {body(observation)}
                 <div className="memory-item__actions">
                   <button
@@ -175,6 +249,7 @@ export function MemoryPanel() {
               <li key={observation.id} className="memory-item">
                 <div className="memory-item__head">
                   <p className="memory-item__kind">{KIND_LABELS[observation.kind]}</p>
+                  {subjectRow(observation)}
                   <div className="memory-item__actions">
                     <button
                       type="button"

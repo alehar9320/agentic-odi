@@ -232,8 +232,10 @@ only the surface is missing.
 |---|---|---|---|---|
 | `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Rejected | — | — | Checked against the installed 0.15.31 rather than the docs: `groupMessageParts` starts a run at any adjacent `tool-call` or `reasoning` part, so its one disclosure would gather a write that is still asking. `GroupedParts` with `workGrouping` ends a run at an unanswered approval. |
 | Pending approvals inside a group | Rejected | — | — | A pending write is a question, not history. It stays ungrouped and visible, always. |
-| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. |
+| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. The pending strip (#390) counts from a start the store stamps when the call arrives, so it also shows nothing on a restored turn. |
 | `useMessageTiming` | Decision | — | — | Tokens/second is engineering telemetry. Useful to us, not to the PM; expose it only behind a diagnostics toggle if at all. |
+| `useAuiState((s) => s.thread.messages)` for liveness | Rejected | — | — | On the external-store path every part status normalizes to `complete` (`thread-message-client` only keeps a part `running` while its own message is), so the runtime cannot tell a live call from a settled one here. The store's `ChatPart.status` is the honest source, and `pending.ts` reads that instead. |
+| Pending-call strip | Adopted | `apps/studio/src/components/chat/PendingCalls.tsx` | #390 | The running and awaiting-approval calls, below the last message. A summary, never a queue: no speculative "up next" rows. |
 
 ## Selection and quote
 
@@ -319,14 +321,14 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 47 |
+| Adopted | 48 |
 | Partial | 10 |
 | Planned | 13 |
 | Decision | 42 |
-| Rejected | 43 |
-| Total | 155 |
+| Rejected | 44 |
+| Total | 157 |
 
-Read it as: **56** of the library's 155 relevant capabilities already deliver
+Read it as: **58** of the library's 157 relevant capabilities already deliver
 something a person can use, **13** more are carried by open issues, **42** rows
 wait on a named decision, and **44** are rejected with a reason. Every row is
 accounted for — that is the whole point of the page.

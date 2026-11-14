@@ -39,6 +39,7 @@ import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon, SpeakerIcon } from "../icons";
 import { Markdown } from "./Markdown";
+import { PendingCalls } from "./PendingCalls";
 import { StallNotice } from "./StallNotice";
 import { WorkBlock } from "./WorkBlock";
 import { workGrouping } from "./workGrouping";
@@ -397,7 +398,7 @@ function EditComposer() {
 }
 
 export function Conversation() {
-  const { sendMessage, streaming, thinkingPhase, messages } = useStudio();
+  const { sendMessage, streaming, thinkingPhase, messages, openDetail } = useStudio();
 
   // Only the newest reply is announcement-worthy. Keeping it out of the log
   // means a reader can move through history without every delta replaying it.
@@ -426,7 +427,11 @@ export function Conversation() {
 
   return (
     <UiActionContext.Provider
-      value={{ onIntent: (intent) => void sendMessage(intent), busy: streaming }}
+      value={{
+        onIntent: (intent) => void sendMessage(intent),
+        onDetail: (target) => openDetail(target.panel, target.subject),
+        busy: streaming,
+      }}
     >
       {/* The phase lives outside the log: the streaming reply is `aria-busy`,
           and a status message inside it would not be announced until the
@@ -445,6 +450,10 @@ export function Conversation() {
               EditComposer,
             }}
           />
+          {/* The calls still in flight, below the last message: the transcript
+              is the record of what happened, and this is the one place that
+              answers what has not happened yet. */}
+          <PendingCalls />
         </div>
       </TranscriptClockContext.Provider>
     </UiActionContext.Provider>

@@ -1,0 +1,140 @@
+name: PR AI merge authorize
+
+# Labels a pull request ``ai-merge-authorized`` when every gate passes:
+#   * ``ai-merge-safe`` (trust label from pr-ai-merge.yml)
+#   * CI green (combined status of the head commit is ``success``)
+#   * ``ready-for-merge`` (no merge conflicts)
+#   * open pull request targeting main, not a draft
+#
+# Any failing gate removes the label. Deterministic: no LLM calls, no network
+# beyond the GitHub API, no pull request code executed. Fork pull requests are
+# skipped per-job because they carry a read-only token.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  check_suite:
+    types: [completed]
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write # gh label create lives under the issues API
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  labels:
+    name: Label pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      # A fork pull request gets a read-only token, so labeling it cannot
+      # succeed. Say so instead of failing red on a PR we may not touch.
+      - name: Note fork pull requests
+        if: ${{ github.event.pull_request.head.repo.fork }}
+        run: echo "::notice::Skipping AI merge authorize labels for a fork pull request (read-only token)."
+
+      # Resolve which pull request(s) to process. On pull_request events we
+      # have a PR number. On check_suite we have the head SHA but need to map
+      # it to a PR number. On schedule / workflow_dispatch we re-scan every
+      # open PR targeting main so labels stay eventually consistent.
+      - name: Resolve pull request numbers to process
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-numbers.txt"
+          elif [ "${{ github.event_name }}" = "check_suite" ]; then
+            head_sha="${{ github.event.check_suite.head_sha }}"
+            gh pr list --repo "$REPO" --base main --state open --json number,headRefOid \
+              -q '.[] | select(.headRefOid == "'"$head_sha"'") | .number' \
+              > "$RUNNER_TEMP/pr-numbers.txt" || true
+          else
+            gh pr list --repo "$REPO" --base main \
+              --state open --json number -q '.[].number' \
+              > "$RUNNER_TEMP/pr-numbers.txt"
+          fi
+
+      # The label did not exist, so --add-label failed with
+      # "'ai-merge-authorized' not found" and the job went red. Create it once.
+      - name: Ensure the AI merge authorized label exists
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh label create "ai-merge-authorized" --color 0e8a16 \
+            --description "CI green and trust label present; AI agent may auto-merge" \
+            --repo "$REPO" --force
+
+      - name: Process each pull request
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          while IFS= read -r PR_NUMBER; do
+            [ -z "$PR_NUMBER" ] && continue
+
+            # Assemble the fact sheet the tested Python entrypoint reads.
+            gh pr view "$PR_NUMBER" --repo "$REPO" \
+              --json author,body,headRefName,baseRefName,isDraft,state,labels \
+              > "$RUNNER_TEMP/meta-$PR_NUMBER.json"
+
+            # Combined status of the head commit: "success" means CI is green.
+            HEAD_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid -q '.headRefOid')"
+            STATUS="$(gh api "repos/$REPO/commits/$HEAD_SHA/status" -q '.state' 2>/dev/null || echo pending)"
+
+            jq -n \
+              --slurpfile meta "$RUNNER_TEMP/meta-$PR_NUMBER.json" \
+              --arg status "$STATUS" \
+              '{
+                author: $meta[0].author,
+                branch: $meta[0].headRefName,
+                body: $meta[0].body,
+                commits: [],
+                files: [],
+                labels: ($meta[0].labels | map(.name)),
+                state: $meta[0].state,
+                draft: $meta[0].isDraft,
+                base: $meta[0].baseRefName,
+                status: $status
+              }' \
+              > "$RUNNER_TEMP/facts-$PR_NUMBER.json"
+
+            computed="$(python3 scripts/pr_ai_authorize.py --facts "$RUNNER_TEMP/facts-$PR_NUMBER.json")"
+
+            # Removing an absent label is a harmless no-op, so it is tolerated.
+            # Adding must not be swallowed.
+            if [ -n "$computed" ]; then
+              gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label "ai-merge-authorized"
+            else
+              gh pr edit "$PR_NUMBER" --repo "$REPO" --remove-label "ai-merge-authorized" || true
+            fi
+
+            {
+              echo "### AI merge authorize label — PR #$PR_NUMBER"
+              echo
+              if [ -n "$computed" ]; then
+                echo "Applied: ai-merge-authorized (CI green, trust label present)"
+              else
+                echo "Not applied: one or more gates did not pass."
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+          done < "$RUNNER_TEMP/pr-numbers.txt"

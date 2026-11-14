@@ -246,9 +246,14 @@ test suites, so a regression turns the build red without a separate command:
   structural statement, not WCAG conformance and not a screen-reader
   certification — that evidence is ALH-252's to collect.
 
-Reduced motion is honoured globally in `theme.css` (`@media
-(prefers-reduced-motion: reduce)` collapses animations, transitions, and
-`scroll-behavior`), so new components inherit it without opting in.
+Reduced motion is honoured globally in `theme.css`: `@media
+(prefers-reduced-motion: reduce)` collapses the `--motion-*` duration tokens to
+`0ms` and turns off `scroll-behavior`, so a new rule inherits it by reading a
+token instead of opting in. Motion driven from JavaScript reads
+`useReducedMotion()` (`src/lib/useReducedMotion.ts`), which follows a change
+without a reload. The budget is asserted in `src/styles/motion.test.ts`: every
+duration outside the token block must be a token, exactly one reduced-motion
+rule exists, and only the thinking dots and the streaming caret loop.
 
 ### Contrast as a build gate
 

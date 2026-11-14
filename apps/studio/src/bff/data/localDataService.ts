@@ -1,7 +1,13 @@
-import type { CanvasData, Job, Outcome, Step } from "../../types";
+import type { CanvasData, Evidence, Job, Outcome, Step } from "../../types";
 import { notFound, validation } from "../errors";
 import { newId, nowIso } from "../id";
-import type { LocalStore, StoredJob, StoredOutcome, StoredStep } from "../store/types";
+import type {
+  LocalStore,
+  StoredEvidence,
+  StoredJob,
+  StoredOutcome,
+  StoredStep,
+} from "../store/types";
 
 export function computeOpportunityScore(importance: number, satisfaction: number): number {
   return importance + Math.max(importance - satisfaction, 0);
@@ -28,6 +34,21 @@ function stripOutcome(outcome: StoredOutcome): Outcome {
     importance: outcome.importance,
     satisfaction: outcome.satisfaction,
     opportunity_score: outcome.opportunity_score,
+  };
+}
+
+function stripEvidence(record: StoredEvidence): Evidence {
+  return {
+    id: record.id,
+    source_name: record.source_name,
+    source_kind: record.source_kind,
+    item_type: record.item_type,
+    name: record.name,
+    content: record.content,
+    url: record.url ?? null,
+    job_id: record.job_id ?? null,
+    step_id: record.step_id ?? null,
+    outcome_id: record.outcome_id ?? null,
   };
 }
 
@@ -60,16 +81,18 @@ export class LocalDataService {
   constructor(private readonly store: LocalStore) {}
 
   async fetchCanvas(): Promise<CanvasData> {
-    const [jobs, steps, outcomes] = await Promise.all([
+    const [jobs, steps, outcomes, evidence] = await Promise.all([
       this.store.listJobs(),
       this.store.listSteps(),
       this.store.listOutcomes(),
+      this.store.listEvidence(),
     ]);
     const empty = jobs.length === 0 && steps.length === 0 && outcomes.length === 0;
     return {
       jobs: jobs.map(stripJob),
       steps: steps.map(stripStep),
       outcomes: outcomes.map(stripOutcome),
+      evidence: evidence.map(stripEvidence),
       source: "local",
       provenance: {
         kind: empty ? "empty" : "live",
@@ -79,7 +102,7 @@ export class LocalDataService {
           jobs: jobs.length,
           steps: steps.length,
           outcomes: outcomes.length,
-          evidence: 0,
+          evidence: evidence.length,
         },
       },
     };
@@ -267,6 +290,48 @@ export class LocalDataService {
     }
     await this.store.deleteOutcome(outcomeId);
     return { deleted: outcomeId };
+  }
+
+  async addEvidence(input: {
+    source_name?: string;
+    source_kind?: string;
+    item_type?: string;
+    name: string;
+    content: string;
+    url?: string;
+    job_id?: string;
+    step_id?: string;
+    outcome_id?: string;
+  }): Promise<Evidence> {
+    if (input.job_id && !(await this.store.getJob(input.job_id))) {
+      throw notFound("Job", input.job_id);
+    }
+    const now = nowIso();
+    const record: StoredEvidence = {
+      id: newId(),
+      source_name: input.source_name,
+      source_kind: input.source_kind,
+      item_type: input.item_type,
+      name: validateName(input.name, "Evidence name"),
+      content: input.content,
+      url: input.url ?? null,
+      job_id: input.job_id ?? null,
+      step_id: input.step_id ?? null,
+      outcome_id: input.outcome_id ?? null,
+      seq: await this.store.nextSeq(),
+      created_at: now,
+      updated_at: now,
+    };
+    await this.store.putEvidence(record);
+    return stripEvidence(record);
+  }
+
+  async deleteEvidence(evidenceId: string): Promise<{ deleted: string }> {
+    if (!(await this.store.getEvidence(evidenceId))) {
+      throw notFound("Evidence", evidenceId);
+    }
+    await this.store.deleteEvidence(evidenceId);
+    return { deleted: evidenceId };
   }
 
   async computeOpportunity(importance: number, satisfaction: number): Promise<number> {

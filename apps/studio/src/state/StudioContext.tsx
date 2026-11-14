@@ -17,6 +17,7 @@ import type {
 } from "@assistant-ui/react";
 
 import { focusLabel, focusPointer } from "../lib/focus";
+import { useRegionState, type Detail } from "./regions";
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -68,10 +69,8 @@ import { textOf } from "../assistant/convert";
 import { createTurnQueue, queuedUserMessage } from "../assistant/queue";
 import { textWithQuote, type ComposerQuote } from "../assistant/quote";
 import { capabilityRegistry, type Capability } from "../bff/capabilities/registry";
-import { isOnline } from "../lib/onlineStatus";
-import { parseRoute, routeToPath, type Route, withSearch } from "../lib/routes";
-import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
 import { deriveDeviceStatus, type DeviceStatus } from "./deviceStatus";
+import { isOnline } from "../lib/onlineStatus";
 import {
   PROBE_SETTINGS_DEBOUNCE_MS,
   createProbeScheduler,
@@ -84,6 +83,7 @@ import {
   type ProbeBreaker,
   type ProbeOutcome,
 } from "./probeBreaker";
+import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -252,17 +252,6 @@ const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const THESES_KEY = "studio.theses";
 
-/**
- * The current browser path, honoring the file/protocol split: http(s) uses
- * the pathname; anything else (Tauri's asset protocol) uses the hash.
- */
-function currentPath(): string {
-  if (window.location.protocol === "http:" || window.location.protocol === "https:") {
-    return window.location.pathname;
-  }
-  return window.location.hash.replace(/^#/, "") || "/";
-}
-
 /** How often a focused window re-reads the signal inbox from the store. */
 const SIGNAL_POLL_INTERVAL_MS = 60_000;
 
@@ -342,8 +331,6 @@ export interface StudioContextValue {
   /** The failure behind `canvasState.kind === "error"`, if any. */
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
-  /** Navigate to a route: updates the URL and derives studio state from it. */
-  navigateTo: (route: Route, replace?: boolean) => void;
   llmHealth: { healthy: boolean | null; message: string };
   /**
    * What the probe breaker is doing (#536): `state` is `closed`, `open`,
@@ -458,6 +445,18 @@ export interface StudioContextValue {
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
+  /**
+   * The right region's one detail (#735). `openDetail` is the single entry;
+   * `openPanel` is the one-hop alias that remains during transition.
+   */
+  detail: Detail | null;
+  openDetail: (panel: WorkspacePanelId, subject?: { kind: string; id: string }) => void;
+  closeDetail: () => void;
+  /** The left drawer, whose accessible name the rail helper reuses. */
+  drawerOpen: boolean;
+  toggleDrawer: () => void;
+  /** The left drawer's collapsed state. */
+  collapsed: boolean;
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
   pushToast: (
@@ -679,27 +678,22 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
-
-  // The URL is the single source of truth for what is on screen. The route is
-  // parsed from the address bar on boot and updated on every navigation; the
-  // conversation, active panel, and customize-open state are derived from it.
-  const initialRoute = parseRoute(currentPath(), window.location.search);
-  const [currentRoute, setCurrentRoute] = useState<Route>(initialRoute);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(
-    currentRoute.name === "thread" ||
-    currentRoute.name === "threadPanel" ||
-    currentRoute.name === "threadPanelSubject"
-      ? currentRoute.threadId
-      : null
-  );
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
-  const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
+  // The three-region contract (#735), declared once in its own module so this
+  // provider's in-flight splits (#345, #506) do not collide with it. The right
+  // region's `detail` is the single source of truth: `activePanel` is derived
+  // from it, and `openPanel` is the one-hop alias that writes through.
+  const regions = useRegionState();
+  // The right region holds exactly one detail; its panel id is what the lens
+  // renders. Kept derived so no caller can set one without the other.
+  const activePanel: WorkspacePanelId | null = regions.detail?.panel ?? null;
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
@@ -760,68 +754,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const settingsProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The last written settings, so an edit can be compared without a stale closure. */
   const settingsRef = useRef(settings);
-
-  /**
-   * Navigate to a route: update the browser URL and the derived studio state
-   * (conversation, active panel, customize-open). `replace` controls whether
-   * the navigation pushes a new history entry or replaces the current one.
-   */
-  const navigateTo = useCallback(
-    (route: Route, replace = false) => {
-      const path = withSearch(routeToPath(route), route.search ?? "");
-      setCurrentRoute(route);
-
-      const threadId =
-        route.name === "thread" ||
-        route.name === "threadPanel" ||
-        route.name === "threadPanelSubject"
-          ? route.threadId
-          : null;
-      const panel =
-        route.name === "threadPanel" || route.name === "threadPanelSubject"
-          ? route.panel
-          : null;
-      const customize =
-        route.name === "customize" || route.name === "customizeListing";
-
-      setConversationId(threadId);
-      setActivePanel(panel);
-      setCustomizeOpen(customize);
-
-      if (replace) {
-        window.history.replaceState({}, "", path);
-      } else {
-        window.history.pushState({}, "", path);
-      }
-    },
-    []
-  );
-
-  /**
-   * Restore the route from the URL on boot: a non-home URL loads that thread
-   * through `fetchConversationTree`; "/" falls back to today's latest
-   * conversation behaviour. A popstate listener restores state on back/
-   * forward without starting any stream.
-   */
-  useEffect(() => {
-    function onPopState() {
-      const route = parseRoute(currentPath(), window.location.search);
-      setCurrentRoute(route);
-      setConversationId(
-        route.name === "thread" || route.name === "threadPanel" || route.name === "threadPanelSubject"
-          ? route.threadId
-          : null
-      );
-      setActivePanel(
-        route.name === "threadPanel" || route.name === "threadPanelSubject" ? route.panel : null
-      );
-      setCustomizeOpen(route.name === "customize" || route.name === "customizeListing");
-    }
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-
-
 
   const signals = useMemo(
     () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
@@ -1217,9 +1149,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   const openSetup = useCallback(() => {
-    setActivePanel(null);
+    regions.closeDetail();
     setSetupOpen(true);
-  }, []);
+  }, [regions.closeDetail]);
 
   const closeSetup = useCallback(() => {
     setSetupOpen(false);
@@ -1640,25 +1572,16 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
-  const closePanel = useCallback(() => {
-    setActivePanel(null);
-    if (conversationId) {
-      navigateTo({ name: "thread", threadId: conversationId }, false);
-    }
-  }, [conversationId, navigateTo]);
+  const closePanel = useCallback(() => regions.closeDetail(), [regions.closeDetail]);
 
   const openPanel = useCallback(
     (panel: WorkspacePanelId) => {
       if (setupOpen) {
         closeSetup();
       }
-      if (conversationId) {
-        navigateTo({ name: "threadPanel", threadId: conversationId, panel }, false);
-      } else {
-        setActivePanel(panel);
-      }
+      regions.openDetail(panel);
     },
-    [conversationId, navigateTo, setupOpen, closeSetup],
+    [setupOpen, closeSetup, regions.openDetail],
   );
 
   /**
@@ -1671,14 +1594,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       return;
     }
     saveSession(sessionForSubject(kind, id));
-    const panel = PANEL_FOR_SUBJECT[kind];
-    if (conversationId && panel) {
-      navigateTo(
-        { name: "threadPanelSubject", threadId: conversationId, panel, subjectKind: kind, subjectId: id },
-        false
-      );
-    }
-  }, [conversationId, navigateTo]);
+  }, []);
 
   /**
    * Stop speaking for the screen. The session slot goes with the selection, so a
@@ -1719,16 +1635,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const focusEvidence = useCallback(
     (evidenceId: string) => {
       setFocusedEvidenceId(evidenceId);
-      if (conversationId) {
-        navigateTo(
-          { name: "threadPanelSubject", threadId: conversationId, panel: "evidence", subjectKind: "evidence", subjectId: evidenceId },
-          false
-        );
-      } else {
-        openPanel("evidence");
-      }
+      openPanel("evidence");
     },
-    [conversationId, navigateTo, openPanel],
+    [openPanel],
   );
 
   /**
@@ -1957,7 +1866,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           toolSeq += 1;
           parts = [
             ...parts,
-            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status },
+            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status, startedAt: Date.now() },
           ];
           return;
         }
@@ -1966,6 +1875,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
             ...open,
             status,
             ...(preview ? { preview } : {}),
+            // The call settled, so the pending row stops counting: the start is
+            // dropped with the status it belonged to.
+            startedAt: undefined,
             // A result means the gate was answered; the question is spent.
             approval: undefined,
           };
@@ -2047,6 +1959,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
                 id: String(event.data.tool_call_id ?? `approval-${approvalId}`),
                 name: String(event.data.name ?? ""),
                 status: "running",
+                startedAt: Date.now(),
                 approval: {
                   id: approvalId,
                   prompt: String(event.data.prompt ?? "Allow this change?"),
@@ -2392,10 +2305,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   /** The single conversational exit from any lens. */
   const ask = useCallback(
     (intent: string) => {
-      setActivePanel(null);
+      regions.closeDetail();
       void sendMessage(intent);
     },
-    [sendMessage],
+    [sendMessage, regions.closeDetail],
   );
 
   const refreshMemory = useCallback(async () => {
@@ -2501,12 +2414,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     setOfflineReplyFor(null);
     setConversationId(null);
     void apiCreateConversation()
-      .then((conversation) => {
-        setConversationId((current) => current ?? conversation.id);
-        navigateTo({ name: "thread", threadId: conversation.id }, true);
-      })
+      .then((conversation) =>
+        setConversationId((current) => current ?? conversation.id),
+      )
       .catch(() => undefined);
-  }, [navigateTo]);
+  }, []);
 
   // First paint shows the person's own work; nothing that nobody asked for gets
   // to declare the studio broken. Boot order, and why nothing on the first
@@ -2870,7 +2782,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
-      navigateTo,
+      detail: regions.detail,
+      openDetail: regions.openDetail,
+      closeDetail: regions.closeDetail,
+      drawerOpen: regions.drawerOpen,
+      toggleDrawer: regions.toggleDrawer,
+      collapsed: regions.collapsed,
     }),
     [
       settings,
@@ -2997,7 +2914,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
-      navigateTo,
+      regions.detail,
+      regions.openDetail,
+      regions.closeDetail,
+      regions.drawerOpen,
+      regions.toggleDrawer,
+      regions.collapsed,
     ],
   );
 
