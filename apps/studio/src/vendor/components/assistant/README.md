@@ -1,7 +1,7 @@
 # Copied conversation surfaces
 
-Presentation for transcript parts — tool calls, plans, quotes, terminals —
-copied from a UI kit or from assistant-ui's own examples.
+Presentation for transcript parts — tool calls, plans, quotes, terminals,
+questionnaires — copied from a UI kit or from assistant-ui's own examples.
 
 What may live here:
 

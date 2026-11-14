@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { JOB_STAGES, type JobStage } from "../../domain/jobStages";
-import { canvasHasRecords, savedCopyCaption } from "../../lib/canvasProvenance";
+import { canvasHasRecords, keptByBrowserCaption, savedCopyCaption } from "../../lib/canvasProvenance";
 import { useStudio } from "../../state/StudioContext";
 import { FailurePanel } from "../FailurePanel";
 import { GhostJobSteps } from "../Skeletons";
@@ -150,6 +150,7 @@ export function JobMap() {
   // warm reload (previous data, not from cache) draws it too, but captions
   // nothing, because that data is live rather than a saved copy.
   const savedCaption = canvasCached && hasRecords ? savedCopyCaption(canvas) : null;
+  const keptCaption = keptByBrowserCaption(canvas);
 
   if (canvasState.kind === "error") {
     // A failed canvas must not render as eight empty phases.
@@ -175,6 +176,11 @@ export function JobMap() {
       {savedCaption ? (
         <p className="canvas-saved" role="status">
           {savedCaption}
+        </p>
+      ) : null}
+      {keptCaption ? (
+        <p className="canvas-saved" role="status">
+          {keptCaption}
         </p>
       ) : null}
 

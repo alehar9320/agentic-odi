@@ -6,6 +6,7 @@ import type {
   Observation,
   ObservationKind,
   ObservationStatus,
+  ObservationSubjectType,
 } from "../../types";
 import { notFound, validation } from "../errors";
 import { newId, nowIso } from "../id";
@@ -24,6 +25,12 @@ const OBSERVATION_STATUSES = new Set<ObservationStatus>([
   "suggested",
   "confirmed",
   "dismissed",
+]);
+const OBSERVATION_SUBJECT_TYPES = new Set<ObservationSubjectType>([
+  "job",
+  "step",
+  "outcome",
+  "evidence",
 ]);
 const TURN_ROLES = new Set<ConversationTurn["role"]>([
   "user",
@@ -74,14 +81,50 @@ function cleanData(data: Record<string, unknown> | undefined): Record<string, un
   return data ?? {};
 }
 
+function cleanSubject(
+  subjectType: ObservationSubjectType | null | undefined,
+  subjectId: string | null | undefined,
+): { subject_type: ObservationSubjectType | null; subject_id: string | null } {
+  if ((subjectType ?? null) === null && (subjectId ?? null) === null) {
+    return { subject_type: null, subject_id: null };
+  }
+  if (!subjectType) {
+    throw validation("A subject id requires a subject type.");
+  }
+  if (!OBSERVATION_SUBJECT_TYPES.has(subjectType)) {
+    throw validation(`Unknown observation subject type: ${subjectType}.`);
+  }
+  const trimmed = subjectId?.trim();
+  if (!trimmed) {
+    throw validation("A subject type requires a non-empty subject id.");
+  }
+  return { subject_type: subjectType, subject_id: trimmed };
+}
+
 export class LocalMemoryService {
   constructor(private readonly store: LocalStore) {}
 
-  async listObservations(includeDismissed = false): Promise<Observation[]> {
-    const observations = await this.store.listObservations();
-    return includeDismissed
-      ? observations
-      : observations.filter((observation) => observation.status !== "dismissed");
+  async listObservations(
+    includeDismissed = false,
+    subject?: { subject_type?: string | null; subject_id?: string | null },
+  ): Promise<Observation[]> {
+    let observations = await this.store.listObservations();
+    if (!includeDismissed) {
+      observations = observations.filter(
+        (observation) => observation.status !== "dismissed",
+      );
+    }
+    if (subject?.subject_type) {
+      observations = observations.filter(
+        (observation) => observation.subject_type === subject.subject_type,
+      );
+    }
+    if (subject?.subject_id) {
+      observations = observations.filter(
+        (observation) => observation.subject_id === subject.subject_id,
+      );
+    }
+    return observations;
   }
 
   async addObservation(input: {
@@ -90,16 +133,39 @@ export class LocalMemoryService {
     data?: Record<string, unknown>;
     confidence?: number;
     confirmed?: boolean;
+    subject_type?: ObservationSubjectType | null;
+    subject_id?: string | null;
   }): Promise<Observation> {
     const now = nowIso();
+    const subject = cleanSubject(input.subject_type, input.subject_id);
+    const text = cleanText(input.text);
+    const existing = (await this.store.listObservations()).find(
+      (observation) =>
+        observation.subject_type === subject.subject_type &&
+        observation.subject_id === subject.subject_id &&
+        observation.text === text,
+    );
+    if (existing) {
+      // The same claim about the same subject is one row: refresh the
+      // confidence and the timestamp instead of duplicating it.
+      const refreshed: Observation = {
+        ...existing,
+        confidence: cleanConfidence(input.confidence ?? existing.confidence),
+        updated_at: now,
+      };
+      await this.store.putObservation(refreshed);
+      return refreshed;
+    }
     const observation: Observation = {
       id: newId(),
       kind: cleanKind(input.kind),
-      text: cleanText(input.text),
+      text,
       data: cleanData(input.data),
       status: input.confirmed ? "confirmed" : "suggested",
       confidence: cleanConfidence(input.confidence ?? 0.5),
       source_turn: null,
+      subject_type: subject.subject_type,
+      subject_id: subject.subject_id,
       created_at: now,
       updated_at: now,
     };

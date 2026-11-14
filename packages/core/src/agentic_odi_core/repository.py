@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
@@ -23,6 +24,10 @@ from agentic_odi_core.models import (
 )
 
 _Item = TypeVar("_Item")
+
+#: Characters a connector may wrap a quote in; stripped before fingerprinting so
+#: ``"Lost hours"`` and ``Lost hours`` identify the same customer sentence.
+_WRAPPING_QUOTES = "\"'“”‘’«»"
 
 #: A workspace has exactly one V2MOM, and the model carries no id, so the store
 #: keys it by this constant rather than a generated one.
@@ -114,6 +119,36 @@ def compute_evidence_fingerprint(
             json.dumps(raw or {}, sort_keys=True),
         ]
     )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def normalize_quote_text(text: str) -> str:
+    """Normalize quote text so two renderings of one quote share an identity.
+
+    Unicode NFC, collapsed whitespace, casefold, wrapping quotes removed, and
+    terminal punctuation stripped. A connector that re-renders the same
+    sentence — extra spaces, a smart quote, a trailing period — must not look
+    like a second customer.
+    """
+    normalized = unicodedata.normalize("NFC", text or "")
+    normalized = " ".join(normalized.split()).casefold()
+    while normalized and normalized[0] in _WRAPPING_QUOTES:
+        normalized = normalized[1:].lstrip()
+    while normalized and normalized[-1] in _WRAPPING_QUOTES:
+        normalized = normalized[:-1].rstrip()
+    normalized = normalized.rstrip(".!?,;:")
+    return normalized
+
+
+def compute_promotion_fingerprint(source_kind: str, source_name: str, content: str) -> str:
+    """Fingerprint a quote by what identifies it, not how it was labelled.
+
+    Hashes the source with the *normalized* content, joined by ``\\x1f`` the way
+    signals do. ``name`` and ``raw`` are deliberately excluded: connectors
+    relabel records and payloads carry fetch timestamps, so including them
+    would let one quote become several opportunities.
+    """
+    payload = "\x1f".join([source_kind or "", source_name or "", normalize_quote_text(content)])
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

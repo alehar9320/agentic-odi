@@ -48,7 +48,7 @@ const acceptedTextExtensions = acceptedAttachmentTypes.filter((type) => type.sta
 const acceptedImageTypes = acceptedAttachmentTypes
   .filter((type) => type.startsWith("image/"))
   .map((type) => type.slice("image/".length).toUpperCase());
-const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*), Word documents (.docx), and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files up to ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")} characters, longer files are refused.`;
+const ATTACHMENT_HELP = `Supported text files (${acceptedTextExtensions.join(", ")} and text/*), Word documents (.docx), PDFs (.pdf), and images (${acceptedImageTypes.join(", ")}). Images up to ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB; text files and PDFs up to ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")} characters, longer files are refused.`;
 
 /** The local preview for an image before it is ever sent. */
 function AttachmentThumb({ file }: { file?: File }) {
