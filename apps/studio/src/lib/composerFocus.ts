@@ -49,6 +49,26 @@ export function startComposerCommand(): boolean {
 }
 
 /**
+ * Whether the composer may take the caret when it appears.
+ *
+ * A composer can mount late — after a boot probe resolves, or when a view
+ * swaps in — and by then the person may already be somewhere else: a dialog
+ * they just opened, a field they just clicked. Taking the caret then would
+ * pull it out from under them, and the dialog that later closes would hand
+ * focus back to the composer instead of to the control that opened it (#695).
+ */
+export function composerMayTakeCaret(): boolean {
+  if (typeof document === "undefined") {
+    return false;
+  }
+  if (dialogOpen()) {
+    return false;
+  }
+  const active = document.activeElement;
+  return !active || active === document.body || active === document.documentElement;
+}
+
+/**
  * Whether a modal is on screen. A dialog owns the keyboard while it is open,
  * so a shell shortcut must not reach behind it to the page it covers.
  */
