@@ -62,4 +62,21 @@ describe("SuggestionPills starters", () => {
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sendMessage).toHaveBeenCalledWith(NOTES_PROMPT);
   });
+
+  it("renders the starters as cards in a list, not pills", () => {
+    renderPills();
+
+    const list = screen.getByRole("list");
+    expect(list).toHaveClass("composer__starters");
+    expect(document.querySelector(".composer__pills")).toBeNull();
+    expect(list.querySelectorAll("li")).toHaveLength(3);
+  });
+
+  it("keeps the landscape action outside the card list", () => {
+    renderPills();
+
+    const list = screen.getByRole("list");
+    const landscape = screen.getByRole("button", { name: "Opportunity landscape" });
+    expect(list.contains(landscape)).toBe(false);
+  });
 });
