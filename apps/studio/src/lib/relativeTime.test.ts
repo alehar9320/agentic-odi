@@ -5,6 +5,7 @@ import {
   formatClockTime,
   formatDayHeading,
   formatRelativeTime,
+  formatTurnTime,
   groupByDay,
   startsNewDay,
 } from "./relativeTime";
@@ -106,5 +107,27 @@ describe("clock time (#694 D15)", () => {
   it("reads a clock time and refuses to invent one", () => {
     expect(formatClockTime(new Date(2026, 9, 22, 14, 5).toISOString())).toMatch(/\d/);
     expect(formatClockTime("not a date")).toBe("");
+  });
+});
+
+describe("turn time (#737)", () => {
+  it("summarises a recent turn and clocks an old one", () => {
+    const now = new Date(2026, 9, 22, 12, 0);
+    const recent = new Date(now.getTime() - 14 * 60 * 1000).toISOString();
+    const old = new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString();
+
+    expect(formatTurnTime(recent, now)).toBe("14m ago");
+    expect(formatTurnTime(old, now)).toBe(formatClockTime(old));
+  });
+
+  it("refuses to invent a relation for a moment it cannot read", () => {
+    expect(formatTurnTime("not a date")).toBe("");
+  });
+
+  it("clocks a future moment rather than claiming it just happened", () => {
+    const now = new Date(2026, 9, 22, 12, 0);
+    const ahead = new Date(now.getTime() + 60 * 1000).toISOString();
+
+    expect(formatTurnTime(ahead, now)).toBe(formatClockTime(ahead));
   });
 });
