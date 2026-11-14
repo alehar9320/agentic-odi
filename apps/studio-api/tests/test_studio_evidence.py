@@ -87,6 +87,56 @@ def test_evidence_promotes_into_a_job() -> None:
     assert "Sync secrets" in [job["name"] for job in client.get("/api/canvas").json()["jobs"]]
 
 
+def test_a_repeat_import_does_not_add_a_second_outcome() -> None:
+    client = _client()
+    job_id = _job(client)
+    first = _capture(client, job_id, url=LINK)
+
+    def promote(evidence_id: str, **extra: Any) -> dict:
+        response = client.post(
+            f"/api/evidence/{evidence_id}/promote",
+            json={
+                "target": "outcome",
+                "statement": STATEMENT,
+                "importance": 8.0,
+                "satisfaction": 3.0,
+                **extra,
+            },
+        )
+        assert response.status_code == 200
+        return response.json()["result"]
+
+    outcome = promote(first["id"])
+
+    #: A second import of the same quote, relabelled, is a distinct record…
+    second = _capture(client, job_id, name="Fintech call (recap)", url=None)
+    assert second["id"] != first["id"]
+
+    #: …that promotes to the same outcome, so the landscape is unchanged.
+    again = promote(second["id"])
+    assert again["id"] == outcome["id"]
+    assert [item["id"] for item in client.get("/api/canvas").json()["outcomes"]] == [outcome["id"]]
+
+
+def test_force_promotes_a_repeat_import_into_a_second_outcome() -> None:
+    client = _client()
+    job_id = _job(client)
+    record = _capture(client, job_id, url=LINK)
+    body = {
+        "target": "outcome",
+        "statement": STATEMENT,
+        "importance": 8.0,
+        "satisfaction": 3.0,
+    }
+    first = client.post(f"/api/evidence/{record['id']}/promote", json=body).json()["result"]
+    forced = client.post(
+        f"/api/evidence/{record['id']}/promote", json={**body, "force": True}
+    ).json()["result"]
+
+    assert forced["id"] != first["id"]
+    assert len(client.get("/api/canvas").json()["outcomes"]) == 2
+
+
 def test_deleting_evidence_removes_it_from_the_canvas() -> None:
     client = _client()
     record = _capture(client, _job(client), url=LINK)
