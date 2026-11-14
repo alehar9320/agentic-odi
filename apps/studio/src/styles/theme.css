@@ -724,6 +724,21 @@ a {
     border-color var(--motion-fast) ease;
 }
 
+/* The tint above is authored for dark: a 2.5% white alpha disappears over the
+   light page, so a starter card reads as an outline with no fill. Light theme
+   takes the surface token instead. Scoped to the starter set so the setup
+   wizard's reply pills, which share `.suggestion`, keep their own surfaces.
+   The hover re-states the base rule because these selectors out-specify it. */
+html.theme-light .composer__pills .suggestion,
+html.theme-light .suggestion--card {
+  background: var(--surface);
+}
+
+html.theme-light .composer__pills .suggestion:hover:not(:disabled),
+html.theme-light .suggestion--card:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
 .suggestion--card {
   align-items: flex-start;
   min-width: min(210px, 100%);
@@ -3283,6 +3298,21 @@ button.message__tag:hover {
 
   .before-after {
     grid-template-columns: 1fr;
+  }
+}
+
+/* A phone holds one starter per line. The 1023px block above only widened the
+   card modifier, which the composer never applies, so the starters kept
+   wrapping in a row at 390px. */
+@media (max-width: 390px) {
+  .composer__pills {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .composer__pills .suggestion {
+    width: 100%;
+    max-width: none;
   }
 }
 
