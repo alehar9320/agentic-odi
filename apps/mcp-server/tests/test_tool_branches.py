@@ -262,3 +262,16 @@ async def test_open_study_reports_a_missing_job_as_an_envelope() -> None:
     text = _text(result)
     assert failure(text).code.value == "not_found"
     assert sentence(text) == "Job not found: missing"
+
+
+@pytest.mark.asyncio
+async def test_add_interview_reports_a_missing_job_as_a_typed_failure() -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "add_interview",
+            {"title": "Ana — onboarding", "participant_label": "Ana", "job_id": "missing"},
+        )
+
+    text = _text(result)
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Job not found: missing"

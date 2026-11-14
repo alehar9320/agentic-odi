@@ -611,7 +611,7 @@ async def add_evidence(
             outcome_id=outcome_id,
         )
     except JobNotFoundError:
-        return _fail(JobNotFoundError(job_id or ""), job_not_found(job_id or ""))
+        return job_not_found(job_id or "")
     except StepNotFoundError:
         return _step_not_found(step_id)
     except OutcomeNotFoundError:
@@ -683,7 +683,7 @@ def add_interview(
             notes=notes,
         )
     except JobNotFoundError:
-        return job_not_found(job_id or "")
+        return _fail(JobNotFoundError(job_id or ""), job_not_found(job_id or ""))
     except (OdiError, ValueError) as exc:
         return _fail(exc)
     return f"Interview created successfully: {interview.model_dump_json()}"
