@@ -19,11 +19,15 @@ export function BlockedReasonNote({
   const generatedId = useId();
   const noteId = id ?? generatedId;
   const reason = blockedReason(capability);
-  const { openPanel, openSetup, recheckConnections } = useStudio();
+  const { closeCustomize, openPanel, openSetup, recheckConnections } = useStudio();
 
   function run(kind: BlockedActionKind) {
     switch (kind) {
       case "start-sidecar":
+        // The setup conversation lives in the chat stage, which Customize
+        // replaces while it is open — so leaving Customize first is what makes
+        // this action visible where the note was pressed.
+        closeCustomize();
         openSetup();
         break;
       case "add-model":

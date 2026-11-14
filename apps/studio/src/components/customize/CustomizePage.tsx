@@ -348,7 +348,9 @@ function ListingCard({
           </a>
         ) : null}
       </div>
-      {listing.installable && !gate.allowed ? (
+      {!installed && listing.installable && !gate.allowed ? (
+        // Only a listing that still offers Add has something to explain: an
+        // added connector shows "Added" and must not carry install guidance.
         <BlockedReasonNote capability="sidecar-connectors" id={blockedId} />
       ) : null}
     </article>

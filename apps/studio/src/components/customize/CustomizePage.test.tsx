@@ -256,6 +256,31 @@ describe("CustomizePage blocked install", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("does not explain an install block under a connector already added", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [{ name: "notion", kind: "mcp", enabled: true }],
+        capabilities: [
+          {
+            id: "sidecar-connectors",
+            label: "Sidecar connectors",
+            description: "Adds third-party data sources through the sidecar.",
+            status: "unavailable",
+            reason: "The sidecar did not answer.",
+          },
+        ],
+      }),
+    );
+
+    render(<CustomizePage />);
+
+    // The card shows "Added" and offers no Add button, so there is nothing for
+    // installation guidance to explain or attach to.
+    expect(screen.getAllByText("Added").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+    expect(screen.queryByText(/needs the local service/)).toBeNull();
+  });
+
   it("says nothing when the sidecar is available", () => {
     vi.mocked(useStudio).mockReturnValue(
       stubContext({

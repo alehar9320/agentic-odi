@@ -5,10 +5,11 @@ import { BlockedReasonNote } from "./BlockedReasonNote";
 
 const openSetup = vi.fn();
 const openPanel = vi.fn();
+const closeCustomize = vi.fn();
 const recheckConnections = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../state/StudioContext", () => ({
-  useStudio: () => ({ openSetup, openPanel, recheckConnections }),
+  useStudio: () => ({ closeCustomize, openSetup, openPanel, recheckConnections }),
 }));
 
 describe("BlockedReasonNote", () => {
@@ -19,8 +20,12 @@ describe("BlockedReasonNote", () => {
     expect(note).not.toBeNull();
     expect(note?.textContent).toContain("needs the local service");
 
+    closeCustomize.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Start the local service" }));
     expect(openSetup).toHaveBeenCalledTimes(1);
+    // Setup renders in the chat stage, which Customize replaces while it is
+    // open: leaving Customize first is what makes the action visible.
+    expect(closeCustomize).toHaveBeenCalledTimes(1);
     expect(openPanel).not.toHaveBeenCalled();
   });
 
