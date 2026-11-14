@@ -173,10 +173,19 @@ def test_scheduled_work_fields_round_trip_through_sqlite(tmp_path):
     assert stored.last_error == "RuntimeError: model unreachable"
     assert stored.next_run_at == "2026-05-01T02:02:00+00:00"
 
-    # A row created before the change deserializes with the additive defaults.
-    untouched = reloaded.add_scheduled_work(
-        ScheduledWork(name="Old row", schedule_expression="+1h")
+    # A payload written before the change replays with the additive defaults.
+    # Writing the old row through `add_scheduled_work` would store the new
+    # fields, so this appends the event a previous version actually wrote — with
+    # the three fields absent — and reads it back from a fresh repository.
+    legacy = ScheduledWork(name="Old row", schedule_expression="+1h")
+    repo.store.append(
+        "SCHEDULED_WORK_CREATED",
+        legacy.model_dump(exclude={"last_status", "attempts", "last_error"}),
     )
+    untouched = SQLiteRepository(db_path).get_scheduled_work(legacy.id)
+    assert untouched is not None
+    assert untouched.name == "Old row"
+    assert untouched.schedule_expression == "+1h"
     assert untouched.last_status is None
     assert untouched.attempts == 0
     assert untouched.last_error is None
