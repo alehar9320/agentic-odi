@@ -137,6 +137,7 @@ uv run odi --version
 git clone https://github.com/alehar9320/agentic-odi.git
 cd agentic-odi
 uv sync --all-packages              # install the whole workspace
+npm --prefix apps/studio ci         # install the Studio's dependencies
 npm --prefix apps/studio run build  # build the Living Studio once
 uv run python scripts/dev.py        # start the MCP server + Studio together
 ```
@@ -152,6 +153,14 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
 - **Hot reload:** `npm --prefix apps/studio run dev:full` (Vite on
   http://localhost:5173).
 - **Desktop app:** `npm --prefix apps/studio run tauri dev`.
+- **Optional test tooling.** The default `npm ci` above deliberately skips
+  Playwright, Chromatic, and the Tauri CLI so a clone, a lint-only job, and a
+  restricted sandbox never wait on a browser they will not use. Install that
+  tooling in one command when you need the end-to-end, visual, or desktop
+  paths: `npm --prefix apps/studio run tooling:install` (then
+  `npm --prefix apps/studio run test:e2e` or `... run test:visual`). The e2e
+  scripts call the tooling check first, so a missing browser is a named error
+  rather than a silent skip.
 - **No model? No problem.** Without an OpenAI-compatible LLM every job, step,
   and outcome stays editable by hand. See [Local LLM Backend](docs/local-llm.md).
 - **A real conversation runtime.** The Studio uses assistant-ui over its

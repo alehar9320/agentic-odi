@@ -311,6 +311,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Playwright, Chromatic, and the Tauri CLI are optional tooling (#752);
+      # `npm ci` no longer pulls them. This installs exactly what the job needs
+      # without rewriting package.json or the lockfile.
+      - name: Install optional test tooling
+        run: npm run tooling:install
+
       - name: Lint
         run: npm run lint
 
@@ -356,6 +362,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Playwright, Chromatic, and the Tauri CLI are optional tooling (#752);
+      # `npm ci` no longer pulls them. This installs exactly what the job needs
+      # without rewriting package.json or the lockfile.
+      - name: Install optional test tooling
+        run: npm run tooling:install
 
       - name: Build the Studio
         run: npm run build
@@ -406,6 +418,10 @@ jobs:
       - name: Install dependencies
         working-directory: apps/studio
         run: npm ci
+
+      - name: Install optional test tooling
+        working-directory: apps/studio
+        run: npm run tooling:install
 
       - name: Build the Studio
         working-directory: apps/studio
@@ -489,6 +505,10 @@ jobs:
         run: npm ci
         working-directory: apps/studio
 
+      - name: Install optional test tooling
+        run: npm run tooling:install
+        working-directory: apps/studio
+
       # Dependabot PRs cannot read repository secrets, so the signing key is
       # empty there. Export it only when present and disable updater artifacts
       # otherwise; passing an empty key makes the bundler try (and fail) to
@@ -556,6 +576,12 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+        working-directory: apps/studio
+
+      # `scripts/verify-desktop-update.sh` shells out to `npx tauri`, which is
+      # optional tooling (#752); `npm ci` no longer pulls it.
+      - name: Install optional test tooling
+        run: npm run tooling:install
         working-directory: apps/studio
 
       - name: Prove the updater end to end
