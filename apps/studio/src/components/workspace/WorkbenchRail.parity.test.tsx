@@ -69,7 +69,7 @@ function evidenceRecords(count: number): Evidence[] {
 /** The number the map prints for a destination, exactly as a person reads it. */
 function mapCount(id: string): string {
   const row = screen
-    .getByRole("navigation", { name: "Studio" })
+    .getByRole("navigation", { name: "Your work" })
     .querySelector<HTMLButtonElement>(`[data-panel="${id}"]`);
   return row?.querySelector(".rail__count")?.textContent ?? "";
 }
