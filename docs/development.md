@@ -388,18 +388,31 @@ or `needs human review` cancels auto-merge and a comment explains why.
 
 ### Branch protection (enforced on `main`)
 
-Labeling is advisory; branch protection makes it enforceable. The
-`main-requires-ci-green` ruleset on branch `main` must require all three:
+A label is advisory; a status check is not. The `main-requires-ci-green`
+ruleset on `main` requires these checks, and nothing can bypass them:
 
 | Check / requirement | Purpose |
 |---------------------|---------|
 | `CI green` status check | Full CI matrix passes |
 | `PR guardrails` status check | Diff-shape, body-truth, and fabrication gates pass |
-| Label: `ai-merge-safe` | PR is non-disruptive and non-sensitive |
 
-This is a GitHub Settings change (Settings → Branches → branch protection
-rules); it cannot be enforced from repo files. See [issue #956](https://github.com/alehar9320/agentic-odi/issues/956)
-for the tracking issue and the exact rule to configure.
+The `protect-main` ruleset adds the branch-level rules: no deletion, no
+non-fast-forward push, and every change arrives through a pull request.
+
+A ruleset cannot require a *label* — its rule types are checks, reviews, and push
+rules, not labels — so `ai-merge-safe` is enforced one step later, by the merge
+path: gate 1 of `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized`
+without it, and `pr-ai-merge-act.yml` arms auto-merge only on that label. A pull
+request can therefore satisfy both checks and still not be auto-merged; what stops
+it is the missing label and the `do-not-merge` / `needs human review` labels, not
+GitHub settings.
+
+Rulesets are repository settings, not files, so this cannot be enforced from the
+checkout. `tests/test_adr_index.py` checks the names the documents claim against
+the job names in `.github/workflows/ci.yml` and
+`.github/workflows/pr-guardrails.yml`, so a renamed job fails on the pull request
+that renamed it. See [ADR 0007](architecture/adr/0007-branch-protection-enforces-checks-not-labels.md)
+for the decision and the deferred `label gate` check.
 
 ## Testing
 
