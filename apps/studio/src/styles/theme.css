@@ -716,7 +716,7 @@ a {
   padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--surface);
   color: var(--muted);
   font-size: 0.775rem;
   cursor: pointer;
@@ -926,6 +926,21 @@ a {
 @media (max-width: 640px) {
   .composer__input {
     font-size: 16px;
+  }
+}
+
+/* On a phone the starter pills stack in one full-width column so nothing
+   wraps or overflows past the screen edge. */
+@media (max-width: 390px) {
+  .composer__pills {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .suggestion {
+    flex: 1 1 100%;
+    max-width: none;
+    width: 100%;
   }
 }
 
