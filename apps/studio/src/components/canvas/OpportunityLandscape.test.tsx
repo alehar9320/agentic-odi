@@ -632,7 +632,9 @@ describe("OpportunityLandscape score rendering", () => {
     fireEvent.click(screen.getByText("📋 Table View"));
 
     const row = screen.getByRole("row", { name: /minimize unanswered support tickets/i });
-    expect(within(row).getByText("—")).toBeInTheDocument();
+    // Both the Opp. Score and the Backed by columns say — for an unscored row;
+    // neither invents a zero or a confidence level.
+    expect(within(row).getAllByText("—")).toHaveLength(2);
     expect(within(row).getByText("Not scored")).toBeInTheDocument();
   });
 
@@ -659,6 +661,47 @@ describe("OpportunityLandscape score rendering", () => {
     expect(within(rows[2]).getByText("Not scored")).toBeInTheDocument();
     expect(within(rows[0]).getByText("16.0")).toBeInTheDocument();
     expect(within(rows[0]).getByText("UNDERSERVED")).toBeInTheDocument();
+  });
+
+  it("backs each scored row with the same confidence reading the card shows", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        ...mockCanvasData,
+        outcomes: [
+          {
+            id: "O-VERIFIED",
+            statement: "Verified outcome",
+            importance: 9,
+            satisfaction: 2,
+            opportunity_score: 16,
+            claim_check: {
+              asked: ["How often?"],
+              answers: ["Every week."],
+              skips: [],
+              verified: true,
+            },
+          },
+          {
+            id: "O-GUESSED",
+            statement: "Guessed outcome",
+            importance: 8,
+            satisfaction: 7,
+            opportunity_score: 9,
+          },
+        ],
+      },
+    } as unknown as CanvasState;
+    render(<OpportunityLandscape />);
+    fireEvent.click(screen.getByText("📋 Table View"));
+
+    const verified = screen.getByRole("row", { name: /verified outcome/i });
+    const guessed = screen.getByRole("row", { name: /guessed outcome/i });
+
+    expect(within(verified).getByText("Verified")).toBeInTheDocument();
+    // A bare number is a hypothesis, and the table says so rather than leaving
+    // the column blank or letting it read like the verified row.
+    expect(within(guessed).getByText("Hypothesis")).toBeInTheDocument();
   });
 
   // The matrix draws a point only for an outcome the store actually scored. An

@@ -90,7 +90,8 @@ Releases are cut and published by CI with no approval step:
 1. Conventional commits land on `main`; `release-please` opens or updates the
    release PR.
 2. The `release-please` workflow arms auto-merge on that PR. `main` requires the
-   `CI green` check (ruleset `main-requires-ci-green`), so the PR merges itself
+   `CI green` and `PR guardrails` checks (rulesets `main-requires-ci-green` and
+   `protect-main`), so the PR merges itself
    as soon as CI passes — nobody clicks merge.
 3. The merge cuts tag `vX.Y.Z` and publishes the GitHub Release. The `release`
    and `Tauri Release` workflows attach the CLI archives, `checksums.txt`, the

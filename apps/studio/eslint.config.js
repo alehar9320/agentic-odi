@@ -51,4 +51,16 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // The pre-React bootstraps in `public/` are plain browser scripts the
+    // document loads directly, not modules Vite bundles: they need the browser
+    // globals the TS block gets, and they must stay classic scripts so <head>
+    // runs them before first paint.
+    files: ["public/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "script",
+      globals: { ...globals.browser },
+    },
+  },
 );
