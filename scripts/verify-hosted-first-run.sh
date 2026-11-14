@@ -102,13 +102,18 @@ while true; do
   if [[ "$STATUS" == "200" ]]; then
     break
   fi
-  if ((SECONDS >= deadline)); then
+  if ((SECONDS > deadline)); then
     fail "the deploy identifies itself" \
       "GET /api/deploy answered $STATUS after ${wait_seconds}s of polling (${attempt} attempts)"
     break
   fi
   printf '%s waiting for a deploy to answer (GET /api/deploy -> %s, attempt %d)\n' \
     "$(stamp)" "$STATUS" "$attempt"
+  if ((SECONDS >= deadline)); then
+    fail "the deploy identifies itself" \
+      "GET /api/deploy answered $STATUS after ${wait_seconds}s of polling (${attempt} attempts)"
+    break
+  fi
   sleep "$interval_seconds"
 done
 
