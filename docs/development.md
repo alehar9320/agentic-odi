@@ -153,6 +153,7 @@ the pure count arithmetic:
 | `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface, the decision brief included, with zero violations; contrast is scoped to the token audit and documented there |
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition — a reference that carries a fallback is not caught, so painting is proved by the visual captures |
+| `apps/studio/src/styles/tokens.test.ts` | The typographic and scalar foundation: `--font-display` and its fallback, five or more steps each of the type and spacing scales, the corner and leading scales, the light theme carries no `--font` override, the display face is self-hosted (no CDN) with `font-display: swap`, and `var(--font-display)` is applied at exactly four sites |
 | `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
 | `apps/studio/src/lib/theme.test.ts` | `resolveTheme`: the stored choice wins, the media query answers when nothing is stored, and dark is the last resort |
 | `apps/studio/src/lib/boot.test.ts` | `removeBootShell` clears the shell on mount and is a no-op without one |
@@ -388,18 +389,31 @@ or `needs human review` cancels auto-merge and a comment explains why.
 
 ### Branch protection (enforced on `main`)
 
-Labeling is advisory; branch protection makes it enforceable. The
-`main-requires-ci-green` ruleset on branch `main` must require all three:
+A label is advisory; a status check is not. The `main-requires-ci-green`
+ruleset on `main` requires these checks, and nothing can bypass them:
 
 | Check / requirement | Purpose |
 |---------------------|---------|
 | `CI green` status check | Full CI matrix passes |
 | `PR guardrails` status check | Diff-shape, body-truth, and fabrication gates pass |
-| Label: `ai-merge-safe` | PR is non-disruptive and non-sensitive |
 
-This is a GitHub Settings change (Settings → Branches → branch protection
-rules); it cannot be enforced from repo files. See [issue #956](https://github.com/alehar9320/agentic-odi/issues/956)
-for the tracking issue and the exact rule to configure.
+The `protect-main` ruleset adds the branch-level rules: no deletion, no
+non-fast-forward push, and every change arrives through a pull request.
+
+A ruleset cannot require a *label* — its rule types are checks, reviews, and push
+rules, not labels — so `ai-merge-safe` is enforced one step later, by the merge
+path: gate 1 of `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized`
+without it, and `pr-ai-merge-act.yml` arms auto-merge only on that label. A pull
+request can therefore satisfy both checks and still not be auto-merged; what stops
+it is the missing label and the `do-not-merge` / `needs human review` labels, not
+GitHub settings.
+
+Rulesets are repository settings, not files, so this cannot be enforced from the
+checkout. `tests/test_adr_index.py` checks the names the documents claim against
+the job names in `.github/workflows/ci.yml` and
+`.github/workflows/pr-guardrails.yml`, so a renamed job fails on the pull request
+that renamed it. See [ADR 0007](architecture/adr/0007-branch-protection-enforces-checks-not-labels.md)
+for the decision and the deferred `label gate` check.
 
 ## Testing
 
