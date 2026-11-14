@@ -25,6 +25,7 @@ const harness = vi.hoisted(() => ({
     openSetup: vi.fn(),
     setupOpen: false,
     canvas: null as unknown,
+    displayName: "",
     brief: null as unknown,
     settings: { base_url: "http://llm", api_key: "k", model_name: "m", mcp_url: "http://mcp" },
     mcpReachable: true,
@@ -71,6 +72,8 @@ describe("ChatStage", () => {
   afterEach(() => {
     harness.state.messages = [];
     harness.state.streaming = false;
+    harness.state.brief = null;
+    harness.state.canvas = null;
     vi.restoreAllMocks();
   });
 
@@ -471,5 +474,59 @@ describe("ChatStage", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(harness.state.openPanel).toHaveBeenCalledWith("brief");
+  });
+
+  describe("mainstage title bar (#737)", () => {
+    function renderWithTurn() {
+      harness.state.messages = [
+        { id: "u-1", parentId: null, role: "user", content: "A question" },
+        { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer" },
+      ];
+      return render(
+        <StudioRuntimeProvider>
+          <ChatStage />
+        </StudioRuntimeProvider>,
+      );
+    }
+
+    it("names the inquiry in the bar above the thread", () => {
+      harness.state.brief = { product_name: "Invoice sweep" };
+      const { container } = renderWithTurn();
+
+      expect(screen.getByRole("heading", { name: "Invoice sweep" })).toBeInTheDocument();
+      expect(container.querySelector(".mainstage__bar")).not.toBeNull();
+    });
+
+    it("falls back to the job statement, then to a plain name", () => {
+      harness.state.brief = { job_statement: "Get invoices out the door" };
+      const { unmount } = renderWithTurn();
+      expect(
+        screen.getByRole("heading", { name: "Get invoices out the door" }),
+      ).toBeInTheDocument();
+      unmount();
+
+      harness.state.brief = null;
+      renderWithTurn();
+      expect(screen.getByRole("heading", { name: "This conversation" })).toBeInTheDocument();
+    });
+
+    it("flags a simulated canvas in the bar, not the transcript", () => {
+      harness.state.brief = { product_name: "Invoice sweep" };
+      harness.state.canvas = { source: "seed", jobs: [], outcomes: [] };
+      const { container } = renderWithTurn();
+
+      const chip = container.querySelector(".mainstage__provenance");
+      expect(chip).not.toBeNull();
+      expect(chip?.textContent).toBe("DEMO");
+      expect(container.querySelector(".conversation .mainstage__provenance")).toBeNull();
+    });
+
+    it("shows no provenance chip when the canvas is the person's own", () => {
+      harness.state.brief = { product_name: "Invoice sweep" };
+      harness.state.canvas = null;
+      const { container } = renderWithTurn();
+
+      expect(container.querySelector(".mainstage__provenance")).toBeNull();
+    });
   });
 });

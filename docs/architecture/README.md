@@ -192,11 +192,20 @@ branch is still visible:
 The logic lives in `scripts/pr_guards.py`; the YAML only gathers the diff.
 Unit tests are in `tests/scripts/test_pr_guards.py`.
 
-Repository ruleset `main-requires-ci-green` (id `25356329`) requires both
-`CI green` and `PR guardrails`, sets
-`strict_required_status_checks_policy: true`, and keeps the admin bypass only
-for pull requests (`bypass_mode: pull_request`). Rulesets are repository
-settings, not files; change them with `gh api` and record it here.
+Repository rulesets `main-requires-ci-green` (id `25356329`) and `protect-main`
+(id `25656413`) both target `~DEFAULT_BRANCH`, are `active`, and set
+`current_user_can_bypass: never`. The first requires the `CI green` and
+`PR guardrails` status checks (`strict_required_status_checks_policy: false`,
+`do_not_enforce_on_create: false`); the second adds `deletion`,
+`non_fast_forward`, and `pull_request` with `required_approving_review_count: 0`
+and `require_extra_approval_for_unattributed_changes: true`. A ruleset cannot
+require a label, so `ai-merge-safe` is a gate of the merge path, not of
+`main`: `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized` without it.
+Rulesets are repository settings, not files; change them with `gh api` and record
+the decision in
+[ADR 0007](adr/0007-branch-protection-enforces-checks-not-labels.md). The names
+these documents claim are checked against the workflow job names by
+`tests/test_adr_index.py`.
 
 ## Documents
 
