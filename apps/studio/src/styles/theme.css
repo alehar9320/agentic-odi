@@ -1,5 +1,24 @@
 @import "./print.css";
 
+/* The Studio's display face, self-hosted so the shell opens with no network
+   (see #545) and the Tauri build works offline. Source Serif 4, SIL OFL 1.1;
+   the licence sits beside the files in public/fonts/. */
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-latin-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-latin-600.woff2") format("woff2");
+}
+
 :root {
   color-scheme: dark;
   --bg: #0a0b0e;
@@ -18,6 +37,43 @@
   --surface-hover: rgba(255, 255, 255, 0.06);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  /* The display voice: the self-hosted serif plus a system-serif fallback, so a
+     heading keeps its weight before the face loads and when it never does. */
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", Times, serif;
+
+  /* One type scale. Existing declarations keep their literal sizes until a
+     later, separately-labelled pass adopts these names component by component. */
+  --text-2xs: 0.64rem;
+  --text-xs: 0.72rem;
+  --text-sm: 0.78rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.15rem;
+  --text-2xl: 1.4rem;
+  --text-3xl: 1.8rem;
+  --text-4xl: 2.25rem;
+
+  /* One spacing scale, on a 4px grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* One corner scale, replacing the 23 one-off radii as rules adopt it. */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* One leading scale. */
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
 
   /* Canvas components were written against the original palette; the aliases
      keep them on the live tokens so both themes stay in step. */
@@ -610,6 +666,7 @@ a {
   margin: 0;
   min-height: 2.34em;
   max-width: 24ch;
+  font-family: var(--font-display);
   font-size: clamp(1.55rem, 3.4vw, 2.25rem);
   font-weight: 600;
   line-height: 1.17;
@@ -2010,8 +2067,8 @@ a {
   font-weight: 600;
 }
 
-/* The interview behind the number. Verified reads as settled; an unverified
-   score is dashed and amber, so a guess never borrows a measured claim's look. */
+/* The interview behind the number. Verified reads as settled; a hypothesis is
+   dashed and amber, so a guess never borrows a measured claim's look. */
 .claim-check {
   margin: 0 0 8px;
   padding-left: 10px;
@@ -2021,20 +2078,13 @@ a {
   line-height: 1.45;
 }
 
-.claim-check--unverified {
+.claim-check--hypothesis,
+.claim-check--partial {
   border-left-style: dashed;
 }
 
 .claim-check__head {
   margin: 0 0 4px;
-}
-
-.claim-check__head b {
-  color: var(--muted);
-}
-
-.claim-check--unverified .claim-check__head b {
-  color: var(--amber);
 }
 
 .claim-check__list {
@@ -2098,6 +2148,22 @@ a {
   border-color: rgba(139, 140, 248, 0.3);
   background: rgba(99, 102, 241, 0.12);
   color: var(--accent);
+}
+
+/* A badge that is also a control: it reveals the evidence behind a score, so
+   it must read as pressable without losing the badge's shape. */
+.badge--button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.badge--button:hover {
+  filter: brightness(1.15);
+}
+
+.badge--button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* Job map */
@@ -3749,6 +3815,7 @@ html.theme-fading *::after {
 
 .ui-stat__value {
   margin-top: 3px;
+  font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -4776,6 +4843,7 @@ details[open] summary {
 
 .brand__wordmark {
   color: var(--muted);
+  font-family: var(--font-display);
   font-size: 0.88rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -5000,6 +5068,7 @@ details[open] summary {
 
 .lens__title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -5137,6 +5206,29 @@ details[open] summary {
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* What a note is about: the parent record, its id, and its title. */
+.memory-item__subject {
+  margin: 2px 0 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  text-align: left;
+  background: none;
+  border: none;
+}
+
+.memory-item__subject--link {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.memory-item__subject--link:hover {
+  color: var(--text);
 }
 
 .memory-item__text {
@@ -5580,6 +5672,7 @@ details[open] summary {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
+  min-height: 44px;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
   background: var(--surface);
@@ -5603,6 +5696,116 @@ details[open] summary {
 .approval__deny:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.approval__consequence {
+  margin: -4px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.approval__arguments {
+  margin: 0 0 10px;
+}
+
+.approval__argument-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  /* Six rows is what fits without pushing the buttons out of reach; past that
+     the list scrolls rather than hiding an argument the person is approving. */
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.approval__argument {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.4fr) 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+
+.approval__argument-key {
+  color: var(--muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+}
+
+.approval__argument-value {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.approval__raw-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.approval__raw-toggle:hover {
+  color: var(--text);
+}
+
+.approval__raw-chevron {
+  transition: transform var(--motion-fast) ease;
+}
+
+.approval__raw-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.approval__raw {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approval__reason {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+
+.approval__reason-label {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.approval__reason-input {
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.approval__reason-count {
+  align-self: flex-end;
+  color: var(--faint);
+  font-size: 11.5px;
 }
 
 .branch-picker {
@@ -7261,4 +7464,49 @@ input,
 textarea,
 [contenteditable="true"] {
   caret-color: var(--accent);
+}
+
+/* The calls a turn is waiting on (issue #390). A summary, not a second
+   transcript: it sits below the last message and carries only what is still in
+   flight, in the transcript's own row anatomy. */
+.pending-calls {
+  margin: 2px 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.pending-calls__head {
+  margin: 0 0 4px;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.pending-calls__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pending-calls__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pending-calls__state {
+  color: var(--faint);
+  opacity: 0.85;
+}
+
+.pending-calls__elapsed {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.pending-calls__prompt {
+  color: var(--muted);
+  font-size: 12.5px;
 }

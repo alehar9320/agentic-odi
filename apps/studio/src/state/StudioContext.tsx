@@ -174,6 +174,10 @@ export function turnsToMessages(
         parentId: node.parent_id,
         role: node.role,
         content,
+        // A restored turn carries the moment it was written, so the transcript
+        // dates a record rather than guessing one. Absent when the stored turn
+        // has no time, and the transcript then shows no clock at all (#737).
+        ...(node.created_at ? { createdAt: node.created_at } : {}),
         parts: claims.length
           ? [{ kind: "claims" as const, content, claims }]
           : content
@@ -228,6 +232,15 @@ function readClaims(raw: unknown): Claim[] {
     });
   }
   return claims;
+}
+
+/**
+ * Whether an SSE `approval` frame carried usable arguments. The gate shows
+ * them as given; a malformed payload is dropped rather than rendered as
+ * machine text, and the card falls back to the tool name alone.
+ */
+function isArguments(raw: unknown): raw is Record<string, unknown> {
+  return raw !== null && typeof raw === "object" && !Array.isArray(raw);
 }
 
 /** Read the failure the sidecar reported on an SSE `error` event. */
@@ -1873,7 +1886,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           toolSeq += 1;
           parts = [
             ...parts,
-            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status },
+            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status, startedAt: Date.now() },
           ];
           return;
         }
@@ -1882,6 +1895,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
             ...open,
             status,
             ...(preview ? { preview } : {}),
+            // The call settled, so the pending row stops counting: the start is
+            // dropped with the status it belonged to.
+            startedAt: undefined,
             // A result means the gate was answered; the question is spent.
             approval: undefined,
           };
@@ -1963,9 +1979,13 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
                 id: String(event.data.tool_call_id ?? `approval-${approvalId}`),
                 name: String(event.data.name ?? ""),
                 status: "running",
+                startedAt: Date.now(),
                 approval: {
                   id: approvalId,
                   prompt: String(event.data.prompt ?? "Allow this change?"),
+                  ...(isArguments(event.data.arguments)
+                    ? { arguments: event.data.arguments }
+                    : {}),
                 },
               },
             ];
