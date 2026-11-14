@@ -5689,7 +5689,7 @@ details[open] summary {
 }
 
 .approval__raw-chevron {
-  transition: transform 120ms ease;
+  transition: transform var(--motion-fast) ease;
 }
 
 .approval__raw-chevron.is-open {
