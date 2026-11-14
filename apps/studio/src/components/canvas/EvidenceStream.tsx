@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 
 import { asStudioError } from "../../api/studioApi";
 import { focusLastClaimChip } from "../../assistant/claims";
-import { savedCopyCaption } from "../../lib/canvasProvenance";
+import { keptByBrowserCaption, savedCopyCaption } from "../../lib/canvasProvenance";
 import { formatOpportunityScore, opportunityPill } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Evidence, StudioError } from "../../types";
@@ -70,6 +70,7 @@ export function EvidenceStream() {
   // failed one they are the previous copy, and the caption says so rather than
   // letting them read as freshly confirmed.
   const savedCaption = canvasCached ? savedCopyCaption(canvasState.data) : null;
+  const keptCaption = keptByBrowserCaption(canvasState.data);
 
   const outcomes = useMemo(() => canvasState.data?.outcomes ?? [], [canvasState.data]);
   const outcomeMap = useMemo(
@@ -238,6 +239,11 @@ export function EvidenceStream() {
       {savedCaption ? (
         <p className="canvas-saved" role="status">
           {savedCaption}
+        </p>
+      ) : null}
+      {keptCaption ? (
+        <p className="canvas-saved" role="status">
+          {keptCaption}
         </p>
       ) : null}
 

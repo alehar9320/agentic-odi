@@ -226,7 +226,15 @@ agentic-odi evidence delete <evidence-id> --yes
 # Promote into the ODI model
 agentic-odi evidence promote <evidence-id> --to job
 agentic-odi evidence promote <evidence-id> --to outcome --job-id <job-id>
+
+# Promote a quote a second time on purpose
+agentic-odi evidence promote <evidence-id> --to outcome --job-id <job-id> --force
 ```
+
+A quote promotes at most once. Re-importing the same quote, or promoting it
+twice, links to the outcome the first promotion created instead of adding a
+second opportunity the landscape would count as independent demand. Pass
+`--force` to promote it again deliberately.
 
 `--file` reads `.txt`, `.md`, `.markdown`, `.vtt`, and `.srt`, and takes exactly
 one of `--content` or `--file`. A file longer than 20,000 characters is truncated

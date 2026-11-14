@@ -119,6 +119,69 @@ def test_recommended_presets_are_marked() -> None:
     assert {"notion", "posthog", "exa", "linear", "github"} <= recommended
 
 
+def test_composio_preset_is_optional_and_oauth() -> None:
+    preset = get_preset("composio")
+
+    assert preset.label == "Composio"
+    assert preset.area == "strategy-alignment"
+    assert preset.url == "https://connect.composio.dev/mcp"
+    assert preset.auth == "oauth"
+    assert preset.env_vars == []
+    assert preset.headers == {}
+    assert preset.is_recommended is False
+    assert preset.docs.startswith("https://")
+
+
+def test_composio_config_can_be_added_without_blocking_others(tmp_path: Path) -> None:
+    """A composio entry must not prevent other connectors from being registered."""
+    registry = ConnectorRegistry(tmp_path / "connectors.json")
+
+    registry.add(connector_config_from_preset(get_preset("notion")))
+    registry.add(connector_config_from_preset(get_preset("composio")))
+
+    names = {config.name for config in registry.list_all()}
+    assert {"notion", "composio"} <= names
+
+
+def test_composio_health_failure_does_not_block_other_connectors(tmp_path: Path) -> None:
+    """Health is per-connector: a down composio connector must not hide the rest."""
+    import asyncio
+
+    from agentic_odi_connectors.factory import build_connector
+    from agentic_odi_connectors.protocol import HealthStatus
+
+    class _Broken:
+        async def health(self) -> HealthStatus:
+            return HealthStatus(ok=False, message="unreachable: composio down")
+
+    class _Healthy:
+        async def health(self) -> HealthStatus:
+            return HealthStatus(ok=True, message="ok")
+
+    real_build = build_connector
+
+    def fake_build(config):
+        if config.name == "composio":
+            return _Broken()
+        if config.name == "notion":
+            return _Healthy()
+        return real_build(config)
+
+    registry = ConnectorRegistry(tmp_path / "connectors.json")
+    registry.add(connector_config_from_preset(get_preset("composio")))
+    registry.add(connector_config_from_preset(get_preset("notion")))
+
+    statuses = []
+    for item in registry.list_all():
+        connector = fake_build(item)
+        statuses.append((item.name, asyncio.run(connector.health())))
+
+    composio_status = next(s for n, s in statuses if n == "composio")
+    notion_status = next(s for n, s in statuses if n == "notion")
+    assert composio_status.ok is False
+    assert notion_status.ok is True
+
+
 def test_list_presets_recommended_filter_returns_subset() -> None:
     full = list_presets()
     rec = list_presets(recommended=True)

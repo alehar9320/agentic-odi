@@ -14,6 +14,7 @@
   <meta property="og:description" content="{% block og_description %}{{ page.description }}{% endblock %}">
   <meta property="og:url" content="{{ pages_url }}{{ page.path if page.path != 'index.html' else '' }}">
   <meta property="og:image" content="{{ pages_url }}assets/og.png">
+  <meta property="og:image:alt" content="{% block og_image_alt %}{{ page.title }} — {{ site_name }}{% endblock %}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{% block twitter_title %}{{ page.title }}{% endblock %}">
   <meta name="twitter:description" content="{% block twitter_description %}{{ page.description }}{% endblock %}">
