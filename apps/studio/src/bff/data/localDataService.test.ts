@@ -135,6 +135,9 @@ describe("row provenance", () => {
 
     expect(canvas.jobs[0].origin).toBe("demo");
     expect(canvas.steps[0].origin).toBe("user");
+  });
+});
+
 describe("evidence", () => {
   it("stores a capture and returns it on the canvas", async () => {
     const store = makeStore();

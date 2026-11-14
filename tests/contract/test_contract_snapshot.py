@@ -537,6 +537,7 @@ def _declared_pin() -> Snapshot:
                     "name",
                     "importance",
                     "satisfaction",
+                    "force",
                 ],
                 "required": ["evidence_id", "target"],
                 "returns": "The created Job or Outcome.",
@@ -1063,6 +1064,7 @@ def _live_pin() -> Snapshot:
                 "additionalProperties": False,
                 "properties": {
                     "evidence_id": {"type": "string"},
+                    "force": {"default": False, "type": "boolean"},
                     "importance": {
                         "anyOf": [{"type": "number"}, {"type": "null"}],
                         "default": None,
