@@ -546,7 +546,9 @@ def count_tests_added(added_lines: Sequence[tuple[str, int, str]]) -> int:
 def _git(*args: str) -> str:
     import subprocess
 
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout
+    return subprocess.run(
+        ["git", *args], capture_output=True, text=True, errors="replace", check=True
+    ).stdout
 
 
 def _release_lookup(base_ref: str) -> ReleaseLookup:
