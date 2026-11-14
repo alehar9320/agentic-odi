@@ -673,7 +673,7 @@ class LocalBackend(Backend):
         from agentic_odi_core import JobNotFoundError, job_not_found
         from agentic_odi_core.transcript import TranscriptFormatError
 
-        display = args.get("display_name") or args.get("filename") or "stdin"
+        display = args.get("filename") or "stdin"
         try:
             interview, quotes = self.service.import_transcript(
                 args["text"],
