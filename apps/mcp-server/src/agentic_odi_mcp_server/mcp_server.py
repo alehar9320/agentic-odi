@@ -660,6 +660,7 @@ def promote_evidence(
     name: str | None = None,
     importance: float | None = None,
     satisfaction: float | None = None,
+    force: bool = False,
 ) -> str:
     try:
         artifact = service.promote_evidence(
@@ -670,6 +671,7 @@ def promote_evidence(
             name=name,
             importance=importance,
             satisfaction=satisfaction,
+            force=force,
         )
     except EvidenceNotFoundError as exc:
         return _evidence_not_found(evidence_id, exc.hint)
