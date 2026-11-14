@@ -32,6 +32,18 @@ describe("resolveNativeModel", () => {
     stubLanguageModel({ create: vi.fn() });
     expect(resolveNativeModel()).toBeNull();
   });
+
+  it("accepts the Web IDL interface object, which is a function", () => {
+    // `LanguageModel` carries static `availability()`/`create()` on the interface
+    // object itself, and a Web IDL interface object is a function. A guard that
+    // only accepted plain objects would make the tier dead on real browsers.
+    const interfaceObject = Object.assign(function LanguageModel() {}, {
+      availability: vi.fn(async () => "available"),
+      create: vi.fn(),
+    });
+    vi.stubGlobal("LanguageModel", interfaceObject);
+    expect(resolveNativeModel()).not.toBeNull();
+  });
 });
 
 describe("NativeModelAdapter availability", () => {
@@ -68,6 +80,29 @@ describe("NativeModelAdapter availability", () => {
 describe("NativeModelAdapter session", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("installs the system prompt and the thread's history through initialPrompts", async () => {
+    const create = vi.fn(async (options?: Record<string, unknown>) => {
+      void options;
+      return { prompt: vi.fn(async () => "ok"), destroy: vi.fn() };
+    });
+    stubLanguageModel({ availability: vi.fn(async () => "available"), create });
+
+    await resolveNativeModel()!.create({
+      system: "You cannot change the canvas.",
+      history: [{ role: "user", content: "suggest three outcomes" }],
+    });
+
+    const options = create.mock.calls[0][0];
+    expect(options).toMatchObject({
+      initialPrompts: [
+        { role: "system", content: "You cannot change the canvas." },
+        { role: "user", content: "suggest three outcomes" },
+      ],
+    });
+    // The browser reads no `system` option; sending one silently drops the guardrail.
+    expect(options).not.toHaveProperty("system");
   });
 
   it("yields from promptStreaming when the session has it", async () => {

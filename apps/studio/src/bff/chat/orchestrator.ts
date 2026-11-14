@@ -21,23 +21,23 @@ import {
 
 type Provider = "endpoint" | "browser-native" | "deterministic";
 
+/** The prefixes the responder itself performs, whatever model is available. */
+const DETERMINISTIC_PREFIX = /^(add job|add outcome|remember)\b/;
+
+/** A board request is a verb and its object, not the word "board" anywhere. */
+const BOARD_COMMAND = /^(render|show)\b[^.!?]*\b(board|canvas)\b/;
+
 /**
- * The phrases the assistant performs itself, whatever model is available.
+ * Whether a turn is a command the assistant performs itself.
  *
- * These four prefixes are the deterministic surface: "add job", "add outcome",
- * "remember", and the render/show family. They run before any model is consulted,
- * so a browser-only turn still creates a job even when a native model is ready.
+ * These run before any model is consulted, so a browser-only turn still creates a
+ * job even when a native model is ready. The match stays narrow on purpose: a
+ * question that happens to contain "board" or "show" ("How do I onboard
+ * customers?") is prose and belongs to whichever model can answer it.
  */
 export function isDeterministicCommand(message: string): boolean {
   const lower = message.trim().toLowerCase();
-  return (
-    lower.startsWith("add job") ||
-    lower.startsWith("add outcome") ||
-    lower.startsWith("remember") ||
-    lower.includes("render") ||
-    lower.includes("board") ||
-    lower.includes("show")
-  );
+  return DETERMINISTIC_PREFIX.test(lower) || BOARD_COMMAND.test(lower);
 }
 
 const TOOLS = [
@@ -287,7 +287,7 @@ export class ChatOrchestrator {
     if (provider === "endpoint") {
       await this.streamEndpoint(request, conversation, onEvent, signal);
     } else if (provider === "browser-native") {
-      await this.streamNative(userMessage, conversation, onEvent, signal);
+      await this.streamNative(request, conversation, onEvent, signal);
     } else {
       await this.streamDeterministic(userMessage, onEvent);
     }
@@ -325,16 +325,31 @@ export class ChatOrchestrator {
    * rules.
    */
   private async streamNative(
-    userMessage: ChatMessage | undefined,
+    request: ChatStreamRequest,
     conversation: StoredConversationLike,
     onEvent: (event: RawSseEvent) => void,
     signal?: AbortSignal,
   ): Promise<void> {
     const adapter = this.nativeModel;
+    const messages = request.messages;
+    const lastMessage = messages[messages.length - 1];
+    const userMessage =
+      lastMessage && lastMessage.role === "user" ? lastMessage : undefined;
     if (!adapter) {
       await this.streamDeterministic(userMessage, onEvent);
       return;
     }
+    // The browser model keeps nothing between sessions, so a follow-up ("make
+    // the second one shorter") only makes sense with the thread attached. Notices
+    // are UI furniture, not conversation.
+    const history = messages
+      .slice(0, -1)
+      .filter(
+        (message): message is ChatMessage & { role: "user" | "assistant" } =>
+          message.role === "user" || message.role === "assistant",
+      )
+      .slice(-10)
+      .map((message) => ({ role: message.role, content: message.content }));
 
     let session: NativeModelSession | null = null;
     const collected: string[] = [];
@@ -347,6 +362,7 @@ export class ChatOrchestrator {
           "changed, tell them to use a command like “add job <name>”, " +
           "“add outcome <statement> importance N satisfaction N”, “remember <note>”, " +
           "or “render the opportunity board”.",
+        history,
         signal,
       });
       const text = userMessage ? userMessage.content : "";
@@ -378,7 +394,9 @@ export class ChatOrchestrator {
     }
 
     const assistantTurn = collected.join("");
-    const assistantId = crypto.randomUUID();
+    // The caller named the reply it is streaming; persist that id, or the next
+    // turn's parent points at a turn this conversation does not hold.
+    const assistantId = request.assistant_id ?? crypto.randomUUID();
     const userMessageId = userMessage?.id ?? null;
     await this.memory.appendTurn(
       conversation.id,

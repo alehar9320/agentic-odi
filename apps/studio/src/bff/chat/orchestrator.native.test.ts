@@ -73,6 +73,15 @@ describe("isDeterministicCommand", () => {
     expect(isDeterministicCommand("show me the board")).toBe(true);
     expect(isDeterministicCommand("how do I frame an outcome?")).toBe(false);
   });
+
+  it("leaves ordinary prose to a model, whatever words it contains", () => {
+    // "board" inside "onboard" and "show" inside a question are not commands;
+    // sending them to the responder would bypass a configured endpoint or the
+    // browser model entirely.
+    expect(isDeterministicCommand("How do I onboard customers?")).toBe(false);
+    expect(isDeterministicCommand("show me a summary of my jobs")).toBe(false);
+    expect(isDeterministicCommand("what should I show the board next? no -- say more")).toBe(false);
+  });
 });
 
 describe("ChatOrchestrator browser-native provider", () => {
@@ -208,6 +217,49 @@ describe("ChatOrchestrator browser-native provider", () => {
     expect(messages(events).some((content) => content.includes("Onboard customers"))).toBe(true);
     const canvas = await data.fetchCanvas();
     expect(canvas.jobs.map((job) => job.name)).toContain("Onboard customers");
+  });
+
+  it("hands the thread's earlier turns to the new session", async () => {
+    const native = fakeNative();
+    const { orchestrator } = makeBff(native);
+    const { onEvent } = collectEvents();
+
+    await orchestrator.stream(
+      {
+        ...browserOnlyRequest("make the second one shorter", "u-2"),
+        messages: [
+          { id: "u-1", parentId: null, role: "user", content: "suggest three outcomes" },
+          { id: "a-1", parentId: "u-1", role: "assistant", content: "one, two, three" },
+          lastUserMessage("make the second one shorter", "u-2"),
+        ],
+      },
+      onEvent,
+    );
+
+    expect(native.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        history: [
+          { role: "user", content: "suggest three outcomes" },
+          { role: "assistant", content: "one, two, three" },
+        ],
+      }),
+    );
+  });
+
+  it("persists the reply under the id the caller is streaming", async () => {
+    const native = fakeNative();
+    const { orchestrator, memory } = makeBff(native);
+    const { onEvent } = collectEvents();
+
+    await orchestrator.stream(
+      { ...browserOnlyRequest("how do I frame an outcome?"), assistant_id: "a-42" },
+      onEvent,
+    );
+
+    const { turns } = await memory.latestConversation();
+    expect(
+      turns.some((turn) => turn.message_id === "a-42" && turn.content === "native prose"),
+    ).toBe(true);
   });
 
   it("stays deterministic when the browser has no model at all", async () => {

@@ -6,7 +6,7 @@ import {
   isPrivateHost,
 } from "../../lib/modelEndpoint";
 import type { StudioConfig } from "../../types";
-import { isBrowserModelPresent } from "../chat/nativeModel";
+import { resolveNativeModel } from "../chat/nativeModel";
 
 export type CapabilityId =
   | "local-data"
@@ -91,10 +91,28 @@ const localStatuses: Record<CapabilityId, Capability> = {
   },
 };
 
-function isBrowserModelAvailable(): boolean {
-  // One check, shared with the orchestrator's browser-native provider, so the
-  // status the person reads and the provider the turn uses never disagree.
-  return isBrowserModelPresent();
+/**
+ * What the person reads has to match what a turn will actually do, so this asks
+ * the same adapter the orchestrator does, and asks about readiness rather than
+ * the mere presence of the API: a model that is on the device but not downloaded
+ * is a setup state, not a provider.
+ */
+async function browserModelStatus(): Promise<{ ok: boolean; reason?: string }> {
+  const adapter = resolveNativeModel();
+  if (!adapter) {
+    return { ok: false };
+  }
+  const availability = await adapter.availability();
+  if (availability === "available") {
+    return { ok: true };
+  }
+  if (availability === "downloadable") {
+    return {
+      ok: false,
+      reason: "The browser's model is on this device but has not been downloaded yet.",
+    };
+  }
+  return { ok: false };
 }
 
 /** Probe a same-origin sidecar route. In the browser this is the Worker
@@ -130,7 +148,7 @@ export class CapabilityRegistry {
       id: "browser-model",
       label: localStatuses["browser-model"].label,
       description: localStatuses["browser-model"].description,
-      check: async () => ({ ok: isBrowserModelAvailable() }),
+      check: () => browserModelStatus(),
     },
     {
       id: "endpoint-model",

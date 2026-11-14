@@ -19,9 +19,18 @@ export interface BrowserLanguageModelSession {
   destroy?(): void;
 }
 
+/** One turn of context, in the shape the browser's model understands. */
+export interface BrowserLanguageModelPrompt {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
 export interface BrowserLanguageModelApi {
   availability(options?: unknown): Promise<string> | string;
-  create(options?: { system?: string; signal?: AbortSignal }): Promise<BrowserLanguageModelSession>;
+  create(options?: {
+    initialPrompts?: BrowserLanguageModelPrompt[];
+    signal?: AbortSignal;
+  }): Promise<BrowserLanguageModelSession>;
 }
 
 /** One open model session. */
@@ -32,7 +41,12 @@ export interface NativeModelSession {
 
 export interface NativeModelAdapter {
   availability(): Promise<NativeAvailability>;
-  create(options: { system: string; signal?: AbortSignal }): Promise<NativeModelSession>;
+  create(options: {
+    system: string;
+    /** Earlier turns, so a follow-up has something to refer to. */
+    history?: BrowserLanguageModelPrompt[];
+    signal?: AbortSignal;
+  }): Promise<NativeModelSession>;
 }
 
 function abortError(): Error {
@@ -45,7 +59,10 @@ function abortError(): Error {
 }
 
 function isApi(value: unknown): value is BrowserLanguageModelApi {
-  if (!value || typeof value !== "object") {
+  // `LanguageModel` is a Web IDL interface object: a *function* carrying static
+  // `availability()` and `create()`. Rejecting anything that is not a plain
+  // object would make the whole tier dead on the browsers that ship it.
+  if (!value || (typeof value !== "object" && typeof value !== "function")) {
     return false;
   }
   const candidate = value as { availability?: unknown; create?: unknown };
@@ -76,11 +93,6 @@ export function browserModelApi(
   return null;
 }
 
-/** Whether the browser exposes a model at all, whatever its readiness. */
-export function isBrowserModelPresent(scope: typeof globalThis = globalThis): boolean {
-  return browserModelApi(scope) !== null;
-}
-
 /**
  * The first usable browser model, or nothing.
  *
@@ -105,8 +117,14 @@ function wrapApi(api: BrowserLanguageModelApi): NativeModelAdapter {
         return "unavailable";
       }
     },
-    async create({ system, signal }) {
-      const session = await api.create({ system, signal });
+    async create({ system, history, signal }) {
+      // The browser installs instructions through `initialPrompts`, not a `system`
+      // option — anything else is silently dropped, guardrail included. The
+      // thread's earlier turns ride along so a follow-up still has context.
+      const session = await api.create({
+        initialPrompts: [{ role: "system", content: system }, ...(history ?? [])],
+        signal,
+      });
       return wrapSession(session);
     },
   };
