@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The browser BFF is the first-run answer path, and it lives in IndexedDB.
 import "fake-indexeddb/auto";
 
-import { SESSION_KEY } from "../lib/session";
+import { CONVERSATION_KEY, SESSION_KEY } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
 import { getStudioBff } from "../bff/index";
 import {
@@ -83,6 +83,8 @@ let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
 let conversationCreates = 0;
+let activeConversationPreference: string | null = null;
+let latestConversationFetches = 0;
 /** When true, the canvas/evidence write routes answer 503 with no structured error. */
 let writeFails = false;
 
@@ -262,7 +264,14 @@ function route(
   if (url === "/api/memory/observations") {
     return json({ observations: [OBSERVATION] });
   }
+  if (url === "/api/session/conversation") {
+    if (init?.method === "PUT") {
+      activeConversationPreference = (JSON.parse(String(init.body)) as { conversation_id: string | null }).conversation_id;
+    }
+    return json({ conversation_id: activeConversationPreference });
+  }
   if (url === "/api/conversations/latest") {
+    latestConversationFetches += 1;
     return json({
       conversation: CONVERSATION,
       turns: [
@@ -291,7 +300,13 @@ function route(
     headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
     return json({ conversation: CONVERSATION });
   }
-  if (url === "/api/conversations/c-1/tree") {
+  if (url.startsWith("/api/conversations/") && url.endsWith("/tree")) {
+    if (url !== "/api/conversations/c-1/tree") {
+      return new Response(JSON.stringify({ detail: "Conversation not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return json({
       conversation: CONVERSATION,
       messages: [
@@ -375,6 +390,11 @@ function route(
   return json({});
 }
 
+afterEach(() => {
+  activeConversationPreference = null;
+  latestConversationFetches = 0;
+});
+
 describe("StudioContext memory and resume", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -390,6 +410,8 @@ describe("StudioContext memory and resume", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    activeConversationPreference = null;
+    latestConversationFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -413,6 +435,16 @@ describe("StudioContext memory and resume", () => {
     );
 
     expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-9" });
+  });
+
+  it("clears the remembered conversation when the session is cleared", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => result.current.clearFocus());
+
+    await waitFor(() => expect(activeConversationPreference).toBeNull());
+    expect(localStorage.getItem(CONVERSATION_KEY)).toBeNull();
   });
 
   it("remembers the subject the user navigates to", () => {
@@ -578,6 +610,48 @@ describe("StudioContext memory and resume", () => {
     expect(result.current.memory.map((item) => item.text)).toEqual([
       "Accountable for activation.",
     ]);
+  });
+
+  it("restores the stored thread without asking for the latest one", async () => {
+    localStorage.setItem(CONVERSATION_KEY, "c-1");
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "I own activation.",
+      "Tell me more.",
+    ]);
+    expect(latestConversationFetches).toBe(0);
+  });
+
+  it("uses the sidecar preference when browser storage is empty", async () => {
+    activeConversationPreference = "c-1";
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    expect(latestConversationFetches).toBe(0);
+  });
+
+  it("silently falls back when the stored conversation was deleted", async () => {
+    localStorage.setItem(CONVERSATION_KEY, "c-deleted");
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+    expect(latestConversationFetches).toBe(1);
+    await waitFor(() => expect(localStorage.getItem(CONVERSATION_KEY)).toBe("c-1"));
+    expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
+  });
+
+  it("persists the conversation that answered the user's message", async () => {
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("hello");
+    });
+
+    await waitFor(() => expect(localStorage.getItem(CONVERSATION_KEY)).toBe("c-2"));
+    await waitFor(() => expect(activeConversationPreference).toBe("c-2"));
   });
 
   it("loads the history list on boot, newest first", async () => {

@@ -29,6 +29,7 @@ export class MemoryLocalStore implements LocalStore {
   private readonly turns: StoredTurn[] = [];
   private readonly outbox = new Map<string, OutboxRecord>();
   private lease: DrainLease | null = null;
+  private readonly preferences = new Map<string, string>();
 
   // A Map-backed store has no second connection to lose, so it never asks for a
   // reload. The accessors exist to satisfy `LocalStore`.
@@ -36,6 +37,15 @@ export class MemoryLocalStore implements LocalStore {
 
   onVersionChange(): () => void {
     return () => undefined;
+  }
+
+  async getPreference(key: string): Promise<string | null> {
+    return this.preferences.get(key) ?? null;
+  }
+
+  async setPreference(key: string, value: string | null): Promise<void> {
+    if (value === null) this.preferences.delete(key);
+    else this.preferences.set(key, value);
   }
 
   async nextSeq(): Promise<number> {
@@ -337,6 +347,7 @@ export class MemoryLocalStore implements LocalStore {
     this.turns.length = 0;
     this.outbox.clear();
     this.lease = null;
+    this.preferences.clear();
     this.seq = 0;
     this.turnId = 0;
   }

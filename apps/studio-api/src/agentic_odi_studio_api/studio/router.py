@@ -84,6 +84,8 @@ from agentic_odi_studio_api.studio.schemas import (
     ConnectorListItem,
     ConnectorOperationResponse,
     ConversationListResponse,
+    ConversationPreferenceResponse,
+    ConversationPreferenceUpdate,
     ConversationResponse,
     ConversationTreeResponse,
     CreateJobRequest,
@@ -1259,6 +1261,23 @@ def latest_conversation(request: Request) -> LatestConversationResponse:
         conversation=conversation.to_dict(),
         turns=[turn.to_dict() for turn in turns],
     )
+
+
+@router.get("/session/conversation", response_model=ConversationPreferenceResponse)
+def get_active_conversation(request: Request) -> ConversationPreferenceResponse:
+    """Return the active thread remembered by this local Studio sidecar."""
+    return ConversationPreferenceResponse(
+        conversation_id=_memory(request).get_preference("active_conversation_id")
+    )
+
+
+@router.put("/session/conversation", response_model=ConversationPreferenceResponse)
+def put_active_conversation(
+    body: ConversationPreferenceUpdate, request: Request
+) -> ConversationPreferenceResponse:
+    """Remember or clear the active thread for clients of this sidecar."""
+    _memory(request).set_preference("active_conversation_id", body.conversation_id)
+    return ConversationPreferenceResponse(conversation_id=body.conversation_id)
 
 
 @router.get("/conversations", response_model=ConversationListResponse)

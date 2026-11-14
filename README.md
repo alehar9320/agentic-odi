@@ -166,7 +166,8 @@ or `AGENTIC_ODI_MCP_PORT=8010`. The flag wins over the environment variable.
   sample or offline canvas. Settings → About says where the app is running —
   desktop app, installed web app, or browser tab — and whether the offline
   shell is on, and offers an opt-in, redacted local diagnostics preview; no
-  report is uploaded. See [The Living Studio](docs/living-studio.md).
+  report is uploaded. It also reopens the active thread and visible branch
+  after a reload. See [The Living Studio](docs/living-studio.md).
 - **Just the CLI:** it is local-first, so data commands need no server at all.
 
 ```bash

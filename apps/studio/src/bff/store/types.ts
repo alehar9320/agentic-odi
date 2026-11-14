@@ -129,6 +129,8 @@ export interface LocalStore {
    * connection closes under a schema change. Returns an unsubscribe function.
    */
   onVersionChange(listener: (needsReload: boolean) => void): () => void;
+  getPreference(key: string): Promise<string | null>;
+  setPreference(key: string, value: string | null): Promise<void>;
   nextSeq(): Promise<number>;
   listJobs(): Promise<StoredJob[]>;
   getJob(id: string): Promise<StoredJob | undefined>;

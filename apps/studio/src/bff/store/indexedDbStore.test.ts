@@ -63,6 +63,18 @@ describe("IndexedDbLocalStore", () => {
     next.close();
   });
 
+  it("persists session preferences across store instances", async () => {
+    const first = await makeStore();
+    await first.setPreference("active_conversation_id", "c-1");
+    first.close();
+
+    const next = await makeStore();
+    expect(await next.getPreference("active_conversation_id")).toBe("c-1");
+    await next.setPreference("active_conversation_id", null);
+    expect(await next.getPreference("active_conversation_id")).toBeNull();
+    next.close();
+  });
+
   it("orders jobs by seq", async () => {
     const store = await makeStore();
     await store.putJob({
@@ -157,6 +169,7 @@ describe("IndexedDbLocalStore", () => {
 
   it("snapshots and restores the whole workspace across store instances", async () => {
     const first = await makeStore();
+    await first.setPreference("active_conversation_id", "c-1");
     await first.putJob({
       id: "j-1",
       name: "Job A",
@@ -197,6 +210,7 @@ describe("IndexedDbLocalStore", () => {
 
     const second = await makeStore();
     await second.restore(snapshot);
+    expect(await second.getPreference("active_conversation_id")).toBe("c-1");
     const jobs = await second.listJobs();
     expect(jobs.map((j) => j.name)).toEqual(["Job A"]);
     const outcomes = await second.listOutcomes();

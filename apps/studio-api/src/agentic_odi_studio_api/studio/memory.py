@@ -244,6 +244,11 @@ CREATE TABLE IF NOT EXISTS conversations (
     head_id TEXT
 );
 
+CREATE TABLE IF NOT EXISTS studio_preferences (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS turns (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -421,6 +426,24 @@ class StudioMemory:
                 # sidecar for the next process to recover.
                 self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             self._connection.close()
+
+    def get_preference(self, key: str) -> str | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT value FROM studio_preferences WHERE key = ?", (key,)
+            ).fetchone()
+            return None if row is None else row["value"]
+
+    def set_preference(self, key: str, value: str | None) -> None:
+        with self._lock, self._connection:
+            if value is None:
+                self._connection.execute("DELETE FROM studio_preferences WHERE key = ?", (key,))
+            else:
+                self._connection.execute(
+                    "INSERT INTO studio_preferences (key, value) VALUES (?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    (key, value),
+                )
 
     def checkpoint(self, mode: str = "TRUNCATE") -> None:
         """Fold the write-ahead log back into the database file."""

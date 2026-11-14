@@ -56,6 +56,7 @@ counted as done.
 - [ ] **Evidence from a file at the terminal** — `evidence add --file` reads text (or stdin) on the Studio's attachment cap ([PR #415](https://github.com/alehar9320/agentic-odi/pull/415)).
 - [ ] **A traceability report: orphans, unfunded, drift** — an outcome names the V2MOM method or measure it advances, the link is refused if the target does not exist, and a read-only report names the orphans, the unfunded objectives, and the links the vision dropped (issue [#591](https://github.com/alehar9320/agentic-odi/issues/591)).
 - [ ] **Every conversation in one list, with its turn count** — `GET /api/conversations` returns each stored conversation newest-first with its turns, so the Studio can show a switcher ([PR #451](https://github.com/alehar9320/agentic-odi/pull/451)).
+- [ ] **Resume the active conversation on boot** — browser and Tauri clients sharing a local sidecar reopen the last thread and visible branch, with a silent fallback when the thread was deleted ([PR #452](https://github.com/alehar9320/agentic-odi/pull/452)).
 
 ## Next
 

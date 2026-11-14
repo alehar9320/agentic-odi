@@ -74,6 +74,8 @@ vi.mock("./api/studioApi", () => ({
   },
   fetchChangelog: vi.fn(async () => ({ releases: [] })),
   fetchLatestConversation: vi.fn(async () => ({ conversation: null, turns: [] })),
+  fetchActiveConversationId: vi.fn(async () => null),
+  setActiveConversationId: vi.fn(async () => undefined),
   listConversations: vi.fn(async () => []),
   createConversation: vi.fn(async () => ({
     id: "c-new",

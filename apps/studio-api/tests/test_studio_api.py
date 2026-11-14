@@ -698,6 +698,20 @@ def test_conversation_endpoints_and_chat_persistence() -> None:
     assert [turn["role"] for turn in latest["turns"]] == ["user", "assistant"]
 
 
+def test_active_conversation_preference_round_trips_in_sidecar() -> None:
+    client = _client()
+    assert client.get("/api/session/conversation").json() == {"conversation_id": None}
+
+    assert client.put("/api/session/conversation", json={"conversation_id": "c-1"}).json() == {
+        "conversation_id": "c-1"
+    }
+    assert client.get("/api/session/conversation").json() == {"conversation_id": "c-1"}
+
+    assert client.put("/api/session/conversation", json={"conversation_id": None}).json() == {
+        "conversation_id": None
+    }
+
+
 def test_chat_resumes_an_existing_conversation() -> None:
     client = _client()
     created = client.post("/api/conversations").json()["conversation"]

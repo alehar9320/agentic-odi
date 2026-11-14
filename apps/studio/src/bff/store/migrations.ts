@@ -21,7 +21,7 @@ export const DB_NAME = "agentic-odi-studio";
  */
 export const DB_VERSION = 3;
 
-export type MetaValue = number | DrainLease;
+export type MetaValue = number | string | DrainLease;
 
 /**
  * The database shape, in one place: the store reads it and the migration

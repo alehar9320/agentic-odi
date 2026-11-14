@@ -69,6 +69,22 @@ export class IndexedDbLocalStore implements LocalStore {
     };
   }
 
+  async getPreference(key: string): Promise<string | null> {
+    const value = (await this.db.get("meta", `preference:${key}`))?.value;
+    return typeof value === "string" ? value : null;
+  }
+
+  async setPreference(key: string, value: string | null): Promise<void> {
+    const tx = this.db.transaction("meta", "readwrite");
+    const storageKey = `preference:${key}`;
+    if (value === null) {
+      await tx.store.delete(storageKey);
+    } else {
+      await tx.store.put({ key: storageKey, value });
+    }
+    await tx.done;
+  }
+
   private markNeedsReload(): void {
     if (this.reloadNeeded) {
       return;
@@ -369,7 +385,11 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async restore(snapshot: WorkspaceSnapshot): Promise<void> {
+    const activeConversationId = await this.getPreference("active_conversation_id");
     await this.clearAll();
+    if (activeConversationId !== null) {
+      await this.setPreference("active_conversation_id", activeConversationId);
+    }
     const tx = this.db.transaction(
       [
         "jobs",
