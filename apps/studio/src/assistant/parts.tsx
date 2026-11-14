@@ -24,7 +24,8 @@ import {
   rememberClaimChip,
   type ClaimSegment,
 } from "./claims";
-import { CLAIMS_PART, SURFACE_PART } from "./convert";
+import { CLAIMS_PART, SURFACE_PART, isArguments } from "./convert";
+import { describeConsequence } from "./consequence";
 import { ClaimCitation } from "../components/chat/ClaimCitation";
 
 /** Prose. The existing renderer, so the transcript reads exactly as before. */
@@ -328,11 +329,72 @@ export function FilePart() {
 export const toolLabel = (name: string): string => name.replace(/_/g, " ");
 
 /**
+ * The model's arguments as a compact key/value list.
+ *
+ * Scrolls past six rows rather than truncating: the person is being asked to
+ * approve the whole call, so every argument has to stay reachable. The raw
+ * JSON stays behind a disclosure for the case where the list is not enough.
+ */
+function ApprovalArguments({ args }: { args: Record<string, unknown> }) {
+  const [rawOpen, setRawOpen] = useState(false);
+  const rawId = useId();
+  const entries = Object.entries(args);
+
+  return (
+    <div className="approval__arguments">
+      <dl className="approval__argument-list">
+        {entries.map(([key, value]) => (
+          <div className="approval__argument" key={key}>
+            <dt className="approval__argument-key">{key}</dt>
+            <dd className="approval__argument-value">{formatArgument(value)}</dd>
+          </div>
+        ))}
+      </dl>
+      <button
+        type="button"
+        className="approval__raw-toggle"
+        aria-expanded={rawOpen}
+        aria-controls={rawId}
+        onClick={() => setRawOpen((value) => !value)}
+      >
+        <ChevronDownIcon className={`approval__raw-chevron${rawOpen ? " is-open" : ""}`} size={12} />
+        Raw arguments
+      </button>
+      <pre className="approval__raw" id={rawId} hidden={!rawOpen}>
+        {JSON.stringify(args, null, 2)}
+      </pre>
+    </div>
+  );
+}
+
+/** One argument value, as a person would read it. */
+function formatArgument(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
+/** The most a deny reason may hold, matching the sidecar's own cap. */
+const MAX_REASON_CHARS = 280;
+
+/**
  * A tool call, and the one question the agent is not allowed to answer itself:
  * whether it may write.
+ *
+ * The question is about an action, not a tool name: the card states what the
+ * call will do, shows the arguments it will do it with, and — when the answer
+ * is no — lets the person say why, so the agent can propose something else.
  */
 export function ToolPart({
   toolName,
+  args,
   approval,
   result,
   isError,
@@ -341,9 +403,20 @@ export function ToolPart({
 }: ToolCallMessagePartProps) {
   const [busy, setBusy] = useState(false);
   const [answered, setAnswered] = useState(false);
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  // Where the card's place went: after an answer the gate is replaced by the
+  // trace, and focus must follow the decision rather than drop to the body.
+  const traceRef = useRef<HTMLParagraphElement>(null);
   const payload = result as { status?: string; preview?: string } | undefined;
   const pending = approval !== undefined && approval.approved === undefined && !result;
   const running = status?.type === "running";
+
+  useEffect(() => {
+    if (answered) {
+      traceRef.current?.focus();
+    }
+  }, [answered]);
 
   async function answer(approved: boolean) {
     if (!approval || busy) {
@@ -351,7 +424,10 @@ export function ToolPart({
     }
     setBusy(true);
     try {
-      await respondToApproval({ approved });
+      await respondToApproval({
+        approved,
+        ...(!approved && reason.trim() ? { reason: reason.trim() } : {}),
+      });
       setAnswered(true);
     } catch {
       // The gate may have expired; the stream reports what happened to the turn.
@@ -361,6 +437,8 @@ export function ToolPart({
   }
 
   if (pending && !answered) {
+    const approvalArgs = isArguments(args) ? args : {};
+    const hasArgs = Object.keys(approvalArgs).length > 0;
     return (
       <div
         className="approval"
@@ -369,6 +447,26 @@ export function ToolPart({
         data-aui-quote-selectable="false"
       >
         <p className="approval__prompt">{approval.prompt ?? `Run ${toolLabel(toolName)}?`}</p>
+        <p className="approval__consequence">This {describeConsequence(toolName)}.</p>
+        {hasArgs ? <ApprovalArguments args={approvalArgs} /> : null}
+        {reasonOpen ? (
+          <div className="approval__reason">
+            <label className="approval__reason-label" htmlFor={`${approval.id}-reason`}>
+              Why not? (optional)
+            </label>
+            <textarea
+              id={`${approval.id}-reason`}
+              className="approval__reason-input"
+              value={reason}
+              maxLength={MAX_REASON_CHARS}
+              rows={2}
+              onChange={(event) => setReason(event.target.value)}
+            />
+            <span className="approval__reason-count">
+              {reason.length}/{MAX_REASON_CHARS}
+            </span>
+          </div>
+        ) : null}
         <div className="approval__actions">
           <button
             type="button"
@@ -378,28 +476,45 @@ export function ToolPart({
           >
             <CheckIcon size={14} /> Allow
           </button>
-          <button
-            type="button"
-            className="approval__deny"
-            disabled={busy}
-            onClick={() => void answer(false)}
-          >
-            Don't allow
-          </button>
+          {reasonOpen ? (
+            <button
+              type="button"
+              className="approval__deny"
+              disabled={busy}
+              onClick={() => void answer(false)}
+            >
+              Send refusal
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="approval__deny"
+              disabled={busy}
+              onClick={() => setReasonOpen(true)}
+            >
+              Don't allow
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
   const tone = isError || payload?.status === "error" ? " is-error" : "";
+  const declined = payload?.status === "declined";
+  // The state is named as well as coloured: a red dot alone tells a person
+  // nothing about what happened, and nothing at all to a screen reader.
+  const stateLabel = running ? "working" : declined ? "declined" : isError ? "failed" : "";
   return (
     <p
-      className={`tool-trace${tone}${running ? " is-running" : ""}`}
+      ref={traceRef}
+      tabIndex={-1}
+      className={`tool-trace${tone}${running ? " is-running" : ""}${declined ? " is-declined" : ""}`}
       data-aui-quote-selectable="false"
     >
       <span className="tool-trace__dot" aria-hidden="true" />
       {toolLabel(toolName)}
-      {running ? " · working" : payload?.status === "declined" ? " · declined" : ""}
+      {stateLabel ? <span className="tool-trace__state"> · {stateLabel}</span> : null}
       {payload?.preview ? <span className="tool-trace__preview">{payload.preview}</span> : null}
     </p>
   );
