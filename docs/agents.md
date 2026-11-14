@@ -278,8 +278,11 @@ Two practical consequences:
 - Read `AGENTS.md` and `.agents/rules/agent_instructions.md` before writing code.
   Kiro additionally reads `.kiro/steering/`; Qoder Action reads `AGENTS.md`.
 - Never push to `main` and never merge. Agents open pull requests; a human merges.
-  The `main-requires-ci-green` ruleset requires `CI green`, `PR guardrails`, and
-  the `ai-merge-safe` label before a merge to `main` can complete.
+  The `main-requires-ci-green` ruleset requires `CI green` and `PR guardrails`
+  before a merge to `main` can complete, and `protect-main` refuses direct pushes,
+  deletions, and force pushes. A ruleset cannot require a label, so `ai-merge-safe`
+  is enforced by the merge path (`scripts/pr_ai_authorize.py`) rather than by
+  GitHub settings; see [ADR 0007](architecture/adr/0007-branch-protection-enforces-checks-not-labels.md).
 - Fill in the pull request template truthfully, including the machine-readable
   diff summary and the `AGENT_METADATA` block. The guardrails compare the claims
   with the actual diff.
