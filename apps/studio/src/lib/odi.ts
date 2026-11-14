@@ -31,11 +31,36 @@ export function formatOpportunityScore(score: number | null | undefined): string
 }
 
 export function opportunityPill(score: number | null | undefined): PillDescriptor {
+  // A missing score is not "served". Saying so would read as a verdict the
+  // store never reached, so it gets a neutral descriptor of its own.
+  if (!hasScore(score)) {
+    return { label: "Not scored", variant: "blue" };
+  }
   const formatted = formatOpportunityScore(score);
   if (isUnderserved(score)) {
     return { label: `🔥 Underserved (Opp: ${formatted})`, variant: "amber" };
   }
   return { label: `✓ Served (Opp: ${formatted})`, variant: "green" };
+}
+
+/**
+ * The importance at which an outcome's opportunity score crosses the threshold
+ * for a given satisfaction: the solution of `2·importance − satisfaction =
+ * UNDERSERVED_THRESHOLD` for importance. The underserved region sits above this
+ * line, so the drawn zone and `isUnderserved(opportunityScore(...))` cannot
+ * disagree.
+ */
+export function underservedBoundaryImportance(satisfaction: number): number {
+  return (UNDERSERVED_THRESHOLD + satisfaction) / 2;
+}
+
+/**
+ * The matrix's region test, in point space rather than score space. It is the
+ * same rule as `isUnderserved(opportunityScore(importance, satisfaction))`, kept
+ * separate so a plotted point and the shaded polygon share one boundary.
+ */
+export function isUnderservedPoint(importance: number, satisfaction: number): boolean {
+  return importance > underservedBoundaryImportance(satisfaction);
 }
 
 /** What a group of member scores supports, with no score invented. */
@@ -103,5 +128,24 @@ export function segmentBasisLine(peopleInferred: boolean): string {
   return peopleInferred
     ? "Candidate segment — grouped by the job it serves, not by researched people."
     : "People named from your evidence.";
+}
+
+/**
+ * The one line an outcome card or table row shows for what it advances.
+ *
+ * The link is recorded at filing time, so the text shown is the objective's
+ * text as it read then — a reworded vision leaves the old text behind as
+ * drift evidence rather than silently updating the card. An outcome with no
+ * link says plainly that it advances nothing yet, and never invents an
+ * objective: a guess dressed as a record is the one thing this surface must
+ * not do.
+ */
+export function formatAdvances(outcome: Outcome): string {
+  const links = outcome.trace ?? [];
+  if (links.length === 0) {
+    return "Advances nothing yet";
+  }
+  const parts = links.map((link) => `${link.text} (${link.field})`);
+  return `Advances ${parts.join(" · ")}`;
 }
 

@@ -2,7 +2,6 @@ import { openDB, type IDBPDatabase } from "idb";
 
 import type { Observation } from "../../types";
 import { nowIso } from "../id";
-import { StorageWriteGuard } from "./storageFull";
 import {
   DB_NAME,
   DB_VERSION,
@@ -17,6 +16,7 @@ import {
   type LocalStore,
   type OutboxRecord,
   type StoredConversation,
+  type StoredEvidence,
   type StoredJob,
   type StoredOutcome,
   type StoredStep,
@@ -31,7 +31,6 @@ const DRAIN_LEASE_KEY = "drain_lease";
 export class IndexedDbLocalStore implements LocalStore {
   readonly durable = true;
   private readonly db: IDBPDatabase<StudioDb>;
-  private readonly guard = new StorageWriteGuard();
   private reloadNeeded = false;
   private readonly reloadListeners = new Set<(needsReload: boolean) => void>();
 
@@ -81,28 +80,13 @@ export class IndexedDbLocalStore implements LocalStore {
     }
   }
 
-  get storageFull(): boolean {
-    return this.guard.storageFull;
-  }
-
-  subscribeStorageFull(listener: () => void): () => void {
-    return this.guard.subscribe(listener);
-  }
-
-  /** One write, guarded so a full origin pauses every later write. */
-  private write<T>(run: () => Promise<T>): Promise<T> {
-    return this.guard.run(run);
-  }
-
   async nextSeq(): Promise<number> {
-    return this.write(async () => {
-      const tx = this.db.transaction("meta", "readwrite");
-      const current = (await tx.store.get("seq"))?.value;
-      const next = (typeof current === "number" ? current : 0) + 1;
-      await tx.store.put({ key: "seq", value: next });
-      await tx.done;
-      return next;
-    });
+    const tx = this.db.transaction("meta", "readwrite");
+    const current = (await tx.store.get("seq"))?.value;
+    const next = (typeof current === "number" ? current : 0) + 1;
+    await tx.store.put({ key: "seq", value: next });
+    await tx.done;
+    return next;
   }
 
   async listJobs(): Promise<StoredJob[]> {
@@ -115,11 +99,11 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async putJob(job: StoredJob): Promise<void> {
-    await this.write(() => this.db.put("jobs", job));
+    await this.db.put("jobs", job);
   }
 
   async deleteJob(id: string): Promise<void> {
-    await this.write(() => this.db.delete("jobs", id));
+    await this.db.delete("jobs", id);
   }
 
   async listSteps(jobId?: string): Promise<StoredStep[]> {
@@ -134,11 +118,11 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async putStep(step: StoredStep): Promise<void> {
-    await this.write(() => this.db.put("steps", step));
+    await this.db.put("steps", step);
   }
 
   async deleteStep(id: string): Promise<void> {
-    await this.write(() => this.db.delete("steps", id));
+    await this.db.delete("steps", id);
   }
 
   async listOutcomes(jobId?: string): Promise<StoredOutcome[]> {
@@ -153,11 +137,30 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async putOutcome(outcome: StoredOutcome): Promise<void> {
-    await this.write(() => this.db.put("outcomes", outcome));
+    await this.db.put("outcomes", outcome);
   }
 
   async deleteOutcome(id: string): Promise<void> {
-    await this.write(() => this.db.delete("outcomes", id));
+    await this.db.delete("outcomes", id);
+  }
+
+  async listEvidence(jobId?: string): Promise<StoredEvidence[]> {
+    const evidence = jobId
+      ? await this.db.getAllFromIndex("evidence", "by-job", jobId)
+      : await this.db.getAll("evidence");
+    return evidence.sort(bySeq);
+  }
+
+  async getEvidence(id: string): Promise<StoredEvidence | undefined> {
+    return this.db.get("evidence", id);
+  }
+
+  async putEvidence(evidence: StoredEvidence): Promise<void> {
+    await this.db.put("evidence", evidence);
+  }
+
+  async deleteEvidence(id: string): Promise<void> {
+    await this.db.delete("evidence", id);
   }
 
   async listObservations(): Promise<Observation[]> {
@@ -168,19 +171,19 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async putObservation(observation: Observation): Promise<void> {
-    await this.write(() => this.db.put("observations", observation));
+    await this.db.put("observations", observation);
   }
 
   async deleteObservation(id: string): Promise<void> {
-    await this.write(() => this.db.delete("observations", id));
+    await this.db.delete("observations", id);
   }
 
   async clearObservations(): Promise<void> {
-    await this.write(() => this.db.clear("observations"));
+    await this.db.clear("observations");
   }
 
   async enqueueOutbox(record: OutboxRecord): Promise<void> {
-    await this.write(() => this.db.put("outbox", record));
+    await this.db.put("outbox", record);
   }
 
   async getOutbox(id: string): Promise<OutboxRecord | undefined> {
@@ -188,11 +191,11 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async putOutbox(record: OutboxRecord): Promise<void> {
-    await this.write(() => this.db.put("outbox", record));
+    await this.db.put("outbox", record);
   }
 
   async deleteOutbox(id: string): Promise<void> {
-    await this.write(() => this.db.delete("outbox", id));
+    await this.db.delete("outbox", id);
   }
 
   async listOutbox(): Promise<OutboxRecord[]> {
@@ -201,7 +204,7 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async clearOutbox(): Promise<void> {
-    await this.write(() => this.db.clear("outbox"));
+    await this.db.clear("outbox");
   }
 
   async claimDrainLease(
@@ -272,7 +275,7 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async putConversation(conversation: StoredConversation): Promise<void> {
-    await this.write(() => this.db.put("conversations", conversation));
+    await this.db.put("conversations", conversation);
   }
 
   async setConversationHead(
@@ -289,7 +292,7 @@ export class IndexedDbLocalStore implements LocalStore {
       head_id: headId,
       updated_at: now,
     };
-    await this.write(() => this.db.put("conversations", next));
+    await this.db.put("conversations", next);
     return next;
   }
 
@@ -302,10 +305,8 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn> {
-    return this.write(async () => {
-      const id = await this.db.add("turns", turn as StoredTurn);
-      return { ...turn, id: Number(id) };
-    });
+    const id = await this.db.add("turns", turn as StoredTurn);
+    return { ...turn, id: Number(id) };
   }
 
   async conversationTree(conversationId: string): Promise<{
@@ -335,22 +336,22 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async clearTurns(conversationId: string): Promise<void> {
-    await this.write(async () => {
-      const tx = this.db.transaction("turns", "readwrite");
-      const keys = await tx.store.index("by-conversation").getAllKeys(conversationId);
-      await Promise.all(keys.map((key) => tx.store.delete(key)));
-      await tx.done;
-    });
+    const tx = this.db.transaction("turns", "readwrite");
+    const keys = await tx.store.index("by-conversation").getAllKeys(conversationId);
+    await Promise.all(keys.map((key) => tx.store.delete(key)));
+    await tx.done;
   }
 
   async snapshot(): Promise<WorkspaceSnapshot> {
-    const [jobs, steps, outcomes, observations, conversations] = await Promise.all([
-      this.listJobs(),
-      this.listSteps(),
-      this.listOutcomes(),
-      this.listObservations(),
-      this.listConversations(),
-    ]);
+    const [jobs, steps, outcomes, evidence, observations, conversations] =
+      await Promise.all([
+        this.listJobs(),
+        this.listSteps(),
+        this.listOutcomes(),
+        this.listEvidence(),
+        this.listObservations(),
+        this.listConversations(),
+      ]);
     const turnLists = await Promise.all(
       conversations.map((conversation) => this.listTurns(conversation.id)),
     );
@@ -360,6 +361,7 @@ export class IndexedDbLocalStore implements LocalStore {
       jobs,
       steps,
       outcomes,
+      evidence,
       observations,
       conversations,
       turns,
@@ -367,62 +369,64 @@ export class IndexedDbLocalStore implements LocalStore {
   }
 
   async restore(snapshot: WorkspaceSnapshot): Promise<void> {
-    await this.write(async () => {
-      await this.clearAll();
-      const tx = this.db.transaction(
-        [
-          "jobs",
-          "steps",
-          "outcomes",
-          "observations",
-          "conversations",
-          "turns",
-        ],
-        "readwrite",
-      );
-      await Promise.all([
-        ...snapshot.jobs.map((job) => tx.objectStore("jobs").put(job)),
-        ...snapshot.steps.map((step) => tx.objectStore("steps").put(step)),
-        ...snapshot.outcomes.map((outcome) => tx.objectStore("outcomes").put(outcome)),
-        ...snapshot.observations.map((observation) =>
-          tx.objectStore("observations").put(observation),
-        ),
-        ...snapshot.conversations.map((conversation) =>
-          tx.objectStore("conversations").put(conversation),
-        ),
-        ...snapshot.turns.map((turn) => tx.objectStore("turns").put(turn)),
-      ]);
-      await tx.done;
-    });
+    await this.clearAll();
+    const tx = this.db.transaction(
+      [
+        "jobs",
+        "steps",
+        "outcomes",
+        "evidence",
+        "observations",
+        "conversations",
+        "turns",
+      ],
+      "readwrite",
+    );
+    await Promise.all([
+      ...snapshot.jobs.map((job) => tx.objectStore("jobs").put(job)),
+      ...snapshot.steps.map((step) => tx.objectStore("steps").put(step)),
+      ...snapshot.outcomes.map((outcome) => tx.objectStore("outcomes").put(outcome)),
+      ...(snapshot.evidence ?? []).map((record) =>
+        tx.objectStore("evidence").put(record),
+      ),
+      ...snapshot.observations.map((observation) =>
+        tx.objectStore("observations").put(observation),
+      ),
+      ...snapshot.conversations.map((conversation) =>
+        tx.objectStore("conversations").put(conversation),
+      ),
+      ...snapshot.turns.map((turn) => tx.objectStore("turns").put(turn)),
+    ]);
+    await tx.done;
   }
 
   async clearAll(): Promise<void> {
-    await this.write(async () => {
-      const tx = this.db.transaction(
-        [
-          "meta",
-          "jobs",
-          "steps",
-          "outcomes",
-          "observations",
-          "outbox",
-          "conversations",
-          "turns",
-        ],
-        "readwrite",
-      );
-      await Promise.all([
-        tx.objectStore("meta").clear(),
-        tx.objectStore("jobs").clear(),
-        tx.objectStore("steps").clear(),
-        tx.objectStore("outcomes").clear(),
-        tx.objectStore("observations").clear(),
-        tx.objectStore("outbox").clear(),
-        tx.objectStore("conversations").clear(),
-        tx.objectStore("turns").clear(),
-      ]);
-      await tx.done;
-    });
+    const tx = this.db.transaction(
+      [
+        "meta",
+        "jobs",
+        "steps",
+        "outcomes",
+        "evidence",
+        "observations",
+        "outbox",
+        "conversations",
+        "turns",
+      ],
+      "readwrite",
+    );
+    await Promise.all([
+      tx.objectStore("meta").clear(),
+      tx.objectStore("jobs").clear(),
+      tx.objectStore("steps").clear(),
+      tx.objectStore("outcomes").clear(),
+      tx.objectStore("evidence").clear(),
+      tx.objectStore("observations").clear(),
+      tx.objectStore("outbox").clear(),
+      tx.objectStore("conversations").clear(),
+      tx.objectStore("turns").clear(),
+    ]);
+    await tx.done;
   }
 
   close(): void {

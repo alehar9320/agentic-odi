@@ -144,3 +144,20 @@ export function formatClockTime(isoString: string): string {
   }
   return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
 }
+
+/**
+ * The exact local moment, e.g. "12 Oct 2026, 2:05 PM"; empty when unreadable.
+ *
+ * Relative time is a summary. This is what it is a summary of, so a relative
+ * label can be interrogated rather than trusted.
+ */
+export function formatExactTime(isoString: string): string {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}

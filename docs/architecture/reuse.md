@@ -39,6 +39,8 @@ missing.
 | Dialog, focus trap, dismissal | `radix-ui` (declared; used only under `src/vendor`) | `apps/studio/src/lib/useFocusTrap.ts`, four hand-built `role="dialog"` surfaces |
 | Opportunity score wording | `apps/studio/src/lib/odi.ts` (`formatOpportunityScore`, `isUnderserved`, `UNDERSERVED_THRESHOLD`) | `apps/studio/src/lib/records.ts` prints the stored number as-is, on purpose — that table reports what the store returned |
 | Number clamping | `apps/studio/src/ui/primitives.tsx` | `apps/studio/src/ui/cards.tsx`, `apps/studio/src/components/canvas/OpportunityLandscape.tsx` |
+| Which host the app is running in | `apps/studio/src/bridge/runtime.ts` (`detectRuntime`, `runtimeFacts`) | `isTauri()`/`isInstalled()` read directly by a caller that then re-derives host or install state |
+| The build version on screen | `apps/studio/src/lib/version.ts` (`STUDIO_VERSION`, `versionLabel`) | any component carrying its own version literal |
 | Id minting | `apps/studio/src/bff/id.ts` | inline id construction in `apps/studio/src/state/StudioContext.tsx` |
 | HTTP with retries | `packages/connectors/src/agentic_odi_connectors/http.py` | `urllib.request.urlopen` in `rest/connector.py` and `marketplace.py` |
 | HTTP from the CLI | `httpx` (declared by `apps/cli`) | `urllib.request.urlopen` in `apps/cli/src/agentic_odi_cli/update.py` |

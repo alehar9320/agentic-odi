@@ -307,6 +307,7 @@ ObservationKind = Literal[
     "preference",
 ]
 ObservationStatus = Literal["suggested", "confirmed", "dismissed"]
+ObservationSubjectType = Literal["job", "step", "outcome", "evidence"]
 
 
 class ObservationModel(BaseModel):
@@ -317,6 +318,8 @@ class ObservationModel(BaseModel):
     status: str
     confidence: float
     source_turn: int | None = None
+    subject_type: str | None = None
+    subject_id: str | None = None
     created_at: str
     updated_at: str
 
@@ -335,6 +338,8 @@ class ObservationCreateRequest(BaseModel):
     data: dict[str, Any] | None = None
     confidence: float = Field(default=0.6, ge=0, le=1)
     confirmed: bool = False
+    subject_type: ObservationSubjectType | None = None
+    subject_id: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class ObservationUpdateRequest(BaseModel):

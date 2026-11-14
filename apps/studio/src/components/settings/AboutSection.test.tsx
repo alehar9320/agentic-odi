@@ -51,4 +51,14 @@ describe("AboutSection", () => {
     expect(screen.getByRole("button", { name: /create diagnostics bundle/i })).toBeInTheDocument();
     expect(screen.getByText(/nothing is uploaded/i)).toBeInTheDocument();
   });
+
+  // #800: About answers "which host am I in?" before anything else, from the
+  // one runtime module. jsdom is a plain browser tab, so the row reads that.
+  it("reports where the app is running", () => {
+    renderSection();
+
+    const about = screen.getByRole("region", { name: "About" });
+    expect(within(about).getByText("Runtime")).toBeInTheDocument();
+    expect(within(about).getByText(/Browser tab/)).toBeInTheDocument();
+  });
 });

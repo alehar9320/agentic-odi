@@ -172,7 +172,7 @@ must not leave them so.
 | `ComposerPrimitive.Resume` | Planned | — | #424 | Appears only with a checkpoint. |
 | `ComposerPrimitive.TriggerPopover` (and its `Root`/`Items`/`Item`/`Categories`/`CategoryItem`/`Back`) | Planned | — | #426 | `@` mentions and `/` commands. |
 | `ComposerPrimitive.If` | Decision | — | — | `AuiIf` is the idiom already in use. |
-| `ComposerPrimitive.AttachmentByIndex` | Rejected | — | — | Attachment chips iterate their own list. |
+| `ComposerPrimitive.AttachmentByIndex` | Rejected | — | — | The composer renders chips through `ComposerPrimitive.Attachments`, which scopes each to its attachment; the bare by-index form stays unused. |
 | `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | `quote` and `dictation` are read today; `queue` arrives with #410, and `submission`/`inTransit` matter to that issue's honesty: a sent message the thread does not show yet must not look lost. |
 
 ## Action bar
@@ -197,7 +197,7 @@ must not leave them so.
 |---|---|---|---|---|
 | Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction refused above 20k chars (not shortened, #652), images capped at 5 MB, refusals explained. |
 | Drop and paste | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer follows the same accept rules as the input. |
-| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Rejected | — | — | The current chip shows extraction state and the reason a file was refused. The primitive would show a name and a thumbnail, which is less than the person needs. |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`, which scopes each chip to its own attachment; the extraction state, the refusal reason and the size ride inside `Root` as children, so the primitive shows more than a name. The sent-turn chip in `parts.tsx` still writes its own `attachment-chip` markup, so this is a partial slice of #859. |
 
 ## Thread list
 
@@ -232,8 +232,10 @@ only the surface is missing.
 |---|---|---|---|---|
 | `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Rejected | — | — | Checked against the installed 0.15.31 rather than the docs: `groupMessageParts` starts a run at any adjacent `tool-call` or `reasoning` part, so its one disclosure would gather a write that is still asking. `GroupedParts` with `workGrouping` ends a run at an unanswered approval. |
 | Pending approvals inside a group | Rejected | — | — | A pending write is a question, not history. It stays ungrouped and visible, always. |
-| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. |
+| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. The pending strip (#390) counts from a start the store stamps when the call arrives, so it also shows nothing on a restored turn. |
 | `useMessageTiming` | Decision | — | — | Tokens/second is engineering telemetry. Useful to us, not to the PM; expose it only behind a diagnostics toggle if at all. |
+| `useAuiState((s) => s.thread.messages)` for liveness | Rejected | — | — | On the external-store path every part status normalizes to `complete` (`thread-message-client` only keeps a part `running` while its own message is), so the runtime cannot tell a live call from a settled one here. The store's `ChatPart.status` is the honest source, and `pending.ts` reads that instead. |
+| Pending-call strip | Adopted | `apps/studio/src/components/chat/PendingCalls.tsx` | #390 | The running and awaiting-approval calls, below the last message. A summary, never a queue: no speculative "up next" rows. |
 
 ## Selection and quote
 
@@ -319,14 +321,14 @@ only the surface is missing.
 
 | Status | Rows |
 |---|---|
-| Adopted | 47 |
-| Partial | 9 |
+| Adopted | 48 |
+| Partial | 10 |
 | Planned | 13 |
 | Decision | 42 |
 | Rejected | 44 |
-| Total | 155 |
+| Total | 157 |
 
-Read it as: **56** of the library's 155 relevant capabilities already deliver
+Read it as: **58** of the library's 157 relevant capabilities already deliver
 something a person can use, **13** more are carried by open issues, **42** rows
 wait on a named decision, and **44** are rejected with a reason. Every row is
 accounted for — that is the whole point of the page.

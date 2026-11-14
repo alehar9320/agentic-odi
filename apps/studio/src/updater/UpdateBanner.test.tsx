@@ -85,6 +85,34 @@ describe("UpdateBanner", () => {
     expect(screen.getByText("50%")).toBeInTheDocument();
   });
 
+  it("announces the title and detail, never the percent (D45)", async () => {
+    let push: ((progress: DownloadProgress) => void) | null = null;
+    const transport = makeTransport({
+      check: vi.fn(async () =>
+        makeHandle({
+          download: (onProgress) => {
+            push = onProgress;
+            return new Promise<void>(() => undefined);
+          },
+        }),
+      ),
+    });
+    const service = renderBanner(transport);
+
+    await act(async () => {
+      void service.check();
+      await Promise.resolve();
+    });
+    act(() => push?.({ received: 5, total: 10 }));
+
+    const live = screen.getByRole("status");
+    expect(live).toHaveTextContent("Downloading version 0.12.0");
+    // The bar keeps changing; if it lived inside the live region a screen
+    // reader would re-announce the whole banner on every tick.
+    expect(live).not.toContainElement(screen.getByRole("progressbar"));
+    expect(live).not.toHaveTextContent("50%");
+  });
+
   it("offers one clear restart once the update is staged", async () => {
     const transport = makeTransport({ check: vi.fn(async () => makeHandle()) });
     const service = renderBanner(transport);

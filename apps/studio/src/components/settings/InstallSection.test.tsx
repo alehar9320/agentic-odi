@@ -10,10 +10,16 @@ vi.mock("../../install", () => ({
   dismissInstall: vi.fn(),
 }));
 
+vi.mock("../../bridge/runtime", () => ({
+  runtimeFacts: vi.fn(() => ({ host: "browser" })),
+}));
+
+import { runtimeFacts } from "../../bridge/runtime";
 import { dismissInstall, isDismissed, isInstalled, offerInstall } from "../../install";
 
 describe("InstallSection", () => {
   beforeEach(() => {
+    vi.mocked(runtimeFacts).mockReturnValue({ host: "browser" } as never);
     vi.mocked(isInstalled).mockReturnValue(false);
     vi.mocked(isDismissed).mockReturnValue(false);
     vi.mocked(offerInstall).mockReturnValue(false);
@@ -38,6 +44,14 @@ describe("InstallSection", () => {
 
   it("stays quiet once the app is installed", () => {
     vi.mocked(isInstalled).mockReturnValue(true);
+    render(<InstallSection />);
+
+    expect(screen.queryByRole("button", { name: /install app/i })).toBeNull();
+  });
+
+  // #800: the desktop app is already its own window, so it cannot be installed.
+  it("offers nothing inside the desktop app", () => {
+    vi.mocked(runtimeFacts).mockReturnValue({ host: "desktop" } as never);
     render(<InstallSection />);
 
     expect(screen.queryByRole("button", { name: /install app/i })).toBeNull();

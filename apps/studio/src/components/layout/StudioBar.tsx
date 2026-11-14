@@ -5,7 +5,9 @@ import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../
 import { isEndpointConfiguredForSettings, endpointReachability, isPrivateHost } from "../../lib/modelEndpoint";
 import { formatRelativeTime, groupByDay } from "../../lib/relativeTime";
 import { resolveTheme } from "../../lib/theme";
+import { formatRetryCountdown } from "../../state/probeBreaker";
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import {
@@ -39,6 +41,7 @@ export function StudioBar({
     conversationId,
     conversations,
     llmHealth,
+    probeRetry,
     messages,
     openConversation,
     refreshConversations,
@@ -61,7 +64,7 @@ export function StudioBar({
   const [historyOpen, setHistoryOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
-  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reduceMotion = useReducedMotion();
   const [askOpen, setAskOpen] = useState(false);
   const askRef = useRef<HTMLDivElement>(null);
   const keepWritingRef = useRef<HTMLButtonElement>(null);
@@ -214,14 +217,20 @@ export function StudioBar({
       )
     : "reachable";
   const deviceOnly = reachability === "device-only";
+  // While the breaker is open nothing is being probed, so a spinner would be a
+  // lie: say when the next try is, not that one is happening (#536).
+  const retryCountdown =
+    probeRetry.state === "open" ? formatRetryCountdown(probeRetry.retryInMs) : null;
   const status =
-    llmHealth.healthy === true
-      ? "Live"
-      : llmHealth.healthy === false
-        ? "Local mode"
-        : endpointConfigured || sidecarReachable === true
-          ? "Connecting"
-          : "Local";
+    retryCountdown !== null
+      ? retryCountdown
+      : llmHealth.healthy === true
+        ? "Live"
+        : llmHealth.healthy === false
+          ? "Local mode"
+          : endpointConfigured || sidecarReachable === true
+            ? "Connecting"
+            : "Local";
   const statusDetail = deviceOnly
     ? "local endpoint, not reachable from this page"
     : status === "Local" ? "Answering from your device. No model connected." : llmHealth.message;
@@ -415,7 +424,13 @@ export function StudioBar({
           title={statusDetail}
         >
           <StatusDot
-            tone={status === "Local mode" ? "warn" : status === "Connecting" ? "unknown" : "ok"}
+            tone={
+              retryCountdown !== null || status === "Local mode"
+                ? "warn"
+                : status === "Connecting"
+                  ? "unknown"
+                  : "ok"
+            }
           />
           {status}
         </button>

@@ -1,4 +1,5 @@
-import type { CanvasData, Job, Outcome, Step } from "../types";
+import type { CanvasData, Evidence, Job, Outcome, Step } from "../types";
+import type { CanvasProvenance } from "../types";
 import { computeOpportunityScore } from "./data/localDataService";
 import type { OutboxRecord } from "./store/types";
 
@@ -70,6 +71,33 @@ function pendingOutcome(id: string, payload: unknown): Outcome {
   };
 }
 
+function pendingEvidence(id: string, payload: unknown): Evidence {
+  const body = (payload ?? {}) as {
+    source_name?: string;
+    source_kind?: string;
+    item_type?: string;
+    name?: string;
+    content?: string;
+    url?: string;
+    job_id?: string | null;
+    step_id?: string | null;
+    outcome_id?: string | null;
+  };
+  return {
+    id,
+    source_name: body.source_name,
+    source_kind: body.source_kind,
+    item_type: body.item_type,
+    name: body.name ?? "",
+    content: body.content ?? "",
+    url: body.url ?? null,
+    job_id: body.job_id ?? null,
+    step_id: body.step_id ?? null,
+    outcome_id: body.outcome_id ?? null,
+    pending: true,
+  };
+}
+
 /**
  * Overlay the writes that are still queued on this device onto a canvas read.
  *
@@ -92,12 +120,14 @@ export function applyPendingWrites(
   const touchedJobs = idsFor(active, "job", "create");
   const touchedSteps = idsFor(active, "step", "create");
   const touchedOutcomes = idsFor(active, "outcome", "create");
+  const touchedEvidence = idsFor(active, "evidence", "create");
   const updatedJobs = idsFor(active, "job", "update");
   const updatedSteps = idsFor(active, "step", "update");
   const updatedOutcomes = idsFor(active, "outcome", "update");
   const deletedJobs = idsFor(active, "job", "delete");
   const deletedSteps = idsFor(active, "step", "delete");
   const deletedOutcomes = idsFor(active, "outcome", "delete");
+  const deletedEvidence = idsFor(active, "evidence", "delete");
 
   const jobs = canvas.jobs
     .filter((job) => !deletedJobs.has(job.id))
@@ -118,6 +148,11 @@ export function applyPendingWrites(
         ? { ...outcome, pending: true }
         : outcome,
     );
+  const evidence = (canvas.evidence ?? [])
+    .filter((record) => !deletedEvidence.has(record.id))
+    .map((record) =>
+      touchedEvidence.has(record.id) ? { ...record, pending: true } : record,
+    );
 
   for (const record of active) {
     if (record.kind !== "create" || !record.local_id) {
@@ -135,8 +170,27 @@ export function applyPendingWrites(
       !outcomes.some((outcome) => outcome.id === record.local_id)
     ) {
       outcomes.push(pendingOutcome(record.local_id, record.payload));
+    } else if (
+      record.entity === "evidence" &&
+      !evidence.some((item) => item.id === record.local_id)
+    ) {
+      evidence.push(pendingEvidence(record.local_id, record.payload));
     }
   }
 
-  return { ...canvas, jobs, steps, outcomes };
+  return { ...canvas, jobs, steps, outcomes, evidence, provenance: withKeptByBrowser(canvas) };
+}
+
+/**
+ * Whether this device is holding an unacknowledged write, so the board can say
+ * the record lives here rather than claiming the server has it. `active` is
+ * already filtered to the records the overlay merged, so a write the sidecar
+ * acknowledged does not set this.
+ */
+function withKeptByBrowser(canvas: CanvasData): CanvasProvenance | undefined {
+  const active = canvas.provenance;
+  if (!active) {
+    return undefined;
+  }
+  return { ...active, kept_by_browser: true };
 }

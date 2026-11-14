@@ -9,6 +9,7 @@ import { initServiceWorker } from "./lib/swUpdate";
 import "./styles/theme.css";
 import "./styles/records.css";
 import "./styles/brief.css";
+import "./styles/interview.css";
 // Vendor utilities last: Tailwind is scoped to src/vendor (issue #385), and
 // loading it after the theme keeps the product stylesheet authoritative.
 import "./vendor/index.css";
