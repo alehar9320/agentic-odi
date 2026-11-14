@@ -219,8 +219,10 @@ def _mcp_connector_config(
     url: str | None,
     preset_id: str | None,
     tools: list[str] | None,
+    headers: dict[str, str] | None = None,
 ) -> ConnectorConfig:
     from agentic_odi_connectors.catalog import (
+        ENV_VAR_PATTERN,
         UnknownPresetError,
         connector_config_from_preset,
         get_preset,
@@ -233,7 +235,18 @@ def _mcp_connector_config(
         except UnknownPresetError as exc:
             typer.echo(f"Error: {exc}", err=True)
             raise typer.Exit(code=1) from exc
-        return connector_config_from_preset(preset, name=name, url=url, tools=tools)
+        config = connector_config_from_preset(preset, name=name, url=url, tools=tools)
+        if headers:
+            merged = dict(config.settings.get("headers") or {})
+            merged.update(headers)
+            config.settings["headers"] = merged
+            settings_env = list(config.settings.get("env_vars") or [])
+            for value in headers.values():
+                for var in ENV_VAR_PATTERN.findall(value):
+                    if var not in settings_env:
+                        settings_env.append(var)
+            config.settings["env_vars"] = settings_env
+        return config
     if not url:
         typer.echo("Error: --url is required for MCP connectors (or pass --preset).", err=True)
         raise typer.Exit(code=1)
@@ -243,6 +256,11 @@ def _mcp_connector_config(
     settings: dict[str, object] = {"url": url}
     if tools:
         settings["tools"] = tools
+    if headers:
+        settings["headers"] = headers
+        settings["env_vars"] = sorted(
+            {var for value in headers.values() for var in ENV_VAR_PATTERN.findall(value)}
+        )
     return ConnectorConfig(name=name, kind="mcp", settings=settings)
 
 
@@ -265,7 +283,9 @@ def add_connector(
     ),
     method: str | None = typer.Option(None, "--method", help="HTTP method for REST/webhook."),
     header: list[str] | None = typer.Option(  # noqa: B008
-        None, "--header", help="HTTP header as KEY=VALUE. Repeatable."
+        None,
+        "--header",
+        help="HTTP header as KEY=VALUE (MCP and REST/webhook). Repeatable.",
     ),
     records_key: str | None = typer.Option(
         None, "--records-key", help="Dot path to the record list in the response."
@@ -287,7 +307,9 @@ def add_connector(
         typer.echo("Error: --preset is only supported for MCP connectors.", err=True)
         raise typer.Exit(code=1)
     if kind == "mcp":
-        connector_config = _mcp_connector_config(name=name, url=url, preset_id=preset, tools=tool)
+        connector_config = _mcp_connector_config(
+            name=name, url=url, preset_id=preset, tools=tool, headers=_parse_headers(header)
+        )
     elif kind in {"rest", "webhook"}:
         if not name:
             typer.echo("Error: --name is required.", err=True)

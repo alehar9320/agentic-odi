@@ -91,6 +91,15 @@ Composio is a managed MCP hub for 1000+ apps (GitHub, Slack, Linear, Notion,
 Jira, ...). It is wired up like any other preset, and it is **optional**:
 nothing in the CLI or the default flow requires it.
 
+Composio exposes two MCP entry points, and they are not interchangeable. The
+preset covers the first; the second is registered by hand.
+
+### 1. Composio Connect — the preset (shared OAuth URL)
+
+For a client that wants Composio's shared endpoint, the URL is static and
+OAuth handles app consent in the browser on first use. This is what the
+`composio` preset encodes:
+
 ```bash
 # Register the preset (OAuth consent starts on first health/ingest call)
 python -m agentic_odi_cli connectors add mcp --preset composio
@@ -103,6 +112,58 @@ python -m agentic_odi_cli connectors health --name composio
 python -m agentic_odi_cli connectors ingest --name composio --job-id job_123
 ```
 
+Source: Composio's *Composio Connect* page documents
+`https://connect.composio.dev/mcp` as the shared MCP URL, and says "If you are
+building an application, start with the SDK Quickstart or create a session MCP
+endpoint instead." That is why the preset keeps `auth="oauth"` and a static
+URL: for Composio Connect, that URL is correct.
+
+### 2. Session-scoped MCP — per-user toolkits (no static URL)
+
+When you are building an application and want one user's session over MCP,
+there is **no static MCP URL to hardcode**. You create a session and read the
+endpoint off it. From Composio's *Using sessions via MCP* and the
+*Create a new tool router session* API reference:
+
+```bash
+# 1. Create a session (scoped project API key; opt into MCP with mcp: true).
+#    POST https://backend.composio.dev/api/v3.1/tool_router/session
+#    header: x-api-key: $COMPOSIO_API_KEY
+#    -> the response carries session.mcp.url and session.mcp.headers
+curl -sS -X POST https://backend.composio.dev/api/v3.1/tool_router/session \
+  -H "x-api-key: ${COMPOSIO_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"user_id": "user-123", "mcp": true}' | jq -r '.mcp.url'
+
+# 2. Register the session endpoint the response returned. Do NOT construct this
+#    URL from a server id, and do NOT paste the session URL into the catalog —
+#    it is per-session and short-lived. The header carries the API key as a
+#    ${VAR} placeholder, so the registry never stores the token.
+python -m agentic_odi_cli connectors add mcp --name composio-session \
+  --url "<session.mcp.url>" \
+  --header "X-API-Key=\${COMPOSIO_API_KEY}"
+
+python -m agentic_odi_cli connectors health --name composio-session
+```
+
+Source: Composio's *Using sessions via MCP* guide and the v3.1
+*Create a new tool router session* reference. The guide says to read the URL and
+headers off `session.mcp`, and the API reference documents a session-create
+call to `backend.composio.dev/api/v3.1/tool_router/session` authenticated with
+`x-api-key`. Composio's *single-toolkit MCP* page adds: "Pass an `x-api-key`
+header when connecting to Composio MCP. ... Set `COMPOSIO_MCP_URL` to the URL
+returned by the generate step, and keep `COMPOSIO_API_KEY` on the server. Don't
+construct the MCP URL from a server ID."
+
+Because the preset is the shared OAuth endpoint and the session path is
+per-user, the two stories are consistent: the preset keeps
+`url="https://connect.composio.dev/mcp"` and `auth="oauth"`, while the guide
+above documents the session-scoped recipe for teams that need per-user
+toolkits. `--header` (repeatable, `KEY=VALUE`) is accepted for MCP connectors so
+the session recipe above works, and any `${VAR}` in a header is recorded in
+`env_vars` and resolved from the environment when the connection opens.
+
+### Taking it to another project
+
 The preset shape lives in
 `packages/connectors/src/agentic_odi_connectors/catalog.py`. To add it to
 another project, copy the `composio` entry (id, label, area, summary, url,
@@ -110,6 +171,7 @@ auth, docs, `is_recommended: false`), regenerate the catalog JSON, and update
 the presets table. Because health and ingest are per-connector, a missing or
 unreachable Composio endpoint never breaks another connector or the CLI —
 verify that in the host project before shipping.
+
 
 ## Ingest behavior
 

@@ -71,6 +71,55 @@ def test_connectors_add_mcp_then_list(tmp_path: Path) -> None:
     assert payload["connectors"][0]["settings"]["url"] == "http://localhost:9000/mcp"
 
 
+def test_connectors_add_mcp_with_session_header(tmp_path: Path) -> None:
+    """The Composio session-scoped recipe registers a header with a ${VAR} placeholder."""
+    config = tmp_path / "connectors.json"
+    result = runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "composio-session",
+            "--url",
+            "https://mcp.composio.dev/session/abc123/mcp",
+            "--header",
+            "X-API-Key=${COMPOSIO_API_KEY}",
+            "--config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    stored = json.loads(config.read_text(encoding="utf-8"))["connectors"][0]
+    assert stored["settings"]["headers"] == {"X-API-Key": "${COMPOSIO_API_KEY}"}
+    assert stored["settings"]["env_vars"] == ["COMPOSIO_API_KEY"]
+
+
+def test_connectors_add_mcp_rejects_bad_header(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+    result = runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "composio-session",
+            "--url",
+            "https://mcp.composio.dev/session/abc123/mcp",
+            "--header",
+            "broken",
+            "--config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "KEY=VALUE" in _strip(result.output)
+
+
 def test_connectors_add_rejects_duplicate(tmp_path: Path) -> None:
     config = tmp_path / "connectors.json"
     args = [
