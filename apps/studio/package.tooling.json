@@ -1,0 +1,12 @@
+{
+  "//": "Optional test tooling, kept out of the default install (#752). Install with `npm run tooling:install`. Versions are pinned to the ones resolved in package-lock.json so the tooling tree matches the lock.",
+  "devDependencies": {
+    "@chromatic-com/vitest": "1.0.1",
+    "@playwright/test": "1.64.1",
+    "@tauri-apps/cli": "2.12.3",
+    "@vitest/browser-playwright": "4.1.12",
+    "chromatic": "18.13.3",
+    "playwright": "1.64.1",
+    "vitest-browser-react": "2.3.0"
+  }
+}
