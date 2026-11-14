@@ -56,6 +56,10 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
+    # Composio's hosted MCP endpoint and its session API, which the connector
+    # guide documents for the `composio` preset.
+    "https://connect.composio.dev/mcp",
+    "https://backend.composio.dev",
     # The agent vendors whose docs the assignment guide cites as sources.
     "https://docs.openhands.dev",
     "https://kiro.dev",

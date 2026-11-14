@@ -46,7 +46,7 @@ by the presence of one handler.
 | `onReload` (regenerate) | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `regenerateFrom`. |
 | `onCancel` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `stopStreaming`. |
 | `onRespondToToolApproval` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `respondToApproval`, the write gate. |
-| `adapters.attachments` | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text refused above 20k chars (not shortened, #652), images at 5 MB, refusals explained. |
+| `adapters.attachments` | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text refused above 20k chars (not shortened, #652), images at 5 MB, `.docx` and `.pdf` extracted in the browser (#393), refusals explained. |
 | runtime `suggestions` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `suggestionsFor`, computed from canvas state. |
 | `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | `apps/studio/src/state/StudioContext.tsx` | — | Branching works through `setMessages` and `head_id`; the dedicated adapter is unused, so the runtime infers branches from parent ids. |
 | `queue` adapter | Adopted | `apps/studio/src/assistant/queue.ts` | #410 | Keeps a follow-up while a reply runs. |
@@ -195,7 +195,7 @@ must not leave them so.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction refused above 20k chars (not shortened, #652), images capped at 5 MB, refusals explained. |
+| Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction refused above 20k chars (not shortened, #652), images capped at 5 MB, `.docx` and `.pdf` extracted in the browser (#393), refusals explained. |
 | Drop and paste | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer follows the same accept rules as the input. |
 | `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`, which scopes each chip to its own attachment; the extraction state, the refusal reason and the size ride inside `Root` as children, so the primitive shows more than a name. The sent-turn chip in `parts.tsx` still writes its own `attachment-chip` markup, so this is a partial slice of #859. |
 
