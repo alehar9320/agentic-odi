@@ -27,7 +27,12 @@ from agentic_odi_core.compare import (
     OutcomeComparison,
     align_outcomes,
 )
-from agentic_odi_core.errors import AlreadyPromotedError, ConflictError, NotFoundError, ValidationError
+from agentic_odi_core.errors import (
+    AlreadyPromotedError,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+)
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     classify_opportunity,
