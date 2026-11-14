@@ -7,7 +7,7 @@
  * refusal.
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 
@@ -147,7 +147,9 @@ describe("ToolPart approval", () => {
     fireEvent.click(screen.getByRole("button", { name: "Allow" }));
 
     const trace = await screen.findByText("add job");
-    expect(document.activeElement).toBe(trace.closest("p"));
+    // The focus move happens after the approval promise settles, so wait for it
+    // rather than reading activeElement on the tick the trace appears.
+    await waitFor(() => expect(document.activeElement).toBe(trace.closest("p")));
   });
 
   it("reaches and answers the card with the keyboard alone", () => {
