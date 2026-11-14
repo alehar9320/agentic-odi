@@ -11,7 +11,7 @@ is the only place allowed to read both.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -33,6 +33,8 @@ class EvidenceDraft(BaseModel):
     job_id: str | None = None
     step_id: str | None = None
     outcome_id: str | None = None
+    #: Where the row came from; kept in step with ``core.Evidence.origin``.
+    origin: Literal["user", "demo", "sample", "imported"] = "user"
     discriminator: str | None = Field(
         None, description="Stable key of the source record (call id, page id, message ts)"
     )

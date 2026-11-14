@@ -1,10 +1,18 @@
 import type { RecordKind } from "./lib/records";
 import type { UiCatalogManifest, UiNode } from "./ui/protocol";
 
+/**
+ * Where a row came from. `user` is typed by the customer, `demo` is loaded on
+ * purpose by `odi demo load`, `sample` arrives with the product, `imported`
+ * comes from a connector. Storage records the fact; presentation marks it.
+ */
+export type Origin = "user" | "demo" | "sample" | "imported";
+
 export interface Job {
   id: string;
   name?: string;
   description?: string;
+  origin?: Origin;
   /** True while the write is queued locally and the sidecar has not acknowledged it. */
   pending?: boolean;
 }
@@ -14,6 +22,7 @@ export interface Step {
   job_id?: string;
   name?: string;
   order?: number;
+  origin?: Origin;
   /** True while the write is queued locally and the sidecar has not acknowledged it. */
   pending?: boolean;
 }
@@ -55,6 +64,7 @@ export interface Outcome {
   claim_check?: ClaimCheck | null;
   evidence?: string;
   telemetry?: string;
+  origin?: Origin;
   /** The V2MOM methods and measures this outcome advances. Empty means the outcome is unlinked. */
   trace?: OutcomeAlignment[];
   /** True while the write is queued locally and the sidecar has not acknowledged it. */
@@ -73,6 +83,7 @@ export interface Evidence {
   job_id?: string | null;
   step_id?: string | null;
   outcome_id?: string | null;
+  origin?: Origin;
   /** True while the write is queued locally and the sidecar has not acknowledged it. */
   pending?: boolean;
 }
