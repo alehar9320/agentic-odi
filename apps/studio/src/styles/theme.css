@@ -1033,7 +1033,9 @@ a {
 }
 
 .starter__recommended {
-  color: var(--faint);
+  /* --faint is 3.86:1 on --surface in light theme (needs 4.5:1); --muted
+     clears 5:1, so the "Recommended" badge stays readable (#317 contrast). */
+  color: var(--muted);
   font-size: 0.6rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1066,7 +1068,9 @@ a {
 .starter__artifact-label {
   display: block;
   margin-bottom: 1px;
-  color: var(--faint);
+  /* --faint is 3.86:1 on --surface in light theme (needs 4.5:1); --muted
+     clears 5:1, so the "Produces" label stays readable (#317 contrast). */
+  color: var(--muted);
   font-size: 0.6rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1075,7 +1079,10 @@ a {
 
 .starter__action {
   margin-top: auto;
-  color: var(--accent);
+  /* --accent is 4.16:1 on --surface in light theme (needs 4.5:1); the
+     stronger brand variant clears 4.5:1 without leaving the palette (#317
+     contrast). */
+  color: var(--accent-strong);
   font-size: 0.75rem;
   font-weight: 600;
 }
@@ -1105,12 +1112,6 @@ a {
 @media (max-width: 719px) {
   .starter-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .starter:hover:not(:disabled) {
-    transform: none;
   }
 }
 
