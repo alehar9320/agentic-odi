@@ -361,6 +361,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "name",
             "importance",
             "satisfaction",
+            "force",
         ),
         required=("evidence_id", "target"),
         returns="The created Job or Outcome.",

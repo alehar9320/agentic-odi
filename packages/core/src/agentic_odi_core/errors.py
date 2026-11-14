@@ -45,6 +45,20 @@ class ConflictError(OdiError):
     """The requested change conflicts with the current state."""
 
 
+class AlreadyPromotedError(ConflictError):
+    """A quote was already promoted, so promoting it again would duplicate demand.
+
+    Carries the id of the outcome the evidence already supports so a caller can
+    offer to open that outcome instead of creating a second one.
+    """
+
+    def __init__(self, outcome_id: str) -> None:
+        self.outcome_id = outcome_id
+        super().__init__(
+            f"This quote already supports {outcome_id}; open it instead of promoting again."
+        )
+
+
 class RateLimitError(OdiError):
     """The caller exceeded an allowed rate or volume."""
 

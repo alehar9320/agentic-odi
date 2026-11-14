@@ -11,7 +11,7 @@ from typing import Any, TypeVar
 
 from pydantic import ValidationError as PydanticValidationError
 
-from agentic_odi_core.errors import NotFoundError, ValidationError
+from agentic_odi_core.errors import AlreadyPromotedError, NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     classify_opportunity,
@@ -54,7 +54,11 @@ from agentic_odi_core.models import (
     StudyStatus,
     compute_opportunity_score,
 )
-from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.repository import (
+    Repository,
+    compute_promotion_fingerprint,
+    page,
+)
 from agentic_odi_core.segmentation import (
     MIN_OUTCOMES_PER_SEGMENT,
     OutcomeClusterStrategy,
@@ -858,6 +862,7 @@ class ODIService:
         name: str | None = None,
         importance: float | None = None,
         satisfaction: float | None = None,
+        force: bool = False,
     ) -> Job | Outcome:
         evidence = self.repo.get_evidence(evidence_id)
         if evidence is None:
@@ -871,12 +876,15 @@ class ODIService:
             )
             return self.add_job(label, description=evidence.content or None)
         if target == "outcome":
-            #: Idempotent promotion: if this evidence was already promoted to an
-            #: outcome, return the existing outcome instead of creating a copy.
-            if evidence.outcome_id is not None:
-                existing = self.repo.get_outcome(evidence.outcome_id)
-                if existing is not None:
-                    return existing
+            #: One quote promotes at most once. If this evidence — or a repeat
+            #: import of the same quote — already supports an outcome, link to
+            #: it instead of creating a second opportunity the landscape would
+            #: count as independent demand. ``force`` overrides deliberately.
+            existing = self.promoted_outcome_for(evidence_id)
+            if existing is not None and not force:
+                if evidence.outcome_id != existing.id:
+                    self.repo.update_evidence(evidence.id, {"outcome_id": existing.id})
+                return existing
             target_job_id = job_id or evidence.job_id
             if target_job_id is None:
                 raise ValidationError("job_id is required to promote evidence to an outcome")
@@ -909,6 +917,54 @@ class ODIService:
             )
             return outcome
         raise ValidationError(f"Unknown promotion target: {target}")
+
+    def promoted_outcome_for(self, evidence_id: str) -> Outcome | None:
+        """The outcome a quote already supports, if any.
+
+        A quote is identified by its promotion fingerprint — source plus
+        normalized content — so a repeat import that produced a second evidence
+        row still resolves to the one outcome. The row's own ``outcome_id`` is
+        checked first; otherwise every evidence row sharing the fingerprint is
+        consulted. Returns ``None`` when the quote has not been promoted.
+        """
+        evidence = self.repo.get_evidence(evidence_id)
+        if evidence is None:
+            raise EvidenceNotFoundError(
+                evidence_id,
+                "List the stored records with list_evidence() to find a valid id.",
+            )
+        if evidence.outcome_id is not None:
+            linked = self.repo.get_outcome(evidence.outcome_id)
+            if linked is not None:
+                return linked
+        fingerprint = compute_promotion_fingerprint(
+            evidence.source_kind, evidence.source_name, evidence.content
+        )
+        for candidate in self.repo.list_evidence():
+            if candidate.outcome_id is None:
+                continue
+            if (
+                compute_promotion_fingerprint(
+                    candidate.source_kind, candidate.source_name, candidate.content
+                )
+                != fingerprint
+            ):
+                continue
+            linked = self.repo.get_outcome(candidate.outcome_id)
+            if linked is not None:
+                return linked
+        return None
+
+    def require_unpromoted(self, evidence_id: str) -> None:
+        """Raise :class:`AlreadyPromotedError` when a quote already supports an outcome.
+
+        A caller that must not silently merge — a strict client or an import
+        job — uses this to turn a repeat promotion into a typed conflict
+        carrying the existing outcome id, rather than a second opportunity.
+        """
+        existing = self.promoted_outcome_for(evidence_id)
+        if existing is not None:
+            raise AlreadyPromotedError(existing.id)
 
     def propose_outcome_from_evidence(self, evidence_id: str) -> OutcomeProposal:
         """Propose a desired outcome from one evidence record.
