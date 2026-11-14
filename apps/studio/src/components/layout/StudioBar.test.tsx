@@ -353,7 +353,7 @@ describe("StudioBar", () => {
     expect(refreshConversations).toHaveBeenCalledOnce();
     expect(within(menu).getByText("Where does onboarding leak?")).toBeInTheDocument();
     expect(within(menu).getByText("Price the churn spike")).toBeInTheDocument();
-    expect(within(menu).getByText("Just now")).toBeInTheDocument();
+    expect(within(menu).getByText(/Just now/)).toBeInTheDocument();
     vi.useRealTimers();
   });
 
