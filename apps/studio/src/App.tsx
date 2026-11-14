@@ -18,6 +18,7 @@ import { dialogOpen, focusComposer, startComposerCommand } from "./lib/composerF
 import { isEditableTarget } from "./lib/commands";
 import { sharedTokenFromPath } from "./lib/share";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
+import { ActivityProvider } from "./notices/ActivityProvider";
 import { StudioRuntimeProvider } from "./assistant/StudioRuntime";
 import { StudioProvider, useStudio } from "./state/StudioContext";
 import { UpdateBanner, UpdateProvider } from "./updater";
@@ -191,8 +192,10 @@ export default function App() {
           <BannerProvider>
             <StudioRuntimeProvider>
               <OnboardingProvider>
-                <StudioShell />
-                <FirstRunWizard />
+                <ActivityProvider>
+                  <StudioShell />
+                  <FirstRunWizard />
+                </ActivityProvider>
               </OnboardingProvider>
             </StudioRuntimeProvider>
           </BannerProvider>

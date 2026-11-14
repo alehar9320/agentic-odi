@@ -1,3 +1,4 @@
+import type { Notice } from "../../notices/types";
 import type {
   Conversation,
   ConversationTurn,
@@ -181,6 +182,13 @@ export interface LocalStore {
     messages: StoredTurn[];
     head_id: string | null;
   }>;
+  /**
+   * The notice history, newest first. Notices are a durable record of what the
+   * studio announced, so they survive a reload; they are deliberately outside
+   * `WorkspaceSnapshot`, which is the ODI workspace, not the notice log.
+   */
+  listNotices(): Promise<Notice[]>;
+  putNotices(notices: Notice[]): Promise<void>;
   /** Serialize every stored workspace record for export. */
   snapshot(): Promise<WorkspaceSnapshot>;
   /** Replace every stored workspace record with the imported snapshot. */

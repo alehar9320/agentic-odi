@@ -7330,3 +7330,235 @@ textarea,
   color: var(--muted);
   font-size: 12.5px;
 }
+
+/* ---------------------------------------------------------------------------
+   The activity centre (#406)
+
+   A durable history of what the studio announced. It reuses the changelog
+   modal's overlay pattern so the two dialogs feel like one product; only the
+   row anatomy is new. Severity is carried by a word, never by colour alone.
+--------------------------------------------------------------------------- */
+
+.activity-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 13, 19, 0.75);
+  backdrop-filter: blur(12px);
+  padding: 20px;
+}
+
+.activity-scrim {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.activity-centre {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.activity-centre__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.activity-centre__title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.activity-centre__subtitle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.activity-centre__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-centre__mark-read {
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.activity-centre__mark-read:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.activity-centre__mark-read:disabled {
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.activity-centre__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.activity-centre__close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.activity-centre__body {
+  padding: 8px 20px 20px;
+  overflow-y: auto;
+}
+
+.activity-centre__empty {
+  margin: 24px 0;
+  color: var(--faint);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+.activity-group {
+  margin-top: 12px;
+}
+
+.activity-group__day {
+  margin: 0 0 6px;
+  color: var(--faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activity-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.activity-row:first-child {
+  border-top: 0;
+}
+
+.activity-row__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.activity-row__severity {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.activity-row__severity--critical {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.activity-row__severity--warning {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.activity-row__severity--success {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.activity-row__title {
+  flex: 1;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.activity-row__time {
+  flex: none;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-row__foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.activity-row__details,
+.activity-row__dismiss {
+  padding: 3px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.activity-row__details:hover,
+.activity-row__dismiss:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.activity-row__detail {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.76rem;
+}
+
+.activity-row__detail dt {
+  color: var(--faint);
+}
+
+.activity-row__detail dd {
+  margin: 0;
+  color: var(--text);
+}

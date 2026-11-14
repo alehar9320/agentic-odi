@@ -273,6 +273,17 @@ describe("StudioBar", () => {
     expect(bell.querySelector(".bell-badge")).toBeNull();
   });
 
+  it("offers the activity centre from the bar without a provider", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext() as never);
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    // No ActivityProvider in this tree: the entry point is still there, and it
+    // simply reports that there is nothing unread.
+    const control = screen.getByRole("button", { name: "Activity: no unread notices" });
+    expect(control).toHaveAttribute("aria-haspopup", "dialog");
+    expect(control.querySelector(".bell-badge")).toBeNull();
+  });
+
   it("announces the unread count politely when it changes", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ unreadSignalCount: 0 }) as never);
     const { rerender } = render(
