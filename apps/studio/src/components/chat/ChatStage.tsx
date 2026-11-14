@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ThreadPrimitive, useThreadViewport } from "@assistant-ui/react";
 
 import { isFeatureEnabled } from "../../features/flags";
+import { canvasStatus } from "../../lib/canvasProvenance";
 import { arrivalAnnouncement, arrivalLabel, arrivedSince } from "./arrivalCount";
 import {
   HELP_TEXT,
@@ -100,6 +101,9 @@ export function ChatStage() {
   } = useStudio();
 
   const empty = messages.length === 0;
+  // The provenance chip the rail already shows, reused here so the inquiry's
+  // own bar says whether the board it describes is real or a sample (#737).
+  const provenance = canvasStatus(canvas);
 
   function runCommand(command: StudioCommand) {
     if (VIEW_COMMANDS.has(command.id)) {
@@ -214,6 +218,19 @@ export function ChatStage() {
       {/* Outside the viewport, so the toolbar is never clipped by the scroll
           frame; absent on the empty stage because there is nothing to quote. */}
       <SelectionToolbar />
+      <header className="mainstage__bar">
+        <h2 className="mainstage__title">
+          {brief?.product_name || brief?.job_statement || "This conversation"}
+        </h2>
+        {provenance ? (
+          <span
+            className={`mainstage__provenance${provenance.label === "OFFLINE" ? " is-offline" : ""}`}
+            title={provenance.detail}
+          >
+            {provenance.label}
+          </span>
+        ) : null}
+      </header>
       <div className="chat__transcript">
         <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
           <div className="chat__thread">

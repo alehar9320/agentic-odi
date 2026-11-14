@@ -38,6 +38,7 @@ from agentic_odi_core.contract import (
     capability_summary,
 )
 from agentic_odi_core.errors import (
+    AlreadyPromotedError,
     ConflictError,
     NotFoundError,
     OdiError,
@@ -143,6 +144,8 @@ from agentic_odi_core.remote import (
 from agentic_odi_core.repository import (
     InMemoryRepository,
     Repository,
+    compute_promotion_fingerprint,
+    normalize_quote_text,
 )
 from agentic_odi_core.review import (
     NO_CHANGE,
@@ -241,6 +244,7 @@ __all__ = [
     "CompareCandidate",
     "CompareRow",
     "ConflictError",
+    "AlreadyPromotedError",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
@@ -359,6 +363,8 @@ __all__ = [
     "classify_opportunity",
     "classify_value",
     "compute_traceability_report",
+    "compute_promotion_fingerprint",
+    "normalize_quote_text",
     "normalize_objective",
     "objective_key",
     "objectives_from_v2mom",

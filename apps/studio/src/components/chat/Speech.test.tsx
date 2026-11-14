@@ -31,6 +31,7 @@ const harness = vi.hoisted(() => ({
     thinkingPhase: null as string | null,
     toolActivity: [] as unknown[],
     offlineReply: false,
+    displayName: "",
     canvas: null,
     regenerateFrom: vi.fn(),
     editFrom: vi.fn(),
