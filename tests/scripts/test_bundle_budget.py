@@ -23,9 +23,7 @@ def _node_available() -> bool:
     return shutil.which("node") is not None
 
 
-pytestmark = pytest.mark.skipif(
-    not _node_available(), reason="the budget gate is a Node script"
-)
+pytestmark = pytest.mark.skipif(not _node_available(), reason="the budget gate is a Node script")
 
 
 def _write_manifest(dist: Path, entry_bytes: int, vendor_bytes: int = 0) -> Path:
