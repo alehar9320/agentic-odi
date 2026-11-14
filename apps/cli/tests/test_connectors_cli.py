@@ -71,6 +71,32 @@ def test_connectors_add_mcp_then_list(tmp_path: Path) -> None:
     assert payload["connectors"][0]["settings"]["url"] == "http://localhost:9000/mcp"
 
 
+def test_connectors_add_mcp_with_session_header(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+    result = runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "composio-session",
+            "--url",
+            "https://mcp.composio.dev/session/abc",
+            "--header",
+            "x-api-key=${COMPOSIO_API_KEY}",
+            "--config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    settings = json.loads(config.read_text(encoding="utf-8"))["connectors"][0]["settings"]
+    assert settings["headers"] == {"x-api-key": "${COMPOSIO_API_KEY}"}
+    assert settings["env_vars"] == ["COMPOSIO_API_KEY"]
+    assert "COMPOSIO_API_KEY" in _strip(result.output)
+
+
 def test_connectors_add_rejects_duplicate(tmp_path: Path) -> None:
     config = tmp_path / "connectors.json"
     args = [
