@@ -51,6 +51,46 @@ per dock — top strips can never hide corner toasts.
 `critical > warning > info > success`, and the default `maxVisible` is 3 per dock;
 anything beyond that collapses into a "+N more notices" affordance.
 
+## The durable notice history
+
+A banner is transient by design: it fades, it is dismissed, and a reload wipes
+it. That is right for a statement about the present moment and wrong for the
+person who looked away. The **activity centre** (#406) is the other half of the
+same system: every banner and toast raised through the studio is also written
+down as a `Notice`, and the history outlives the banner that produced it.
+
+```text
+notices/types.ts       Notice, NoticeSeverity, NoticeInput
+notices/recorder.ts    pure functions: recordNotice, dismissNotice, markAllRead, groupNoticesByDay
+notices/fromBanner.ts  a BannerSpec resolves to a NoticeInput through the same catalog
+notices/ActivityProvider.tsx  holds the list, reads it once, writes every change
+components/activity/ActivityCentre.tsx  the dialog: day groups, severity, dismiss
+```
+
+**One description, not two.** `fromBanner.ts` calls `resolveSpec` on the banner
+catalog, so a notice's severity, title, and body are the exact words the person
+saw on screen. A second, hand-written summary of the same event would be a
+description that drifts from the thing it describes.
+
+**The recorder is pure and capped.** `recordNotice` returns a new list, newest
+first, dedupes a repeat raised within a minute, and keeps at most
+`NOTICE_CAP` rows so the history cannot grow without bound. Dismissal removes a
+row permanently; "Mark all read" clears the unread count without removing
+anything. These rules are unit-tested without a renderer.
+
+**Persistence is best-effort.** `ActivityProvider` reads the list once on mount
+and writes it after every change through `LocalStore.putNotices`. A store that
+fails to open leaves the list empty rather than blocking the shell, and a
+failure to write is swallowed: losing the history is a smaller failure than
+losing the studio.
+
+**Escape closes, only Dismiss removes.** The dialog is a dialog: Escape and the
+scrim close it without touching a row, and it is portalled to the document root
+so the shell behind it can be made inert without inerting the dialog too.
+Severity is carried by a word ("Critical", "Warning", "Info", "Done"), never by
+colour alone. With no rows the dialog says so — "Nothing has happened yet in
+this workspace" — rather than showing an empty list.
+
 ## Adding a banner
 
 1. Add the kind to `BannerKind` in `types.ts`.

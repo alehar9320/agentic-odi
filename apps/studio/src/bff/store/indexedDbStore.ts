@@ -1,5 +1,6 @@
 import { openDB, type IDBPDatabase } from "idb";
 
+import type { Notice } from "../../notices/types";
 import type { Observation } from "../../types";
 import { nowIso } from "../id";
 import {
@@ -342,6 +343,18 @@ export class IndexedDbLocalStore implements LocalStore {
     await tx.done;
   }
 
+  async listNotices(): Promise<Notice[]> {
+    const notices = await this.db.getAllFromIndex("notices", "by-at");
+    return notices.sort((left, right) => right.at - left.at);
+  }
+
+  async putNotices(notices: Notice[]): Promise<void> {
+    const tx = this.db.transaction("notices", "readwrite");
+    await tx.store.clear();
+    await Promise.all(notices.map((notice) => tx.store.put(notice)));
+    await tx.done;
+  }
+
   async snapshot(): Promise<WorkspaceSnapshot> {
     const [jobs, steps, outcomes, evidence, observations, conversations] =
       await Promise.all([
@@ -412,6 +425,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "outbox",
         "conversations",
         "turns",
+        "notices",
       ],
       "readwrite",
     );
@@ -425,6 +439,7 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("outbox").clear(),
       tx.objectStore("conversations").clear(),
       tx.objectStore("turns").clear(),
+      tx.objectStore("notices").clear(),
     ]);
     await tx.done;
   }

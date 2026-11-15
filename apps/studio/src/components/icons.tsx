@@ -284,6 +284,15 @@ export function BellIcon(props: IconProps) {
   );
 }
 
+/** A pulse line: the activity centre's mark, distinct from the signal bell. */
+export function ActivityIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 12h4l2.5-6 4 12 2.5-6h5" />
+    </Icon>
+  );
+}
+
 export function SunIcon(props: IconProps) {
   return (
     <Icon {...props}>

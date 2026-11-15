@@ -11,6 +11,7 @@ import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
 import { useUpdateSnapshot } from "../../updater";
 import {
+  ActivityIcon,
   BellIcon,
   HistoryIcon,
   MenuIcon,
@@ -20,6 +21,8 @@ import {
   SettingsIcon,
   SunIcon,
 } from "../icons";
+import { ActivityCentre } from "../activity/ActivityCentre";
+import { useActivityOptional } from "../../notices/ActivityProvider";
 import { OdiMascot } from "../OdiMascot";
 import { StatusDot } from "../status/StatusDot";
 
@@ -62,6 +65,9 @@ export function StudioBar({
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const activity = useActivityOptional();
+  const activityUnread = activity?.unread ?? 0;
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
   const reduceMotion = useReducedMotion();
@@ -418,6 +424,23 @@ export function StudioBar({
 
         <button
           type="button"
+          className="icon-button bar__activity"
+          aria-label={
+            activityUnread > 0
+              ? `Activity: ${activityUnread} unread`
+              : "Activity: no unread notices"
+          }
+          title="Activity"
+          aria-haspopup="dialog"
+          aria-expanded={activityOpen}
+          onClick={() => setActivityOpen(true)}
+        >
+          <ActivityIcon size={17} />
+          {activityUnread > 0 && <span className="bell-badge">{activityUnread}</span>}
+        </button>
+
+        <button
+          type="button"
           className="bar__health"
           onClick={() => openPanel("settings")}
           aria-label={`Model status: ${status}. ${statusDetail}`}
@@ -494,6 +517,8 @@ export function StudioBar({
           ? `${unreadSignalCount} new ${unreadSignalCount === 1 ? "notification" : "notifications"}`
           : ""}
       </p>
+
+      <ActivityCentre open={activityOpen} onClose={() => setActivityOpen(false)} />
     </header>
   );
 }

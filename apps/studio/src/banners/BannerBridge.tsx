@@ -1,10 +1,12 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 
 import { useOnlineStatus } from "../lib/onlineStatus";
 import { dismissAppUpdate, reloadForUpdate, useAppUpdate } from "../lib/swUpdate";
+import { noticeFromBanner } from "../notices/fromBanner";
+import { useActivityOptional } from "../notices/ActivityProvider";
 import { useStudio } from "../state/StudioContext";
 import { useBanner } from "./BannerProvider";
-import type { BannerActionId } from "./types";
+import type { BannerActionId, BannerSpec } from "./types";
 
 /**
  * The reactive half of the banner system.
@@ -18,6 +20,7 @@ import type { BannerActionId } from "./types";
  */
 export function BannerBridge() {
   const { raise, resolve } = useBanner();
+  const activity = useActivityOptional();
   const {
     sidecarReachable,
     dismissedSidecarNotice,
@@ -27,46 +30,61 @@ export function BannerBridge() {
   const online = useOnlineStatus();
   const appUpdate = useAppUpdate();
 
+  // A banner is shown and forgotten; a notice is the record that outlives it.
+  // Recording here, beside the raise, means every condition-driven banner
+  // leaves a row without any call site having to know the activity centre
+  // exists. A retry loop raising the same banner is deduped by the recorder.
+  const record = activity?.record;
+  const raiseAndRecord = useCallback(
+    (spec: BannerSpec) => {
+      raise(spec);
+      if (record) {
+        record(noticeFromBanner(spec));
+      }
+    },
+    [raise, record],
+  );
+
   useEffect(() => {
     // One sentence when the connection goes, resolved when it comes back. The
     // stable kind means a flapping connection updates this row in place instead
     // of stacking a copy per event, so it is not repeated on every action.
     if (!online) {
-      raise({ kind: "offline" });
+      raiseAndRecord({ kind: "offline" });
     } else {
       resolve("offline");
     }
-  }, [online, raise, resolve]);
+  }, [online, raiseAndRecord, resolve]);
 
   useEffect(() => {
     // A staged build is offered once, and never mid-sentence: while a turn is
     // streaming the offer waits, so activating the new worker cannot reload the
     // page under a reply that is still arriving.
     if (appUpdate.ready && !appUpdate.dismissed && !streaming) {
-      raise({ kind: "app-update-ready" });
+      raiseAndRecord({ kind: "app-update-ready" });
     } else {
       resolve("app-update-ready");
     }
-  }, [appUpdate.ready, appUpdate.dismissed, streaming, raise, resolve]);
+  }, [appUpdate.ready, appUpdate.dismissed, streaming, raiseAndRecord, resolve]);
 
   useEffect(() => {
     // The offline strip is the one line while the browser has no network: this
     // strip's Recheck and Start-the-sidecar actions could not succeed anyway.
     if (sidecarReachable === false && !dismissedSidecarNotice && online) {
-      raise({ kind: "sidecar-down" });
+      raiseAndRecord({ kind: "sidecar-down" });
     } else {
       resolve("sidecar-down");
     }
-  }, [sidecarReachable, dismissedSidecarNotice, online, raise, resolve]);
+  }, [sidecarReachable, dismissedSidecarNotice, online, raiseAndRecord, resolve]);
 
   useEffect(() => {
     // Same reason as the sidecar strip: the offline line says what still works.
     if (llmHealth.healthy === false && online) {
-      raise({ kind: "model-offline" });
+      raiseAndRecord({ kind: "model-offline" });
     } else {
       resolve("model-offline");
     }
-  }, [llmHealth.healthy, online, raise, resolve]);
+  }, [llmHealth.healthy, online, raiseAndRecord, resolve]);
 
   return null;
 }
