@@ -35,7 +35,7 @@ missing.
 
 | Concern | Owner | Known stray copies |
 | --- | --- | --- |
-| Markdown rendering | `@assistant-ui/react-markdown` (declared, imported nowhere) | `apps/studio/src/lib/markdown.ts` |
+| Markdown rendering | `@assistant-ui/react-markdown` (`MarkdownTextPrimitive`, plus the shared `mdComponents` map in `apps/studio/src/components/chat/Markdown.tsx`) | none left — the hand-written parser under `apps/studio/src/lib/` was deleted in #394 |
 | Dialog, focus trap, dismissal | `radix-ui` (declared; used only under `src/vendor`) | `apps/studio/src/lib/useFocusTrap.ts`, four hand-built `role="dialog"` surfaces |
 | Opportunity score wording | `apps/studio/src/lib/odi.ts` (`formatOpportunityScore`, `isUnderserved`, `UNDERSERVED_THRESHOLD`) | `apps/studio/src/lib/records.ts` prints the stored number as-is, on purpose — that table reports what the store returned |
 | Number clamping | `apps/studio/src/ui/primitives.tsx` | `apps/studio/src/ui/cards.tsx`, `apps/studio/src/components/canvas/OpportunityLandscape.tsx` |

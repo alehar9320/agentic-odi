@@ -25,3 +25,15 @@
     Tests the roadmap gate that PR #497 removes, so the test goes with it. The
     gate required every new capability to add a line to docs/roadmap.md, which
     made every agent PR edit one shared file and conflict with every other.
+- path: "apps/studio/src/lib/markdown.ts"
+  issue: 394
+  reason: >-
+    The hand-written markdown subset is superseded by the declared
+    `@assistant-ui/react-markdown` owner rendering through `react-markdown`
+    (#394). Its behaviours moved to `components/chat/Markdown.test.tsx`.
+- path: "apps/studio/src/lib/markdown.test.ts"
+  issue: 394
+  reason: >-
+    The seven parser behaviours moved to `components/chat/Markdown.test.tsx`
+    against the library renderer, so this parser test goes with its parser
+    (#394).
