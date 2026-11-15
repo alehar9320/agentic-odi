@@ -277,6 +277,19 @@ class Evidence(BaseModel):
     job_id: str | None = Field(None, description="Job this evidence supports")
     step_id: str | None = Field(None, description="Job-map Step this evidence supports")
     outcome_id: str | None = Field(None, description="Desired Outcome this evidence supports")
+    impact: Literal["high", "medium", "low"] = Field(
+        "medium",
+        description=(
+            "How much this evidence moves the outcome score; mirrors JPD's insights impact rating"
+        ),
+    )
+    confidence: Literal["verified", "claimed"] = Field(
+        "claimed",
+        description=(
+            "Whether the record was confirmed by the person (verified) or "
+            "asserted without confirmation (claimed)"
+        ),
+    )
 
 
 class CustomerOutcome(BaseModel):
