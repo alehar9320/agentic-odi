@@ -547,3 +547,52 @@ class ScheduledWork(BaseModel):
     last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
     next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
     result_summary: str | None = Field(None, description="Execution outcome or error summary")
+
+
+class RelationshipType(str, Enum):
+    """Typed relationship between two domain entities.
+
+    Mirrors Jira-style issue links but is AI-native: links carry structured
+    metadata that LLMs can traverse without guessing.
+    """
+
+    references = "references"
+    serves = "serves"
+    blocked_by = "blocked_by"
+    blocking = "blocking"
+    duplicates = "duplicates"
+    relates_to = "relates_to"
+    implements = "implements"
+    validates = "validates"
+    evidence_for = "evidence_for"
+    outcome_of = "outcome_of"
+    external_jira = "external_jira"
+    external_linear = "external_linear"
+    external_jpd = "external_jpd"
+    external_github = "external_github"
+    external_notion = "external_notion"
+
+
+class Link(BaseModel):
+    """A first-class typed link between two agentic-odi entities.
+
+    Links connect jobs, steps, outcomes, evidence, candidates, segments, and
+    strategies without changing ODI scoring or segmentation logic. A human
+    must approve each link before it is written (human-in-the-loop).
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    source_type: str = Field(..., description="The type of the source entity")
+    source_id: str = Field(..., description="The ID of the source entity")
+    target_type: str = Field(..., description="The type of the target entity")
+    target_id: str = Field(..., description="The ID of the target entity")
+    relationship_type: RelationshipType = Field(..., description="The type of relationship")
+    external_system: str | None = Field(
+        None, description="External system that originated the link, if any"
+    )
+    external_id: str | None = Field(None, description="External ID in the origin system, if any")
+    preview: dict | None = Field(None, description="Cached preview of the target entity")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When the link was created",
+    )
