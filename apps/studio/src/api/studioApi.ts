@@ -35,6 +35,8 @@ import type {
   ShareLink,
   StudioError,
   Study,
+  FeedbackSummary,
+  MessageFeedback,
 } from "../types";
 import { createSseParser, type RawSseEvent } from "./sse";
 import { recordStudioError } from "../diagnostics/bundle";
@@ -865,6 +867,41 @@ export async function resolveApproval(
         { approved, reason },
       ),
     async () => ({ ok: true, id: approvalId }),
+  );
+}
+
+/** Store one verdict on one reply. A later verdict on the same reply replaces it. */
+export async function recordFeedback(payload: {
+  conversation_id: string;
+  message_id: string;
+  type: "positive" | "negative";
+  comment?: string | null;
+}): Promise<MessageFeedback> {
+  return withLocal(
+    () =>
+      postJson<{ feedback: MessageFeedback }>("/api/feedback", payload).then(
+        (body) => body.feedback,
+      ),
+    async (bff) => bff.memory.recordFeedback(payload),
+  );
+}
+
+/** The stored verdicts for one conversation, newest first. */
+export async function listFeedback(conversationId: string): Promise<MessageFeedback[]> {
+  return withLocal(
+    () =>
+      getJson<{ feedback: MessageFeedback[] }>(
+        `/api/conversations/${encodeURIComponent(conversationId)}/feedback`,
+      ).then((body) => body.feedback),
+    async (bff) => bff.memory.listFeedback(conversationId),
+  );
+}
+
+/** Counts by verdict for the current month, computed from stored rows only. */
+export async function fetchFeedbackSummary(): Promise<FeedbackSummary> {
+  return withLocal(
+    () => getJson<FeedbackSummary>("/api/feedback/summary"),
+    async (bff) => bff.memory.feedbackSummary(),
   );
 }
 

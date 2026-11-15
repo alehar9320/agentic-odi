@@ -17,6 +17,7 @@ import {
   type OutboxRecord,
   type StoredConversation,
   type StoredEvidence,
+  type StoredFeedback,
   type StoredJob,
   type StoredOutcome,
   type StoredStep,
@@ -342,6 +343,18 @@ export class IndexedDbLocalStore implements LocalStore {
     await tx.done;
   }
 
+  async listFeedback(): Promise<StoredFeedback[]> {
+    return this.db.getAll("feedback");
+  }
+
+  async putFeedback(feedback: StoredFeedback): Promise<void> {
+    await this.db.put("feedback", feedback);
+  }
+
+  async deleteFeedback(id: string): Promise<void> {
+    await this.db.delete("feedback", id);
+  }
+
   async snapshot(): Promise<WorkspaceSnapshot> {
     const [jobs, steps, outcomes, evidence, observations, conversations] =
       await Promise.all([
@@ -412,6 +425,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "outbox",
         "conversations",
         "turns",
+        "feedback",
       ],
       "readwrite",
     );
@@ -425,6 +439,7 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("outbox").clear(),
       tx.objectStore("conversations").clear(),
       tx.objectStore("turns").clear(),
+      tx.objectStore("feedback").clear(),
     ]);
     await tx.done;
   }
