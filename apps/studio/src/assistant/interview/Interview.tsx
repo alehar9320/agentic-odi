@@ -1,5 +1,5 @@
 /**
- * The interview in the thread (issue #397).
+ * The interview in the thread (issues #397, #400).
  *
  * This is the wiring point: it renders the interview card (#396), reports the
  * person's answers to the conductor, and hands the conductor's result back to
@@ -9,15 +9,15 @@
  * component that composes the card and the conductor rather than a new
  * orchestration path inside either file.
  *
- * The records the conductor creates are the same `createJob`/`addOutcome`/
- * `addEvidence` the studio already uses; this component adds no store and no
- * fetch of its own. Rendering the answered card as a collapsed record is a
- * separate slice (#400), so this host reports completion instead of drawing it.
+ * Once the conductor reports the records it created, the host hands them back
+ * to the card as `answered`, so a finished interview collapses into the record
+ * of itself (#400) while an unfinished one stays live and answerable.
  */
 
 import { useEffect, useRef, useState } from "react";
 
 import { InterviewCard, REQUIRED_ANSWER_MESSAGE } from "../../components/interview/InterviewCard";
+import type { AnsweredInterview } from "../../components/interview/answered";
 import type { Question } from "../../components/interview/types";
 import {
   createConductor,
@@ -39,6 +39,11 @@ export interface InterviewProps {
   onComplete?: (created: CreatedRecords) => void;
   /** Called when a write stopped part-way, naming the step that failed. */
   onFailure?: (state: InterviewState) => void;
+  /**
+   * Open a record the answers created, through the host's existing focus
+   * action. The card offers one link per created outcome.
+   */
+  onOpenRecord?: (id: string) => void;
 }
 
 export function Interview({
@@ -47,6 +52,7 @@ export function Interview({
   plan = planFromAnswers,
   onComplete,
   onFailure,
+  onOpenRecord,
 }: InterviewProps) {
   const [state, setState] = useState<InterviewState>(() =>
     createConductor({ ports, plan }).getState(),
@@ -77,6 +83,26 @@ export function Interview({
 
   const errors = state.invalid === null ? undefined : { [state.invalid]: REQUIRED_ANSWER_MESSAGE };
 
+  // The record of a finished interview, built from the answers the submit was
+  // validated against and the records the store confirmed. A failed submit
+  // leaves the card live, with the reason on screen and the answers intact.
+  const answered: AnsweredInterview | null =
+    state.status === "done"
+      ? {
+          questions: questions.map((question) => ({
+            id: question.id,
+            prompt: question.prompt,
+          })),
+          answers: state.answers,
+          created: {
+            outcomeIds: state.created.outcomeIds,
+            evidenceCount: state.created.evidenceCount,
+          },
+        }
+      : null;
+
+  const failure = state.status === "failed" && state.failure ? state.failure.message : null;
+
   return (
     <InterviewCard
       questions={questions}
@@ -85,6 +111,9 @@ export function Interview({
       onSubmit={() => conductor.send({ type: "submit" })}
       busy={state.status === "submitting"}
       errors={errors}
+      answered={answered}
+      onOpenRecord={onOpenRecord}
+      failure={failure}
     />
   );
 }
