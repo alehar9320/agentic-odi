@@ -120,6 +120,13 @@ describe("IndexedDbLocalStore", () => {
     await store.setConversationHead("c-1", "m-1");
     const again = await store.conversationTree("c-1");
     expect(again.head_id).toBe("m-1");
+
+    // A name is not a branch: the visible turn survives the rename.
+    const renamed = await store.renameConversation("c-1", "Activation model");
+    expect(renamed.title).toBe("Activation model");
+    expect(renamed.head_id).toBe("m-1");
+    expect((await store.getConversation("c-1"))?.title).toBe("Activation model");
+    await expect(store.renameConversation("c-1", "  ")).rejects.toThrow(/name/i);
     store.close();
   });
 

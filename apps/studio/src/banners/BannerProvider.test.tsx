@@ -20,14 +20,14 @@ describe("BannerProvider", () => {
 
   it("exposes a raised banner to consumers", () => {
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.raise({ kind: "sidecar-down" }));
-    expect(result.current.view.visible[0].kind).toBe("sidecar-down");
+    act(() => result.current.raise({ kind: "write-rejected" }));
+    expect(result.current.view.visible[0].kind).toBe("write-rejected");
   });
 
   it("updates one banner when the same persistent kind is raised twice", () => {
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.raise({ kind: "sidecar-down", body: "First." }));
-    act(() => result.current.raise({ kind: "sidecar-down", body: "Second." }));
+    act(() => result.current.raise({ kind: "write-rejected", body: "First." }));
+    act(() => result.current.raise({ kind: "write-rejected", body: "Second." }));
     expect(result.current.view.visible).toHaveLength(1);
     expect(result.current.view.visible[0].body).toBe("Second.");
   });
@@ -41,15 +41,15 @@ describe("BannerProvider", () => {
 
   it("resolves a banner when its condition clears", () => {
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.raise({ kind: "sidecar-down" }));
-    act(() => result.current.resolve("sidecar-down"));
+    act(() => result.current.raise({ kind: "offline" }));
+    act(() => result.current.resolve("offline"));
     expect(result.current.view.visible).toHaveLength(0);
   });
 
   it("dismisses a banner by id", () => {
     const { result } = renderHook(useHarness, { wrapper });
-    act(() => result.current.raise({ kind: "sidecar-down" }));
-    act(() => result.current.dismiss("sidecar-down"));
+    act(() => result.current.raise({ kind: "write-rejected" }));
+    act(() => result.current.dismiss("write-rejected"));
     expect(result.current.view.visible).toHaveLength(0);
   });
 });

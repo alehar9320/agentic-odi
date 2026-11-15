@@ -7,10 +7,10 @@ import type { Banner } from "./types";
 
 function banner(overrides: Partial<Banner> = {}): Banner {
   return {
-    id: "sidecar-down",
-    kind: "sidecar-down",
-    title: "The studio sidecar isn't running.",
-    body: "The assistant is paused.",
+    id: "write-rejected",
+    kind: "write-rejected",
+    title: "That write was rejected.",
+    body: "The change was not saved.",
     severity: "critical",
     life: "persistent",
     dock: "top",
@@ -25,8 +25,8 @@ function banner(overrides: Partial<Banner> = {}): Banner {
 describe("BannerStack", () => {
   it("renders the title and the body of a banner", () => {
     render(<BannerStack banners={[banner()]} overflow={0} onDismiss={() => {}} onIntent={() => {}} />);
-    expect(screen.getByText("The studio sidecar isn't running.")).toBeInTheDocument();
-    expect(screen.getByText("The assistant is paused.")).toBeInTheDocument();
+    expect(screen.getByText("That write was rejected.")).toBeInTheDocument();
+    expect(screen.getByText("The change was not saved.")).toBeInTheDocument();
   });
 
   it("announces a critical banner as an alert and a quiet one as a status", () => {
@@ -35,7 +35,7 @@ describe("BannerStack", () => {
     );
     // Scope to the banner itself: Radix also renders its own `role="status"`
     // announcer, so a document-wide query would match more than one node.
-    expect(screen.getByText("The studio sidecar isn't running.").closest("[role]")).toHaveAttribute(
+    expect(screen.getByText("That write was rejected.").closest("[role]")).toHaveAttribute(
       "role",
       "alert",
     );
@@ -58,7 +58,7 @@ describe("BannerStack", () => {
       <BannerStack
         banners={[
           banner({
-            actions: [{ label: "Recheck", intent: "Recheck the sidecar.", tone: "ghost" }],
+            actions: [{ label: "Explain", intent: "What changed?", tone: "ghost" }],
           }),
         ]}
         overflow={0}
@@ -66,8 +66,8 @@ describe("BannerStack", () => {
         onIntent={onIntent}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Recheck" }));
-    expect(onIntent).toHaveBeenCalledWith("Recheck the sidecar.");
+    fireEvent.click(screen.getByRole("button", { name: "Explain" }));
+    expect(onIntent).toHaveBeenCalledWith("What changed?");
   });
 
   it("calls onDismiss with the banner's id", () => {
@@ -76,7 +76,7 @@ describe("BannerStack", () => {
       <BannerStack banners={[banner()]} overflow={0} onDismiss={onDismiss} onIntent={() => {}} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
-    expect(onDismiss).toHaveBeenCalledWith("sidecar-down");
+    expect(onDismiss).toHaveBeenCalledWith("write-rejected");
   });
 
   it("keeps each banner in the dock it names", () => {
@@ -91,7 +91,7 @@ describe("BannerStack", () => {
         onIntent={() => {}}
       />,
     );
-    expect(screen.getByText("The studio sidecar isn't running.").closest("ol")).toHaveClass(
+    expect(screen.getByText("That write was rejected.").closest("ol")).toHaveClass(
       "banner-dock--top",
     );
     expect(screen.getByText("Saved.").closest("ol")).toHaveClass("banner-dock--corner");
@@ -100,7 +100,7 @@ describe("BannerStack", () => {
   it("shows how many banners are hidden behind the cap", () => {
     render(
       <BannerStack
-        banners={[banner(), banner({ id: "model-offline", kind: "model-offline" })]}
+        banners={[banner(), banner({ id: "offline", kind: "offline" })]}
         overflow={2}
         onDismiss={() => {}}
         onIntent={() => {}}

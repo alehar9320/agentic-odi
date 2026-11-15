@@ -4,6 +4,14 @@
  * One entry per kind, and a new banner is an entry here plus a `raise()` call —
  * never a new component and never a new CSS class. This file is the single
  * source of truth for a banner's severity, life, dock, and default copy.
+ *
+ * What is not here matters as much as what is. A studio with no model is
+ * supported by design — the turn is carried by the browser and labelled for what
+ * it is — so there is no kind for it: announcing a supported state trains a
+ * person to ignore the strips that report a real failure. The state is read on
+ * request from the capability control instead. `sidecar-down` survives because
+ * it describes a different thing: the loss of a sidecar this session was
+ * talking to.
  */
 
 import type { Banner, BannerDefaults, BannerKind, BannerSeverity, BannerSpec } from "./types";
@@ -24,35 +32,13 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
       { label: "Start the sidecar", action: "open-setup", tone: "ghost" },
     ],
   },
-  "model-offline": {
-    severity: "warning",
-    life: "persistent",
-    dock: "top",
-    title: "Working by hand.",
-    body: "No model is reachable, so the assistant is paused. Every change still writes to your ODI repository.",
-    dismissible: false,
-    actions: [
-      { label: "Capture an outcome", action: "open-capture", tone: "ghost" },
-      { label: "Map the job", action: "open-jobmap", tone: "ghost" },
-      { label: "Set your context", action: "open-setup", tone: "ghost" },
-    ],
-  },
-  "offline": {
+  offline: {
     severity: "info",
     life: "persistent",
     dock: "top",
     title: "You're offline.",
     body: "The Studio still opens, and your canvas, conversations, and settings are on this device. Answers come from what is stored here until a connection is back.",
     dismissible: true,
-  },
-  "app-update-ready": {
-    severity: "info",
-    life: "persistent",
-    dock: "top",
-    title: "A new version of the Studio is ready.",
-    body: "Reload to use it. Your conversation is saved on this device.",
-    dismissible: true,
-    actions: [{ label: "Reload for the new version", action: "reload-app", tone: "primary" }],
   },
   "update-available": {
     severity: "info",
