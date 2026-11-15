@@ -561,11 +561,37 @@ a {
 }
 
 .chat__scroll {
+  /* The frame the vendored thread Element renders; also the positioning context
+     for the jump-to-latest control, which floats over the transcript. */
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 6px 22px 20px;
   scrollbar-gutter: stable;
+}
+
+/* The Element's content column: the message list and the footer, centred. */
+.chat__thread {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+/* The empty stage: the welcome and the footer share the centred column. */
+.chat__thread.aui-thread-content--empty {
+  justify-content: center;
+}
+
+/* The footer docks to the bottom of the scroll frame when the thread has turns,
+   so it stays visible while the transcript scrolls under it. The scroll frame
+   already provides the side and bottom padding, so the dock drops its own. */
+.chat__dock--pinned {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding: 6px 0 0;
 }
 
 /* Keyboard readers can scroll history without a mouse (WCAG 2.1.1). */

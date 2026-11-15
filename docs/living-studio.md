@@ -498,6 +498,7 @@ cites the issue or PR that landed it.
 | `data-aui-quote-selectable="false"` | Adopted | Tool traces and generated surfaces are marked non-prose. | #435 |
 | `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | The quote persists in the turn's metadata. | #435 |
 | `button` Element | Adopted | The one copy-in: a shadcn button under `src/vendor`, with a provenance header and a `vendor.lock.json` entry. It is not an assistant-ui primitive — it is a vendor decision, recorded here because the ledger audits the library and the alley is part of that audit. | #383 |
+| `thread` Element | Partial | Its frame is copied into `src/vendor/components/assistant/thread.tsx`: the thread root, the scrolling viewport, and the viewport footer the composer docks into, so the empty stage and a running thread share one layout. The Element's own message, composer, and markdown sections are not taken — `Conversation`/`parts.tsx`, `ThreadComposer`, and `Markdown.tsx` own those. | — |
 | Structured turn failure | Adopted | The failure panel with retry copy. | #129 |
 | `unstable_useMessageStallDetection` | Adopted | "Still working · no new output for Ns", only when output stops moving. | #431 |
 | `useAuiState` | Adopted | Runtime state read across the transcript and composer. | #238 |

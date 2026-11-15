@@ -529,4 +529,39 @@ describe("ChatStage", () => {
       expect(container.querySelector(".mainstage__provenance")).toBeNull();
     });
   });
+
+  describe("the assistant-ui thread frame (#993)", () => {
+    it("renders the empty stage through the Element's root and viewport", () => {
+      harness.state.messages = [];
+      const { container } = render(
+        <StudioRuntimeProvider>
+          <ChatStage />
+        </StudioRuntimeProvider>,
+      );
+
+      expect(container.querySelectorAll("[data-aui-thread-root]")).toHaveLength(1);
+      expect(container.querySelectorAll(".chat__scroll")).toHaveLength(1);
+      // The hero and the composer share the Element's welcome slot, and the
+      // composer is reachable without a second frame.
+      expect(container.querySelector(".chat__welcome")).not.toBeNull();
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+
+    it("mounts one thread root and one viewport for a populated thread", () => {
+      harness.state.messages = [
+        { id: "u-1", parentId: null, role: "user", content: "A question" },
+        { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer" },
+      ];
+      const { container } = render(
+        <StudioRuntimeProvider>
+          <ChatStage />
+        </StudioRuntimeProvider>,
+      );
+
+      // The old hand-built frame is gone: no second root or viewport remains.
+      expect(container.querySelectorAll("[data-aui-thread-root]")).toHaveLength(1);
+      expect(container.querySelectorAll(".chat__scroll")).toHaveLength(1);
+      expect(container.querySelector(".chat__dock")).not.toBeNull();
+    });
+  });
 });
