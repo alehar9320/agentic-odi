@@ -621,7 +621,15 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="links_list",
         summary="List links, optionally filtered by source/target entity and relationship type.",
         effect=_derive_effect("links_list"),
-        arguments=("source_type", "source_id", "target_type", "target_id", "relationship_type"),
+        arguments=(
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "relationship_type",
+            "limit",
+            "offset",
+        ),
         returns="A list of Link records.",
     ),
     ToolName.LINKS_REMOVE.value: ToolSpec(
