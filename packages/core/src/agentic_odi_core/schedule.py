@@ -149,6 +149,20 @@ def validate_schedule_expression(expression: str) -> None:
     compute_next_run(expression)
 
 
+MAX_RETRY_ATTEMPTS = 3
+MAX_RETRY_DELAY_MINUTES = 30
+
+
+def retry_delay_minutes(attempts: int) -> int:
+    """Backoff for a run that just failed, capped so a flaky run never waits forever.
+
+    ``attempts`` is the number of consecutive failures so far, so the first
+    failure (``attempts == 1``) waits two minutes, the second four, and every
+    failure after the cap waits ``MAX_RETRY_DELAY_MINUTES``.
+    """
+    return min(2**attempts, MAX_RETRY_DELAY_MINUTES)
+
+
 def is_due(expression: str, last_run: datetime | None = None, now: datetime | None = None) -> bool:
     if now is None:
         now = datetime.now(timezone.utc)

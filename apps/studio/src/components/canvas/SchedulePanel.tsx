@@ -5,8 +5,13 @@ import {
   scheduleWork as apiScheduleWork,
   triggerScheduledWork as apiTriggerScheduledWork,
 } from "../../api/studioApi";
+import { AlertIcon, CheckIcon } from "../icons";
+import { formatClockTime } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
 import type { ScheduledWork } from "../../types";
+
+/** Mirrors core's MAX_RETRY_ATTEMPTS; the panel only formats, it never schedules. */
+const MAX_RUN_ATTEMPTS = 3;
 
 /** The status, as a badge tone. `failed` is a warning, `running` is in flight. */
 function statusTone(status: ScheduledWork["status"]): string {
@@ -20,6 +25,35 @@ function statusTone(status: ScheduledWork["status"]): string {
     default:
       return "badge";
   }
+}
+
+/**
+ * What the last run did, said in words and an icon — never colour alone, and
+ * never a time the record does not carry. A run with no outcome yet renders
+ * nothing rather than a plausible-looking default.
+ */
+function RunLine({ work }: { work: ScheduledWork }) {
+  if (work.last_status === "failed") {
+    const attempts = work.attempts ?? 0;
+    const outcome = work.next_run_at
+      ? `retrying at ${formatClockTime(work.next_run_at)}`
+      : "needs attention";
+    return (
+      <p className="card__evidence">
+        <AlertIcon size={14} /> Failed — {work.last_error ?? "unknown error"} · attempt {attempts} of{" "}
+        {MAX_RUN_ATTEMPTS} · {outcome}
+      </p>
+    );
+  }
+  if (work.last_status === "ok") {
+    return (
+      <p className="card__evidence">
+        <CheckIcon size={14} /> Ran at{" "}
+        <time dateTime={work.last_run_at ?? undefined}>{formatClockTime(work.last_run_at ?? "")}</time>
+      </p>
+    );
+  }
+  return null;
 }
 
 /**
@@ -187,6 +221,7 @@ export function SchedulePanel({ agentId: initialAgentId }: { agentId?: string })
               <p className="card__meta">
                 Agent {work.agent_id} · {work.trigger_type} · {work.schedule_expression || "—"}
               </p>
+              <RunLine work={work} />
               {work.result_summary ? <p className="card__evidence">{work.result_summary}</p> : null}
               {work.status !== "cancelled" && work.status !== "completed" ? (
                 <div className="card__actions">
