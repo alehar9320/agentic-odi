@@ -19,6 +19,7 @@ from agentic_odi_core.contract import (
     capability_summary,
 )
 from agentic_odi_core.errors import (
+    AlreadyPromotedError,
     ConflictError,
     NotFoundError,
     OdiError,
@@ -71,6 +72,7 @@ from agentic_odi_core.models import (
     Job,
     JobStage,
     Outcome,
+    OutcomeAlignment,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -95,7 +97,12 @@ from agentic_odi_core.remote import (
     parse_tool_result,
     tool_result_text,
 )
-from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.repository import (
+    InMemoryRepository,
+    Repository,
+    compute_promotion_fingerprint,
+    normalize_quote_text,
+)
 from agentic_odi_core.router import LocalOpenAIEngine, ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.segmentation import (
@@ -130,6 +137,15 @@ from agentic_odi_core.steve_jobs import (
     generate_steve_jobs_response,
 )
 from agentic_odi_core.strategy import propose_strategy
+from agentic_odi_core.traceability import (
+    Objective,
+    TraceabilityReport,
+    TraceLink,
+    compute_traceability_report,
+    normalize_objective,
+    objective_key,
+    objectives_from_v2mom,
+)
 
 __all__ = [
     "ScheduledWork",
@@ -163,6 +179,7 @@ __all__ = [
     "ClaimCheckError",
     "ClaimSkip",
     "ConflictError",
+    "AlreadyPromotedError",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
@@ -185,9 +202,11 @@ __all__ = [
     "OdiError",
     "OnDeviceLLMEngine",
     "Outcome",
+    "OutcomeAlignment",
     "OutcomeNotFoundError",
     "OutcomeProposal",
     "OutcomeStatementError",
+    "Objective",
     "ProposalStatus",
     "ProposalStrategy",
     "HeuristicProposalStrategy",
@@ -205,6 +224,8 @@ __all__ = [
     "SignalNotFoundError",
     "StudioError",
     "StudioErrorCode",
+    "TraceLink",
+    "TraceabilityReport",
     "ValueMetric",
     "ValueOutOfRangeError",
     "InMemoryRepository",
@@ -217,6 +238,12 @@ __all__ = [
     "V2MOM",
     "capability_manifest",
     "capability_summary",
+    "compute_traceability_report",
+    "compute_promotion_fingerprint",
+    "normalize_quote_text",
+    "normalize_objective",
+    "objective_key",
+    "objectives_from_v2mom",
     "Repository",
     "build_repository",
     "compute_opportunity_score",

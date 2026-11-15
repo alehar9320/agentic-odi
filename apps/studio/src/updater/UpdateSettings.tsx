@@ -1,5 +1,24 @@
 import { StatusDot } from "../components/status/StatusDot";
+import { formatActionTime } from "./machine";
 import { useUpdateService, useUpdateSnapshot } from "./UpdateProvider";
+import type { UpdateActionKind } from "./types";
+
+const ACTION_LABELS: Record<UpdateActionKind, string> = {
+  "check-started": "Checked for updates",
+  "check-succeeded": "Reached the update server",
+  "check-failed": "Couldn't reach the update server",
+  "download-started": "Started downloading",
+  "download-finished": "Finished downloading",
+  "download-failed": "The download didn't finish",
+  "install-started": "Started installing",
+  installed: "Update installed",
+  "install-failed": "The install didn't finish",
+  skipped: "Skipped this version",
+  dismissed: "Dismissed the update",
+  "restart-failed": "Couldn't restart the app",
+};
+
+const ACTION_LOG_LIMIT = 6;
 
 /**
  * The honest, complete picture: the running version, what the updater is doing,
@@ -16,6 +35,10 @@ export function UpdateSettings() {
     snapshot.phase === "installing";
   const version = snapshot.currentVersion;
   const notes = snapshot.available?.notes;
+  // A check that never reached the server has no update to talk about; the
+  // status line owns that sentence, so the bare check time would contradict it.
+  const checkFailed = snapshot.phase === "error" && snapshot.available === null;
+  const recentActions = snapshot.actions.slice(0, ACTION_LOG_LIMIT);
   const canSkip =
     snapshot.available !== null &&
     !snapshot.installed &&
@@ -45,8 +68,25 @@ export function UpdateSettings() {
         <span>{service.statusLine()}</span>
       </p>
 
-      {supported && snapshot.lastCheckedAt !== null && (
+      {supported && snapshot.lastCheckedAt !== null && !checkFailed && (
         <p className="muted">{service.checkedAtLabel()}</p>
+      )}
+
+      {supported && recentActions.length > 0 && (
+        <details className="disclosure update-settings__activity">
+          <summary>Recent update activity</summary>
+          <ul className="update-settings__log">
+            {recentActions.map((action, index) => (
+              <li
+                key={`${action.kind}-${action.at}-${index}`}
+                className="update-settings__log-row"
+              >
+                <span>{ACTION_LABELS[action.kind]}</span>
+                <span className="muted">{formatActionTime(action.at)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {snapshot.available && notes && (

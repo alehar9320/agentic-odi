@@ -32,12 +32,42 @@ export interface DownloadProgress {
   total: number | null;
 }
 
+export type UpdateActionKind =
+  | "check-started"
+  | "check-succeeded"
+  | "check-failed"
+  | "download-started"
+  | "download-finished"
+  | "download-failed"
+  | "install-started"
+  | "installed"
+  | "install-failed"
+  | "skipped"
+  | "dismissed"
+  | "restart-failed";
+
+/** One thing the updater did this session. The snapshot keeps them newest first. */
+export interface UpdateAction {
+  at: number;
+  kind: UpdateActionKind;
+  detail?: string;
+}
+
 export interface UpdateSnapshot {
   phase: UpdatePhase;
   currentVersion: string | null;
   available: AvailableUpdate | null;
   progress: DownloadProgress | null;
+  /** When a check last *started*; a failure still moves this. */
   lastCheckedAt: number | null;
+  /**
+   * The last check that actually reached the server and answered. A failed
+   * check leaves this untouched, so Settings can tell "couldn't check" from
+   * "you're up to date". Session-only, like the rest of this snapshot.
+   */
+  lastSuccessfulCheckAt: number | null;
+  /** Session-only, bounded, newest first: what the updater actually did. */
+  actions: UpdateAction[];
   /** True when the artifact is staged and the next launch runs it. */
   installed: boolean;
   /** True when the artifact is downloaded but needs an app exit to install. */

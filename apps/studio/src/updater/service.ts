@@ -18,6 +18,8 @@ import {
 } from "./machine";
 import { detectPlatform, installAfterDownload, type DesktopPlatform } from "./platform";
 import type {
+  UpdateAction,
+  UpdateActionKind,
   UpdateEvent,
   UpdatePreferences,
   UpdateSnapshot,
@@ -30,6 +32,8 @@ export const SKIPPED_VERSION_KEY = "studio.update.skippedVersion";
 
 const DEFAULT_INITIAL_DELAY_MS = 4_000;
 const DEFAULT_INTERVAL_MS = 6 * 60 * 60 * 1_000;
+/** Newest-first cap on the in-session activity log. */
+const MAX_ACTIONS = 20;
 
 type PreferenceStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -146,6 +150,21 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
     }
   }
 
+  /**
+   * Append one line to the in-session activity log. Bounded and newest-first,
+   * so a long-running session cannot grow it without limit.
+   */
+  function record(kind: UpdateActionKind, detail?: string): void {
+    const action: UpdateAction = { at: now(), kind, ...(detail ? { detail } : {}) };
+    snapshot = {
+      ...snapshot,
+      actions: [action, ...snapshot.actions].slice(0, MAX_ACTIONS),
+    };
+    for (const listener of listeners) {
+      listener();
+    }
+  }
+
   function forgetHandle(): void {
     const previous = handle;
     handle = null;
@@ -194,6 +213,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
     }
 
     emit({ type: "check-started" });
+    record("check-started");
 
     inFlight = (async () => {
       let stage: "check" | "download" | "install" = "check";
@@ -206,6 +226,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
             currentVersion: snapshot.currentVersion,
             at: now(),
           });
+          record("check-succeeded");
           return;
         }
 
@@ -228,6 +249,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
             update: info,
             at: now(),
           });
+          record("check-succeeded");
           return;
         }
 
@@ -240,6 +262,8 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
           update: info,
           at: now(),
         });
+        record("check-succeeded");
+        record("download-started", update.version);
 
         stage = "download";
         await update.download((progress) => {
@@ -252,22 +276,27 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
         downloaded = true;
 
         emit({ type: "download-finished" });
+        record("download-finished");
 
         if (!installAfterDownload(platform)) {
           emit({ type: "download-finished-pending" });
+          record("download-finished");
           return;
         }
 
         stage = "install";
         emit({ type: "install-started" });
+        record("install-started");
         await update.install();
         emit({ type: "installed" });
+        record("installed");
       } catch (error) {
-        emit({
-          type: "failed",
-          message: describeUpdateFailure(error, stage),
-          at: now(),
-        });
+        const message = describeUpdateFailure(error, stage);
+        emit({ type: "failed", message, at: now() });
+        record(
+          stage === "check" ? "check-failed" : stage === "download" ? "download-failed" : "install-failed",
+          message,
+        );
       }
     })().finally(() => {
       inFlight = null;
@@ -280,14 +309,14 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
     if (handle && !snapshot.installed && snapshot.pendingInstall) {
       try {
         emit({ type: "install-started" });
+        record("install-started");
         await handle.install();
         emit({ type: "installed" });
+        record("installed");
       } catch (error) {
-        emit({
-          type: "failed",
-          message: describeUpdateFailure(error, "install"),
-          at: now(),
-        });
+        const message = describeUpdateFailure(error, "install");
+        emit({ type: "failed", message, at: now() });
+        record("install-failed", message);
         return;
       }
     }
@@ -299,6 +328,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
         type: "relaunch-failed",
         message: "The app couldn't restart. Close and reopen it to finish updating.",
       });
+      record("restart-failed", "The app couldn't restart.");
     }
   }
 
@@ -387,8 +417,12 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
       if (downloaded && handle && snapshot.error) {
         try {
           emit({ type: "install-started" });
+        record("install-started");
+          record("install-started");
           await handle.install();
           emit({ type: "installed" });
+        record("installed");
+          record("installed");
           return;
         } catch (error) {
           emit({
@@ -408,6 +442,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
 
     dismiss() {
       emit({ type: "dismissed" });
+      record("dismissed");
     },
 
     skipCurrent() {
@@ -418,6 +453,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
       persistSkipped(version);
       forgetHandle();
       emit({ type: "skipped", version });
+      record("skipped", version);
     },
 
     setAutoCheck(enabled: boolean) {

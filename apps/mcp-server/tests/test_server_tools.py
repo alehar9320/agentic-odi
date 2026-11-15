@@ -341,9 +341,10 @@ async def test_a_refused_score_range_carries_the_range_code():
         payload = _failure_payload(res.content[0].text)
 
         assert payload["error"]["code"] == "out_of_range"
-        assert (
-            payload["message"] == "Error: importance and satisfaction must be between 1.0 and 10.0"
-        )
+        # The score that was out of range is named, so a client can show the
+        # message next to the field that needs it instead of on top of the form.
+        assert payload["error"]["field"] == "importance"
+        assert payload["message"] == "Error: importance must be between 1.0 and 10.0"
 
 
 @pytest.mark.asyncio

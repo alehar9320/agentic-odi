@@ -133,7 +133,20 @@ export function WorkbenchRail() {
                 onMouseLeave={() => setOpenTip((current) => (current === item.id ? null : current))}
                 onFocus={() => setOpenTip(item.id)}
                 onBlur={() => setOpenTip((current) => (current === item.id ? null : current))}
-                onClick={() => (open ? closePanel() : openPanel(item.id))}
+                onClick={(event) => {
+                  // The chip is what opened the lens, so it is where focus goes
+                  // back to when the lens closes (#810). A browser focuses a
+                  // button it was clicked with, but a programmatic activation
+                  // does not; without this the lens falls back to whatever had
+                  // focus — on an empty stage, the composer it auto-focused —
+                  // and closing a lens would drop the caret into the reply box.
+                  event.currentTarget.focus();
+                  if (open) {
+                    closePanel();
+                  } else {
+                    openPanel(item.id);
+                  }
+                }}
               >
                 <span className="rail__icon" aria-hidden="true">
                   {item.icon}

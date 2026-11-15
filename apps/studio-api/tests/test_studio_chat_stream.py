@@ -426,6 +426,56 @@ def test_attachment_text_is_truncated(monkeypatch) -> None:
     assert chat.MAX_ATTACHMENT_TEXT < 50_000
 
 
+def test_a_bmp_file_at_the_client_limit_arrives_whole(monkeypatch) -> None:
+    """The client cap and the sidecar cap agree for BMP text.
+
+    The studio refuses a text file longer than `MAX_ATTACHMENT_CHARS` (20,000)
+    before it is sent, and the sidecar slices at `MAX_ATTACHMENT_TEXT` (20,000).
+    For BMP text every character is one UTF-16 unit on the client and one code
+    point here, so a file the client accepts arrives whole: the sidecar slice
+    only ever bites on text the client would already have refused. The two
+    counts diverge for astral characters (an emoji is two UTF-16 units but one
+    code point), which makes the client the stricter of the two; that is
+    deliberate and neither limit is changed to paper over it.
+    """
+    at_limit = "a" * chat.MAX_ATTACHMENT_TEXT
+    assert len(at_limit) == chat.MAX_ATTACHMENT_TEXT
+
+    block = chat._attachment_block(
+        [AttachmentRef(name="notes.md", content_type="text/markdown", text=at_limit)]
+    )
+
+    # The whole 20,000-character file is in the block, unshortened: the body
+    # between the label lines is exactly the text that was attached.
+    body = block.split("\n", 1)[1].rsplit("\n", 1)[0]
+    assert body == at_limit
+    assert len(body) == chat.MAX_ATTACHMENT_TEXT
+
+
+def test_a_client_accepted_file_with_an_emoji_arrives_whole() -> None:
+    """A 20,000-UTF-16-unit file with one emoji reaches the sidecar intact.
+
+    The client counts UTF-16 code units (`String.length`); the sidecar counts
+    code points (`len()` on a Python `str`). 19,998 BMP characters plus one
+    astral emoji is 20,000 units on the client — exactly what it allows — but
+    only 19,999 code points here, so the sidecar keeps every code point. The
+    counts diverge for astral characters, and the client is the stricter of the
+    two: nothing the client accepts is cut here. Neither limit is changed to
+    paper over the difference.
+    """
+    text = "a" * 19_998 + "🎯"
+    assert len(text.encode("utf-16-le")) // 2 == 20_000  # client units
+    assert len(text) == 19_999  # sidecar code points
+
+    block = chat._attachment_block(
+        [AttachmentRef(name="notes.md", content_type="text/markdown", text=text)]
+    )
+
+    body = block.split("\n", 1)[1].rsplit("\n", 1)[0]
+    assert body == text
+    assert "🎯" in body
+
+
 def test_a_cited_sentence_names_the_record_not_the_tool(monkeypatch) -> None:
     _install(
         monkeypatch,

@@ -378,43 +378,45 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Step 4 — first move                                                */
+/* Step 4 — where it lands                                            */
 /* ------------------------------------------------------------------ */
 
-.wizard-launch {
+.wizard-land {
   display: grid;
   gap: 16px;
 }
 
-.wizard-choice {
+.wizard-land__note {
   display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.wizard-choice__title {
-  display: block;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.wizard-choice__result {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.83rem;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
   color: var(--muted);
 }
 
-.wizard-destination {
-  padding: 14px 18px;
-  border-left: 2px solid rgba(139, 140, 248, 0.7);
-  border-radius: 0 10px 10px 0;
-  background: rgba(139, 140, 248, 0.07);
+.wizard-land__note .badge {
+  flex: none;
+  margin-top: 1px;
 }
 
-.wizard-destination__label {
-  margin: 0 0 4px;
+.wizard-land__plot {
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(9, 10, 14, 0.5);
+}
+
+.wizard-land__missing {
+  padding: 12px 16px;
+  border-left: 2px solid rgba(251, 191, 36, 0.6);
+  border-radius: 0 10px 10px 0;
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.wizard-land__missing-label {
+  margin: 0 0 6px;
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -422,11 +424,12 @@
   color: var(--faint);
 }
 
-.wizard-destination__detail {
+.wizard-land__missing-list {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: var(--text);
+  padding-left: 18px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--muted);
 }
 
 /* ------------------------------------------------------------------ */

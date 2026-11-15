@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { fetchChangelog } from "../api/studioApi";
 import { markReleasesRead, readReleaseVersions, unreadReleases } from "../lib/changelogRead";
+import { formatExactTime } from "../lib/relativeTime";
 import { useFocusTrap } from "../lib/useFocusTrap";
 import type { ChangelogData } from "../types";
 
@@ -15,6 +17,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [readVersions, setReadVersions] = useState<string[]>(() => readReleaseVersions());
+  const [markMessage, setMarkMessage] = useState("");
 
   const unread = useMemo(
     () => unreadReleases(changelog?.releases ?? [], readVersions),
@@ -26,10 +29,14 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   );
 
   const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(dialogRef, isOpen);
+  useFocusTrap(dialogRef, isOpen, true);
 
   function markAllRead() {
+    const count = unread.length;
     setReadVersions(markReleasesRead((changelog?.releases ?? []).map((r) => r.version)));
+    setMarkMessage(
+      count === 1 ? "1 release marked read" : `${count} releases marked read`,
+    );
   }
 
   useEffect(() => {
@@ -67,7 +74,9 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
 
   if (!isOpen) return null;
 
-  return (
+  // Rendered at the document root, outside `.studio-app`, so the shell behind
+  // it can be made inert without inerting the dialog too.
+  return createPortal(
     <div className="changelog-overlay fade-in">
       {/* A real control so a pointer can dismiss; Escape and the close button
           are the keyboard paths. */}
@@ -143,7 +152,13 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
                     <span className="changelog-release__version">
                       v{release.version}
                     </span>
-                    <time className="changelog-release__date">{release.date}</time>
+                    <time
+                      className="changelog-release__date"
+                      dateTime={release.date}
+                      title={formatExactTime(release.date)}
+                    >
+                      {release.date}
+                    </time>
                     {unreadVersions.has(release.version) && (
                       <span className="changelog-release__new">New</span>
                     )}
@@ -173,6 +188,11 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
           <span className="changelog-modal__quote">
             "Design is not just what it looks like and feels like. Design is how it works."
           </span>
+          {/* Says what the action did. Kept out of the layout flow so the
+              button disabling never shifts the footer. */}
+          <p className="sr-only" aria-live="polite">
+            {markMessage}
+          </p>
           <div className="changelog-modal__actions">
             <button
               type="button"
@@ -192,6 +212,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
           </div>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

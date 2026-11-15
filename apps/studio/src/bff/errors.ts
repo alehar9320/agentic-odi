@@ -11,6 +11,7 @@ export class BffError extends Error {
       detail?: string | null;
       suggestion?: string | null;
       retryable?: boolean;
+      field?: string | null;
     } = {},
   ) {
     super(message);
@@ -21,6 +22,7 @@ export class BffError extends Error {
       detail: options.detail ?? null,
       suggestion: options.suggestion ?? null,
       retryable: options.retryable ?? false,
+      field: options.field ?? null,
     };
   }
 }
@@ -31,8 +33,9 @@ export function notFound(entity: string, id: string): BffError {
   });
 }
 
-export function validation(message: string): BffError {
+export function validation(message: string, field?: string | null): BffError {
   return new BffError("validation", message, {
     suggestion: "Check the value and try again.",
+    field: field ?? null,
   });
 }

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioRuntimeProvider } from "../../assistant/StudioRuntime";
+import { formatClockTime } from "../../lib/relativeTime";
 import type { ChatMessage } from "../../types";
 import { catalogManifest } from "../../ui/catalog";
 import { parseUiSpec, type UiNode } from "../../ui/protocol";
@@ -16,6 +17,7 @@ const harness = vi.hoisted(() => ({
     offlineReplyFor: null as string | null,
     openPanel: vi.fn<(panel: string) => void>(),
     canvas: null,
+    displayName: "",
     regenerateFrom: vi.fn(),
     editFrom: vi.fn(),
     switchBranch: vi.fn(),
@@ -480,4 +482,167 @@ describe("Conversation failures", () => {
     expect(screen.queryByRole("button", { name: /show more/i })).toBeNull();
   });
 
+});
+
+describe("transcript day dividers (#694 D14)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("puts one separator between calendar days and none inside a day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 9, 0));
+    try {
+      renderTurn([
+        {
+          id: "u-1",
+          parentId: null,
+          role: "user",
+          content: "Before midnight",
+          createdAt: new Date(2026, 9, 21, 23, 50).toISOString(),
+        },
+        {
+          id: "a-1",
+          parentId: "u-1",
+          role: "assistant",
+          content: "Still the same evening",
+          createdAt: new Date(2026, 9, 21, 23, 55).toISOString(),
+        },
+        {
+          id: "u-2",
+          parentId: "a-1",
+          role: "user",
+          content: "After midnight",
+          createdAt: new Date(2026, 9, 22, 0, 10).toISOString(),
+        },
+      ]);
+
+      const separators = screen.getAllByRole("separator");
+      expect(separators).toHaveLength(1);
+      expect(separators[0]).toHaveAttribute("aria-label", "Today");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("separates nothing when a thread stays inside one day", () => {
+    renderTurn([
+      {
+        id: "u-1",
+        parentId: null,
+        role: "user",
+        content: "Morning",
+        createdAt: new Date(2026, 8, 3, 9, 0).toISOString(),
+      },
+      {
+        id: "a-1",
+        parentId: "u-1",
+        role: "assistant",
+        content: "Afternoon",
+        createdAt: new Date(2026, 8, 3, 15, 0).toISOString(),
+      },
+    ]);
+
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+  });
+});
+
+describe("message timestamps (#694 D15)", () => {
+  it("keeps the exact time off the page until the message is asked for", () => {
+    const at = new Date(2026, 9, 22, 9, 30).toISOString();
+    const clock = formatClockTime(at);
+
+    renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "A question", createdAt: at },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer", createdAt: at },
+    ]);
+
+    const times = Array.from(document.querySelectorAll("time.message__time")) as HTMLTimeElement[];
+    expect(times).toHaveLength(2);
+    for (const time of times) {
+      expect(time).toHaveAttribute("datetime", at);
+      expect(time.textContent).toBe(clock);
+      // It lives with the actions, which the stylesheet only reveals on hover
+      // or focus, so it is never on the page at rest.
+      expect(time.closest(".message__actions")).not.toBeNull();
+    }
+
+    expect(screen.getByRole("group", { name: `Reply actions, ${clock}` })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: `Message actions, ${clock}` })).toBeInTheDocument();
+  });
+});
+
+describe("turn anatomy (#737)", () => {
+  it("names your own turn and draws your initial", () => {
+    harness.state.displayName = "Ada Lovelace";
+    renderTurn([
+      {
+        id: "u-1",
+        parentId: null,
+        role: "user",
+        content: "A question",
+        createdAt: new Date(2026, 9, 22, 9, 30).toISOString(),
+      },
+    ]);
+
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    const initial = document.querySelector(".message__avatar--user");
+    expect(initial).not.toBeNull();
+    expect(initial?.textContent).toBe("A");
+  });
+
+  it("says 'You' rather than inventing a name nobody gave", () => {
+    harness.state.displayName = "";
+    renderTurn([{ id: "u-1", parentId: null, role: "user", content: "A question" }]);
+
+    expect(screen.getByText("You")).toBeInTheDocument();
+    expect(document.querySelector(".message__avatar--user")?.textContent).toBe("Y");
+  });
+
+  it("renders no time element at all when a restored turn has none", () => {
+    harness.state.displayName = "Ada";
+    renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "A question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer" },
+    ]);
+
+    expect(document.querySelectorAll("time.message__time")).toHaveLength(0);
+  });
+});
+
+describe("message roots are MessagePrimitive.Root (#994)", () => {
+  it("renders each turn through the primitive, as an article with its own id", () => {
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "A question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer" },
+    ]);
+
+    // The primitive stamps `data-message-id` on the root it renders, so the
+    // three message roots are the primitive's, not a hand-written wrapper.
+    const roots = Array.from(container.querySelectorAll(".conversation > .message"));
+    expect(roots.map((root) => root.getAttribute("data-message-id"))).toEqual(["u-1", "a-1"]);
+    for (const root of roots) {
+      expect(root.tagName).toBe("ARTICLE");
+    }
+    expect(roots[0]).toHaveClass("message--user");
+    expect(roots[1]).toHaveClass("message--assistant");
+    expect(container.querySelectorAll("article.message").length).toBe(
+      container.querySelectorAll(".message").length,
+    );
+  });
+
+  it("keeps the notice turn an article too", () => {
+    harness.state.messages = [
+      { id: "s-1", parentId: null, role: "system", content: "A notice" },
+    ];
+    render(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    const notice = document.querySelector(".message--notice") as HTMLElement;
+    expect(notice.tagName).toBe("ARTICLE");
+    expect(notice.getAttribute("data-message-id")).toBe("s-1");
+  });
 });
