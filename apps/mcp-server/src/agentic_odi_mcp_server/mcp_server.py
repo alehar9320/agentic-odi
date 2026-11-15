@@ -589,6 +589,8 @@ async def add_evidence(
     job_id: str | None = None,
     step_id: str | None = None,
     outcome_id: str | None = None,
+    impact: str = "medium",
+    confidence: str = "claimed",
 ) -> str:
     await ctx.report_progress(0, 2, "Validating the evidence links")
     try:
@@ -603,6 +605,8 @@ async def add_evidence(
             job_id=job_id,
             step_id=step_id,
             outcome_id=outcome_id,
+            impact=impact,
+            confidence=confidence,
         )
     except JobNotFoundError:
         return _fail(JobNotFoundError(job_id or ""), job_not_found(job_id or ""))

@@ -774,6 +774,8 @@ class ODIService:
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
+        impact: str = "medium",
+        confidence: str = "claimed",
     ) -> Evidence:
         resolved_job_id = job_id
         if step_id is not None:
@@ -808,6 +810,8 @@ class ODIService:
             job_id=resolved_job_id,
             step_id=step_id,
             outcome_id=outcome_id,
+            impact=impact,
+            confidence=confidence,
         )
         #: Dedupe: the same quote imported twice must not become two evidence
         #: records. Return the existing record instead of appending.
