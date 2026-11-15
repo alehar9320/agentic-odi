@@ -176,6 +176,19 @@ describe("LocalMemoryService conversations", () => {
     expect(found?.id).toBe(conv.id);
   });
 
+  it("renames a thread, trims the name, and refuses a blank one", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const conv = await memory.createConversation("First");
+
+    const renamed = await memory.renameConversation(conv.id, "  Retention work  ");
+    expect(renamed.title).toBe("Retention work");
+    expect((await memory.getConversation(conv.id))?.title).toBe("Retention work");
+
+    await expect(memory.renameConversation(conv.id, "   ")).rejects.toThrow(/name/i);
+    expect((await memory.getConversation(conv.id))?.title).toBe("Retention work");
+  });
+
   it("appends user and assistant turns with ids and parents", async () => {
     const store = makeStore();
     const memory = new LocalMemoryService(store);

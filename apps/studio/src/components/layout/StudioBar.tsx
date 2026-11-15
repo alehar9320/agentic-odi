@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 
 import { PRODUCT_NAME, versionLabel } from "../../lib/brand";
 import { conversationToMarkdown, downloadMarkdown, exportFilename } from "../../lib/export";
@@ -45,6 +51,7 @@ export function StudioBar({
     messages,
     openConversation,
     refreshConversations,
+    renameConversation,
     sidecarReachable,
     streaming,
     unreadSignalCount,
@@ -62,6 +69,9 @@ export function StudioBar({
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [renameInvalid, setRenameInvalid] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
   const reduceMotion = useReducedMotion();
@@ -73,6 +83,33 @@ export function StudioBar({
   // An empty transcript is only nothing to lose when nothing is on screen to
   // leave: the plus is the documented way out of the first-run setup, and a
   // disabled control there would strand the person in it.
+  /**
+   * A name is not a door: renaming a row never opens it, and the menu stays
+   * where it is so the person sees the new name land.
+   */
+  function startRename(conversation: { id: string; title: string }) {
+    setRenamingId(conversation.id);
+    setRenameDraft(conversation.title.trim() || "New conversation");
+    setRenameInvalid(false);
+  }
+
+  /**
+   * A blank name is refused in place rather than sent; an unchanged one is not
+   * sent at all, because the store already says it.
+   */
+  function commitRename(conversation: { id: string; title: string }) {
+    const cleaned = renameDraft.trim();
+    if (!cleaned) {
+      setRenameInvalid(true);
+      return;
+    }
+    setRenamingId(null);
+    setRenameInvalid(false);
+    if (cleaned !== (conversation.title.trim() || "New conversation")) {
+      void renameConversation(conversation.id, cleaned);
+    }
+  }
+
   const nothingToLeave =
     messages.length === 0 && !streaming && !setupOpen && !customizeOpen && activePanel === null;
 
@@ -358,9 +395,10 @@ export function StudioBar({
                     <p className="bar__history-day">{group.label}</p>
                     {group.items.map((conversation) => {
                       const current = conversation.id === conversationId;
+                      const title = conversation.title.trim() || "New conversation";
                       return (
+                        <Fragment key={conversation.id}>
                         <button
-                          key={conversation.id}
                           ref={current ? activeHistoryRef : undefined}
                           type="button"
                           role="menuitem"
@@ -368,9 +406,7 @@ export function StudioBar({
                           aria-current={current ? "true" : undefined}
                           onClick={() => selectConversation(conversation.id)}
                         >
-                          <span className="bar__history-title">
-                            {conversation.title.trim() || "New conversation"}
-                          </span>
+                          <span className="bar__history-title">{title}</span>
                           {/* A thread with no turns has nothing to count, so
                               it says nothing rather than "0 turns". */}
                           {conversation.turn_count > 0 ? (
@@ -381,6 +417,41 @@ export function StudioBar({
                             </span>
                           ) : null}
                         </button>
+                        {renamingId === conversation.id ? (
+                          <input
+                            className="input bar__history-rename"
+                            aria-label={`Name for ${title}`}
+                            aria-invalid={renameInvalid || undefined}
+                            autoFocus
+                            value={renameDraft}
+                            onChange={(event) => setRenameDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                commitRename(conversation);
+                              } else if (event.key === "Escape") {
+                                // Escape gives up the name, not the list: the
+                                // bar's own handler would close the history.
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setRenamingId(null);
+                                setRenameInvalid(false);
+                              }
+                            }}
+                            onBlur={() => commitRename(conversation)}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="quiet-action bar__history-rename"
+                            aria-label={`Rename ${title}`}
+                            title="Rename"
+                            onClick={() => startRename(conversation)}
+                          >
+                            <span aria-hidden="true">Rename</span>
+                          </button>
+                        )}
+                        </Fragment>
                       );
                     })}
                   </div>

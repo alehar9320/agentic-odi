@@ -1,6 +1,7 @@
 import type { Observation } from "../../types";
 import { nowIso } from "../id";
 import {
+  MAX_CONVERSATION_TITLE,
   byCreated,
   bySeq,
   type DrainLease,
@@ -214,6 +215,27 @@ export class MemoryLocalStore implements LocalStore {
       ...conversation,
       head_id: headId,
       updated_at: now,
+    };
+    this.conversations.set(id, next);
+    return next;
+  }
+
+  async renameConversation(
+    id: string,
+    title: string,
+  ): Promise<StoredConversation> {
+    const conversation = this.conversations.get(id);
+    if (!conversation) {
+      throw new Error(`Conversation ${id} not found`);
+    }
+    const cleaned = title.trim();
+    if (!cleaned) {
+      throw new Error("A conversation needs a name.");
+    }
+    const next: StoredConversation = {
+      ...conversation,
+      title: cleaned.slice(0, MAX_CONVERSATION_TITLE),
+      updated_at: nowIso(),
     };
     this.conversations.set(id, next);
     return next;
