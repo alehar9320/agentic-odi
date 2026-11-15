@@ -492,7 +492,7 @@ cites the issue or PR that landed it.
 | `ThreadPrimitive.Root` | Adopted | The transcript's shell. | #238 |
 | `ThreadPrimitive.Viewport` | Adopted | Scrolling; the jump-to-latest affordance reads its `isAtBottom`. | #238 |
 | `ThreadPrimitive.Messages` | Adopted | The message map. | #238 |
-| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data is adopted; the pills are hand-rolled because they carry the artifact-preview copy. | — |
+| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | Selection and submission are the primitive's; the list stays ours because the artifact preview does not survive the runtime's suggestion store. | — |
 | `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
 | `MessagePrimitive.GroupedParts` | Adopted | One collapsed row holds what a turn did — its reasoning and tool calls — and never hides a write that is still asking. | #392 |
 | `MessagePrimitive.Attachments` | Adopted | User turns show what was sent. | #238 |
