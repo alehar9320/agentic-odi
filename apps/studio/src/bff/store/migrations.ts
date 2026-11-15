@@ -3,6 +3,7 @@ import type { DBSchema, IDBPDatabase } from "idb";
 import type { Observation } from "../../types";
 import type {
   DrainLease,
+  InterviewDraft,
   OutboxRecord,
   StoredConversation,
   StoredEvidence,
@@ -19,7 +20,7 @@ export const DB_NAME = "agentic-odi-studio";
  * `MIGRATIONS` entry is caught by `migrations.test.ts`, so a release can never
  * ship a bump that would throw `ConstraintError` on an existing database.
  */
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export type MetaValue = number | DrainLease;
 
@@ -65,6 +66,11 @@ export interface StudioDb extends DBSchema {
     key: number;
     value: StoredTurn;
     indexes: { "by-conversation": string };
+  };
+  interview_drafts: {
+    key: string;
+    value: InterviewDraft;
+    indexes: { "by-job": string; "by-updated": string };
   };
 }
 
@@ -114,6 +120,13 @@ export const MIGRATIONS: Record<number, Migration> = {
     const evidence = db.createObjectStore("evidence", { keyPath: "id" });
     evidence.createIndex("by-job", "job_id");
     evidence.createIndex("by-seq", "seq");
+  },
+  4: (db) => {
+    // Interview drafts persist the conductor's answers so a half-answered
+    // interview resumes at the same question after a reload (#402).
+    const drafts = db.createObjectStore("interview_drafts", { keyPath: "id" });
+    drafts.createIndex("by-job", "jobId");
+    drafts.createIndex("by-updated", "updatedAt");
   },
 };
 
