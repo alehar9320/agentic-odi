@@ -131,8 +131,14 @@ function AssistantMessage() {
     <>
       <DayDivider />
       {/* `aria-busy` keeps a screen reader from announcing every streamed token;
-          it reads the reply once the turn settles. */}
-      <article className="message message--assistant" aria-busy={running}>
+          it reads the reply once the turn settles. The primitive owns the
+          wrapper — hover state and the top anchor come from it — and renders
+          the same `article` the turn had before. */}
+      <MessagePrimitive.Root
+        className="message message--assistant"
+        aria-busy={running}
+        render={<article />}
+      >
       <AssistantAvatar />
       <div className="message__body">
         {/* Named on the reply it describes, never on every reply on screen, and
@@ -281,7 +287,7 @@ function AssistantMessage() {
           </ActionBarPrimitive.Root>
         ) : null}
       </div>
-      </article>
+      </MessagePrimitive.Root>
     </>
   );
 }
@@ -314,7 +320,7 @@ function UserMessage() {
   return (
     <>
       <DayDivider />
-      <article className="message message--user">
+      <MessagePrimitive.Root className="message message--user" render={<article />}>
       <div className="message__column message__column--user">
       <p className="message__byline">{name}</p>
       <div
@@ -379,7 +385,7 @@ function UserMessage() {
       <span className="message__avatar message__avatar--user" aria-hidden="true">
         {initial}
       </span>
-      </article>
+      </MessagePrimitive.Root>
     </>
   );
 }
@@ -388,9 +394,9 @@ function SystemMessage() {
   return (
     <>
       <DayDivider />
-      <article className="message message--notice">
+      <MessagePrimitive.Root className="message message--notice" render={<article />}>
         <MessagePrimitive.Parts components={{ Text: TextPart }} />
-      </article>
+      </MessagePrimitive.Root>
     </>
   );
 }
