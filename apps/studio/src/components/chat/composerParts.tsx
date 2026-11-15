@@ -68,7 +68,12 @@ export function SuggestionPills() {
   return (
     <div className="composer__pills" aria-label="Suggested next steps">
       {pills.map((pill) => (
-        <button key={pill.id} type="button" className="suggestion" onClick={pill.run}>
+        <button
+          key={pill.id}
+          type="button"
+          className="suggestion suggestion--card"
+          onClick={pill.run}
+        >
           {pill.icon}
           {pill.label}
         </button>
