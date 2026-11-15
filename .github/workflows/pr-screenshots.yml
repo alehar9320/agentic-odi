@@ -1,0 +1,112 @@
+name: PR screenshots
+
+# A screenshot job runs only from this repository: fork PRs get a read-only
+# token and cannot comment, so the comment step is skipped with a notice.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pr-screenshots:
+    name: Product screenshots
+    runs-on: ubuntu-latest
+    # Advisory: a screenshot that fails must never block a merge. This job is
+    # deliberately not in `ci-green`'s `needs`, alongside `e2e`.
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: apps/studio/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/studio
+        run: npm ci
+
+      - name: Build the Studio
+        working-directory: apps/studio
+        run: npm run build
+
+      - name: Install the browser
+        working-directory: apps/studio
+        run: npx playwright install --with-deps chromium
+
+      # The spec runs through the existing `playwright.config.ts` `webServer`,
+      # which starts the MCP server on `:8000` and the sidecar on `:8100`
+      # serving the built SPA. No separate dev server, no forked startup.
+      - name: Capture product screenshots
+        working-directory: apps/studio
+        run: npx playwright test pr-screenshots.spec.ts
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-screenshots-report
+          path: apps/studio/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-screenshots
+          path: apps/studio/pr-screenshots
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Fork PRs cannot comment; say so instead of failing red.
+      - name: Note fork pull requests
+        if: ${{ github.event.pull_request.head.repo.fork }}
+        run: echo "::notice::Skipping the screenshot comment for a fork pull request (read-only token)."
+
+      - name: Post screenshots to the PR
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          SHOT_DIR: apps/studio/pr-screenshots
+        run: |
+          body="$RUNNER_TEMP/pr-screenshots.md"
+          : > "$body"
+
+          if ! ls "$SHOT_DIR"/*.png >/dev/null 2>&1; then
+            echo "::notice::No screenshots were captured this run; nothing to post."
+            exit 0
+          fi
+
+          {
+            echo "## Product screenshots"
+            echo
+            echo "The built Studio, driven against a live MCP server and sidecar:"
+          } > "$body"
+
+          for shot in "$SHOT_DIR"/*.png; do
+            name="$(basename "$shot")"
+            printf '![%s](%s)\n\n' "$name" "$shot" >> "$body"
+          done
+
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$body" || {
+            echo "::warning::Could not post the screenshot comment."
+          }

@@ -16,6 +16,7 @@
      not tell a reviewer what was covered. -->
 
 - [ ] Tests pass and docs are updated for behavior, command, or link changes.
+- [ ] Product screenshots posted to this PR by the `pr-screenshots` CI job.
 - [ ] If this changes the Studio or Worker, I checked `/` on the Cloudflare preview.
 - [ ] If this changes `/api/*` or Worker behavior, I checked the expected response with and without `SIDECAR_URL`.
 

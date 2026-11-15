@@ -67,7 +67,7 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /mcp-backend\.spec\.ts/,
+      testIgnore: [/mcp-backend\.spec\.ts/, /pr-screenshots\.spec\.ts/],
     },
     {
       // The same Studio against its MCP passthrough backend, which talks to
