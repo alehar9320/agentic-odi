@@ -64,7 +64,9 @@ export async function seedCanvas(
         job_id: jobId,
         name: step.name,
         order: step.order,
-        allow_empty_job_map: false,
+        // The fixture stages the map before its outcomes; the API only allows
+        // a step on an empty map when that is explicit and audited.
+        allow_empty_job_map: true,
       },
     });
     expect(stepRes.ok()).toBeTruthy();

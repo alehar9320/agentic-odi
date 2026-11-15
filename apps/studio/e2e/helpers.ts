@@ -36,6 +36,17 @@ export async function openStudio(page: Page): Promise<void> {
   // The composer is present in both the empty and the active conversation
   // states, so it is the one landmark that means the Studio is ready.
   await expect(page.getByRole("textbox", { name: COMPOSER })).toBeVisible();
+  await dismissConnectorSuggestion(page);
+}
+
+/**
+ * Dismiss the connector suggestion modal when it opens.
+ *
+ * The modal is real product behavior on a Studio with no connectors, so a test
+ * that opens or reloads the page has to put it away the way a user would before
+ * it can reach the surface behind it.
+ */
+export async function dismissConnectorSuggestion(page: Page): Promise<void> {
   const suggestion = page.getByRole("dialog", { name: "Connector suggestion" });
   await suggestion.waitFor({ state: "visible", timeout: 2_000 }).catch(() => {});
   if (await suggestion.isVisible()) {
@@ -114,6 +125,23 @@ export async function resetRepository(request: APIRequestContext): Promise<void>
 
   for (const job of canvas.jobs) {
     const deleted = await request.delete(`/api/jobs/${encodeURIComponent(job.id)}`);
+    expect(deleted.ok()).toBeTruthy();
+  }
+}
+
+/**
+ * Remove every conversation so a screen that lists recent threads starts
+ * empty. The visual harness captures the drawer, whose contents otherwise
+ * depend on whichever specs ran before it.
+ */
+export async function resetConversations(request: APIRequestContext): Promise<void> {
+  const response = await request.get("/api/conversations");
+  expect(response.ok()).toBeTruthy();
+  const body = (await response.json()) as { conversations: { id: string }[] };
+  for (const conversation of body.conversations) {
+    const deleted = await request.delete(
+      `/api/conversations/${encodeURIComponent(conversation.id)}`,
+    );
     expect(deleted.ok()).toBeTruthy();
   }
 }

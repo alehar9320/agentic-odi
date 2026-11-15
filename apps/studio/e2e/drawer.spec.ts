@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { COMPOSER, openStudio, rail } from "./helpers";
+import { COMPOSER, dismissConnectorSuggestion, openStudio, rail } from "./helpers";
 
 /**
  * The drawer is the identity of the shell (#736): the brand, the one way to
@@ -30,6 +30,7 @@ test.describe("the navigation drawer", () => {
 
     await page.reload();
     await expect(page.getByRole("textbox", { name: COMPOSER })).toBeVisible();
+    await dismissConnectorSuggestion(page);
     await expect(rail(page)).toBeHidden();
 
     await page.getByRole("button", { name: "Show navigation" }).click();

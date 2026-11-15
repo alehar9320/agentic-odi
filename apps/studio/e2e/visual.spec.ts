@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openStudio, rail } from "./helpers";
+import { openStudio, resetConversations, workbench } from "./helpers";
 import { MULTI_JOB, RECORD_JOB, seedCanvas } from "./visual/fixtures";
 
 /**
@@ -33,7 +33,7 @@ function emulateTheme(page: Page, theme: "dark" | "light") {
  */
 async function openView(page: Page, view: string): Promise<void> {
   await openStudio(page);
-  await rail(page)
+  await workbench(page)
     .getByRole("button", { name: new RegExp(`^${view},`) })
     .click();
 }
@@ -49,6 +49,7 @@ test.describe("the visual harness", () => {
       const deleted = await request.delete(`/api/jobs/${encodeURIComponent(job.id)}`);
       expect(deleted.ok()).toBeTruthy();
     }
+    await resetConversations(request);
   });
 
   for (const viewport of VIEWPORTS) {
@@ -63,12 +64,16 @@ test.describe("the visual harness", () => {
 
         await openView(page, "Records");
 
-        await expect(page.getByRole("complementary", { name: "Records" })).toBeVisible();
+        // The same lens is docked (complementary) on desktop and a dialog
+        // sheet on mobile; the class is the surface both shells share.
+        await expect(page.locator(".lens").first()).toBeVisible();
         await expect(page.getByText("On-call incident report")).toBeVisible();
 
-        await expect(page).toHaveScreenshot(
-          `records-${viewport.name}-${theme}.png`,
-        );
+        // Seed IDs are random; tolerate the few hundred pixels they occupy
+        // while still failing on a real layout change.
+        await expect(page).toHaveScreenshot(`records-${viewport.name}-${theme}.png`, {
+          maxDiffPixelRatio: 0.01,
+        });
       });
 
       test(`renders the landscape at ${viewport.name} in ${theme} theme`, async ({
@@ -81,13 +86,11 @@ test.describe("the visual harness", () => {
 
         await openView(page, "Landscape");
 
-        await expect(
-          page.getByRole("complementary", { name: "Opportunity landscape" }),
-        ).toBeVisible();
+        await expect(page.locator(".lens").first()).toBeVisible();
 
-        await expect(page).toHaveScreenshot(
-          `landscape-${viewport.name}-${theme}.png`,
-        );
+        await expect(page).toHaveScreenshot(`landscape-${viewport.name}-${theme}.png`, {
+          maxDiffPixelRatio: 0.01,
+        });
       });
 
       test(`renders the capture panel at ${viewport.name} in ${theme} theme`, async ({
@@ -105,13 +108,11 @@ test.describe("the visual harness", () => {
           .getByRole("button", { name: "Capture an outcome" })
           .click();
 
-        await expect(
-          page.getByRole("complementary", { name: "Capture by hand" }),
-        ).toBeVisible();
+        await expect(page.locator(".lens").first()).toBeVisible();
 
-        await expect(page).toHaveScreenshot(
-          `capture-${viewport.name}-${theme}.png`,
-        );
+        await expect(page).toHaveScreenshot(`capture-${viewport.name}-${theme}.png`, {
+          maxDiffPixelRatio: 0.01,
+        });
       });
     }
   }

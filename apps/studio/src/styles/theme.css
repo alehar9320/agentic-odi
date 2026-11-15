@@ -5212,13 +5212,12 @@ details[open] summary {
   white-space: normal;
 }
 
+/* The count keeps --muted even while the chip is hovered or open: the chip's
+   label switches to --text over --surface then, and a --faint count on that
+   surface falls below AA once the drawer narrows the stage (#736). */
 .rail__count {
-  color: var(--faint);
-  font-variant-numeric: tabular-nums;
-}
-
-.rail__chip.is-open .rail__count {
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------------ */

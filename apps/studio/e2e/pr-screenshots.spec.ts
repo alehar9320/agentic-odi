@@ -1,6 +1,14 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
-import { COMPOSER, lens, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import {
+  COMPOSER,
+  lens,
+  openStudio,
+  rail,
+  resetRepository,
+  seedOutcomes,
+  workbench,
+} from "./helpers";
 
 /**
  * Product screenshots for human review, not for assertions.
@@ -83,9 +91,13 @@ async function closeLens(page: Page): Promise<void> {
   }
 }
 
-/** Open a lens through the workbench rail. */
-async function openFromRail(page: Page, name: RegExp): Promise<void> {
-  await rail(page).getByRole("button", { name }).click();
+/** Open a lens from the drawer or the artifacts strip. */
+async function openFromRail(
+  page: Page,
+  name: string | RegExp,
+  nav = rail(page),
+): Promise<void> {
+  await nav.getByRole("button", { name }).click();
   await expect(lens(page)).toBeVisible();
 }
 
@@ -105,8 +117,8 @@ test.describe("product screenshots", () => {
     await seedOutcomes(request, OUTCOMES);
     await seedJobMap(request);
 
-    // 01 — the first screen the Studio paints, with the rail already holding
-    // what the thread has produced.
+    // 01 — the first screen the Studio paints, with the artifacts strip
+    // already holding what the thread has produced.
     await openStudio(page);
     await capture(page, "01-home.png");
 
@@ -117,13 +129,13 @@ test.describe("product screenshots", () => {
     await expect(reply.last().getByRole("button", { name: "Copy reply" })).toBeVisible();
     await capture(page, "02-chat.png");
 
-    // 03 — the job map, opened from the rail.
-    await openFromRail(page, /^Job map,/);
+    // 03 — the job map, opened from its drawer destination.
+    await openFromRail(page, /^Job map$/);
     await capture(page, "03-job-map.png");
     await closeLens(page);
 
-    // 04 — the opportunity landscape, opened from the rail.
-    await openFromRail(page, /^Landscape,/);
+    // 04 — the opportunity landscape, opened from the artifacts strip.
+    await openFromRail(page, /^Landscape,/, workbench(page));
     await capture(page, "04-landscape.png");
     await closeLens(page);
 
