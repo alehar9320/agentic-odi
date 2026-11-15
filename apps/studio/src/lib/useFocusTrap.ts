@@ -25,11 +25,17 @@ export function focusableWithin(container: HTMLElement): HTMLElement[] {
  * descendant. Applying `inert` blurs a control focused inside the shell, so
  * the opener is captured before it is applied and refocused after it is
  * removed.
+ *
+ * `scopeKey` handles a dialog whose element is replaced while it stays open —
+ * a workspace sheet switched from one lens to its sibling. The ref survives the
+ * swap, so without a key in the dependencies the trap's listener stays on the
+ * detached element and the new dialog never receives focus.
  */
 export function useFocusTrap(
   ref: RefObject<HTMLElement | null>,
   active: boolean,
   inertPage = false,
+  scopeKey?: unknown,
 ): void {
   useEffect(() => {
     if (!active) {
@@ -83,5 +89,5 @@ export function useFocusTrap(
       }
       previouslyFocused?.focus();
     };
-  }, [ref, active, inertPage]);
+  }, [ref, active, inertPage, scopeKey]);
 }
