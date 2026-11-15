@@ -1,3 +1,4 @@
+import { isSimulatedCanvas } from "../lib/canvasProvenance";
 import {
   formatMemberMean,
   formatOpportunityScore,
@@ -8,7 +9,7 @@ import {
 } from "../lib/odi";
 import { useStudio } from "../state/StudioContext";
 import { readActions } from "./actions";
-import { ActionRow, MeterBar, ScorePill, type NodeProps } from "./primitives";
+import { ActionRow, MeterBar, ScorePill, StatValue, type NodeProps } from "./primitives";
 import { num, str, type Tone } from "./props";
 import { Markdown } from "../components/chat/Markdown";
 
@@ -674,6 +675,90 @@ export function StrategyCard({ node }: NodeProps) {
           );
         })}
       </div>
+
+      <ActionRow actions={readActions(node.props)} />
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* finding-card                                                        */
+/* ------------------------------------------------------------------ */
+
+const FINDING_KIND: Record<string, { label: string; tone: Tone }> = {
+  key_finding: { label: "Key finding", tone: "warning" },
+  risk: { label: "Risk", tone: "critical" },
+  opportunity: { label: "Opportunity", tone: "positive" },
+};
+
+const IMPACT_BAND: Record<string, { label: string; tone: Tone }> = {
+  high: { label: "High impact", tone: "critical" },
+  medium: { label: "Medium impact", tone: "warning" },
+  low: { label: "Low impact", tone: "info" },
+};
+
+/**
+ * One finding, as the agent stands behind it.
+ *
+ * Every number is a prop the agent supplied from real canvas data: the card
+ * computes nothing, so it cannot turn an opinion into a measurement. The step
+ * is the one thing read back from the canvas — a named step must be a real
+ * `Step.name`, and an unknown name is omitted rather than drawn as if the job
+ * contained it.
+ */
+export function FindingCard({ node }: NodeProps) {
+  const { canvasState } = useStudio();
+  const canvas = canvasState.data;
+  const kind = FINDING_KIND[str(node.props, "kind", "key_finding")] ?? FINDING_KIND.key_finding;
+  const headline = str(node.props, "headline");
+  const impact = IMPACT_BAND[str(node.props, "impact")];
+  const detail = str(node.props, "detail");
+  const metric = record(node.props.metric);
+  const metricLabel = str(metric, "label", "Impact");
+  const metricValue = str(metric, "value");
+  const metricDelta = str(metric, "delta");
+  const stepName = str(node.props, "step");
+  const steps = canvas?.steps ?? [];
+  const step = stepName ? steps.find((candidate) => candidate.name === stepName) : undefined;
+  const stepPosition =
+    step && typeof step.order === "number" && step.order > 0
+      ? `Step ${step.order} of ${steps.length}`
+      : "Step";
+  const sample = isSimulatedCanvas(canvas);
+
+  return (
+    <article
+      className="ui-card ui-card--finding"
+      aria-label={headline ? `Finding: ${headline}` : "Finding"}
+    >
+      <header className="ui-card__head">
+        <span className="ui-card__id">{kind.label}</span>
+        {sample ? (
+          <span className="badge badge--amber" title="This is bundled sample data, not yours.">
+            Sample
+          </span>
+        ) : null}
+        {impact ? <ScorePill tone={impact.tone}>{impact.label}</ScorePill> : null}
+      </header>
+
+      <h4 className="ui-card__title">{headline}</h4>
+
+      {step ? <p className="ui-caption">{`${stepPosition} · ${step.name}`}</p> : null}
+
+      {metricValue ? (
+        <StatValue
+          label={metricLabel}
+          value={metricValue}
+          {...(metricDelta ? { delta: metricDelta } : {})}
+          tone={impact?.tone ?? "neutral"}
+        />
+      ) : null}
+
+      {detail ? (
+        <div className="ui-text">
+          <Markdown source={detail} />
+        </div>
+      ) : null}
 
       <ActionRow actions={readActions(node.props)} />
     </article>
