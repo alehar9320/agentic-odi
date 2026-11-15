@@ -19,9 +19,10 @@
 An **MCP server** that hands your agents verified customer outcomes — the jobs,
 desired outcomes, and opportunity scores that rank them.
 
-**Try it now — nothing to install.** The Studio opens in your browser and works
-from the first minute: the canvas, the thread, and the assistant all run on your
-device.
+**Try it now — nothing to install, nothing to connect.** Open the Studio in any
+browser and it works from the first minute: canvas, thread, and assistant all
+run on your device, with no account and no server. The local app (any OS) and
+the sidecar elevate your capabilities when you're ready — they never block you.
 
 [![Open the Living Studio](https://img.shields.io/badge/Open%20the%20Living%20Studio-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://agentic-odi.alehar.workers.dev/)
 [![Open the sample workspace](https://img.shields.io/badge/Open%20the%20sample%20workspace-1e293b?style=for-the-badge&logo=githubpages&logoColor=white)](https://alehar9320.github.io/agentic-odi/sample/)
@@ -62,7 +63,14 @@ The project card, rendered from the committed source by
 | **Evidence becomes outcomes.** An ingested record is mined into a scored, approvable outcome proposal — statement, direction, importance, satisfaction, and a stated confidence, with its rationale and the quote it came from. The mining is deterministic and offline. | [The method →](docs/method.md) |
 | **A catch-up that means something.** Writes emit signals — an outcome re-scored, evidence promoted, a job map completed — stored in the same event log and read by the CLI, any MCP client, and the Studio's bell. Nothing is invented, and the feed is deduped and budgeted. | [CLI reference →](docs/cli.md) |
 | **Connectors, without storing a credential.** Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) from a trusted vendor marketplace, conversationally, or from the CLI. A listing that needs a token names the environment variable to set. | [External Connectors →](docs/connectors.md) |
-| **Local-first by default.** The CLI and server work with no network and no account. Point them at a remote MCP server with one flag, or run an OpenAI-compatible model on your own machine. | [Local LLM Backend →](docs/local-llm.md) |
+| **Browser-first, local-second.** The Studio opens in any browser and is fully usable with no account, no server, and no sidecar: jobs, outcomes, memory, and the assistant all run locally on your device. The desktop app (any OS) and the sidecar elevate your capabilities — local LLM proxy, connectors, MCP passthrough, updates — when you choose to add them. Start on web or mobile, then graduate to the CLI or local app as you get deeper. | [Local LLM Backend →](docs/local-llm.md) |
+
+**How you start.** Open the Studio on the web (desktop or mobile) or connect any
+MCP client to the local server. Everything works right there. When you want more
+power — a local model, third-party connectors, a desktop shell — install the local
+app. The sidecar elevates; it never blocks. You can stay in the browser forever,
+or move to the CLI and then the local app as you become more embedded in the
+service.
 
 ### Also in the box
 
