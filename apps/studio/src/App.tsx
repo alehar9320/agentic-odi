@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge";
 import { BannerProvider, useBanner } from "./banners/BannerProvider";
 import { BannerStack } from "./banners/BannerStack";
@@ -153,11 +154,13 @@ function StudioShell() {
           <CustomizePage />
         ) : (
           <div className="stage__split">
-            <div className="stage__thread">
-              <WorkbenchRail />
-              <ChatStage />
-            </div>
-            <WorkspacePanel />
+            <ResizablePanelGroup orientation="horizontal" className="stage__split-group">
+              <ResizablePanel className="stage__thread" minSize="40%">
+                <WorkbenchRail />
+                <ChatStage />
+              </ResizablePanel>
+              <WorkspacePanel />
+            </ResizablePanelGroup>
           </div>
         )}
       </main>
