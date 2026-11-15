@@ -149,14 +149,21 @@ def test_more_than_five_questions_is_refused(memory: StudioMemory) -> None:
         memory.open_score_plan(
             _conversation(memory),
             STATEMENT,
-            [*QUESTIONS, "A fourth question here", "A fifth question here", "A sixth question here"],
+            [
+                *QUESTIONS,
+                "A fourth question here",
+                "A fifth question here",
+                "A sixth question here",
+            ],
         )
     assert MAX_SCORE_PLAN_QUESTIONS == 5
 
 
 def test_questions_must_be_distinct(memory: StudioMemory) -> None:
     with pytest.raises(MemoryError):
-        memory.open_score_plan(_conversation(memory), STATEMENT, [QUESTIONS[0], QUESTIONS[0], QUESTIONS[2]])
+        memory.open_score_plan(
+            _conversation(memory), STATEMENT, [QUESTIONS[0], QUESTIONS[0], QUESTIONS[2]]
+        )
 
 
 def test_one_question_must_ask_about_the_workaround_or_its_cost(
@@ -176,7 +183,9 @@ def test_one_question_must_ask_about_the_workaround_or_its_cost(
 
 def test_a_question_that_is_too_short_is_refused(memory: StudioMemory) -> None:
     with pytest.raises(MemoryError):
-        memory.open_score_plan(_conversation(memory), STATEMENT, ["Hi?", QUESTIONS[1], QUESTIONS[2]])
+        memory.open_score_plan(
+            _conversation(memory), STATEMENT, ["Hi?", QUESTIONS[1], QUESTIONS[2]]
+        )
 
 
 def test_a_proposed_score_outside_one_to_ten_is_refused(memory: StudioMemory) -> None:

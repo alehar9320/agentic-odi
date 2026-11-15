@@ -148,7 +148,9 @@ def test_a_scored_write_with_no_plan_is_refused(monkeypatch) -> None:
                     _chunk(
                         tool_calls=[
                             _tool_call(
-                                json.dumps({"job_id": "JOB-1", "statement": STATEMENT, "importance": 8.6}),
+                                json.dumps(
+                                    {"job_id": "JOB-1", "statement": STATEMENT, "importance": 8.6}
+                                ),
                                 "add_outcome",
                             )
                         ]
@@ -302,7 +304,10 @@ def test_a_skip_plan_lets_the_score_through_with_a_recorded_reason(monkeypatch) 
     _, arguments = _Mcp.calls[0]
     assert arguments["claim_check"]["answers"] == []
     assert arguments["claim_check"]["skips"]
-    assert all(skip["reason"] == "No customer access this week" for skip in arguments["claim_check"]["skips"])
+    assert all(
+        skip["reason"] == "No customer access this week"
+        for skip in arguments["claim_check"]["skips"]
+    )
 
 
 def test_an_unscored_outcome_is_never_gated(monkeypatch) -> None:
