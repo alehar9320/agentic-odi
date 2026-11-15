@@ -235,7 +235,18 @@ def _mcp_connector_config(
         except UnknownPresetError as exc:
             typer.echo(f"Error: {exc}", err=True)
             raise typer.Exit(code=1) from exc
-        return connector_config_from_preset(preset, name=name, url=url, tools=tools)
+        config = connector_config_from_preset(preset, name=name, url=url, tools=tools)
+        if headers:
+            merged = dict(config.settings.get("headers") or {})
+            merged.update(headers)
+            config.settings["headers"] = merged
+            settings_env = list(config.settings.get("env_vars") or [])
+            for value in headers.values():
+                for var in ENV_VAR_PATTERN.findall(value):
+                    if var not in settings_env:
+                        settings_env.append(var)
+            config.settings["env_vars"] = settings_env
+        return config
     if not url:
         typer.echo("Error: --url is required for MCP connectors (or pass --preset).", err=True)
         raise typer.Exit(code=1)
@@ -247,11 +258,11 @@ def _mcp_connector_config(
         settings["tools"] = tools
     if headers:
         settings["headers"] = headers
-    referenced = set(ENV_VAR_PATTERN.findall(url))
-    for value in (headers or {}).values():
-        referenced.update(ENV_VAR_PATTERN.findall(value))
-    if referenced:
-        settings["env_vars"] = sorted(referenced)
+        referenced = set(ENV_VAR_PATTERN.findall(url))
+        for value in (headers or {}).values():
+            referenced.update(ENV_VAR_PATTERN.findall(value))
+        if referenced:
+            settings["env_vars"] = sorted(referenced)
     return ConnectorConfig(name=name, kind="mcp", settings=settings)
 
 
@@ -274,7 +285,9 @@ def add_connector(
     ),
     method: str | None = typer.Option(None, "--method", help="HTTP method for REST/webhook."),
     header: list[str] | None = typer.Option(  # noqa: B008
-        None, "--header", help="HTTP header as KEY=VALUE. Repeatable."
+        None,
+        "--header",
+        help="HTTP header as KEY=VALUE (MCP and REST/webhook). Repeatable.",
     ),
     records_key: str | None = typer.Option(
         None, "--records-key", help="Dot path to the record list in the response."
