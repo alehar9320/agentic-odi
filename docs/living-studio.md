@@ -375,7 +375,15 @@ fixtures. Its real content is the store's signal inbox
 `/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
-already connected.
+already connected. The connector-install control explains a block in place: when
+the sidecar is known to be absent, **Add** stays disabled and a sentence beneath
+it says why, with one real next action (`Start the local service`), sourced from
+the single `blockedReason` table and tied to the button through
+`aria-describedby`. An unprobed capability is a wait rather than a failure, so
+nothing is explained for a host that has not answered yet. The table already
+carries wording for every capability the registry models, so a new capability
+cannot ship without it; wiring the remaining blocked controls (capture, agent
+send) and retiring the duplicate global banner are follow-ups.
 
 The Opportunity Matrix is held to the same rule. It plots a point only for an
 outcome the store actually scored — no default of 5 fills a missing importance
