@@ -35,6 +35,11 @@
   --line-strong: rgba(255, 255, 255, 0.14);
   --surface: rgba(255, 255, 255, 0.03);
   --surface-hover: rgba(255, 255, 255, 0.06);
+  /* The modal frame: the scrim behind it and the shadow that lifts it. Both
+     are literals here because this file owns the palette; the shared Dialog
+     reads them by name. */
+  --scrim: rgba(11, 13, 19, 0.75);
+  --shadow-dialog: 0 24px 48px rgba(0, 0, 0, 0.6);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   /* The display voice: the self-hosted serif plus a system-serif fallback, so a
