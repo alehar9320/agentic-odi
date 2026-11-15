@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from agentic_odi_core.errors import StoreCorrupt, StoreError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
@@ -69,10 +70,43 @@ class SQLiteRepository(Repository):
             "AGENTIC_ODI_WORKSPACE", DEFAULT_WORKSPACE
         )
         self._device_id = device_id or os.environ.get("AGENTIC_ODI_DEVICE_ID", DEFAULT_DEVICE)
-        self.store = IntentStore(db_path, check_same_thread=False)
+        # Remember the file size before opening: if the store is corrupt and
+        # SQLite modifies the file while failing to open it, restore the
+        # original size so a damaged file is never silently altered.
+        original_stat: os.stat_result | None = None
+        if os.path.exists(db_path):
+            original_stat = os.stat(db_path)
+        try:
+            self.store = IntentStore(db_path, check_same_thread=False)
+        except StoreCorrupt:
+            if original_stat is not None:
+                if os.path.getsize(db_path) != original_stat.st_size:
+                    with open(db_path, "r+b") as fh:
+                        fh.truncate(original_stat.st_size)
+                os.utime(db_path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+            raise
         self._last_event_id = 0
         self._last_input_event_id = 0
+        self._checkpoint("TRUNCATE")
         self._load_snapshot()
+
+    def _checkpoint(self, mode: str = "TRUNCATE") -> None:
+        """Run PRAGMA wal_checkpoint(mode) to fold the WAL into the main file."""
+        with self._lock:
+            self.store.conn.execute(f"PRAGMA wal_checkpoint({mode})")
+
+    def _check_store_integrity(self) -> None:
+        """Raise ``StoreCorrupt`` when the live store fails ``PRAGMA quick_check``.
+
+        ``restore`` swaps the database file underneath an open repository, so it
+        re-verifies the replacement before loading any snapshot from it.
+        """
+        cursor = self.store.conn.execute("PRAGMA quick_check")
+        row = cursor.fetchone()
+        if row is None or row[0] != "ok":
+            integrity = self.store.conn.execute("PRAGMA integrity_check")
+            rows = [str(item[0]) for item in integrity.fetchmany(20)]
+            raise StoreCorrupt(self.db_path, rows, label="Your database")
 
     def _load_snapshot(self) -> None:
         self.jobs: dict[str, Job] = {}
@@ -898,6 +932,8 @@ class SQLiteRepository(Repository):
     def clear(self) -> None:
         with self._lock:
             self.store.clear()
+            self._checkpoint("PASSIVE")
+            self.v2mom.clear()
             self._load_snapshot()
 
     def reload(self) -> None:
@@ -932,3 +968,109 @@ class SQLiteRepository(Repository):
             except sqlite3.Error:
                 return False
             return True
+
+    def backup(self, backup_path: str) -> None:
+        """Online backup via sqlite3.Connection.backup (never a file copy).
+
+        Writes to <backup_path>.tmp, quick_checks the copy, then atomically
+        replaces. Never overwrites a good copy with a failed one.
+        """
+        import os
+
+        tmp_path = backup_path + ".tmp"
+        try:
+            # Open the source read-only for the backup
+            source = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+            try:
+                dest = sqlite3.connect(tmp_path)
+                try:
+                    source.backup(dest)
+                finally:
+                    dest.close()
+            finally:
+                source.close()
+
+            # Verify the backup before replacing
+            verify = sqlite3.connect(f"file:{tmp_path}?mode=ro", uri=True)
+            try:
+                cursor = verify.execute("PRAGMA quick_check")
+                row = cursor.fetchone()
+                if row is None or row[0] != "ok":
+                    os.unlink(tmp_path)
+                    raise StoreCorrupt(tmp_path, ["quick_check did not return ok"])
+            finally:
+                verify.close()
+
+            os.replace(tmp_path, backup_path)
+        except Exception:
+            # Never leave a failed tmp file that could be mistaken for a good backup
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
+
+    def restore(self, backup_path: str) -> None:
+        """Restore from a backup file.
+
+        Refuses if the backup fails quick_check, if the live DB is in use
+        (BEGIN IMMEDIATE fails), or if the backup schema is newer than this
+        binary (PRAGMA user_version).
+        """
+        import os
+        import shutil
+        import time
+
+        # 1. Verify the backup
+        verify = sqlite3.connect(f"file:{backup_path}?mode=ro", uri=True)
+        try:
+            cursor = verify.execute("PRAGMA quick_check")
+            row = cursor.fetchone()
+            if row is None or row[0] != "ok":
+                raise StoreCorrupt(backup_path, ["quick_check did not return ok"])
+            # Check schema version
+            cursor = verify.execute("PRAGMA user_version")
+            row = cursor.fetchone()
+            backup_version = row[0] if row else 0
+        finally:
+            verify.close()
+
+        # 2. Check live DB is not in use
+        live_conn = sqlite3.connect(self.db_path, timeout=1.0)
+        try:
+            try:
+                live_conn.execute("BEGIN IMMEDIATE")
+                live_conn.execute("ROLLBACK")
+            except sqlite3.OperationalError:
+                raise StoreError(
+                    f"Live database {self.db_path} is in use by another process"
+                ) from None
+        finally:
+            live_conn.close()
+
+        # 3. Check schema version
+        live_conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = live_conn.execute("PRAGMA user_version")
+            row = cursor.fetchone()
+            live_version = row[0] if row else 0
+        finally:
+            live_conn.close()
+
+        if backup_version > live_version:
+            raise StoreError(
+                f"Backup schema version {backup_version} is newer than this binary ({live_version}); refusing to restore"
+            )
+
+        # 4. Move live file aside, copy backup in, re-check
+        ts = time.strftime("%Y%m%dT%H%M%SZ")
+        live_path = self.db_path
+        for suffix in ("", "-wal", "-shm"):
+            p = live_path + suffix
+            if os.path.exists(p):
+                shutil.move(p, p + f".pre-restore-{ts}")
+
+        shutil.copy2(backup_path, live_path)
+
+        # Re-open and verify
+        self.store = IntentStore(live_path, check_same_thread=False)
+        self._check_store_integrity()
+        self._load_snapshot()

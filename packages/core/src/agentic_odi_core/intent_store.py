@@ -57,6 +57,7 @@ class IntentStore:
 
     def _init_db(self) -> None:
         with self.conn:
+            self.conn.execute("PRAGMA user_version = 1")
             self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS events (

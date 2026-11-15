@@ -41,6 +41,7 @@ function StudioShell() {
     startNewThread,
     streaming,
     stopStreaming,
+    navigateTo,
     bootError,
     recheckBoot,
   } = useStudio();
@@ -54,6 +55,7 @@ function StudioShell() {
     closePanel();
     closeSetup();
     closeCustomize();
+    navigateTo({ name: "home" }, true);
   }
 
   function newThread(options?: { stop?: boolean }) {
@@ -61,6 +63,7 @@ function StudioShell() {
     closePanel();
     closeSetup();
     closeCustomize();
+    navigateTo({ name: "home" }, true);
   }
 
   // One listener for the keys the whole room shares. The composer registers
