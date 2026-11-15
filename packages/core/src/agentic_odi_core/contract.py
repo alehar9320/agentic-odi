@@ -602,7 +602,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.LINKS_ADD.value: ToolSpec(
         name="links_add",
-        summary="Create a typed link between two entities.",
+        summary="Create a typed link between two agentic-odi entities.",
         effect=_derive_effect("links_add"),
         arguments=(
             "source_type",
@@ -615,22 +615,14 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "preview",
         ),
         required=("source_type", "source_id", "target_type", "target_id", "relationship_type"),
-        returns="The created Link.",
+        returns="The created Link record.",
     ),
     ToolName.LINKS_LIST.value: ToolSpec(
         name="links_list",
-        summary="List links, optionally filtered by source, target, or relationship type.",
+        summary="List links, optionally filtered by source/target entity and relationship type.",
         effect=_derive_effect("links_list"),
-        arguments=(
-            "source_type",
-            "source_id",
-            "target_type",
-            "target_id",
-            "relationship_type",
-            "limit",
-            "offset",
-        ),
-        returns="A list of Links.",
+        arguments=("source_type", "source_id", "target_type", "target_id", "relationship_type"),
+        returns="A list of Link records.",
     ),
     ToolName.LINKS_REMOVE.value: ToolSpec(
         name="links_remove",
@@ -638,7 +630,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         effect=_derive_effect("links_remove"),
         arguments=("link_id",),
         required=("link_id",),
-        returns="True if the link was removed.",
+        returns="True if the link was removed, False if not found.",
     ),
 }
 
