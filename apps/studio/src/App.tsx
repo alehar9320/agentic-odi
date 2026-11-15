@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge";
 import { BannerProvider, useBanner } from "./banners/BannerProvider";
 import { BannerStack } from "./banners/BannerStack";
@@ -72,20 +73,26 @@ function StudioShell() {
     closeCustomize();
   }
 
-  function newThread(options?: { stop?: boolean }) {
-    startNewThread(options);
-    closePanel();
-    closeSetup();
-    closeCustomize();
-    // New inquiry is one gesture: leave the old thread and start typing. On a
-    // sheet the drawer must close first, and its focus trap restores the toggle
-    // on that commit; the effect below takes the caret back afterwards.
+  // The drawer and Quick jump share the name New inquiry, so they share one
+  // meaning: put the caret in the composer without discarding the thread.
+  // Discarding stays behind the bar's New thread, which asks before it does.
+  // On a sheet the drawer closes first, and its focus trap restores the toggle
+  // on that commit; the effect below takes the caret back afterwards.
+  function newInquiry() {
     if (drawerEnabled && drawerOpen && isMobile) {
       focusAfterDrawerClose.current = true;
       toggleDrawer();
     } else {
       focusComposer();
     }
+  }
+
+  function newThread(options?: { stop?: boolean }) {
+    startNewThread(options);
+    closePanel();
+    closeSetup();
+    closeCustomize();
+    newInquiry();
   }
 
   // One listener for the keys the whole room shares. The composer registers
@@ -256,15 +263,17 @@ function StudioShell() {
           <CustomizePage />
         ) : (
           <div className="stage__split">
-            {drawerEnabled && <NavigationDrawer onHome={goHome} onNew={newThread} />}
-            <div className="stage__thread">
-              <WorkbenchRail
-                label={drawerEnabled ? "What this thread made" : undefined}
-                jobMapInDrawer={drawerEnabled}
-              />
-              <ChatStage />
-            </div>
-            <WorkspacePanel />
+            {drawerEnabled && <NavigationDrawer onHome={goHome} onNew={newInquiry} />}
+            <ResizablePanelGroup orientation="horizontal" className="stage__split-group">
+              <ResizablePanel className="stage__thread" minSize="40%">
+                <WorkbenchRail
+                  label={drawerEnabled ? "What this thread made" : undefined}
+                  jobMapInDrawer={drawerEnabled}
+                />
+                <ChatStage />
+              </ResizablePanel>
+              <WorkspacePanel />
+            </ResizablePanelGroup>
           </div>
         )}
       </main>

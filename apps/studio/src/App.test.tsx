@@ -964,6 +964,19 @@ describe("the bar's new thread can be undone (#319)", () => {
     await screen.findByText("Where do I start?");
   }
 
+  it("leaves the thread alone when the drawer's New inquiry takes the caret", async () => {
+    await withAThread();
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(composer).not.toHaveFocus();
+
+    const drawer = screen.getByRole("navigation", { name: "Your work" });
+    fireEvent.click(within(drawer).getByRole("button", { name: /new inquiry/i }));
+
+    expect(screen.getByText("Where do I start?")).toBeInTheDocument();
+    expect(composer).toHaveFocus();
+  });
+
   it("clears the transcript from the bar and offers the same thread back", async () => {
     await withAThread();
 

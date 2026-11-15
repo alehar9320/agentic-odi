@@ -15,10 +15,11 @@ interface JumpRow {
 /**
  * Quick jump (#736): the one meaning of Meta/Ctrl+K.
  *
- * The first row is New inquiry, which hands the caret back to the composer.
- * The rest are the recent threads and the same commands the slash palette
- * runs, so there is one vocabulary and one implementation. It is a modal: a
- * dialog owns Escape, focus stays inside, and the shell behind it is inert.
+ * The first row is New inquiry, which hands the caret back to the composer
+ * without discarding the thread on screen. The rest are the recent threads and
+ * the same commands the slash palette runs, so there is one vocabulary and one
+ * implementation. It is a modal: a dialog owns Escape, focus stays inside, and
+ * the shell behind it is inert.
  */
 export function QuickJump({
   open,
@@ -38,11 +39,13 @@ export function QuickJump({
     openConversation,
     refreshConversations,
     pushToast,
+    closeCustomize,
   } = useStudio();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const id = useId();
 
   useFocusTrap(dialogRef, open, true);
@@ -65,8 +68,14 @@ export function QuickJump({
       list.push({
         key: "new",
         label: "New inquiry",
-        hint: "Start a new thread and put the caret in the composer",
-        run: onNewInquiry,
+        hint: "Put the caret in the composer for a new inquiry",
+        run: () => {
+          onClose();
+          // Customize replaces the conversation; leaving it first makes the
+          // composer exist by the time focus is handed back.
+          closeCustomize();
+          onNewInquiry();
+        },
       });
     }
 
@@ -76,15 +85,19 @@ export function QuickJump({
       if (needle && !title.toLowerCase().includes(needle)) {
         continue;
       }
+      const current = conversation.id === conversationId;
       list.push({
         key: `thread-${conversation.id}`,
         label: title,
-        hint:
-          conversation.id === conversationId
-            ? "The thread on the mainstage"
-            : "Open this thread",
+        hint: current ? "The thread on the mainstage" : "Open this thread",
         run: () => {
           onClose();
+          closeCustomize();
+          // Reopening the thread already on screen would abort its reply and
+          // reload the saved turns. Choosing it means "stay here".
+          if (current) {
+            return;
+          }
           void openConversation(conversation.id).catch(() =>
             pushToast("error", "I couldn't open that conversation."),
           );
@@ -96,19 +109,23 @@ export function QuickJump({
       }
     }
 
-    for (const command of matchCommands(needle ? `/${needle}` : "/")) {
+    // matchCommands accepts text with or without the slash, so a typed
+    // `/help` is not turned into `//help`.
+    for (const command of matchCommands(needle || "/")) {
       list.push({
         key: `command-${command.id}`,
         label: `${command.name} — ${command.label}`,
         hint: command.description,
         run: () => {
           onClose();
+          closeCustomize();
           onCommand(command);
         },
       });
     }
     return list;
   }, [
+    closeCustomize,
     conversationId,
     conversations,
     onClose,
@@ -120,14 +137,25 @@ export function QuickJump({
     query,
   ]);
 
+  // A shorter result list never leaves the highlight stranded past its end.
+  const selected = Math.min(active, Math.max(rows.length - 1, 0));
+
+  // Keep the active row on screen; the list can be taller than the sheet.
+  useEffect(() => {
+    const row = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    row?.scrollIntoView?.({ block: "nearest" });
+  }, [selected, query]);
+
   if (!open) {
     return null;
   }
 
-  // A shorter result list never leaves the highlight stranded past its end.
-  const selected = Math.min(active, Math.max(rows.length - 1, 0));
-
   function onFieldKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    // An input method owns these keys while it is composing: Enter chooses a
+    // candidate, it does not run the highlighted row.
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setActive(rows.length ? (selected + 1) % rows.length : 0);
@@ -145,7 +173,7 @@ export function QuickJump({
   }
 
   function onDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== "Escape") {
+    if (event.key !== "Escape" || event.nativeEvent.isComposing) {
       return;
     }
     // The dialog owns its Escape; the stream behind it keeps running.
@@ -178,14 +206,19 @@ export function QuickJump({
           aria-expanded="true"
           aria-autocomplete="list"
           aria-controls={`${id}-list`}
+          aria-activedescendant={rows.length ? `${id}-row-${selected}` : undefined}
           aria-label="Search threads and commands"
           placeholder="Jump to a thread or a command"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActive(0);
+          }}
           onKeyDown={onFieldKeyDown}
           autoFocus
         />
         <div
+          ref={listRef}
           className="quickjump__list"
           id={`${id}-list`}
           role="listbox"
@@ -199,6 +232,7 @@ export function QuickJump({
             rows.map((row, index) => (
               <button
                 key={row.key}
+                id={`${id}-row-${index}`}
                 type="button"
                 role="option"
                 aria-selected={index === selected}

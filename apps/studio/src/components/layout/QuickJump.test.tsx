@@ -12,6 +12,7 @@ const studio = vi.hoisted(() => ({
   openConversation: vi.fn(async () => undefined),
   refreshConversations: vi.fn(async () => undefined),
   pushToast: vi.fn(),
+  closeCustomize: vi.fn(),
 }));
 
 vi.mock("../../state/StudioContext", () => ({
@@ -41,6 +42,7 @@ beforeEach(() => {
   studio.openConversation.mockClear();
   studio.refreshConversations.mockClear();
   studio.pushToast.mockClear();
+  studio.closeCustomize.mockClear();
 });
 
 describe("QuickJump", () => {
@@ -53,12 +55,13 @@ describe("QuickJump", () => {
     expect(rows[0]).toHaveTextContent("New inquiry");
   });
 
-  it("hands the caret back through New inquiry", () => {
+  it("hands the caret back through New inquiry without clearing the thread", () => {
     const { onNewInquiry } = renderJump();
 
     fireEvent.click(screen.getByRole("option", { name: /new inquiry/i }));
 
     expect(onNewInquiry).toHaveBeenCalledOnce();
+    expect(studio.closeCustomize).toHaveBeenCalled();
   });
 
   it("lists threads and opens one", () => {
@@ -78,6 +81,24 @@ describe("QuickJump", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("stays put when the chosen thread is already on the mainstage", () => {
+    studio.conversations = [
+      {
+        id: "c-1",
+        title: "Activation model",
+        updated_at: "2026-11-15T10:00:00Z",
+        turn_count: 2,
+      },
+    ];
+    studio.conversationId = "c-1";
+    const { onClose } = renderJump();
+
+    fireEvent.click(screen.getByRole("option", { name: /activation model/i }));
+
+    expect(studio.openConversation).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("runs the same commands as the slash palette", () => {
     const { onCommand, onClose } = renderJump();
 
@@ -88,6 +109,16 @@ describe("QuickJump", () => {
 
     expect(onCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "landscape" }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("matches a command typed with its own slash", () => {
+    renderJump();
+
+    fireEvent.change(screen.getByRole("combobox", { name: /search threads and commands/i }), {
+      target: { value: "/help" },
+    });
+
+    expect(screen.getByRole("option", { name: /\/help/i })).toBeInTheDocument();
   });
 
   it("filters to what matches, and says so when nothing does", () => {
@@ -117,6 +148,29 @@ describe("QuickJump", () => {
     });
 
     expect(onNewInquiry).toHaveBeenCalledOnce();
+  });
+
+  it("tells the focused field which option is active, and moves it", () => {
+    renderJump();
+    const field = screen.getByRole("combobox", { name: /search threads and commands/i });
+    const rows = screen.getAllByRole("option");
+
+    expect(field).toHaveAttribute("aria-activedescendant", rows[0]?.id);
+
+    fireEvent.keyDown(field, { key: "ArrowDown" });
+
+    expect(field).toHaveAttribute("aria-activedescendant", rows[1]?.id);
+  });
+
+  it("lets an input method keep Enter and Escape while it is composing", () => {
+    const { onNewInquiry, onClose } = renderJump();
+    const field = screen.getByRole("combobox", { name: /search threads and commands/i });
+
+    fireEvent.keyDown(field, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(field, { key: "Escape", isComposing: true });
+
+    expect(onNewInquiry).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("reads the history when it opens", () => {
