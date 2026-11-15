@@ -83,4 +83,49 @@ describe("Interview", () => {
     expect(calls.job).toHaveLength(0);
     expect(calls.outcome).toHaveLength(0);
   });
+
+  it("collapses into the record of itself once the answers are saved (#400)", async () => {
+    const { port } = ports();
+    render(<Interview ports={port} />);
+
+    await answerEveryQuestion();
+    fireEvent.click(screen.getByRole("button", { name: /save answers/i }));
+
+    const summary = await screen.findByRole("button", { name: /Answered/ });
+    expect(summary).toHaveTextContent("Answered · 5 of 5 · 1 outcome, 1 evidence");
+    // The live form is gone; the record of the interview stands in its place.
+    expect(screen.queryByRole("button", { name: /save answers/i })).not.toBeInTheDocument();
+  });
+
+  it("opens a created record through the focus action", async () => {
+    const { port } = ports();
+    const onOpenRecord = vi.fn();
+    render(<Interview ports={port} onOpenRecord={onOpenRecord} />);
+
+    await answerEveryQuestion();
+    fireEvent.click(screen.getByRole("button", { name: /save answers/i }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /Answered/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Outcome 1" }));
+
+    expect(onOpenRecord).toHaveBeenCalledWith("outcome-1");
+  });
+
+  it("keeps the live card when a write fails, naming what stopped (#400)", async () => {
+    const port: InterviewPorts = {
+      createJob: vi.fn(async () => "job-1"),
+      addOutcome: vi.fn(async () => {
+        throw new Error("the store refused it");
+      }),
+      addEvidence: vi.fn(async () => undefined),
+    };
+    render(<Interview ports={port} />);
+
+    await answerEveryQuestion();
+    fireEvent.click(screen.getByRole("button", { name: /save answers/i }));
+
+    expect(await screen.findByText("Not saved — the store refused it")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save answers/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Answered/ })).not.toBeInTheDocument();
+  });
 });
