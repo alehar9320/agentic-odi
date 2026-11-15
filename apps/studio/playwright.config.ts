@@ -70,6 +70,23 @@ export default defineConfig({
       testIgnore: /mcp-backend\.spec\.ts/,
     },
     {
+      // The visual harness: deterministic screens at two sizes, in both themes,
+      // with fonts and animation disabled. It is a screenshot contract, so it
+      // takes a screenshot for every test and keeps them under version control.
+      name: "visual",
+use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 800 },
+        // The spec sets the theme per test; this is the baseline the browser
+        // starts from when nothing has emulated a scheme yet.
+        colorScheme: "dark",
+        // A screenshot per test, not just on failure: the harness is the
+        // contract, so the baseline is the point.
+        screenshot: "on",
+      },
+      testMatch: /visual\.spec\.ts/,
+    },
+    {
       // The same Studio against its MCP passthrough backend, which talks to
       // the FastMCP server over HTTP instead of reading the local
       // repository. This is the path where the tool results have to be
