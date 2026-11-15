@@ -7,6 +7,7 @@ safe to ship.
 
 from __future__ import annotations
 
+import re
 import struct
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -20,6 +21,7 @@ ASSETS = ROOT / "brand" / "assets"
 ASSET_NAMES = (
     "odi-mascot.svg",
     "odi-mark.svg",
+    "odi-chrome-mark.svg",
     "odi-mascot-256.png",
     "odi-mascot-512.png",
     "odi-mascot-1024.png",
@@ -155,6 +157,47 @@ def test_svg_assets_are_well_formed_and_script_free():
 def test_mascot_svg_carries_the_golden_ratio_guide_layer():
     text = (ASSETS / "odi-mascot.svg").read_text(encoding="utf-8")
     assert 'data-guides="true"' in text
+
+
+def test_chrome_mark_is_resolution_independent_shapes():
+    root = ET.parse(ASSETS / "odi-chrome-mark.svg").getroot()
+    assert root.tag.endswith("svg")
+    assert root.get("viewBox") == "0 0 32 32"
+    # This is the vector sibling of the pixel mark: no grid, no script, and no
+    # crisp-edge snapping that would force the curves back onto 32 units.
+    assert root.get("shape-rendering") is None
+    assert not any(element.tag.endswith("script") for element in root.iter())
+
+    text = (ASSETS / "odi-chrome-mark.svg").read_text(encoding="utf-8")
+    assert "<circle" in text
+    assert "<ellipse" in text
+    assert "<path" in text
+
+
+def test_chrome_mark_uses_the_brand_palette():
+    text = (ASSETS / "odi-chrome-mark.svg").read_text(encoding="utf-8")
+    for colour in ("#131722", "#B4794C", "#DCA871", "#F6EAD8", "#1B1410"):
+        assert colour in text
+    assert odi_mascot.chrome_mark_svg() == text
+
+
+def test_chrome_mark_component_and_asset_share_one_source():
+    """The studio component must carry every path in the shipped asset."""
+    component = (ROOT / "apps" / "studio" / "src" / "components" / "OdiMascot.tsx").read_text(
+        encoding="utf-8"
+    )
+    asset = (ASSETS / "odi-chrome-mark.svg").read_text(encoding="utf-8")
+    paths = re.findall(r'd="([^"]+)"', asset)
+    assert paths, "the chrome mark draws no paths"
+    for path in paths:
+        assert path in component
+    for fragment in (
+        '<rect width="32" height="32" rx="7"',
+        '<ellipse cx="16" cy="17" rx="11" ry="6.8"',
+        '<ellipse cx="16" cy="20" rx="4" ry="2.5"',
+    ):
+        assert fragment in asset
+        assert fragment in component
 
 
 def test_ascii_banner_is_sixteen_rows_of_thirty_two_columns():

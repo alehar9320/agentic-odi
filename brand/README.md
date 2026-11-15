@@ -88,17 +88,40 @@ drawn on.
 
 ---
 
-## The three variants
+## The variants
 
 | Variant | Contents | Where it is used |
 |---|---|---|
-| `head` | skull, ears, eyes, muzzle, nose, mouth | the base for the other two |
-| `mark` | the head on the `odi-tile` rounded square | app icon, favicon, studio brand mark |
+| `head` | skull, ears, eyes, muzzle, nose, mouth | the base for the others |
+| `mark` | the head on the `odi-tile` rounded square, on the 32 × 32 pixel grid | app icon, favicon |
+| `chrome` | the icon head as resolution-independent shapes | the Living Studio brand mark |
 | `bust` | head, shoulders, chest, and the spark | README hero, brand guide |
 
 The `mark` exists because operating-system icons want a filled shape (Windows
 `StoreLogo`, macOS `.icns`) while a browser tab and a toolbar want the
 character standing on its own. Both share the identical head.
+
+`chrome` is the same head drawn from the same geometry and palette, but as
+`<circle>`, `<ellipse>`, `<rect>`, and `<path>` shapes instead of the 32 × 32
+grid. The studio bar renders Odi at 32 CSS px, where a retina or
+fractional-scaling display would upscale the pixel grid unevenly and drop the
+one-unit face details. The vector mark keeps those details at every device
+pixel ratio. The grid still owns the icons, where the medium *is* the grid.
+
+### Fidelities
+
+The character is defined once, but it ships in two fidelities:
+
+| Fidelity | Medium | Where it is used |
+|---|---|---|
+| pixel 32-grid | one `<rect>` per unit on the 32 × 32 master grid | favicon, `apple-touch-icon`, desktop/Tauri icon, ICO/ICNS, CLI banner, OG card |
+| vector chrome mark | `<circle>`, `<ellipse>`, `<rect>`, and `<path>` shapes | the Living Studio brand mark |
+
+The pixel grid is right where the medium *is* the grid — a 16 px favicon, a
+terminal cell. It is wrong for the 32 px button in the Studio bar, where the
+display scales the grid by whatever device-pixel ratio the user runs. The
+chrome mark is drawn from the same constants and palette, so the two fidelities
+are the same animal at two resolutions.
 
 ---
 
@@ -107,6 +130,7 @@ character standing on its own. Both share the identical head.
 ```text
 brand/
   assets/        the committed artwork (generated)
+    odi-chrome-mark.svg  the vector chrome mark the Studio bar renders
   src/           the generator — the single source of truth
   tests/         the asset contract and the drift check
   tools/render.py  regenerates everything
@@ -132,12 +156,14 @@ the code that made it.
 
 ## Usage rules
 
-- **Never scale the art to a non-integer size.** The master grid is 32 × 32.
-  Render it at 16, 32, 64, 128, 256, 512, or 1024 — a 28-pixel slot would
-  scale the grid by 0.875 and blur it.
+- **Never scale the pixel mark to a non-integer size.** Its master grid is
+  32 × 32. Render it at 16, 32, 64, 128, 256, 512, or 1024 — a 28-pixel slot
+  would scale the grid by 0.875 and blur it. The rule governs the *pixel*
+  mark only; the vector `chrome` mark may render at any size.
 - **Never recolour `odi-ink`.** The outline is the character's structure.
 - **Never place the head on a background other than `odi-tile`** in the `mark`
-  variant. The bust is transparent and may sit on any dark surface.
+  or `chrome` variant. The bust is transparent and may sit on any dark
+  surface.
 - **Keep clear space of one head width** around the mark.
 - **The mascot is decoration.** It is never the only label of a control, and
   it is always `aria-hidden` where it appears in the UI.
