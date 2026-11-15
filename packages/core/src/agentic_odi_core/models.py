@@ -280,8 +280,7 @@ class Evidence(BaseModel):
     impact: Literal["high", "medium", "low"] = Field(
         "medium",
         description=(
-            "How much this evidence moves the outcome score; mirrors JPD's "
-            "insights impact rating"
+            "How much this evidence moves the outcome score; mirrors JPD's insights impact rating"
         ),
     )
     confidence: Literal["verified", "claimed"] = Field(
