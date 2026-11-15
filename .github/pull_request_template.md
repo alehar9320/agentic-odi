@@ -10,6 +10,8 @@
 
 <!-- The behavior, files, or commands a reviewer should look at. -->
 
+- Registers touched: none | generated (`scripts/docs_index.py --write`)
+
 ## How this was verified
 
 <!-- The exact commands you ran and what they printed. "Tests pass" alone does
