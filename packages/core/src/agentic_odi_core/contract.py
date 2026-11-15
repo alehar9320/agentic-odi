@@ -320,7 +320,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.ADD_EVIDENCE.value: ToolSpec(
         name="add_evidence",
-        summary="Capture an evidence record from a connector.",
+        summary="Capture an evidence record from a connector with optional impact and confidence ratings.",
         effect=_derive_effect("add_evidence"),
         arguments=(
             "source_name",
