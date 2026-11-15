@@ -45,8 +45,47 @@ function json(body: unknown): Response {
   });
 }
 
+
+/**
+ * A reply of `count` deltas whose terminal frame carries no content, so what is
+ * rendered is exactly what the deltas accumulated. A delta the frame batching
+ * dropped would show up here as a short string.
+ */
+function streamOfProse(count: number): string {
+  const deltas = Array.from(
+    { length: count },
+    (_unused, index) => `event: delta\ndata: {"text":"w${index} "}\n\n`,
+  ).join("");
+  return deltas + "event: message\ndata: {}\n\n";
+}
+
 function sse(body: string): Response {
   return new Response(body, {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+
+/** The same bytes, released one event per macrotask: what a network delivers. */
+function chunkedSse(body: string): Response {
+  const encoder = new TextEncoder();
+  const blocks = body.split("\n\n").filter((block) => block.trim().length > 0);
+  let index = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const push = () => {
+        if (index >= blocks.length) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(encoder.encode(`${blocks[index]}\n\n`));
+        index += 1;
+        setTimeout(push, 0);
+      };
+      setTimeout(push, 0);
+    },
+  });
+  return new Response(stream, {
     status: 200,
     headers: { "Content-Type": "text/event-stream" },
   });
@@ -62,6 +101,8 @@ const DEFAULT_CHAT_STREAM =
   'event: message\ndata: {"content":"Hi"}\n\n';
 
 let chatStream: string | null = null;
+/** Deliver the stream one event per macrotask, as a real network does. */
+let chatChunked = false;
 let canvasFails = false;
 /** Extra records the canvas route serves; empty keeps every other test as-is. */
 let canvasRecords: Record<string, unknown> = {};
@@ -93,6 +134,8 @@ type GatedTurn = {
   body: Record<string, unknown>;
   aborted: boolean;
   respond: (events: string) => void;
+  /** Release part of the stream without closing it: a reply mid-flight. */
+  emit: (events: string) => void;
   abort: () => void;
 };
 let gateChats = false;
@@ -110,6 +153,9 @@ function gatedChatResponse(
     respond: (events) => {
       streamController?.enqueue(encoder.encode(events));
       streamController?.close();
+    },
+    emit: (events) => {
+      streamController?.enqueue(encoder.encode(events));
     },
     abort: () => {
       turn.aborted = true;
@@ -181,6 +227,9 @@ function route(
     }
     if (gateChats) {
       return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
+    }
+    if (chatChunked) {
+      return chunkedSse(chatStream ?? DEFAULT_CHAT_STREAM);
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
@@ -2787,6 +2836,131 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(STREAM_BUDGET);
+  });
+
+  it("batches a chunked reply into a frame's worth of renders, not one per delta", async () => {
+    // The network delivers one event per macrotask. Forty deltas that each
+    // published their own render would land as roughly forty renders of every
+    // surface; batching to one frame brings the transcript-only surfaces back
+    // to their quiet baseline.
+    chatChunked = true;
+    chatStream = streamOfDeltas(40);
+    const studio = await countedStudio();
+
+    await act(async () => {
+      await studio.sendMessage("hello");
+    });
+
+    const counts = getCounts();
+    expect(counts.landscape ?? 0, "the landscape rendered per delta").toBeLessThanOrEqual(3);
+    expect(counts.rail ?? 0, "the rail rendered per delta").toBeLessThanOrEqual(3);
+    expect(counts.banners ?? 0, "the banners rendered per delta").toBeLessThanOrEqual(3);
+    chatChunked = false;
+  });
+
+  it("renders the streamed prose exactly as the deltas arrived", async () => {
+    // A turn held open on the wire, then released with forty deltas and the
+    // frame that closes it: the accumulated text must be every delta, in order,
+    // even though the frames batched them.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].respond(streamOfProse(40));
+    });
+
+    const expected = Array.from({ length: 40 }, (_unused, index) => `w${index} `).join("");
+    await waitFor(() => expect(live.current!.messages.at(-1)?.content).toBe(expected));
+    gateChats = false;
+    gatedTurns = [];
+  });
+
+  it("keeps the settled messages identical while the reply streams", async () => {
+    // The assistant message is replaced on every flush; every message before it
+    // keeps its identity, so a reader of the settled transcript is not asked to
+    // render again.
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+    const settled = live.current!.messages.slice();
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+
+    settled.forEach((message, index) => {
+      expect(live.current!.messages[index]).toBe(message);
+    });
+  });
+
+  it("keeps the text that arrived before a cancel, and drops only the placeholder", async () => {
+    // A stop mid-reply: the deltas already received are flushed before the
+    // empty placeholder is removed, so the person keeps what they had read.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].emit('event: delta\ndata: {"text":"half an "}\n\nevent: delta\ndata: {"text":"answer"}\n\n');
+    });
+
+    await act(async () => {
+      live.current!.stopStreaming();
+    });
+    await waitFor(() => expect(live.current!.streaming).toBe(false));
+
+    expect(live.current!.messages.at(-1)?.content).toBe("half an answer");
+    gateChats = false;
+    gatedTurns = [];
+  });
+
+  it("lands a mid-stream approval after the prose that preceded it", async () => {
+    // Batching prose must not reorder a surface: a tool row that arrives
+    // between two deltas stays between them, not above or below the flush.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("add a job");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].respond(
+        'event: delta\ndata: {"text":"Let me add "}\n\n' +
+          'event: approval\ndata: {"id":"apv_9","tool_call_id":"call-9","name":"add_job","prompt":"Allow the assistant to add job?"}\n\n' +
+          'event: delta\ndata: {"text":"it now."}\n\n' +
+          'event: message\ndata: {"content":"Let me add it now."}\n\n',
+      );
+    });
+    await waitFor(() => expect(live.current!.streaming).toBe(false));
+
+    const parts = live.current!.messages.at(-1)?.parts ?? [];
+    const kinds = parts.map((part) => part.kind);
+    const approvalAt = kinds.indexOf("tool");
+    const lastTextAt = kinds.lastIndexOf("text");
+    expect(approvalAt).toBeGreaterThan(-1);
+    expect(approvalAt).toBeLessThan(lastTextAt);
+    gateChats = false;
+    gatedTurns = [];
   });
 
   it("takes twenty keystrokes within its budget", async () => {

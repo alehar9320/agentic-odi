@@ -1910,19 +1910,71 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         ];
       };
 
+      // A streamed reply arrives one delta at a time, and a render per delta is
+      // a render per token. Prose is therefore published once per frame: the
+      // accumulated `content` and `parts` are read when the frame fires, not
+      // when the delta lands. Everything else — a citation, a tool row, the
+      // terminal frame — publishes immediately, and cancels the pending frame
+      // first so nothing is rendered out of order.
+      let frame: number | null = null;
+      let frameKind: "raf" | "timeout" | null = null;
+
+      const flush = () => {
+        frame = null;
+        frameKind = null;
+        setMessages((prev) => {
+          const index = prev.findIndex((message) => message.id === assistantId);
+          if (index === -1) {
+            return prev;
+          }
+          // Only the streaming message is replaced; every settled message keeps
+          // its identity, so a memoised reader of the settled transcript is not
+          // asked to render again.
+          const next = prev.slice();
+          next[index] = {
+            ...prev[index],
+            content,
+            parts: [...parts],
+            ...(failure ? { error: failure, retryText: trimmed } : {}),
+          };
+          return next;
+        });
+      };
+
+      const cancelFrame = () => {
+        if (frame === null) {
+          return;
+        }
+        if (frameKind === "raf") {
+          cancelAnimationFrame(frame);
+        } else {
+          clearTimeout(frame);
+        }
+        frame = null;
+        frameKind = null;
+      };
+
+      /** Batch a streamed delta into the next frame; at most one per frame. */
+      const publishStream = () => {
+        if (frame !== null) {
+          return;
+        }
+        if (typeof requestAnimationFrame === "function") {
+          frameKind = "raf";
+          frame = requestAnimationFrame(flush);
+        } else {
+          // A frame is a wall-clock idea; without rAF the same batching still
+          // holds, on the shortest timer that stands in for one.
+          frameKind = "timeout";
+          frame = setTimeout(flush, 16) as unknown as number;
+        }
+      };
+
       const publish = () => {
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === assistantId
-              ? {
-                  ...message,
-                  content,
-                  parts: [...parts],
-                  ...(failure ? { error: failure, retryText: trimmed } : {}),
-                }
-              : message,
-          ),
-        );
+        // An immediate publish supersedes any pending frame: the same content
+        // is rendered now, once, rather than twice.
+        cancelFrame();
+        flush();
       };
 
       const handleEvent = (event: RawSseEvent) => {
@@ -1938,12 +1990,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           }
           case "reasoning": {
             appendReasoning(String(event.data.text ?? ""));
-            publish();
+            publishStream();
             break;
           }
           case "delta": {
             appendText(String(event.data.text ?? ""));
-            publish();
+            publishStream();
             break;
           }
           case "source": {
@@ -2128,6 +2180,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           // An abort is the user's own doing: drop the empty placeholder, keep
           // the question, and report no failure — the assistant did not break.
           stopped = true;
+          // The deltas that arrived before the abort are still in the closure,
+          // not yet in a frame. Publishing flushes them synchronously — and
+          // cancels the pending frame — so the partial answer is what stays on
+          // screen, and the empty placeholder is the only thing dropped.
+          publish();
           setMessages((prev) =>
             prev.filter((message) => message.id !== assistantId || message.content !== ""),
           );
