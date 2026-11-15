@@ -27,6 +27,53 @@ function emulateTheme(page: Page, theme: "dark" | "light") {
 }
 
 /**
+ * Pin the system faces to the Liberation fonts Playwright installs on CI.
+ *
+ * The display face is already self-hosted; leaving the sans and mono faces to
+ * the host makes the same screen differ between a laptop and the runner. This
+ * has to run after navigation, or it would style the blank page instead.
+ */
+async function pinFonts(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    // The page's CSP refuses an inline <style>; setting the custom properties
+    // through the CSSOM is not an inline style parse and is allowed.
+    document.documentElement.style.setProperty(
+      "--font",
+      '"Liberation Sans", Arial, sans-serif',
+      "important",
+    );
+    document.documentElement.style.setProperty(
+      "--mono",
+      '"Liberation Mono", monospace',
+      "important",
+    );
+  });
+}
+
+/**
+ * Replace the ids the sidecar assigns at random with one stable placeholder.
+ *
+ * The placeholder keeps the 36-character shape, so the tables wrap exactly as
+ * they would with a real id, while two runs can never disagree on which hex
+ * letters fall on a line. Without this, every screenshot is a different image
+ * even though the store, the layout, and the values around the ids are the same.
+ */
+async function normalizeIds(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+    const placeholder = "00000000-0000-4000-8000-000000000000";
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const texts: Text[] = [];
+    while (walker.nextNode()) {
+      texts.push(walker.currentNode as Text);
+    }
+    for (const node of texts) {
+      node.data = node.data.replace(uuid, placeholder);
+    }
+  });
+}
+
+/**
  * Open the Studio on a fresh canvas and open the named view. The first-run
  * wizard and the setup conversation are switched off the way a QA engineer
  * would, so the screen under test is the only thing on screen.
@@ -69,8 +116,9 @@ test.describe("the visual harness", () => {
         await expect(page.locator(".lens").first()).toBeVisible();
         await expect(page.getByText("On-call incident report")).toBeVisible();
 
-        // Seed IDs are random; tolerate the few hundred pixels they occupy
-        // while still failing on a real layout change.
+        await pinFonts(page);
+        await normalizeIds(page);
+
         await expect(page).toHaveScreenshot(`records-${viewport.name}-${theme}.png`, {
           maxDiffPixelRatio: 0.01,
         });
@@ -87,6 +135,8 @@ test.describe("the visual harness", () => {
         await openView(page, "Landscape");
 
         await expect(page.locator(".lens").first()).toBeVisible();
+        await pinFonts(page);
+        await normalizeIds(page);
 
         await expect(page).toHaveScreenshot(`landscape-${viewport.name}-${theme}.png`, {
           maxDiffPixelRatio: 0.01,
@@ -109,6 +159,8 @@ test.describe("the visual harness", () => {
           .click();
 
         await expect(page.locator(".lens").first()).toBeVisible();
+        await pinFonts(page);
+        await normalizeIds(page);
 
         await expect(page).toHaveScreenshot(`capture-${viewport.name}-${theme}.png`, {
           maxDiffPixelRatio: 0.01,
