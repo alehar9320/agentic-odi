@@ -474,7 +474,7 @@ cites the issue or PR that landed it.
 | `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
 | `MessagePrimitive.GroupedParts` | Adopted | One collapsed row holds what a turn did — its reasoning and tool calls — and never hides a write that is still asking. | #392 |
 | `MessagePrimitive.Attachments` | Adopted | User turns show what was sent. | #238 |
-| `MessagePrimitive.Root` | Partial | The wrapper is a hand-written article carrying `aria-busy` and the avatar. | — |
+| `MessagePrimitive.Root` | Adopted | Every turn renders its root through the primitive — the hover state the actions read and the top anchor come from it; the `article`, the classes and `aria-busy` ride on it unchanged. | #994 |
 | `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
 | `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Custom text/file renderers, because claim chips and extraction state need them. | — |
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
