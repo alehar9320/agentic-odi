@@ -50,6 +50,25 @@ missing.
 These rows are the record of an audit, not a to-do list with a deadline. Fixing them
 is ordinary refactoring, one pull request per concern.
 
+## Interaction surface audit
+
+A surface-by-surface read of `apps/studio/src`, recording the current owner and an
+`adopt`, `keep`, or `revisit` recommendation for each interaction surface. This is
+the record of an audit, not a migration plan: no components are moved and no
+dependencies are added here. Conventional surfaces point at the libraries already
+declared in the workspace; ODI-specific visualizations and composer behavior are
+product presentation and state, not generic-library replacements.
+
+| Surface | Files | Owner | Recommendation | Reason |
+|---|---|---|---|---|
+| Dialogs, focus trap, dismissal | `ChangelogModal.tsx`, `ShareSheet.tsx`, `ConnectorSuggestionModal.tsx`, `DiagnosticsModal.tsx`, `FirstRunWizard.tsx`, `StudioBar.tsx` (`role="dialog"`), `useFocusTrap.ts` | `radix-ui` (declared; used under `src/vendor`) | adopt | Six hand-built `role="dialog"` surfaces duplicate a declared dependency; a shared Radix Dialog primitive is the consolidation target (issues #1001, #1002, #1004). |
+| Notifications | `BannerStack.tsx`, `Banner.tsx`, `useToasts()` in `StudioContext.tsx` | `@radix-ui/react-toast` | keep | The Radix toast stack is already the notification owner; every banner portals into the single registered viewport. |
+| Conversation stage (viewport, message list, parts, branch picker) | `ChatStage.tsx`, `Conversation.tsx`, `ThreadComposer.tsx`, `SelectionToolbar.tsx`, `QueueLane.tsx`, `StallNotice.tsx` | `@assistant-ui/react` | keep | assistant-ui owns the conversation runtime; these encode product behavior on top of it and are not replaceable by a generic dialog library. |
+| Inline composer suggestions / slash commands | `composerParts.tsx` (`CommandPalette`, `SuggestionPills`), `Composer.tsx`, `ThreadComposer.tsx` | `@assistant-ui/react` | keep | Inline composer suggestions are assistant-ui behavior; not marked for automatic replacement with `cmdk` or a generic library. |
+| ODI visualizations | `OpportunityLandscape.tsx`, `JobMap.tsx`, `SegmentBoard.tsx`, `MemoryPanel.tsx`, `DirectCapture.tsx`, `EvidenceStream.tsx` | product-specific (Studio) | keep | ODI-specific visualizations encode domain behavior and are not candidates for generic libraries. |
+| Markdown rendering | `lib/markdown.ts` | `@assistant-ui/react-markdown` (declared, imported nowhere) | revisit | Declared but unused; a stray local copy exists. Covered by the canonical owners table. |
+
+
 ## The bounds
 
 Reuse is not a licence to add a dependency anywhere. Three places deliberately
