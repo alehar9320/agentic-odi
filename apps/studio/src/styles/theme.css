@@ -561,11 +561,27 @@ a {
 }
 
 .chat__scroll {
+  /* The frame the vendored thread Element renders; also the positioning context
+     for the jump-to-latest control, which floats over the transcript. */
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 6px 22px 20px;
   scrollbar-gutter: stable;
+}
+
+/* The Element's content column: the message list and the footer, centred. */
+.chat__thread {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+/* The empty stage: the welcome and the footer share the centred column. */
+.chat__thread.aui-thread-content--empty {
+  justify-content: center;
 }
 
 /* Keyboard readers can scroll history without a mouse (WCAG 2.1.1). */
@@ -575,12 +591,16 @@ a {
   border-radius: 14px;
 }
 
+/* The jump-to-latest pill floats over the transcript in the scroll frame,
+   not inside the dock, so it never covers the composer. `.chat__scroll`
+   (position: relative) is its positioning context. */
 .chat__latest {
-  position: absolute;
-  z-index: 1;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* In flow above the composer inside the dock, so it never covers the
+     composer; `.chat__dock > *` centres it. Visually hidden when the reader is
+     already at the bottom (ChatStage only mounts it while scrolled away). */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 7px 13px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
@@ -601,11 +621,22 @@ a {
   margin: 0 auto;
 }
 
+/* The footer docks to the bottom of the scroll frame when the thread has turns,
+   so it stays visible while the transcript scrolls under it. The scroll frame
+   already provides the side and bottom padding, so the dock drops its own. */
 .chat__dock {
-  position: relative;
   flex: none;
   padding: 6px 22px calc(16px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, var(--bg) 60%, transparent);
+}
+
+/* The pinned modifier must come after the base rule so `position: sticky`
+   wins the cascade and the composer stays pinned to the viewport bottom. */
+.chat__dock--pinned {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding: 6px 0 0;
 }
 
 /* Scroll anchor: floats above the composer only while the reader is behind. */

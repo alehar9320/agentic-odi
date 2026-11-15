@@ -46,6 +46,7 @@ agreeing.
 
 | Package | Licence | Declared in | Why the alley needs it |
 |---|---|---|---|
+| `@assistant-ui/react` | MIT | dependencies | the `ThreadPrimitive` the copied `thread` Element is built over |
 | `class-variance-authority` | MIT | devDependencies | the variant table the copied button is built from |
 | `clsx` | MIT | devDependencies | the class merger under `lib/utils.ts`, which every copy calls |
 | `radix-ui` | MIT | dependencies | `Slot`, the `asChild` primitive the button renders through |
