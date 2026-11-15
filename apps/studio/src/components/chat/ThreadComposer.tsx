@@ -29,7 +29,7 @@ import {
 import { dictationSupported } from "../../assistant/dictation";
 import { recallAnnouncement, useComposerHistory } from "../../assistant/composerHistory";
 import { isSlashCommand, matchCommands, type StudioCommand } from "../../lib/commands";
-import { registerComposer } from "../../lib/composerFocus";
+import { composerMayTakeCaret, registerComposer } from "../../lib/composerFocus";
 import { useStudio } from "../../state/StudioContext";
 import { ArrowUpIcon, MicIcon, PaperclipIcon, StopIcon } from "../icons";
 import {
@@ -157,6 +157,17 @@ function ComposerBody({
   // to be unique per instance rather than a fixed string in the document.
   const attachmentHelpId = useId();
   const inputId = useId();
+  // The composer takes the caret itself instead of handing `autoFocus` to the
+  // primitive: the primitive re-runs its focus effect whenever its own enabled
+  // state changes, and a composer that appears late would pull the caret out of
+  // a dialog the person just opened (#695). One focus, decided when it is taken
+  // rather than when this component rendered, is the whole behaviour we want.
+  useEffect(() => {
+    if (!autoFocus || !composerMayTakeCaret()) {
+      return;
+    }
+    document.getElementById(inputId)?.focus({ preventScroll: true });
+  }, [autoFocus, inputId]);
   const paletteId = useId();
   const text = useAuiState((state) => state.composer.text);
   const running = useAuiState((state) => state.thread.isRunning);
@@ -332,7 +343,7 @@ function ComposerBody({
           id={inputId}
           className="composer__input"
           rows={1}
-          autoFocus={autoFocus}
+          autoFocus={false}
           placeholder={
             placeholder ??
             (offline
