@@ -19,9 +19,10 @@
 An **MCP server** that hands your agents verified customer outcomes — the jobs,
 desired outcomes, and opportunity scores that rank them.
 
-**Try it now — nothing to install.** The Studio opens in your browser and works
-from the first minute: the canvas, the thread, and the assistant all run on your
-device.
+**Try it now — nothing to install, nothing to connect.** Open the Studio in any
+browser and it works from the first minute: canvas, thread, and assistant all
+run on your device, with no account and no server. The local app (any OS) and
+the sidecar elevate your capabilities when you're ready — they never block you.
 
 [![Open the Living Studio](https://img.shields.io/badge/Open%20the%20Living%20Studio-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://agentic-odi.alehar.workers.dev/)
 [![Open the sample workspace](https://img.shields.io/badge/Open%20the%20sample%20workspace-1e293b?style=for-the-badge&logo=githubpages&logoColor=white)](https://alehar9320.github.io/agentic-odi/sample/)
@@ -62,10 +63,22 @@ The project card, rendered from the committed source by
 | **Evidence becomes outcomes.** An ingested record is mined into a scored, approvable outcome proposal — statement, direction, importance, satisfaction, and a stated confidence, with its rationale and the quote it came from. The mining is deterministic and offline. | [The method →](docs/method.md) |
 | **A catch-up that means something.** Writes emit signals — an outcome re-scored, evidence promoted, a job map completed — stored in the same event log and read by the CLI, any MCP client, and the Studio's bell. Nothing is invented, and the feed is deduped and budgeted. | [CLI reference →](docs/cli.md) |
 | **Connectors, without storing a credential.** Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) from a trusted vendor marketplace, conversationally, or from the CLI. A listing that needs a token names the environment variable to set. | [External Connectors →](docs/connectors.md) |
-| **Local-first by default.** The CLI and server work with no network and no account. Point them at a remote MCP server with one flag, or run an OpenAI-compatible model on your own machine. | [Local LLM Backend →](docs/local-llm.md) |
+| **Browser-first, local-second.** The Studio opens in any browser and is fully usable with no account, no server, and no sidecar: jobs, outcomes, memory, and the assistant all run locally on your device. The desktop app (any OS) and the sidecar elevate your capabilities — local LLM proxy, connectors, MCP passthrough, updates — when you choose to add them. Start on web or mobile, then graduate to the CLI or local app as you get deeper. | [Local LLM Backend →](docs/local-llm.md) |
+
+**How you start.** Open the Studio on the web (desktop or mobile) or connect any
+MCP client to the local server. Everything works right there. When you want more
+power — a local model, third-party connectors, a desktop shell — install the local
+app. The sidecar elevates; it never blocks. You can stay in the browser forever,
+or move to the CLI and then the local app as you become more embedded in the
+service.
 
 ### Also in the box
 
+- **Typed entity links in the core domain model.** `Link` and `RelationshipType`
+  in `packages/core` describe typed, AI-native relationships between ODI
+  entities (such as `evidence` serving an `outcome`, `blocked_by`, or
+  `external_jira`/`external_github` references) with optional external
+  identifiers and cached previews, currently scoped to the core domain model.
 - **One artifact you can hand over.** A read-only link opens a single artifact
   and its evidence on its own page — no rail, no composer, no way into the rest
   of the workspace — and states when the link expires. The link is a capability,
@@ -274,7 +287,7 @@ drift from the workspace. The distributions are:
 
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models, the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), the innovation strategy (Stage 6), and traceability (which objectives outcomes advance, which are unfunded, which links drifted). |
+| **`packages/core/`** | `agentic-odi-core` | Domain models (including typed entity `Link` and `RelationshipType` models), the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), the innovation strategy (Stage 6), and traceability (which objectives outcomes advance, which are unfunded, which links drifted). |
 | **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, traceability, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, PM memory, and scoped read-only share tokens for one artifact. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
@@ -282,7 +295,7 @@ drift from the workspace. The distributions are:
 | **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) precaches the built shell so the app opens with no network, answers an uncached navigation with the cached shell or `public/offline.html`, and never caches `/api/**`. |
 | **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
 | **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
-| **`scripts/`** | — | Dev launcher, binary build, installer tests, the deterministic study-corpus generator (`gen_corpus.py`), the shared structural audit every artifact HTML passes through (`artifact_a11y.py`, with its renderer inventory in `artifact_renderers.py`), and the hosted probe that asks the production URL whether it keeps the promises this README makes (`verify-hosted-first-run.sh`). |
+| **`scripts/`** | — | Dev launcher, binary build, installer tests, the deterministic study-corpus generator (`gen_corpus.py`), the shared structural audit every artifact HTML passes through (`artifact_a11y.py`, with its renderer inventory in `artifact_renderers.py`), the merge-churn report that ranks the files merged pull requests touch (`doc_churn.py`), and the hosted probe that asks the production URL whether it keeps the promises this README makes (`verify-hosted-first-run.sh`). |
 | **`tests/contract/`** | — | Cross-package MCP contract tests. |
 
 Inside `packages/core` there are four groups, and the rules between them are

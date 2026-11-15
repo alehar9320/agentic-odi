@@ -1,0 +1,127 @@
+name: PR screenshots
+
+# Advisory, self-hosted visual review. Every pull request gets one comment
+# showing screenshots of the *running product* — the built Studio driven
+# against a live MCP server and sidecar — so a reviewer sees the real result
+# without cloning or building. It reuses the `e2e` job's build/start pattern and
+# `playwright.config.ts`'s `webServer`; it adds no vendor and no baseline.
+#
+# `continue-on-error: true` and no membership in `ci-green`'s `needs` mean a
+# screenshot failure can never block a merge. Chromatic stays the source of
+# truth for component-level visual regression.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  screenshots:
+    name: Product screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: apps/studio/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/studio
+        run: npm ci
+
+      - name: Build the Studio
+        working-directory: apps/studio
+        run: npm run build
+
+      - name: Install the browser
+        working-directory: apps/studio
+        run: npx playwright install --with-deps chromium
+
+      # The config's `webServer` brings up the MCP server (:8000) and the
+      # sidecar (:8100), which serves the built SPA. `PR_SCREENSHOTS=1` enables
+      # the `screenshots` project; the default `test:e2e` run does not see it,
+      # so the `e2e` job's coverage is untouched.
+      - name: Capture the product screens
+        working-directory: apps/studio
+        env:
+          PR_SCREENSHOTS: "1"
+        run: npx playwright test --project=screenshots
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-screenshots-report
+          path: apps/studio/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-screenshots
+          path: apps/studio/pr-screenshots
+          if-no-files-found: ignore
+          retention-days: 1
+
+      # A fork pull request gets a read-only token, so the comment cannot be
+      # written. Say so instead of failing red on a PR we may not touch.
+      - name: Note fork pull requests
+        if: ${{ github.event.pull_request.head.repo.fork }}
+        run: echo "::notice::Skipping the screenshot comment for a fork pull request (read-only token)."
+
+      # One comment, updated on re-run, so a reviewer never reads a stale set.
+      # The artifact link is used rather than inline images: the artifact is
+      # short-lived and the comment body stays small.
+      - name: Post the screenshot comment
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          shots="$(ls apps/studio/pr-screenshots/*.png 2>/dev/null | wc -l | tr -d ' ')"
+          message="$RUNNER_TEMP/pr-screenshots.md"
+          {
+            echo "## Product screenshots"
+            echo
+            if [ "$shots" -gt 0 ]; then
+              echo "Screenshots of the running product for this pull request ($shots captured)."
+            else
+              echo "No screenshots were captured on this run; see the [workflow run]($RUN_URL) log."
+            fi
+            echo
+            echo "Download the \`pr-screenshots\` artifact from the [workflow run]($RUN_URL) (retained for one day)."
+            echo
+            echo "_This comment was created by an AI agent (OpenHands) on behalf of the pull request author._"
+          } > "$message"
+
+          comment_id="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq '.[] | select(.body | startswith("## Product screenshots")) | .id' |
+            head -n 1)"
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$comment_id" \
+              -F body=@"$message" >/dev/null
+          else
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$message"
+          fi

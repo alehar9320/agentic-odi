@@ -191,6 +191,12 @@ Studio says so in one place and keeps going:
   color, `aria-hidden` when a word already states the state, named by `label`
   when it stands alone. A `.studio-pill` is a label, not an indicator, so it
   carries no dot of its own.
+- Settings answers the same question with three words, and only claims what a
+  probe established: **available**, **unavailable**, or **configured, not
+  checked**. A model endpoint you have typed into Settings reads the third — it
+  never reads available until a health answer says so — and the MCP row is read
+  by the `POST` its route accepts, so a healthy sidecar no longer reports MCP
+  missing (`apps/studio/src/bff/capabilities/registry.ts`).
 - A reply that no model produced carries one line, on that reply: **Local draft,
   no model connected**. It is a button, and it opens Settings. It never repeats
   on the replies around it, and nothing about it covers the thread.
@@ -375,7 +381,15 @@ fixtures. Its real content is the store's signal inbox
 `/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
-already connected.
+already connected. The connector-install control explains a block in place: when
+the sidecar is known to be absent, **Add** stays disabled and a sentence beneath
+it says why, with one real next action (`Start the local service`), sourced from
+the single `blockedReason` table and tied to the button through
+`aria-describedby`. An unprobed capability is a wait rather than a failure, so
+nothing is explained for a host that has not answered yet. The table already
+carries wording for every capability the registry models, so a new capability
+cannot ship without it; wiring the remaining blocked controls (capture, agent
+send) and retiring the duplicate global banner are follow-ups.
 
 The Opportunity Matrix is held to the same rule. It plots a point only for an
 outcome the store actually scored — no default of 5 fills a missing importance
@@ -422,7 +436,7 @@ without giving up the message model the sidecar already understands.
 
 | Capability | What it means here |
 |---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Prose is published once per animation frame — deltas accumulate in the turn and one render shows them all — while a citation, a tool row, the terminal frame, a cancel, and an error publish immediately and cancel any pending frame. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
 | **Silence** | A run that stops producing tokens for eight seconds shows *Still working · no new output for Ns* under the reply, while the Stop button keeps its meaning. The signal comes from assistant-ui's stall detection over text, reasoning, tool arguments, and tool results — never from a timer watching the DOM — so a long tool call reads as work, not a freeze. A dropped stream never shows it: that path ends in the failure panel. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
 | **Work** | What a turn did folds into one row: *Working… · 3 calls* while it runs, then *Worked for 12s · 3 calls*, closed and reopenable. Opening it is the turn's own record, not a paraphrase — the same reasoning disclosure and trace chips, in the order they arrived. A turn the browser did not watch from the start shows its calls with no duration. |
@@ -439,7 +453,7 @@ without giving up the message model the sidecar already understands.
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 | **Queue** | A follow-up sent while an answer still streams does not hit a wall: it joins a quiet lane above the composer and runs in the order it was sent once the live turn settles. Each row offers **Run now** — it jumps ahead of the other waiting follow-ups — and a remove that drops only that message. Stop stops the live turn and the lane waits for the next send; it never clears the queue. The lane is in-memory and dies with the page, and the sidecar still sees exactly one SSE turn at a time — the queue sequences, it never parallelises. |
 | **Read aloud** | A settled reply with prose offers **Read aloud** beside Copy, and becomes **Stop reading** while it speaks. Starting another reply stops the first; **Stop reading**, Escape inside the thread, and leaving the conversation end it. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken. A streaming reply is never spoken, and speech is never persisted. |
-| **Interview** | Three to five structured questions arrive as an **interview card** (`InterviewCard`): a short statement with the outcome format hint, a free-text answer, and a scale with a visible value and keyboard steps. Each question is a labelled group; a required one is marked and enforced on submit, and an empty required answer is refused with one plain sentence rather than a silent no-op. The card is presentation only — it takes the questions, the answers, and a submit callback as props and never reads the canvas or the sidecar — so the conductor that turns answers into records (#397) owns that work. |
+| **Interview** | Three to five structured questions arrive as an **interview card** (`InterviewCard`): a short statement with the outcome format hint, a free-text answer, and a scale with a visible value and keyboard steps. Each question is a labelled group; a required one is marked and enforced on submit, and an empty required answer is refused with one plain sentence rather than a silent no-op. The card is presentation only — it takes the questions, the answers, and a submit callback as props and never reads the canvas or the sidecar. The conductor (`apps/studio/src/assistant/interview/conductor.ts`, #397) owns the work behind it: a pure reducer walks `idle → asking → collecting → submitting → done`, validates the required answers before it submits, and creates the records in order through the existing `createJob`/`addOutcome`/`addEvidence` actions — a failure stops the run and names the step that failed, leaving what already succeeded in place. |
 
 #### What the runtime gives us, and what we did not take
 
@@ -498,6 +512,7 @@ cites the issue or PR that landed it.
 | `data-aui-quote-selectable="false"` | Adopted | Tool traces and generated surfaces are marked non-prose. | #435 |
 | `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | The quote persists in the turn's metadata. | #435 |
 | `button` Element | Adopted | The one copy-in: a shadcn button under `src/vendor`, with a provenance header and a `vendor.lock.json` entry. It is not an assistant-ui primitive — it is a vendor decision, recorded here because the ledger audits the library and the alley is part of that audit. | #383 |
+| `thread` Element | Partial | Its frame is copied into `src/vendor/components/assistant/thread.tsx`: the thread root, the scrolling viewport, and the viewport footer the composer docks into, so the empty stage and a running thread share one layout. The Element's own message, composer, and markdown sections are not taken — `Conversation`/`parts.tsx`, `ThreadComposer`, and `Markdown.tsx` own those. | — |
 | Structured turn failure | Adopted | The failure panel with retry copy. | #129 |
 | `unstable_useMessageStallDetection` | Adopted | "Still working · no new output for Ns", only when output stops moving. | #431 |
 | `useAuiState` | Adopted | Runtime state read across the transcript and composer. | #238 |
@@ -750,11 +765,12 @@ The copilot does not only talk. When a surface carries the evidence better than 
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
 customer quote with its lineage, the eight-stage job map, an opportunity thesis,
-a decision record, an outcome-based segment, or the strategy it implies.
+a decision record, an outcome-based segment, the strategy it implies, or a
+finding with the number and the step behind it.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and nine cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and ten cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
@@ -764,8 +780,10 @@ Three properties keep this safe and cheap to extend:
   result naming the exact violation, and the loop offers the tool again, so a
   fumbled prop is corrected in the same reply. A client that sends no catalog
   never sees the tool.
-- **Cards are views, never actors.** Every button is an `intent` string that the
-  agent receives as the user's next message — one authority, one audit trail.
+- **Cards are views, never actors.** An `intent` button is a string the agent
+  receives as the user's next message — one authority, one audit trail. A
+  `detail` button is the one exception: it opens the record the card names in the
+  right region and sends nothing, so inspecting a finding never costs a turn.
 
 A surface is one node tree, streamed as one event:
 
@@ -803,6 +821,14 @@ The strategy card carries Stage 6: the one path the evidence supports, the moves
 it proposes, and **every path it beat with the reason**. The catalog requires at
 least two rejected paths, so a strategy that records none cannot be validated.
 
+The finding card is the one sentence the agent will not bury: a headline claim,
+an impact band, the measured number behind it, and the real `Step.name` it
+happens on. It carries no score, so nothing on it is computed. The step line is
+read back from `canvas.steps` and omitted when the name does not resolve, a
+sample canvas badges the card, and every number is the agent's own formatted
+value. Its **View breakdown** action is a `detail` action: it opens the lens that
+holds the record, focused on that record, without sending a message.
+
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
 paragraph after it. The opportunity score is computed from importance and
@@ -817,7 +843,10 @@ that fails validation is dropped whole, and the surrounding prose still reads.
 2. Register the component in `apps/studio/src/ui/registry.ts`.
 3. Implement it in `apps/studio/src/ui/cards.tsx` (domain shape) or
    `apps/studio/src/ui/primitives.tsx` (composition).
-4. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
+4. Add the card to `website/content/landing.json` and a macro in
+   `website/templates/_cards.html`. CI reads `catalog.ts` and fails when a card
+   is missing from the built site.
+5. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
    catalog and the registry drift apart.
 
 No server change is needed, and no new dependency.

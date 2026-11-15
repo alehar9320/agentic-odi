@@ -8,15 +8,18 @@ records the protocol and the reasons it is shaped this way.
 
 The protocol has four layers:
 
-1. **The catalog** — `apps/studio/src/ui/catalog.ts:72`. Sixteen entries: nine
+1. **The catalog** — `apps/studio/src/ui/catalog.ts`. Nineteen entries: nine
    primitives (`stack`, `grid`, `heading`, `text`, `list`, `stat`, `meter`,
-   `callout`, `divider`) and seven cards (`outcome-card`, `opportunity-board`,
+   `callout`, `divider`) and ten cards (`outcome-card`, `opportunity-board`,
    `impact-simulation`, `evidence-quote`, `job-map`, `opportunity-thesis`,
-   `decision-record`). Each has a typed prop schema and optional `actions`; cards
-   describe ODI content rather than generic text.
-2. **The manifest** — `catalogManifest()` (`catalog.ts:338`) is sent with a turn
-   so the model knows exactly which types and props exist; `catalogPrompt()`
-   renders the same information as model-facing prose.
+   `decision-record`, `segment-card`, `strategy-card`, `finding-card`). Each has
+   a typed prop schema and optional `actions`; cards describe ODI content rather
+   than generic text.
+2. **The manifest** — `catalogManifest()` is sent with a turn so the model knows
+   exactly which types and props exist. The sidecar derives the `render_ui` tool
+   description from that manifest, which is the copy the model reads;
+   `catalogPrompt()` renders the same catalog as prose for a reader of this
+   repository.
 3. **The tool call** — the model calls the local `render_ui` tool. The sidecar
    validates the arguments against the catalog (`ui_spec.py:115-117`), emits an
    SSE frame `event: ui` with `{id, spec}` (`chat.py:762-786`), and does **not**
@@ -63,11 +66,20 @@ tree.
 
 ## The action model
 
-Actions are `{label, intent, tone?: "primary" | "ghost"}`, at most 40. Malformed
-entries are dropped (`actions.ts:29-51`). Pressing one calls `onIntent(intent)`,
-which sends a chat message (`primitives.tsx:21-41`) and is disabled while a reply
-streams. Cards are **views**: an action is a prompt back into the conversation,
-never a direct mutation or navigation.
+Actions are a union of at most 40 entries. Malformed ones are dropped
+(`actions.ts`):
+
+- `{ kind: "intent", label, intent, tone? }` sends its `intent` back as the
+  user's next message, and is disabled while a reply streams.
+- `{ kind: "detail", label, target: { panel, subject? }, tone? }` opens the right
+  region on the record the card names and sends nothing. `openDetail()` in the
+  store resolves a subject the lenses know through `PANEL_FOR_SUBJECT`, marks the
+  record focused, and opens that lens. A `primary` detail action renders the
+  arrow the mock shows.
+
+Cards are still **views**: they cannot write to the store. An intent is a prompt
+back into the conversation; a detail is a look at the record the card is already
+about.
 
 ## Registry parity
 
@@ -97,8 +109,9 @@ a cross-language fixture.
 
 - It does not accept arbitrary HTML, JavaScript, or `eval`; there is no
   `dangerouslySetInnerHTML` path.
-- It does not let a card read from or write to the store. Every action is a chat
-  intent.
+- It does not let a card write to the store. An `intent` action is a chat
+  message; a `detail` action opens the right region on a record the card can
+  already name.
 - It does not enumerate or support third-party catalogs.
 - It does not provide a layout editor or persist a tree; a rendered UI is a
   message, not a saved page.
