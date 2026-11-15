@@ -260,6 +260,15 @@ export class LocalMemoryService {
     return this.store.setConversationHead(id, headId);
   }
 
+  /** Remove a thread and its turns; an unknown id is a not-found, not a no-op. */
+  async deleteConversation(id: string): Promise<{ ok: boolean }> {
+    if (!(await this.store.getConversation(id))) {
+      throw notFound("Conversation", id);
+    }
+    await this.store.deleteConversation(id);
+    return { ok: true };
+  }
+
   async latestConversation(): Promise<LatestConversation> {
     const conversations = await this.store.listConversations();
     const conversation = conversations[0] ?? null;

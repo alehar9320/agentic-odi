@@ -9,6 +9,7 @@ import {
   clearMemory,
   createConversation,
   deleteConnector,
+  deleteConversation,
   deleteObservation,
   dismissSignal,
   fetchLatestConversation,
@@ -415,6 +416,15 @@ describe("conversations", () => {
     expect(fetch).toHaveBeenCalledWith(
       "/api/conversations",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("deleteConversation sends DELETE to the thread", async () => {
+    mockJson({ ok: true });
+    await expect(deleteConversation("c-1")).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/conversations/c-1",
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 

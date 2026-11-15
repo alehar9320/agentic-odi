@@ -274,4 +274,25 @@ describe("LocalMemoryService conversations", () => {
     expect(listed[0].id).toBe("c-24");
     expect(listed.map((item) => item.id)).not.toContain("c-4");
   });
+
+  it("deletes a thread and its turns, and reports an unknown one", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const kept = await memory.createConversation("Keep me");
+    const doomed = await memory.createConversation("Delete me");
+    await memory.appendTurn(doomed.id, "user", "hello", "m-1", null);
+    await memory.appendTurn(doomed.id, "assistant", "hi", "m-2", "m-1");
+
+    await expect(memory.deleteConversation(doomed.id)).resolves.toEqual({ ok: true });
+
+    expect(await memory.getConversation(doomed.id)).toBeUndefined();
+    expect((await memory.listConversations()).map((item) => item.id)).toEqual([kept.id]);
+    await expect(memory.conversationTree(doomed.id)).rejects.toThrow(/not found/i);
+    // The kept thread is untouched: deleting one thread is not clearing the store.
+    expect(await memory.getConversation(kept.id)).toBeDefined();
+
+    await expect(memory.deleteConversation("missing")).rejects.toMatchObject({
+      studioError: { code: "not_found" },
+    });
+  });
 });

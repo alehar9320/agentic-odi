@@ -30,6 +30,7 @@ import {
   deleteConnector as apiDeleteConnector,
   deleteJob as apiDeleteJob,
   deleteObservation as apiDeleteObservation,
+  deleteConversation as apiDeleteConversation,
   deleteEvidence as apiDeleteEvidence,
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
@@ -415,6 +416,11 @@ export interface StudioContextValue {
   refreshConversations: () => Promise<void>;
   /** Open a past thread by loading its turns; never a conversation without them. */
   openConversation: (conversationId: string) => Promise<void>;
+  /**
+   * Remove one thread and its turns. Deleting the open thread returns the stage
+   * to the empty state; a failure leaves the history untouched.
+   */
+  deleteConversation: (conversationId: string) => Promise<boolean>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -2474,6 +2480,40 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [refreshConversations],
   );
 
+  /**
+   * Remove one thread and its turns, then re-read the history.
+   *
+   * Deleting the thread that is open leaves nothing on the stage, so the stage
+   * is cleared to the empty state rather than left pointing at a row that is
+   * gone. A failed delete changes nothing the person can see.
+   */
+  const deleteConversation = useCallback(
+    async (targetId: string) => {
+      try {
+        await apiDeleteConversation(targetId);
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, `/api/conversations/${targetId}`);
+        pushToast("error", "I couldn't delete that conversation.");
+        return false;
+      }
+      if (targetId === conversationId) {
+        abortRef.current?.abort();
+        abortRef.current = null;
+        turnQueueRef.current?.clear();
+        setStreaming(false);
+        setThinkingPhase(null);
+        setOfflineReplyFor(null);
+        setToolActivity([]);
+        setMessages([]);
+        setConversationId(null);
+      }
+      await refreshConversations();
+      return true;
+    },
+    [conversationId, pushToast, refreshConversations],
+  );
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -2778,6 +2818,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      deleteConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2910,6 +2951,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      deleteConversation,
       memory,
       memoryLoading,
       refreshMemory,
