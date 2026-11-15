@@ -196,6 +196,7 @@ Update the relevant file whenever any of the following change:
 
 ### 4. General Philosophy
 - **Reuse before you write**: take the ladder in `docs/architecture/reuse.md` in cost order — something already in this repo, then a dependency the workspace already declares, then a copy with a ledger entry, then new. A near-duplicate is a refactor-to-share, not a second copy. Any plan or pull request that adds a source file states a `Reuses:` block; `.agents/skills/reuse-first/SKILL.md` is the short form.
+- **UI component selection**: when adding or changing Studio interaction surfaces, follow the UI Component Selection Workflow in `.agents/skills/reuse-first/SKILL.md` (rungs: existing Studio component → declared foundation/specialist library → reviewed presentation copy-in with provenance → custom behavior). The workflow includes the restraint rule (one decorative standout per page) and preserves boundaries for assistant-ui, behavior dependencies, the vendor ledger, and dependency review.
 - **Separation of Concerns**: Isolate the ODI data logic/retrieval from the MCP server tooling logic.
 - **Agentic Purpose**: Remember that the tools being built are meant to be consumed by autonomous agents. Design tool interfaces that are intuitive for an LLM to call and interpret.
 - **External connectors**: Integrations live in the `packages/connectors` workspace package. New kinds implement `agentic_odi_connectors.protocol.Connector` and register via `register_kind`. Do not write ingested records into `jobs_db` / outcomes unless a later mapping task says so.
