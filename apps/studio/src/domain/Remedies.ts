@@ -70,6 +70,10 @@ const ILLUSTRATIVE_REMEDIES: Remedy[] = [
  * takes the subject so a real implementation can key on it without a signature
  * change, and so the call site already threads the finding through.
  */
-export function getRemedies(_finding: FindingSubject): Remedy[] {
+export function getRemedies(finding: FindingSubject): Remedy[] {
+  // Today the mock does not vary by finding; a real backend will. Naming the
+  // subject in the body keeps the signature the spec asks for without
+  // pretending the result is specific to this record.
+  void finding;
   return ILLUSTRATIVE_REMEDIES.map((remedy) => ({ ...remedy }));
 }
