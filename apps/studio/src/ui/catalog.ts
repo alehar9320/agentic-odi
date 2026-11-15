@@ -509,11 +509,13 @@ export const CATALOG: readonly UiCatalogEntry[] = [
           },
           value: {
             type: "string",
-            description: "The measured number, pre-formatted, e.g. \"34%\" or \"12 days\".",
+            description:
+              "The measured number, pre-formatted with its unit and copied from the data. Never a number the agent did not measure.",
           },
           delta: {
             type: "string",
-            description: "An optional comparison, e.g. \"up from 21% in March\".",
+            description:
+              "An optional comparison against an earlier measurement, in the words the data already uses.",
           },
         },
         required: ["label", "value"],

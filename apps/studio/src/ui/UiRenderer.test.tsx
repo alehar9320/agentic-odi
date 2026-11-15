@@ -396,6 +396,25 @@ describe("finding card", () => {
     expect(onIntent).not.toHaveBeenCalled();
   });
 
+  it("counts the step against its own job, not every step on the canvas", () => {
+    toast.canvasState = {
+      kind: "ready",
+      data: {
+        ...canvas,
+        steps: [
+          { id: "S-2", job_id: "J-1", name: "Match each line", order: 2 },
+          { id: "S-3", job_id: "J-1", name: "Review the exceptions", order: 3 },
+          { id: "S-9", job_id: "J-2", name: "File the invoice", order: 1 },
+          { id: "S-10", job_id: "J-2", name: "Chase the approval", order: 2 },
+        ],
+      },
+    };
+
+    renderSpec(finding());
+
+    expect(screen.getByText("Step 2 of 2 · Match each line")).toBeInTheDocument();
+  });
+
   it("names no step when the canvas does not hold that step", () => {
     renderSpec(finding({ step: "A step nobody captured" }));
 
