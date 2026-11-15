@@ -5,16 +5,10 @@ import { useThreadViewport } from "@assistant-ui/react";
 import { isFeatureEnabled } from "../../features/flags";
 import { canvasStatus } from "../../lib/canvasProvenance";
 import { arrivalAnnouncement, arrivalLabel, arrivedSince } from "./arrivalCount";
-import {
-  HELP_TEXT,
-  IMPACT_PROMPT,
-  STUDIO_COMMANDS,
-  isSlashCommand,
-  type StudioCommand,
-} from "../../lib/commands";
+import { STUDIO_COMMANDS, isSlashCommand } from "../../lib/commands";
 import { useReducedMotion } from "../../lib/useReducedMotion";
+import { useStudioCommands } from "../../lib/useStudioCommands";
 import { useStudio } from "../../state/StudioContext";
-import type { WorkspacePanelId } from "../../types";
 import { IntroConversation } from "../setup/IntroConversation";
 import { SetupConversation } from "../setup/SetupConversation";
 import { ThreadElement } from "../../vendor/components/assistant/thread";
@@ -23,16 +17,6 @@ import { GuidanceHint } from "./GuidanceHint";
 import { Hero } from "./Hero";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { ThreadComposer } from "./ThreadComposer";
-
-const VIEW_COMMANDS = new Set<string>([
-  "records",
-  "landscape",
-  "brief",
-  "jobmap",
-  "segments",
-  "evidence",
-  "settings",
-]);
 
 /**
  * The one scroll control.
@@ -85,99 +69,13 @@ function LatestMessageButton({ messageCount }: { messageCount: number }) {
 }
 
 export function ChatStage() {
-  const {
-    messages,
-    sendMessage,
-    pushNotice,
-    openPanel,
-    closePanel,
-    clearChat,
-    openSetup,
-    setupOpen,
-    canvas,
-    brief,
-    settings,
-    mcpReachable,
-    llmHealth,
-  } = useStudio();
+  const { messages, pushNotice, setupOpen, canvas, brief } = useStudio();
+  const runCommand = useStudioCommands();
 
   const empty = messages.length === 0;
   // The provenance chip the rail already shows, reused here so the inquiry's
   // own bar says whether the board it describes is real or a sample (#737).
   const provenance = canvasStatus(canvas);
-
-  function runCommand(command: StudioCommand) {
-    if (VIEW_COMMANDS.has(command.id)) {
-      openPanel(command.id as WorkspacePanelId);
-      return;
-    }
-    switch (command.id) {
-      case "help":
-        pushNotice(HELP_TEXT);
-        return;
-      case "new":
-      case "home":
-        clearChat();
-        closePanel();
-        return;
-      case "start":
-        openSetup();
-        return;
-      case "jobs": {
-        const jobs = canvas?.jobs ?? [];
-        const lines = jobs.length
-          ? jobs.map((job) => `- **${job.id}** — ${job.name ?? "Untitled job"}`)
-          : ["- Nothing captured yet. Use `/start` to name the job."];
-        pushNotice(
-          [
-            `**${jobs.length} job${jobs.length === 1 ? "" : "s"} on the canvas**`,
-            ...lines,
-            "",
-            brief?.job_statement ? `Working job: ${brief.job_statement}` : "",
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        );
-        openPanel("jobmap");
-        return;
-      }
-      case "impact":
-        void sendMessage(IMPACT_PROMPT);
-        return;
-      case "capture":
-        // With a model, capture is a sentence. Without one, the offline form
-        // is the only honest path that still writes to the repository.
-        if (llmHealth.healthy === false) {
-          openPanel("capture");
-          return;
-        }
-        void sendMessage(
-          "I want to capture an outcome I heard from a customer. Ask me what they said.",
-        );
-        return;
-      case "status":
-        pushNotice(
-          [
-            "**Studio status**",
-            `- Model: ${settings.model_name} at ${settings.base_url} — ${
-              llmHealth.healthy === null
-                ? "checking"
-                : llmHealth.healthy
-                  ? "reachable"
-                  : "offline"
-            }`,
-            `- MCP: ${mcpReachable ? "connected" : "offline"} (${settings.mcp_url})`,
-            `- Context: ${
-              brief ? `${brief.product_name || "named job"} — ${brief.job_statement}` : "not set"
-            }`,
-            `- Canvas: ${canvas?.jobs.length ?? 0} jobs, ${canvas?.outcomes.length ?? 0} outcomes`,
-          ].join("\n"),
-        );
-        return;
-      default:
-        return;
-    }
-  }
 
   function submitCommand(text: string) {
     if (!isSlashCommand(text)) {

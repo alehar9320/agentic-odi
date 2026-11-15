@@ -3,13 +3,12 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { ResizableHandle, ResizablePanel } from "@/components/ui/resizable";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useStudio } from "../../state/StudioContext";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { MOBILE_QUERY, useMediaQuery } from "../../lib/useMediaQuery";
 import { CloseIcon } from "../icons";
 import { PanelBoundary } from "./PanelBoundary";
 import type { WorkspacePanelId } from "../../types";
 import { findPanel, type PanelDefinition } from "./panels";
 
-const MOBILE_QUERY = "(max-width: 1023px)";
 
 /**
  * The lens body as its own component, so a lens that throws while rendering is

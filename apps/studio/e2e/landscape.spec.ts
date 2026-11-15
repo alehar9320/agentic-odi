@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import { openStudio, resetRepository, seedOutcomes, workbench } from "./helpers";
 
 /**
  * The Opportunity Landscape is where scored outcomes are read. These tests
@@ -30,7 +30,7 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await workbench(page).getByRole("button", { name: /^Landscape,/ }).click();
     const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
     await expect(landscape).toBeVisible();
 
@@ -43,7 +43,7 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await workbench(page).getByRole("button", { name: /^Landscape,/ }).click();
     const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
 
     // The cards view shows every outcome, unlike the matrix, which shows one
@@ -60,7 +60,7 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await workbench(page).getByRole("button", { name: /^Landscape,/ }).click();
     const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
 
     // The table view lists each outcome by statement.
@@ -78,7 +78,7 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await workbench(page).getByRole("button", { name: /^Landscape,/ }).click();
     const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
 
     await expect(landscape.getByRole("button", { name: "📊 Matrix" })).toBeVisible();

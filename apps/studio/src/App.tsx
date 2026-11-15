@@ -1,8 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { LogicalSize } from "@tauri-apps/api/dpi";
 import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge";
 import { BannerProvider, useBanner } from "./banners/BannerProvider";
 import { BannerStack } from "./banners/BannerStack";
@@ -13,12 +10,17 @@ import { ChatStage } from "./components/chat/ChatStage";
 import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
 import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { NavigationDrawer } from "./components/layout/NavigationDrawer";
+import { QuickJump } from "./components/layout/QuickJump";
 import { SharedArtifact } from "./components/SharedArtifact";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
 import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
 import { dialogOpen, focusComposer, startComposerCommand } from "./lib/composerFocus";
 import { isEditableTarget } from "./lib/commands";
+import { MOBILE_QUERY, useMediaQuery } from "./lib/useMediaQuery";
+import { useStudioCommands } from "./lib/useStudioCommands";
+import { isFeatureEnabled } from "./features/flags";
 import { sharedTokenFromPath } from "./lib/share";
 import { isTauri } from "./bridge/desktopBridge";
 import { FirstRunWizard, OnboardingProvider } from "./onboarding";
@@ -30,10 +32,10 @@ import { initInstall } from "./install";
 /**
  * One room, one intelligence.
  *
- * The conversation owns the stage at every moment. The rail above it is the
- * only navigation, and it is derived from what the thread has produced. A
- * workspace view docks beside the thread instead of replacing it, so the
- * composer never leaves the screen.
+ * The drawer holds what you are working on, the conversation owns the
+ * mainstage at every moment, and a detail docks on the right instead of
+ * replacing the thread. The artifacts strip above the thread still names what
+ * the inquiry has produced. Nothing is a prerequisite for anything else.
  */
 function StudioShell() {
   const {
@@ -42,15 +44,25 @@ function StudioShell() {
     closeSetup,
     customizeOpen,
     closeCustomize,
+    drawerOpen,
     startNewThread,
     streaming,
     stopStreaming,
+    toggleDrawer,
     bootError,
     recheckBoot,
   } = useStudio();
   const { view } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
+  const [quickJumpOpen, setQuickJumpOpen] = useState(false);
+  const drawerEnabled = isFeatureEnabled("studioDrawer");
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const runCommand = useStudioCommands();
+  // New inquiry closes the sheet; the caret moves on the commit after that,
+  // so the focus trap's own restore cannot take it back.
+  const focusAfterJump = useRef(false);
+  const focusAfterDrawerClose = useRef(false);
 
   function goHome() {
     // Home closes what is open and leaves the thread alone. Discarding it is
@@ -65,6 +77,15 @@ function StudioShell() {
     closePanel();
     closeSetup();
     closeCustomize();
+    // New inquiry is one gesture: leave the old thread and start typing. On a
+    // sheet the drawer must close first, and its focus trap restores the toggle
+    // on that commit; the effect below takes the caret back afterwards.
+    if (drawerEnabled && drawerOpen && isMobile) {
+      focusAfterDrawerClose.current = true;
+      toggleDrawer();
+    } else {
+      focusComposer();
+    }
   }
 
   // One listener for the keys the whole room shares. The composer registers
@@ -76,6 +97,13 @@ function StudioShell() {
 
       if (modifier && !event.altKey && event.key.toLowerCase() === "k") {
         if (dialogOpen()) {
+          return;
+        }
+        // One key, one meaning: the sheet, whose first row is New inquiry
+        // (#736). With the drawer flag off the old composer binding returns.
+        if (drawerEnabled) {
+          event.preventDefault();
+          setQuickJumpOpen(true);
           return;
         }
         if (focusComposer()) {
@@ -102,12 +130,18 @@ function StudioShell() {
         if (dialogOpen()) {
           return;
         }
-        if (streaming) {
-          stopStreaming();
-          return;
-        }
+        // Backing out goes right to left: the detail first, then the drawer,
+        // and only then the reply still streaming on the mainstage (#735/#736).
         if (activePanel) {
           closePanel();
+          return;
+        }
+        if (drawerEnabled && drawerOpen) {
+          toggleDrawer();
+          return;
+        }
+        if (streaming) {
+          stopStreaming();
           return;
         }
         // Nothing is open, so Escape does the one thing it can: it takes you
@@ -117,7 +151,33 @@ function StudioShell() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activePanel, closePanel, streaming, stopStreaming]);
+  }, [
+    activePanel,
+    closePanel,
+    drawerEnabled,
+    drawerOpen,
+    streaming,
+    stopStreaming,
+    toggleDrawer,
+  ]);
+
+  // The sheet's first row hands the caret back only after the dialog has
+  // unmounted, so its focus trap cannot restore the opener over the composer.
+  useEffect(() => {
+    if (!quickJumpOpen && focusAfterJump.current) {
+      focusAfterJump.current = false;
+      focusComposer();
+    }
+  }, [quickJumpOpen]);
+
+  // Closing the drawer on a phone happens in its own commit; take the caret
+  // back once the sheet's focus trap has finished restoring the toggle.
+  useEffect(() => {
+    if (!drawerOpen && focusAfterDrawerClose.current) {
+      focusAfterDrawerClose.current = false;
+      focusComposer();
+    }
+  }, [drawerOpen]);
 
   // Capture the install prompt as early as possible so the browser's
   // beforeinstallprompt event is not missed before Settings is opened.
@@ -186,6 +246,9 @@ function StudioShell() {
         onHome={goHome}
         onNew={newThread}
         onChangelog={() => setShowChangelog(true)}
+        drawerEnabled={drawerEnabled}
+        drawerOpen={drawerOpen}
+        onToggleDrawer={toggleDrawer}
       />
       <UpdateBanner />
       <main id="studio-stage" className="stage" tabIndex={-1}>
@@ -193,17 +256,30 @@ function StudioShell() {
           <CustomizePage />
         ) : (
           <div className="stage__split">
-            <ResizablePanelGroup orientation="horizontal" className="stage__split-group">
-              <ResizablePanel className="stage__thread" minSize="40%">
-                <WorkbenchRail />
-                <ChatStage />
-              </ResizablePanel>
-              <WorkspacePanel />
-            </ResizablePanelGroup>
+            {drawerEnabled && <NavigationDrawer onHome={goHome} onNew={newThread} />}
+            <div className="stage__thread">
+              <WorkbenchRail
+                label={drawerEnabled ? "What this thread made" : undefined}
+                jobMapInDrawer={drawerEnabled}
+              />
+              <ChatStage />
+            </div>
+            <WorkspacePanel />
           </div>
         )}
       </main>
       <ChangelogModal isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
+      {quickJumpOpen && (
+        <QuickJump
+          open
+          onClose={() => setQuickJumpOpen(false)}
+          onNewInquiry={() => {
+            focusAfterJump.current = true;
+            setQuickJumpOpen(false);
+          }}
+          onCommand={runCommand}
+        />
+      )}
       <ConnectorSuggestionModal />
     </div>
   );

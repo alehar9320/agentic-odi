@@ -19,6 +19,7 @@ const harness = vi.hoisted(() => ({
     respondToApproval: vi.fn<(approvalId: string, approved: boolean) => Promise<void>>(),
     stopStreaming: vi.fn(),
     openPanel: vi.fn(),
+    openDetail: vi.fn(),
     closePanel: vi.fn(),
     clearChat: vi.fn(),
     pushNotice: vi.fn(),
@@ -445,7 +446,7 @@ describe("ChatStage", () => {
   });
 
   it("docks the records lens when the palette runs /records", () => {
-    harness.state.openPanel.mockClear();
+    harness.state.openDetail.mockClear();
 
     render(
       <StudioRuntimeProvider>
@@ -457,11 +458,11 @@ describe("ChatStage", () => {
     fireEvent.change(input, { target: { value: "/records" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
-    expect(harness.state.openPanel).toHaveBeenCalledWith("records");
+    expect(harness.state.openDetail).toHaveBeenCalledWith("records");
   });
 
   it("docks the decision brief when the palette runs /brief", () => {
-    harness.state.openPanel.mockClear();
+    harness.state.openDetail.mockClear();
 
     render(
       <StudioRuntimeProvider>
@@ -473,7 +474,7 @@ describe("ChatStage", () => {
     fireEvent.change(input, { target: { value: "/brief" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
-    expect(harness.state.openPanel).toHaveBeenCalledWith("brief");
+    expect(harness.state.openDetail).toHaveBeenCalledWith("brief");
   });
 
   describe("mainstage title bar (#737)", () => {

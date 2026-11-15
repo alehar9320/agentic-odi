@@ -1,4 +1,5 @@
 @import "./print.css";
+@import "./drawer.css";
 
 /* The Studio's display face, self-hosted so the shell opens with no network
    (see #545) and the Tauri build works offline. Source Serif 4, SIL OFL 1.1;
@@ -40,6 +41,9 @@
      reads them by name. */
   --scrim: rgba(11, 13, 19, 0.75);
   --shadow-dialog: 0 24px 48px rgba(0, 0, 0, 0.6);
+  /* Elevation for surfaces that leave the page plane: menus and sheets. */
+  --shadow-menu: 0 12px 30px rgba(0, 0, 0, 0.35);
+  --shadow-sheet: 0 24px 70px rgba(0, 0, 0, 0.48);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   /* The display voice: the self-hosted serif plus a system-serif fallback, so a

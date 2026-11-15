@@ -44,9 +44,18 @@ export async function openStudio(page: Page): Promise<void> {
   }
 }
 
-/** The workbench rail — the list of views the user can open. */
+/**
+ * The left drawer — what you are working on. It deliberately keeps the
+ * accessible name the old workbench rail used, so this helper survived the
+ * region moving (#736).
+ */
 export function rail(page: Page) {
   return page.getByRole("navigation", { name: "Your work" });
+}
+
+/** The artifacts the thread has made, above the mainstage. */
+export function workbench(page: Page) {
+  return page.getByRole("navigation", { name: "What this thread made" });
 }
 
 /** The docked view (the "lens") that a rail item opens. */

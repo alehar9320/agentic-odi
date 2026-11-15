@@ -30,7 +30,15 @@ interface RailItem {
  * something worth looking at. Clicking a chip is the "regular click" path for
  * people who prefer it; the conversation stays exactly where it was.
  */
-export function WorkbenchRail() {
+export function WorkbenchRail({
+  label = "Your work",
+  jobMapInDrawer = false,
+}: {
+  /** The landmark. The drawer takes "Your work" while it is enabled (#736). */
+  label?: string;
+  /** The job map is a drawer destination while the drawer exists. */
+  jobMapInDrawer?: boolean;
+}) {
   const { canvas, memory, segments, activePanel, openPanel, closePanel } = useStudio();
   // One tooltip at a time: the chip under the pointer or the keyboard (#696).
   const [openTip, setOpenTip] = useState<WorkspacePanelId | null>(null);
@@ -60,7 +68,7 @@ export function WorkbenchRail() {
         icon: <CompassIcon size={14} />,
       });
     }
-    if (steps.length > 0) {
+    if (!jobMapInDrawer && steps.length > 0) {
       rail.push({
         id: "jobmap",
         label: "Job map",
@@ -97,7 +105,7 @@ export function WorkbenchRail() {
       });
     }
     return rail;
-  }, [canvas, memory, segments]);
+  }, [canvas, jobMapInDrawer, memory, segments]);
 
   const status = canvasStatus(canvas);
 
@@ -106,7 +114,7 @@ export function WorkbenchRail() {
   }
 
   return (
-    <nav className="rail" aria-label="Your work">
+    <nav className="rail" aria-label={label}>
       <ul className="rail__list">
         {status ? (
           <li>

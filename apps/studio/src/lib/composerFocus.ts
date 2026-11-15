@@ -1,12 +1,13 @@
 /**
  * One shortcut, one composer.
  *
- * The shell owns the keys that reach the composer from anywhere (⌘/Ctrl+K,
- * `/`, and the Escape that has nowhere else to go). It cannot hold a ref to a
- * textarea it does not render, so the composer that is on stage registers how
- * to take the caret here instead. The listener then exists once per page, not
- * once per composer, and a page with two of them still moves the caret into
- * the one the person can see.
+ * The shell owns the keys that reach the composer from anywhere (`/`, and the
+ * Escape that has nowhere else to go). Meta/Ctrl+K belongs to Quick jump since
+ * #736, and that sheet's first row is the way back here. It cannot hold a ref
+ * to a textarea it does not render, so the composer that is on stage registers
+ * how to take the caret here instead. The listener then exists once per page,
+ * not once per composer, and a page with two of them still moves the caret
+ * into the one the person can see.
  */
 
 export interface ComposerHandle {

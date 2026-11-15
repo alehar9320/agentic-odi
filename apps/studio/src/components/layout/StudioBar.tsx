@@ -26,17 +26,24 @@ import { StatusDot } from "../status/StatusDot";
 
 /**
  * The only persistent chrome: where you are, how to start again, whether the
- * studio can hear you, and the way out to settings. No navigation lives here —
- * the artifacts above the conversation carry that.
+ * studio can hear you, and the way out to settings. The drawer owns the brand
+ * and the work list when it is enabled (#736); the bar keeps the control that
+ * brings it back, so the region is reachable from anywhere without a hunt.
  */
 export function StudioBar({
   onHome,
   onNew,
   onChangelog,
+  drawerEnabled = false,
+  drawerOpen = false,
+  onToggleDrawer,
 }: {
   onHome: () => void;
   onNew: (options?: { stop?: boolean }) => void;
   onChangelog: () => void;
+  drawerEnabled?: boolean;
+  drawerOpen?: boolean;
+  onToggleDrawer?: () => void;
 }) {
   const {
     conversationId,
@@ -286,18 +293,33 @@ export function StudioBar({
   return (
     <header className="bar">
       <div className="bar__left">
-        <button
-          type="button"
-          className="brand brand--home"
-          onClick={onHome}
-          aria-label={`${PRODUCT_NAME}, go to home`}
-          title="Home"
-        >
-          <span className="brand__mark" aria-hidden="true">
-            <OdiMascot size={32} />
-          </span>
-          <span className="brand__wordmark">{PRODUCT_NAME}</span>
-        </button>
+        {drawerEnabled ? (
+          <button
+            id="studio-drawer-toggle"
+            type="button"
+            className="icon-button"
+            aria-label={drawerOpen ? "Hide navigation" : "Show navigation"}
+            aria-controls={drawerOpen ? "studio-drawer" : undefined}
+            aria-expanded={drawerOpen}
+            title={drawerOpen ? "Hide navigation" : "Show navigation"}
+            onClick={onToggleDrawer}
+          >
+            <MenuIcon size={17} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="brand brand--home"
+            onClick={onHome}
+            aria-label={`${PRODUCT_NAME}, go to home`}
+            title="Home"
+          >
+            <span className="brand__mark" aria-hidden="true">
+              <OdiMascot size={32} />
+            </span>
+            <span className="brand__wordmark">{PRODUCT_NAME}</span>
+          </button>
+        )}
       </div>
 
       <div className="bar__right">

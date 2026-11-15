@@ -1,0 +1,406 @@
+/*
+ * The left drawer and Quick jump (#736).
+ *
+ * The drawer answers "what am I working on?" and Quick jump is the one key that
+ * reaches it. Styles live here, never in `:root`: this file composes the
+ * theme's tokens, it does not add to them.
+ */
+
+.drawer {
+  display: flex;
+  flex: none;
+  width: 248px;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+
+.drawer__nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px 10px 10px;
+}
+
+.drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.drawer__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.drawer__brand:hover {
+  background: var(--surface-hover);
+}
+
+.drawer__mark {
+  display: inline-flex;
+  flex: none;
+}
+
+.drawer__wordmark {
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The one way to start: a row that says what it does and names the key that
+   reaches the same sheet from anywhere. */
+.drawer__new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.drawer__new:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.drawer__new-label {
+  flex: 1;
+  text-align: left;
+}
+
+.drawer__kbd,
+.quickjump__foot kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+}
+
+.drawer__section {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.drawer__section-title {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.drawer__list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.drawer__thread {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.drawer__thread:hover {
+  background: var(--surface-hover);
+}
+
+.drawer__thread[aria-current="page"] {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.drawer__thread-title {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer__thread-meta {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+/* An empty drawer says so. It never invents a thread to look populated. */
+.drawer__empty {
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.drawer__destinations {
+  flex: none;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.drawer__link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.drawer__link:hover {
+  background: var(--surface-hover);
+}
+
+.drawer__foot {
+  flex: none;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+/* The identity chip is pinned at the foot: the name Settings stores, one
+   visible initial, and the role the product does not have yet. */
+.drawer__identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.drawer__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.drawer__who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drawer__name {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer__role {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-snug);
+}
+
+.drawer__menu {
+  position: relative;
+  flex: none;
+}
+
+.drawer__menu-list {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 60;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-menu);
+}
+
+.drawer__menu-item {
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.drawer__menu-item:hover {
+  background: var(--surface-hover);
+}
+
+/* Below the one breakpoint the drawer is a sheet over the thread, like the
+   right region. It is a modal there, so it keeps focus and closes itself. */
+@media (max-width: 1023px) {
+  .drawer {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    width: min(300px, 86vw);
+    border-right-color: var(--line-strong);
+    box-shadow: var(--shadow-sheet);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Quick jump                                                         */
+/* ------------------------------------------------------------------ */
+
+.quickjump-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: max(10vh, 56px) 16px 16px;
+}
+
+.quickjump__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(2px);
+  cursor: default;
+}
+
+.quickjump {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(620px, 100%);
+  max-height: min(70vh, 560px);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-sheet);
+}
+
+.quickjump__field {
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-lg);
+}
+
+.quickjump__field::placeholder {
+  color: var(--muted);
+}
+
+.quickjump__list {
+  flex: 1;
+  min-height: 0;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.quickjump__row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.quickjump__row.is-active,
+.quickjump__row:hover {
+  border-color: var(--line);
+  background: var(--surface-hover);
+}
+
+.quickjump__label {
+  font-size: var(--text-base);
+}
+
+.quickjump__hint {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+.quickjump__empty {
+  margin: 0;
+  padding: 12px 10px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.quickjump__foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+
+.quickjump__foot kbd {
+  margin-right: 2px;
+}

@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { COMPOSER, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import { COMPOSER, openStudio, resetRepository, seedOutcomes, workbench } from "./helpers";
 import {
   contrastWalker,
   formatFindings,
@@ -96,7 +96,7 @@ async function goto(page: Page, screen: Screen): Promise<void> {
   await openStudio(page);
   if (screen === "landscape" || screen === "records") {
     const label = screen === "landscape" ? "Landscape" : "Records";
-    await rail(page).getByRole("button", { name: new RegExp(`^${label},`) }).click();
+    await workbench(page).getByRole("button", { name: new RegExp(`^${label},`) }).click();
   } else if (screen === "brief") {
     // The command is the keyboard route, and the only one that reaches the
     // brief without a model.

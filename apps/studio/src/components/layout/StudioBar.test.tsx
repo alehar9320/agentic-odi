@@ -457,7 +457,14 @@ describe("StudioBar new thread control (#319)", () => {
     });
   });
 
-  function renderBar(overrides: Record<string, unknown> = {}) {
+  function renderBar(
+    overrides: Record<string, unknown> = {},
+    bar: {
+      drawerEnabled?: boolean;
+      drawerOpen?: boolean;
+      onToggleDrawer?: () => void;
+    } = {},
+  ) {
     const onNew = vi.fn();
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
@@ -468,9 +475,32 @@ describe("StudioBar new thread control (#319)", () => {
         ...overrides,
       }) as never,
     );
-    render(<StudioBar onHome={() => {}} onNew={onNew} onChangelog={() => {}} />);
+    render(
+      <StudioBar onHome={() => {}} onNew={onNew} onChangelog={() => {}} {...bar} />,
+    );
     return { onNew };
   }
+
+  it("hands the brand to the drawer and keeps the control that brings it back", () => {
+    const onToggleDrawer = vi.fn();
+    renderBar({}, { drawerEnabled: true, drawerOpen: true, onToggleDrawer });
+
+    expect(screen.queryByRole("button", { name: /go to home/i })).toBeNull();
+    const toggle = screen.getByRole("button", { name: "Hide navigation" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(toggle);
+    expect(onToggleDrawer).toHaveBeenCalledOnce();
+  });
+
+  it("names the way back when the drawer is collapsed", () => {
+    renderBar({}, { drawerEnabled: true, drawerOpen: false, onToggleDrawer: () => {} });
+
+    expect(screen.getByRole("button", { name: "Show navigation" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
 
   it("says the words New thread where there is room for them", () => {
     const { onNew } = renderBar({ messages: transcript });

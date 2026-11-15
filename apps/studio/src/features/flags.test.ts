@@ -91,3 +91,17 @@ describe("first-run wizard flag", () => {
     }
   });
 });
+
+describe("studio drawer flag", () => {
+  it("is on by default", () => {
+    expect(resolveFlag("studioDrawer", {}).enabled).toBe(true);
+  });
+
+  it("is switched off by its query value, so the pre-drawer shell is QA-able", () => {
+    expect(resolveFlag("studioDrawer", { query: "off" })).toEqual({
+      enabled: false,
+      source: "query",
+      raw: "off",
+    });
+  });
+});

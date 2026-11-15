@@ -12,7 +12,7 @@
  * can never silently change behaviour.
  */
 
-export type FeatureFlagName = "firstRunWizard" | "firstRunIntro";
+export type FeatureFlagName = "firstRunWizard" | "firstRunIntro" | "studioDrawer";
 
 export interface FeatureFlagDefinition {
   name: FeatureFlagName;
@@ -33,6 +33,13 @@ export const FEATURE_FLAGS: Record<FeatureFlagName, FeatureFlagDefinition> = {
     description:
       "The conversational first-run introduction, in place of the five-field setup form.",
     envVar: "VITE_STUDIO_FIRST_RUN_INTRO",
+    defaultEnabled: true,
+  },
+  studioDrawer: {
+    name: "studioDrawer",
+    description:
+      "The left drawer: recent threads, the job map, and who is using the Studio.",
+    envVar: "VITE_STUDIO_DRAWER",
     defaultEnabled: true,
   },
 };
