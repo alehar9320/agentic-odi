@@ -1,6 +1,15 @@
 {
   "$comment": "Ledger for apps/studio/src/vendor. Rule 3 of docs/architecture/vendor.md: every vendored file carries a provenance header and an entry here, so its licence is auditable and a re-copy diff stays possible. `src/vendor/ledger.test.ts` fails the suite if a file in that tree is missing from both lists, or if a header stops agreeing with its entry. `tests/scripts/test_vendor_policy.py` holds every licence to the SPDX ids we may ship and keeps both sections sorted by path, so a refresh diffs as what changed rather than as a reordering. Upstream registry items have no commit, so `integrity` is the sha256 of the artefact fetched from `source` — the handle a refresh diffs against.",
   "vendored": {
+    "components/assistant/thread.tsx": {
+      "source": "https://r.assistant-ui.com/thread.json",
+      "retrievedBy": "fetched the assistant-ui `thread` registry item",
+      "retrieved": "2026-11-15",
+      "licence": "MIT",
+      "upstreamIssue": "assistant-ui, registry item thread",
+      "integrity": "sha256-5730679ac3e85e5fdf1f89647ec6ce689f4e1f490dbfc3b1382ced8bfcea4fd2",
+      "localEdits": "only the frame is kept (root, viewport, viewport footer); the message, composer, attachment, markdown, reasoning, and tool-group sections are dropped because Conversation/parts.tsx and ThreadComposer render them, the frame keeps the Studio's classes, the viewport keeps auto-scroll, a float slot carries the jump-to-latest control, and the empty state is a prop rather than derived from the runtime"
+    },
     "components/ui/button.tsx": {
       "source": "https://ui.shadcn.com/r/styles/new-york-v4/button.json",
       "retrievedBy": "npx shadcn@latest add button",
