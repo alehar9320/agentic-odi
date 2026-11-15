@@ -322,6 +322,8 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "job_id",
             "step_id",
             "outcome_id",
+            "impact",
+            "confidence",
         ),
         required=("source_name", "source_kind", "name", "content"),
         returns="The created Evidence record.",
