@@ -47,6 +47,22 @@ missing.
 | ISO-8601 timestamps | `datetime.isoformat()` | `strftime("%Y-%m-%dT%H:%M:%SZ")` in `apps/cli/src/agentic_odi_cli/profile.py` and `apps/cli/src/agentic_odi_cli/flags.py` |
 | Structural rules for artifact HTML | `scripts/artifact_a11y.py` (stdlib `html.parser`, six rules) with its inventory in `scripts/artifact_renderers.py` | none left — the four heading, anchor and decorative-svg regexes in `website/tests/test_site.py` were folded in rather than kept as a second opinion |
 
+## Studio interaction surfaces (audit, 2026-11-15)
+
+This is the canonical record of where interaction behavior lives in the Studio,
+whether it is reusable library behavior or product-specific presentation/state,
+and what to do next. It is not a migration plan; no dependencies or components
+change here.
+
+| Surface | Current owner / implementation | Behavior vs presentation & state | Recommendation | Reason |
+| --- | --- | --- | --- | --- |
+| Conversation transcript, composer shell, thread/list primitives | `@assistant-ui/react` runtime + thread/composer/message primitives in `apps/studio/src/assistant/*`, `components/chat/*` | Reusable conversation behavior (streaming, message model, composer/thread mechanics) owned by the library; Studio owns ODI-specific message parts, copy, and layout | **adopt** | Assistant-ui is the established behavior owner for conversation surfaces; keep extending through its primitives rather than parallel transcript/composer mechanics. |
+| Notifications (toasts/banners) | Radix toast stack via `banners/Banner.tsx`, `banners/BannerStack.tsx` (`@radix-ui/react-toast`, `Toast.Provider`/`Viewport`/`Root`/`Action`/`Close`), fed by `BannerToasts` + `state/notices` | Reusable notification behavior and accessibility come from Radix Toast; banner kinds, copy, actions, and when notices are raised are product state/presentation | **adopt** | Existing Radix toast stack is the notification owner; new notification behavior should reuse it, not introduce a second toast mechanism. |
+| Standard modal dialogs (release notes, diagnostics export, share link, connector suggestion, first-run wizard) | Hand-built `role="dialog"` surfaces: `components/ChangelogModal.tsx`, `diagnostics/DiagnosticsModal.tsx`, `components/ShareSheet.tsx`, `components/customize/ConnectorSuggestionModal.tsx`, `onboarding/FirstRunWizard.tsx`, each wiring `useFocusTrap`/Escape/scrim/inert behavior ad hoc | Dismissal, focus trapping, modality, and `aria` dialog semantics are generic interaction behavior; panel content and product flows are Studio-specific presentation/state | **revisit** (conventional dialogs) | These are candidates for the already-declared `radix-ui` dependency (Dialog primitives) to replace duplicated modal mechanics; behavior consolidation is follow-up work, product copy/layout stays local. |
+| Inline composer slash-command suggestions | `components/chat/composerParts.tsx` + `lib/commands.ts` (`CommandPalette`, `paletteOpenFor`) as an inline, draft-driven `listbox` over Studio command definitions | Selection/highlighting behavior is small and tightly coupled to the composer draft and ODI command registry; visual treatment matches the composer | **keep** | Inline command suggestions are product-specific composer behavior/state; do not automatically replace with `cmdk` or a generic command menu library. |
+| Menus and lightweight popovers | Bespoke anchors/dropdowns in context (e.g. thread/history affordances and canvas-local actions) rather than a shared menu primitive | Interaction is contextual to the owning surface and its state; visuals are product-specific | **keep** (revisit only if a menu becomes a repeated, generic pattern) | Current menus are surface-specific; introducing a generic menu library now would be premature without repeated shared behavior. |
+| ODI canvas & visualizations (job map, opportunity landscape, segment/evidence/thesis/capture views) | Canvas components in `components/canvas/*` rendering ODI domain entities and scores | Domain visualization and product meaning are the presentation/state; interactions are specific to ODI artifacts, not generic UI widgets | **keep** | ODI visualizations encode product/domain behavior and should not be marked for automatic replacement with generic charting or UI libraries. |
+
 These rows are the record of an audit, not a to-do list with a deadline. Fixing them
 is ordinary refactoring, one pull request per concern.
 
