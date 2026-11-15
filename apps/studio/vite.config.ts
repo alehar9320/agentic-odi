@@ -22,6 +22,34 @@ export default defineConfig({
     },
   },
   clearScreen: false,
+  build: {
+    // Emit `dist/.vite/manifest.json` so the budget script measures the entry
+    // chunk by role rather than by a hashed file name (#529).
+    manifest: true,
+    // The entry chunk is the cold-start budget (#529). Split the heavy vendor
+    // libraries out of it so the shell and the current view are not shipped
+    // behind the assistant runtime, the markdown renderer, or the Tauri API.
+    // `scripts/check_bundle_budget.mjs` ratchets the recorded entry size.
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            // The conversation runtime and its markdown renderer.
+            {
+              name: "assistant",
+              test: /[\\/]node_modules[\\/](@assistant-ui|@radix-ui|remark|rehype|unified|micromark|mdast-util|hast-util|unist-util)[\\/]/,
+            },
+            // The desktop shell's API and updater.
+            { name: "tauri", test: /[\\/]node_modules[\\/]@tauri-apps[\\/]/ },
+            // Everything else that came from node_modules.
+            { name: "vendor", test: /[\\/]node_modules[\\/]/ },
+          ],
+        },
+      },
+    },
+    // The entry chunk is bounded by the budget script, not this warning.
+    chunkSizeWarningLimit: 700,
+  },
   // Settings → About reports which build is running; the release workflow's
   // date is baked in at build time. Applies to vitest transforms too.
   define: {

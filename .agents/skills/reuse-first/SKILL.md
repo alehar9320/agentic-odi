@@ -60,3 +60,72 @@ not a second copy. Two callers and one behaviour means one function.
 
 `npm run lint` and the vendor tests enforce the copy half. `scripts/pr_guards.py
 body-truth` warns when a pull request adds source with no `Reuses:` block.
+
+---
+
+## UI Component Selection Workflow
+
+**Scope:** Applies when adding or changing Studio interaction surfaces (dialogs,
+notifications, composer suggestions, menus, popovers, canvas visualizations, or
+any user-facing component).
+
+### Decision ladder for UI work
+
+Work down in cost order. Stop at the first rung that serves the task.
+
+1. **Reuse an existing Studio component.** Search `apps/studio/src/components`,
+   `apps/studio/src/lib`, and `apps/studio/src/assistant` for a component that
+   already implements the required behavior and accessibility. Prefer the
+   canonical copies listed in `docs/architecture/reuse.md`.
+
+2. **Use a behavior/accessibility foundation already declared.** The workspace
+   declares `radix-ui` (dialog, tooltip, toast, popover, select, tabs, etc.)
+   and `assistant-ui` (transcript, composer, approval, branching). If a Radix
+   primitive or assistant-ui primitive covers the interaction, compose with it.
+   Do not add another foundation library.
+
+3. **Use a specialist library already declared.** `sonner` (toast), `vaul`
+   (drawer), `cmdk` (command palette) are declared for focused interactions.
+   Use them when the interaction matches their purpose.
+
+4. **Copy reviewed presentation code from a designed component source.** Sources
+   such as shadcn/ui, Base UI, Beautiful UI, Rare UI, Magic UI, Aceternity,
+   21st.dev, and NumberFlow are *examples*, not required dependencies. If you
+   copy presentation markup/styles:
+   - Keep the licence notice.
+   - Record provenance and any new dependencies in `docs/architecture/vendor.md`
+     (the vendor ledger).
+   - Adapt colors, typography, and radii to Studio's design tokens — do not
+     ship default shadcn styling.
+   - The dependency review step (`docs/architecture/references/foss-adoption.md`)
+     still applies for any new package.
+
+5. **Write custom behavior** — and say, in one sentence, which of rungs 1–4
+   failed and why. "I would rather own it" is not a reason.
+
+### Library categories (for rung 4 reference)
+
+| Category | Purpose | Example sources (not required deps) |
+|---|---|---|
+| Foundations | Behavior + accessibility primitives | Radix, Base UI, headless UI |
+| Specialists | One focused interaction | cmdk (command palette), Vaul (drawer), Sonner (toast), NumberFlow (animated numbers) |
+| Designed component sources | Presentation + styling reference | shadcn/ui, Beautiful UI, Rare UI, Magic UI, Aceternity, 21st.dev |
+
+### Restraint rule
+
+**At most one highly decorative or animated standout moment per page.**
+Animations, gradients, glassmorphism, particle effects, and similar "wow"
+elements count. Exceeding this requires explicit justification in the PR
+description.
+
+### Preserved boundaries
+
+- **assistant-ui** owns the transcript, composer, approval prompts, branches,
+  and generative UI parts. Do not replace, wrap, or re-implement these.
+- **Behavior dependencies** (Radix, assistant-ui, cmdk, Vaul, Sonner) are
+  declared at the workspace level. Do not add another dialog, toast, or
+  command-palette foundation.
+- **Vendor ledger** (`docs/architecture/vendor.md`) is the single source of
+  truth for copied code provenance and dependency fitness.
+- **Dependency review** follows `docs/architecture/references/foss-adoption.md`
+  for any new package.

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import pytest
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
     Direction,
+    Evidence,
     ValueMetric,
 )
+from pydantic import ValidationError
 
 
 def _customer_value(**overrides: object) -> CustomerValue:
@@ -50,3 +53,46 @@ def test_customer_outcome_delegates_opportunity_score() -> None:
         ),
     )
     assert outcome.opportunity_score == 11.0
+
+
+def test_evidence_defaults_to_medium_impact_and_claimed_confidence() -> None:
+    evidence = Evidence(
+        source_name="demo",
+        source_kind="demo",
+        name="fixture",
+        content="A captured quote",
+    )
+    assert evidence.impact == "medium"
+    assert evidence.confidence == "claimed"
+
+
+def test_evidence_accepts_explicit_impact_and_confidence() -> None:
+    evidence = Evidence(
+        source_name="demo",
+        source_kind="demo",
+        name="fixture",
+        content="A captured quote",
+        impact="high",
+        confidence="verified",
+    )
+    assert evidence.impact == "high"
+    assert evidence.confidence == "verified"
+
+
+def test_evidence_rejects_unknown_impact_and_confidence() -> None:
+    with pytest.raises(ValidationError):
+        Evidence(
+            source_name="demo",
+            source_kind="demo",
+            name="fixture",
+            content="A captured quote",
+            impact="extreme",
+        )
+    with pytest.raises(ValidationError):
+        Evidence(
+            source_name="demo",
+            source_kind="demo",
+            name="fixture",
+            content="A captured quote",
+            confidence="maybe",
+        )

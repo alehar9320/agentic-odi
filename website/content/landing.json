@@ -249,22 +249,26 @@
       {
         "label": "Download Linux",
         "platform": "Linux",
-        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz"
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/Living%20Studio_0.15.0_amd64.deb",
+        "badge_url": "https://img.shields.io/badge/Linux-Living%20Studio_0.15.0_amd64.deb-blue?logo=linux&logoColor=white"
       },
       {
         "label": "Download macOS Apple Silicon",
         "platform": "macOS Apple Silicon",
-        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz"
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/Living%20Studio_0.15.0_aarch64.dmg",
+        "badge_url": "https://img.shields.io/badge/macOS-Apple%20Silicon-blue?logo=apple&logoColor=white"
       },
       {
         "label": "Download macOS Intel",
         "platform": "macOS Intel",
-        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz"
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/Living%20Studio_0.15.0_x64.dmg",
+        "badge_url": "https://img.shields.io/badge/macOS-Intel-blue?logo=apple&logoColor=white"
       },
       {
         "label": "Download Windows",
         "platform": "Windows",
-        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip"
+        "url": "https://github.com/alehar9320/agentic-odi/releases/latest/download/Living%20Studio_0.15.0_x64-setup.exe",
+        "badge_url": "https://img.shields.io/badge/Windows-Living%20Studio_0.15.0_x64--setup.exe-blue?logo=windows&logoColor=white"
       }
     ],
     "mcp_config": "{\n  \"mcpServers\": {\n    \"agentic-odi\": { \"url\": \"http://localhost:8000/mcp\" }\n  }\n}",

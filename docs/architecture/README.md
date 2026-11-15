@@ -90,7 +90,13 @@ graph BT
     agentic_odi_cli --> agentic_odi_connectors
 ```
 
-The Studio SPA may run with zero sidecar reachable. Its local BFF is the primary data path for reads and writes; the sidecar is consulted only for sidecar-owned capabilities (LLM proxy, connectors, MCP passthrough, desktop shell). Any SPA-to-sidecar edge is optional runtime communication, not a compile-time workspace dependency.
+The Studio SPA may run with zero sidecar reachable. Its local IndexedDB BFF is
+the primary data path for reads and writes in the browser-first direction;
+`apps/studio-api` is consulted only as an optional runtime elevation layer for
+sidecar-owned capabilities such as the LLM proxy, connectors, MCP passthrough,
+and the desktop shell. This optional SPA-to-sidecar relationship is not a
+compile-time workspace dependency, so it is intentionally omitted from the
+contract graph above.
 
 This picture is a contract, not an illustration. `tests/test_architecture.py`
 reads the arrows above and asserts they equal both the `[project] dependencies`
