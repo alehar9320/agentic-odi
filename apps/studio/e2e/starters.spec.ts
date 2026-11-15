@@ -21,7 +21,7 @@ test.describe("the starters", () => {
   test("offers three concrete situations, in order, on an empty canvas", async ({ page }) => {
     await openStudio(page);
 
-    const starters = page.locator(".composer__pills");
+    const starters = page.locator(".composer__starters");
     for (const title of STARTERS) {
       await expect(starters.getByRole("button", { name: title })).toBeVisible();
     }
@@ -37,7 +37,7 @@ test.describe("the starters", () => {
     await openStudio(page);
 
     await page
-      .locator(".composer__pills")
+      .locator(".composer__starters")
       .getByRole("button", { name: STARTERS[0] })
       .click();
 
