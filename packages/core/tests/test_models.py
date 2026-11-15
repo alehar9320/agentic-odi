@@ -8,6 +8,7 @@ from agentic_odi_core.models import (
     CustomerOutcome,
     CustomerValue,
     Direction,
+    Evidence,
     ValueMetric,
 )
 
@@ -50,3 +51,27 @@ def test_customer_outcome_delegates_opportunity_score() -> None:
         ),
     )
     assert outcome.opportunity_score == 11.0
+
+
+def test_evidence_has_impact_and_confidence_fields_with_defaults() -> None:
+    evidence = Evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="Q3 call",
+        content="It takes too long to rotate production secrets.",
+    )
+    assert evidence.impact == "medium"
+    assert evidence.confidence == "claimed"
+
+
+def test_evidence_accepts_explicit_impact_and_confidence() -> None:
+    evidence = Evidence(
+        source_name="gong",
+        source_kind="mcp",
+        name="Q3 call",
+        content="It takes too long to rotate production secrets.",
+        impact="high",
+        confidence="verified",
+    )
+    assert evidence.impact == "high"
+    assert evidence.confidence == "verified"
