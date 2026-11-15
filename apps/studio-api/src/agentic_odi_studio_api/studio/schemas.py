@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
 from agentic_odi_core import BusinessValue, ClaimCheck, CustomerValue
-from agentic_odi_core.models import JobStage
+from agentic_odi_core.models import (
+    MAX_VALUE_SOURCE,
+    BetStatus,
+    DecisionConfidence,
+    JobStage,
+    ScoreMethod,
+    StrategyKind,
+    ValueBasis,
+    ValueUnit,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
@@ -59,6 +69,33 @@ class AddOutcomeRequest(BaseModel):
     mcp_url: str
     job_id: str
     statement: str
+    importance: float | None = Field(None, ge=1.0, le=10.0)
+    satisfaction: float | None = Field(None, ge=1.0, le=10.0)
+    importance_n: int | None = Field(None, ge=1)
+    satisfaction_n: int | None = Field(None, ge=1)
+    score_method: ScoreMethod = "estimate"
+    claim_check: ClaimCheck | None = None
+
+
+class RejectedOptionRequest(BaseModel):
+    """One option a decision considered and turned down, with its reason."""
+
+    outcome_id: str = Field(min_length=1)
+    reason: str = ""
+
+
+class RecordDecisionRequest(BaseModel):
+    """Record a decision, optionally naming the one it supersedes."""
+
+    mcp_url: str = ""
+    job_id: str = Field(min_length=1)
+    chosen_outcome_ids: list[str] = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+    decided_by: str = Field(min_length=1)
+    decided_at: str | None = None
+    rejected: list[RejectedOptionRequest] = Field(default_factory=list)
+    confidence: DecisionConfidence = DecisionConfidence.MEDIUM
+    supersedes: str | None = None
     importance: float | None = Field(default=None, ge=1.0, le=10.0)
     satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
     #: The questions behind the score. Required when either score is set; a
@@ -90,7 +127,98 @@ class UpdateOutcomeRequest(BaseModel):
     statement: str | None = None
     importance: float | None = None
     satisfaction: float | None = None
+    importance_n: int | None = Field(None, ge=1)
+    satisfaction_n: int | None = Field(None, ge=1)
+    score_method: ScoreMethod | None = None
+    at: str | None = None
+    note: str | None = None
     mcp_url: str = ""
+
+
+class SetOutcomeValueRequest(BaseModel):
+    """Record what an opportunity is worth, with its unit and its basis.
+
+    ``estimate=None`` clears the value and its companions. A ``market`` or
+    ``pilot`` basis requires a ``source`` — enforced by the model, mirrored here.
+    """
+
+    estimate: float | None = Field(None, ge=0.0)
+    unit: ValueUnit | None = None
+    basis: ValueBasis = "estimate"
+    n: int | None = Field(None, ge=1)
+    source: str | None = Field(None, max_length=MAX_VALUE_SOURCE)
+    mcp_url: str = ""
+
+
+class ReviewDecisionRequest(BaseModel):
+    """Re-examine a past decision against today's numbers."""
+
+    decision_id: str = Field(min_length=1)
+    today: str | None = None
+    mcp_url: str = ""
+
+
+class RecordBetRequest(BaseModel):
+    """Record a bet: a hypothesis with its baseline captured at creation."""
+
+    mcp_url: str = ""
+    decision_id: str = Field(min_length=1)
+    outcome_id: str = Field(min_length=1)
+    hypothesis: str = Field(min_length=1)
+    target: float
+    measure_by: str = Field(min_length=1)
+    baseline: float | None = None
+
+
+class AdvanceBetRequest(BaseModel):
+    """Advance a bet. The bet is named by the path, so it is not in the body."""
+
+    status: BetStatus
+    at: str | None = None
+    mcp_url: str = ""
+
+
+class SegmentOrigin(str, Enum):
+    """Where a segment came from: typed by hand, or accepted from a suggestion."""
+
+    MANUAL = "manual"
+    CANDIDATE = "candidate"
+
+
+class AddSegmentRequest(BaseModel):
+    """Create a segment from its member outcomes."""
+
+    mcp_url: str = ""
+    job_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    criterion: str = Field(min_length=1)
+    outcome_ids: list[str] = Field(min_length=1)
+    notes: str | None = None
+    origin: SegmentOrigin = SegmentOrigin.MANUAL
+
+
+class AcceptSegmentCandidateRequest(BaseModel):
+    """Accept a suggested candidate, matched by its stable fingerprint."""
+
+    mcp_url: str = ""
+    job_id: str = Field(min_length=1)
+    fingerprint: str = Field(min_length=1)
+    name: str | None = None
+    criterion: str | None = None
+
+
+class ChooseStrategyRequest(BaseModel):
+    """Record a strategy for a segment."""
+
+    mcp_url: str = ""
+    kind: StrategyKind
+    rationale: str = Field(min_length=1)
+    expected_effect: str = Field(min_length=1)
+    chosen_at: str | None = None
+    rejected: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description='The paths this one beat: [{"kind": "disruptive", "why": "..."}]',
+    )
 
 
 class SignalActionRequest(BaseModel):

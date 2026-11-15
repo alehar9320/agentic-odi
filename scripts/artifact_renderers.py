@@ -74,6 +74,7 @@ RENDERERS: Final[tuple[Renderer, ...]] = (
     Renderer("not-found page", "website/templates/404.html", "html", "emits-html", "ALH-238"),
     Renderer("sample workspace", "website/templates/sample.html", "html", "emits-html", "ALH-238"),
     Renderer("quick start", "website/templates/_quick_start.html", "html", "emits-html", "ALH-238"),
+    Renderer("catalog cards", "website/templates/_cards.html", "html", "emits-html", "ALH-238"),
     Renderer(
         "connector reference",
         "website/templates/_connector_reference.html",
