@@ -44,7 +44,7 @@ function Dialog({ open, onOpenChange, title, children, footer }: DialogProps) {
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           className={cn(
-            "fixed inset-0 z-50 bg-[rgba(11,13,19,0.75)] backdrop-blur-[12px]",
+            "fixed inset-0 z-50 bg-[var(--scrim)] backdrop-blur-[12px]",
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
             "data-[state=open]:animate-in data-[state=open]:fade-in-0",
           )}
@@ -63,7 +63,7 @@ function Dialog({ open, onOpenChange, title, children, footer }: DialogProps) {
             "max-w-[680px] -translate-x-1/2 -translate-y-1/2 flex-col",
             "rounded-[var(--radius-lg)] border border-[var(--line-strong)]",
             "bg-[var(--bg-raised)] p-[var(--space-5)] text-[var(--text)]",
-            "shadow-[0_24px_48px_rgba(0,0,0,0.6)]",
+            "shadow-[var(--shadow-dialog)]",
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:animate-in",
             "data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
