@@ -1,3 +1,11 @@
+---
+title: The Method, Stage by Stage
+blurb: The eight job-map stages as a practitioner works them.
+nav_group: Build
+nav_order: 0
+slug: method
+---
+
 # The Method, Stage by Stage
 
 A practitioner's guide to the eight stages of the Universal Job Map, inside this

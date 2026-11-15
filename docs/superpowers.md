@@ -1,3 +1,11 @@
+---
+title: Superpowers
+blurb: Pi, OpenCode, and Freebuff integration.
+nav_group: Operate
+nav_order: 5
+slug: superpowers
+---
+
 # Superpowers (Pi, OpenCode & Freebuff)
 
 This project includes [Superpowers](https://github.com/obra/superpowers) as a

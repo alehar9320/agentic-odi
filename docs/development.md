@@ -1,3 +1,11 @@
+---
+title: Development
+blurb: Lint, types, frontend checks, and the coverage map.
+nav_group: Operate
+nav_order: 1
+slug: development
+---
+
 # Development
 
 Everything below mirrors what CI runs. Install the workspace first:

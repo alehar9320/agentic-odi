@@ -242,22 +242,23 @@ soon". See [External Connectors](docs/connectors.md).
 
 ## Documentation
 
+<!-- BEGIN GENERATED: docs -->
 | Guide | Contents |
 |---|---|
-| [The Living Studio](docs/living-studio.md) | The chat-first interface, first run, approvals, memory, and the desktop app |
-| [CLI Reference](docs/cli.md) | Backends, chat, entities, scoring, and environment variables |
-| [The Method, Stage by Stage](docs/method.md) | The eight job-map stages as a practitioner works them — what each is for, the mistakes, and the commands |
-| [External Connectors](docs/connectors.md) | Presets, the registry, and the `Connector` protocol |
-| [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling |
-| [Architecture](docs/architecture/README.md) | Workspace layout, dependency direction, data flow, and testing |
-| [Reuse First](docs/architecture/reuse.md) | The ladder agents walk before writing code: reuse what exists, adopt what is declared, copy with provenance, then build |
-| [Studio Banners](docs/architecture/banners.md) | The Studio's unified notice system |
-| [Development](docs/development.md) | Lint, types, frontend checks, tests, and PR risk labels |
-| [Installation](docs/installation.md) | Binary install, updater behavior, and release automation |
-| [Deployment](docs/deployment.md) | Project site, Hosted Studio, MCP endpoint, and the Cloudflare Worker |
-| [Roadmap](docs/roadmap.md) | Completed and upcoming milestones |
-| [Agent assignment](docs/agents.md) | Which agents take issues, how they claim one, and when a claim expires |
-| [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration |
+| [Installation](docs/installation.md) | Binaries, the installer, and updates. |
+| [The Living Studio](docs/living-studio.md) | The chat-first interface, its first run, and the desktop app. |
+| [Local LLM Backend](docs/local-llm.md) | Running a local OpenAI-compatible model with tool calling. |
+| [The Method, Stage by Stage](docs/method.md) | The eight job-map stages as a practitioner works them. |
+| [CLI Reference](docs/cli.md) | Backends, chat, entities, and scoring. |
+| [Connectors](docs/connectors.md) | The registry, the presets, and the protocol. |
+| [Architecture](docs/architecture/README.md) | The workspace, the data flow, and the testing strategy. |
+| [Deployment](docs/deployment.md) | The project site, the hosted server, and the Worker. |
+| [Development](docs/development.md) | Lint, types, frontend checks, and the coverage map. |
+| [The assistant-ui ledger](docs/assistant-ui-ledger.md) | Every assistant-ui capability, and the one honest state it is in. |
+| [Agent Assignment](docs/agents.md) | Which agents take issues, how to claim one, and when a claim expires. |
+| [Roadmap](docs/roadmap.md) | What has shipped, and what is queued. |
+| [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration. |
+<!-- END GENERATED: docs -->
 
 Every guide is also published on the
 [project site](https://alehar9320.github.io/agentic-odi/docs/), rendered from

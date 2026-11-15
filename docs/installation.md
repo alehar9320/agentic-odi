@@ -1,3 +1,11 @@
+---
+title: Installation
+blurb: Binaries, the installer, and updates.
+nav_group: Get started
+nav_order: 1
+slug: installation
+---
+
 # Installation
 
 Prebuilt binaries are available for Linux, macOS, and Windows. Install the latest

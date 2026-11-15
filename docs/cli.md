@@ -1,3 +1,11 @@
+---
+title: CLI Reference
+blurb: Backends, chat, entities, and scoring.
+nav_group: Build
+nav_order: 1
+slug: cli
+---
+
 # CLI Reference
 
 The `agentic-odi` CLI is a [`Typer`](https://github.com/fastapi/typer)-based

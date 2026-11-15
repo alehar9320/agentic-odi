@@ -1,3 +1,11 @@
+---
+title: Architecture
+blurb: The workspace, the data flow, and the testing strategy.
+nav_group: Build
+nav_order: 4
+slug: architecture
+---
+
 # Repository Architecture
 
 Agentic ODI is a uv workspace with a single root `pyproject.toml` for shared tooling. Python distributions are imported by their stable `agentic_odi_*` package names; directory layout does not leak into imports.

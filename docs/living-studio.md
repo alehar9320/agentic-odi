@@ -1,3 +1,11 @@
+---
+title: The Living Studio
+blurb: The chat-first interface, its first run, and the desktop app.
+nav_group: Get started
+nav_order: 2
+slug: studio
+---
+
 # Running The Living Studio
 
 **The Living Studio** is the conversational GUI for Outcome-Driven Innovation:

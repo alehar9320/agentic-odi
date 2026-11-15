@@ -1,3 +1,11 @@
+---
+title: Roadmap
+blurb: What has shipped, and what is queued.
+nav_group: Operate
+nav_order: 4
+slug: roadmap
+---
+
 # Roadmap
 
 A roadmap that says everything is done is not a roadmap. This page tracks three
