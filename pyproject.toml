@@ -31,6 +31,7 @@ dev = [
     "ruff==0.17.3",
     "grimp==3.18",
     "pillow==12.3.0",
+    "inline-snapshot==0.36.1",
 ]
 
 [tool.bandit]
@@ -57,6 +58,13 @@ exclude = ['^apps/studio-api/tests/conftest\.py$', '^apps/cli/tests/conftest\.py
 ignore_missing_imports = true
 plugins = ["pydantic.mypy"]
 disable_error_code = ["prop-decorator"]
+
+[tool.inline-snapshot]
+# Snapshot literals are written into Python source, so they have to come out of the
+# generator already formatted the way CI checks it. Without this,
+# --inline-snapshot=create emits one 20k-character line per surface and
+# `ruff format --check` fails the build.
+format-command = "uv run ruff format --stdin-filename {filename}"
 
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
