@@ -95,6 +95,9 @@ jobs:
       - name: Check the documentation against the code
         run: uv run python scripts/doc_check.py
 
+      - name: Check the documentation index is up to date
+        run: uv run python scripts/docs_index.py --check
+
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 10

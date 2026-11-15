@@ -1,3 +1,11 @@
+---
+title: The assistant-ui ledger
+blurb: Every assistant-ui capability, and the one honest state it is in.
+nav_group: Operate
+nav_order: 2
+slug: assistant-ui-ledger
+---
+
 # The assistant-ui ledger
 
 The Studio runs on assistant-ui, and "we use assistant-ui" is not a coverage
