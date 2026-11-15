@@ -1045,64 +1045,6 @@ def get_traceability_report() -> str:
     return json.dumps(service.traceability_report().as_dict())
 
 
-@mcp.tool
-def links_add(
-    source_type: str,
-    source_id: str,
-    target_type: str,
-    target_id: str,
-    relationship_type: str,
-    external_system: str | None = None,
-    external_id: str | None = None,
-    preview: dict | None = None,
-) -> str:
-    """Create a typed link between two agentic-odi entities.
-
-    Stub placeholder: the link repository write path is implemented in a
-    separate change. Returns an accepted link record with the supplied fields.
-    """
-    return json.dumps(
-        {
-            "link": {
-                "source_type": source_type,
-                "source_id": source_id,
-                "target_type": target_type,
-                "target_id": target_id,
-                "relationship_type": relationship_type,
-                "external_system": external_system,
-                "external_id": external_id,
-                "preview": preview,
-            }
-        }
-    )
-
-
-@mcp.tool
-def links_list(
-    source_type: str | None = None,
-    source_id: str | None = None,
-    target_type: str | None = None,
-    target_id: str | None = None,
-    relationship_type: str | None = None,
-) -> str:
-    """List links, optionally filtered by source/target entity and relationship type.
-
-    Stub placeholder: the link repository read path is implemented in a
-    separate change. Returns an empty list.
-    """
-    return json.dumps({"links": []})
-
-
-@mcp.tool
-def links_remove(link_id: str) -> str:
-    """Remove a link by ID.
-
-    Stub placeholder: the link repository delete path is implemented in a
-    separate change. Returns ok=true.
-    """
-    return json.dumps({"ok": True})
-
-
 DEFAULT_PORT = 8000
 
 
