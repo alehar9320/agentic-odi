@@ -106,6 +106,23 @@ def test_beyond_tolerance_fails_and_names_the_delta(tmp_path: Path) -> None:
     assert "ceiling" in result.stderr
 
 
+def test_invalid_tolerance_fails_loudly(tmp_path: Path) -> None:
+    """An invalid --tolerance must fail the gate instead of silently bypassing it."""
+    manifest = _write_manifest(tmp_path / "dist", entry_bytes=2048)
+    baseline = tmp_path / "bundle-budget.json"
+    assert _run(manifest, baseline, "--update").returncode == 0
+
+    # Grow by 10%: inside the default 20% tolerance, so a valid tolerance passes.
+    _write_manifest(tmp_path / "dist", entry_bytes=2252)
+    assert _run(manifest, baseline).returncode == 0
+
+    # A non-numeric tolerance must fail loudly rather than silently bypass the budget.
+    result = _run(manifest, baseline, "--tolerance", "not-a-number")
+    assert result.returncode == 1, result.stderr
+    combined = (result.stdout + result.stderr).lower()
+    assert "tolerance" in combined
+
+
 def test_cold_total_includes_static_imports(tmp_path: Path) -> None:
     manifest = _write_manifest(tmp_path / "dist", entry_bytes=1024, vendor_bytes=4096)
     baseline = tmp_path / "bundle-budget.json"

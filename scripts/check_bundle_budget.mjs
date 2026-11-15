@@ -36,7 +36,14 @@ function argValue(flag, fallback) {
 
 const MANIFEST = argValue("--manifest", join(REPO_ROOT, "apps/studio/dist/.vite/manifest.json"));
 const BASELINE_FILE = argValue("--baseline", join(HERE, "bundle-budget.json"));
-const TOLERANCE = Number(argValue("--tolerance", "0.2"));
+const TOLERANCE_RAW = argValue("--tolerance", "0.2");
+const TOLERANCE = Number(TOLERANCE_RAW);
+if (!Number.isFinite(TOLERANCE) || TOLERANCE < 0) {
+  fail(
+    `Invalid --tolerance value: expected a non-negative number, got "${TOLERANCE_RAW}". ` +
+      `An invalid tolerance would silently bypass the budget check.`,
+  );
+}
 // Asset paths in the manifest are relative to the build output root, which is
 // the directory holding `.vite/`.
 const DIST_ROOT = join(dirname(MANIFEST), "..");
