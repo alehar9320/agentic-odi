@@ -16,6 +16,7 @@ import {
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
 import { StudioProvider, useStudio } from "./StudioContext";
+import { LOCAL_BOARD_NOTE } from "../lib/canvasProvenance";
 import { useToasts } from "./notices/NoticesContext";
 import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
 
@@ -2809,5 +2810,69 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+});
+
+describe("StudioContext when the board is kept in this browser", () => {
+  /**
+   * The board reports where it lives through `source`. The local BFF answers
+   * "browser"; the sidecar answers "mcp", or "local" for its own repository. A
+   * receipt that just says "saved" promises a server that isn't there, so the
+   * browser-kept case must name the store — and every other case must keep its
+   * old, truthful copy.
+   */
+  beforeEach(() => {
+    localStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.startsWith("/api/canvas")) {
+          return json({ jobs: [], steps: [], outcomes: [], source: "browser" });
+        }
+        return route(input, init);
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("tells the visitor which store kept their write", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+    expect(result.current.boardStoredLocally).toBe(true);
+
+    let jobId = "";
+    await act(async () => {
+      jobId =
+        (await result.current.createJob({
+          name: "Get a service from commit to production",
+        })) ?? "";
+    });
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time from merge to production",
+        importance: 9,
+        satisfaction: 3,
+      });
+    });
+
+    const receipts = result.current.toasts.map((toast) => toast.message).join("\n");
+    // "Saved" is not enough on a deployment with no server: a person who later
+    // opens the studio on another machine needs to know the board they wrote is
+    // the one they are standing at.
+    expect(receipts).toContain("Job created: Get a service from commit to production");
+    expect(receipts).toContain(LOCAL_BOARD_NOTE);
+    expect((receipts.match(/Saved in this browser\./g) ?? []).length).toBe(2);
   });
 });

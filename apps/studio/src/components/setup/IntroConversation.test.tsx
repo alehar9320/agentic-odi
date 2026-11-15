@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LOCAL_BOARD_NOTE } from "../../lib/canvasProvenance";
 import { INTRO_DRAFT_KEY } from "../../lib/intro";
 import { IntroConversation } from "./IntroConversation";
 
@@ -8,6 +9,7 @@ const harness = vi.hoisted(() => ({
   state: {
     brief: null as unknown,
     canvas: null as unknown,
+    boardStoredLocally: false,
     saveBrief: vi.fn(),
     createJob: vi.fn(async () => "JOB-1"),
     updateJob: vi.fn(async () => undefined),
@@ -67,6 +69,7 @@ function seedDraft(answers: Record<string, string>) {
 beforeEach(() => {
   window.localStorage.clear();
   harness.state.brief = null;
+  harness.state.boardStoredLocally = false;
   harness.state.saveBrief.mockClear();
   harness.state.createJob.mockClear();
   harness.state.updateJob.mockClear();
@@ -230,4 +233,24 @@ describe("IntroConversation", () => {
     expect(harness.state.clearChat).toHaveBeenCalledTimes(1);
     expect(window.localStorage.getItem(INTRO_DRAFT_KEY)).toBeNull();
   });
+
+  /**
+   * On a deployment with no server, the board a visitor just wrote to is the
+   * browser they are standing in. "Context saved" alone reads as "saved on the
+   * studio's side", and the next machine then looks like it lost their work.
+   */
+  it("names the browser store when that is where the context landed", async () => {
+    harness.state.boardStoredLocally = true;
+    seedDraft(COMPLETE);
+    render(<IntroConversation />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Looks like me" }));
+
+    await waitFor(() => expect(harness.state.saveBrief).toHaveBeenCalledTimes(1));
+    expect(harness.state.pushToast).toHaveBeenCalledWith(
+      "success",
+      expect.stringContaining(LOCAL_BOARD_NOTE),
+    );
+  });
+
 });

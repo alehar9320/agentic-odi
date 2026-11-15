@@ -198,6 +198,12 @@ Studio says so in one place and keeps going:
   in the browser: the conversation, the canvas, and memory are read and written
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
+  all. While that board is the browser's — `canvas.source === "browser"`, the
+  one value `isBrowserCanvas` accepts, since the sidecar's own repository says
+  `local` and `provenance.kind` says *live* for both — the receipt for a job, a
+  step, an outcome, and the first-run context ends with **Saved in this
+  browser.** "Saved" alone would promise a server that is not there, and the
+  next machine would look like it lost their work.
   all.
 - A write falls back the same way a read does. Every canvas write the UI offers —
   job, step, outcome, score correction, and the evidence capture — goes through
