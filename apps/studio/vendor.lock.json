@@ -19,7 +19,7 @@
       "upstreamIssue": "shadcn-ui/ui, registry item new-york-v4/resizable",
       "integrity": "sha256-d6aa302ab794f451e9a38a68c746ded280eba15bcc4b9cf7a453624c4bcbafc6",
       "localEdits": "the class-merger import moves from the \"cn\" package to \"@/lib/utils\"; the six-line header above it is ours",
-      "ourCommit": "PENDING"
+      "ourCommit": "95ed73e"
     },
     "components/ui/sheet.tsx": {
       "source": "https://ui.shadcn.com/r/styles/new-york-v4/sheet.json",
@@ -29,7 +29,7 @@
       "upstreamIssue": "shadcn-ui/ui, registry item new-york-v4/sheet",
       "integrity": "sha256-bdf118300491675f05a9181af491217ba690929338aefd108437c2b07d25432f",
       "localEdits": "the class-merger import moves from the \"cn\" package to \"@/lib/utils\"; the six-line header above it is ours",
-      "ourCommit": "PENDING"
+      "ourCommit": "95ed73e"
     }
   },
   "firstParty": {
