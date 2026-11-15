@@ -326,6 +326,39 @@ merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
 workflows and are deliberately left alone. The workflow is silent: it updates
 labels only and never posts PR comments.
 
+### Merge-state labels
+
+The [merge-conflict workflow](.github/workflows/label-merge-conflicts.yml) owns
+the two labels a reviewer reads to know whether a pull request can land:
+
+| Label | Meaning |
+|---|---|
+| `merge-conflict` | The branch cannot merge into `main` as it stands. |
+| `ready-for-merge` | No conflict; the branch merges cleanly. |
+
+GitHub computes mergeability lazily and answers `UNKNOWN` for a moment after
+every push, so the workflow polls `mergeStateStatus` (up to ten times, six
+seconds apart) before it decides. A state that is still `UNKNOWN` after the
+retries leaves both labels untouched rather than guessing; a state that is
+neither `clean` nor `dirty` (for example `behind`) clears `merge-conflict`
+without claiming the PR is ready.
+
+### Which files actually conflict
+
+`scripts/doc_churn.py` ranks the files and top-level directories that appear in
+the most merged pull requests, which is the churn that produces conflicts. It
+is offline by default — it reads the saved fixtures payload — and shells out to
+`gh` only with `--live`:
+
+```bash
+uv run python scripts/doc_churn.py --since 30d            # offline fixtures
+uv run python scripts/doc_churn.py --since 30d --live     # the real history
+uv run python scripts/doc_churn.py --since 30d --live --json
+```
+
+A path repeated inside one pull request counts once: the number is how many
+pull requests touched a file, not how many file entries named it.
+
 ### Tiered Automated Triage (shift-left filtering)
 
 The same risk workflow runs a third job, **triage**, which decides whether a
