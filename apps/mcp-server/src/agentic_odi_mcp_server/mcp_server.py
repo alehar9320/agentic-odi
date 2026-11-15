@@ -1002,6 +1002,50 @@ def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
 
 
 @mcp.tool
+def links_add(
+    source_type: str,
+    source_id: str,
+    target_type: str,
+    target_id: str,
+    relationship_type: str,
+    external_system: str | None = None,
+    external_id: str | None = None,
+    preview: dict | None = None,
+) -> str:
+    """Create a typed link between two entities. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_add is not yet implemented"),
+        "Error: links_add is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
+def links_list(
+    source_type: str | None = None,
+    source_id: str | None = None,
+    target_type: str | None = None,
+    target_id: str | None = None,
+    relationship_type: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> str:
+    """List links, optionally filtered by source, target, or relationship type. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_list is not yet implemented"),
+        "Error: links_list is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
+def links_remove(link_id: str) -> str:
+    """Remove a link by ID. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_remove is not yet implemented"),
+        "Error: links_remove is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
 def get_outcome_alignments(outcome_id: str | None = None) -> str:
     """List the V2MOM links recorded on Outcomes, optionally for one outcome."""
     return json.dumps(service.list_alignments(outcome_id))

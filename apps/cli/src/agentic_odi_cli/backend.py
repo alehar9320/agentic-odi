@@ -765,6 +765,15 @@ class LocalBackend(Backend):
     def _get_traceability_report(self, args: dict[str, Any]) -> dict[str, Any]:
         return self.service.traceability_report().as_dict()
 
+    def _links_add(self, args: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError("links_add is not yet implemented")
+
+    def _links_list(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        raise NotImplementedError("links_list is not yet implemented")
+
+    def _links_remove(self, args: dict[str, Any]) -> str:
+        raise NotImplementedError("links_remove is not yet implemented")
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -820,6 +829,9 @@ _LOCAL_HANDLERS = {
     "unlink_outcome": LocalBackend._unlink_outcome,
     "get_outcome_alignments": LocalBackend._get_outcome_alignments,
     "get_traceability_report": LocalBackend._get_traceability_report,
+    "links_add": LocalBackend._links_add,
+    "links_list": LocalBackend._links_list,
+    "links_remove": LocalBackend._links_remove,
     "get_health": LocalBackend._get_health,
 }
 

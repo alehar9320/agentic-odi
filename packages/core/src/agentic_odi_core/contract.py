@@ -67,6 +67,9 @@ class ToolName(str, Enum):
     GET_TRACEABILITY_REPORT = "get_traceability_report"
     OPEN_STUDY = "open_study"
     LIST_STUDIES = "list_studies"
+    LINKS_ADD = "links_add"
+    LINKS_LIST = "links_list"
+    LINKS_REMOVE = "links_remove"
 
 
 class ToolEffect(str, Enum):
@@ -606,6 +609,46 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         effect=_derive_effect("list_studies"),
         arguments=("job_id",),
         returns="A list of Studies. Empty until a study has been opened.",
+    ),
+    ToolName.LINKS_ADD.value: ToolSpec(
+        name="links_add",
+        summary="Create a typed link between two agentic-odi entities.",
+        effect=_derive_effect("links_add"),
+        arguments=(
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "relationship_type",
+            "external_system",
+            "external_id",
+            "preview",
+        ),
+        required=("source_type", "source_id", "target_type", "target_id", "relationship_type"),
+        returns="The created Link record.",
+    ),
+    ToolName.LINKS_LIST.value: ToolSpec(
+        name="links_list",
+        summary="List links, optionally filtered by source/target entity and relationship type.",
+        effect=_derive_effect("links_list"),
+        arguments=(
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "relationship_type",
+            "limit",
+            "offset",
+        ),
+        returns="A list of Link records.",
+    ),
+    ToolName.LINKS_REMOVE.value: ToolSpec(
+        name="links_remove",
+        summary="Remove a link by ID.",
+        effect=_derive_effect("links_remove"),
+        arguments=("link_id",),
+        required=("link_id",),
+        returns="True if the link was removed, False if not found.",
     ),
 }
 
