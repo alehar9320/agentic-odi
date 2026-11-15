@@ -127,6 +127,13 @@ import {
   useNoticesActions,
   type ToastKind,
 } from "./notices/NoticesContext";
+import {
+  CanvasActionsContext,
+  CanvasProvider,
+  CanvasStateContext,
+  type CanvasActionsValue,
+  type CanvasStateValue,
+} from "./canvas/CanvasContext";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -560,7 +567,39 @@ export interface StudioContextValue {
   focusEvidence: (evidenceId: string) => void;
 }
 
-const StudioContext = createContext<StudioContextValue | null>(null);
+/**
+ * The canvas fields a component reads through its own context (#505). They are
+ * named here once so the composite type can exclude them: a canvas refresh must
+ * not rebuild the object every other surface subscribes to.
+ */
+export type CanvasContextFields =
+  | "canvas"
+  | "canvasLoading"
+  | "canvasCached"
+  | "canvasState"
+  | "canvasError"
+  | "refreshCanvas"
+  | "addStep"
+  | "addOutcome"
+  | "createJob"
+  | "updateJob"
+  | "deleteJob"
+  | "updateStep"
+  | "deleteStep"
+  | "updateOutcome"
+  | "deleteOutcome"
+  | "deleteEvidence"
+  | "promoteEvidence";
+
+/**
+ * Everything the composite value still carries. The canvas fields are excluded
+ * because they now live in `CanvasContext`; `useStudio()` merges them back in so
+ * no caller changes, while a narrow reader can subscribe to the canvas alone.
+ */
+export type StudioCompositeValue = Omit<StudioContextValue, CanvasContextFields>;
+
+
+const StudioContext = createContext<StudioCompositeValue | null>(null);
 
 /**
  * Whether an edit moved what the studio talks to. The theme is stored beside the
@@ -1409,30 +1448,53 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     setDismissedSidecarNotice(true);
   }, [setDismissedSidecarNotice]);
 
+  /**
+   * The in-flight canvas read, shared by every concurrent caller (#505).
+   * A turn, a mutation, and a manual refresh can all ask for the board at the
+   * same moment; the point of the single-flight promise is that they join one
+   * request instead of racing three.
+   */
+  const canvasRefreshRef = useRef<Promise<void> | null>(null);
+
   const refreshCanvas = useCallback(async () => {
-    // The inbox is re-read alongside the board: every path that reaches this
-    // function either just changed the store or is checking what changed, and
-    // a canvas that fails to load must not leave the bell showing stale counts.
-    void refreshSignals();
-    // Segments and the strategy are the other things a turn can create, and the
-    // rail counts them, so they are re-read on the same beat.
-    void refreshSegments();
-    setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
-    try {
-      const data = await fetchCanvas(settings.mcp_url);
-      const isEmpty = !data.jobs.length && !data.steps.length && !data.outcomes.length;
-      setCanvasState({ kind: isEmpty ? "empty" : "ready", data });
-      setCanvasCached(false);
+    // Join a read already on the wire rather than starting a second one. The
+    // promise clears in a `finally` so a failed read does not wedge the guard.
+    if (canvasRefreshRef.current) {
+      return canvasRefreshRef.current;
+    }
+    const run = (async () => {
+      // The inbox is re-read alongside the board: every path that reaches this
+      // function either just changed the store or is checking what changed, and
+      // a canvas that fails to load must not leave the bell showing stale counts.
+      void refreshSignals();
+      // Segments and the strategy are the other things a turn can create, and the
+      // rail counts them, so they are re-read on the same beat.
+      void refreshSegments();
+      setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
       try {
-        localStorage.setItem(CANVAS_KEY, JSON.stringify(data));
-      } catch {
-        /* storage unavailable */
+        const data = await fetchCanvas(settings.mcp_url);
+        const isEmpty = !data.jobs.length && !data.steps.length && !data.outcomes.length;
+        setCanvasState({ kind: isEmpty ? "empty" : "ready", data });
+        setCanvasCached(false);
+        try {
+          localStorage.setItem(CANVAS_KEY, JSON.stringify(data));
+        } catch {
+          /* storage unavailable */
+        }
+      } catch (error) {
+        // A failed canvas is a failure, not an empty canvas: the studio shows
+        // what went wrong instead of a zeroed-out board.
+        const problem = asStudioError(error);
+        setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
       }
-    } catch (error) {
-      // A failed canvas is a failure, not an empty canvas: the studio shows
-      // what went wrong instead of a zeroed-out board.
-      const problem = asStudioError(error);
-      setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
+    })();
+    canvasRefreshRef.current = run;
+    try {
+      await run;
+    } finally {
+      if (canvasRefreshRef.current === run) {
+        canvasRefreshRef.current = null;
+      }
     }
   }, [settings.mcp_url, refreshSignals, refreshSegments]);
 
@@ -2728,6 +2790,48 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const canvasLoading = canvasState.kind === "loading";
   const canvasError = canvasState.kind === "error" ? canvasState.error : null;
 
+  /**
+   * The canvas's two values (#505), split so a reader and a writer never share
+   * a dependency. The state value changes when the board changes; the actions
+   * value keeps its identity across those changes because every mutator below
+   * is a `useCallback` whose own dependencies are settings, toasts, and the
+   * refresh itself — none of which move when a refresh lands.
+   */
+  const canvasStateValue = useMemo<CanvasStateValue>(
+    () => ({ canvas, canvasLoading, canvasCached, canvasState, canvasError }),
+    [canvas, canvasLoading, canvasCached, canvasState, canvasError],
+  );
+  const canvasActionsValue = useMemo<CanvasActionsValue>(
+    () => ({
+      refreshCanvas,
+      addStep,
+      addOutcome,
+      createJob,
+      updateJob,
+      deleteJob,
+      updateStep,
+      deleteStep,
+      updateOutcome,
+      deleteOutcome,
+      deleteEvidence,
+      promoteEvidence,
+    }),
+    [
+      refreshCanvas,
+      addStep,
+      addOutcome,
+      createJob,
+      updateJob,
+      deleteJob,
+      updateStep,
+      deleteStep,
+      updateOutcome,
+      deleteOutcome,
+      deleteEvidence,
+      promoteEvidence,
+    ],
+  );
+
   // Re-probe after the person restored a backup: a clean answer clears the boot
   // page and re-hydrates the studio in place.
   const recheckBoot = useCallback(async () => {
@@ -2769,7 +2873,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [capabilities, capabilitiesCheckedAt],
   );
 
-  const value = useMemo<StudioContextValue>(
+  const value = useMemo<StudioCompositeValue>(
     () => ({
       settings,
       saveSettings,
@@ -2780,12 +2884,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       setupOpen,
       openSetup,
       closeSetup,
-      canvas,
-      canvasLoading,
-      canvasCached,
-      canvasState,
-      canvasError,
-      refreshCanvas,
       llmHealth,
       probeRetry,
       models,
@@ -2828,17 +2926,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
-      addStep,
-      addOutcome,
-      promoteEvidence,
-      createJob,
-      updateJob,
-      deleteJob,
-      updateStep,
-      deleteStep,
-      updateOutcome,
-      deleteOutcome,
-      deleteEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -2913,12 +3000,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       setupOpen,
       openSetup,
       closeSetup,
-      canvas,
-      canvasLoading,
-      canvasCached,
-      canvasState,
-      canvasError,
-      refreshCanvas,
       llmHealth,
       probeRetry,
       models,
@@ -2961,17 +3042,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
-      addStep,
-      addOutcome,
-      promoteEvidence,
-      createJob,
-      updateJob,
-      deleteJob,
-      updateStep,
-      deleteStep,
-      updateOutcome,
-      deleteOutcome,
-      deleteEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -3038,7 +3108,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
+  return (
+    <CanvasProvider state={canvasStateValue} actions={canvasActionsValue}>
+      <StudioContext.Provider value={value}>{children}</StudioContext.Provider>
+    </CanvasProvider>
+  );
 }
 
 export function StudioProvider({ children }: { children: ReactNode }) {
@@ -3051,10 +3125,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The composite view every existing caller uses. It merges the canvas's own
+ * context back into the rest, so this issue changes no component: the canvas
+ * fields are read from `CanvasContext` rather than carried in the composite
+ * `useMemo`, which is what keeps a refresh from rebuilding that object (#505).
+ */
 export function useStudio(): StudioContextValue {
   const context = useContext(StudioContext);
-  if (!context) {
+  const canvas = useContext(CanvasStateContext);
+  const canvasActions = useContext(CanvasActionsContext);
+  if (!context || !canvas || !canvasActions) {
     throw new Error("useStudio must be used within a StudioProvider");
   }
-  return context;
+  return useMemo(
+    () => ({ ...context, ...canvas, ...canvasActions }),
+    [context, canvas, canvasActions],
+  );
 }
