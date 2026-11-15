@@ -292,6 +292,14 @@ nothing on screen can claim otherwise before the person has asked for something.
   rather than failing on the first try. An endpoint that *did* answer badly (a
   rejected key) is reported, not hidden behind a local draft that looks like the
   model you asked for.
+- When no endpoint is configured but the browser ships its own model (the
+  `LanguageModel` API, or its older `ai.languageModel` spelling), that model
+  answers in prose. It is the third tier of the provider ladder — below a
+  configured endpoint and above the deterministic assistant — and it can only
+  speak: it never reads or changes the canvas, so the deterministic commands
+  (`add job`, `add outcome`, `remember`, `render`) still run first and still do
+  the work. A model the browser would have to download is a setup state, not a
+  session, and it never starts one.
 - The **sidecar isn't running** strip is for the loss of a sidecar this session
   was talking to: the assistant paused and live data froze is only said when both
   are true. It offers **Recheck** and **Start the sidecar**, is dismissible for
