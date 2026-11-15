@@ -80,6 +80,15 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     body: "The change was not saved. Nothing was written to your ODI repository.",
     dismissible: true,
   },
+  "storage-full": {
+    severity: "critical",
+    life: "persistent",
+    dock: "top",
+    title: "This browser is out of space for this site.",
+    body: "Your existing work is safe — export it, or free space and try again.",
+    dismissible: true,
+    actions: [{ label: "Export", action: "export-workspace", tone: "primary" }],
+  },
   info: {
     severity: "info",
     life: "transient",

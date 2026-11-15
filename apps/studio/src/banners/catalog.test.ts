@@ -11,6 +11,7 @@ const ALL_KINDS: BannerKind[] = [
   "update-available",
   "update-ready",
   "write-rejected",
+  "storage-full",
   "info",
   "success",
   "error",
