@@ -852,6 +852,20 @@ export async function setConversationHead(
   );
 }
 
+/**
+ * Remove one thread and its turns. Falls through to the local store, so a
+ * delete still lands when the sidecar is down.
+ */
+export function deleteConversation(conversationId: string): Promise<{ ok: boolean }> {
+  return withLocal(
+    () =>
+      deleteJson<{ ok: boolean }>(
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+      ),
+    (bff) => bff.memory.deleteConversation(conversationId),
+  );
+}
+
 /** Answer one paused write. The turn resumes on the stream it came from. */
 export async function resolveApproval(
   approvalId: string,
