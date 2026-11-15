@@ -16,6 +16,8 @@ const harness = vi.hoisted(() => ({
     toolActivity: [] as unknown[],
     offlineReplyFor: null as string | null,
     openPanel: vi.fn<(panel: string) => void>(),
+    openDetail: vi.fn<(panel: string, subject?: { kind: string; id: string }) => void>(),
+    canvasState: { kind: "ready", data: null } as unknown,
     canvas: null,
     displayName: "",
     regenerateFrom: vi.fn(),
@@ -604,6 +606,50 @@ describe("turn anatomy (#737)", () => {
     ]);
 
     expect(document.querySelectorAll("time.message__time")).toHaveLength(0);
+  });
+
+  it("opens a finding's breakdown without sending a message", () => {
+    harness.state.openDetail.mockClear();
+    harness.state.sendMessage.mockClear();
+
+    renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [
+          {
+            kind: "ui",
+            id: "ui-1",
+            node: nodeOf({
+              type: "finding-card",
+              props: {
+                headline: "Waiting on IT approval",
+                detail: "The drop-off is internal waiting.",
+                metric: { label: "Drop-off at Step 2", value: "34%" },
+                actions: [
+                  {
+                    kind: "detail",
+                    label: "View breakdown",
+                    target: { panel: "jobmap", subject: { kind: "step", id: "S-2" } },
+                    tone: "primary",
+                  },
+                ],
+              },
+            }),
+          },
+        ],
+      },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "View breakdown" }));
+
+    expect(harness.state.openDetail).toHaveBeenCalledWith("jobmap", {
+      kind: "step",
+      id: "S-2",
+    });
+    expect(harness.state.sendMessage).not.toHaveBeenCalled();
   });
 });
 

@@ -2667,6 +2667,79 @@ describe("StudioContext agent focus", () => {
     expect(chatBody?.focus ?? null).toBeNull();
   });
 
+  it("opens a detail on the lens that holds its subject, not the panel it named", async () => {
+    canvasRecords = {
+      jobs: [{ id: "J-1", name: "Reconcile invoices" }],
+      steps: [{ id: "S-2", job_id: "J-1", name: "Match each line", order: 2 }],
+    };
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvasState.data?.steps).toHaveLength(1));
+
+    act(() => {
+      result.current.openDetail("landscape", { kind: "step", id: "S-2" });
+    });
+
+    // The subject decides the lens: a step lives in the job map (#739).
+    expect(result.current.activePanel).toBe("jobmap");
+    expect(result.current.detail).toEqual({
+      panel: "jobmap",
+      subject: { kind: "step", id: "S-2" },
+    });
+    expect(result.current.focusedSubject).toEqual({ kind: "step", id: "S-2" });
+    expect(result.current.focusedJobId).toBe("J-1");
+  });
+
+  it("keeps the panel a detail named when its subject names no lens", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.openDetail("evidence", { kind: "finding", id: "F-1" });
+    });
+
+    // An unwired subject is not guessed at: the panel the action named stands,
+    // and no focus is recorded for a kind the lenses do not know.
+    expect(result.current.activePanel).toBe("evidence");
+    expect(result.current.detail).toEqual({
+      panel: "evidence",
+      subject: { kind: "finding", id: "F-1" },
+    });
+    expect(result.current.focusedSubject).toBeNull();
+  });
+
+  it("opens the panel a detail named when it has no subject", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.openDetail("catchup");
+    });
+
+    expect(result.current.activePanel).toBe("catchup");
+    expect(result.current.detail).toEqual({ panel: "catchup" });
+  });
+
   it("stops pointing at the screen once the person clears the focus", async () => {
     const { result } = renderHook(
       () => {

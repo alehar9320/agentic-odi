@@ -765,11 +765,12 @@ The copilot does not only talk. When a surface carries the evidence better than 
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
 customer quote with its lineage, the eight-stage job map, an opportunity thesis,
-a decision record, an outcome-based segment, or the strategy it implies.
+a decision record, an outcome-based segment, the strategy it implies, or a
+finding with the number and the step behind it.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and nine cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and ten cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
@@ -779,8 +780,10 @@ Three properties keep this safe and cheap to extend:
   result naming the exact violation, and the loop offers the tool again, so a
   fumbled prop is corrected in the same reply. A client that sends no catalog
   never sees the tool.
-- **Cards are views, never actors.** Every button is an `intent` string that the
-  agent receives as the user's next message — one authority, one audit trail.
+- **Cards are views, never actors.** An `intent` button is a string the agent
+  receives as the user's next message — one authority, one audit trail. A
+  `detail` button is the one exception: it opens the record the card names in the
+  right region and sends nothing, so inspecting a finding never costs a turn.
 
 A surface is one node tree, streamed as one event:
 
@@ -818,6 +821,14 @@ The strategy card carries Stage 6: the one path the evidence supports, the moves
 it proposes, and **every path it beat with the reason**. The catalog requires at
 least two rejected paths, so a strategy that records none cannot be validated.
 
+The finding card is the one sentence the agent will not bury: a headline claim,
+an impact band, the measured number behind it, and the real `Step.name` it
+happens on. It carries no score, so nothing on it is computed. The step line is
+read back from `canvas.steps` and omitted when the name does not resolve, a
+sample canvas badges the card, and every number is the agent's own formatted
+value. Its **View breakdown** action is a `detail` action: it opens the lens that
+holds the record, focused on that record, without sending a message.
+
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
 paragraph after it. The opportunity score is computed from importance and
@@ -832,7 +843,10 @@ that fails validation is dropped whole, and the surrounding prose still reads.
 2. Register the component in `apps/studio/src/ui/registry.ts`.
 3. Implement it in `apps/studio/src/ui/cards.tsx` (domain shape) or
    `apps/studio/src/ui/primitives.tsx` (composition).
-4. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
+4. Add the card to `website/content/landing.json` and a macro in
+   `website/templates/_cards.html`. CI reads `catalog.ts` and fails when a card
+   is missing from the built site.
+5. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
    catalog and the registry drift apart.
 
 No server change is needed, and no new dependency.

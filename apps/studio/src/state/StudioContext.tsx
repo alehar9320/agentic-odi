@@ -1678,6 +1678,31 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * The one entry to the right region (#735), with a card's detail target
+   * resolved through the lens map (#739): a subject the lenses know decides the
+   * panel, the panel the action named is the fallback, and the record is marked
+   * focused so the lens opens on it rather than on a generic view.
+   */
+  const openDetail = useCallback(
+    (panel: WorkspacePanelId, subject?: { kind: string; id: string }) => {
+      if (!subject) {
+        regions.openDetail(panel);
+        return;
+      }
+      const wired = Object.prototype.hasOwnProperty.call(PANEL_FOR_SUBJECT, subject.kind);
+      if (wired) {
+        focusSubject(subject.kind as SignalSubjectKind, subject.id);
+        if (subject.kind === "evidence") {
+          setFocusedEvidenceId(subject.id);
+        }
+      }
+      const lens = wired ? PANEL_FOR_SUBJECT[subject.kind as SignalSubjectKind] : undefined;
+      regions.openDetail(lens ?? panel, subject);
+    },
+    [focusSubject, regions.openDetail],
+  );
+
+  /**
    * Stop speaking for the screen. The session slot goes with the selection, so a
    * reload cannot resurrect a focus the person just dismissed.
    */
@@ -2984,7 +3009,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       focusedEvidenceId,
       focusEvidence,
       detail: regions.detail,
-      openDetail: regions.openDetail,
+      openDetail,
       closeDetail: regions.closeDetail,
       drawerOpen: regions.drawerOpen,
       toggleDrawer: regions.toggleDrawer,
@@ -3100,7 +3125,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       focusedEvidenceId,
       focusEvidence,
       regions.detail,
-      regions.openDetail,
+      openDetail,
       regions.closeDetail,
       regions.drawerOpen,
       regions.toggleDrawer,
