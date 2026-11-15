@@ -609,3 +609,40 @@ describe("turn anatomy (#737)", () => {
     expect(document.querySelectorAll("time.message__time")).toHaveLength(0);
   });
 });
+
+describe("message roots are MessagePrimitive.Root (#994)", () => {
+  it("renders each turn through the primitive, as an article with its own id", () => {
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "A question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer" },
+    ]);
+
+    // The primitive stamps `data-message-id` on the root it renders, so the
+    // three message roots are the primitive's, not a hand-written wrapper.
+    const roots = Array.from(container.querySelectorAll(".conversation > .message"));
+    expect(roots.map((root) => root.getAttribute("data-message-id"))).toEqual(["u-1", "a-1"]);
+    for (const root of roots) {
+      expect(root.tagName).toBe("ARTICLE");
+    }
+    expect(roots[0]).toHaveClass("message--user");
+    expect(roots[1]).toHaveClass("message--assistant");
+    expect(container.querySelectorAll("article.message").length).toBe(
+      container.querySelectorAll(".message").length,
+    );
+  });
+
+  it("keeps the notice turn an article too", () => {
+    harness.state.messages = [
+      { id: "s-1", parentId: null, role: "system", content: "A notice" },
+    ];
+    render(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    const notice = document.querySelector(".message--notice") as HTMLElement;
+    expect(notice.tagName).toBe("ARTICLE");
+    expect(notice.getAttribute("data-message-id")).toBe("s-1");
+  });
+});
