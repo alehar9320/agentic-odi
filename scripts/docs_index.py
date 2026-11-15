@@ -29,6 +29,30 @@ END_MARKER = "<!-- END GENERATED: docs -->"
 FRONT_MATTER_RE = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
 _FRONT_MATTER_STRIP_RE = re.compile(r"^---\n.*?\n---\n?", re.DOTALL)
 
+# Virtual pages have no markdown source file: they are rendered from templates
+# in website/tools/build_site.py (_quick_start.html and _mcp_reference.html),
+# so the front-matter scan over docs/ cannot discover them. They must remain in
+# the generated navigation so those pages keep being built; without them the
+# MCP reference page is never emitted and the site's content-sync tests fail.
+VIRTUAL_PAGES: list[dict[str, Any]] = [
+    {
+        "source": None,
+        "slug": "quick-start",
+        "title": "Quick start",
+        "blurb": "From nothing to a running studio.",
+        "nav_group": "Get started",
+        "nav_order": 0,
+    },
+    {
+        "source": None,
+        "slug": "mcp",
+        "title": "MCP tool reference",
+        "blurb": "Every tool the server exposes.",
+        "nav_group": "Build",
+        "nav_order": 3,
+    },
+]
+
 
 def strip_front_matter(text: str) -> str:
     """Remove YAML front matter from markdown if present."""
@@ -127,7 +151,9 @@ def build_readme_table(guides: list[dict[str, Any]]) -> str:
     """Build the README Documentation table from guides."""
     # Sort by group order and then nav_order
     group_order = {"Get started": 0, "Build": 1, "Operate": 2}
-    guides_sorted = sorted(guides, key=lambda g: (group_order.get(g["nav_group"], 99), g["nav_order"]))
+    guides_sorted = sorted(
+        guides, key=lambda g: (group_order.get(g["nav_group"], 99), g["nav_order"])
+    )
 
     lines = ["| Guide | Contents |", "|---|---|"]
     for guide in guides_sorted:
@@ -139,7 +165,9 @@ def build_readme_table(guides: list[dict[str, Any]]) -> str:
 def write_nav_json(nav: dict[str, Any]) -> None:
     """Write nav.json with deterministic formatting."""
     NAV_JSON.parent.mkdir(parents=True, exist_ok=True)
-    NAV_JSON.write_text(json.dumps(nav, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    NAV_JSON.write_text(
+        json.dumps(nav, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def write_readme_table(table: str) -> None:
@@ -191,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--write and --check are mutually exclusive")
 
     guides = collect_guides()
-    nav = build_nav(guides)
+    nav = build_nav(guides + VIRTUAL_PAGES)
     table = build_readme_table(guides)
 
     if args.write:

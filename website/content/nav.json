@@ -3,6 +3,12 @@
     {
       "guides": [
         {
+          "blurb": "From nothing to a running studio.",
+          "slug": "quick-start",
+          "source": null,
+          "title": "Quick start"
+        },
+        {
           "blurb": "Binaries, the installer, and updates.",
           "slug": "installation",
           "source": "docs/installation.md",
@@ -42,6 +48,12 @@
           "slug": "connectors",
           "source": "docs/connectors.md",
           "title": "Connectors"
+        },
+        {
+          "blurb": "Every tool the server exposes.",
+          "slug": "mcp",
+          "source": null,
+          "title": "MCP tool reference"
         },
         {
           "blurb": "The workspace, the data flow, and the testing strategy.",

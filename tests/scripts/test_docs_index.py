@@ -55,7 +55,9 @@ def test_collect_guides_missing_nav_group_fails(tmp_path: Path) -> None:
     original_docs_dir = docs_index.DOCS_DIR
     docs_index.DOCS_DIR = docs_dir
     try:
-        with pytest.raises(ValueError, match=r"bad_guide\.md: missing front matter fields:.*nav_group"):
+        with pytest.raises(
+            ValueError, match=r"bad_guide\.md: missing front matter fields:.*nav_group"
+        ):
             docs_index.collect_guides()
     finally:
         docs_index.DOCS_DIR = original_docs_dir
@@ -90,9 +92,30 @@ def test_collect_guides_excludes_superpowers(tmp_path: Path) -> None:
 def test_build_nav_groups_and_sorts(tmp_path: Path) -> None:
     """build_nav groups guides by nav_group and sorts by nav_order."""
     guides = [
-        {"slug": "c", "title": "C", "source": "docs/c.md", "blurb": "C", "nav_group": "Build", "nav_order": 0},
-        {"slug": "a", "title": "A", "source": "docs/a.md", "blurb": "A", "nav_group": "Get started", "nav_order": 1},
-        {"slug": "b", "title": "B", "source": "docs/b.md", "blurb": "B", "nav_group": "Get started", "nav_order": 0},
+        {
+            "slug": "c",
+            "title": "C",
+            "source": "docs/c.md",
+            "blurb": "C",
+            "nav_group": "Build",
+            "nav_order": 0,
+        },
+        {
+            "slug": "a",
+            "title": "A",
+            "source": "docs/a.md",
+            "blurb": "A",
+            "nav_group": "Get started",
+            "nav_order": 1,
+        },
+        {
+            "slug": "b",
+            "title": "B",
+            "source": "docs/b.md",
+            "blurb": "B",
+            "nav_group": "Get started",
+            "nav_order": 0,
+        },
     ]
     nav = docs_index.build_nav(guides)
     group_titles = [g["title"] for g in nav["groups"]]
@@ -106,9 +129,30 @@ def test_build_nav_groups_and_sorts(tmp_path: Path) -> None:
 def test_build_readme_table_sorted(tmp_path: Path) -> None:
     """build_readme_table sorts by group order then nav_order."""
     guides = [
-        {"slug": "c", "title": "C", "source": "docs/c.md", "blurb": "C", "nav_group": "Build", "nav_order": 0},
-        {"slug": "a", "title": "A", "source": "docs/a.md", "blurb": "A", "nav_group": "Get started", "nav_order": 1},
-        {"slug": "b", "title": "B", "source": "docs/b.md", "blurb": "B", "nav_group": "Get started", "nav_order": 0},
+        {
+            "slug": "c",
+            "title": "C",
+            "source": "docs/c.md",
+            "blurb": "C",
+            "nav_group": "Build",
+            "nav_order": 0,
+        },
+        {
+            "slug": "a",
+            "title": "A",
+            "source": "docs/a.md",
+            "blurb": "A",
+            "nav_group": "Get started",
+            "nav_order": 1,
+        },
+        {
+            "slug": "b",
+            "title": "B",
+            "source": "docs/b.md",
+            "blurb": "B",
+            "nav_group": "Get started",
+            "nav_order": 0,
+        },
     ]
     table = docs_index.build_readme_table(guides)
     lines = table.strip().split("\n")
@@ -225,7 +269,12 @@ def test_check_detects_stale_readme_table(tmp_path: Path) -> None:
                     {
                         "title": "Get started",
                         "guides": [
-                            {"slug": "guide", "title": "Guide", "source": "docs/guide.md", "blurb": "A guide"}
+                            {
+                                "slug": "guide",
+                                "title": "Guide",
+                                "source": "docs/guide.md",
+                                "blurb": "A guide",
+                            }
                         ],
                     }
                 ]
