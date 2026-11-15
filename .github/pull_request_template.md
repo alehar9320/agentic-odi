@@ -8,6 +8,8 @@
 
 ## What changed
 
+<!-- Registers touched: none | generated (<script>) -->
+
 <!-- The behavior, files, or commands a reviewer should look at. -->
 
 - Registers touched: none | generated (`scripts/docs_index.py --write`)
