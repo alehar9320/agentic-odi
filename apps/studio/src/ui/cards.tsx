@@ -720,9 +720,14 @@ export function FindingCard({ node }: NodeProps) {
   const stepName = str(node.props, "step");
   const steps = canvas?.steps ?? [];
   const step = stepName ? steps.find((candidate) => candidate.name === stepName) : undefined;
+  // `order` counts within a job, so the total has to come from the same job: a
+  // canvas with three jobs would otherwise caption every step "of 24".
+  const siblings = step?.job_id
+    ? steps.filter((candidate) => candidate.job_id === step.job_id)
+    : steps;
   const stepPosition =
     step && typeof step.order === "number" && step.order > 0
-      ? `Step ${step.order} of ${steps.length}`
+      ? `Step ${step.order} of ${siblings.length}`
       : "Step";
   const sample = isSimulatedCanvas(canvas);
 
