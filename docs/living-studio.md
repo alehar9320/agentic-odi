@@ -423,6 +423,18 @@ number with nothing behind it says so rather than borrowing a measured claim's
 look. On the card the indicator is itself the control that reveals the linked
 quotes, through the same reveal path the **Evidence** button drives.
 
+Scoring itself is a two-turn act, not one. Before an outcome carries an
+importance or satisfaction, the agent calls `prepare_score` with the statement,
+the two numbers it proposes, and three to five questions — at least one about
+what the customer does today and what that costs. The sidecar streams the open
+plan as a `score_plan` event and records nothing yet; the person answers or skips
+with a reason at `POST /api/score-plans/{id}`. Only a resolved plan lets the
+write through: the sidecar refuses a scored `add_outcome` that has no resolved
+plan for that statement, streaming the refusal as a `score_gate` event, and it
+writes the plan's basis as the `claim_check`, ignoring any the model supplied. A
+plan expires after 24 hours, after which the person is asked again rather than a
+stale answer being reused.
+
 ### The thread is the room
 
 Capture, scoring, simulation, and decisions are conversations. The storefront

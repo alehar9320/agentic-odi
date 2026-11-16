@@ -60,6 +60,7 @@ from agentic_odi_studio_api.studio.mcp_data import call_mcp_tool, fetch_canvas, 
 from agentic_odi_studio_api.studio.memory import (
     ConversationNotFoundError,
     ObservationNotFoundError,
+    ScorePlanNotFoundError,
     StudioMemory,
 )
 from agentic_odi_studio_api.studio.probes import (
@@ -106,7 +107,9 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeOutcomeRequest,
     ProposeStrategyRequest,
     RejectProposalRequest,
+    ResolveScorePlanRequest,
     ScheduleWorkRequest,
+    ScorePlanResponse,
     SharedArtifactResponse,
     ShareMintResponse,
     SignalActionRequest,
@@ -1352,6 +1355,45 @@ def patch_conversation(
             )
         ) from exc
     return ConversationResponse(conversation=conversation.to_dict())
+
+
+@router.get("/score-plans/{plan_id}", response_model=ScorePlanResponse)
+def get_score_plan(plan_id: str, request: Request) -> ScorePlanResponse:
+    plan = _memory(request).get_score_plan(plan_id)
+    if plan is None:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Score plan {plan_id} not found",
+            )
+        )
+    return ScorePlanResponse(plan=plan.to_dict())
+
+
+@router.post("/score-plans/{plan_id}", response_model=ScorePlanResponse)
+def resolve_score_plan(
+    plan_id: str, body: ResolveScorePlanRequest, request: Request
+) -> ScorePlanResponse:
+    """Answer or skip a score plan. Answering writes nothing here — the score is
+    filed on the next ``add_outcome``, which now carries the resolved basis."""
+    memory = _memory(request)
+    try:
+        if body.skip_reason is not None:
+            plan = memory.skip_score_plan(plan_id, body.skip_reason)
+        else:
+            plan = memory.answer_score_plan(plan_id, body.answers)
+    except ScorePlanNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Score plan {plan_id} not found",
+            )
+        ) from exc
+    except ValueError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
+        ) from exc
+    return ScorePlanResponse(plan=plan.to_dict())
 
 
 @router.post("/approvals/{approval_id}", response_model=ApprovalDecisionResponse)

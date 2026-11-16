@@ -214,6 +214,13 @@ Score **> 10** → underserved, innovate. **= 10** → served, maintain.
 **< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
 (as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
 
+In the Studio a score is a two-turn act: the agent must first ask the person three
+to five questions about the claim — one of them about what the customer does
+today and what that costs — and the person answers, or skips with a reason,
+before the number is recorded. The questions travel with the score as its
+`claim_check`, so a number never arrives without the basis behind it. See
+[The Living Studio →](docs/living-studio.md).
+
 A score says *which outcome* to chase; the job map says *who* is underserved.
 Stage 5 clusters a job's scored outcomes by the step they attach to, and Stage 6
 recommends one of three paths — differentiated for an underserved segment,
