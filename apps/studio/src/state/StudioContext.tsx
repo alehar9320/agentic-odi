@@ -106,6 +106,7 @@ import type {
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
+  Outcome,
   Segment,
   Signal,
   SignalSubjectKind,
@@ -458,10 +459,13 @@ export interface StudioContextValue {
   deleteJob: (jobId: string) => Promise<void>;
   updateStep: (stepId: string, payload: { name?: string; order?: number }) => Promise<void>;
   deleteStep: (stepId: string) => Promise<void>;
+  /** Resolves with the outcome the server returned, or `null` when the write
+   * failed — the failure is already surfaced as a toast, and the caller may keep
+   * the editor open on the values it holds. */
   updateOutcome: (
     outcomeId: string,
     payload: { statement?: string; importance?: number; satisfaction?: number },
-  ) => Promise<void>;
+  ) => Promise<Outcome | null>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
   deleteEvidence: (evidenceId: string) => Promise<void>;
   promoteEvidence: (
@@ -1597,7 +1601,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     async (
       outcomeId: string,
       payload: { statement?: string; importance?: number; satisfaction?: number },
-    ) => {
+    ): Promise<Outcome | null> => {
       try {
         const outcome = await apiUpdateOutcome(outcomeId, {
           ...payload,
@@ -1605,8 +1609,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         });
         pushToast("success", writeReceipt(outcome, "Outcome updated."));
         await refreshCanvas();
+        return outcome;
       } catch (error) {
         pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
+        return null;
       }
     },
     [settings.mcp_url, pushToast, refreshCanvas],

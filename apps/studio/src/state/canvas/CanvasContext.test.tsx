@@ -28,7 +28,7 @@ function actionsValue(onRefresh: () => void): CanvasActionsValue {
     deleteJob: noop,
     updateStep: noop,
     deleteStep: noop,
-    updateOutcome: noop,
+    updateOutcome: async () => null,
     deleteOutcome: noop,
     deleteEvidence: noop,
     promoteEvidence: noop,

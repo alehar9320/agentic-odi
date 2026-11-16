@@ -228,6 +228,8 @@ describe("studio shell", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
     fireEvent.click(await screen.findByRole("button", { name: /adjust scores/i }));
+    // The panel saves only a change: nudge an assumption before pressing Save.
+    fireEvent.change(screen.getByLabelText("Importance"), { target: { value: "9.5" } });
     fireEvent.click(screen.getByRole("button", { name: /save scores/i }));
 
     await waitFor(() => {

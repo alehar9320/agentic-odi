@@ -7,12 +7,12 @@ import {
   hasScore,
   isUnderserved,
   opportunityPill,
-  opportunityScore,
   scoreConfidence,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
+import { ScorePopover } from "./ScorePopover";
 
 export function OutcomeCard({
   outcome,
@@ -25,19 +25,18 @@ export function OutcomeCard({
    * the reader straight to the one control that fixes a missing score. */
   startEditing?: boolean;
 }) {
-  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
+  const { ask, canvasState, deleteOutcome, pushToast, saveThesis } = useStudio();
   // Records captured against this outcome, with their way back to the source.
   const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
     (item) => item.outcome_id === outcome.id,
   );
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [editing, setEditing] = useState(startEditing);
+  // The score panel is the one place the arithmetic and its two inputs are seen
+  // together, so the card opens it rather than growing a second edit surface.
+  const [scorePopoverOpen, setScorePopoverOpen] = useState(startEditing);
   const [thesisOpen, setThesisOpen] = useState(false);
   const [rationale, setRationale] = useState("");
-  const [importance, setImportance] = useState(outcome.importance ?? 5);
-  const [satisfaction, setSatisfaction] = useState(outcome.satisfaction ?? 5);
-  const [saving, setSaving] = useState(false);
 
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
@@ -152,58 +151,9 @@ export function OutcomeCard({
           </p>
         ))}
 
-      {editing && (
-        <form
-          className="card__edit"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!outcome.id || saving) {
-              return;
-            }
-            setSaving(true);
-            void updateOutcome(outcomeId, { importance, satisfaction }).finally(() => {
-              setSaving(false);
-              setEditing(false);
-            });
-          }}
-        >
-          <label className="card__slider" htmlFor={`importance-${outcomeId}`}>
-            Importance · {importance.toFixed(1)}
-            <input
-              id={`importance-${outcomeId}`}
-              type="range"
-              min={1}
-              max={10}
-              step={0.1}
-              value={importance}
-              onChange={(event) => setImportance(Number(event.target.value))}
-            />
-          </label>
-          <label className="card__slider" htmlFor={`satisfaction-${outcomeId}`}>
-            Satisfaction · {satisfaction.toFixed(1)}
-            <input
-              id={`satisfaction-${outcomeId}`}
-              type="range"
-              min={1}
-              max={10}
-              step={0.1}
-              value={satisfaction}
-              onChange={(event) => setSatisfaction(Number(event.target.value))}
-            />
-          </label>
-          <p className="score-preview">
-            Opportunity <b>{formatOpportunityScore(opportunityScore(importance, satisfaction))}</b>
-          </p>
-          <div className="card__edit-actions">
-            <button type="submit" className="button button--ghost" disabled={saving}>
-              {saving ? "Saving…" : "Save scores"}
-            </button>
-            <button type="button" className="quiet-action" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
+      {scorePopoverOpen && outcome.id ? (
+        <ScorePopover outcome={outcome} onClose={() => setScorePopoverOpen(false)} />
+      ) : null}
 
       <div className="card__actions">
         <button
@@ -250,10 +200,10 @@ export function OutcomeCard({
           <button
             type="button"
             className="quiet-action"
-            aria-expanded={editing}
-            onClick={() => setEditing((prev) => !prev)}
+            aria-expanded={scorePopoverOpen}
+            onClick={() => setScorePopoverOpen((prev) => !prev)}
           >
-            {editing ? "Stop editing" : "Adjust scores"}
+            {scorePopoverOpen ? "Stop editing" : "Adjust scores"}
           </button>
         )}
         <button

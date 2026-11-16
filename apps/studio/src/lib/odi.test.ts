@@ -15,6 +15,7 @@ import {
   opportunityPill,
   opportunityScore,
   scoreConfidence,
+  scoreMismatch,
   scoredAverage,
   segmentBasisLine,
   summarizeMemberScores,
@@ -105,6 +106,25 @@ describe("opportunityScore", () => {
   it("never subtracts when satisfaction exceeds importance", () => {
     expect(opportunityScore(4, 9)).toBeCloseTo(4, 5);
     expect(opportunityScore(8, 8)).toBeCloseTo(8, 5);
+  });
+});
+
+describe("scoreMismatch", () => {
+  it("flags a stored score that no longer matches its inputs", () => {
+    // 8.6 / 4.9 produce 12.3, not the 14.0 the record holds.
+    expect(scoreMismatch(14, 8.6, 4.9)).toBe(true);
+  });
+
+  it("tolerates a rounding difference within a twentieth", () => {
+    // 8.6 / 4.9 produce 12.3; four hundredths away is a rounding difference.
+    expect(scoreMismatch(12.34, 8.6, 4.9)).toBe(false);
+    // A tenth away is a real disagreement.
+    expect(scoreMismatch(12.4, 8.6, 4.9)).toBe(true);
+  });
+
+  it("never mismatches an unscored outcome", () => {
+    expect(scoreMismatch(null, 8.6, 4.9)).toBe(false);
+    expect(scoreMismatch(undefined, 8.6, 4.9)).toBe(false);
   });
 });
 
