@@ -19,6 +19,7 @@ from agentic_odi_connectors.models import (
     HealthStatus,
     IngestBatch,
     IngestRecord,
+    LinkPreviewData,
     RestConnectorSettings,
 )
 from agentic_odi_connectors.paths import cache_path
@@ -216,6 +217,48 @@ class RestConnector(Connector):
             )
         _store_health(self.name, result)
         return result
+
+    async def preview(self, external_id: str) -> LinkPreviewData | None:
+        """Fetch one item by id and map it to a preview."""
+        base_url = self.settings.url.rstrip("/")
+        url = f"{base_url}/{external_id}" if external_id else base_url
+        try:
+            status, body = self._fetch(
+                "GET",
+                url,
+                dict(self.settings.headers),
+                None,
+                self.settings.timeout,
+            )
+        except Exception:  # noqa: BLE001
+            return None
+        if not 200 <= status < 400:
+            return None
+        text = body.decode("utf-8", errors="replace")
+        try:
+            payload: Any = json.loads(text)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        title = str(
+            payload.get("title")
+            or payload.get("name")
+            or payload.get("id")
+            or external_id
+        )
+        status_val = payload.get("status") if isinstance(payload.get("status"), str) else None
+        if status_val is None:
+            state_val = payload.get("state")
+            status_val = state_val if isinstance(state_val, str) else None
+        url_val = payload.get("url") if isinstance(payload.get("url"), str) else None
+        if url_val is None:
+            for key in ("html_url", "web_url"):
+                candidate = payload.get(key)
+                if isinstance(candidate, str):
+                    url_val = candidate
+                    break
+        return LinkPreviewData(title=title, status=status_val, url=url_val)
 
     async def ingest(self) -> IngestBatch:
         batch = IngestBatch(connector_name=self.name)

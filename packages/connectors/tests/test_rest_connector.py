@@ -207,6 +207,36 @@ async def test_ingest_records_fetch_errors() -> None:
 
 
 @pytest.mark.asyncio
+async def test_preview_returns_link_preview_data() -> None:
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/items"),
+        fetcher=_fetcher(200, {"title": "Ticket", "status": "Open", "url": "https://ex/1"}),
+    )
+
+    preview = await connector.preview("1")
+
+    assert preview is not None
+    assert preview.title == "Ticket"
+    assert preview.status == "Open"
+    assert preview.url == "https://ex/1"
+    assert preview.fetched_at is not None
+
+
+@pytest.mark.asyncio
+async def test_preview_returns_none_on_404() -> None:
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/items"),
+        fetcher=_fetcher(404, {"error": "not found"}),
+    )
+
+    preview = await connector.preview("missing")
+
+    assert preview is None
+
+
+@pytest.mark.asyncio
 async def test_webhook_posts_json_body_and_uses_configured_item_type() -> None:
     calls: Calls = []
     connector = WebhookConnector(
