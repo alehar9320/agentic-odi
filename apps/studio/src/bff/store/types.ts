@@ -1,3 +1,4 @@
+import type { WriteReceipt } from "../../lib/receipts";
 import type {
   Conversation,
   ConversationTurn,
@@ -85,6 +86,14 @@ export interface OutboxRecord {
   acknowledged_at: string | null;
 }
 
+/**
+ * One durable receipt, keyed by the record it describes so a write's outcome
+ * outlives the toast that announced it.
+ */
+export interface StoredReceipt extends WriteReceipt {
+  seq: number;
+}
+
 /** The single-holder claim a drain takes when `navigator.locks` is missing. */
 export interface DrainLease {
   holder: string;
@@ -150,6 +159,10 @@ export interface LocalStore {
   putObservation(observation: Observation): Promise<void>;
   deleteObservation(id: string): Promise<void>;
   clearObservations(): Promise<void>;
+  listReceipts(): Promise<StoredReceipt[]>;
+  getReceipt(recordId: string): Promise<StoredReceipt | undefined>;
+  putReceipt(receipt: StoredReceipt): Promise<void>;
+  deleteReceipt(recordId: string): Promise<void>;
   enqueueOutbox(record: OutboxRecord): Promise<void>;
   getOutbox(id: string): Promise<OutboxRecord | undefined>;
   putOutbox(record: OutboxRecord): Promise<void>;

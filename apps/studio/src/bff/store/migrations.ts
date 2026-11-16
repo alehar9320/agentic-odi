@@ -8,6 +8,7 @@ import type {
   StoredEvidence,
   StoredJob,
   StoredOutcome,
+  StoredReceipt,
   StoredStep,
   StoredTurn,
 } from "./types";
@@ -19,7 +20,7 @@ export const DB_NAME = "agentic-odi-studio";
  * `MIGRATIONS` entry is caught by `migrations.test.ts`, so a release can never
  * ship a bump that would throw `ConstraintError` on an existing database.
  */
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export type MetaValue = number | DrainLease;
 
@@ -55,6 +56,11 @@ export interface StudioDb extends DBSchema {
     key: string;
     value: OutboxRecord;
     indexes: { "by-state": string; "by-created": string };
+  };
+  receipts: {
+    key: string;
+    value: StoredReceipt;
+    indexes: { "by-seq": number };
   };
   conversations: {
     key: string;
@@ -114,6 +120,13 @@ export const MIGRATIONS: Record<number, Migration> = {
     const evidence = db.createObjectStore("evidence", { keyPath: "id" });
     evidence.createIndex("by-job", "job_id");
     evidence.createIndex("by-seq", "seq");
+  },
+  4: (db) => {
+    // Every canvas write leaves a durable receipt keyed by the record it
+    // describes, so a failed save is recoverable from the row instead of
+    // vanishing with the toast (#307).
+    const receipts = db.createObjectStore("receipts", { keyPath: "recordId" });
+    receipts.createIndex("by-seq", "seq");
   },
 };
 
