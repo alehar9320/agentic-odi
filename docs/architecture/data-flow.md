@@ -122,7 +122,7 @@ MCP client / Studio MCP mode / CLI --backend mcp
   -> configured Repository
 ```
 
-`apps/mcp-server` builds its repository once at import time with `build_repository()`. Production uses SQLite; tests set `AGENTIC_ODI_DB=:memory:` (the root test suite does this in `tests/conftest.py`).
+`apps/mcp-server` builds its repository in `main()` through the composition root `configure()`, not at import: importing the module has no side effects. Production uses SQLite; tests call `configure(InMemoryRepository())` and never depend on import order.
 
 ### Studio API
 

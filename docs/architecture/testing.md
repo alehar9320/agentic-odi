@@ -64,7 +64,7 @@ rules below are what stays prose here.
 ## Isolation Rules
 
 - Use `InMemoryRepository` in tests. `create_app(InMemoryRepository())` keeps the Studio API off the real `~/.agentic-odi/odi.db`.
-- The MCP server uses `build_repository()`; tests set `AGENTIC_ODI_DB=:memory:` before import and call tools through `Client(mcp)` without HTTP.
+- The MCP server builds no store at import. `main()` calls `configure()`; a test calls `configure(InMemoryRepository())` in an autouse fixture and reaches tools through `Client(mcp)` without HTTP.
 - Async tests use `@pytest.mark.asyncio` (strict mode).
 
 ## Coverage

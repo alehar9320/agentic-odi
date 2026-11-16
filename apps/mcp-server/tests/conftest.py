@@ -1,35 +1,22 @@
+"""Shared fixtures for the MCP server tests.
+
+Importing ``agentic_odi_mcp_server`` builds no store, so a test names its own
+here rather than setting an environment variable before import. Each test gets
+a fresh in-memory repository; nothing is shared between tests.
+"""
+
 from __future__ import annotations
 
-import os
+from collections.abc import Generator
 
-os.environ["AGENTIC_ODI_DB"] = ":memory:"
-
-from collections.abc import Generator  # noqa: E402
-from typing import Any  # noqa: E402
-
-import pytest  # noqa: E402
-from agentic_odi_mcp_server import (  # noqa: E402
-    candidates_db,
-    customer_outcomes_db,
-    evidence_db,
-    jobs_db,
-    outcomes_db,
-    segments_db,
-    signals_db,
-    steps_db,
-    strategies_db,
-)
+import pytest
+from agentic_odi_core import InMemoryRepository
+from agentic_odi_mcp_server import mcp_server
 
 
 @pytest.fixture(autouse=True)
-def reset_db() -> Generator[None, Any, None]:
-    jobs_db.clear()
-    steps_db.clear()
-    outcomes_db.clear()
-    customer_outcomes_db.clear()
-    evidence_db.clear()
-    signals_db.clear()
-    candidates_db.clear()
-    segments_db.clear()
-    strategies_db.clear()
+def configured_server() -> Generator[None, None, None]:
+    mcp_server.configure(InMemoryRepository())
     yield
+    mcp_server._repo = None
+    mcp_server._service = None
