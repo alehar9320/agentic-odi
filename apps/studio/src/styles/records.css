@@ -351,9 +351,9 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3);
-  border: 1px solid rgba(240, 179, 74, 0.35);
+  border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
   border-radius: 10px;
-  background: rgba(240, 179, 74, 0.08);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
 }
 
 .score-popover__mismatch p {
