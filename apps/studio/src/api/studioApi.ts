@@ -853,6 +853,26 @@ export async function setConversationHead(
 }
 
 /**
+ * Rename a thread. Falls through to the local store, so a rename still lands
+ * when the sidecar is down; the sidecar truncates to 200 characters, and the
+ * local path matches so both paths produce the same title.
+ */
+export async function renameConversation(
+  conversationId: string,
+  title: string,
+): Promise<Conversation> {
+  return withLocal(
+    () =>
+      sendJson<{ conversation: Conversation }>(
+        "PATCH",
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+        { title },
+      ).then((body) => body.conversation),
+    (bff) => bff.memory.renameConversation(conversationId, title),
+  );
+}
+
+/**
  * Remove one thread and its turns. Falls through to the local store, so a
  * delete still lands when the sidecar is down.
  */

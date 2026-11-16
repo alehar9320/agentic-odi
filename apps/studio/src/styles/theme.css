@@ -498,6 +498,32 @@ a {
   min-width: 0;
 }
 
+/* Rename and delete share a column so the row keeps one trailing slot. */
+.bar__history-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.bar__history-rename-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 2px 0 2px 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.bar__history-rename-input:disabled {
+  opacity: 0.6;
+}
+
+.bar__history-action,
 .bar__history-delete {
   flex: 0 0 auto;
   display: inline-flex;
@@ -515,9 +541,16 @@ a {
   opacity: 0;
 }
 
+.bar__history-row:hover .bar__history-action,
+.bar__history-action:focus-visible,
 .bar__history-row:hover .bar__history-delete,
 .bar__history-delete:focus-visible {
   opacity: 1;
+}
+
+.bar__history-action:hover {
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .bar__history-delete:hover {

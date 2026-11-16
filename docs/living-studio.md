@@ -645,6 +645,14 @@ conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
 
+The bar's conversation-history menu lists recent threads, newest first. Each row
+can be **renamed** in place — the editor opens seeded with the current title, and
+Enter or blur writes it through `PATCH /api/conversations/{id}` with `title`,
+capped at the same 200 characters the sidecar enforces; Escape leaves the editor
+without writing. A row can also be **deleted** behind a confirmation that names
+the thread and how many of its turns go with it. Both fall through to the local
+store, so a rename or a delete still lands when the sidecar is down.
+
 ### Printing and export
 
 The bar's overflow menu has **Export → Markdown**. The file labels every

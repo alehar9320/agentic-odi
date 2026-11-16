@@ -17,6 +17,7 @@ import {
   fetchSignals,
   fetchUnreadSignalCount,
   markSignalRead,
+  renameConversation,
   updateObservation,
   fetchCanvas,
   fetchChangelog,
@@ -426,6 +427,20 @@ describe("conversations", () => {
       "/api/conversations/c-1",
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+
+  it("renameConversation PATCHes the new title and unwraps the conversation", async () => {
+    mockJson({ conversation: { ...conversation, title: "Renamed" } });
+    await expect(renameConversation("c-1", "Renamed")).resolves.toMatchObject({
+      id: "c-1",
+      title: "Renamed",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/conversations/c-1",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect(JSON.parse(String(init?.body))).toEqual({ title: "Renamed" });
   });
 
   it("streamChat forwards conversation_id", async () => {

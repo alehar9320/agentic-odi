@@ -295,4 +295,27 @@ describe("LocalMemoryService conversations", () => {
       studioError: { code: "not_found" },
     });
   });
+
+  it("renames a thread, and reports an unknown one", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const conv = await memory.createConversation("Before");
+
+    const renamed = await memory.renameConversation(conv.id, "  After  ");
+    expect(renamed.title).toBe("After");
+    expect((await memory.getConversation(conv.id))?.title).toBe("After");
+
+    await expect(memory.renameConversation("missing", "Nope")).rejects.toMatchObject({
+      studioError: { code: "not_found" },
+    });
+  });
+
+  it("caps a rename at the 200 characters the sidecar enforces", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const conv = await memory.createConversation("Before");
+
+    const renamed = await memory.renameConversation(conv.id, "x".repeat(250));
+    expect(renamed.title).toHaveLength(200);
+  });
 });

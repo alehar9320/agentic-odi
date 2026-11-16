@@ -15,6 +15,7 @@ import {
   HistoryIcon,
   MenuIcon,
   MoonIcon,
+  PencilIcon,
   PlugIcon,
   PlusIcon,
   SettingsIcon,
@@ -42,6 +43,7 @@ export function StudioBar({
     conversationId,
     conversations,
     deleteConversation,
+    renameConversation,
     llmHealth,
     probeRetry,
     messages,
@@ -69,6 +71,13 @@ export function StudioBar({
   // delete and an index would point at the wrong row.
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // The row being renamed, its in-progress text, and the row whose rename is in
+  // flight. Like delete, the id names the row so a re-read cannot point the
+  // editor at a different thread.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [savingRenameId, setSavingRenameId] = useState<string | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const keepThreadRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
@@ -157,6 +166,7 @@ export function StudioBar({
       if (event.key === "Escape") {
         setHistoryOpen(false);
         setConfirmingDeleteId(null);
+        setRenamingId(null);
       }
     }
     window.addEventListener("mousedown", onPointerDown);
@@ -174,6 +184,15 @@ export function StudioBar({
       keepThreadRef.current?.focus();
     }
   }, [confirmingDeleteId]);
+  // The rename editor opens with the caret in it and the text selected, so a
+  // person can type the new name immediately instead of clearing the old one.
+  useEffect(() => {
+    if (renamingId) {
+      const input = renameInputRef.current;
+      input?.focus();
+      input?.select();
+    }
+  }, [renamingId]);
   // Opening the list lands on the thread already on screen: with forty in the
   // list the one being read can be well below the fold, and hunting for it is
   // work the app can do. Reduced motion gets the jump instead of the glide.
@@ -227,6 +246,59 @@ export function StudioBar({
     setConfirmingDeleteId(null);
     if (removed && id === conversationId) {
       setHistoryOpen(false);
+    }
+  }
+
+  function beginRename(id: string, title: string) {
+    setConfirmingDeleteId(null);
+    setDeletingId(null);
+    setRenamingId(id);
+    setRenameDraft(title);
+  }
+
+  function cancelRename() {
+    setRenamingId(null);
+    setRenameDraft("");
+  }
+
+  async function commitRename(id: string) {
+    // A second submit while the first is in flight must not send another: the
+    // row already carries the new name, and two writes would race.
+    if (savingRenameId) {
+      return;
+    }
+    const trimmed = renameDraft.trim();
+    // Nothing to write when the text is unchanged or empty: a rename to blank
+    // would erase the only name the thread has, so the editor just closes.
+    if (!trimmed || trimmed === currentTitleOf(id)) {
+      cancelRename();
+      return;
+    }
+    setSavingRenameId(id);
+    const renamed = await renameConversation(id, trimmed);
+    setSavingRenameId(null);
+    if (renamed) {
+      setRenamingId(null);
+      setRenameDraft("");
+    }
+  }
+
+  function currentTitleOf(id: string): string {
+    const found = conversations.find((conversation) => conversation.id === id);
+    return (found?.title ?? "").trim();
+  }
+
+  function onRenameKeyDown(event: ReactKeyboardEvent<HTMLInputElement>, id: string) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commitRename(id);
+      return;
+    }
+    if (event.key === "Escape") {
+      // The list's Escape closes the whole menu; a rename is one step inside it,
+      // so stop the keystroke here and only leave the editor.
+      event.stopPropagation();
+      cancelRename();
     }
   }
 
@@ -402,28 +474,45 @@ export function StudioBar({
                       const current = conversation.id === conversationId;
                       const label = conversation.title.trim() || "New conversation";
                       const confirming = confirmingDeleteId === conversation.id;
+                      const renaming = renamingId === conversation.id;
+                      const saving = savingRenameId === conversation.id;
                       return (
                         <div className="bar__history-row" key={conversation.id}>
-                          <button
-                            ref={current ? activeHistoryRef : undefined}
-                            type="button"
-                            role="menuitem"
-                            className="bar__menu-item bar__history-item"
-                            aria-current={current ? "true" : undefined}
-                            onClick={() => selectConversation(conversation.id)}
-                          >
-                            <span className="bar__history-title">{label}</span>
-                            {/* A thread with no turns has nothing to count, so
-                                it says nothing rather than "0 turns". */}
-                            {conversation.turn_count > 0 ? (
-                              <span className="bar__history-meta">
-                                {formatRelativeTime(conversation.updated_at)} ·{" "}
-                                {conversation.turn_count}{" "}
-                                {conversation.turn_count === 1 ? "turn" : "turns"}
-                              </span>
-                            ) : null}
-                          </button>
-                          {confirming ? (
+                          {renaming ? (
+                            <input
+                              ref={renameInputRef}
+                              type="text"
+                              className="bar__history-rename-input"
+                              aria-label={`Rename ${label}`}
+                              value={renameDraft}
+                              maxLength={200}
+                              disabled={saving}
+                              onChange={(event) => setRenameDraft(event.target.value)}
+                              onKeyDown={(event) => onRenameKeyDown(event, conversation.id)}
+                              onBlur={() => void commitRename(conversation.id)}
+                            />
+                          ) : (
+                            <button
+                              ref={current ? activeHistoryRef : undefined}
+                              type="button"
+                              role="menuitem"
+                              className="bar__menu-item bar__history-item"
+                              aria-current={current ? "true" : undefined}
+                              onClick={() => selectConversation(conversation.id)}
+                            >
+                              <span className="bar__history-title">{label}</span>
+                              {/* A thread with no turns has nothing to count, so
+                                  it says nothing rather than "0 turns". */}
+                              {conversation.turn_count > 0 ? (
+                                <span className="bar__history-meta">
+                                  {formatRelativeTime(conversation.updated_at)} ·{" "}
+                                  {conversation.turn_count}{" "}
+                                  {conversation.turn_count === 1 ? "turn" : "turns"}
+                                </span>
+                              ) : null}
+                            </button>
+                          )}
+                          {renaming ? null : confirming ? (
                             <div
                               className="bar__history-confirm"
                               role="group"
@@ -457,15 +546,26 @@ export function StudioBar({
                               </div>
                             </div>
                           ) : (
-                            <button
-                              type="button"
-                              className="bar__history-delete"
-                              aria-label={`Delete ${label}`}
-                              title={`Delete ${label}`}
-                              onClick={() => beginDelete(conversation.id)}
-                            >
-                              <TrashIcon size={14} />
-                            </button>
+                            <div className="bar__history-actions">
+                              <button
+                                type="button"
+                                className="bar__history-action bar__history-rename"
+                                aria-label={`Rename ${label}`}
+                                title={`Rename ${label}`}
+                                onClick={() => beginRename(conversation.id, conversation.title)}
+                              >
+                                <PencilIcon size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="bar__history-delete"
+                                aria-label={`Delete ${label}`}
+                                title={`Delete ${label}`}
+                                onClick={() => beginDelete(conversation.id)}
+                              >
+                                <TrashIcon size={14} />
+                              </button>
+                            </div>
                           )}
                         </div>
                       );

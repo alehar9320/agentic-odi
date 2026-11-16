@@ -171,6 +171,8 @@ export interface LocalStore {
   getConversation(id: string): Promise<StoredConversation | undefined>;
   putConversation(conversation: StoredConversation): Promise<void>;
   setConversationHead(id: string, headId: string | null): Promise<StoredConversation>;
+  /** Rename a conversation; an unknown id is a not-found, not a silent insert. */
+  setConversationTitle(id: string, title: string): Promise<StoredConversation>;
   listTurns(conversationId: string): Promise<ConversationTurn[]>;
   /** How much a conversation holds, without reading every turn. */
   countTurns(conversationId: string): Promise<number>;
