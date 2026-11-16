@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 from agentic_odi_cli.cli import app
 from typer.testing import CliRunner
+
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(text: str) -> str:
+    return ANSI_ESCAPE.sub("", text)
 
 
 def _job_id(runner: CliRunner, db: str) -> str:
@@ -338,8 +345,9 @@ def test_evidence_add_help_lists_impact_and_confidence(tmp_path):
         ["--db", str(tmp_path / "odi.db"), "evidence", "add", "--help"],
     )
     assert result.exit_code == 0
-    assert "--impact" in result.output
-    assert "--confidence" in result.output
+    output = _strip_ansi(result.output)
+    assert "--impact" in output
+    assert "--confidence" in output
 
 
 def test_evidence_add_stores_impact_and_confidence_from_flags(tmp_path):
