@@ -200,6 +200,50 @@ class RestConnector(Connector):
             raw=raw,
         )
 
+    async def preview(self, external_id: str) -> LinkPreviewData | None:
+        """Describe one external item by id, or return ``None``.
+
+        Sends one request for the item and maps the JSON body onto
+        ``LinkPreviewData``. A non-2xx response or a body that is not a JSON
+        object returns ``None`` rather than raising.
+        """
+        url = self._item_url(external_id)
+        try:
+            status, body = self._request(url)
+        except Exception:  # noqa: BLE001
+            return None
+        if not 200 <= status < 400:
+            return None
+        try:
+            payload: Any = json.loads(body.decode("utf-8", errors="replace"))
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        title = payload.get("title") or payload.get("name") or payload.get("id")
+        if title is None:
+            return None
+        status_value = payload.get("status") or payload.get("state")
+        return LinkPreviewData(
+            title=str(title),
+            status=str(status_value) if status_value is not None else None,
+            url=self._preview_url(payload),
+        )
+
+    def _item_url(self, external_id: str) -> str:
+        """Resolve the URL for a single item from its external id."""
+        if external_id.startswith(("http://", "https://")):
+            return external_id
+        base = self.settings.url if self.settings.url.endswith("/") else self.settings.url + "/"
+        return urllib.parse.urljoin(base, external_id)
+
+    def _preview_url(self, payload: dict[str, Any]) -> str | None:
+        for key in ("url", "html_url", "web_url"):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                return value
+        return None
+
     async def health(self) -> HealthStatus:
         cached = _cached_health(self.name)
         if cached is not None:
