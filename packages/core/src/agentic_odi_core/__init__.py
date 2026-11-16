@@ -59,6 +59,7 @@ from agentic_odi_core.messages import (
 from agentic_odi_core.models import (
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    LINK_RELATIONSHIP_TYPES,
     V2MOM,
     BusinessImpactCategory,
     BusinessValue,
@@ -214,6 +215,9 @@ __all__ = [
     "ProposalStatus",
     "ProposalStrategy",
     "HeuristicProposalStrategy",
+    "Link",
+    "RelationshipType",
+    "LINK_RELATIONSHIP_TYPES",
     "LocalOpenAIEngine",
     "RateLimitError",
     "RoutingMode",

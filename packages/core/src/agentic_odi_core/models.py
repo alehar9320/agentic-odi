@@ -573,6 +573,11 @@ class RelationshipType(str, Enum):
     external_notion = "external_notion"
 
 
+#: The full set of relationship kinds, as plain strings, for consumers that do
+#: not want to import the enum (e.g. JSON-deserializing a row back into a link).
+LINK_RELATIONSHIP_TYPES: list[str] = [member.value for member in RelationshipType]
+
+
 class Link(BaseModel):
     """A first-class typed link between two agentic-odi entities.
 
