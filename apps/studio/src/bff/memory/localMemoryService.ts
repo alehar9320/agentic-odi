@@ -260,6 +260,22 @@ export class LocalMemoryService {
     return this.store.setConversationHead(id, headId);
   }
 
+  /**
+   * Give a thread a new name. The title is trimmed and capped at 200 characters,
+   * matching the sidecar's `update_title`; an empty name is rejected rather than
+   * stored, and an unknown id is a not-found.
+   */
+  async renameConversation(id: string, title: string): Promise<Conversation> {
+    const cleaned = title.trim().slice(0, 200);
+    if (!cleaned) {
+      throw validation("A conversation name cannot be empty.");
+    }
+    if (!(await this.store.getConversation(id))) {
+      throw notFound("Conversation", id);
+    }
+    return this.store.renameConversation(id, cleaned);
+  }
+
   /** Remove a thread and its turns; an unknown id is a not-found, not a no-op. */
   async deleteConversation(id: string): Promise<{ ok: boolean }> {
     if (!(await this.store.getConversation(id))) {

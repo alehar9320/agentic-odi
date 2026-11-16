@@ -296,6 +296,20 @@ export class IndexedDbLocalStore implements LocalStore {
     return next;
   }
 
+  async renameConversation(id: string, title: string): Promise<StoredConversation> {
+    const conversation = await this.db.get("conversations", id);
+    if (!conversation) {
+      throw new Error(`Conversation ${id} not found`);
+    }
+    const next: StoredConversation = {
+      ...conversation,
+      title,
+      updated_at: nowIso(),
+    };
+    await this.db.put("conversations", next);
+    return next;
+  }
+
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.db.getAllFromIndex("turns", "by-conversation", conversationId);
   }
