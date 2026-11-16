@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useState } from "react";
 
 import { fetchChangelog } from "../api/studioApi";
 import { markReleasesRead, readReleaseVersions, unreadReleases } from "../lib/changelogRead";
 import { formatExactTime } from "../lib/relativeTime";
-import { useFocusTrap } from "../lib/useFocusTrap";
+import { Dialog } from "../vendor/components/ui/dialog";
 import type { ChangelogData } from "../types";
 
 interface ChangelogModalProps {
@@ -27,9 +26,6 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
     () => new Set(unread.map((release) => release.version)),
     [unread],
   );
-
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(dialogRef, isOpen, true);
 
   function markAllRead() {
     const count = unread.length;
@@ -59,64 +55,38 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
         }
       });
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
     return () => {
       mounted = false;
-      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // Rendered at the document root, outside `.studio-app`, so the shell behind
-  // it can be made inert without inerting the dialog too.
-  return createPortal(
-    <div className="changelog-overlay fade-in">
-      {/* A real control so a pointer can dismiss; Escape and the close button
-          are the keyboard paths. */}
-      <button
-        type="button"
-        className="changelog-scrim"
-        aria-label="Close release notes"
-        tabIndex={-1}
-        onClick={onClose}
-      />
-      <div
-        ref={dialogRef}
-        className="changelog-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="changelog-modal-title"
-      >
-        <header className="changelog-modal__header">
-          <div>
-            <div className="changelog-modal__badge">WHAT'S NEW</div>
-            <h2 id="changelog-modal-title" className="changelog-modal__title">
-              Release Notes & Progress
-            </h2>
-            {unread.length > 0 && (
-              <p className="changelog-modal__unread" role="status">
-                {unread.length} new
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            className="changelog-modal__close"
-            onClick={onClose}
-            aria-label="Close changelog modal"
-          >
-            ✕
-          </button>
-        </header>
-
-        <div className="changelog-modal__body">
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title="Release Notes & Progress"
+    >
+      <div className="changelog-modal__header">
+        <div className="changelog-modal__badge">WHAT'S NEW</div>
+        {unread.length > 0 && (
+          <p className="changelog-modal__unread" role="status">
+            {unread.length} new
+          </p>
+        )}
+        <button
+          type="button"
+          className="changelog-modal__close"
+          onClick={onClose}
+          aria-label="Close changelog modal"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="changelog-modal__body">
           {loading && (
             <div className="changelog-modal__loading">
               <div className="skeleton skeleton-title" style={{ width: "40%" }} />
@@ -211,8 +181,6 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
             </button>
           </div>
         </footer>
-      </div>
-    </div>,
-    document.body,
+      </Dialog>
   );
 }

@@ -39,6 +39,13 @@ describe("ShareSheet", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("exposes an accessible dialog name", () => {
+    render(<ShareSheet isOpen onClose={() => undefined} onCreate={vi.fn()} />);
+    expect(
+      screen.getByRole("dialog", { name: "Share a read-only link" }),
+    ).toBeInTheDocument();
+  });
+
   it("mints a link for the chosen duration and offers it to copy", async () => {
     stubClipboard();
     const onCreate = vi.fn(async () => link());
@@ -99,7 +106,7 @@ describe("ShareSheet", () => {
     const onClose = vi.fn();
     render(<ShareSheet isOpen onClose={onClose} onCreate={vi.fn()} />);
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalled();
   });

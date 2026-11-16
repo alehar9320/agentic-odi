@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-import { useFocusTrap } from "../lib/useFocusTrap";
+import { Dialog } from "../vendor/components/ui/dialog";
 import type { ShareLink } from "../types";
 import { CheckIcon, CloseIcon, CopyIcon } from "./icons";
 
@@ -33,39 +33,27 @@ export function ShareSheet({ isOpen, onClose, onCreate, onRevoke }: ShareSheetPr
   // The body mounts only while open, so each open starts from fresh state
   // without an effect resetting it after the fact.
   return isOpen ? (
-    <ShareSheetBody onClose={onClose} onCreate={onCreate} onRevoke={onRevoke} />
+    <ShareSheetBody isOpen={isOpen} onClose={onClose} onCreate={onCreate} onRevoke={onRevoke} />
   ) : null;
 }
 
 function ShareSheetBody({
+  isOpen,
   onClose,
   onCreate,
   onRevoke,
 }: {
+  isOpen: boolean;
   onClose: () => void;
   onCreate: (days: number) => Promise<ShareLink>;
   onRevoke?: (id: string) => Promise<void>;
 }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const [days, setDays] = useState(7);
   const [link, setLink] = useState<ShareLink | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [revoked, setRevoked] = useState(false);
-
-  useFocusTrap(dialogRef, true);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
 
   async function create() {
     setBusy(true);
@@ -112,12 +100,12 @@ function ShareSheetBody({
   const shareUrl = link ? `${window.location.origin}/shared/${link.token}` : null;
 
   return (
-    <div
-      ref={dialogRef}
-      className="share-sheet"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Share a read-only link"
+    <Dialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title="Share a read-only link"
     >
       <div className="share-sheet__card">
         <button type="button" className="share-sheet__close" aria-label="Close" onClick={onClose}>
@@ -193,6 +181,6 @@ function ShareSheetBody({
           </div>
         )}
       </div>
-    </div>
+    </Dialog>
   );
 }

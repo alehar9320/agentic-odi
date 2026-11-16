@@ -36,6 +36,14 @@ describe("ChangelogModal", () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it("exposes an accessible dialog name", () => {
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({ releases: [] });
+    render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+    expect(
+      screen.getByRole("dialog", { name: "Release Notes & Progress" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders changelog content when open and fetch succeeds", async () => {
     vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({
       releases: [
@@ -140,7 +148,7 @@ describe("ChangelogModal", () => {
     });
 
     await act(async () => {
-      fireEvent.keyDown(window, { key: "Escape" });
+      fireEvent.keyDown(document, { key: "Escape" });
     });
 
     expect(onClose).toHaveBeenCalled();
