@@ -6,6 +6,8 @@ import pytest
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
+    CandidateSolution,
+    CandidateStatus,
     CustomerOutcome,
     CustomerValue,
     Direction,
@@ -15,6 +17,7 @@ from agentic_odi_core.models import (
     Signal,
     SignalKind,
     Step,
+    StrategyKind,
 )
 from agentic_odi_core.repository import InMemoryRepository
 
@@ -333,3 +336,48 @@ def test_stamping_the_same_signal_twice_spends_one_event_id() -> None:
     #: The second read changes nothing, so no event is appended and no id spent.
     assert repo.mark_signal_read("sig-1") is not None
     assert repo.last_event_id() == after_add + 1
+
+
+def _candidate(id: str = "cand-1") -> CandidateSolution:
+    return CandidateSolution(
+        id=id,
+        title="Guided setup checklist",
+        hypothesis="A checklist will reduce the time to first value.",
+        outcome_ids=["o-1", "o-2"],
+        strategy_path=StrategyKind.DIFFERENTIATED,
+        evidence_ids=["e-1"],
+    )
+
+
+def test_candidate_solution_round_trips_through_the_in_memory_repository() -> None:
+    repo = InMemoryRepository()
+    repo.add_candidate(_candidate())
+
+    fetched = repo.get_candidate("cand-1")
+    assert fetched is not None
+    assert fetched.title == "Guided setup checklist"
+    assert fetched.hypothesis == "A checklist will reduce the time to first value."
+    assert fetched.outcome_ids == ["o-1", "o-2"]
+    assert fetched.status is CandidateStatus.PROPOSED
+    assert fetched.strategy_path is StrategyKind.DIFFERENTIATED
+    assert fetched.evidence_ids == ["e-1"]
+    assert [candidate.id for candidate in repo.list_candidates()] == ["cand-1"]
+
+
+def test_candidate_status_can_be_updated_in_place() -> None:
+    repo = InMemoryRepository()
+    repo.add_candidate(_candidate())
+
+    updated = repo.update_candidate("cand-1", {"status": "accepted"})
+
+    assert updated is not None
+    assert updated.status is CandidateStatus.ACCEPTED
+    stored = repo.get_candidate("cand-1")
+    assert stored is not None
+    assert stored.status is CandidateStatus.ACCEPTED
+
+
+def test_updating_a_missing_candidate_returns_none() -> None:
+    repo = InMemoryRepository()
+    assert repo.update_candidate("missing", {"status": "accepted"}) is None
+    assert repo.get_candidate("missing") is None
