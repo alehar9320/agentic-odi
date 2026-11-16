@@ -235,11 +235,17 @@ GET   /api/conversations                       -> every thread, last touch first
 GET   /api/conversations/latest                -> thread + turns (resume)
 GET   /api/conversations/{id}/tree             -> branch tree + head
 PATCH /api/conversations/{id} {"head_id"}      -> record the visible branch
+DELETE /api/conversations/{id}                 -> drop the thread and its turns
 ```
 
 A conversation written before ids existed has none, so the tree endpoint
 synthesises a linear chain and old threads still open. `apps/studio` never
 invents a branch the sidecar cannot reproduce.
+
+A delete removes the thread and its turns in one transaction, and an unknown
+id answers 404 rather than a silent success. The SPA asks before it sends the
+request and clears the stage when the thread it was reading is the one that
+went.
 
 ## Read Paths
 

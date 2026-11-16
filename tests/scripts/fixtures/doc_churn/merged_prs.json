@@ -1,0 +1,48 @@
+[
+  {
+    "number": 901,
+    "mergedAt": "2026-11-05T10:00:00Z",
+    "files": [
+      {"path": "docs/a.md", "additions": 3, "deletions": 0, "changeType": "MODIFIED"},
+      {"path": "docs/a.md", "additions": 1, "deletions": 1, "changeType": "MODIFIED"},
+      {"path": "scripts/x.py", "additions": 10, "deletions": 2, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 902,
+    "mergedAt": "2026-11-04T10:00:00Z",
+    "files": [
+      {"path": "docs/a.md", "additions": 1, "deletions": 0, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 903,
+    "mergedAt": "2026-11-03T10:00:00Z",
+    "files": [
+      {"path": "docs/b.md", "additions": 2, "deletions": 0, "changeType": "ADDED"},
+      {"path": "README.md", "additions": 5, "deletions": 5, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 904,
+    "mergedAt": "2026-11-02T10:00:00Z",
+    "files": [
+      {"path": "docs/a.md", "additions": 4, "deletions": 0, "changeType": "MODIFIED"},
+      {"path": "README.md", "additions": 1, "deletions": 0, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 905,
+    "mergedAt": "2026-09-01T10:00:00Z",
+    "files": [
+      {"path": "docs/a.md", "additions": 99, "deletions": 0, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 906,
+    "mergedAt": "",
+    "files": [
+      {"path": "docs/c.md", "additions": 1, "deletions": 0, "changeType": "MODIFIED"}
+    ]
+  }
+]

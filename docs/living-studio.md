@@ -1,3 +1,11 @@
+---
+title: The Living Studio
+blurb: The chat-first interface, its first run, and the desktop app.
+nav_group: Get started
+nav_order: 2
+slug: studio
+---
+
 # Running The Living Studio
 
 **The Living Studio** is the conversational GUI for Outcome-Driven Innovation:
@@ -191,6 +199,12 @@ Studio says so in one place and keeps going:
   color, `aria-hidden` when a word already states the state, named by `label`
   when it stands alone. A `.studio-pill` is a label, not an indicator, so it
   carries no dot of its own.
+- Settings answers the same question with three words, and only claims what a
+  probe established: **available**, **unavailable**, or **configured, not
+  checked**. A model endpoint you have typed into Settings reads the third — it
+  never reads available until a health answer says so — and the MCP row is read
+  by the `POST` its route accepts, so a healthy sidecar no longer reports MCP
+  missing (`apps/studio/src/bff/capabilities/registry.ts`).
 - A reply that no model produced carries one line, on that reply: **Local draft,
   no model connected**. It is a button, and it opens Settings. It never repeats
   on the replies around it, and nothing about it covers the thread.
@@ -375,7 +389,15 @@ fixtures. Its real content is the store's signal inbox
 `/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
-already connected.
+already connected. The connector-install control explains a block in place: when
+the sidecar is known to be absent, **Add** stays disabled and a sentence beneath
+it says why, with one real next action (`Start the local service`), sourced from
+the single `blockedReason` table and tied to the button through
+`aria-describedby`. An unprobed capability is a wait rather than a failure, so
+nothing is explained for a host that has not answered yet. The table already
+carries wording for every capability the registry models, so a new capability
+cannot ship without it; wiring the remaining blocked controls (capture, agent
+send) and retiring the duplicate global banner are follow-ups.
 
 The Opportunity Matrix is held to the same rule. It plots a point only for an
 outcome the store actually scored — no default of 5 fills a missing importance
@@ -388,6 +410,18 @@ sampled from `2 × importance − satisfaction > 10` and drawn with its threshol
 line — so the region a point sits in and `isUnderserved` never disagree. The
 pill follows suit: a score the store never computed reads **Not scored**, never
 **Served**.
+
+A score that was computed also says how well it is backed. The card and the
+landscape's **Backed by** column read one derived helper, `scoreConfidence`, over
+the `claim_check` behind the score and the evidence records linked to it, and
+name one of three levels: **Verified** when every asked question was answered,
+**Partly verified** when answers exist but a question was skipped, and
+**Hypothesis** when there is no check or no answer — with a one-line basis
+(answered count, quote count, and the distinct sources). No confidence number is
+invented: the level is a function of records the store already holds, and a bare
+number with nothing behind it says so rather than borrowing a measured claim's
+look. On the card the indicator is itself the control that reveals the linked
+quotes, through the same reveal path the **Evidence** button drives.
 
 ### The thread is the room
 
@@ -410,15 +444,15 @@ without giving up the message model the sidecar already understands.
 
 | Capability | What it means here |
 |---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Prose is published once per animation frame — deltas accumulate in the turn and one render shows them all — while a citation, a tool row, the terminal frame, a cancel, and an error publish immediately and cancel any pending frame. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
 | **Silence** | A run that stops producing tokens for eight seconds shows *Still working · no new output for Ns* under the reply, while the Stop button keeps its meaning. The signal comes from assistant-ui's stall detection over text, reasoning, tool arguments, and tool results — never from a timer watching the DOM — so a long tool call reads as work, not a freeze. A dropped stream never shows it: that path ends in the failure panel. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
 | **Work** | What a turn did folds into one row: *Working… · 3 calls* while it runs, then *Worked for 12s · 3 calls*, closed and reopenable. Opening it is the turn's own record, not a paraphrase — the same reasoning disclosure and trace chips, in the order they arrived. A turn the browser did not watch from the start shows its calls with no duration. |
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
-| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. The ask is never folded into the work row — a question is not history. |
+| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Don't allow**. The card names the action, not the tool: one sentence of consequence (*This creates a job.*) from the pure map in `assistant/consequence.ts`, the model's arguments as a key/value list that scrolls past six rows with the raw JSON behind a **Raw arguments** disclosure, and — after **Don't allow** — an optional reason (280 characters) that travels with the refusal so the model can propose something else. A decline is a tool result, not an error. The ask is never folded into the work row — a question is not history. |
 | **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
 | **Claims** | Each declarative sentence ends with an evidence marker, and the reply arrives with a validated claim list. A chip names the source and the record (`Gong · Call with Acme`), never the tool; `Hypothesis` tags an ungrounded guess; an unmarked sentence keeps its place with a dotted underline and the accessible name *Uncited claim*. A chip opens that row in the Evidence lens, and Escape returns focus to the chip. Claims are stored with the turn, so they survive a reload; a record deleted later keeps its snapshot label and stops being a link. A seeded demo reply labels its chips **Sample** and does not count as cited. |
-| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. A turn carries at most five attachments, counting text and images together; a sixth is refused, naming the file and the limit, before the turn is sent. Chips show a name, size, an image preview, and a remove control. A file that is accepted by name but whose bytes never become content — an interrupted read, a `.docx` that will not unpack — is reported before the turn is sent: the chip keeps its name, says "Could not read this file", and send stays disabled until that chip is removed, leaving the draft and every other attachment in place. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter — and the per-file limit is 20,000 characters: a text-like file longer than that is refused, not silently shortened, with the chip naming the file and the limit (a `.docx` over the cap has its cut announced in the extracted text instead). Nothing is stored server-side. |
+| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), PDFs (`.pdf`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. A turn carries at most five attachments, counting text and images together; a sixth is refused, naming the file and the limit, before the turn is sent. Chips show a name, size, an image preview, and a remove control. A file that is accepted by name but whose bytes never become content — an interrupted read, a `.docx` that will not unpack, a `.pdf` whose text layer is missing or locked — is reported before the turn is sent: the chip keeps its name, says why (a scanned PDF names the missing text layer, an encrypted one names the password), and send stays disabled until that chip is removed, leaving the draft and every other attachment in place. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter, and `.pdf` through `pdfjs-dist`'s text layer, with each page marked `[page N]` — and the per-file limit is 20,000 characters: a text-like file longer than that is refused, not silently shortened, with the chip naming the file and the limit (a `.docx` or `.pdf` over the cap has its cut announced in the extracted text instead, a PDF dropping whole pages so no sentence stops mid-thought). Nothing is stored server-side. |
 | **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
@@ -427,7 +461,7 @@ without giving up the message model the sidecar already understands.
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 | **Queue** | A follow-up sent while an answer still streams does not hit a wall: it joins a quiet lane above the composer and runs in the order it was sent once the live turn settles. Each row offers **Run now** — it jumps ahead of the other waiting follow-ups — and a remove that drops only that message. Stop stops the live turn and the lane waits for the next send; it never clears the queue. The lane is in-memory and dies with the page, and the sidecar still sees exactly one SSE turn at a time — the queue sequences, it never parallelises. |
 | **Read aloud** | A settled reply with prose offers **Read aloud** beside Copy, and becomes **Stop reading** while it speaks. Starting another reply stops the first; **Stop reading**, Escape inside the thread, and leaving the conversation end it. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken. A streaming reply is never spoken, and speech is never persisted. |
-| **Interview** | Three to five structured questions arrive as an **interview card** (`InterviewCard`): a short statement with the outcome format hint, a free-text answer, and a scale with a visible value and keyboard steps. Each question is a labelled group; a required one is marked and enforced on submit, and an empty required answer is refused with one plain sentence rather than a silent no-op. The card is presentation only — it takes the questions, the answers, and a submit callback as props and never reads the canvas or the sidecar — so the conductor that turns answers into records (#397) owns that work. |
+| **Interview** | Three to five structured questions arrive as an **interview card** (`InterviewCard`): a short statement with the outcome format hint, a free-text answer, and a scale with a visible value and keyboard steps. Each question is a labelled group; a required one is marked and enforced on submit, and an empty required answer is refused with one plain sentence rather than a silent no-op. The card is presentation only — it takes the questions, the answers, and a submit callback as props and never reads the canvas or the sidecar. The conductor (`apps/studio/src/assistant/interview/conductor.ts`, #397) owns the work behind it: a pure reducer walks `idle → asking → collecting → submitting → done`, validates the required answers before it submits, and creates the records in order through the existing `createJob`/`addOutcome`/`addEvidence` actions — a failure stops the run and names the step that failed, leaving what already succeeded in place. Once the records are created, the card collapses into the record of the interview (#400): one line, `Answered · 3 of 3 · 2 outcomes, 1 evidence`, whose counts come from the records the store confirmed rather than from how many questions were answered. Expanding it shows each question with the answer given and a link to every outcome the answers created, routed through the existing focus action. An unfinished interview stays live and answerable, and a failed submission keeps the card with `Not saved — <reason>` on screen instead of a summary that claims a write that never happened. |
 
 #### What the runtime gives us, and what we did not take
 
@@ -462,7 +496,7 @@ cites the issue or PR that landed it.
 | `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
 | `MessagePrimitive.GroupedParts` | Adopted | One collapsed row holds what a turn did — its reasoning and tool calls — and never hides a write that is still asking. | #392 |
 | `MessagePrimitive.Attachments` | Adopted | User turns show what was sent. | #238 |
-| `MessagePrimitive.Root` | Partial | The wrapper is a hand-written article carrying `aria-busy` and the avatar. | — |
+| `MessagePrimitive.Root` | Adopted | Every turn renders its root through the primitive — the hover state the actions read and the top anchor come from it; the `article`, the classes and `aria-busy` ride on it unchanged. | #994 |
 | `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
 | `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Custom text/file renderers, because claim chips and extraction state need them. | — |
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
@@ -486,6 +520,7 @@ cites the issue or PR that landed it.
 | `data-aui-quote-selectable="false"` | Adopted | Tool traces and generated surfaces are marked non-prose. | #435 |
 | `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | The quote persists in the turn's metadata. | #435 |
 | `button` Element | Adopted | The one copy-in: a shadcn button under `src/vendor`, with a provenance header and a `vendor.lock.json` entry. It is not an assistant-ui primitive — it is a vendor decision, recorded here because the ledger audits the library and the alley is part of that audit. | #383 |
+| `thread` Element | Partial | Its frame is copied into `src/vendor/components/assistant/thread.tsx`: the thread root, the scrolling viewport, and the viewport footer the composer docks into, so the empty stage and a running thread share one layout. The Element's own message, composer, and markdown sections are not taken — `Conversation`/`parts.tsx`, `ThreadComposer`, and `Markdown.tsx` own those. | — |
 | Structured turn failure | Adopted | The failure panel with retry copy. | #129 |
 | `unstable_useMessageStallDetection` | Adopted | "Still working · no new output for Ns", only when output stops moving. | #431 |
 | `useAuiState` | Adopted | Runtime state read across the transcript and composer. | #238 |
@@ -495,6 +530,7 @@ cites the issue or PR that landed it.
 | `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count is ours (`arrivalCount.ts`). | #245 |
 | Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
 | Tool result rendering | Adopted | Each MCP call is a trace chip, gathered under the turn's work row. | #238 |
+| Pending-call strip | Adopted | The calls a turn is still waiting on, below the last message: running, or holding an unanswered approval — never a speculative "up next" list. | #390 |
 | `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
 | ODI surfaces as `data` parts | Adopted | A validated `UiNode` rides the transcript and renders through `UiRenderer`. | #55 |
 
@@ -509,6 +545,8 @@ cites the issue or PR that landed it.
 | `apps/studio/src/assistant/claims.ts` | Hides claim markers (including one split across streamed chunks), cuts the reply so every chip lands after its own sentence, and counts citations without a seeded demo. The Markdown export reads a claim-bearing reply through this same parser, so the file cannot say something other than what the transcript showed. |
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.GroupedParts` with the turn's work grouped, the branch picker, the action bar, and the in-place edit composer. |
 | `apps/studio/src/components/chat/WorkBlock.tsx` | The work row itself: one line that counts the calls it holds, times only a run this browser watched, and opens on the turn's own record. |
+| `apps/studio/src/assistant/pending.ts` | The calls a turn is actually waiting on — running, or holding an unanswered approval. Pure over `ChatPart`, and never a speculative "up next" list. |
+| `apps/studio/src/components/chat/PendingCalls.tsx` | The pending strip below the last message: the calls in flight, with the store's own start time when it recorded one and no clock otherwise. |
 | `apps/studio/src/components/chat/workGrouping.ts` | Which parts of a reply are one run of work — the thinking and the answered calls together, a pending approval never folded in. Pure over the runtime's parts, so it needs no browser to test. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
@@ -565,6 +603,15 @@ Each note is `suggested` or `confirmed`. Suggested notes appear first under
 **What I know** with **Yes, that's right**, **That's not it**, and **Edit**;
 confirmed notes can be edited or forgotten. The PM can also add a note by hand.
 Nothing is silently promoted: the agent may propose, but the person decides.
+
+A note may also name a **subject**: the job, step, outcome, or evidence it is
+about (`subject_type` plus `subject_id`). The panel renders that as the record's
+own words — its parent job, its id, and its title — and clicking it focuses the
+record on the canvas. A note that names no subject says so, and one whose subject
+is no longer on the canvas says that instead of showing a bare id. Repeating a
+note with the same text and subject updates the existing row rather than adding a
+duplicate. `GET /api/memory/observations` accepts `subject_type` and `subject_id`
+to return only the notes about one record.
 
 The agent writes notes through a `remember` tool during a normal reply. The
 sidecar applies it, emits a `memory` SSE event, and the panel updates without a
@@ -726,11 +773,12 @@ The copilot does not only talk. When a surface carries the evidence better than 
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
 customer quote with its lineage, the eight-stage job map, an opportunity thesis,
-a decision record, an outcome-based segment, or the strategy it implies.
+a decision record, an outcome-based segment, the strategy it implies, or a
+finding with the number and the step behind it.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and nine cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and ten cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
@@ -740,8 +788,10 @@ Three properties keep this safe and cheap to extend:
   result naming the exact violation, and the loop offers the tool again, so a
   fumbled prop is corrected in the same reply. A client that sends no catalog
   never sees the tool.
-- **Cards are views, never actors.** Every button is an `intent` string that the
-  agent receives as the user's next message — one authority, one audit trail.
+- **Cards are views, never actors.** An `intent` button is a string the agent
+  receives as the user's next message — one authority, one audit trail. A
+  `detail` button is the one exception: it opens the record the card names in the
+  right region and sends nothing, so inspecting a finding never costs a turn.
 
 A surface is one node tree, streamed as one event:
 
@@ -779,6 +829,14 @@ The strategy card carries Stage 6: the one path the evidence supports, the moves
 it proposes, and **every path it beat with the reason**. The catalog requires at
 least two rejected paths, so a strategy that records none cannot be validated.
 
+The finding card is the one sentence the agent will not bury: a headline claim,
+an impact band, the measured number behind it, and the real `Step.name` it
+happens on. It carries no score, so nothing on it is computed. The step line is
+read back from `canvas.steps` and omitted when the name does not resolve, a
+sample canvas badges the card, and every number is the agent's own formatted
+value. Its **View breakdown** action is a `detail` action: it opens the lens that
+holds the record, focused on that record, without sending a message.
+
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
 paragraph after it. The opportunity score is computed from importance and
@@ -793,7 +851,10 @@ that fails validation is dropped whole, and the surrounding prose still reads.
 2. Register the component in `apps/studio/src/ui/registry.ts`.
 3. Implement it in `apps/studio/src/ui/cards.tsx` (domain shape) or
    `apps/studio/src/ui/primitives.tsx` (composition).
-4. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
+4. Add the card to `website/content/landing.json` and a macro in
+   `website/templates/_cards.html`. CI reads `catalog.ts` and fails when a card
+   is missing from the built site.
+5. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
    catalog and the registry drift apart.
 
 No server change is needed, and no new dependency.
@@ -838,6 +899,14 @@ The app spawns the MCP server and sidecar itself:
 npm --prefix apps/studio run tauri dev     # dev window
 npm --prefix apps/studio run tauri build   # bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)
 ```
+
+The window opens at 1100 × 760 — a focused first frame rather than a
+full-desktop canvas — with a usable floor of 900 × 600 and `resizable: true`, so
+the person grows it rather than shrinking it. Size, position, and the maximized
+flag are restored on the next launch by `tauri-plugin-window-state`, so the
+small default only applies to the first run. Only those three are restored:
+decorations, fullscreen, and visibility stay the shell's business, and a stale
+`visible: false` would open a window nobody can see.
 
 > [!NOTE]
 > **Tauri prerequisites.** The desktop build needs the WebKitGTK toolchain and
@@ -937,7 +1006,7 @@ Each row below names a state to reach and what is worth your own eyes.
 | Reasoning | A backend that streams `reasoning_content` or `reasoning` | The disclosure opens while it is written, settles to *Thought for Ns*, reopens on click, and never repeats the answer |
 | Work row | A model that emits real `tool_calls`, then a page reload | The row reads *Working… · N calls* while the turn runs and *Worked for Ns · N calls* at rest; opening it lists the calls in the order they arrived without shifting the answer; the same turn reopened from the store counts its calls and invents no duration |
 | Tool trace and sources | A model that emits real `tool_calls` | The dot pulses while the tool runs, the chip previews what came back, and the source names the tool the turn actually read |
-| Approval | The same, asking it to write ("add a step to …") | The turn pauses for **Allow**/**Decline**, the ask is never folded into the work row, a decline reads as a tool result and not an error, and a double click runs the tool once |
+| Approval | The same, asking it to write ("add a step to …") | The turn pauses on a card that states the consequence and lists the arguments; **Don't allow** offers an optional reason that reaches the model; the ask is never folded into the work row, a decline reads as a tool result and not an error, and a double click runs the tool once |
 | Model picker | **Model** in the hint row; open it twice; narrow the window first | The list matches the backend, the configured id stays selectable, arrows/Home/End/Enter/Escape work, an offline backend explains itself and its Settings button is reachable from the keyboard, and it probes once per backend |
 | Attachments | Paperclip, drag a file onto the composer, paste a screenshot, then drop a `.exe`; a read failure shows on the chip when the browser hands over a file it will not open (a locked transcript, or one the tab lost the handle to) | Thumbnail, name, size, and remove on the chip; the refused file never becomes a chip; the unreadable one stays as a chip marked *Could not read this file* with send disabled until it is removed, and the draft and any other attachment survive it; the sent turn shows the same; the paperclip has a visible focus ring |
 | Branches | Edit your own turn, then regenerate a reply | **Alternative N of M** with `‹`/`›`, and a reload reopens the branch you were reading |

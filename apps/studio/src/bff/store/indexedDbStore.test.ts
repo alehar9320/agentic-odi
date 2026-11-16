@@ -275,6 +275,24 @@ describe("IndexedDbLocalStore", () => {
     store.close();
   });
 
+  it("deletes a conversation and its turns together", async () => {
+    const store = await makeStore();
+    await store.putConversation(conversation("c-1", "2026-01-01T00:00:00Z"));
+    await store.putConversation(conversation("c-2", "2026-01-02T00:00:00Z"));
+    await store.appendTurn(turn("c-1", "m-1"));
+    await store.appendTurn(turn("c-1", "m-2"));
+    await store.appendTurn(turn("c-2", "m-3"));
+
+    await store.deleteConversation("c-1");
+
+    expect(await store.getConversation("c-1")).toBeUndefined();
+    expect(await store.countTurns("c-1")).toBe(0);
+    // The other thread keeps its row and its turn.
+    expect(await store.getConversation("c-2")).toBeDefined();
+    expect(await store.countTurns("c-2")).toBe(1);
+    store.close();
+  });
+
   it("orders conversations the same way the in-memory store does", async () => {
     const rows = [
       conversation("c-middle", "2026-02-05T00:00:00Z"),

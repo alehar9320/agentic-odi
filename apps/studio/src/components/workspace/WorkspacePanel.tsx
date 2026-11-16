@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
-import { useFocusTrap } from "../../lib/useFocusTrap";
+import { ResizableHandle, ResizablePanel } from "@/components/ui/resizable";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useStudio } from "../../state/StudioContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { CloseIcon } from "../icons";
@@ -18,21 +19,80 @@ function PanelBody({ panel }: { panel: PanelDefinition }) {
   return <>{panel.render()}</>;
 }
 
+interface LensChromeProps {
+  panel: PanelDefinition;
+  onClose: () => void;
+  onTalk: () => void;
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
+  bodyRef: React.RefObject<HTMLDivElement | null>;
+  onScroll: () => void;
+}
+
+/**
+ * The lens header, body, and foot. The same markup serves the docked panel and
+ * the mobile sheet, so the two shells cannot drift apart.
+ */
+function LensChrome({ panel, onClose, onTalk, headingRef, bodyRef, onScroll }: LensChromeProps) {
+  return (
+    <>
+      <header className="lens__head">
+        <div className="lens__heading">
+          <span className="lens__icon" aria-hidden="true">
+            {panel.icon}
+          </span>
+          <div>
+            <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
+              {panel.title}
+            </h2>
+            <p className="lens__blurb">{panel.blurb}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Close workspace view"
+          title="Close"
+          onClick={onClose}
+        >
+          <CloseIcon size={16} />
+        </button>
+      </header>
+
+      <div className="lens__body" ref={bodyRef} onScroll={onScroll}>
+        <div className="lens__content">
+          <PanelBoundary name={panel.id}>
+            <PanelBody panel={panel} />
+          </PanelBoundary>
+        </div>
+      </div>
+
+      {panel.talk && (
+        <footer className="lens__foot">
+          <p className="lens__note">A lens on the conversation, not a separate place.</p>
+          <button type="button" className="button button--block" onClick={onTalk}>
+            {panel.talk.label}
+          </button>
+        </footer>
+      )}
+    </>
+  );
+}
+
 /**
  * A lens on the conversation, not a place you go.
  *
- * On a wide screen it docks to the right and the thread keeps the stage: the
- * composer is still there, still focused, still usable. On a narrow screen
- * there is no room for both, so it becomes a sheet over the thread with a scrim
- * and a close control. A sheet is a modal: focus stays inside it, Escape
- * closes it, and focus returns to whatever opened it.
+ * On a wide screen it docks to the right as the second panel of the split, so
+ * the separator resizes the lens and the thread together. On a narrow screen
+ * there is no room for both, so it becomes a sheet over the thread. Both shells
+ * come from the copied `resizable`/`sheet` primitives: focus trapping, Escape
+ * handling, and sibling hiding are the primitive's job, not a bespoke DOM walk
+ * (#407).
  */
 export function WorkspacePanel() {
   const { activePanel, closePanel, sendMessage } = useStudio();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const panel = activePanel ? findPanel(activePanel) : null;
   const panelId = panel?.id ?? null;
-  const panelRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   // Where each lens was left. The body remounts with the lens, so the position
@@ -66,14 +126,12 @@ export function WorkspacePanel() {
     return () => document.removeEventListener("click", rememberOpener, true);
   }, []);
 
-  useFocusTrap(panelRef, isMobile && Boolean(panel));
-
   // On a wide screen the lens opens under the keyboard, so focus goes to the
   // heading and comes back to the control that opened it. The composer is
   // autofocused, so recording "whatever held focus" would pull the caret out
   // of the lens and into the thread on Escape; only a lens with no distinct
   // opener falls back to the previously focused element. The mobile sheet
-  // keeps its trap and its own return path; this stays out of its way (#696).
+  // keeps its own trap and return path; this stays out of its way (#696).
   useEffect(() => {
     if (!panelId) {
       const target = returnFocusRef.current;
@@ -100,51 +158,6 @@ export function WorkspacePanel() {
     headingRef.current?.focus();
   }, [panelId, isMobile]);
 
-  // Everything behind the sheet is out of reach while it is open.
-  useEffect(() => {
-    if (!isMobile || !activePanel || !panelRef.current) {
-      return;
-    }
-    const hidden: HTMLElement[] = [];
-    let node: HTMLElement | null = panelRef.current;
-    while (node && node !== document.body) {
-      for (const sibling of Array.from(node.parentElement?.children ?? [])) {
-        if (
-          sibling !== node &&
-          sibling instanceof HTMLElement &&
-          !sibling.hasAttribute("aria-hidden") &&
-          sibling.tagName !== "SCRIPT"
-        ) {
-          sibling.setAttribute("aria-hidden", "true");
-          hidden.push(sibling);
-        }
-      }
-      node = node.parentElement;
-    }
-    return () => {
-      for (const element of hidden) {
-        element.removeAttribute("aria-hidden");
-      }
-    };
-  }, [isMobile, activePanel, panel?.id]);
-
-  // Capture so the escape never reaches the app-level handler, which would
-  // stop a running reply instead of closing the sheet the person is looking at.
-  useEffect(() => {
-    if (!isMobile || !activePanel) {
-      return;
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        closePanel();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [isMobile, activePanel, closePanel]);
-
   // A lens opens where it was left; a different lens starts at its top.
   useLayoutEffect(() => {
     if (!panelId) {
@@ -165,10 +178,6 @@ export function WorkspacePanel() {
     scrollByPanel.current.set(panelId, body.scrollTop);
   }
 
-  if (!panel) {
-    return null;
-  }
-
   function talk() {
     if (!panel?.talk) {
       return;
@@ -177,65 +186,56 @@ export function WorkspacePanel() {
     void sendMessage(panel.talk.intent);
   }
 
+  const chrome = panel ? (
+    <LensChrome
+      panel={panel}
+      onClose={closePanel}
+      onTalk={talk}
+      headingRef={headingRef}
+      bodyRef={bodyRef}
+      onScroll={rememberScroll}
+    />
+  ) : null;
+
+  // The sheet stays mounted while the lens is closed so the copied primitive
+  // owns its own open/close transition and returns focus to the trigger. An
+  // always-`open` sheet would bypass that lifecycle and strand focus on `<body>`.
+  if (isMobile) {
+    return (
+      <Sheet open={Boolean(panel)} onOpenChange={(open) => !open && closePanel()}>
+        {panel ? (
+          <SheetContent
+            className="lens lens--sheet"
+            side="right"
+            showCloseButton={false}
+            aria-label={panel.title}
+          >
+            <SheetTitle className="sr-only">{panel.title}</SheetTitle>
+            {chrome}
+          </SheetContent>
+        ) : null}
+      </Sheet>
+    );
+  }
+
+  if (!panel) {
+    return null;
+  }
+
   return (
     <>
-      {isMobile && (
-        <button
-          type="button"
-          className="scrim"
-          aria-label="Close workspace view"
-          onClick={closePanel}
-        />
-      )}
-      <aside
-        ref={panelRef}
-        className="lens"
-        role={isMobile ? "dialog" : "complementary"}
-        aria-modal={isMobile || undefined}
-        aria-label={panel.title}
-        tabIndex={-1}
+      <ResizableHandle withHandle />
+      <ResizablePanel
+        className="lens-panel"
+        defaultSize={480}
+        minSize={360}
+        maxSize={760}
         key={panel.id}
       >
-        <header className="lens__head">
-          <div className="lens__heading">
-            <span className="lens__icon" aria-hidden="true">
-              {panel.icon}
-            </span>
-            <div>
-              <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
-                {panel.title}
-              </h2>
-              <p className="lens__blurb">{panel.blurb}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Close workspace view"
-            title="Close"
-            onClick={closePanel}
-          >
-            <CloseIcon size={16} />
-          </button>
-        </header>
-
-        <div className="lens__body" ref={bodyRef} onScroll={rememberScroll}>
-          <div className="lens__content">
-            <PanelBoundary name={panel.id}>
-              <PanelBody panel={panel} />
-            </PanelBoundary>
-          </div>
-        </div>
-
-        {panel.talk && (
-          <footer className="lens__foot">
-            <p className="lens__note">A lens on the conversation, not a separate place.</p>
-            <button type="button" className="button button--block" onClick={talk}>
-              {panel.talk.label}
-            </button>
-          </footer>
-        )}
-      </aside>
+        <aside className="lens lens--docked" role="complementary" aria-label={panel.title}>
+          {chrome}
+        </aside>
+      </ResizablePanel>
     </>
   );
 }

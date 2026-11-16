@@ -18,11 +18,17 @@ export type CapabilityId =
   | "sidecar-mcp"
   | "sidecar-import";
 
+/**
+ * What a probe has actually established. `unknown` is its own answer: a thing
+ * can be configured and still unproven, and that must never read as available.
+ */
+export type CapabilityStatus = "available" | "unavailable" | "unknown";
+
 export interface Capability {
   id: CapabilityId;
   label: string;
   description: string;
-  status: "available" | "unavailable";
+  status: CapabilityStatus;
   reason?: string;
 }
 
@@ -30,7 +36,7 @@ export interface CapabilityProbe {
   id: CapabilityId;
   label: string;
   description: string;
-  check(settings: StudioConfig): Promise<{ ok: boolean; reason?: string }>;
+  check(settings: StudioConfig): Promise<{ ok: boolean; reason?: string; unproven?: boolean }>;
 }
 
 const localStatuses: Record<CapabilityId, Capability> = {
@@ -60,7 +66,7 @@ const localStatuses: Record<CapabilityId, Capability> = {
   },
   "endpoint-model": {
     id: "endpoint-model",
-    label: "Configured model endpoint",
+    label: "Configured",
     description: "Calls the model endpoint you configured in Settings directly.",
     status: "unavailable",
   },
@@ -122,6 +128,31 @@ async function probeSidecar(path: string, capabilityId?: CapabilityId): Promise<
   }
 }
 
+async function probeMcp(mcpUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(apiUrl("/api/health/mcp"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ mcp_url: mcpUrl }),
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!response.ok) {
+      return false;
+    }
+    const body = (await response.json()) as { reachable?: boolean };
+    return body.reachable === true;
+  } catch {
+    return false;
+  }
+}
+
+
+/** The same loopback rule `modelEndpoint.ts` uses before it calls a host private. */
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  return host === "localhost" || host.endsWith(".localhost") || host === "::1" || host.startsWith("127.");
+}
+
 export class CapabilityRegistry {
   private readonly probes: CapabilityProbe[] = [
     {
@@ -134,6 +165,10 @@ export class CapabilityRegistry {
       id: "endpoint-model",
       label: localStatuses["endpoint-model"].label,
       description: localStatuses["endpoint-model"].description,
+      // Present in Settings is not the same as answering. Reachability is only
+      // proven when the page and the endpoint sit on the same side: a hosted
+      // page can reach a public endpoint, a device page a loopback one. Anything
+      // else is configured, not checked (#515).
       check: async (settings) => {
         if (!isEndpointConfiguredForSettings(settings)) {
           return { ok: false };
@@ -154,7 +189,19 @@ export class CapabilityRegistry {
               "This endpoint is on your machine. A hosted page cannot reach it; use the desktop app or open the Studio on this device.",
           };
         }
-        return { ok: true };
+        let hostname: string;
+        try {
+          hostname = new URL(settings.base_url.trim()).hostname;
+        } catch {
+          hostname = "";
+        }
+        const proven =
+          hostname === ""
+            ? true
+            : originClass === "hosted"
+              ? !isPrivateHost(hostname)
+              : isLoopbackHost(hostname);
+        return proven ? { ok: true } : { ok: true, unproven: true };
       },
     },
     {
@@ -173,7 +220,7 @@ export class CapabilityRegistry {
       id: "sidecar-mcp",
       label: localStatuses["sidecar-mcp"].label,
       description: localStatuses["sidecar-mcp"].description,
-      check: async () => ({ ok: await probeSidecar("/api/health/mcp") }),
+      check: async (settings) => ({ ok: await probeMcp(settings.mcp_url) }),
     },
     {
       id: "sidecar-import",
@@ -188,17 +235,24 @@ export class CapabilityRegistry {
       this.probes.map(async (probe) => {
         let ok: boolean;
         let reason: string | undefined;
+        let unproven = false;
         try {
           const result = await probe.check(settings);
           ok = result.ok;
           reason = result.reason;
+          unproven = result.unproven === true;
         } catch (error) {
           ok = false;
           reason = error instanceof Error ? error.message : "Probe failed.";
         }
+        const status: Capability["status"] = ok
+          ? unproven
+            ? "unknown"
+            : "available"
+          : "unavailable";
         return {
           ...localStatuses[probe.id],
-          status: (ok ? "available" : "unavailable") as Capability["status"],
+          status,
           ...(ok ? {} : { reason }),
         };
       }),
