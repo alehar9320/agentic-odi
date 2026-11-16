@@ -593,6 +593,10 @@ def test_the_allowlist_only_approves_reviewed_deletions() -> None:
             "apps/studio/src/components/notices/SidecarNotice.test.tsx",
             "apps/studio/src/components/notices/SidecarNotice.tsx",
         },
+        394: {
+            "apps/studio/src/lib/markdown.test.ts",
+            "apps/studio/src/lib/markdown.ts",
+        },
         497: {"tests/scripts/test_roadmap_check.py"},
     }
     assert all(entry["reason"] for entry in allowlist)

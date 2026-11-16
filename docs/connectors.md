@@ -1,3 +1,11 @@
+---
+title: Connectors
+blurb: The registry, the presets, and the protocol.
+nav_group: Build
+nav_order: 2
+slug: connectors
+---
+
 # External Connectors (MCP Ingest)
 
 Connectors are named integrations stored in `~/.config/agentic-odi/connectors.json`

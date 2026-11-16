@@ -1,3 +1,11 @@
+---
+title: Deployment
+blurb: The project site, the hosted server, and the Worker.
+nav_group: Operate
+nav_order: 0
+slug: deployment
+---
+
 # Deployment
 
 ## Project Site (GitHub Pages)

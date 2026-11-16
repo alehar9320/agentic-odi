@@ -29,11 +29,11 @@ describe("CapabilityRegistry", () => {
     expect(byId["deterministic-assistant"].status).toBe("available");
   });
 
-  it("reports endpoint-model as unavailable for default local config", async () => {
+  it("reports endpoint-model as unavailable when the settings name no usable endpoint", async () => {
     const statuses = await capabilityRegistry.statuses({
-      base_url: "http://localhost:8001/v1",
-      api_key: "local",
-      model_name: "local-tools-model",
+      base_url: "https://api.example.com/v1",
+      api_key: "",
+      model_name: "",
       mcp_url: "http://localhost:8000/mcp",
       theme: "dark",
     });
@@ -41,7 +41,7 @@ describe("CapabilityRegistry", () => {
     expect(byId["endpoint-model"].status).toBe("unavailable");
   });
 
-  it("reports endpoint-model as available for a configured external endpoint", async () => {
+  it("never reports a configured endpoint as available before it answers (#515)", async () => {
     const statuses = await capabilityRegistry.statuses({
       base_url: "https://api.example.com/v1",
       api_key: "sk-test",
@@ -50,7 +50,80 @@ describe("CapabilityRegistry", () => {
       theme: "dark",
     });
     const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
-    expect(byId["endpoint-model"].status).toBe("available");
+    // Configuration is not evidence that a model answers: the honest answer is
+    // "configured, not checked", never "available".
+    expect(byId["endpoint-model"].status).toBe("unknown");
+    expect(byId["endpoint-model"].label).toBe("Configured");
+  });
+
+  it("reports a configured private-network endpoint the same way", async () => {
+    const statuses = await capabilityRegistry.statuses({
+      base_url: "http://192.168.1.10:11434/v1",
+      api_key: "",
+      model_name: "llama3",
+      mcp_url: "http://localhost:8000/mcp",
+      theme: "dark",
+    });
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["endpoint-model"].status).toBe("unknown");
+  });
+
+  it("probes MCP with the POST its route accepts, carrying the configured url (#515)", async () => {
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init });
+      if (String(input).includes("/api/health/mcp")) {
+        return new Response(JSON.stringify({ reachable: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const statuses = await capabilityRegistry.statuses({
+      base_url: "http://localhost:8001/v1",
+      api_key: "local",
+      model_name: "local-tools-model",
+      mcp_url: "http://localhost:8000/mcp",
+      theme: "dark",
+    });
+
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["sidecar-mcp"].status).toBe("available");
+
+    const call = calls.find(({ input }) => String(input).includes("/api/health/mcp"));
+    expect(call?.init).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ mcp_url: "http://localhost:8000/mcp" }),
+    });
+  });
+
+  it("reports MCP unavailable when the sidecar answered but the server did not", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes("/api/health/mcp")) {
+          return new Response(JSON.stringify({ reachable: false }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response("", { status: 404 });
+      }),
+    );
+
+    const statuses = await capabilityRegistry.statuses({
+      base_url: "http://localhost:8001/v1",
+      api_key: "local",
+      model_name: "local-tools-model",
+      mcp_url: "http://localhost:8000/mcp",
+      theme: "dark",
+    });
+
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["sidecar-mcp"].status).toBe("unavailable");
   });
 
   it("reports sidecar capabilities as unavailable when unreachable", async () => {
@@ -84,7 +157,13 @@ describe("CapabilityRegistry", () => {
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
         }
-        if (url.includes("/api/connectors") || url.includes("/api/health/mcp")) {
+        if (url.includes("/api/health/mcp")) {
+          return new Response(JSON.stringify({ reachable: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (url.includes("/api/connectors")) {
           return new Response("", { status: 200 });
         }
         return new Response("", { status: 404 });
@@ -127,7 +206,15 @@ describe("CapabilityRegistry", () => {
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
         }
-        if (url.includes("/api/connectors") || url.includes("/api/health/mcp")) {
+        if (url.includes("/api/health/mcp")) {
+          // #515: the MCP probe reads the body's `reachable`; a bare 200 proves
+          // the sidecar answered, not that the MCP server did.
+          return new Response(JSON.stringify({ reachable: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (url.includes("/api/connectors")) {
           return new Response("", { status: 200 });
         }
         return new Response("", { status: 404 });

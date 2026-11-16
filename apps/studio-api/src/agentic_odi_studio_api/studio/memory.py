@@ -651,6 +651,22 @@ class StudioMemory:
             )
         return self._updated_conversation(conversation_id)
 
+    def delete_conversation(self, conversation_id: str) -> None:
+        """Remove a conversation and everything hanging off it, in one transaction.
+
+        ``turns`` and ``turn_citations`` reference their parents with
+        ``ON DELETE CASCADE`` and ``PRAGMA foreign_keys`` is on, so the single
+        delete takes the turns and their citations with it. An unknown id is a
+        not-found, not a silent success: the caller asked to destroy something
+        that was not there.
+        """
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM conversations WHERE id = ?", (conversation_id,)
+            )
+            if cursor.rowcount == 0:
+                raise ConversationNotFoundError(conversation_id)
+
     def _updated_conversation(self, conversation_id: str) -> Conversation:
         """Read back a row this instance just wrote.
 

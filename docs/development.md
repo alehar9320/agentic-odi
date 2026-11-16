@@ -1,3 +1,11 @@
+---
+title: Development
+blurb: Lint, types, frontend checks, and the coverage map.
+nav_group: Operate
+nav_order: 1
+slug: development
+---
+
 # Development
 
 Everything below mirrors what CI runs. Install the workspace first:
@@ -134,7 +142,7 @@ the pure count arithmetic:
 |---|---|
 | `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
 | `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
-| `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
+| `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, the finding card's measured number and canvas-checked step, per-node failure isolation, catalog/registry parity |
 | `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | The segment board's members and basis (#559): each segment lists its member outcomes with their stored scores, the mean is over scored members only with "Not scored" for none, an inferred group is called a candidate, a missing member is dropped and counted, a member opens in the landscape by mouse and keyboard, and the empty state names the next step |
 | `apps/studio/src/components/canvas/OpportunityLandscape.test.tsx` | The landscape's honesty pass (#501): the plot draws a point only for a scored outcome, the underserved zone is sampled from `2 × importance − satisfaction > 10` (a boundary pair at one satisfaction lands on opposite sides), an unscored outcome appears under **Not scored (n)** with a **Score me** action that opens the score form without writing a rating |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
@@ -143,7 +151,7 @@ the pure count arithmetic:
 | `apps/studio-api/tests/test_studio_diagnostics.py` | Metadata-only diagnostics response, safe database basename/counts, integrity state, and absence of row contents/config |
 | `apps/studio-api/tests/test_boot_integrity.py` | A damaged store answers every data route with one `store_corrupt` body, health reports degraded, diagnostics and health stay reachable, the idle timer checkpoints and honors `AGENTIC_ODI_CHECKPOINT_SECONDS`, and a clean shutdown checkpoints and closes both stores |
 | `apps/studio-api/tests/test_studio_chat_stream.py` | Streaming chat, opt-in approval decisions for contract writes and unknown tools, and read-only/local-tool classification |
-| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
+| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; intent actions become messages while a finding's breakdown opens the record without sending one; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
 | `apps/studio/src/assistant/quote.test.ts`, `src/components/chat/SelectionToolbar.test.tsx` | Quoting a passage verbatim with its attribution, one copy only, and no toolbar until text is selected |
 | `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
 | `apps/studio/src/assistant/pending.test.ts`, `src/components/chat/PendingCalls.test.tsx` | The pending-call strip (#390): only running and awaiting-approval calls appear, in transcript order, a settled call leaves the strip for the transcript, a clock is shown only when the store recorded a start, and the strip is never a second live region |
@@ -325,6 +333,39 @@ The risk tier labels (`safe to merge`, `needs a look`, `danger zone`) and the
 merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
 workflows and are deliberately left alone. The workflow is silent: it updates
 labels only and never posts PR comments.
+
+### Merge-state labels
+
+The [merge-conflict workflow](.github/workflows/label-merge-conflicts.yml) owns
+the two labels a reviewer reads to know whether a pull request can land:
+
+| Label | Meaning |
+|---|---|
+| `merge-conflict` | The branch cannot merge into `main` as it stands. |
+| `ready-for-merge` | No conflict; the branch merges cleanly. |
+
+GitHub computes mergeability lazily and answers `UNKNOWN` for a moment after
+every push, so the workflow polls `mergeStateStatus` (up to ten times, six
+seconds apart) before it decides. A state that is still `UNKNOWN` after the
+retries leaves both labels untouched rather than guessing; a state that is
+neither `clean` nor `dirty` (for example `behind`) clears `merge-conflict`
+without claiming the PR is ready.
+
+### Which files actually conflict
+
+`scripts/doc_churn.py` ranks the files and top-level directories that appear in
+the most merged pull requests, which is the churn that produces conflicts. It
+is offline by default — it reads the saved fixtures payload — and shells out to
+`gh` only with `--live`:
+
+```bash
+uv run python scripts/doc_churn.py --since 30d            # offline fixtures
+uv run python scripts/doc_churn.py --since 30d --live     # the real history
+uv run python scripts/doc_churn.py --since 30d --live --json
+```
+
+A path repeated inside one pull request counts once: the number is how many
+pull requests touched a file, not how many file entries named it.
 
 ### Tiered Automated Triage (shift-left filtering)
 
@@ -515,6 +556,15 @@ Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
 a second sidecar on the MCP passthrough backend. Two projects run against
 them: `chromium` for the local backend (the product default) and
 `mcp-backend` for the passthrough.
+
+A third project, `screenshots`, is added only when `PR_SCREENSHOTS=1` is set.
+It runs `e2e/pr-screenshots.spec.ts`, which writes one PNG per key screen into
+the `pr-screenshots` directory under `apps/studio` for human review. The
+default `test:e2e` run never sees it. The `pr-screenshots` workflow sets the
+variable, captures the screens against a live backend, and posts them as a
+single comment on the pull request. The job is advisory — `continue-on-error:
+true` and no membership in `ci-green`'s `needs` — so a screenshot failure
+cannot block a merge.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none. When a test

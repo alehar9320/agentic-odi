@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
+import pytest
 from agentic_odi_core import InMemoryRepository
 from agentic_odi_studio_api.app import create_app
 from agentic_odi_studio_api.studio.claims import (
@@ -11,7 +12,11 @@ from agentic_odi_studio_api.studio.claims import (
     EvidenceSnapshot,
     split_claims,
 )
-from agentic_odi_studio_api.studio.memory import MAX_CONVERSATIONS, StudioMemory
+from agentic_odi_studio_api.studio.memory import (
+    MAX_CONVERSATIONS,
+    ConversationNotFoundError,
+    StudioMemory,
+)
 from fastapi.testclient import TestClient
 
 
@@ -281,6 +286,48 @@ def test_patching_an_unknown_conversation_is_a_404() -> None:
     response = client.patch("/api/conversations/missing", json={"head_id": "m-1"})
 
     assert response.status_code == 404
+
+
+def test_deleting_a_conversation_takes_its_turns_with_it() -> None:
+    memory = _memory()
+    kept = memory.create_conversation("Keep me")
+    doomed = memory.create_conversation("Delete me")
+    memory.append_turn(doomed.id, "user", "list jobs", "m-1", None)
+    memory.append_turn(doomed.id, "assistant", "here they are", "m-2", "m-1")
+
+    memory.delete_conversation(doomed.id)
+
+    assert [row.id for row in memory.list_conversations()] == [kept.id]
+    assert memory.get_conversation(doomed.id) is None
+    with pytest.raises(ConversationNotFoundError):
+        memory.list_turns(doomed.id)
+    assert memory._connection.execute("SELECT COUNT(*) FROM turns").fetchone()[0] == 0
+
+
+def test_deleting_an_unknown_conversation_is_a_not_found() -> None:
+    memory = _memory()
+
+    with pytest.raises(ConversationNotFoundError):
+        memory.delete_conversation("missing")
+
+
+def test_the_delete_route_removes_the_thread_and_reports_an_unknown_one() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    memory.append_turn(conversation.id, "user", "list jobs", "m-1", None)
+    app = create_app(repo=InMemoryRepository(), memory=memory)
+    client = TestClient(app)
+
+    response = client.delete(f"/api/conversations/{conversation.id}")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert memory.get_conversation(conversation.id) is None
+    assert client.get(f"/api/conversations/{conversation.id}/tree").status_code == 404
+
+    missing = client.delete("/api/conversations/missing")
+    assert missing.status_code == 404
+    assert missing.json()["error"]["code"] == "not_found"
 
 
 def test_renaming_a_conversation_keeps_the_selected_branch() -> None:

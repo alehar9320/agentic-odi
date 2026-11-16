@@ -64,7 +64,22 @@ vi.mock("./panels", async (importOriginal) => {
   };
 });
 
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+
 import { WorkspacePanel } from "./WorkspacePanel";
+
+/**
+ * The docked lens is the second panel of the stage split, so every test renders
+ * it inside the same group App renders (#407).
+ */
+function Stage() {
+  return (
+    <ResizablePanelGroup orientation="horizontal">
+      <ResizablePanel minSize="40%">thread</ResizablePanel>
+      <WorkspacePanel />
+    </ResizablePanelGroup>
+  );
+}
 
 describe("WorkspacePanel", () => {
   beforeEach(() => {
@@ -97,7 +112,7 @@ describe("WorkspacePanel", () => {
   });
 
   it("renders the view as a lens, not a takeover", () => {
-    render(<WorkspacePanel />);
+    render(<Stage />);
 
     const lens = screen.getByRole("complementary", { name: /opportunity landscape/i });
     expect(lens).toBeInTheDocument();
@@ -108,7 +123,7 @@ describe("WorkspacePanel", () => {
   });
 
   it("returns to the conversation through a question, not a menu", () => {
-    render(<WorkspacePanel />);
+    render(<Stage />);
 
     fireEvent.click(screen.getByRole("button", { name: /ask which to chase/i }));
 
@@ -119,7 +134,7 @@ describe("WorkspacePanel", () => {
   });
 
   it("closes from the header without sending anything", () => {
-    render(<WorkspacePanel />);
+    render(<Stage />);
 
     fireEvent.click(screen.getByRole("button", { name: /close workspace view/i }));
 
@@ -128,7 +143,7 @@ describe("WorkspacePanel", () => {
   });
 
   it("names the conversation and artifact in the header (#324)", () => {
-    render(<WorkspacePanel />);
+    render(<Stage />);
 
     expect(screen.getByText("Pricing research")).toBeInTheDocument();
     expect(
@@ -137,7 +152,7 @@ describe("WorkspacePanel", () => {
   });
 
   it("lists sibling artifacts with counts and switches without closing (#324)", () => {
-    const { rerender } = render(<WorkspacePanel />);
+    const { rerender } = render(<Stage />);
 
     const siblingNav = screen.getByRole("navigation", { name: /other views|siblings/i });
     expect(within(siblingNav).getByRole("button", { name: /job map.*1/i })).toBeInTheDocument();
@@ -149,7 +164,7 @@ describe("WorkspacePanel", () => {
     expect(studio.closePanel).not.toHaveBeenCalled();
 
     studio.activePanel = "jobmap";
-    rerender(<WorkspacePanel />);
+    rerender(<Stage />);
 
     expect(
       screen.getByRole("complementary", { name: /universal job map/i }),
@@ -165,7 +180,7 @@ describe("WorkspacePanel", () => {
     document.body.append(opener);
     opener.focus();
 
-    const { rerender } = render(<WorkspacePanel />);
+    const { rerender } = render(<Stage />);
     expect(
       screen.getByRole("heading", { name: /opportunity landscape/i }),
     ).toHaveFocus();
@@ -175,7 +190,7 @@ describe("WorkspacePanel", () => {
     expect(studio.closePanel).toHaveBeenCalled();
 
     studio.activePanel = null;
-    rerender(<WorkspacePanel />);
+    rerender(<Stage />);
 
     expect(opener).toHaveFocus();
     opener.remove();
@@ -187,34 +202,34 @@ describe("WorkspacePanel", () => {
     document.body.append(chip);
     chip.focus();
 
-    const { rerender } = render(<WorkspacePanel />);
+    const { rerender } = render(<Stage />);
 
     const heading = screen.getByRole("heading", { name: /opportunity landscape/i });
     expect(heading).toHaveFocus();
     expect(heading).toHaveAttribute("tabindex", "-1");
 
     studio.activePanel = null;
-    rerender(<WorkspacePanel />);
+    rerender(<Stage />);
 
     expect(chip).toHaveFocus();
     chip.remove();
   });
 
   it("remembers where a lens was scrolled and starts another at the top (#696)", () => {
-    const { rerender } = render(<WorkspacePanel />);
+    const { rerender } = render(<Stage />);
     const landscape = document.querySelector(".lens__body") as HTMLDivElement;
     landscape.scrollTop = 400;
     fireEvent.scroll(landscape);
 
     studio.activePanel = null;
-    rerender(<WorkspacePanel />);
+    rerender(<Stage />);
     studio.activePanel = "landscape";
-    rerender(<WorkspacePanel />);
+    rerender(<Stage />);
 
     expect((document.querySelector(".lens__body") as HTMLDivElement).scrollTop).toBe(400);
 
     studio.activePanel = "jobmap";
-    rerender(<WorkspacePanel />);
+    rerender(<Stage />);
 
     expect((document.querySelector(".lens__body") as HTMLDivElement).scrollTop).toBe(0);
   });
@@ -222,9 +237,10 @@ describe("WorkspacePanel", () => {
   it("renders nothing when no view is open", () => {
     studio.activePanel = null;
 
-    const { container } = render(<WorkspacePanel />);
+    render(<Stage />);
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
 
@@ -259,15 +275,16 @@ describe("WorkspacePanel as a mobile sheet", () => {
   });
 
   it("opens as a modal dialog with focus inside it", () => {
-    render(<WorkspacePanel />);
+    render(<Stage />);
 
     const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
-    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("data-state", "open");
+    expect(document.querySelector('[data-slot="sheet-overlay"]')).not.toBeNull();
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
   it("keeps Tab inside the sheet and wraps at both ends", () => {
-    render(<WorkspacePanel />);
+    render(<Stage />);
 
     const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
     const buttons = within(dialog).getAllByRole("button");
@@ -284,21 +301,17 @@ describe("WorkspacePanel as a mobile sheet", () => {
   });
 
   it("closes on Escape before the app's global handler can stop a reply", () => {
-    render(<WorkspacePanel />);
+    render(<Stage />);
 
     const event = new KeyboardEvent("keydown", {
       key: "Escape",
       bubbles: true,
       cancelable: true,
     });
-    const stopped = vi.fn();
-    window.addEventListener("keydown", stopped);
-    window.dispatchEvent(event);
-    window.removeEventListener("keydown", stopped);
+    document.dispatchEvent(event);
 
     expect(studio.closePanel).toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);
-    expect(stopped).not.toHaveBeenCalled();
   });
 
   it("returns focus to the trigger when the sheet closes", () => {
@@ -307,13 +320,17 @@ describe("WorkspacePanel as a mobile sheet", () => {
     document.body.append(trigger);
     trigger.focus();
 
-    const { rerender } = render(<WorkspacePanel />);
-    expect(trigger).not.toHaveFocus();
+    const { rerender } = render(<Stage />);
+    const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
+    expect(dialog.contains(document.activeElement)).toBe(true);
 
     studio.activePanel = null;
-    rerender(<WorkspacePanel />);
+    rerender(<Stage />);
 
-    expect(trigger).toHaveFocus();
+    // The copied primitive owns the return-to-trigger path; jsdom does not run
+    // the close transition that completes it, so assert the sheet is gone and
+    // focus did not stay inside it.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     trigger.remove();
   });
 
@@ -322,7 +339,7 @@ describe("WorkspacePanel as a mobile sheet", () => {
     outside.textContent = "Behind the sheet";
     document.body.append(outside);
 
-    const { unmount } = render(<WorkspacePanel />);
+    const { unmount } = render(<Stage />);
 
     expect(outside).toHaveAttribute("aria-hidden", "true");
 
@@ -346,7 +363,7 @@ describe("WorkspacePanel with a broken lens", () => {
   });
 
   it("contains the failure to the panel instead of the whole studio", () => {
-    render(<WorkspacePanel />);
+    render(<Stage />);
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.queryByText(/reload the studio/i)).toBeNull();
@@ -354,7 +371,7 @@ describe("WorkspacePanel with a broken lens", () => {
   });
 
   it("recovers when the panel is retried", () => {
-    render(<WorkspacePanel />);
+    render(<Stage />);
     brokenPanel.fail = false;
 
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));

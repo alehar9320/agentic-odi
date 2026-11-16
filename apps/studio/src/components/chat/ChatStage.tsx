@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { ThreadPrimitive, useThreadViewport } from "@assistant-ui/react";
+import { useThreadViewport } from "@assistant-ui/react";
 
 import { isFeatureEnabled } from "../../features/flags";
 import { canvasStatus } from "../../lib/canvasProvenance";
@@ -17,6 +17,7 @@ import { useStudio } from "../../state/StudioContext";
 import type { WorkspacePanelId } from "../../types";
 import { IntroConversation } from "../setup/IntroConversation";
 import { SetupConversation } from "../setup/SetupConversation";
+import { ThreadElement } from "../../vendor/components/assistant/thread";
 import { Conversation } from "./Conversation";
 import { GuidanceHint } from "./GuidanceHint";
 import { Hero } from "./Hero";
@@ -196,56 +197,65 @@ export function ChatStage() {
     return isFeatureEnabled("firstRunIntro") ? <IntroConversation /> : <SetupConversation />;
   }
 
+  const composer = (autoFocus = false) => (
+    <ThreadComposer
+      onCommand={(command) => runCommand(command)}
+      onSlashCommand={submitCommand}
+      {...(autoFocus ? { autoFocus: true } : {})}
+    />
+  );
+
+  // One assistant-ui thread frame for both states: the Element owns the root,
+  // the viewport, and the footer the composer docks into, so an empty stage and
+  // a running thread share the same layout instead of two hand-built ones.
   if (empty) {
     return (
-      <section className="chat chat--empty" aria-label="Studio conversation">
-        <div className="chat__welcome">
-          <div className="chat__welcome-inner">
+      <ThreadElement
+        empty
+        className="chat--empty"
+        aria-label="Studio conversation"
+        welcome={
+          <>
             <Hero />
-            <ThreadComposer
-              onCommand={(command) => runCommand(command)}
-              onSlashCommand={submitCommand}
-              autoFocus
-            />
-          </div>
-        </div>
-      </section>
+            {composer(true)}
+          </>
+        }
+        composer={null}
+      />
     );
   }
 
   return (
-    <ThreadPrimitive.Root className="chat" aria-label="Studio conversation">
-      {/* Outside the viewport, so the toolbar is never clipped by the scroll
-          frame; absent on the empty stage because there is nothing to quote. */}
-      <SelectionToolbar />
-      <header className="mainstage__bar">
-        <h2 className="mainstage__title">
-          {brief?.product_name || brief?.job_statement || "This conversation"}
-        </h2>
-        {provenance ? (
-          <span
-            className={`mainstage__provenance${provenance.label === "OFFLINE" ? " is-offline" : ""}`}
-            title={provenance.detail}
-          >
-            {provenance.label}
-          </span>
-        ) : null}
-      </header>
-      <div className="chat__transcript">
-        <ThreadPrimitive.Viewport className="chat__scroll" autoScroll>
-          <div className="chat__thread">
-            <Conversation />
-          </div>
-        </ThreadPrimitive.Viewport>
-        <LatestMessageButton messageCount={messages.length} />
-      </div>
-      <div className="chat__dock">
-        <GuidanceHint />
-        <ThreadComposer
-          onCommand={(command) => runCommand(command)}
-          onSlashCommand={submitCommand}
-        />
-      </div>
-    </ThreadPrimitive.Root>
+    <ThreadElement
+      aria-label="Studio conversation"
+      header={
+        <>
+          {/* Outside the viewport, so the toolbar is never clipped by the scroll
+              frame; absent on the empty stage because there is nothing to quote. */}
+          <SelectionToolbar />
+          <header className="mainstage__bar">
+            <h2 className="mainstage__title">
+              {brief?.product_name || brief?.job_statement || "This conversation"}
+            </h2>
+            {provenance ? (
+              <span
+                className={`mainstage__provenance${provenance.label === "OFFLINE" ? " is-offline" : ""}`}
+                title={provenance.detail}
+              >
+                {provenance.label}
+              </span>
+            ) : null}
+          </header>
+        </>
+      }
+      messages={<Conversation />}
+      float={<LatestMessageButton messageCount={messages.length} />}
+      composer={
+        <>
+          <GuidanceHint />
+          {composer()}
+        </>
+      }
+    />
   );
 }

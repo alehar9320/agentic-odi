@@ -176,6 +176,8 @@ export interface LocalStore {
   countTurns(conversationId: string): Promise<number>;
   appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn>;
   clearTurns(conversationId: string): Promise<void>;
+  /** Remove a conversation and its turns together, as one unit. */
+  deleteConversation(id: string): Promise<void>;
   conversationTree(conversationId: string): Promise<{
     conversation: StoredConversation;
     messages: StoredTurn[];
