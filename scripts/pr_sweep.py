@@ -167,6 +167,7 @@ def bucket(pr: PR, all_prs: list[PR], now: datetime | None = None) -> str:
 
     # 2. Green-superseded by body reference to merged PR
     import re
+
     merged_ref_pattern = re.compile(r"(?:supersedes|fixes|closes|resolves)\s+#(\d+)", re.IGNORECASE)
     if merged_ref_pattern.search(pr.body or ""):
         return "green-superseded"
