@@ -1,13 +1,14 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
 import { ResizableHandle, ResizablePanel } from "@/components/ui/resizable";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { buildRecords } from "../../lib/records";
 import { useStudio } from "../../state/StudioContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { CloseIcon } from "../icons";
 import { PanelBoundary } from "./PanelBoundary";
 import type { WorkspacePanelId } from "../../types";
-import { findPanel, type PanelDefinition } from "./panels";
+import { findPanel, WORKSPACE_PANELS, type PanelDefinition } from "./panels";
 
 const MOBILE_QUERY = "(max-width: 1023px)";
 
@@ -21,6 +22,9 @@ function PanelBody({ panel }: { panel: PanelDefinition }) {
 
 interface LensChromeProps {
   panel: PanelDefinition;
+  conversationTitle: string;
+  siblingCounts: Partial<Record<WorkspacePanelId, number>>;
+  onOpenPanel: (id: WorkspacePanelId) => void;
   onClose: () => void;
   onTalk: () => void;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
@@ -32,21 +36,55 @@ interface LensChromeProps {
  * The lens header, body, and foot. The same markup serves the docked panel and
  * the mobile sheet, so the two shells cannot drift apart.
  */
-function LensChrome({ panel, onClose, onTalk, headingRef, bodyRef, onScroll }: LensChromeProps) {
+function LensChrome({
+  panel,
+  conversationTitle,
+  siblingCounts,
+  onOpenPanel,
+  onClose,
+  onTalk,
+  headingRef,
+  bodyRef,
+  onScroll,
+}: LensChromeProps) {
   return (
     <>
       <header className="lens__head">
         <div className="lens__heading">
+          <p className="lens__where" aria-label={`In ${conversationTitle}`}>
+            {conversationTitle}
+          </p>
           <span className="lens__icon" aria-hidden="true">
             {panel.icon}
           </span>
           <div>
-            <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
+            <h2
+              id={`lens-title-${panel.id}`}
+              className="lens__title"
+              tabIndex={-1}
+              ref={headingRef}
+            >
               {panel.title}
             </h2>
             <p className="lens__blurb">{panel.blurb}</p>
           </div>
         </div>
+        <nav className="lens__siblings" aria-label="Other views">
+          {WORKSPACE_PANELS.filter((item) => item.id !== panel.id).map((item) => {
+            const count = siblingCounts[item.id];
+            const label = typeof count === "number" ? `${item.label} (${count})` : item.label;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className="lens__sibling"
+                onClick={() => onOpenPanel(item.id)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </nav>
         <button
           type="button"
           className="icon-button"
@@ -89,7 +127,18 @@ function LensChrome({ panel, onClose, onTalk, headingRef, bodyRef, onScroll }: L
  * (#407).
  */
 export function WorkspacePanel() {
-  const { activePanel, closePanel, sendMessage } = useStudio();
+  const {
+    activePanel,
+    openPanel,
+    closePanel,
+    sendMessage,
+    streaming,
+    canvas,
+    conversations,
+    conversationId,
+    memory,
+    segments,
+  } = useStudio();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const panel = activePanel ? findPanel(activePanel) : null;
   const panelId = panel?.id ?? null;
@@ -126,6 +175,29 @@ export function WorkspacePanel() {
     return () => document.removeEventListener("click", rememberOpener, true);
   }, []);
 
+  // The header says where you are: the conversation this lens belongs to, and
+  // the sibling lenses with the count each one holds (#324).
+  const conversationTitle = useMemo(() => {
+    const current = conversations.find((item) => item.id === conversationId);
+    const title = current?.title?.trim();
+    return title || "This conversation";
+  }, [conversations, conversationId]);
+
+  const siblingCounts = useMemo(() => {
+    const outcomes = canvas?.outcomes ?? [];
+    const steps = canvas?.steps ?? [];
+    const evidence = outcomes.filter((outcome) => outcome.evidence?.trim()).length;
+    const records = buildRecords(canvas);
+    return {
+      records: records.length,
+      landscape: outcomes.length,
+      jobmap: steps.length,
+      segments: segments.length,
+      evidence,
+      memory: memory.length,
+    } as Partial<Record<WorkspacePanelId, number>>;
+  }, [canvas, memory, segments]);
+
   // On a wide screen the lens opens under the keyboard, so focus goes to the
   // heading and comes back to the control that opened it. The composer is
   // autofocused, so recording "whatever held focus" would pull the caret out
@@ -158,6 +230,26 @@ export function WorkspacePanel() {
     headingRef.current?.focus();
   }, [panelId, isMobile]);
 
+  // Escape closes the open lens and returns focus to its opener. Captured so it
+  // never reaches the app-level handler. A running reply is the exception: Escape
+  // stops the stream first and leaves the lens open, which is the order the app
+  // shell promises (#324, #692).
+  useEffect(() => {
+    if (!activePanel) {
+      return;
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || streaming) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      closePanel();
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [activePanel, streaming, closePanel]);
+
   // A lens opens where it was left; a different lens starts at its top.
   useLayoutEffect(() => {
     if (!panelId) {
@@ -189,6 +281,9 @@ export function WorkspacePanel() {
   const chrome = panel ? (
     <LensChrome
       panel={panel}
+      conversationTitle={conversationTitle}
+      siblingCounts={siblingCounts}
+      onOpenPanel={openPanel}
       onClose={closePanel}
       onTalk={talk}
       headingRef={headingRef}
@@ -232,7 +327,11 @@ export function WorkspacePanel() {
         maxSize={760}
         key={panel.id}
       >
-        <aside className="lens lens--docked" role="complementary" aria-label={panel.title}>
+        <aside
+          className="lens lens--docked"
+          role="complementary"
+          aria-labelledby={`lens-title-${panel.id}`}
+        >
           {chrome}
         </aside>
       </ResizablePanel>

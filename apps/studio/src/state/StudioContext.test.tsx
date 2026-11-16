@@ -859,6 +859,70 @@ describe("StudioContext failures", () => {
     expect(messages.at(-1)?.error?.code).toBe("internal");
   });
 
+  it("drops a failed send and its question when the row is dismissed (#405)", async () => {
+    chatFailure = new Error("network down");
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const before = result.current.messages;
+    const failed = before.at(-1);
+    const question = before.at(-2);
+    expect(question?.role).toBe("user");
+    expect(question?.content).toBe("list the jobs");
+    expect(failed?.role).toBe("assistant");
+    expect(failed?.error).toBeDefined();
+
+    await act(async () => {
+      result.current.dismissFailedTurn(failed?.id ?? null);
+    });
+
+    // Both the question and the dead reply leave together: the pair is one send.
+    // The earlier, answered turns stay.
+    const after = result.current.messages;
+    expect(after.map((message) => message.id)).not.toContain(failed?.id);
+    expect(after.map((message) => message.id)).not.toContain(question?.id);
+    expect(after).toHaveLength(before.length - 2);
+  });
+
+  it("never dismisses a turn that did not fail (#405)", async () => {
+    chatStream = 'event: message\ndata: {"content":"Here you go."}\n\n';
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const answered = result.current.messages.at(-1);
+    expect(answered?.role).toBe("assistant");
+    expect(answered?.error).toBeUndefined();
+    const before = result.current.messages.length;
+
+    await act(async () => {
+      result.current.dismissFailedTurn(answered?.id ?? null);
+    });
+
+    expect(result.current.messages).toHaveLength(before);
+  });
+
   it("reports a stream that ends without a message as an internal failure", async () => {
     chatStream = 'event: status\ndata: {"phase":"model"}\n\n';
     const { result } = renderHook(
@@ -1024,6 +1088,47 @@ describe("StudioContext first run in a browser with no server", () => {
     // The reply says where it came from, on the reply — not in a strip above.
     expect(result.current.offlineReplyFor).toBe(last?.id);
     expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
+  });
+
+  it("surfaces a real application error instead of falling back", async () => {
+    // A 401 from the sidecar is an application error, not a transport failure:
+    // the local assistant must not answer for it.
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/chat") {
+        chatAttempts += 1;
+        return new Response(
+          JSON.stringify({ error: { code: "unauthorized", message: "Bad token.", retryable: false } }),
+          { status: 401, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return route(input, init);
+    });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.sendMessage("what should I work on first?");
+    });
+
+    // The error surfaces on the assistant message; no local-served marker.
+    await waitFor(() => {
+      const last = result.current.messages.at(-1);
+      expect(last?.role).toBe("assistant");
+      expect(last?.error).toBeDefined();
+    });
+    const last = result.current.messages.at(-1);
+    expect(last?.error).toBeDefined();
+    expect(result.current.offlineReplyFor).toBeNull();
+    // Only one attempt at /api/chat — no fall-through to the browser BFF.
+    expect(chatAttempts).toBe(1);
   });
 
   it("calls nothing broken until the person asks", async () => {
