@@ -9,7 +9,6 @@ from agentic_odi_core import Link as RootLink
 from agentic_odi_core import RelationshipType as RootRelationshipType
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.models import (
-    LINK_RELATIONSHIP_TYPES,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
