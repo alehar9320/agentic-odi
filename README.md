@@ -280,7 +280,7 @@ drift from the workspace. The distributions are:
 <!-- BEGIN GENERATED: packages -->
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/connectors/`** | `agentic-odi-connectors` | External system connectors for Agentic ODI, including an MCP client ingest connector. |
+| **`packages/connectors/`** | `agentic-odi-connectors` | External system connectors for Agentic ODI, including an MCP client ingest connector and REST item previews. |
 | **`packages/core/`** | `agentic-odi-core` | Core domain models, services, and repositories for Agentic ODI. |
 | **`apps/cli/`** | `agentic-odi-cli` | Command-line interface for Agentic ODI. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server for Agentic ODI. |

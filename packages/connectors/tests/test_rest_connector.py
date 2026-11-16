@@ -15,6 +15,22 @@ from agentic_odi_connectors.rest.connector import (
 Calls = list[tuple[str, str, dict[str, str], bytes | None, float]]
 
 
+def test_package_exports_all_public_names() -> None:
+    import agentic_odi_connectors as connectors
+
+    expected = {
+        "DEFAULT_INGEST_RATE",
+        "KNOWN_KINDS",
+        "LinkPreviewData",
+        "REQUIRED_KEYS",
+        "clear_health_cache",
+        "validate_connector_config",
+    }
+
+    assert expected <= set(connectors.__all__)
+    assert [name for name in connectors.__all__ if not hasattr(connectors, name)] == []
+
+
 @pytest.fixture(autouse=True)
 def _isolated_health_cache(monkeypatch, tmp_path):
     monkeypatch.setenv("AGENTIC_ODI_CONNECTORS_CACHE", str(tmp_path / "connector-health.json"))
@@ -204,6 +220,51 @@ async def test_ingest_records_fetch_errors() -> None:
 
     assert batch.records == []
     assert "refused" in batch.errors[0]
+
+
+@pytest.mark.asyncio
+async def test_preview_returns_link_preview_data() -> None:
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/items"),
+        fetcher=_fetcher(200, {"title": "Ticket", "status": "Open", "url": "https://ex/1"}),
+    )
+
+    preview = await connector.preview("1")
+
+    assert preview is not None
+    assert preview.title == "Ticket"
+    assert preview.status == "Open"
+    assert preview.url == "https://ex/1"
+    assert preview.fetched_at is not None
+
+
+@pytest.mark.asyncio
+async def test_preview_returns_none_on_404() -> None:
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/items"),
+        fetcher=_fetcher(404, {"error": "not found"}),
+    )
+
+    preview = await connector.preview("missing")
+
+    assert preview is None
+
+
+@pytest.mark.asyncio
+async def test_preview_appends_encoded_id_to_path_and_preserves_query() -> None:
+    calls: Calls = []
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/items?limit=50"),
+        fetcher=_fetcher(200, {"title": "Ticket"}, calls),
+    )
+
+    preview = await connector.preview("a#b")
+
+    assert preview is not None
+    assert calls[0][1] == "https://api.example/items/a%23b?limit=50"
 
 
 @pytest.mark.asyncio

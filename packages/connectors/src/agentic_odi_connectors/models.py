@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -88,6 +89,15 @@ class PaginationSettings(BaseModel):
     next_path: str = Field(
         ..., description="Dotted path to the next page URL or cursor in the response."
     )
+
+
+class LinkPreviewData(BaseModel):
+    """One external item's summary, ready to store on Link.preview."""
+
+    title: str
+    status: str | None = None
+    url: str | None = None
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class RestConnectorSettings(BaseModel):
