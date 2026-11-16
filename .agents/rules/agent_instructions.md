@@ -211,12 +211,13 @@ our own store; it is not a hand-rolled message list. Do not replace it, wrap it 
 a second one, or re-implement streaming, the composer, attachments, branches, or
 approval prompts beside it.
 
-- **Markdown is a dependency, not a file.** `@assistant-ui/react-markdown` is
-  declared in `apps/studio/package.json` and imported nowhere, while
-  `apps/studio/src/lib/markdown.ts` hand-parses a subset for the transcript. That
-  is the shape the reuse ladder forbids: a paid-for dependency plus a second
-  implementation beside it. New rendering work goes through the library;
-  collapsing the existing parser is its own task, not a reason to add a third.
+- **Markdown is a dependency, not a file.** `@assistant-ui/react-markdown`
+  renders the transcript: `MarkdownTextPrimitive` for prose and reasoning, and
+  the shared `mdComponents` map in `apps/studio/src/components/chat/Markdown.tsx`
+  for the standalone `Markdown({ source })` callers and `ClaimText`. The
+  hand-written parser that used to sit beside it was deleted in #394. New
+  rendering work goes through the library and the shared map; do not add a
+  second parser or a second class vocabulary.
 - **One bridge.** `apps/studio/src/assistant/convert.ts` is the only mapping
   between `ChatMessage`/`ChatPart` and assistant-ui parts. It is pure and tested
   without a runtime. A new part type is added there, rendered in `parts.tsx`, and

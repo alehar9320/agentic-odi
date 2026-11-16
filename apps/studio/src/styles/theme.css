@@ -2100,6 +2100,38 @@ a {
   border-top: 1px solid var(--line);
 }
 
+/* GFM tables arrive as real tables (#394). The wrapper scrolls a wide table
+   instead of letting it push the message column out of the transcript. */
+.md-table-wrap {
+  margin: 0 0 10px;
+  overflow-x: auto;
+}
+
+.md-table {
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.md-table th,
+.md-table td {
+  padding: 4px 12px 4px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-table th {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.md-table tr:last-child td {
+  border-bottom: none;
+}
+
 /* Panel content primitives */
 .stack {
   display: flex;
