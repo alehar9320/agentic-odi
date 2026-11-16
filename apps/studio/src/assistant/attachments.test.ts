@@ -11,11 +11,13 @@ import {
   MAX_DOCUMENT_BYTES,
   MAX_IMAGE_BYTES,
   attachmentRejection,
+  attachmentState,
   createAttachmentAdapter,
   formatFileSize,
   isTextLike,
   prepareAttachment,
   tooLargeMessage,
+  tooManyMessage,
 } from "./attachments";
 
 function fileOf(name: string, type: string, size = 10): File {
@@ -297,5 +299,41 @@ describe("formatFileSize", () => {
 
   it("says nothing when there is no size to report", () => {
     expect(formatFileSize(0)).toBe("");
+  });
+});
+
+describe("tooManyMessage", () => {
+  it("names the file and the five-file limit", () => {
+    expect(tooManyMessage("archive.zip")).toBe("archive.zip exceeds the 5-file attachment limit.");
+  });
+});
+
+describe("attachmentState", () => {
+  it("maps an uploading status to reading", () => {
+    expect(
+      attachmentState({ type: "running", reason: "uploading", progress: 50 }),
+    ).toBe("reading");
+  });
+
+  it("maps a requires-action composer-send status to ready", () => {
+    expect(attachmentState({ type: "requires-action", reason: "composer-send" })).toBe("ready");
+  });
+
+  it("maps a complete status to ready", () => {
+    expect(attachmentState({ type: "complete" })).toBe("ready");
+  });
+
+  it("maps an upload-paused status to refused", () => {
+    expect(attachmentState({ type: "incomplete", reason: "upload-paused" })).toBe("refused");
+  });
+
+  it("maps an error status to failed", () => {
+    expect(attachmentState({ type: "incomplete", reason: "error" })).toBe("failed");
+  });
+
+  it("maps an error status with a message to failed", () => {
+    expect(
+      attachmentState({ type: "incomplete", reason: "error", message: "Could not read x.md" }),
+    ).toBe("failed");
   });
 });

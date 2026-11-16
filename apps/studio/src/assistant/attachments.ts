@@ -10,6 +10,7 @@
 
 import type {
   AttachmentAdapter,
+  AttachmentStatus,
   CompleteAttachment,
   PendingAttachment,
 } from "@assistant-ui/react";
@@ -43,6 +44,28 @@ export const ATTACHMENT_READ_FAILURE = "Could not read this file";
 /** What a chip says when a text file is longer than the per-file cap. */
 export function tooLargeMessage(fileName: string): string {
   return `${fileName} is larger than the ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")}-character limit`;
+}
+
+/** What a chip says when the turn already carries the maximum attachments. */
+export function tooManyMessage(fileName: string): string {
+  return `${fileName} exceeds the ${MAX_ATTACHMENTS}-file attachment limit.`;
+}
+
+/** The per-row state word for one attachment chip. */
+export function attachmentState(status: AttachmentStatus): "reading" | "ready" | "refused" | "failed" {
+  if (status.type === "running" && status.reason === "uploading") {
+    return "reading";
+  }
+  if (status.type === "requires-action" && status.reason === "composer-send") {
+    return "ready";
+  }
+  if (status.type === "complete") {
+    return "ready";
+  }
+  if (status.type === "incomplete" && status.reason === "upload-paused") {
+    return "refused";
+  }
+  return "failed";
 }
 
 export const ATTACHMENT_ACCEPT = [

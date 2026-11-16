@@ -544,3 +544,28 @@ describe("ThreadComposer oversized attachments", () => {
     expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
   });
 });
+
+describe("ThreadComposer attachment retry", () => {
+  it("shows a Retry button on a failed chip", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [unreadableFile("notes.md")]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+
+    const retry = await screen.findByRole("button", { name: "Retry notes.md" });
+    expect(retry).toBeInTheDocument();
+  });
+
+  it("re-attempts the failed file when Retry is clicked", async () => {
+    const { root } = composerWithFiles();
+
+    dropFiles(root, [unreadableFile("notes.md")]);
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+
+    const retry = await screen.findByRole("button", { name: "Retry notes.md" });
+    fireEvent.click(retry);
+
+    // The retried file is still unreadable, so it fails again.
+    await screen.findByText(ATTACHMENT_READ_FAILURE);
+  });
+});
