@@ -35,7 +35,7 @@ missing.
 
 | Concern | Owner | Known stray copies |
 | --- | --- | --- |
-| Markdown rendering | `@assistant-ui/react-markdown` (declared, imported nowhere) | `apps/studio/src/lib/markdown.ts` |
+| Markdown rendering | `@assistant-ui/react-markdown` (`MarkdownTextPrimitive`, plus the shared `mdComponents` map in `apps/studio/src/components/chat/Markdown.tsx`) | none left — the hand-written parser under `apps/studio/src/lib/` was deleted in #394 |
 | Dialog, focus trap, dismissal | `radix-ui` (declared; used only under `src/vendor`) | `apps/studio/src/lib/useFocusTrap.ts`, four hand-built `role="dialog"` surfaces |
 | Opportunity score wording | `apps/studio/src/lib/odi.ts` (`formatOpportunityScore`, `isUnderserved`, `UNDERSERVED_THRESHOLD`) | `apps/studio/src/lib/records.ts` prints the stored number as-is, on purpose — that table reports what the store returned |
 | Number clamping | `apps/studio/src/ui/primitives.tsx` | `apps/studio/src/ui/cards.tsx`, `apps/studio/src/components/canvas/OpportunityLandscape.tsx` |
@@ -77,7 +77,8 @@ product presentation and state, not generic-library replacements.
 
 | Surface | Files | Owner | Recommendation | Reason |
 |---|---|---|---|---|
-| Dialogs, focus trap, dismissal | `ChangelogModal.tsx`, `ShareSheet.tsx`, `ConnectorSuggestionModal.tsx`, `DiagnosticsModal.tsx`, `FirstRunWizard.tsx`, `StudioBar.tsx` (`role="dialog"`), `useFocusTrap.ts` | `radix-ui` (declared; used under `src/vendor`) | adopt | Six hand-built `role="dialog"` surfaces duplicate a declared dependency; a shared Radix Dialog primitive is the consolidation target (issues #1001, #1002, #1004). |
+| Dialogs, focus trap, dismissal | `ChangelogModal.tsx`, `ShareSheet.tsx`, `ConnectorSuggestionModal.tsx`, `DiagnosticsModal.tsx`, `FirstRunWizard.tsx`, `StudioBar.tsx` (`role="dialog"` ask), `useFocusTrap.ts` | `radix-ui` (declared; used under `src/vendor`) | adopt | Six hand-built `role="dialog"` surfaces duplicate a declared dependency; a shared Radix Dialog primitive is the consolidation target (issues #1001, #1002, #1004). |
+| Menus and lightweight popovers | `StudioBar.tsx` history list (`role="menu"`/`menuitem`, Escape close), `More actions` menu (`role="menu"`/`menuitem`, Escape close) | none declared — hand-built anchors/dropdowns | keep | Menus are surface-specific to StudioBar's state and copy; no repeated generic menu pattern exists yet. Revisit only if a second surface needs the same menu mechanics. |
 | Notifications | `BannerStack.tsx`, `Banner.tsx`, `useToasts()` in `StudioContext.tsx` | `@radix-ui/react-toast` | keep | The Radix toast stack is already the notification owner; every banner portals into the single registered viewport. |
 | Conversation stage (viewport, message list, parts, branch picker) | `ChatStage.tsx`, `Conversation.tsx`, `ThreadComposer.tsx`, `SelectionToolbar.tsx`, `QueueLane.tsx`, `StallNotice.tsx` | `@assistant-ui/react` | keep | assistant-ui owns the conversation runtime; these encode product behavior on top of it and are not replaceable by a generic dialog library. |
 | Inline composer suggestions / slash commands | `composerParts.tsx` (`CommandPalette`, `SuggestionPills`), `Composer.tsx`, `ThreadComposer.tsx` | `@assistant-ui/react` | keep | Inline composer suggestions are assistant-ui behavior; not marked for automatic replacement with `cmdk` or a generic library. |
