@@ -129,19 +129,10 @@ iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/l
 [![Download macOS Intel](https://img.shields.io/badge/macOS-Intel-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_macos_x86_64.tar.gz)
 [![Download Windows](https://img.shields.io/badge/Windows-odi__latest__windows__x86__64.zip-blue?logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_windows_x86_64.zip)
 
-**Per-platform archives.** Every
-[release](https://github.com/alehar9320/agentic-odi/releases/latest) also carries
-a direct build with a SHA-256 checksum. Pick the one for your machine:
-
-| Platform | Archive |
-|---|---|
-| Linux (x86_64) | [`odi_0.14.0_linux_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz) |
-| macOS (Apple Silicon) | [`odi_0.14.0_macos_arm64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz) |
-| macOS (Intel) | [`odi_0.14.0_macos_x86_64.tar.gz`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_x86_64.tar.gz) |
-| Windows (x86_64) | [`odi_0.14.0_windows_x86_64.zip`](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_windows_x86_64.zip) |
-
-See [Installation](docs/installation.md) for the install layout, the updater, and
-how a release is cut.
+Every [release](https://github.com/alehar9320/agentic-odi/releases/latest) also
+carries a per-platform SHA-256 table. See
+[Installation](docs/installation.md) for the archive list, the install layout,
+the updater, and how a release is cut.
 
 **Package managers.** The CLI is a `uv`-managed Python workspace, so you can run
 it from source with [uv](https://docs.astral.sh/uv/) instead of a binary:
@@ -286,18 +277,15 @@ is a contract of its own — `tests/test_architecture.py` checks the drawn arrow
 against the declared dependencies and the real imports, so the picture cannot
 drift from the workspace. The distributions are:
 
+<!-- BEGIN GENERATED: packages -->
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/core/`** | `agentic-odi-core` | Domain models (including typed entity `Link` and `RelationshipType` models), the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), the innovation strategy (Stage 6), and traceability (which objectives outcomes advance, which are unfunded, which links drifted). |
-| **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
-| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, traceability, and context tools over HTTP. SQLite by default. |
-| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, PM memory, and scoped read-only share tokens for one artifact. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
-| **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |
-| **`apps/studio/`** | React + TypeScript + Vite | **The Living Studio** SPA and Tauri 2 desktop shell, built on [assistant-ui](https://www.assistant-ui.com). Keyboard- and screen-reader-operable, gated by an [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.1 AA sweep in the frontend suite and a rendered-contrast gate over the core screens in both themes. Its browser-level suite lives in `apps/studio/e2e/`. Copied UI components land under `src/vendor/`, which is the only place Tailwind styles. Installed desktop builds **update themselves** in the background and apply on restart. A service worker (`src/sw.ts`, built to `dist/sw.js`) precaches the built shell so the app opens with no network, answers an uncached navigation with the cached shell or `public/offline.html`, and never caches `/api/**`. |
-| **`infra/cloudflare/`** | Worker | Free-plan Workers Static Assets deployment and sidecar tunnel. |
-| **`website/`** | — | The static project site: a generator over the repository's own sources, plus the committed read-only sample workspace at `website/sample/`. |
-| **`scripts/`** | — | Dev launcher, binary build, installer tests, the deterministic study-corpus generator (`gen_corpus.py`), the shared structural audit every artifact HTML passes through (`artifact_a11y.py`, with its renderer inventory in `artifact_renderers.py`), the merge-churn report that ranks the files merged pull requests touch (`doc_churn.py`), and the hosted probe that asks the production URL whether it keeps the promises this README makes (`verify-hosted-first-run.sh`). |
-| **`tests/contract/`** | — | Cross-package MCP contract tests. |
+| **`packages/connectors/`** | `agentic-odi-connectors` | External system connectors for Agentic ODI, including an MCP client ingest connector. |
+| **`packages/core/`** | `agentic-odi-core` | Core domain models, services, and repositories for Agentic ODI. |
+| **`apps/cli/`** | `agentic-odi-cli` | Command-line interface for Agentic ODI. |
+| **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server for Agentic ODI. |
+| **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI sidecar for the Agentic ODI Living Studio. |
+<!-- END GENERATED: packages -->
 
 Inside `packages/core` there are four groups, and the rules between them are
 written down rather than implied — with `errors.py`, the exception hierarchy, open
@@ -327,6 +315,7 @@ pull request.
 uv run ruff check . && uv run ruff format --check .
 uv run python scripts/verify.py --changed  # PR bar; see .agents/workflows/test.md
 uv run python scripts/doc_check.py   # documented commands, paths, routes, env vars, and the assistant-ui ledger hold up
+uv run python scripts/docs_index.py --write   # regenerate the Code Overview table from the workspace
 ```
 
 See [Development](docs/development.md) for the frontend checks, the coverage
