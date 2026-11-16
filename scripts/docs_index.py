@@ -115,6 +115,12 @@ def collect_guides() -> list[dict[str, Any]]:
                 "nav_order": fm["nav_order"],
             }
         )
+    # Virtual pages have no markdown source (they are rendered from templates in
+    # website/tools/build_site.py), so the front-matter scan over docs/ cannot
+    # discover them. They must remain in the generated navigation so those pages
+    # keep being built; without them the MCP reference page is never emitted and
+    # the site's content-sync tests fail.
+    guides.extend(VIRTUAL_PAGES)
     return guides
 
 
@@ -315,24 +321,30 @@ def write(root: Path = ROOT) -> list[str]:
 
     # Docs / nav block: README docs table + website/content/nav.json.
     # Only active when the README carries the docs GENERATED markers.
-    readme = README.read_text(encoding="utf-8")
+    readme_path = root / "README.md"
+    readme = readme_path.read_text(encoding="utf-8")
     if BEGIN_MARKER in readme and END_MARKER in readme:
         guides = collect_guides()
-        table = build_readme_table(guides)
+        # Virtual pages (source is None) render from templates, not from a
+        # docs/ file, so they belong in the site navigation but not in the
+        # README's linked table.
+        real_guides = [g for g in guides if g.get("source")]
+        table = build_readme_table(real_guides)
 
         before, rest = readme.split(BEGIN_MARKER, 1)
         _, after = rest.split(END_MARKER, 1)
         new_readme = f"{before}{BEGIN_MARKER}\n{table}{END_MARKER}{after}"
         if readme != new_readme:
-            README.write_text(new_readme, encoding="utf-8")
+            readme_path.write_text(new_readme, encoding="utf-8")
             changed.append("README.md")
 
         new_nav = json.dumps(build_nav(guides), indent=2, ensure_ascii=False, sort_keys=True) + "\n"
-        if NAV_JSON.is_file():
-            current_nav = NAV_JSON.read_text(encoding="utf-8")
+        nav_json_path = root / "website" / "content" / "nav.json"
+        if nav_json_path.is_file():
+            current_nav = nav_json_path.read_text(encoding="utf-8")
             if current_nav != new_nav:
-                NAV_JSON.write_text(new_nav, encoding="utf-8")
-                changed.append(NAV_JSON.relative_to(root).as_posix())
+                nav_json_path.write_text(new_nav, encoding="utf-8")
+                changed.append(nav_json_path.relative_to(root).as_posix())
 
     return changed
 
@@ -347,20 +359,26 @@ def check(root: Path = ROOT) -> list[str]:
             issues.append(f"{relative} is stale; run scripts/docs_index.py --write")
 
     # Docs / nav block (only when the README carries the docs markers).
-    readme = README.read_text(encoding="utf-8")
+    readme_path = root / "README.md"
+    readme = readme_path.read_text(encoding="utf-8")
     if BEGIN_MARKER in readme and END_MARKER in readme:
         guides = collect_guides()
-        table = build_readme_table(guides)
+        # Virtual pages (source is None) render from templates, not from a
+        # docs/ file, so they belong in the site navigation but not in the
+        # README's linked table.
+        real_guides = [g for g in guides if g.get("source")]
+        table = build_readme_table(real_guides)
 
         _, rest = readme.split(BEGIN_MARKER, 1)
         current_table, _ = rest.split(END_MARKER, 1)
         if current_table.strip() != table.strip():
             issues.append("README.md docs table is stale")
 
-        if NAV_JSON.is_file():
-            current = json.loads(NAV_JSON.read_text(encoding="utf-8"))
+        nav_json_path = root / "website" / "content" / "nav.json"
+        if nav_json_path.is_file():
+            current = json.loads(nav_json_path.read_text(encoding="utf-8"))
             if current != build_nav(guides):
-                issues.append(f"{NAV_JSON.relative_to(root)} is stale")
+                issues.append(f"{nav_json_path.relative_to(root)} is stale")
 
     return issues
 

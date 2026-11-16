@@ -51,9 +51,9 @@ def test_collect_guides_finds_all_front_matter(tmp_path: Path) -> None:
     finally:
         docs_index.DOCS_DIR = original_docs_dir
 
-    assert len(guides) == 2
+    assert len(guides) == 4
     slugs = {g["slug"] for g in guides}
-    assert slugs == {"guide-one", "guide-two"}
+    assert slugs == {"guide-one", "guide-two", "quick-start", "mcp"}
     for guide in guides:
         assert "title" in guide
         assert "blurb" in guide
@@ -105,7 +105,9 @@ def test_collect_guides_excludes_superpowers(tmp_path: Path) -> None:
     finally:
         docs_index.DOCS_DIR = original_docs_dir
 
-    assert len(guides) == 1
+    assert len(guides) == 3
+    slugs = {g["slug"] for g in guides}
+    assert slugs == {"guide", "quick-start", "mcp"}
     assert guides[0]["slug"] == "guide"
 
 
@@ -382,7 +384,9 @@ def test_slug_defaults_to_filename(tmp_path: Path) -> None:
     finally:
         docs_index.DOCS_DIR = original_docs_dir
 
-    assert len(guides) == 1
+    assert len(guides) == 3
+    slugs = {g["slug"] for g in guides}
+    assert slugs == {"my-guide", "quick-start", "mcp"}
     assert guides[0]["slug"] == "my-guide"
 
 
