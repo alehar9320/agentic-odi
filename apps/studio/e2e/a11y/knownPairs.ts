@@ -23,39 +23,6 @@ import type { KnownPair } from "../../src/test/contrast";
  * — because one token pair usually appears on several screens.
  */
 export const KNOWN_PAIRS: KnownPair[] = [
-  // --faint in the dark theme, over the raised and gradient surfaces it lands on.
-  {
-    theme: "dark",
-    foreground: "rgb(125, 130, 140)",
-    background: "rgb(29, 28, 28)",
-    required: 4.5,
-    issue: 542,
-    note: "--faint on a raised outcome card (4.39:1)",
-  },
-  {
-    theme: "dark",
-    foreground: "rgb(125, 130, 140)",
-    background: "rgb(33, 35, 49)",
-    required: 4.5,
-    issue: 542,
-    note: "--faint on the catch-up metric strip (4.03:1)",
-  },
-  {
-    theme: "dark",
-    foreground: "rgb(125, 130, 140)",
-    background: "rgb(26, 28, 43)",
-    required: 4.5,
-    issue: 542,
-    note: "--faint on the catch-up summary card (4.37:1)",
-  },
-  {
-    theme: "dark",
-    foreground: "rgb(125, 130, 140)",
-    background: "rgb(25, 27, 39)",
-    required: 4.5,
-    issue: 542,
-    note: "--faint on the settings context label (4.46:1)",
-  },
   // --faint in the light theme.
   {
     theme: "light",
@@ -105,22 +72,6 @@ export const KNOWN_PAIRS: KnownPair[] = [
     required: 4.5,
     issue: 542,
     note: "The changelog pill keeps a dark-theme indigo in light mode (1.43:1)",
-  },
-  {
-    theme: "dark",
-    foreground: "rgb(255, 255, 255)",
-    background: "rgb(139, 140, 248)",
-    required: 4.5,
-    issue: 542,
-    note: "White on --accent for the primary button (2.91:1)",
-  },
-  {
-    theme: "dark",
-    foreground: "rgb(255, 255, 255)",
-    background: "rgb(99, 102, 241)",
-    required: 4.5,
-    issue: 542,
-    note: "White on --accent-strong for the bell badge (4.47:1)",
   },
   {
     theme: "light",
