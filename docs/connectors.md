@@ -233,6 +233,23 @@ Pass `--dry-run` to fetch and normalize without writing anything: it prints the
 record count, the first normalized record, and — when `--job-id`, `--step-id`,
 or `--outcome-id` is given — how many evidence drafts the ingest would create.
 
+## Item previews
+
+`Connector.preview(external_id)` returns a `LinkPreviewData` summary for one
+external item, or `None` when the connector cannot describe it. The default
+protocol implementation returns `None`, so connectors opt in without breaking
+existing kinds. A preview carries `title`, optional `status`, optional `url`,
+and the UTC `fetched_at` timestamp; it is a read-only summary ready to store on
+a `Link.preview`.
+
+`RestConnector` implements previews with a `GET` to the configured collection
+URL plus the URL-encoded item id. Query parameters on the collection URL are
+preserved. The response must be a JSON object; `title`, `name`, or `id` supplies
+the title, `status` or `state` supplies the status, and `url`, `html_url`, or
+`web_url` supplies the link. Non-success responses, non-JSON bodies, non-object
+payloads, and fetch errors return `None` rather than raising. Tests inject the
+fetcher, so preview coverage does not touch the network.
+
 Every evidence draft is an `EvidenceDraft` model, so construction raises before
 a record that crossed a process boundary can reach the ODI store with a missing
 or mistyped field. `validate_evidence_draft()` applies the same check to a draft

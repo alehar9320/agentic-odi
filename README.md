@@ -289,7 +289,7 @@ drift from the workspace. The distributions are:
 | Path | Distribution | Description |
 |---|---|---|
 | **`packages/core/`** | `agentic-odi-core` | Domain models (including typed entity `Link` and `RelationshipType` models), the `ODIService` layer, in-memory and SQLite repositories, a bounded SQLite integrity gate at open with a WAL checkpoint policy, the shared MCP tool contract, opportunity-score computation, evidence-to-outcome proposals, outcome-based segmentation (Stage 5), the innovation strategy (Stage 6), and traceability (which objectives outcomes advance, which are unfunded, which links drifted). |
-| **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets and an ingest sink. |
+| **`packages/connectors/`** | `agentic-odi-connectors` | Pluggable MCP and REST connectors with presets, item previews, and an ingest sink. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server exposing Jobs, Steps, Desired Outcomes, Customer Outcomes, Evidence, outcome proposals, Segments, Strategy, traceability, and context tools over HTTP. SQLite by default. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI **Living Studio sidecar**: config, health, metadata-only diagnostics, canvas, local mutations, MCP passthrough, SSE chat, conversations, PM memory, and scoped read-only share tokens for one artifact. It gates both SQLite files on boot, serves a structured failure page for a damaged store, and checkpoints and closes them on a clean stop. |
 | **`apps/cli/`** | `agentic-odi-cli` | Typer CLI with interactive chat, full entity CRUD, `schema`, `connectors`, and local or remote data access. |

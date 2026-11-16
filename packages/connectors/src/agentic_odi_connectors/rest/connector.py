@@ -220,8 +220,11 @@ class RestConnector(Connector):
 
     async def preview(self, external_id: str) -> LinkPreviewData | None:
         """Fetch one item by id and map it to a preview."""
-        base_url = self.settings.url.rstrip("/")
-        url = f"{base_url}/{external_id}" if external_id else base_url
+        parts = urllib.parse.urlsplit(self.settings.url)
+        path = parts.path.rstrip("/")
+        if external_id:
+            path = f"{path}/{urllib.parse.quote(external_id, safe='')}"
+        url = urllib.parse.urlunsplit(parts._replace(path=path))
         try:
             status, body = self._fetch(
                 "GET",
@@ -241,12 +244,7 @@ class RestConnector(Connector):
             return None
         if not isinstance(payload, dict):
             return None
-        title = str(
-            payload.get("title")
-            or payload.get("name")
-            or payload.get("id")
-            or external_id
-        )
+        title = str(payload.get("title") or payload.get("name") or payload.get("id") or external_id)
         status_val = payload.get("status") if isinstance(payload.get("status"), str) else None
         if status_val is None:
             state_val = payload.get("state")

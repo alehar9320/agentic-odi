@@ -49,6 +49,7 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
     UnknownConnectorKindError,
 )
+from agentic_odi_connectors.rest.connector import clear_health_cache
 from agentic_odi_connectors.sink import IngestSink, get_default_sink
 
 KNOWN_KINDS = {"in_memory", "rest", "mcp"}
@@ -119,6 +120,11 @@ _load_and_validate_presets()
 __all__ = [
     "AREA_LABELS",
     "ConfigurationError",
+    "DEFAULT_INGEST_RATE",
+    "PRESETS",
+    "KNOWN_KINDS",
+    "REQUIRED_KEYS",
+    "validate_connector_config",
     "Connector",
     "ConnectorConfig",
     "ConnectorHTTPClient",
@@ -158,6 +164,5 @@ __all__ = [
     "listing_from_preset",
     "listing_from_registry_record",
     "register_kind",
-    "validate_connector_config",
     "validate_evidence_draft",
 ]

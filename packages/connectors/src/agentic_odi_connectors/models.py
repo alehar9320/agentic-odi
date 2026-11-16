@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+
 class ConfigurationError(ValueError):
     """Raised when a connector configuration fails validation.
 
