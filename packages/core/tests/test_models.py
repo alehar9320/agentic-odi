@@ -8,6 +8,7 @@ import pytest
 from agentic_odi_core import Link as RootLink
 from agentic_odi_core import RelationshipType as RootRelationshipType
 from agentic_odi_core.models import (
+    LINK_RELATIONSHIP_TYPES,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -154,3 +155,58 @@ def test_link_relationship_type_has_all_values() -> None:
         "external_notion",
     }
     assert {member.value for member in RelationshipType} == expected
+
+
+def test_relationship_type_is_str_enum() -> None:
+    assert RelationshipType.references == "references"
+    assert isinstance(RelationshipType.references, str)
+
+
+def test_link_relationship_type_constant_matches_enum() -> None:
+    assert LINK_RELATIONSHIP_TYPES == [m.value for m in RelationshipType]
+    assert "external_notion" in LINK_RELATIONSHIP_TYPES
+
+
+def test_link_defaults_are_populated() -> None:
+    link = Link(
+        source_type="evidence",
+        source_id="ev-1",
+        target_type="outcome",
+        target_id="out-1",
+        relationship_type=RelationshipType.evidence_for,
+    )
+
+    assert link.id
+    assert link.external_system is None
+    assert link.external_id is None
+    assert link.preview is None
+    assert link.created_at is not None
+
+
+def test_link_accepts_external_system_and_preview() -> None:
+    link = Link(
+        source_type="outcome",
+        source_id="out-1",
+        target_type="linear_issue",
+        target_id="LIN-1",
+        relationship_type=RelationshipType.external_linear,
+        external_system="linear",
+        external_id="LIN-1",
+        preview={"title": "Implement onboarding", "state": "In Progress"},
+    )
+
+    assert link.external_system == "linear"
+    assert link.external_id == "LIN-1"
+    assert link.preview == {"title": "Implement onboarding", "state": "In Progress"}
+
+
+def test_link_relationship_type_accepts_string_value() -> None:
+    link = Link(
+        source_type="job",
+        source_id="job-1",
+        target_type="job",
+        target_id="job-2",
+        relationship_type="duplicates",
+    )
+
+    assert link.relationship_type is RelationshipType.duplicates

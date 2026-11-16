@@ -108,12 +108,12 @@ by the presence of one handler.
 
 ## Markdown rendering
 
-The Studio renders prose through its own parser (`apps/studio/src/components/chat/Markdown.tsx`
-→ `apps/studio/src/lib/markdown.ts`), not through `@assistant-ui/react-markdown`, which
-is declared in `package.json` and imported nowhere. The package is the canonical owner of
-markdown rendering per `docs/architecture/reuse.md`; the rows below are the decision to
-not adopt it yet, not a silence. A row becomes *Adopted* when prose renders through
-`MarkdownTextPrimitive`, with the file that does it and the PR that landed it.
+The Studio renders prose through `@assistant-ui/react-markdown`. `MarkdownTextPrimitive`
+renders the transcript's prose and reasoning parts, and the shared `mdComponents` map in
+`apps/studio/src/components/chat/Markdown.tsx` serves the standalone `Markdown({ source })`
+callers and `ClaimText`, which keeps its own block renderer so claim chips stay in place.
+The hand-written parser this package replaced was deleted in #394. The rows below were the
+decision to not adopt the package; #857 owns promoting them now that it is adopted.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
