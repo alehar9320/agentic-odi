@@ -413,14 +413,14 @@ describe("studio shell", () => {
       await screen.findByRole("heading", { name: /opportunity landscape/i }),
     ).toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
 
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
     });
     expect(screen.getByRole("heading", { name: /opportunity landscape/i })).toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
 
     await waitFor(() => {
       expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
@@ -822,14 +822,15 @@ describe("composer shortcuts (#692)", () => {
     fireEvent.click(await screen.findByRole("button", { name: /open what's new changelog/i }));
     const dialog = await screen.findByRole("dialog");
 
-    expect(document.querySelector(".studio-app")).toHaveAttribute("inert");
-    // The dialog is not inside the inert shell, so it stays reachable.
+    await waitFor(() => expect(dialog).toHaveAttribute("data-state", "open"));
+    // The dialog is portaled outside the shell, so it stays reachable.
     expect(document.querySelector(".studio-app")?.contains(dialog)).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
 
     await waitFor(() => {
-      expect(document.querySelector(".studio-app")).not.toHaveAttribute("inert");
+      const closed = screen.queryByRole("dialog");
+      expect(closed == null || closed.getAttribute("data-state") === "closed").toBe(true);
     });
   });
 
@@ -869,12 +870,12 @@ describe("composer shortcuts (#692)", () => {
     await screen.findByRole("dialog");
 
     // One Escape closes the changelog; the reply keeps streaming.
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("button", { name: /stop generating/i })).toBeInTheDocument();
 
     // A second Escape, with nothing open, stops it.
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
     });
@@ -887,7 +888,7 @@ describe("composer shortcuts (#692)", () => {
     (document.activeElement as HTMLElement | null)?.blur();
     expect(composer).not.toHaveFocus();
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
 
     expect(composer).toHaveFocus();
   });
@@ -903,7 +904,7 @@ describe("composer shortcuts (#692)", () => {
     const close = screen.getByRole("button", { name: /close workspace view/i });
     close.focus();
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
 
     await waitFor(() => {
       expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();

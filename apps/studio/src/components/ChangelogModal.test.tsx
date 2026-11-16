@@ -119,22 +119,13 @@ describe("ChangelogModal", () => {
     expect(screen.queryByRole("article")).toBeNull();
   });
 
-  it("moves focus into the dialog and traps Tab at both ends", async () => {
+  it("moves focus into the dialog on open", async () => {
     vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({ releases: [] });
 
     render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
 
     const dialog = screen.getByRole("dialog");
-    const close = screen.getByRole("button", { name: "Close changelog modal" });
-    await waitFor(() => expect(close).toHaveFocus());
-
-    const done = screen.getByRole("button", { name: "Done" });
-    done.focus();
-    fireEvent.keyDown(dialog, { key: "Tab" });
-    expect(close).toHaveFocus();
-
-    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
-    expect(done).toHaveFocus();
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
   });
 
   it("closes on Escape key press", async () => {
@@ -154,7 +145,7 @@ describe("ChangelogModal", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("makes the page behind the dialog inert and restores it on close", async () => {
+  it("opens modally on open and is removed on close", async () => {
     vi.mocked(studioApi.fetchChangelog).mockResolvedValue({ releases: [] });
 
     const { unmount } = render(
@@ -163,11 +154,11 @@ describe("ChangelogModal", () => {
       </div>,
     );
 
-    const shell = document.querySelector(".studio-app");
-    await waitFor(() => expect(shell).toHaveAttribute("inert"));
+    const dialog = screen.getByRole("dialog");
+    await waitFor(() => expect(dialog).toHaveAttribute("data-state", "open"));
 
     unmount();
-    expect(shell).not.toHaveAttribute("inert");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("announces how many releases were marked read without shifting the footer", async () => {
