@@ -57,9 +57,11 @@ from agentic_odi_core.messages import (
     step_not_found,
 )
 from agentic_odi_core.models import (
+    CONFIDENCE_WEIGHTS,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
     LINK_RELATIONSHIP_TYPES,
+    OUTCOME_INPUT_MIN,
     V2MOM,
     BusinessImpactCategory,
     BusinessValue,
@@ -90,6 +92,7 @@ from agentic_odi_core.models import (
     StudyStatus,
     ValueMetric,
     compute_opportunity_score,
+    confidence_weighted_inputs,
     create_job,
     job_stage_catalog,
 )
@@ -178,6 +181,7 @@ __all__ = [
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
+    "CONFIDENCE_WEIGHTS",
     "ClaimCheck",
     "ClaimCheckError",
     "ClaimSkip",
@@ -203,6 +207,7 @@ __all__ = [
     "ODIService",
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",
+    "OUTCOME_INPUT_MIN",
     "OdiError",
     "OnDeviceLLMEngine",
     "Outcome",
@@ -255,6 +260,7 @@ __all__ = [
     "Repository",
     "build_repository",
     "compute_opportunity_score",
+    "confidence_weighted_inputs",
     "create_job",
     "customer_outcome_not_found",
     "error_status",

@@ -54,6 +54,7 @@ from agentic_odi_core.models import (
     Study,
     StudyStatus,
     compute_opportunity_score,
+    confidence_weighted_inputs,
 )
 from agentic_odi_core.repository import (
     Repository,
@@ -908,11 +909,17 @@ class ODIService:
                 raise ValidationError(
                     "Promoting evidence to an outcome requires both importance and satisfaction scores."
                 )
+            #: A quote is only as strong as its confidence: the inputs are
+            #: discounted before the shared scorer runs, so a claimed quote
+            #: cannot outrank a verified one on identical raw inputs.
+            weighted_importance, weighted_satisfaction = confidence_weighted_inputs(
+                importance, satisfaction, evidence.confidence
+            )
             outcome = self.add_outcome(
                 target_job_id,
                 text,
-                importance=importance,
-                satisfaction=satisfaction,
+                importance=weighted_importance,
+                satisfaction=weighted_satisfaction,
                 step_id=evidence.step_id,
             )
             #: Record the bidirectional link: evidence → outcome.
@@ -1062,6 +1069,15 @@ class ODIService:
 
         if proposal.job_id is None:
             raise ValidationError(f"Proposal {proposal_id} has no routed job; cannot approve.")
+
+        #: A proposal is mined from one evidence record. If that record is still
+        #: stored, its confidence discounts the inputs before the shared scorer
+        #: runs — the same rule as a direct promotion.
+        source = self.repo.get_evidence(proposal.evidence_id)
+        if source is not None:
+            final_importance, final_satisfaction = confidence_weighted_inputs(
+                final_importance, final_satisfaction, source.confidence
+            )
 
         outcome = self.add_outcome(
             proposal.job_id,

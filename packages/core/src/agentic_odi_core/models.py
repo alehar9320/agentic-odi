@@ -87,6 +87,33 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
     return float(importance + max(importance - satisfaction, 0.0))
 
 
+#: How much an evidence record's inputs count, by whether the person behind it
+#: confirmed the quote. A score built on a claimed quote must not outrank one
+#: built on verified interviews.
+CONFIDENCE_WEIGHTS: dict[str, float] = {"verified": 1.0, "claimed": 0.5}
+
+#: The lower bound both outcome inputs share. Weighting can push a raw value
+#: below it, so the weighted inputs are clamped to stay a legal Outcome score.
+OUTCOME_INPUT_MIN = 1.0
+
+
+def confidence_weighted_inputs(
+    importance: float, satisfaction: float, confidence: str
+) -> tuple[float, float]:
+    """Discount evidence-derived inputs by the evidence's confidence weight.
+
+    The ODI formula itself is untouched: callers hand these weighted inputs to
+    ``compute_opportunity_score`` exactly as before, so a stored outcome's
+    ``opportunity_score`` still equals the formula over its stored inputs.
+    Unknown confidences weigh as ``claimed``.
+    """
+    weight = CONFIDENCE_WEIGHTS.get(confidence, CONFIDENCE_WEIGHTS["claimed"])
+    return (
+        max(importance * weight, OUTCOME_INPUT_MIN),
+        max(satisfaction * weight, OUTCOME_INPUT_MIN),
+    )
+
+
 JOB_NAME_PATTERN = r"^[A-Za-z0-9 _-]+$"
 JOB_NAME_MIN_LENGTH = 3
 JOB_NAME_MAX_LENGTH = 64

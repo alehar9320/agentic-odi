@@ -205,6 +205,12 @@ Score **> 10** → underserved, innovate. **= 10** → served, maintain.
 **< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
 (as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
 
+When an outcome comes from a single evidence record, that record's confidence
+weights the two inputs **before** the formula runs — `verified` counts in full,
+`claimed` counts at half — so a score built on a claimed quote cannot outrank one
+built on verified interviews. The formula above is unchanged; the stored inputs
+are the weighted ones, so the score always matches them.
+
 A score says *which outcome* to chase; the job map says *who* is underserved.
 Stage 5 clusters a job's scored outcomes by the step they attach to, and Stage 6
 recommends one of three paths — differentiated for an underserved segment,
