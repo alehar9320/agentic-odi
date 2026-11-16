@@ -177,6 +177,60 @@ def test_evidence_add_inline_content_is_unchanged(tmp_path):
     assert _stored_content(runner, db, evidence_id) == "Slow setup"
 
 
+def _stored_ratings(runner: CliRunner, db: str, evidence_id: str) -> dict[str, str]:
+    result = runner.invoke(app, ["--db", db, "evidence", "get", evidence_id, "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    return {"impact": payload["impact"], "confidence": payload["confidence"]}
+
+
+def test_evidence_add_forwards_impact_and_confidence(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job_id(runner, db)
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "evidence",
+            "add",
+            "--source-name",
+            "interview",
+            "--name",
+            "quote",
+            "--content",
+            "users churn after onboarding",
+            "--job-id",
+            job_id,
+            "--impact",
+            "high",
+            "--confidence",
+            "verified",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    evidence_id = json.loads(result.output)["id"]
+
+    assert _stored_ratings(runner, db, evidence_id) == {
+        "impact": "high",
+        "confidence": "verified",
+    }
+
+
+def test_evidence_add_defaults_to_medium_and_claimed(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    evidence_id = _add_evidence(runner, db, _job_id(runner, db), content="Slow setup")
+
+    assert _stored_ratings(runner, db, evidence_id) == {
+        "impact": "medium",
+        "confidence": "claimed",
+    }
+
+
 @pytest.mark.parametrize("suffix", [".txt", ".md", ".markdown", ".vtt", ".srt"])
 def test_evidence_add_file_accepts_every_supported_text_format(tmp_path, suffix):
     db = str(tmp_path / "odi.db")
