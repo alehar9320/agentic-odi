@@ -2,7 +2,8 @@ import json
 import re
 
 import pytest
-from agentic_odi_mcp_server import jobs_db, mcp
+from agentic_odi_mcp_server import mcp
+from agentic_odi_mcp_server import mcp_server
 from fastmcp import Client
 
 
@@ -24,7 +25,7 @@ async def test_odi_workflow():
         assert "Job created successfully" in job_text
 
         job_id = extract_id(job_text)
-        assert job_id in jobs_db
+        assert job_id in mcp_server.jobs_db
 
         # 2. Add an Outcome first (steps require an outcome to exist)
         outcome_res = await client.call_tool(
