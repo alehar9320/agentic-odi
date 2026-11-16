@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { LogicalSize } from "@tauri-apps/api/dpi";
 
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { BannerBridge, useBannerActionDispatcher } from "./banners/BannerBridge";
