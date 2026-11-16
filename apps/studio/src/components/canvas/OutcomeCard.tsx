@@ -12,6 +12,7 @@ import {
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
+import { DetailBlock } from "../workspace/DetailBlock";
 import { ScorePopover } from "./ScorePopover";
 
 export function OutcomeCard({
@@ -84,17 +85,21 @@ export function OutcomeCard({
         ) : null}
       </header>
 
-      <p className="card__statement">{statement}</p>
+      <DetailBlock eyebrow="What's happening">
+        <p className="card__statement">{statement}</p>
+      </DetailBlock>
 
-      <p className="card__meta">
-        Importance <b>{outcome.importance ?? "—"}</b>
-        <span aria-hidden="true"> · </span>
-        Satisfaction <b>{outcome.satisfaction ?? "—"}</b>
-        <span aria-hidden="true"> · </span>
-        Opportunity <b>{formatOpportunityScore(opp)}</b>
-      </p>
+      <DetailBlock eyebrow="Impact">
+        <p className="card__meta">
+          Importance <b>{outcome.importance ?? "—"}</b>
+          <span aria-hidden="true"> · </span>
+          Satisfaction <b>{outcome.satisfaction ?? "—"}</b>
+          <span aria-hidden="true"> · </span>
+          Opportunity <b>{formatOpportunityScore(opp)}</b>
+        </p>
 
-      <p className="card__advances">{formatAdvances(outcome)}</p>
+        <p className="card__advances">{formatAdvances(outcome)}</p>
+      </DetailBlock>
 
       {showConfidence && (
         <div className={`claim-check claim-check--${confidence.level}`}>
