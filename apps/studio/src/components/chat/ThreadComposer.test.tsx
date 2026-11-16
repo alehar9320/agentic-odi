@@ -327,8 +327,9 @@ describe("ThreadComposer mixed clipboard paste", () => {
     paste(input, { text: "inserted" });
 
     expect(input.value).toBe("first lineinserted\nsecond line");
-    // No attachment chips: the starters are a list of their own (#317), so ask
-    // for the attachments list specifically rather than any list item.
+    // More than one list can live in the composer now (the starter cards
+    // above the input are list items too), so name the list this test is
+    // about: an empty Attachments list is what "attaches nothing" means.
     expect(screen.queryByRole("list", { name: "Attachments" })).toBeNull();
   });
 
@@ -350,13 +351,13 @@ describe("ThreadComposer mixed clipboard paste", () => {
     const input = renderComposer({ pushToast });
     fireEvent.change(input, { target: { value: draft } });
     input.setSelectionRange(10, 10);
-    const pdf = new File(["x"], "deck.pdf", { type: "application/pdf" });
+    const zip = new File(["x"], "archive.zip", { type: "application/zip" });
 
-    paste(input, { text: "inserted", files: [pdf] });
+    paste(input, { text: "inserted", files: [zip] });
 
     expect(input.value).toBe("first lineinserted\nsecond line");
-    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("deck.pdf"));
-    expect(screen.queryByText("deck.pdf")).toBeNull();
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("archive.zip"));
+    expect(screen.queryByText("archive.zip")).toBeNull();
   });
 
   it("inserts multiline unicode text verbatim", () => {
