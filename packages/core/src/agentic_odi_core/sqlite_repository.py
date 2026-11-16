@@ -16,6 +16,7 @@ from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
+    CandidateSolution,
     CustomerOutcome,
     Evidence,
     Job,
@@ -89,6 +90,7 @@ class SQLiteRepository(Repository):
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.candidates: dict[str, CandidateSolution] = {}
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
         self.links: dict[str, Link] = {}
@@ -203,6 +205,10 @@ class SQLiteRepository(Repository):
             self.strategies[p["id"]] = Strategy.model_validate(p)
         elif et == "STRATEGY_UPDATED":
             self._merge_updates(self.strategies, p, Strategy)
+        elif et == "CANDIDATE_CREATED":
+            self.candidates[p["id"]] = CandidateSolution.model_validate(p)
+        elif et == "CANDIDATE_UPDATED":
+            self._merge_updates(self.candidates, p, CandidateSolution)
         elif et == "PROPOSAL_CREATED":
             self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
         elif et == "PROPOSAL_UPDATED":
@@ -952,6 +958,50 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return new_strategy
+
+    def add_candidate(self, candidate: CandidateSolution) -> CandidateSolution:
+        with self._lock:
+            self.store.append(
+                "CANDIDATE_CREATED",
+                candidate.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return candidate
+
+    def get_candidate(self, candidate_id: str) -> CandidateSolution | None:
+        with self._lock:
+            self._sync()
+            return self.candidates.get(candidate_id)
+
+    def list_candidates(self) -> list[CandidateSolution]:
+        with self._lock:
+            self._sync()
+            return list(self.candidates.values())
+
+    def update_candidate(
+        self, candidate_id: str, updates: dict[str, Any]
+    ) -> CandidateSolution | None:
+        with self._lock:
+            self._sync()
+            candidate = self.candidates.get(candidate_id)
+            if candidate is None:
+                return None
+            current = candidate.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_candidate = candidate.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "CANDIDATE_UPDATED",
+                {"id": candidate_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_candidate
 
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
         with self._lock:

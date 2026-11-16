@@ -474,6 +474,42 @@ class Strategy(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class CandidateStatus(str, Enum):
+    """Where a candidate is in its life: proposed, accepted, rejected, or parked."""
+
+    PROPOSED = "proposed"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    PARKED = "parked"
+
+
+class CandidateSolution(BaseModel):
+    """A proposed solution linked to the underserved outcomes it would serve.
+
+    A candidate is the bridge from research to a bet: it names a hypothesis and
+    the outcomes that justify it. The model records the claim; the rule that a
+    candidate must serve at least one underserved outcome lives at the tool
+    layer, where the opportunity scores are available.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str = Field(..., description="Short human label for the proposed solution")
+    hypothesis: str = Field(..., description="Why this solution would serve the linked outcomes")
+    outcome_ids: list[str] = Field(
+        default_factory=list, description="The underserved outcomes this candidate serves"
+    )
+    status: CandidateStatus = Field(
+        CandidateStatus.PROPOSED, description="Where the candidate is in its life"
+    )
+    strategy_path: StrategyKind | None = Field(
+        None, description="The Stage 6 path this candidate bets on, when chosen"
+    )
+    evidence_ids: list[str] = Field(
+        default_factory=list, description="Evidence that supports the hypothesis"
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class SignalKind(str, Enum):
     """The facts a signal may report. Every kind here has a real producer."""
 
