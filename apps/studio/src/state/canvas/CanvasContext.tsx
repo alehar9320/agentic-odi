@@ -6,6 +6,7 @@ import type {
   AddStepPayload,
   CanvasData,
   CanvasState,
+  Outcome,
   StudioError,
 } from "../../types";
 
@@ -41,10 +42,12 @@ export interface CanvasActionsValue {
   deleteJob: (jobId: string) => Promise<void>;
   updateStep: (stepId: string, payload: { name?: string; order?: number }) => Promise<void>;
   deleteStep: (stepId: string) => Promise<void>;
+  /** Resolves with the outcome the server returned, or `null` when the write
+   * failed — the caller may keep the editor open on the values it holds. */
   updateOutcome: (
     outcomeId: string,
     payload: { statement?: string; importance?: number; satisfaction?: number },
-  ) => Promise<void>;
+  ) => Promise<Outcome | null>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
   deleteEvidence: (evidenceId: string) => Promise<void>;
   promoteEvidence: (

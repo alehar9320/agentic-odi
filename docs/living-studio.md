@@ -411,6 +411,14 @@ line — so the region a point sits in and `isUnderserved` never disagree. The
 pill follows suit: a score the store never computed reads **Not scored**, never
 **Served**.
 
+The score is edited where it is read. **Adjust scores** on the card opens a
+score panel (`ScorePopover`) that holds the two assumptions — importance and
+satisfaction — as a slider and a number each, prints the arithmetic live as
+`importance + gap = opportunity` with the underserved verdict, and saves both in
+one `updateOutcome`. The stored score is shown beside the draft, and when it no
+longer matches the inputs it was made from the panel says so and offers
+**Recompute**; it never repairs the record on its own.
+
 A score that was computed also says how well it is backed. The card and the
 landscape's **Backed by** column read one derived helper, `scoreConfidence`, over
 the `claim_check` behind the score and the evidence records linked to it, and

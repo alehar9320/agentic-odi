@@ -30,6 +30,28 @@ export function formatOpportunityScore(score: number | null | undefined): string
   return score.toFixed(1);
 }
 
+/**
+ * True when a stored score no longer matches what its own inputs produce.
+ *
+ * The store recomputes only when both inputs are present and otherwise keeps
+ * whatever it was handed (`packages/core/src/agentic_odi_core/services.py`), so a
+ * disagreement is possible. The rule is a tolerance, not equality: a stored
+ * `12.34` over inputs `8.6 / 4.9` (which produce `12.3`) is a rounding
+ * difference, not a disagreement, so anything within `0.05` is treated as
+ * agreeing. An unscored outcome never mismatches — there is nothing stored to
+ * disagree with.
+ */
+export function scoreMismatch(
+  stored: number | null | undefined,
+  importance: number,
+  satisfaction: number,
+): boolean {
+  if (!hasScore(stored)) {
+    return false;
+  }
+  return Math.abs(stored - opportunityScore(importance, satisfaction)) > 0.05;
+}
+
 export function opportunityPill(score: number | null | undefined): PillDescriptor {
   // A missing score is not "served". Saying so would read as a verdict the
   // store never reached, so it gets a neutral descriptor of its own.
