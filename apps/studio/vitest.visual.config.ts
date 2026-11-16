@@ -1,5 +1,8 @@
+import { fileURLToPath } from "node:url";
+
 import { chromaticPlugin } from "@chromatic-com/vitest/plugin";
 import { playwright } from "@vitest/browser-playwright";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
@@ -17,12 +20,21 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [
     react(),
+    // The cascade test reads computed styles, so the utilities it measures have
+    // to be compiled here exactly as `vite.config.ts` compiles them for the app.
+    tailwindcss(),
     chromaticPlugin({
       // Pausing animations at their end frame means shimmer and fade-in
       // components diff on real changes instead of on capture timing.
       pauseAnimationAtEnd: true,
     }),
   ],
+  resolve: {
+    // Copied components keep the import paths they shipped with.
+    alias: {
+      "@": fileURLToPath(new URL("./src/vendor", import.meta.url)),
+    },
+  },
   test: {
     include: ["src/**/*.visual.test.tsx"],
     browser: {

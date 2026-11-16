@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import mainstageCss from "./mainstage.css?raw";
 
 // Vitest runs with the studio package as its working directory.
-const entry = readFileSync(join(process.cwd(), "src/main.tsx"), "utf8");
+const entry = readFileSync(join(process.cwd(), "src/styles/entry.css"), "utf8");
 const chatStage = readFileSync(
   join(process.cwd(), "src/components/chat/ChatStage.tsx"),
   "utf8",
@@ -38,7 +38,9 @@ function classesUsedIn(source: string): string[] {
 
 describe("mainstage stylesheet", () => {
   it("is loaded by the studio entry", () => {
-    expect(entry).toContain('"./styles/mainstage.css"');
+    // #384 made entry.css the one file that orders the cascade, so the sheet is
+    // pulled in there, in the product layer, rather than imported by main.tsx.
+    expect(entry).toContain('@import "./mainstage.css" layer(product)');
   });
 
   it("defines a rule for every class the bar and turn anatomy render", () => {
