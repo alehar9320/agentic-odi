@@ -132,6 +132,7 @@ export function WorkspacePanel() {
     openPanel,
     closePanel,
     sendMessage,
+    streaming,
     canvas,
     conversations,
     conversationId,
@@ -230,21 +231,24 @@ export function WorkspacePanel() {
   }, [panelId, isMobile]);
 
   // Escape closes the open lens and returns focus to its opener. Captured so it
-  // never reaches the app-level handler, which would stop a running reply.
+  // never reaches the app-level handler. A running reply is the exception: Escape
+  // stops the stream first and leaves the lens open, which is the order the app
+  // shell promises (#324, #692).
   useEffect(() => {
     if (!activePanel) {
       return;
     }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        closePanel();
+      if (event.key !== "Escape" || streaming) {
+        return;
       }
+      event.preventDefault();
+      event.stopPropagation();
+      closePanel();
     }
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [activePanel, closePanel]);
+  }, [activePanel, streaming, closePanel]);
 
   // A lens opens where it was left; a different lens starts at its top.
   useLayoutEffect(() => {
