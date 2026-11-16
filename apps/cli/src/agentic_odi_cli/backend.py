@@ -431,6 +431,8 @@ class LocalBackend(Backend):
                 job_id=args.get("job_id"),
                 step_id=args.get("step_id"),
                 outcome_id=args.get("outcome_id"),
+                impact=args.get("impact", "medium"),
+                confidence=args.get("confidence", "claimed"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args.get("job_id") or "")) from None

@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 from agentic_odi_cli.cli import app
 from typer.testing import CliRunner
+
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(text: str) -> str:
+    return ANSI_ESCAPE.sub("", text)
 
 
 def _job_id(runner: CliRunner, db: str) -> str:
@@ -323,6 +330,108 @@ def test_evidence_add_refuses_docx_and_points_at_the_studio(tmp_path):
     assert result.exit_code == 1
     assert "not supported from the CLI yet" in result.output
     assert "Traceback" not in result.output
+
+
+def _stored_impact_and_confidence(runner: CliRunner, db: str, evidence_id: str) -> tuple[str, str]:
+    result = runner.invoke(app, ["--db", db, "evidence", "get", evidence_id, "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    return payload["impact"], payload["confidence"]
+
+
+def test_evidence_add_help_lists_impact_and_confidence(tmp_path):
+    result = CliRunner().invoke(
+        app,
+        ["--db", str(tmp_path / "odi.db"), "evidence", "add", "--help"],
+    )
+    assert result.exit_code == 0
+    output = _strip_ansi(result.output)
+    assert "--impact" in output
+    assert "--confidence" in output
+
+
+def test_evidence_add_stores_impact_and_confidence_from_flags(tmp_path):
+    db = str(tmp_path / "odi.db")
+    runner = CliRunner()
+    job_id = _job_id(runner, db)
+
+    evidence_id = _add_evidence(runner, db, job_id)
+    impact, confidence = _stored_impact_and_confidence(runner, db, evidence_id)
+    assert impact == "medium"
+    assert confidence == "claimed"
+
+    result = runner.invoke(
+        app,
+        [
+            "--db",
+            db,
+            "evidence",
+            "add",
+            "--source-name",
+            "gong",
+            "--source-kind",
+            "mcp",
+            "--name",
+            "feedback",
+            "--content",
+            "quote",
+            "--job-id",
+            job_id,
+            "--impact",
+            "high",
+            "--confidence",
+            "verified",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    impact, confidence = _stored_impact_and_confidence(runner, db, json.loads(result.output)["id"])
+    assert impact == "high"
+    assert confidence == "verified"
+
+
+def test_evidence_add_rejects_unknown_impact(tmp_path):
+    result = CliRunner().invoke(
+        app,
+        [
+            "--db",
+            str(tmp_path / "odi.db"),
+            "evidence",
+            "add",
+            "--source-name",
+            "gong",
+            "--name",
+            "feedback",
+            "--content",
+            "quote",
+            "--impact",
+            "urgent",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "urgent" in result.output
+
+
+def test_evidence_add_rejects_unknown_confidence(tmp_path):
+    result = CliRunner().invoke(
+        app,
+        [
+            "--db",
+            str(tmp_path / "odi.db"),
+            "evidence",
+            "add",
+            "--source-name",
+            "gong",
+            "--name",
+            "feedback",
+            "--content",
+            "quote",
+            "--confidence",
+            "certain",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "certain" in result.output
 
 
 def test_evidence_add_refuses_an_unknown_extension(tmp_path):
