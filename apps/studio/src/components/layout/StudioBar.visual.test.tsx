@@ -17,6 +17,7 @@ const stub = vi.hoisted(() => {
   return {
     studio: {
       llmHealth: { healthy: true, message: "ok" },
+      probeRetry: { state: "closed", retryInMs: 0 },
       messages: [
         { id: "t-1", role: "user", content: "I own activation." },
         { id: "t-2", role: "assistant", content: "Tell me more." },

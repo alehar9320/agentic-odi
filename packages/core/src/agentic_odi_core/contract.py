@@ -67,6 +67,9 @@ class ToolName(str, Enum):
     GET_TRACEABILITY_REPORT = "get_traceability_report"
     OPEN_STUDY = "open_study"
     LIST_STUDIES = "list_studies"
+    LINKS_ADD = "links_add"
+    LINKS_LIST = "links_list"
+    LINKS_REMOVE = "links_remove"
 
 
 class ToolEffect(str, Enum):
@@ -206,6 +209,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "satisfaction",
             "step_id",
             "claim_check",
+            "objectives",
         ),
         required=("job_id", "statement"),
         returns="The created Outcome.",
@@ -233,7 +237,14 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="update_outcome",
         summary="Update an Outcome's statement or scores.",
         effect=_derive_effect("update_outcome"),
-        arguments=("outcome_id", "statement", "importance", "satisfaction", "step_id"),
+        arguments=(
+            "outcome_id",
+            "statement",
+            "importance",
+            "satisfaction",
+            "step_id",
+            "objectives",
+        ),
         required=("outcome_id",),
         returns="The updated Outcome.",
         stage="2",
@@ -309,7 +320,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.ADD_EVIDENCE.value: ToolSpec(
         name="add_evidence",
-        summary="Capture an evidence record from a connector.",
+        summary="Capture an evidence record from a connector with optional impact and confidence ratings.",
         effect=_derive_effect("add_evidence"),
         arguments=(
             "source_name",
@@ -322,6 +333,8 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "job_id",
             "step_id",
             "outcome_id",
+            "impact",
+            "confidence",
         ),
         required=("source_name", "source_kind", "name", "content"),
         returns="The created Evidence record.",
@@ -361,6 +374,7 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "name",
             "importance",
             "satisfaction",
+            "force",
         ),
         required=("evidence_id", "target"),
         returns="The created Job or Outcome.",
@@ -595,6 +609,46 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         effect=_derive_effect("list_studies"),
         arguments=("job_id",),
         returns="A list of Studies. Empty until a study has been opened.",
+    ),
+    ToolName.LINKS_ADD.value: ToolSpec(
+        name="links_add",
+        summary="Create a typed link between two agentic-odi entities.",
+        effect=_derive_effect("links_add"),
+        arguments=(
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "relationship_type",
+            "external_system",
+            "external_id",
+            "preview",
+        ),
+        required=("source_type", "source_id", "target_type", "target_id", "relationship_type"),
+        returns="The created Link record.",
+    ),
+    ToolName.LINKS_LIST.value: ToolSpec(
+        name="links_list",
+        summary="List links, optionally filtered by source/target entity and relationship type.",
+        effect=_derive_effect("links_list"),
+        arguments=(
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "relationship_type",
+            "limit",
+            "offset",
+        ),
+        returns="A list of Link records.",
+    ),
+    ToolName.LINKS_REMOVE.value: ToolSpec(
+        name="links_remove",
+        summary="Remove a link by ID.",
+        effect=_derive_effect("links_remove"),
+        arguments=("link_id",),
+        required=("link_id",),
+        returns="True if the link was removed, False if not found.",
     ),
 }
 

@@ -46,11 +46,14 @@ agreeing.
 
 | Package | Licence | Declared in | Why the alley needs it |
 |---|---|---|---|
+| `@assistant-ui/react` | MIT | dependencies | the `ThreadPrimitive` the copied `thread` Element is built over |
 | `class-variance-authority` | MIT | devDependencies | the variant table the copied button is built from |
 | `clsx` | MIT | devDependencies | the class merger under `lib/utils.ts`, which every copy calls |
-| `radix-ui` | MIT | dependencies | `Slot`, the `asChild` primitive the button renders through |
+| `lucide-react` | ISC | dependencies | `GripVerticalIcon` and `XIcon`, the glyphs the resizable handle and the sheet close button render |
+| `radix-ui` | MIT | dependencies | `Slot`, the `asChild` primitive the button renders through, and `Dialog`, which the sheet copy is built from |
 | `react` | MIT | dependencies | `React.ComponentProps` and the JSX the copies are written in |
 | `react-dom` | MIT | dependencies | `createPortal`, which the hover-card copy renders its content through |
+| `react-resizable-panels` | MIT | dependencies | `Group`, `Panel`, and `Separator`, the split the resizable copy wraps |
 | `tailwind-merge` | MIT | devDependencies | resolves the class collisions two copies agree to disagree on |
 | `tailwindcss` | MIT | devDependencies | `index.css` imports its theme and utilities layers, scoped to this tree |
 

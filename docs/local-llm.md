@@ -1,3 +1,11 @@
+---
+title: Local LLM Backend
+blurb: Running a local OpenAI-compatible model with tool calling.
+nav_group: Get started
+nav_order: 3
+slug: local-llm
+---
+
 # Local Tools-Capable LLM Backend
 
 To exercise real tool-calling end-to-end against the MCP server, you need a

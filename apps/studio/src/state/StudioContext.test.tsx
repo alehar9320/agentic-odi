@@ -45,8 +45,47 @@ function json(body: unknown): Response {
   });
 }
 
+
+/**
+ * A reply of `count` deltas whose terminal frame carries no content, so what is
+ * rendered is exactly what the deltas accumulated. A delta the frame batching
+ * dropped would show up here as a short string.
+ */
+function streamOfProse(count: number): string {
+  const deltas = Array.from(
+    { length: count },
+    (_unused, index) => `event: delta\ndata: {"text":"w${index} "}\n\n`,
+  ).join("");
+  return deltas + "event: message\ndata: {}\n\n";
+}
+
 function sse(body: string): Response {
   return new Response(body, {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+
+/** The same bytes, released one event per macrotask: what a network delivers. */
+function chunkedSse(body: string): Response {
+  const encoder = new TextEncoder();
+  const blocks = body.split("\n\n").filter((block) => block.trim().length > 0);
+  let index = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const push = () => {
+        if (index >= blocks.length) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(encoder.encode(`${blocks[index]}\n\n`));
+        index += 1;
+        setTimeout(push, 0);
+      };
+      setTimeout(push, 0);
+    },
+  });
+  return new Response(stream, {
     status: 200,
     headers: { "Content-Type": "text/event-stream" },
   });
@@ -62,6 +101,8 @@ const DEFAULT_CHAT_STREAM =
   'event: message\ndata: {"content":"Hi"}\n\n';
 
 let chatStream: string | null = null;
+/** Deliver the stream one event per macrotask, as a real network does. */
+let chatChunked = false;
 let canvasFails = false;
 /** Extra records the canvas route serves; empty keeps every other test as-is. */
 let canvasRecords: Record<string, unknown> = {};
@@ -73,6 +114,7 @@ let releaseChat: (() => void) | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
 let llmUnhealthy = false;
+let llmTransportFails = false;
 let signalFetches = 0;
 let configHangs = false;
 let configAborts = 0;
@@ -92,6 +134,8 @@ type GatedTurn = {
   body: Record<string, unknown>;
   aborted: boolean;
   respond: (events: string) => void;
+  /** Release part of the stream without closing it: a reply mid-flight. */
+  emit: (events: string) => void;
   abort: () => void;
 };
 let gateChats = false;
@@ -109,6 +153,9 @@ function gatedChatResponse(
     respond: (events) => {
       streamController?.enqueue(encoder.encode(events));
       streamController?.close();
+    },
+    emit: (events) => {
+      streamController?.enqueue(encoder.encode(events));
     },
     abort: () => {
       turn.aborted = true;
@@ -180,6 +227,9 @@ function route(
     }
     if (gateChats) {
       return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
+    }
+    if (chatChunked) {
+      return chunkedSse(chatStream ?? DEFAULT_CHAT_STREAM);
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
@@ -350,6 +400,14 @@ function route(
   }
   if (url === "/api/health/llm") {
     llmHealthFetches += 1;
+    // A dead proxy: the request never reaches a model, so nothing answers. The
+    // 502 with a non-sidecar body is what the studio reads as a transport failure.
+    if (llmTransportFails) {
+      return new Response(JSON.stringify({ detail: "bad gateway" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return json(
       llmUnhealthy
         ? { healthy: false, message: "connection refused" }
@@ -377,6 +435,7 @@ describe("StudioContext memory and resume", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -743,6 +802,7 @@ describe("StudioContext failures", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -858,6 +918,7 @@ describe("StudioContext first run in a browser with no server", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     configAborts = 0;
     catalogFetches = 0;
     featuredFetches = 0;
@@ -1084,6 +1145,63 @@ describe("StudioContext first run in a browser with no server", () => {
     });
     expect(result.current.llmHealth.healthy).toBe(false);
   });
+
+  it("stops probing a dead endpoint and counts down to the next try (#536)", async () => {
+    // A proxy that answers 502 is dead, not flaky: after three transport failures
+    // the breaker opens, the scheduled probe stops spending requests, and the
+    // status the bar reads turns into a countdown.
+    llmTransportFails = true;
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // Step until the breaker opens, so the assertion below sits at the start of a
+    // fresh window rather than somewhere unknown inside it.
+    for (let i = 0; i < 300 && result.current.probeRetry.state !== "open"; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+    }
+    expect(result.current.probeRetry.state).toBe("open");
+    expect(result.current.probeRetry.retryInMs).toBeGreaterThan(0);
+    const spent = llmHealthFetches;
+
+    // Well inside the window the cadence keeps ticking, but the breaker forbids
+    // every request, so nothing is spent.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(result.current.probeRetry.state).toBe("open");
+    expect(llmHealthFetches).toBe(spent);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  });
+
+  it("lets a person asking through an open breaker (#536)", async () => {
+    llmTransportFails = true;
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200_000);
+    });
+    expect(result.current.probeRetry.state).toBe("open");
+    const spent = llmHealthFetches;
+
+    // "Check now" is the person overruling the breaker: it resets and probes.
+    await act(async () => {
+      await result.current.checkConnections();
+    });
+    expect(llmHealthFetches).toBeGreaterThan(spent);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  });
+
 
   it("asks the browser for idle time, and gives it up when the person types", async () => {
     // The branch every real browser takes — jsdom has no requestIdleCallback, so the
@@ -1421,6 +1539,7 @@ describe("StudioContext on a desktop install whose model is down", () => {
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
@@ -1476,6 +1595,7 @@ describe("StudioContext probe scheduling", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.useFakeTimers();
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
@@ -1531,9 +1651,11 @@ describe("StudioContext probe scheduling", () => {
     });
     expect(llmHealthFetches).toBe(afterBoot);
 
-    // ...and one has fired by the longest.
+    // ...and one has fired by the longest. The margin covers the boot settle:
+    // the timer can be armed after the mount (a boot report re-arms it), so the
+    // wait is anchored on the longest delay plus the boot's own 2.5 s.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(longest - shortest + 2_000);
+      await vi.advanceTimersByTimeAsync(longest - shortest + 5_000);
     });
     expect(llmHealthFetches).toBeGreaterThan(afterBoot);
   });
@@ -1725,6 +1847,7 @@ describe("StudioContext theme", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
@@ -1844,6 +1967,7 @@ describe("StudioContext canvas state", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -1895,6 +2019,7 @@ describe("StudioContext stopped turns", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -1937,6 +2062,7 @@ describe("StudioContext write approval and branches", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -2031,6 +2157,7 @@ describe("StudioContext boot failure", () => {
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal(
       "fetch",
@@ -2105,6 +2232,7 @@ describe("StudioContext startNewThread (#319)", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -2506,6 +2634,7 @@ describe("StudioContext agent focus", () => {
     canvasFails = false;
     canvasRecords = {};
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
@@ -2577,6 +2706,79 @@ describe("StudioContext agent focus", () => {
     });
 
     expect(chatBody?.focus ?? null).toBeNull();
+  });
+
+  it("opens a detail on the lens that holds its subject, not the panel it named", async () => {
+    canvasRecords = {
+      jobs: [{ id: "J-1", name: "Reconcile invoices" }],
+      steps: [{ id: "S-2", job_id: "J-1", name: "Match each line", order: 2 }],
+    };
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvasState.data?.steps).toHaveLength(1));
+
+    act(() => {
+      result.current.openDetail("landscape", { kind: "step", id: "S-2" });
+    });
+
+    // The subject decides the lens: a step lives in the job map (#739).
+    expect(result.current.activePanel).toBe("jobmap");
+    expect(result.current.detail).toEqual({
+      panel: "jobmap",
+      subject: { kind: "step", id: "S-2" },
+    });
+    expect(result.current.focusedSubject).toEqual({ kind: "step", id: "S-2" });
+    expect(result.current.focusedJobId).toBe("J-1");
+  });
+
+  it("keeps the panel a detail named when its subject names no lens", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.openDetail("evidence", { kind: "finding", id: "F-1" });
+    });
+
+    // An unwired subject is not guessed at: the panel the action named stands,
+    // and no focus is recorded for a kind the lenses do not know.
+    expect(result.current.activePanel).toBe("evidence");
+    expect(result.current.detail).toEqual({
+      panel: "evidence",
+      subject: { kind: "finding", id: "F-1" },
+    });
+    expect(result.current.focusedSubject).toBeNull();
+  });
+
+  it("opens the panel a detail named when it has no subject", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.openDetail("catchup");
+    });
+
+    expect(result.current.activePanel).toBe("catchup");
+    expect(result.current.detail).toEqual({ panel: "catchup" });
   });
 
   it("stops pointing at the screen once the person clears the focus", async () => {
@@ -2748,6 +2950,131 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(STREAM_BUDGET);
+  });
+
+  it("batches a chunked reply into a frame's worth of renders, not one per delta", async () => {
+    // The network delivers one event per macrotask. Forty deltas that each
+    // published their own render would land as roughly forty renders of every
+    // surface; batching to one frame brings the transcript-only surfaces back
+    // to their quiet baseline.
+    chatChunked = true;
+    chatStream = streamOfDeltas(40);
+    const studio = await countedStudio();
+
+    await act(async () => {
+      await studio.sendMessage("hello");
+    });
+
+    const counts = getCounts();
+    expect(counts.landscape ?? 0, "the landscape rendered per delta").toBeLessThanOrEqual(3);
+    expect(counts.rail ?? 0, "the rail rendered per delta").toBeLessThanOrEqual(3);
+    expect(counts.banners ?? 0, "the banners rendered per delta").toBeLessThanOrEqual(3);
+    chatChunked = false;
+  });
+
+  it("renders the streamed prose exactly as the deltas arrived", async () => {
+    // A turn held open on the wire, then released with forty deltas and the
+    // frame that closes it: the accumulated text must be every delta, in order,
+    // even though the frames batched them.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].respond(streamOfProse(40));
+    });
+
+    const expected = Array.from({ length: 40 }, (_unused, index) => `w${index} `).join("");
+    await waitFor(() => expect(live.current!.messages.at(-1)?.content).toBe(expected));
+    gateChats = false;
+    gatedTurns = [];
+  });
+
+  it("keeps the settled messages identical while the reply streams", async () => {
+    // The assistant message is replaced on every flush; every message before it
+    // keeps its identity, so a reader of the settled transcript is not asked to
+    // render again.
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+    const settled = live.current!.messages.slice();
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+
+    settled.forEach((message, index) => {
+      expect(live.current!.messages[index]).toBe(message);
+    });
+  });
+
+  it("keeps the text that arrived before a cancel, and drops only the placeholder", async () => {
+    // A stop mid-reply: the deltas already received are flushed before the
+    // empty placeholder is removed, so the person keeps what they had read.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].emit('event: delta\ndata: {"text":"half an "}\n\nevent: delta\ndata: {"text":"answer"}\n\n');
+    });
+
+    await act(async () => {
+      live.current!.stopStreaming();
+    });
+    await waitFor(() => expect(live.current!.streaming).toBe(false));
+
+    expect(live.current!.messages.at(-1)?.content).toBe("half an answer");
+    gateChats = false;
+    gatedTurns = [];
+  });
+
+  it("lands a mid-stream approval after the prose that preceded it", async () => {
+    // Batching prose must not reorder a surface: a tool row that arrives
+    // between two deltas stays between them, not above or below the flush.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("add a job");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].respond(
+        'event: delta\ndata: {"text":"Let me add "}\n\n' +
+          'event: approval\ndata: {"id":"apv_9","tool_call_id":"call-9","name":"add_job","prompt":"Allow the assistant to add job?"}\n\n' +
+          'event: delta\ndata: {"text":"it now."}\n\n' +
+          'event: message\ndata: {"content":"Let me add it now."}\n\n',
+      );
+    });
+    await waitFor(() => expect(live.current!.streaming).toBe(false));
+
+    const parts = live.current!.messages.at(-1)?.parts ?? [];
+    const kinds = parts.map((part) => part.kind);
+    const approvalAt = kinds.indexOf("tool");
+    const lastTextAt = kinds.lastIndexOf("text");
+    expect(approvalAt).toBeGreaterThan(-1);
+    expect(approvalAt).toBeLessThan(lastTextAt);
+    gateChats = false;
+    gatedTurns = [];
   });
 
   it("takes twenty keystrokes within its budget", async () => {

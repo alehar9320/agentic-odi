@@ -17,6 +17,7 @@ import type {
 } from "@assistant-ui/react";
 
 import { focusLabel, focusPointer } from "../lib/focus";
+import { useRegionState, type Detail } from "./regions";
 import {
   addConnector as apiAddConnector,
   addObservation as apiAddObservation,
@@ -29,6 +30,7 @@ import {
   deleteConnector as apiDeleteConnector,
   deleteJob as apiDeleteJob,
   deleteObservation as apiDeleteObservation,
+  deleteConversation as apiDeleteConversation,
   deleteEvidence as apiDeleteEvidence,
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
@@ -75,6 +77,13 @@ import {
   createProbeScheduler,
   type ProbeScheduler,
 } from "./scheduleProbe";
+import {
+  classifyProbeError,
+  createProbeBreaker,
+  type BreakerState,
+  type ProbeBreaker,
+  type ProbeOutcome,
+} from "./probeBreaker";
 import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
@@ -118,6 +127,13 @@ import {
   useNoticesActions,
   type ToastKind,
 } from "./notices/NoticesContext";
+import {
+  CanvasActionsContext,
+  CanvasProvider,
+  CanvasStateContext,
+  type CanvasActionsValue,
+  type CanvasStateValue,
+} from "./canvas/CanvasContext";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -159,6 +175,10 @@ export function turnsToMessages(
         parentId: node.parent_id,
         role: node.role,
         content,
+        // A restored turn carries the moment it was written, so the transcript
+        // dates a record rather than guessing one. Absent when the stored turn
+        // has no time, and the transcript then shows no clock at all (#737).
+        ...(node.created_at ? { createdAt: node.created_at } : {}),
         parts: claims.length
           ? [{ kind: "claims" as const, content, claims }]
           : content
@@ -213,6 +233,15 @@ function readClaims(raw: unknown): Claim[] {
     });
   }
   return claims;
+}
+
+/**
+ * Whether an SSE `approval` frame carried usable arguments. The gate shows
+ * them as given; a malformed payload is dropped rather than rendered as
+ * machine text, and the card falls back to the tool name alone.
+ */
+function isArguments(raw: unknown): raw is Record<string, unknown> {
+  return raw !== null && typeof raw === "object" && !Array.isArray(raw);
 }
 
 /** Read the failure the sidecar reported on an SSE `error` event. */
@@ -324,6 +353,12 @@ export interface StudioContextValue {
   canvasError: StudioError | null;
   refreshCanvas: () => Promise<void>;
   llmHealth: { healthy: boolean | null; message: string };
+  /**
+   * What the probe breaker is doing (#536): `state` is `closed`, `open`,
+   * `half-open`, or `degraded`, and `retryInMs` is how long until the next
+   * probe is allowed. The bar reads this to say "Retrying in N min".
+   */
+  probeRetry: { state: BreakerState; retryInMs: number };
   /** Model ids the configured endpoint publishes. Empty means "type one". */
   models: string[];
   modelsLoading: boolean;
@@ -388,6 +423,11 @@ export interface StudioContextValue {
   refreshConversations: () => Promise<void>;
   /** Open a past thread by loading its turns; never a conversation without them. */
   openConversation: (conversationId: string) => Promise<void>;
+  /**
+   * Remove one thread and its turns. Deleting the open thread returns the stage
+   * to the empty state; a failure leaves the history untouched.
+   */
+  deleteConversation: (conversationId: string) => Promise<boolean>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -431,6 +471,18 @@ export interface StudioContextValue {
   activePanel: WorkspacePanelId | null;
   openPanel: (panel: WorkspacePanelId) => void;
   closePanel: () => void;
+  /**
+   * The right region's one detail (#735). `openDetail` is the single entry;
+   * `openPanel` is the one-hop alias that remains during transition.
+   */
+  detail: Detail | null;
+  openDetail: (panel: WorkspacePanelId, subject?: { kind: string; id: string }) => void;
+  closeDetail: () => void;
+  /** The left drawer, whose accessible name the rail helper reuses. */
+  drawerOpen: boolean;
+  toggleDrawer: () => void;
+  /** The left drawer's collapsed state. */
+  collapsed: boolean;
   /** Close any open lens and hand the intent to the agent. One gesture. */
   ask: (intent: string) => void;
   pushToast: (
@@ -515,7 +567,39 @@ export interface StudioContextValue {
   focusEvidence: (evidenceId: string) => void;
 }
 
-const StudioContext = createContext<StudioContextValue | null>(null);
+/**
+ * The canvas fields a component reads through its own context (#505). They are
+ * named here once so the composite type can exclude them: a canvas refresh must
+ * not rebuild the object every other surface subscribes to.
+ */
+export type CanvasContextFields =
+  | "canvas"
+  | "canvasLoading"
+  | "canvasCached"
+  | "canvasState"
+  | "canvasError"
+  | "refreshCanvas"
+  | "addStep"
+  | "addOutcome"
+  | "createJob"
+  | "updateJob"
+  | "deleteJob"
+  | "updateStep"
+  | "deleteStep"
+  | "updateOutcome"
+  | "deleteOutcome"
+  | "deleteEvidence"
+  | "promoteEvidence";
+
+/**
+ * Everything the composite value still carries. The canvas fields are excluded
+ * because they now live in `CanvasContext`; `useStudio()` merges them back in so
+ * no caller changes, while a narrow reader can subscribe to the canvas alone.
+ */
+export type StudioCompositeValue = Omit<StudioContextValue, CanvasContextFields>;
+
+
+const StudioContext = createContext<StudioCompositeValue | null>(null);
 
 /**
  * Whether an edit moved what the studio talks to. The theme is stored beside the
@@ -637,6 +721,15 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     healthy: null,
     message: "Health not checked yet.",
   });
+  /**
+   * What the probe breaker is doing (#536): whether an endpoint has stopped
+   * answering, and how long until the next probe is allowed. The bar reads this
+   * to say "Retrying in N min" instead of showing a spinner forever.
+   */
+  const [probeRetry, setProbeRetry] = useState<{ state: BreakerState; retryInMs: number }>({
+    state: "closed",
+    retryInMs: 0,
+  });
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsMessage, setModelsMessage] = useState<string | null>(null);
@@ -651,7 +744,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [streaming, setStreaming] = useState(false);
   const [thinkingPhase, setThinkingPhase] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
-  const [activePanel, setActivePanel] = useState<WorkspacePanelId | null>(null);
+  // The three-region contract (#735), declared once in its own module so this
+  // provider's in-flight splits (#345, #506) do not collide with it. The right
+  // region's `detail` is the single source of truth: `activePanel` is derived
+  // from it, and `openPanel` is the one-hop alias that writes through.
+  const regions = useRegionState();
+  // The right region holds exactly one detail; its panel id is what the lens
+  // renders. Kept derived so no caller can set one without the other.
+  const activePanel: WorkspacePanelId | null = regions.detail?.panel ?? null;
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
@@ -690,6 +790,20 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * second timer on top of the first (#535).
    */
   const probeSchedulerRef = useRef<ProbeScheduler | null>(null);
+  /**
+   * The single-flight breaker every probe shares (#536): one probe on the wire
+   * at a time, and no probe at all while an endpoint keeps refusing.
+   */
+  const probeBreakerRef = useRef<ProbeBreaker | null>(null);
+  if (probeBreakerRef.current === null) {
+    probeBreakerRef.current = createProbeBreaker();
+  }
+
+  /** Publish the breaker's state so the bar can show a countdown while it is open. */
+  const publishProbeRetry = useCallback(() => {
+    const breaker = probeBreakerRef.current!;
+    setProbeRetry({ state: breaker.state(), retryInMs: breaker.retryInMs() });
+  }, []);
   /** What a scheduled probe should run, kept current without re-creating the timer. */
   const probeNowRef = useRef<() => Promise<boolean>>(async () => false);
   /** Runs the debounced probe a connection-setting edit earns. */
@@ -1093,9 +1207,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   const openSetup = useCallback(() => {
-    setActivePanel(null);
+    regions.closeDetail();
     setSetupOpen(true);
-  }, []);
+  }, [regions.closeDetail]);
 
   const closeSetup = useCallback(() => {
     setSetupOpen(false);
@@ -1114,6 +1228,59 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Measure the sidecar, the MCP server, and the model, keeping the failure that
+   * made a negative answer negative. The scheduled probe needs that failure to
+   * tell a flaky network from a rejected key (#536); a panel does not.
+   */
+  const measureConnections = useCallback(
+    async (
+      override: Partial<StudioConfig> = {},
+    ): Promise<{ report: ConnectionReport; failure: unknown }> => {
+      const target = { ...settings, ...override };
+      let failure: unknown = null;
+      const noteFailure = (error: unknown) => {
+        failure = failure ?? error;
+      };
+      const [sidecar, mcp, llm] = await Promise.all([
+        fetchConfig()
+          .then(() => true)
+          .catch((error: unknown) => {
+            noteFailure(error);
+            return false;
+          }),
+        healthMcp(target.mcp_url)
+          .then((result) => result.reachable)
+          .catch((error: unknown) => {
+            noteFailure(error);
+            return false;
+          }),
+        healthLlm({
+          base_url: target.base_url,
+          api_key: target.api_key,
+          model: target.model_name,
+        }).catch((error: unknown) => {
+          noteFailure(error);
+          return {
+            healthy: false,
+            message: (error as Error).message || "The model did not answer.",
+          };
+        }),
+      ]);
+      void refreshCapabilities();
+      return {
+        report: {
+          sidecarReachable: sidecar,
+          mcpReachable: mcp,
+          llmHealthy: llm.healthy,
+          llmMessage: llm.message,
+        },
+        failure,
+      };
+    },
+    [settings, refreshCapabilities],
+  );
+
+  /**
    * Measure the sidecar, the MCP server, and the model without recording the result.
    *
    * A panel that owes the person looking at it fresh numbers calls this. Nothing here
@@ -1122,32 +1289,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    */
   const surveyConnections = useCallback(
     async (override: Partial<StudioConfig> = {}): Promise<ConnectionReport> => {
-      const target = { ...settings, ...override };
-      const [sidecar, mcp, llm] = await Promise.all([
-        fetchConfig()
-          .then(() => true)
-          .catch(() => false),
-        healthMcp(target.mcp_url)
-          .then((result) => result.reachable)
-          .catch(() => false),
-        healthLlm({
-          base_url: target.base_url,
-          api_key: target.api_key,
-          model: target.model_name,
-        }).catch((error: unknown) => ({
-          healthy: false,
-          message: (error as Error).message || "The model did not answer.",
-        })),
-      ]);
-      void refreshCapabilities();
-      return {
-        sidecarReachable: sidecar,
-        mcpReachable: mcp,
-        llmHealthy: llm.healthy,
-        llmMessage: llm.message,
-      };
+      return (await measureConnections(override)).report;
     },
-    [settings, refreshCapabilities],
+    [measureConnections],
   );
 
   /**
@@ -1214,16 +1358,50 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * restarts the cadence, because the endpoint they just changed is not the one
    * that kept failing.
    */
+  /**
+   * One measurement through the shared breaker: the probe joins whatever is
+   * already on the wire, records the report for the caller, and classifies a
+   * negative answer so the breaker knows whether a retry is worth making (#536).
+   */
+  const probeOnce = useCallback(
+    async (
+      override: Partial<StudioConfig>,
+      mode: "evidence" | "recovery",
+    ): Promise<ConnectionReport | null> => {
+      const settled = await probeBreakerRef.current!.run(async () => {
+        const { report, failure } = await measureConnections(override);
+        applyReport(report, mode);
+        return {
+          outcome: (report.llmHealthy
+            ? "success"
+            : classifyProbeError(failure, report.llmMessage)) as ProbeOutcome,
+          value: report,
+        };
+      });
+      publishProbeRetry();
+      // A joined probe returns the other caller's promise, whose report is the
+      // one this call also wants: both measured the same endpoint. `null` means
+      // the breaker refused, so nothing was measured and nothing is reported.
+      return settled?.value ?? null;
+    },
+    [measureConnections, applyReport, publishProbeRetry],
+  );
+
   const checkConnections = useCallback(
     async (
       override: Partial<StudioConfig> = {},
       mode: "evidence" | "recovery" = "evidence",
     ): Promise<ConnectionReport> => {
-      const report = applyReport(await surveyConnections(override), mode);
+      // A person asking restarts the cadence and closes the breaker: the endpoint
+      // they just edited is not the one that kept failing (#536). They still join
+      // a probe already in flight rather than starting a second one.
+      probeBreakerRef.current?.reset();
+      const report = await probeOnce(override, mode);
       probeSchedulerRef.current?.reset();
-      return report;
+      // `reset` cleared the breaker, so this probe was allowed to run.
+      return report!;
     },
-    [surveyConnections, applyReport],
+    [probeOnce],
   );
 
   // Re-probe after the user acted on the sidecar notice (e.g. started the
@@ -1236,15 +1414,19 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * One scheduled probe: it records what it finds, and it reports back whether
    * the endpoint answered so the scheduler can widen or reset the gap. It does
    * not reset the cadence itself — only a person asking does that.
+   *
+   * The breaker wraps the measurement, so an overlapping tick joins the probe
+   * already in flight and a streak of transport failures stops the requests
+   * rather than repeating them (#536).
    */
   const scheduledProbe = useCallback(async (): Promise<boolean> => {
     if (!isOnline()) {
       applyOffline();
       return false;
     }
-    const report = applyReport(await surveyConnections({}), "recovery");
-    return report.llmHealthy;
-  }, [surveyConnections, applyReport, applyOffline]);
+    const report = await probeOnce({}, "recovery");
+    return report?.llmHealthy ?? false;
+  }, [probeOnce, applyOffline]);
 
   // Keep the scheduler pointed at the freshest probe without ever re-creating
   // the timer: the ref is what the running scheduler reads on each tick.
@@ -1266,30 +1448,53 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     setDismissedSidecarNotice(true);
   }, [setDismissedSidecarNotice]);
 
+  /**
+   * The in-flight canvas read, shared by every concurrent caller (#505).
+   * A turn, a mutation, and a manual refresh can all ask for the board at the
+   * same moment; the point of the single-flight promise is that they join one
+   * request instead of racing three.
+   */
+  const canvasRefreshRef = useRef<Promise<void> | null>(null);
+
   const refreshCanvas = useCallback(async () => {
-    // The inbox is re-read alongside the board: every path that reaches this
-    // function either just changed the store or is checking what changed, and
-    // a canvas that fails to load must not leave the bell showing stale counts.
-    void refreshSignals();
-    // Segments and the strategy are the other things a turn can create, and the
-    // rail counts them, so they are re-read on the same beat.
-    void refreshSegments();
-    setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
-    try {
-      const data = await fetchCanvas(settings.mcp_url);
-      const isEmpty = !data.jobs.length && !data.steps.length && !data.outcomes.length;
-      setCanvasState({ kind: isEmpty ? "empty" : "ready", data });
-      setCanvasCached(false);
+    // Join a read already on the wire rather than starting a second one. The
+    // promise clears in a `finally` so a failed read does not wedge the guard.
+    if (canvasRefreshRef.current) {
+      return canvasRefreshRef.current;
+    }
+    const run = (async () => {
+      // The inbox is re-read alongside the board: every path that reaches this
+      // function either just changed the store or is checking what changed, and
+      // a canvas that fails to load must not leave the bell showing stale counts.
+      void refreshSignals();
+      // Segments and the strategy are the other things a turn can create, and the
+      // rail counts them, so they are re-read on the same beat.
+      void refreshSegments();
+      setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
       try {
-        localStorage.setItem(CANVAS_KEY, JSON.stringify(data));
-      } catch {
-        /* storage unavailable */
+        const data = await fetchCanvas(settings.mcp_url);
+        const isEmpty = !data.jobs.length && !data.steps.length && !data.outcomes.length;
+        setCanvasState({ kind: isEmpty ? "empty" : "ready", data });
+        setCanvasCached(false);
+        try {
+          localStorage.setItem(CANVAS_KEY, JSON.stringify(data));
+        } catch {
+          /* storage unavailable */
+        }
+      } catch (error) {
+        // A failed canvas is a failure, not an empty canvas: the studio shows
+        // what went wrong instead of a zeroed-out board.
+        const problem = asStudioError(error);
+        setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
       }
-    } catch (error) {
-      // A failed canvas is a failure, not an empty canvas: the studio shows
-      // what went wrong instead of a zeroed-out board.
-      const problem = asStudioError(error);
-      setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
+    })();
+    canvasRefreshRef.current = run;
+    try {
+      await run;
+    } finally {
+      if (canvasRefreshRef.current === run) {
+        canvasRefreshRef.current = null;
+      }
     }
   }, [settings.mcp_url, refreshSignals, refreshSegments]);
 
@@ -1448,16 +1653,16 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
-  const closePanel = useCallback(() => setActivePanel(null), []);
+  const closePanel = useCallback(() => regions.closeDetail(), [regions.closeDetail]);
 
   const openPanel = useCallback(
     (panel: WorkspacePanelId) => {
       if (setupOpen) {
         closeSetup();
       }
-      setActivePanel(panel);
+      regions.openDetail(panel);
     },
-    [setupOpen, closeSetup],
+    [setupOpen, closeSetup, regions.openDetail],
   );
 
   /**
@@ -1471,6 +1676,31 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     }
     saveSession(sessionForSubject(kind, id));
   }, []);
+
+  /**
+   * The one entry to the right region (#735), with a card's detail target
+   * resolved through the lens map (#739): a subject the lenses know decides the
+   * panel, the panel the action named is the fallback, and the record is marked
+   * focused so the lens opens on it rather than on a generic view.
+   */
+  const openDetail = useCallback(
+    (panel: WorkspacePanelId, subject?: { kind: string; id: string }) => {
+      if (!subject) {
+        regions.openDetail(panel);
+        return;
+      }
+      const wired = Object.prototype.hasOwnProperty.call(PANEL_FOR_SUBJECT, subject.kind);
+      if (wired) {
+        focusSubject(subject.kind as SignalSubjectKind, subject.id);
+        if (subject.kind === "evidence") {
+          setFocusedEvidenceId(subject.id);
+        }
+      }
+      const lens = wired ? PANEL_FOR_SUBJECT[subject.kind as SignalSubjectKind] : undefined;
+      regions.openDetail(lens ?? panel, subject);
+    },
+    [focusSubject, regions.openDetail],
+  );
 
   /**
    * Stop speaking for the screen. The session slot goes with the selection, so a
@@ -1742,7 +1972,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           toolSeq += 1;
           parts = [
             ...parts,
-            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status },
+            { kind: "tool", id: id ?? `tool-${toolSeq}`, name, status, startedAt: Date.now() },
           ];
           return;
         }
@@ -1751,6 +1981,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
             ...open,
             status,
             ...(preview ? { preview } : {}),
+            // The call settled, so the pending row stops counting: the start is
+            // dropped with the status it belonged to.
+            startedAt: undefined,
             // A result means the gate was answered; the question is spent.
             approval: undefined,
           };
@@ -1770,19 +2003,71 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         ];
       };
 
+      // A streamed reply arrives one delta at a time, and a render per delta is
+      // a render per token. Prose is therefore published once per frame: the
+      // accumulated `content` and `parts` are read when the frame fires, not
+      // when the delta lands. Everything else — a citation, a tool row, the
+      // terminal frame — publishes immediately, and cancels the pending frame
+      // first so nothing is rendered out of order.
+      let frame: number | null = null;
+      let frameKind: "raf" | "timeout" | null = null;
+
+      const flush = () => {
+        frame = null;
+        frameKind = null;
+        setMessages((prev) => {
+          const index = prev.findIndex((message) => message.id === assistantId);
+          if (index === -1) {
+            return prev;
+          }
+          // Only the streaming message is replaced; every settled message keeps
+          // its identity, so a memoised reader of the settled transcript is not
+          // asked to render again.
+          const next = prev.slice();
+          next[index] = {
+            ...prev[index],
+            content,
+            parts: [...parts],
+            ...(failure ? { error: failure, retryText: trimmed } : {}),
+          };
+          return next;
+        });
+      };
+
+      const cancelFrame = () => {
+        if (frame === null) {
+          return;
+        }
+        if (frameKind === "raf") {
+          cancelAnimationFrame(frame);
+        } else {
+          clearTimeout(frame);
+        }
+        frame = null;
+        frameKind = null;
+      };
+
+      /** Batch a streamed delta into the next frame; at most one per frame. */
+      const publishStream = () => {
+        if (frame !== null) {
+          return;
+        }
+        if (typeof requestAnimationFrame === "function") {
+          frameKind = "raf";
+          frame = requestAnimationFrame(flush);
+        } else {
+          // A frame is a wall-clock idea; without rAF the same batching still
+          // holds, on the shortest timer that stands in for one.
+          frameKind = "timeout";
+          frame = setTimeout(flush, 16) as unknown as number;
+        }
+      };
+
       const publish = () => {
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === assistantId
-              ? {
-                  ...message,
-                  content,
-                  parts: [...parts],
-                  ...(failure ? { error: failure, retryText: trimmed } : {}),
-                }
-              : message,
-          ),
-        );
+        // An immediate publish supersedes any pending frame: the same content
+        // is rendered now, once, rather than twice.
+        cancelFrame();
+        flush();
       };
 
       const handleEvent = (event: RawSseEvent) => {
@@ -1798,12 +2083,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           }
           case "reasoning": {
             appendReasoning(String(event.data.text ?? ""));
-            publish();
+            publishStream();
             break;
           }
           case "delta": {
             appendText(String(event.data.text ?? ""));
-            publish();
+            publishStream();
             break;
           }
           case "source": {
@@ -1832,9 +2117,13 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
                 id: String(event.data.tool_call_id ?? `approval-${approvalId}`),
                 name: String(event.data.name ?? ""),
                 status: "running",
+                startedAt: Date.now(),
                 approval: {
                   id: approvalId,
                   prompt: String(event.data.prompt ?? "Allow this change?"),
+                  ...(isArguments(event.data.arguments)
+                    ? { arguments: event.data.arguments }
+                    : {}),
                 },
               },
             ];
@@ -1984,6 +2273,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           // An abort is the user's own doing: drop the empty placeholder, keep
           // the question, and report no failure — the assistant did not break.
           stopped = true;
+          // The deltas that arrived before the abort are still in the closure,
+          // not yet in a frame. Publishing flushes them synchronously — and
+          // cancels the pending frame — so the partial answer is what stays on
+          // screen, and the empty placeholder is the only thing dropped.
+          publish();
           setMessages((prev) =>
             prev.filter((message) => message.id !== assistantId || message.content !== ""),
           );
@@ -2177,10 +2471,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   /** The single conversational exit from any lens. */
   const ask = useCallback(
     (intent: string) => {
-      setActivePanel(null);
+      regions.closeDetail();
       void sendMessage(intent);
     },
-    [sendMessage],
+    [sendMessage, regions.closeDetail],
   );
 
   const refreshMemory = useCallback(async () => {
@@ -2271,6 +2565,40 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       void refreshConversations();
     },
     [refreshConversations],
+  );
+
+  /**
+   * Remove one thread and its turns, then re-read the history.
+   *
+   * Deleting the thread that is open leaves nothing on the stage, so the stage
+   * is cleared to the empty state rather than left pointing at a row that is
+   * gone. A failed delete changes nothing the person can see.
+   */
+  const deleteConversation = useCallback(
+    async (targetId: string) => {
+      try {
+        await apiDeleteConversation(targetId);
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, `/api/conversations/${targetId}`);
+        pushToast("error", "I couldn't delete that conversation.");
+        return false;
+      }
+      if (targetId === conversationId) {
+        abortRef.current?.abort();
+        abortRef.current = null;
+        turnQueueRef.current?.clear();
+        setStreaming(false);
+        setThinkingPhase(null);
+        setOfflineReplyFor(null);
+        setToolActivity([]);
+        setMessages([]);
+        setConversationId(null);
+      }
+      await refreshConversations();
+      return true;
+    },
+    [conversationId, pushToast, refreshConversations],
   );
 
   const clearChat = useCallback(() => {
@@ -2404,6 +2732,17 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // While the breaker is open the countdown is the only thing changing, so tick
+  // it once a second — the timer that carries it is separate from the probe
+  // schedule, and it stops the moment the breaker closes or is reset (#536).
+  useEffect(() => {
+    if (probeRetry.state !== "open") {
+      return;
+    }
+    const timer = window.setInterval(publishProbeRetry, 1_000);
+    return () => window.clearInterval(timer);
+  }, [probeRetry.state, publishProbeRetry]);
+
   // A network that comes back is worth one probe; a network that goes away is
   // worth one sentence and no further requests until it returns. The scheduler
   // itself keeps running, so the timer resumes with the connection.
@@ -2476,6 +2815,48 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const canvasLoading = canvasState.kind === "loading";
   const canvasError = canvasState.kind === "error" ? canvasState.error : null;
 
+  /**
+   * The canvas's two values (#505), split so a reader and a writer never share
+   * a dependency. The state value changes when the board changes; the actions
+   * value keeps its identity across those changes because every mutator below
+   * is a `useCallback` whose own dependencies are settings, toasts, and the
+   * refresh itself — none of which move when a refresh lands.
+   */
+  const canvasStateValue = useMemo<CanvasStateValue>(
+    () => ({ canvas, canvasLoading, canvasCached, canvasState, canvasError }),
+    [canvas, canvasLoading, canvasCached, canvasState, canvasError],
+  );
+  const canvasActionsValue = useMemo<CanvasActionsValue>(
+    () => ({
+      refreshCanvas,
+      addStep,
+      addOutcome,
+      createJob,
+      updateJob,
+      deleteJob,
+      updateStep,
+      deleteStep,
+      updateOutcome,
+      deleteOutcome,
+      deleteEvidence,
+      promoteEvidence,
+    }),
+    [
+      refreshCanvas,
+      addStep,
+      addOutcome,
+      createJob,
+      updateJob,
+      deleteJob,
+      updateStep,
+      deleteStep,
+      updateOutcome,
+      deleteOutcome,
+      deleteEvidence,
+      promoteEvidence,
+    ],
+  );
+
   // Re-probe after the person restored a backup: a clean answer clears the boot
   // page and re-hydrates the studio in place.
   const recheckBoot = useCallback(async () => {
@@ -2517,7 +2898,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [capabilities, capabilitiesCheckedAt],
   );
 
-  const value = useMemo<StudioContextValue>(
+  const value = useMemo<StudioCompositeValue>(
     () => ({
       settings,
       saveSettings,
@@ -2528,13 +2909,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       setupOpen,
       openSetup,
       closeSetup,
-      canvas,
-      canvasLoading,
-      canvasCached,
-      canvasState,
-      canvasError,
-      refreshCanvas,
       llmHealth,
+      probeRetry,
       models,
       modelsLoading,
       modelsMessage,
@@ -2565,6 +2941,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      deleteConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2574,17 +2951,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
-      addStep,
-      addOutcome,
-      promoteEvidence,
-      createJob,
-      updateJob,
-      deleteJob,
-      updateStep,
-      deleteStep,
-      updateOutcome,
-      deleteOutcome,
-      deleteEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -2642,6 +3008,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      detail: regions.detail,
+      openDetail,
+      closeDetail: regions.closeDetail,
+      drawerOpen: regions.drawerOpen,
+      toggleDrawer: regions.toggleDrawer,
+      collapsed: regions.collapsed,
     }),
     [
       settings,
@@ -2653,13 +3025,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       setupOpen,
       openSetup,
       closeSetup,
-      canvas,
-      canvasLoading,
-      canvasCached,
-      canvasState,
-      canvasError,
-      refreshCanvas,
       llmHealth,
+      probeRetry,
       models,
       modelsLoading,
       modelsMessage,
@@ -2690,6 +3057,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      deleteConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2699,17 +3067,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
-      addStep,
-      addOutcome,
-      promoteEvidence,
-      createJob,
-      updateJob,
-      deleteJob,
-      updateStep,
-      deleteStep,
-      updateOutcome,
-      deleteOutcome,
-      deleteEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -2767,10 +3124,20 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      regions.detail,
+      openDetail,
+      regions.closeDetail,
+      regions.drawerOpen,
+      regions.toggleDrawer,
+      regions.collapsed,
     ],
   );
 
-  return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
+  return (
+    <CanvasProvider state={canvasStateValue} actions={canvasActionsValue}>
+      <StudioContext.Provider value={value}>{children}</StudioContext.Provider>
+    </CanvasProvider>
+  );
 }
 
 export function StudioProvider({ children }: { children: ReactNode }) {
@@ -2783,10 +3150,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The composite view every existing caller uses. It merges the canvas's own
+ * context back into the rest, so this issue changes no component: the canvas
+ * fields are read from `CanvasContext` rather than carried in the composite
+ * `useMemo`, which is what keeps a refresh from rebuilding that object (#505).
+ */
 export function useStudio(): StudioContextValue {
   const context = useContext(StudioContext);
-  if (!context) {
+  const canvas = useContext(CanvasStateContext);
+  const canvasActions = useContext(CanvasActionsContext);
+  if (!context || !canvas || !canvasActions) {
     throw new Error("useStudio must be used within a StudioProvider");
   }
-  return context;
+  return useMemo(
+    () => ({ ...context, ...canvas, ...canvasActions }),
+    [context, canvas, canvasActions],
+  );
 }

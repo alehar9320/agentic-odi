@@ -26,3 +26,5 @@ generated_exclusions:
   - "**/schema.d.ts"
   - "coverage.xml"
   - "**/coverage.xml"
+
+# Verification honesty: PR bodies must list tiers run and skipped (see .agents/workflows/test.md)

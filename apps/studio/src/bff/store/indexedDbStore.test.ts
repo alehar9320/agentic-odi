@@ -209,7 +209,7 @@ describe("IndexedDbLocalStore", () => {
     second.close();
   });
 
-  it("migrates a seeded v1 database to v2 with every row and the schema intact", async () => {
+  it("migrates a seeded v1 database to the current version with every row and the schema intact", async () => {
     await seedV1();
 
     const before = await rowsOf(DB_NAME, 1);
@@ -221,18 +221,19 @@ describe("IndexedDbLocalStore", () => {
     for (const name of Object.keys(before)) {
       expect(after[name], `rows in ${name}`).toEqual(before[name]);
     }
-    // The v2 outbox store is added, and it starts empty.
+    // The later stores are added, and they start empty.
     expect(after.outbox).toEqual([]);
+    expect(after.evidence).toEqual([]);
     store.close();
 
-    // The migrated schema equals a fresh v2 database: same stores, key paths,
+    // The migrated schema equals a fresh database: same stores, key paths,
     // auto-increment flags, and index names.
     const migrated = await schemaOf(DB_NAME, DB_VERSION);
     await clearDb();
     const fresh = await makeStore();
     fresh.close();
     expect(migrated).toEqual(await schemaOf(DB_NAME, DB_VERSION));
-    expect(migrated).toEqual(expectedV2Schema());
+    expect(migrated).toEqual(expectedSchema());
   });
 
   it("closes the old connection and flags a reload when another tab upgrades", async () => {
@@ -271,6 +272,24 @@ describe("IndexedDbLocalStore", () => {
 
     expect(await store.countTurns("c-1")).toBe(2);
     expect(await store.countTurns("c-none")).toBe(0);
+    store.close();
+  });
+
+  it("deletes a conversation and its turns together", async () => {
+    const store = await makeStore();
+    await store.putConversation(conversation("c-1", "2026-01-01T00:00:00Z"));
+    await store.putConversation(conversation("c-2", "2026-01-02T00:00:00Z"));
+    await store.appendTurn(turn("c-1", "m-1"));
+    await store.appendTurn(turn("c-1", "m-2"));
+    await store.appendTurn(turn("c-2", "m-3"));
+
+    await store.deleteConversation("c-1");
+
+    expect(await store.getConversation("c-1")).toBeUndefined();
+    expect(await store.countTurns("c-1")).toBe(0);
+    // The other thread keeps its row and its turn.
+    expect(await store.getConversation("c-2")).toBeDefined();
+    expect(await store.countTurns("c-2")).toBe(1);
     store.close();
   });
 
@@ -420,14 +439,20 @@ async function rowsOf(name: string, version: number) {
   return rows;
 }
 
-/** The v2 schema written out, so the migrated shape is asserted, not assumed. */
-function expectedV2Schema() {
+/** The current schema written out, so the migrated shape is asserted, not assumed. */
+function expectedSchema() {
   return [
     {
       store: "conversations",
       keyPath: "id",
       autoIncrement: false,
       indexes: ["by-updated"],
+    },
+    {
+      store: "evidence",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-seq"],
     },
     {
       store: "jobs",

@@ -1161,8 +1161,19 @@ async def get_evidence(
 
 
 @router.get("/memory/observations", response_model=ObservationListResponse)
-def list_observations(request: Request) -> ObservationListResponse:
-    observations = _memory(request).list_observations()
+def list_observations(
+    request: Request,
+    subject_type: str | None = None,
+    subject_id: str | None = None,
+) -> ObservationListResponse:
+    try:
+        observations = _memory(request).list_observations(
+            subject_type=subject_type, subject_id=subject_id
+        )
+    except ValueError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
+        ) from exc
     return ObservationListResponse(
         observations=[observation.to_dict() for observation in observations]
     )
@@ -1177,6 +1188,8 @@ def create_observation(body: ObservationCreateRequest, request: Request) -> Obse
             data=body.data,
             status="confirmed" if body.confirmed else "suggested",
             confidence=body.confidence,
+            subject_type=body.subject_type,
+            subject_id=body.subject_id,
         )
     except ValueError as exc:
         raise StudioHTTPError(
@@ -1295,6 +1308,22 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
         ],
         head_id=conversation.head_id or (turns[-1].message_id if turns else None),
     )
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str, request: Request) -> dict:
+    """Remove one thread and its turns; an unknown id is a 404, not a no-op."""
+    try:
+        _memory(request).delete_conversation(conversation_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+                suggestion="Refresh the history and try again.",
+            )
+        ) from exc
+    return {"ok": True}
 
 
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
@@ -1634,6 +1663,8 @@ async def promote_evidence(
             args["importance"] = body.importance
         if body.satisfaction is not None:
             args["satisfaction"] = body.satisfaction
+        if body.force:
+            args["force"] = True
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.PROMOTE_EVIDENCE.value,
@@ -1649,6 +1680,7 @@ async def promote_evidence(
             name=body.name,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            force=body.force,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc

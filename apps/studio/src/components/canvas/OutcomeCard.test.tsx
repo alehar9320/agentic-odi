@@ -91,34 +91,88 @@ describe("OutcomeCard claim check", () => {
     expect(screen.getByText("never measured")).toBeInTheDocument();
   });
 
-  it("counts the answers against the questions it asked", () => {
+  it("shows a partly verified indicator with the answered and skipped basis", () => {
     const { container } = render(<OutcomeCard outcome={checked} />);
 
     expect(container.querySelector(".claim-check__head")?.textContent).toContain("1 of 3 answered");
+    expect(container.querySelector(".claim-check__head")?.textContent).toContain("1 skipped");
+    expect(container.querySelector(".claim-check--partial")).not.toBeNull();
+    expect(screen.getByText("Partly verified")).toBeInTheDocument();
   });
 
-  it("marks a score with no answers recorded as unverified", () => {
+  it("marks a score with no answers recorded as a hypothesis", () => {
     const guessed = {
       ...checked,
       claim_check: { ...checked.claim_check, answers: [], skips: [], verified: false },
     };
     const { container } = render(<OutcomeCard outcome={guessed} />);
 
-    expect(container.querySelector(".claim-check")).toHaveClass("claim-check--unverified");
-    expect(screen.getByText("Unverified")).toBeInTheDocument();
+    expect(container.querySelector(".claim-check")).toHaveClass("claim-check--hypothesis");
+    expect(screen.getByText("Hypothesis")).toBeInTheDocument();
   });
 
-  it("leaves a verified score unmarked", () => {
-    const { container } = render(<OutcomeCard outcome={checked} />);
+  it("reads a fully answered, verified score as verified", () => {
+    const fullyAnswered = {
+      ...outcome,
+      claim_check: {
+        asked: asked.slice(0, 2),
+        answers: ["Every week.", "A script."],
+        skips: [],
+        verified: true,
+      },
+    };
+    const { container } = render(<OutcomeCard outcome={fullyAnswered} />);
 
-    expect(container.querySelector(".claim-check")).not.toHaveClass("claim-check--unverified");
+    expect(container.querySelector(".claim-check")).toHaveClass("claim-check--verified");
     expect(screen.getByText("Verified")).toBeInTheDocument();
   });
 
-  it("names a bare number when no check arrived with it", () => {
+  it("names a bare number as a hypothesis when no check arrived with it", () => {
     render(<OutcomeCard outcome={outcome} />);
 
-    expect(screen.getByText("No questions recorded behind this score")).toBeInTheDocument();
+    expect(screen.getByText("nothing backs this yet")).toBeInTheDocument();
+    expect(screen.getByText("Hypothesis")).toBeInTheDocument();
+  });
+
+  it("reveals the linked quotes from the indicator itself, not a second control", () => {
+    // A quote captured against this outcome, with its way back to the source.
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [],
+        steps: [],
+        outcomes: [],
+        evidence: [
+          {
+            id: "E-1",
+            outcome_id: "O-101",
+            content: "We sync secrets by hand every deploy.",
+            source_name: "Linear",
+          },
+        ],
+        source: "local",
+      },
+    } as unknown as typeof harness.state.canvasState;
+
+    try {
+      const { container } = render(<OutcomeCard outcome={checked} />);
+
+      expect(container.querySelector(".card__evidence")).toBeNull();
+
+      const indicator = screen.getByRole("button", { name: /Partly verified/i });
+      expect(indicator).toHaveAttribute("aria-expanded", "false");
+      fireEvent.click(indicator);
+      expect(indicator).toHaveAttribute("aria-expanded", "true");
+
+      // One reveal path: the same evidence panel the "Evidence" button drives.
+      expect(screen.getByText(/We sync secrets by hand every deploy./)).toBeInTheDocument();
+      expect(screen.getByText(/Via Linear/)).toBeInTheDocument();
+    } finally {
+      harness.state.canvasState = {
+        kind: "ready",
+        data: { jobs: [], steps: [], outcomes: [], source: "seed" },
+      };
+    }
   });
 
   it("stays quiet when there is no number to stand behind", () => {
@@ -128,10 +182,51 @@ describe("OutcomeCard claim check", () => {
   });
 
   it("does not lecture the bundled sample rows", () => {
-    // A by-hand notice is about the person's own numbers. The demo board is not
+    // A backing notice is about the person's own numbers. The demo board is not
     // theirs, it is already badged Sample, and sample rows are excluded elsewhere.
     const { container } = render(<OutcomeCard outcome={outcome} sample />);
 
     expect(container.querySelector(".claim-check")).toBeNull();
+    expect(container.querySelector(".badge--button")).toBeNull();
+  });
+});
+
+describe("OutcomeCard advances link", () => {
+  it("names the objective an outcome advances, with the field", () => {
+    const linked = {
+      ...outcome,
+      trace: [{ field: "method", key: "abc123", text: "Cut release time in half" }],
+    };
+    render(<OutcomeCard outcome={linked} />);
+    expect(screen.getByText(/Advances Cut release time in half \(method\)/i)).toBeInTheDocument();
+  });
+
+  it("joins several links with a separator", () => {
+    const linked = {
+      ...outcome,
+      trace: [
+        { field: "method", key: "abc123", text: "Cut release time in half" },
+        { field: "measure", key: "def456", text: "Release time" },
+      ],
+    };
+    render(<OutcomeCard outcome={linked} />);
+    expect(screen.getByText(/Cut release time in half \(method\) · Release time \(measure\)/i)).toBeInTheDocument();
+  });
+
+  it("says plainly that an unlinked outcome advances nothing yet", () => {
+    render(<OutcomeCard outcome={outcome} />);
+    expect(screen.getByText("Advances nothing yet")).toBeInTheDocument();
+  });
+
+  it("never invents an objective from a guessed id", () => {
+    // The link text is recorded at filing time. A reworded vision leaves the
+    // frozen text behind as drift evidence rather than updating the card.
+    const drifted = {
+      ...outcome,
+      trace: [{ field: "method", key: "old-key", text: "Old objective wording" }],
+    };
+    render(<OutcomeCard outcome={drifted} />);
+    expect(screen.getByText(/Old objective wording \(method\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/new objective/i)).toBeNull();
   });
 });

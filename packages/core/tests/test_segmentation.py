@@ -239,6 +239,8 @@ def test_segmentation_reads_no_demographic_attribute() -> None:
         "verdict",
         "rationale",
         "confidence",
+        "computed_at_event_id",
+        "stale",
         "created_at",
     }
     assert not any(word in Segment.model_fields for word in demographics)

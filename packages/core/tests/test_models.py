@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
+import pytest
+from agentic_odi_core import Link as RootLink
+from agentic_odi_core import RelationshipType as RootRelationshipType
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
     CustomerValue,
     Direction,
+    Evidence,
+    Link,
+    RelationshipType,
     ValueMetric,
 )
+from pydantic import ValidationError
 
 
 def _customer_value(**overrides: object) -> CustomerValue:
@@ -50,3 +59,98 @@ def test_customer_outcome_delegates_opportunity_score() -> None:
         ),
     )
     assert outcome.opportunity_score == 11.0
+
+
+def test_evidence_defaults_to_medium_impact_and_claimed_confidence() -> None:
+    evidence = Evidence(
+        source_name="demo",
+        source_kind="demo",
+        name="fixture",
+        content="A captured quote",
+    )
+    assert evidence.impact == "medium"
+    assert evidence.confidence == "claimed"
+
+
+def test_evidence_accepts_explicit_impact_and_confidence() -> None:
+    evidence = Evidence(
+        source_name="demo",
+        source_kind="demo",
+        name="fixture",
+        content="A captured quote",
+        impact="high",
+        confidence="verified",
+    )
+    assert evidence.impact == "high"
+    assert evidence.confidence == "verified"
+
+
+def test_evidence_rejects_unknown_impact_and_confidence() -> None:
+    with pytest.raises(ValidationError):
+        Evidence(
+            source_name="demo",
+            source_kind="demo",
+            name="fixture",
+            content="A captured quote",
+            impact="extreme",
+        )
+    with pytest.raises(ValidationError):
+        Evidence(
+            source_name="demo",
+            source_kind="demo",
+            name="fixture",
+            content="A captured quote",
+            confidence="maybe",
+        )
+
+
+def test_link_round_trips_with_relationship_type() -> None:
+    link = Link(
+        source_type="evidence",
+        source_id="evidence-1",
+        target_type="outcome",
+        target_id="outcome-1",
+        relationship_type=RelationshipType.serves,
+        external_system="jira",
+        external_id="EXT-42",
+        preview={"title": "Resolved faster"},
+    )
+    assert link.relationship_type == RelationshipType.serves
+    assert link.relationship_type.value == "serves"
+    assert link.source_type == "evidence"
+    assert link.target_type == "outcome"
+    assert isinstance(link.created_at, datetime)
+    assert link.id is not None
+
+    restored = Link.model_validate_json(link.model_dump_json())
+    assert restored == link
+    assert restored.relationship_type is RelationshipType.serves
+    assert restored.external_system == "jira"
+    assert restored.external_id == "EXT-42"
+    assert restored.preview == {"title": "Resolved faster"}
+
+
+def test_link_is_exported_at_package_root() -> None:
+    assert RootLink is Link
+    assert RootRelationshipType is RelationshipType
+
+
+def test_link_relationship_type_has_all_values() -> None:
+    expected = {
+        "references",
+        "serves",
+        "blocked_by",
+        "blocking",
+        "duplicates",
+        "relates_to",
+        "implements",
+        "validates",
+        "evidence_for",
+        "outcome_of",
+        "external_jira",
+        "external_linear",
+        "external_jpd",
+        "external_github",
+        "external_notion",
+    }
+    assert {member.value for member in RelationshipType} == expected

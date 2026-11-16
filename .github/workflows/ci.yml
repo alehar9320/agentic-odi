@@ -95,6 +95,9 @@ jobs:
       - name: Check the documentation against the code
         run: uv run python scripts/doc_check.py
 
+      - name: Check the documentation index is up to date
+        run: uv run python scripts/docs_index.py --check
+
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -322,6 +325,10 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Check the cold-start bundle budget
+        working-directory: .
+        run: node scripts/check_bundle_budget.mjs
 
       - name: Verify generated API types are up to date
         run: |
