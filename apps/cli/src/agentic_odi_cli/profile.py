@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
@@ -290,22 +291,24 @@ def set_profile(
     business_model: str | None = typer.Option(None, help="Business model"),
     core_problem: str | None = typer.Option(None, help="Core problem solved"),
     current_focus: str | None = typer.Option(None, help="Current focus"),
-    clear: list[str] = typer.Option(
-        [],
-        "--clear",
-        help=(
-            "Field to unset (repeatable): product_name, domain, primary_user, "
-            "business_model, core_problem, current_focus"
+    clear: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--clear",
+            help=(
+                "Field to unset (repeatable): product_name, domain, primary_user, "
+                "business_model, core_problem, current_focus"
+            ),
         ),
-    ),
+    ] = None,
 ) -> None:
     """Set profile values non-interactively."""
+    clear_fields = clear or []
     valid_clear_fields = _CLEARABLE_PROFILE_FIELDS
-    for name in clear:
+    for name in clear_fields:
         if name not in valid_clear_fields:
             typer.echo(
-                "Unknown field to clear: "
-                f"{name}. Valid names: {', '.join(valid_clear_fields)}",
+                f"Unknown field to clear: {name}. Valid names: {', '.join(valid_clear_fields)}",
                 err=True,
             )
             raise typer.Exit(code=2)
@@ -324,7 +327,7 @@ def set_profile(
     if current_focus is not None:
         b.current_focus = current_focus
     # Apply --clear after set-options so `--core-problem x --clear core_problem` ends unset.
-    for name in clear:
+    for name in clear_fields:
         setattr(b, name, None)
     p = save_baseline(b)
     typer.echo(f"Profile saved to {p}")
