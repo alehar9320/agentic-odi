@@ -54,6 +54,7 @@ import {
   listConversations as apiListConversations,
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
+  renameConversation as apiRenameConversation,
   resolveApproval as apiResolveApproval,
   setConversationHead as apiSetConversationHead,
   streamChat,
@@ -436,6 +437,11 @@ export interface StudioContextValue {
    * to the empty state; a failure leaves the history untouched.
    */
   deleteConversation: (conversationId: string) => Promise<boolean>;
+  /**
+   * Rename one thread and refresh the history. A failure leaves the old title
+   * in place and returns false.
+   */
+  renameConversation: (conversationId: string, title: string) => Promise<boolean>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -2655,6 +2661,28 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [conversationId, pushToast, refreshConversations],
   );
 
+  /**
+   * Rename one thread, then re-read the history so the list shows the new name.
+   *
+   * A failed rename changes nothing the person can see: the row keeps the title
+   * it had, and the caller is told the write did not land.
+   */
+  const renameConversation = useCallback(
+    async (targetId: string, title: string) => {
+      try {
+        await apiRenameConversation(targetId, title);
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, `/api/conversations/${targetId}`);
+        pushToast("error", "I couldn't rename that conversation.");
+        return false;
+      }
+      await refreshConversations();
+      return true;
+    },
+    [pushToast, refreshConversations],
+  );
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -2997,6 +3025,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshConversations,
       openConversation,
       deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -3114,6 +3143,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshConversations,
       openConversation,
       deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,

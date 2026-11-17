@@ -260,6 +260,17 @@ export class LocalMemoryService {
     return this.store.setConversationHead(id, headId);
   }
 
+  /**
+   * Rename a thread. The title is trimmed and capped at the same 200 characters
+   * the sidecar enforces, so a rename lands identically with or without it.
+   */
+  async renameConversation(id: string, title: string): Promise<Conversation> {
+    if (!(await this.store.getConversation(id))) {
+      throw notFound("Conversation", id);
+    }
+    return this.store.setConversationTitle(id, title.trim().slice(0, 200));
+  }
+
   /** Remove a thread and its turns; an unknown id is a not-found, not a no-op. */
   async deleteConversation(id: string): Promise<{ ok: boolean }> {
     if (!(await this.store.getConversation(id))) {
