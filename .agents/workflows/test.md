@@ -71,9 +71,11 @@ npm --prefix apps/studio run test:e2e
 ```
 
 CI runs this in the `e2e` job against the real Studio, the real sidecar, and
-the real MCP server. It is deliberately non-blocking: set the repository
-variable `AGENTIC_ODI_E2E` to `false` to skip it, and `continue-on-error`
-keeps a failure from turning CI red.
+the real MCP server. It is advisory by default: set the repository variable
+`AGENTIC_ODI_E2E` to `false` to skip it, and a failure is reported — in the job
+summary, in a warning annotation, and in `CI green`'s table — without turning
+CI red. Set `AGENTIC_ODI_E2E_BLOCKING` to `true` to make a browser failure
+block a merge.
 
 ## Honest PR bodies
 
