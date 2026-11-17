@@ -515,6 +515,51 @@ a {
   opacity: 0;
 }
 
+.bar__history-rename-open {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.bar__history-row:hover .bar__history-rename-open,
+.bar__history-rename-open:focus-visible {
+  opacity: 1;
+}
+
+.bar__history-rename-open:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.bar__history-rename {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 2px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.bar__history-rename:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 1px;
+}
+
 .bar__history-row:hover .bar__history-delete,
 .bar__history-delete:focus-visible {
   opacity: 1;

@@ -219,6 +219,20 @@ export class MemoryLocalStore implements LocalStore {
     return next;
   }
 
+  async renameConversation(id: string, title: string): Promise<StoredConversation> {
+    const conversation = this.conversations.get(id);
+    if (!conversation) {
+      throw new Error(`Conversation ${id} not found`);
+    }
+    const next: StoredConversation = {
+      ...conversation,
+      title,
+      updated_at: nowIso(),
+    };
+    this.conversations.set(id, next);
+    return next;
+  }
+
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.turns
       .filter((turn) => turn.conversation_id === conversationId)

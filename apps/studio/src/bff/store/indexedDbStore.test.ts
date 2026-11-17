@@ -123,6 +123,35 @@ describe("IndexedDbLocalStore", () => {
     store.close();
   });
 
+  it("renames a conversation without touching its turns or head", async () => {
+    const store = await makeStore();
+    await store.putConversation({
+      id: "c-1",
+      title: "Chat",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      head_id: "m-1",
+    });
+    await store.appendTurn({
+      conversation_id: "c-1",
+      role: "user",
+      content: "hi",
+      created_at: "2026-01-01T00:00:00Z",
+      message_id: "m-1",
+      parent_id: null,
+    });
+
+    const renamed = await store.renameConversation("c-1", "Renamed");
+
+    expect(renamed.title).toBe("Renamed");
+    expect((await store.getConversation("c-1"))?.title).toBe("Renamed");
+    // The rename moves the thread's time and nothing else.
+    expect((await store.getConversation("c-1"))?.head_id).toBe("m-1");
+    expect(await store.listTurns("c-1")).toHaveLength(1);
+    await expect(store.renameConversation("missing", "X")).rejects.toThrow(/not found/i);
+    store.close();
+  });
+
   it("round-trips outbox records and reclaims a stale drain lease", async () => {
     const store = await makeStore();
     await store.enqueueOutbox({

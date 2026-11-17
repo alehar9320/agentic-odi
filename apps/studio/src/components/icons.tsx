@@ -311,6 +311,15 @@ export function TrashIcon(props: IconProps) {
   );
 }
 
+export function PencilIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+      <path d="M14.5 5.5l4 4" />
+    </Icon>
+  );
+}
+
 export function TableIcon(props: IconProps) {
   return (
     <Icon {...props}>

@@ -55,6 +55,7 @@ import {
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
+  renameConversation as apiRenameConversation,
   setConversationHead as apiSetConversationHead,
   streamChat,
   updateJob as apiUpdateJob,
@@ -436,6 +437,11 @@ export interface StudioContextValue {
    * to the empty state; a failure leaves the history untouched.
    */
   deleteConversation: (conversationId: string) => Promise<boolean>;
+  /**
+   * Give one thread a new name. The row is renamed in place, and the list is
+   * re-read so ordering follows the touch; a failure leaves the old name.
+   */
+  renameConversation: (conversationId: string, title: string) => Promise<boolean>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -2655,6 +2661,29 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [conversationId, pushToast, refreshConversations],
   );
 
+  /**
+   * Give one thread a new name, and re-read the history.
+   *
+   * The list is re-read rather than patched in place so the renamed thread
+   * moves to the top — its `updated_at` was just touched — exactly as a reload
+   * would show it. A failed rename changes nothing the person can see.
+   */
+  const renameConversation = useCallback(
+    async (targetId: string, title: string) => {
+      try {
+        await apiRenameConversation(targetId, title);
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, `/api/conversations/${targetId}`);
+        pushToast("error", "I couldn't rename that conversation.");
+        return false;
+      }
+      await refreshConversations();
+      return true;
+    },
+    [pushToast, refreshConversations],
+  );
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -2997,6 +3026,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshConversations,
       openConversation,
       deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -3114,6 +3144,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshConversations,
       openConversation,
       deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,

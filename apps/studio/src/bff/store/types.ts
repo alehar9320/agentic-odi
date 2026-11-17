@@ -171,6 +171,8 @@ export interface LocalStore {
   getConversation(id: string): Promise<StoredConversation | undefined>;
   putConversation(conversation: StoredConversation): Promise<void>;
   setConversationHead(id: string, headId: string | null): Promise<StoredConversation>;
+  /** Give a thread a new name. An unknown id throws rather than writing a row. */
+  renameConversation(id: string, title: string): Promise<StoredConversation>;
   listTurns(conversationId: string): Promise<ConversationTurn[]>;
   /** How much a conversation holds, without reading every turn. */
   countTurns(conversationId: string): Promise<number>;

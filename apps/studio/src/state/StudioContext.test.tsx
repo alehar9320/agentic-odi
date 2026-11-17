@@ -123,6 +123,9 @@ let featuredFetches = 0;
 let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+let renamePatches: Record<string, unknown>[] = [];
+/** When true, the conversation PATCH route answers 503 so a rename fails. */
+let renameFails = false;
 let conversationCreates = 0;
 /** When true, the canvas/evidence write routes answer 503 with no structured error. */
 let writeFails = false;
@@ -337,7 +340,19 @@ function route(
     return json({ ok: true, id: url.split("/").pop() });
   }
   if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
-    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    if ("title" in body) {
+      if (renameFails) {
+        return new Response(JSON.stringify({ detail: "nope" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      renamePatches.push({ url, ...body });
+    }
+    if ("head_id" in body) {
+      headPatches.push(body);
+    }
     return json({ conversation: CONVERSATION });
   }
   if (url === "/api/conversations/c-1/tree") {
@@ -439,6 +454,8 @@ describe("StudioContext memory and resume", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -806,6 +823,8 @@ describe("StudioContext failures", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2035,6 +2054,8 @@ describe("StudioContext canvas state", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2087,6 +2108,8 @@ describe("StudioContext stopped turns", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2130,6 +2153,8 @@ describe("StudioContext write approval and branches", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2300,6 +2325,8 @@ describe("StudioContext startNewThread (#319)", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     conversationCreates = 0;
     vi.stubGlobal(
       "fetch",
@@ -2702,6 +2729,8 @@ describe("StudioContext agent focus", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
@@ -3161,5 +3190,72 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+});
+
+describe("StudioContext rename conversation (#642)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmTransportFails = false;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    renamePatches = [];
+    renameFails = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function booted() {
+    const harness = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(harness.result.current.conversations).toHaveLength(2));
+    return harness;
+  }
+
+  it("renames a thread and re-reads the history", async () => {
+    const { result } = await booted();
+
+    await act(async () => {
+      await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(renamePatches).toEqual([{ url: "/api/conversations/c-1", title: "Renamed thread" }]);
+    // The list is re-read from the store, not patched by hand.
+    expect(result.current.conversations).toHaveLength(2);
+  });
+
+  it("reports a failed rename and leaves the history as it was", async () => {
+    const { result } = await booted();
+    renameFails = true;
+    const before = result.current.conversations;
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(ok).toBe(false);
+    expect(result.current.conversations).toEqual(before);
+    expect(result.current.toasts.map((toast) => toast.message)).toContain(
+      "I couldn't rename that conversation.",
+    );
   });
 });
