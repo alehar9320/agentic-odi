@@ -6364,6 +6364,30 @@ details[open] summary {
   font-size: 10.5px;
 }
 
+.attachment-chip__state {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.attachment-chip__retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 10.5px;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.attachment-chip__retry:hover {
+  background: var(--surface-hover);
+  border-color: var(--line-strong);
+}
+
 .composer.is-dragging .composer__shell {
   border-color: rgba(139, 140, 248, 0.6);
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12), 0 14px 34px rgba(0, 0, 0, 0.3);
