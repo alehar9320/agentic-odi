@@ -59,6 +59,18 @@ reason = "Extraction aborts the process on a crafted symlink entry. Same zip 9.x
 expires = "2026-12-16"
 
 [[ignore]]
+id = "RUSTSEC-2026-0545"
+package = "zip"
+reason = "AES entries are returned without checking their authentication code when the data ends early or is empty. Fix is zip >= 9.0.0, the same breaking major as RUSTSEC-2026-0369; the Tauri updater path must be reviewed first (#1090)."
+expires = "2026-12-16"
+
+[[ignore]]
+id = "RUSTSEC-2026-0548"
+package = "zip"
+reason = "`ZipStreamReader` extracts entries under local-header names that can differ from the central directory. Fix is zip >= 9.0.5, the same breaking major as RUSTSEC-2026-0369 (#1090)."
+expires = "2026-12-16"
+
+[[ignore]]
 id = "RUSTSEC-2026-0382"
 package = "rustls-webpki"
 reason = "Certificate verification may accept distrusted intermediates. Fix is a patch bump to 0.103.16 via `cargo update` (#1090)."
