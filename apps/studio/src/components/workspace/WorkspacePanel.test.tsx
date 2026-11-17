@@ -88,20 +88,6 @@ describe("WorkspacePanel", () => {
     studio.activePanel = "landscape";
     studio.openPanel.mockClear();
     studio.detail = null;
-    studio.canvas = {
-      jobs: [],
-      steps: [],
-      outcomes: [
-        {
-          id: "O-1",
-          statement: "Minimize the time it takes to ship",
-          importance: 9,
-          satisfaction: 3,
-          opportunity_score: 15,
-        },
-      ],
-      source: "seed",
-    } as never;
     studio.closePanel.mockClear();
     studio.sendMessage.mockClear();
     studio.conversationId = "c1";
