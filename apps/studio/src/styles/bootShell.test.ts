@@ -4,10 +4,17 @@
  * The shell exists so a cold load is never the browser's white canvas. It can
  * only do that if it runs before the bundle, carries no request of its own, and
  * paints the same colours the app will. These tests read the document as
- * shipped and hold it to that contract; the colour check keeps the inline
- * literals in step with `theme.css`, which stays the source of truth.
+ * shipped and hold it to that contract; the colour check keeps the literals in
+ * `public/boot.css` in step with `theme.css`, which stays the source of truth.
+ *
+ * Both bootstraps are same-origin files rather than inline blocks. The sidecar
+ * (`CSP_POLICY` in the studio API) and the Tauri window serve this document
+ * under `script-src 'self'; style-src 'self'`, so an inline `<style>` or
+ * `<script>` is refused by the browser and the shell paints nothing at all.
+ * "No inline script or style" is therefore part of the contract these tests
+ * hold, not a matter of taste.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,24 +23,17 @@ import themeCss from "./theme.css?raw";
 
 // Vitest runs with the studio package as its working directory.
 const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
-
-function readTag(tag: "style" | "script"): string {
-  const match = html.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
-  expect(match, `missing inline <${tag}>`).not.toBeNull();
-  return match![1];
-}
-
-const inlineStyle = readTag("style");
-const inlineScript = readTag("script");
+const bootCss = readFileSync(join(process.cwd(), "public", "boot.css"), "utf8");
+const themeScript = readFileSync(join(process.cwd(), "public", "boot-theme.js"), "utf8");
 
 /** The value of a custom property inside the first block matching `selector`. */
 function bootToken(selector: string, token: string): string | null {
-  const start = inlineStyle.indexOf(selector);
+  const start = bootCss.indexOf(selector);
   if (start < 0) {
     return null;
   }
-  const open = inlineStyle.indexOf("{", start);
-  const block = inlineStyle.slice(open, inlineStyle.indexOf("}", open));
+  const open = bootCss.indexOf("{", start);
+  const block = bootCss.slice(open, bootCss.indexOf("}", open));
   return block.match(new RegExp(`--${token}:\\s*([^;]+);`))?.[1].trim() ?? null;
 }
 
@@ -59,16 +59,30 @@ describe("the bootstrap shell", () => {
     }
   });
 
+  it("keeps the document free of inline script and style, so the strict CSP can serve it", () => {
+    expect(html).not.toMatch(/<style[\s>]/i);
+    for (const tag of html.match(/<script\b[^>]*>/gi) ?? []) {
+      expect(tag, `inline script would be refused by the CSP: ${tag}`).toMatch(/\bsrc="/);
+    }
+  });
+
+  it("loads both bootstraps from same-origin files that exist", () => {
+    expect(html).toContain('<link rel="stylesheet" href="/boot.css" />');
+    expect(html).toContain('<script src="/boot-theme.js"></script>');
+    expect(existsSync(join(process.cwd(), "public", "boot.css"))).toBe(true);
+    expect(existsSync(join(process.cwd(), "public", "boot-theme.js"))).toBe(true);
+  });
+
   it("requests neither a font nor an image", () => {
-    expect(inlineStyle).not.toMatch(/url\(/);
-    expect(inlineStyle).not.toMatch(/@font-face/);
-    expect(inlineScript).not.toMatch(/url\(/);
+    expect(bootCss).not.toMatch(/url\(/);
+    expect(bootCss).not.toMatch(/@font-face/);
+    expect(themeScript).not.toMatch(/url\(/);
   });
 
   it("stays a small bootstrap rather than a second stylesheet", () => {
-    // #308 budgets the inline style at 1 KB; the script is a few hundred bytes.
-    expect(inlineStyle.length).toBeLessThan(1024);
-    expect(inlineStyle.length + inlineScript.length).toBeLessThan(2048);
+    // #308 budgets the boot style at 1 KB; the script is a few hundred bytes.
+    expect(bootCss.length).toBeLessThan(1024);
+    expect(bootCss.length + themeScript.length).toBeLessThan(2048);
   });
 });
 
@@ -91,16 +105,16 @@ describe("the bootstrap colours", () => {
   });
 
   it("follows the operating system before the script runs, without overriding a resolved class", () => {
-    expect(inlineStyle).toMatch(/@media\s*\(prefers-color-scheme:\s*light\)/);
+    expect(bootCss).toMatch(/@media\s*\(prefers-color-scheme:\s*light\)/);
     // The resolved class is declared after the media block, so it wins the cascade.
-    expect(inlineStyle.indexOf("html.theme-light")).toBeGreaterThan(
-      inlineStyle.indexOf("@media (prefers-color-scheme: light)"),
+    expect(bootCss.indexOf("html.theme-light")).toBeGreaterThan(
+      bootCss.indexOf("@media (prefers-color-scheme: light)"),
     );
-    expect(inlineStyle).toContain("html:not(.theme-dark)");
+    expect(bootCss).toContain("html:not(.theme-dark)");
   });
 });
 
-describe("the inline theme script", () => {
+describe("the theme bootstrap script", () => {
   const originalMatchMedia = window.matchMedia;
 
   function runScript(options: { stored?: string | null; prefersLight: boolean }): void {
@@ -126,7 +140,7 @@ describe("the inline theme script", () => {
     document.documentElement.removeAttribute("style");
     // The script is the one the browser runs before the bundle; executing it
     // here is what makes this a test of the resolution and not of its text.
-    new Function(inlineScript)();
+    new Function(themeScript)();
   }
 
   afterEach(() => {
@@ -170,8 +184,13 @@ describe("the inline theme script", () => {
   });
 
   it("is plain and synchronous, so nothing can defer it", () => {
-    expect(inlineScript).not.toMatch(/\bimport\b/);
-    expect(inlineScript).not.toMatch(/async|defer/);
+    expect(themeScript).not.toMatch(/\bimport\b/);
+    expect(themeScript).not.toMatch(/async|defer/);
+    // The tag that loads it must not defer either: it has to run before the
+    // module bundle and before first paint.
+    const tag = html.match(/<script\b[^>]*boot-theme\.js[^>]*>/i)?.[0] ?? "";
+    expect(tag).not.toMatch(/\b(defer|async)\b/);
+    expect(tag).not.toContain('type="module"');
   });
 
   it("declares both colour schemes so native controls follow the class", () => {

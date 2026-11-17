@@ -1,3 +1,11 @@
+---
+title: Installation
+blurb: Binaries, the installer, and updates.
+nav_group: Get started
+nav_order: 1
+slug: installation
+---
+
 # Installation
 
 Prebuilt binaries are available for Linux, macOS, and Windows. Install the latest
@@ -27,6 +35,13 @@ uses `~\AppData\Local\agentic-odi\` and copies `.exe` files to
 
 Prefer a direct archive? Pick the build for your machine and expand it. Every
 release carries each of these with a SHA-256 checksum in `checksums.txt`:
+
+**Direct download buttons:**
+
+[![Download Linux](https://img.shields.io/badge/Linux-odi__latest__linux__x86__64.tar.gz-blue?logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_linux_x86_64.tar.gz)
+[![Download macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple%20Silicon-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_macos_arm64.tar.gz)
+[![Download macOS Intel](https://img.shields.io/badge/macOS-Intel-blue?logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_macos_x86_64.tar.gz)
+[![Download Windows](https://img.shields.io/badge/Windows-odi__latest__windows__x86__64.zip-blue?logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_latest_windows_x86_64.zip)
 
 | Platform | Archive |
 |---|---|
@@ -90,7 +105,8 @@ Releases are cut and published by CI with no approval step:
 1. Conventional commits land on `main`; `release-please` opens or updates the
    release PR.
 2. The `release-please` workflow arms auto-merge on that PR. `main` requires the
-   `CI green` check (ruleset `main-requires-ci-green`), so the PR merges itself
+   `CI green` and `PR guardrails` checks (rulesets `main-requires-ci-green` and
+   `protect-main`), so the PR merges itself
    as soon as CI passes — nobody clicks merge.
 3. The merge cuts tag `vX.Y.Z` and publishes the GitHub Release. The `release`
    and `Tauri Release` workflows attach the CLI archives, `checksums.txt`, the

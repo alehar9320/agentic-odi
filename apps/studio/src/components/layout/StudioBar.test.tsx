@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -21,6 +21,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   probeRetry: { state: "closed", retryInMs: 0 },
   messages: [],
   openConversation: vi.fn(),
+  deleteConversation: vi.fn(async () => true),
   refreshConversations: vi.fn(),
   unreadSignalCount: 0,
   openPanel: vi.fn(),
@@ -745,5 +746,96 @@ describe("history is grouped by day (#694 D13)", () => {
     expect(screen.getByRole("group", { name: "Today" })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Yesterday" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Earlier" })).toBeNull();
+  });
+});
+
+describe("StudioBar delete conversation (#643)", () => {
+  const conversations = [
+    conversation("c-2", "Current thread", new Date(2026, 9, 22, 9, 0).toISOString(), 4),
+    conversation("c-1", "An older thread", new Date(2026, 9, 21, 9, 0).toISOString(), 1),
+  ];
+
+  function openHistory(overrides: Record<string, unknown> = {}) {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ conversationId: "c-2", conversations, ...overrides }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+  }
+
+  it("asks before deleting, and says what goes with the thread", () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Current thread" }));
+
+    // Nothing is deleted until the ask is answered: the question is not the act.
+    expect(deleteConversation).not.toHaveBeenCalled();
+    expect(screen.getByRole("group", { name: "Delete Current thread?" })).toHaveTextContent(
+      "Delete “Current thread”? Its 4 turns go with it.",
+    );
+  });
+
+  it("keeps the thread when the confirmation is declined", () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Current thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    expect(deleteConversation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("group", { name: "Delete Current thread?" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Delete Current thread" })).toBeInTheDocument();
+  });
+
+  it("deletes the thread once, and closes the list when it was the open one", async () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Current thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-2"));
+    expect(deleteConversation).toHaveBeenCalledOnce();
+    // The row being read is gone, so the list closes rather than framing a gap.
+    await waitFor(() =>
+      expect(screen.queryByRole("menu", { name: "Recent conversations" })).toBeNull(),
+    );
+  });
+
+  it("leaves the list open when a thread other than the open one is deleted", async () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-1"));
+    expect(screen.getByRole("menu", { name: "Recent conversations" })).toBeInTheDocument();
+  });
+
+  it("shows the row again when the delete fails", async () => {
+    const deleteConversation = vi.fn(async () => false);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-1"));
+    // A failed delete is not a hidden row: the thread is still there to retry.
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete An older thread" })).toBeInTheDocument();
+  });
+
+  it("names an untitled thread in the confirmation rather than quoting nothing", () => {
+    openHistory({
+      conversations: [conversation("c-9", "", new Date(2026, 9, 22, 9, 0).toISOString(), 0)],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete New conversation" }));
+
+    expect(screen.getByRole("group", { name: "Delete New conversation?" })).toHaveTextContent(
+      "This cannot be undone.",
+    );
   });
 });

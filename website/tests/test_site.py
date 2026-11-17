@@ -51,11 +51,16 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://pypi.org/project/",
     "https://codecov.io",
     "https://developers.cloudflare.com",
+    "https://img.shields.io",
     "https://docs.entire.io",
     "https://www.chromatic.com",
     "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
+    # Composio's hosted MCP endpoint and its session API, which the connector
+    # guide documents for the `composio` preset.
+    "https://connect.composio.dev/mcp",
+    "https://backend.composio.dev",
     # The agent vendors whose docs the assignment guide cites as sources.
     "https://docs.openhands.dev",
     "https://kiro.dev",
@@ -66,6 +71,11 @@ ALLOWED_EXTERNAL_PREFIXES = (
     # A placeholder in the connector documentation. It is not routable, and
     # it is shown as an example of what a connector URL looks like.
     "https://mcp.internal.example",
+    # Composio's documented MCP entry points, cited as sources by the
+    # connectors guide: the shared OAuth URL the preset encodes, and the
+    # session-create endpoint the session-scoped recipe calls.
+    "https://connect.composio.dev/mcp",
+    "https://backend.composio.dev/api/v3.1/tool_router/session",
     # The local endpoints, which the site points developers at.
     "http://localhost:8000/mcp",
     "http://localhost:8000",

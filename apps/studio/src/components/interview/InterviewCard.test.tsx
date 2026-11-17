@@ -119,6 +119,104 @@ describe("InterviewCard", () => {
   });
 });
 
+const answeredInterview = {
+  questions: [
+    { id: "job", prompt: "In one sentence, what job is this market trying to get done?" },
+    { id: "outcome", prompt: "What is the customer trying to get done?" },
+    { id: "importance", prompt: "How important is this outcome to the customer?" },
+  ],
+  answers: {
+    job: "Turn interview notes into one opportunity",
+    outcome: "Minimize the time it takes to turn notes into a scored outcome",
+    importance: 9,
+  },
+  created: { outcomeIds: ["outcome-1", "outcome-2"], evidenceCount: 1 },
+};
+
+describe("InterviewCard answered record", () => {
+  it("reads as one line with the counts from the records, not the answers", () => {
+    renderCard({ answered: answeredInterview });
+
+    expect(screen.getByRole("button", { name: /Answered · 3 of 3 · 2 outcomes, 1 evidence/ })).toBeInTheDocument();
+  });
+
+  it("says 0 outcomes when the answers produced no records", () => {
+    renderCard({
+      answered: {
+        questions: answeredInterview.questions,
+        answers: answeredInterview.answers,
+        created: { outcomeIds: [], evidenceCount: 0 },
+      },
+    });
+
+    expect(screen.getByRole("button", { name: /0 outcomes, 0 evidence/ })).toBeInTheDocument();
+  });
+
+  it("is collapsed until expanded, then shows the answers", () => {
+    renderCard({ answered: answeredInterview });
+
+    expect(screen.queryByText("What is the customer trying to get done?")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Answered/ }));
+    expect(screen.getByText("What is the customer trying to get done?")).toBeInTheDocument();
+    expect(
+      screen.getByText("Minimize the time it takes to turn notes into a scored outcome"),
+    ).toBeInTheDocument();
+  });
+
+  it("links each created record and reports the focus action once", () => {
+    const onOpenRecord = vi.fn();
+    renderCard({ answered: answeredInterview, onOpenRecord });
+
+    fireEvent.click(screen.getByRole("button", { name: /Answered/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Outcome 2" }));
+
+    expect(onOpenRecord).toHaveBeenCalledTimes(1);
+    expect(onOpenRecord).toHaveBeenCalledWith("outcome-2");
+  });
+
+  it("offers no link when nothing was created", () => {
+    renderCard({
+      answered: {
+        questions: answeredInterview.questions,
+        answers: answeredInterview.answers,
+        created: { outcomeIds: [], evidenceCount: 0 },
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Answered/ }));
+    expect(screen.getByText("No records were created.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Outcome/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps the live form answerable after a failed submit", () => {
+    renderCard({
+      answers: { job: "x", outcome: "y", importance: 5 },
+      failure: "The store refused the write.",
+    });
+
+    expect(screen.getByRole("button", { name: /save answers/i })).toBeInTheDocument();
+    expect(screen.getByText("Not saved — The store refused the write.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Answered/ })).not.toBeInTheDocument();
+  });
+
+  it("passes the axe sweep on the expanded record", async () => {
+    const { container } = render(
+      <main>
+        <h1>Interview</h1>
+        <InterviewCard
+          questions={questions}
+          answers={answeredInterview.answers}
+          onAnswer={vi.fn()}
+          onSubmit={vi.fn()}
+          answered={answeredInterview}
+        />
+      </main>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Answered/ }));
+    await expectAccessible(container);
+  });
+});
+
 describe("isQuestion", () => {
   it("accepts all three well-formed kinds", () => {
     expect(isQuestion({ id: "a", kind: "statement", prompt: "p", required: true })).toBe(true);

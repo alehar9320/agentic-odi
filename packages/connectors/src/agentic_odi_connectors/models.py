@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -61,6 +62,19 @@ class IngestBatch(BaseModel):
     connector_name: str
     records: list[IngestRecord] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
+
+
+class LinkPreviewData(BaseModel):
+    """A single external item's summary, as a connector can describe it.
+
+    Serializes to the keys ``Link.preview`` already holds in core, so a caller
+    can store it without a translation layer.
+    """
+
+    title: str
+    status: str | None = None
+    url: str | None = None
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class McpConnectorSettings(BaseModel):

@@ -53,6 +53,13 @@ PATH_PARAM = re.compile(r"\{[^}]+\}")
 ENV_VAR = re.compile(r"\bAGENTIC_ODI_[A-Z0-9_]+\b")
 COMMAND_NAME = re.compile(r"^[a-z][a-z0-9-]*$")
 
+_FRONT_MATTER_RE = re.compile(r"^---\n.*?\n---\n?", re.DOTALL)
+
+
+def strip_front_matter(text: str) -> str:
+    """Remove YAML front matter from markdown if present."""
+    return _FRONT_MATTER_RE.sub("", text, count=1)
+
 
 def documentation(root: Path = ROOT) -> dict[str, str]:
     """Every living Markdown document the drift check reads.
@@ -67,7 +74,7 @@ def documentation(root: Path = ROOT) -> dict[str, str]:
         relative = path.relative_to(root).as_posix()
         if relative.startswith("docs/superpowers/"):
             continue
-        docs[relative] = path.read_text(encoding="utf-8")
+        docs[relative] = strip_front_matter(path.read_text(encoding="utf-8"))
     return docs
 
 

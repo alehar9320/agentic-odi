@@ -17,6 +17,112 @@
   justify-content: flex-end;
 }
 
+/* The answered record: one line that expands to what was asked and what it
+   produced. It is a quieter surface than the live form — the work is done. */
+.interview--answered {
+  gap: 10px;
+}
+
+.interview__summary {
+  align-self: flex-start;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.interview__summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--muted);
+}
+
+.interview__summary[aria-expanded="true"]::before {
+  content: "▾";
+}
+
+.interview__summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.interview__record {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 16px;
+  border-left: 2px solid var(--line);
+}
+
+.interview__record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.interview__record-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.interview__record-prompt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.interview__record-answer {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.interview__record-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.interview__record-link {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--accent);
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.interview__record-link:hover {
+  border-color: var(--accent);
+}
+
+.interview__record-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.interview__record-note,
+.interview__failure {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
 .interview__submit {
   padding: 7px 14px;
   border: 1px solid var(--accent);

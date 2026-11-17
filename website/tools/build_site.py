@@ -265,7 +265,7 @@ def _guide_body(
     path = ROOT / source
     if not path.is_file():
         raise FileNotFoundError(f"the guide {source} does not exist")
-    raw, title = markdown_render.take_title(path.read_text(encoding="utf-8"))
+    raw, title = markdown_render.take_title(markdown_render.read_guide(path))
     body = markdown_render.render(
         raw,
         source_path=source,

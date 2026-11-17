@@ -16,13 +16,17 @@ const harness = vi.hoisted(() => ({
     toolActivity: [] as unknown[],
     offlineReplyFor: null as string | null,
     openPanel: vi.fn<(panel: string) => void>(),
+    openDetail: vi.fn<(panel: string, subject?: { kind: string; id: string }) => void>(),
+    canvasState: { kind: "ready", data: null } as unknown,
     canvas: null,
+    displayName: "",
     regenerateFrom: vi.fn(),
     editFrom: vi.fn(),
     switchBranch: vi.fn(),
     respondToApproval: vi.fn(),
     stopStreaming: vi.fn(),
     sendMessage: vi.fn<(text: string) => Promise<void>>(),
+    dismissFailedTurn: vi.fn<(messageId: string | null) => void>(),
   },
 }));
 
@@ -322,12 +326,9 @@ describe("Conversation offline context", () => {
       },
     ]);
 
-    const chips = container.querySelectorAll("button.message__tag");
+    const chips = container.querySelectorAll("span.message__tag");
     expect(chips).toHaveLength(1);
-    expect(chips[0]).toHaveTextContent("Local draft, no model connected");
-
-    fireEvent.click(chips[0] as HTMLButtonElement);
-    expect(harness.state.openPanel).toHaveBeenCalledWith("settings");
+    expect(chips[0]).toHaveTextContent("Built-in assistant");
 
     harness.state.offlineReplyFor = null;
     harness.state.openPanel.mockClear();
@@ -432,6 +433,34 @@ describe("Conversation failures", () => {
     fireEvent.click(retry);
 
     expect(harness.state.sendMessage).toHaveBeenCalledWith("list the jobs");
+  });
+
+  it("offers a Delete on a failed send that names the failed reply (#405)", () => {
+    harness.state.dismissFailedTurn = vi.fn<(messageId: string | null) => void>();
+    const { container } = renderTurn([
+      { id: "m-1", parentId: null, role: "user", content: "list the jobs" },
+      {
+        id: "m-2",
+        parentId: "m-1",
+        role: "assistant",
+        content: "",
+        parts: [],
+        error: {
+          code: "internal",
+          message: "The assistant stopped before answering.",
+          suggestion: "Try again — your question is still here.",
+          retryable: true,
+        },
+        retryText: "list the jobs",
+      },
+    ]);
+
+    const del = screen.getByRole("button", { name: /delete/i });
+    fireEvent.click(del);
+
+    // The control asks the store to forget this reply, by id — not a blanket clear.
+    expect(harness.state.dismissFailedTurn).toHaveBeenCalledWith("m-2");
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
   });
   it("clamps a pasted document behind a keyboard-reachable Show more (#696)", () => {
     Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
@@ -568,5 +597,124 @@ describe("message timestamps (#694 D15)", () => {
 
     expect(screen.getByRole("group", { name: `Reply actions, ${clock}` })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: `Message actions, ${clock}` })).toBeInTheDocument();
+  });
+});
+
+describe("turn anatomy (#737)", () => {
+  it("names your own turn and draws your initial", () => {
+    harness.state.displayName = "Ada Lovelace";
+    renderTurn([
+      {
+        id: "u-1",
+        parentId: null,
+        role: "user",
+        content: "A question",
+        createdAt: new Date(2026, 9, 22, 9, 30).toISOString(),
+      },
+    ]);
+
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    const initial = document.querySelector(".message__avatar--user");
+    expect(initial).not.toBeNull();
+    expect(initial?.textContent).toBe("A");
+  });
+
+  it("says 'You' rather than inventing a name nobody gave", () => {
+    harness.state.displayName = "";
+    renderTurn([{ id: "u-1", parentId: null, role: "user", content: "A question" }]);
+
+    expect(screen.getByText("You")).toBeInTheDocument();
+    expect(document.querySelector(".message__avatar--user")?.textContent).toBe("Y");
+  });
+
+  it("renders no time element at all when a restored turn has none", () => {
+    harness.state.displayName = "Ada";
+    renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "A question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer" },
+    ]);
+
+    expect(document.querySelectorAll("time.message__time")).toHaveLength(0);
+  });
+
+  it("opens a finding's breakdown without sending a message", () => {
+    harness.state.openDetail.mockClear();
+    harness.state.sendMessage.mockClear();
+
+    renderTurn([
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [
+          {
+            kind: "ui",
+            id: "ui-1",
+            node: nodeOf({
+              type: "finding-card",
+              props: {
+                headline: "Waiting on IT approval",
+                detail: "The drop-off is internal waiting.",
+                metric: { label: "Drop-off at Step 2", value: "34%" },
+                actions: [
+                  {
+                    kind: "detail",
+                    label: "View breakdown",
+                    target: { panel: "jobmap", subject: { kind: "step", id: "S-2" } },
+                    tone: "primary",
+                  },
+                ],
+              },
+            }),
+          },
+        ],
+      },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "View breakdown" }));
+
+    expect(harness.state.openDetail).toHaveBeenCalledWith("jobmap", {
+      kind: "step",
+      id: "S-2",
+    });
+    expect(harness.state.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("message roots are MessagePrimitive.Root (#994)", () => {
+  it("renders each turn through the primitive, as an article with its own id", () => {
+    const { container } = renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "A question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer" },
+    ]);
+
+    // The primitive stamps `data-message-id` on the root it renders, so the
+    // three message roots are the primitive's, not a hand-written wrapper.
+    const roots = Array.from(container.querySelectorAll(".conversation > .message"));
+    expect(roots.map((root) => root.getAttribute("data-message-id"))).toEqual(["u-1", "a-1"]);
+    for (const root of roots) {
+      expect(root.tagName).toBe("ARTICLE");
+    }
+    expect(roots[0]).toHaveClass("message--user");
+    expect(roots[1]).toHaveClass("message--assistant");
+    expect(container.querySelectorAll("article.message").length).toBe(
+      container.querySelectorAll(".message").length,
+    );
+  });
+
+  it("keeps the notice turn an article too", () => {
+    harness.state.messages = [
+      { id: "s-1", parentId: null, role: "system", content: "A notice" },
+    ];
+    render(
+      <StudioRuntimeProvider>
+        <Conversation />
+      </StudioRuntimeProvider>,
+    );
+
+    const notice = document.querySelector(".message--notice") as HTMLElement;
+    expect(notice.tagName).toBe("ARTICLE");
+    expect(notice.getAttribute("data-message-id")).toBe("s-1");
   });
 });

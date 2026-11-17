@@ -201,6 +201,22 @@ describe("streamChat fallback", () => {
     expect(bff.chat.stream).not.toHaveBeenCalled();
   });
 
+  it("does not fall back for a 401 unauthorized", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: { code: "unauthorized", message: "Invalid API key" } }, 401));
+    await expect(
+      streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {}),
+    ).rejects.toThrow();
+    expect(bff.chat.stream).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back for a 403 forbidden", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: { code: "forbidden", message: "Access denied" } }, 403));
+    await expect(
+      streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {}),
+    ).rejects.toThrow();
+    expect(bff.chat.stream).not.toHaveBeenCalled();
+  });
+
   it("falls back to the local BFF when a static host answers 200 text/html", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
     vi.mocked(bff.chat.stream).mockResolvedValueOnce(undefined);

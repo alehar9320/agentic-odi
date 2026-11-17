@@ -19,6 +19,7 @@ import {
   PlusIcon,
   SettingsIcon,
   SunIcon,
+  TrashIcon,
 } from "../icons";
 import { OdiMascot } from "../OdiMascot";
 import { StatusDot } from "../status/StatusDot";
@@ -40,6 +41,7 @@ export function StudioBar({
   const {
     conversationId,
     conversations,
+    deleteConversation,
     llmHealth,
     probeRetry,
     messages,
@@ -62,6 +64,12 @@ export function StudioBar({
   const nextTheme = theme === "dark" ? "light" : "dark";
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // The row that has been asked to confirm its own deletion, and the row whose
+  // delete is in flight. Both are ids, not indexes: the list re-reads after a
+  // delete and an index would point at the wrong row.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const keepThreadRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
   const reduceMotion = useReducedMotion();
@@ -148,6 +156,7 @@ export function StudioBar({
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setHistoryOpen(false);
+        setConfirmingDeleteId(null);
       }
     }
     window.addEventListener("mousedown", onPointerDown);
@@ -157,6 +166,14 @@ export function StudioBar({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [historyOpen]);
+  // The confirmation opens with focus on the choice that changes nothing, so an
+  // accidental Enter keeps the thread. #696's rule: a destructive ask is never
+  // answered by the key that opened it.
+  useEffect(() => {
+    if (confirmingDeleteId) {
+      keepThreadRef.current?.focus();
+    }
+  }, [confirmingDeleteId]);
   // Opening the list lands on the thread already on screen: with forty in the
   // list the one being read can be well below the fold, and hunting for it is
   // work the app can do. Reduced motion gets the jump instead of the glide.
@@ -185,6 +202,31 @@ export function StudioBar({
       void openConversation(id).catch(() =>
         pushToast("error", "I couldn't open that conversation."),
       );
+    }
+  }
+
+  function beginDelete(id: string) {
+    setConfirmingDeleteId(id);
+    setDeletingId(null);
+  }
+
+  function cancelDelete() {
+    setConfirmingDeleteId(null);
+    setDeletingId(null);
+  }
+
+  async function confirmDelete(id: string) {
+    // A second click while the first delete is in flight must not send another:
+    // the row is already going, and two deletes would name two threads.
+    if (deletingId) {
+      return;
+    }
+    setDeletingId(id);
+    const removed = await deleteConversation(id);
+    setDeletingId(null);
+    setConfirmingDeleteId(null);
+    if (removed && id === conversationId) {
+      setHistoryOpen(false);
     }
   }
 
@@ -358,29 +400,74 @@ export function StudioBar({
                     <p className="bar__history-day">{group.label}</p>
                     {group.items.map((conversation) => {
                       const current = conversation.id === conversationId;
+                      const label = conversation.title.trim() || "New conversation";
+                      const confirming = confirmingDeleteId === conversation.id;
                       return (
-                        <button
-                          key={conversation.id}
-                          ref={current ? activeHistoryRef : undefined}
-                          type="button"
-                          role="menuitem"
-                          className="bar__menu-item bar__history-item"
-                          aria-current={current ? "true" : undefined}
-                          onClick={() => selectConversation(conversation.id)}
-                        >
-                          <span className="bar__history-title">
-                            {conversation.title.trim() || "New conversation"}
-                          </span>
-                          {/* A thread with no turns has nothing to count, so
-                              it says nothing rather than "0 turns". */}
-                          {conversation.turn_count > 0 ? (
-                            <span className="bar__history-meta">
-                              {formatRelativeTime(conversation.updated_at)} ·{" "}
-                              {conversation.turn_count}{" "}
-                              {conversation.turn_count === 1 ? "turn" : "turns"}
-                            </span>
-                          ) : null}
-                        </button>
+                        <div className="bar__history-row" key={conversation.id}>
+                          <button
+                            ref={current ? activeHistoryRef : undefined}
+                            type="button"
+                            role="menuitem"
+                            className="bar__menu-item bar__history-item"
+                            aria-current={current ? "true" : undefined}
+                            onClick={() => selectConversation(conversation.id)}
+                          >
+                            <span className="bar__history-title">{label}</span>
+                            {/* A thread with no turns has nothing to count, so
+                                it says nothing rather than "0 turns". */}
+                            {conversation.turn_count > 0 ? (
+                              <span className="bar__history-meta">
+                                {formatRelativeTime(conversation.updated_at)} ·{" "}
+                                {conversation.turn_count}{" "}
+                                {conversation.turn_count === 1 ? "turn" : "turns"}
+                              </span>
+                            ) : null}
+                          </button>
+                          {confirming ? (
+                            <div
+                              className="bar__history-confirm"
+                              role="group"
+                              aria-label={`Delete ${label}?`}
+                            >
+                              <p className="bar__history-confirm-text">
+                                Delete &ldquo;{label}&rdquo;?{" "}
+                                {conversation.turn_count > 0
+                                  ? `Its ${conversation.turn_count} ${
+                                      conversation.turn_count === 1 ? "turn goes" : "turns go"
+                                    } with it.`
+                                  : "This cannot be undone."}
+                              </p>
+                              <div className="bar__history-confirm-actions">
+                                <button
+                                  type="button"
+                                  className="bar__history-confirm-keep"
+                                  ref={keepThreadRef}
+                                  onClick={cancelDelete}
+                                >
+                                  Keep it
+                                </button>
+                                <button
+                                  type="button"
+                                  className="bar__history-confirm-delete"
+                                  disabled={deletingId === conversation.id}
+                                  onClick={() => void confirmDelete(conversation.id)}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="bar__history-delete"
+                              aria-label={`Delete ${label}`}
+                              title={`Delete ${label}`}
+                              onClick={() => beginDelete(conversation.id)}
+                            >
+                              <TrashIcon size={14} />
+                            </button>
+                          )}
+                        </div>
                       );
                     })}
                   </div>

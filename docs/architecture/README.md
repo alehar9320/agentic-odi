@@ -1,3 +1,11 @@
+---
+title: Architecture
+blurb: The workspace, the data flow, and the testing strategy.
+nav_group: Build
+nav_order: 4
+slug: architecture
+---
+
 # Repository Architecture
 
 Agentic ODI is a uv workspace with a single root `pyproject.toml` for shared tooling. Python distributions are imported by their stable `agentic_odi_*` package names; directory layout does not leak into imports.
@@ -13,6 +21,7 @@ flowchart LR
     subgraph machine["The user's machine"]
         CLI["CLI: agentic-odi"]
         SPA["Studio SPA: browser or Tauri webview"]
+        BFF["Studio BFF: local IndexedDB (primary data path)"]
         SHELL["Tauri shell: spawns the sidecar, self-updates"]
         MCP["MCP server — :8000/mcp, loopback, unauthenticated"]
         SIDECAR["Studio API sidecar — 127.0.0.1:8100, loopback, unauthenticated"]
@@ -24,7 +33,8 @@ flowchart LR
         CLI -->|"--backend mcp"| MCP
         CLI --> CFG
         MCP --> ODI
-        SPA -->|"/api/*, SSE"| SIDECAR
+        SPA -->|"local BFF (primary)"| BFF
+        SPA -.->|"optional, when reachable"| SIDECAR
         SHELL -.->|launches| SIDECAR
         SHELL -.->|loads| SPA
         SIDECAR --> ODI
@@ -86,7 +96,16 @@ graph BT
     agentic_odi_studio_api --> agentic_odi_connectors
     agentic_odi_cli --> agentic_odi_core
     agentic_odi_cli --> agentic_odi_connectors
+    %% agentic_odi_studio (SPA) -.->|optional runtime| agentic_odi_studio_api
 ```
+
+The Studio SPA (browser or Tauri webview) uses its local IndexedDB BFF as the
+primary data path for reads and writes. The sidecar (`agentic_odi_studio_api`)
+is optional at runtime: the SPA opens and functions with the sidecar process
+completely absent. The sidecar is consulted only for elevation capabilities —
+LLM proxy, connector ingestion, MCP passthrough, desktop shell integration, and
+update checks. This optional runtime dependency is not a compile-time import and
+is not represented as a solid arrow in the diagram above.
 
 This picture is a contract, not an illustration. `tests/test_architecture.py`
 reads the arrows above and asserts they equal both the `[project] dependencies`
@@ -192,11 +211,20 @@ branch is still visible:
 The logic lives in `scripts/pr_guards.py`; the YAML only gathers the diff.
 Unit tests are in `tests/scripts/test_pr_guards.py`.
 
-Repository ruleset `main-requires-ci-green` (id `25356329`) requires both
-`CI green` and `PR guardrails`, sets
-`strict_required_status_checks_policy: true`, and keeps the admin bypass only
-for pull requests (`bypass_mode: pull_request`). Rulesets are repository
-settings, not files; change them with `gh api` and record it here.
+Repository rulesets `main-requires-ci-green` (id `25356329`) and `protect-main`
+(id `25656413`) both target `~DEFAULT_BRANCH`, are `active`, and set
+`current_user_can_bypass: never`. The first requires the `CI green` and
+`PR guardrails` status checks (`strict_required_status_checks_policy: false`,
+`do_not_enforce_on_create: false`); the second adds `deletion`,
+`non_fast_forward`, and `pull_request` with `required_approving_review_count: 0`
+and `require_extra_approval_for_unattributed_changes: true`. A ruleset cannot
+require a label, so `ai-merge-safe` is a gate of the merge path, not of
+`main`: `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized` without it.
+Rulesets are repository settings, not files; change them with `gh api` and record
+the decision in
+[ADR 0007](adr/0007-branch-protection-enforces-checks-not-labels.md). The names
+these documents claim are checked against the workflow job names by
+`tests/test_adr_index.py`.
 
 ## Documents
 

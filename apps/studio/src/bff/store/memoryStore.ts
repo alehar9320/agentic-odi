@@ -268,6 +268,11 @@ export class MemoryLocalStore implements LocalStore {
     }
   }
 
+  async deleteConversation(id: string): Promise<void> {
+    this.conversations.delete(id);
+    await this.clearTurns(id);
+  }
+
   async snapshot(): Promise<WorkspaceSnapshot> {
     const jobs = await this.listJobs();
     const steps = await this.listSteps();

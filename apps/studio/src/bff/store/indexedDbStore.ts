@@ -342,6 +342,18 @@ export class IndexedDbLocalStore implements LocalStore {
     await tx.done;
   }
 
+  async deleteConversation(id: string): Promise<void> {
+    // One transaction, so a conversation and its turns never diverge: a delete
+    // that removed the row but left its turns behind would resurrect them.
+    const tx = this.db.transaction(["conversations", "turns"], "readwrite");
+    const keys = await tx.objectStore("turns").index("by-conversation").getAllKeys(id);
+    await Promise.all([
+      tx.objectStore("conversations").delete(id),
+      ...keys.map((key) => tx.objectStore("turns").delete(key)),
+    ]);
+    await tx.done;
+  }
+
   async snapshot(): Promise<WorkspaceSnapshot> {
     const [jobs, steps, outcomes, evidence, observations, conversations] =
       await Promise.all([

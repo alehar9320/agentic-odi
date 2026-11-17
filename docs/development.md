@@ -1,3 +1,11 @@
+---
+title: Development
+blurb: Lint, types, frontend checks, and the coverage map.
+nav_group: Operate
+nav_order: 1
+slug: development
+---
+
 # Development
 
 Everything below mirrors what CI runs. Install the workspace first:
@@ -29,9 +37,9 @@ uv run bandit -c pyproject.toml -r apps packages website/
 uv run python scripts/doc_check.py
 ```
 
-`docs/roadmap.md` is maintained by hand. No check requires a new capability to
-add a roadmap line, because a shared file every change had to edit conflicted
-with every other change.
+`docs/roadmap.md` is a pointer page; its three lists point at the sources that
+own the facts (the changelog, the open pull-request list, and the ready-for-dev
+issue filter). No check requires a new capability to edit it.
 
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,
@@ -76,6 +84,26 @@ filename instead of running every test in a browser. Browser mode needs Chromium
 locally: `npx playwright install chromium`. See
 [Deployment](deployment.md) for the project setup and budget rules.
 
+### The cold-start bundle budget
+
+The first screen must not wait on everything the app can do, so the Vite build
+splits the assistant runtime, the markdown renderer, and the Tauri API out of the
+entry chunk with `build.rolldownOptions.output.codeSplitting` groups
+(`vite.config.ts`), and emits `dist/.vite/manifest.json` so the budget script can
+find the entry by role rather than by a hashed name.
+
+`scripts/check_bundle_budget.mjs` measures the entry chunk and every chunk a cold
+load pulls statically, and fails when the entry grows past the recorded baseline
+in `scripts/bundle-budget.json` plus a 20% tolerance. CI runs it right after
+`npm run build` in the `studio` job. After a deliberate change, re-record the
+baseline and say why in the pull request:
+
+```bash
+npm --prefix apps/studio run build
+node scripts/check_bundle_budget.mjs           # check
+node scripts/check_bundle_budget.mjs --update  # re-record the baseline
+```
+
 ### Copied components (`src/vendor`)
 
 Tailwind v4 styles `src/vendor/**` and nothing else (issue #385). The stylesheet
@@ -114,7 +142,7 @@ the pure count arithmetic:
 |---|---|
 | `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
 | `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
-| `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
+| `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, the finding card's measured number and canvas-checked step, per-node failure isolation, catalog/registry parity |
 | `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | The segment board's members and basis (#559): each segment lists its member outcomes with their stored scores, the mean is over scored members only with "Not scored" for none, an inferred group is called a candidate, a missing member is dropped and counted, a member opens in the landscape by mouse and keyboard, and the empty state names the next step |
 | `apps/studio/src/components/canvas/OpportunityLandscape.test.tsx` | The landscape's honesty pass (#501): the plot draws a point only for a scored outcome, the underserved zone is sampled from `2 × importance − satisfaction > 10` (a boundary pair at one satisfaction lands on opposite sides), an unscored outcome appears under **Not scored (n)** with a **Score me** action that opens the score form without writing a rating |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
@@ -123,7 +151,7 @@ the pure count arithmetic:
 | `apps/studio-api/tests/test_studio_diagnostics.py` | Metadata-only diagnostics response, safe database basename/counts, integrity state, and absence of row contents/config |
 | `apps/studio-api/tests/test_boot_integrity.py` | A damaged store answers every data route with one `store_corrupt` body, health reports degraded, diagnostics and health stay reachable, the idle timer checkpoints and honors `AGENTIC_ODI_CHECKPOINT_SECONDS`, and a clean shutdown checkpoints and closes both stores |
 | `apps/studio-api/tests/test_studio_chat_stream.py` | Streaming chat, opt-in approval decisions for contract writes and unknown tools, and read-only/local-tool classification |
-| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
+| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; intent actions become messages while a finding's breakdown opens the record without sending one; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
 | `apps/studio/src/assistant/quote.test.ts`, `src/components/chat/SelectionToolbar.test.tsx` | Quoting a passage verbatim with its attribution, one copy only, and no toolbar until text is selected |
 | `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
 | `apps/studio/src/assistant/pending.test.ts`, `src/components/chat/PendingCalls.test.tsx` | The pending-call strip (#390): only running and awaiting-approval calls appear, in transcript order, a settled call leaves the strip for the transcript, a clock is shown only when the store recorded a start, and the strip is never a second live region |
@@ -153,6 +181,7 @@ the pure count arithmetic:
 | `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface, the decision brief included, with zero violations; contrast is scoped to the token audit and documented there |
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
+| `apps/studio/src/styles/tokens.test.ts` | The typographic and scalar foundation: `--font-display` and its fallback, five or more steps each of the type and spacing scales, the corner and leading scales, the light theme carries no `--font` override, the display face is self-hosted (no CDN) with `font-display: swap`, and `var(--font-display)` is applied at exactly four sites |
 | `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
 | `apps/studio/src/lib/theme.test.ts` | `resolveTheme`: the stored choice wins, the media query answers when nothing is stored, and dark is the last resort |
 | `apps/studio/src/lib/boot.test.ts` | `removeBootShell` clears the shell on mount and is a no-op without one |
@@ -305,6 +334,39 @@ merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
 workflows and are deliberately left alone. The workflow is silent: it updates
 labels only and never posts PR comments.
 
+### Merge-state labels
+
+The [merge-conflict workflow](.github/workflows/label-merge-conflicts.yml) owns
+the two labels a reviewer reads to know whether a pull request can land:
+
+| Label | Meaning |
+|---|---|
+| `merge-conflict` | The branch cannot merge into `main` as it stands. |
+| `ready-for-merge` | No conflict; the branch merges cleanly. |
+
+GitHub computes mergeability lazily and answers `UNKNOWN` for a moment after
+every push, so the workflow polls `mergeStateStatus` (up to ten times, six
+seconds apart) before it decides. A state that is still `UNKNOWN` after the
+retries leaves both labels untouched rather than guessing; a state that is
+neither `clean` nor `dirty` (for example `behind`) clears `merge-conflict`
+without claiming the PR is ready.
+
+### Which files actually conflict
+
+`scripts/doc_churn.py` ranks the files and top-level directories that appear in
+the most merged pull requests, which is the churn that produces conflicts. It
+is offline by default — it reads the saved fixtures payload — and shells out to
+`gh` only with `--live`:
+
+```bash
+uv run python scripts/doc_churn.py --since 30d            # offline fixtures
+uv run python scripts/doc_churn.py --since 30d --live     # the real history
+uv run python scripts/doc_churn.py --since 30d --live --json
+```
+
+A path repeated inside one pull request counts once: the number is how many
+pull requests touched a file, not how many file entries named it.
+
 ### Tiered Automated Triage (shift-left filtering)
 
 The same risk workflow runs a third job, **triage**, which decides whether a
@@ -388,18 +450,31 @@ or `needs human review` cancels auto-merge and a comment explains why.
 
 ### Branch protection (enforced on `main`)
 
-Labeling is advisory; branch protection makes it enforceable. The
-`main-requires-ci-green` ruleset on branch `main` must require all three:
+A label is advisory; a status check is not. The `main-requires-ci-green`
+ruleset on `main` requires these checks, and nothing can bypass them:
 
 | Check / requirement | Purpose |
 |---------------------|---------|
 | `CI green` status check | Full CI matrix passes |
 | `PR guardrails` status check | Diff-shape, body-truth, and fabrication gates pass |
-| Label: `ai-merge-safe` | PR is non-disruptive and non-sensitive |
 
-This is a GitHub Settings change (Settings → Branches → branch protection
-rules); it cannot be enforced from repo files. See [issue #956](https://github.com/alehar9320/agentic-odi/issues/956)
-for the tracking issue and the exact rule to configure.
+The `protect-main` ruleset adds the branch-level rules: no deletion, no
+non-fast-forward push, and every change arrives through a pull request.
+
+A ruleset cannot require a *label* — its rule types are checks, reviews, and push
+rules, not labels — so `ai-merge-safe` is enforced one step later, by the merge
+path: gate 1 of `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized`
+without it, and `pr-ai-merge-act.yml` arms auto-merge only on that label. A pull
+request can therefore satisfy both checks and still not be auto-merged; what stops
+it is the missing label and the `do-not-merge` / `needs human review` labels, not
+GitHub settings.
+
+Rulesets are repository settings, not files, so this cannot be enforced from the
+checkout. `tests/test_adr_index.py` checks the names the documents claim against
+the job names in `.github/workflows/ci.yml` and
+`.github/workflows/pr-guardrails.yml`, so a renamed job fails on the pull request
+that renamed it. See [ADR 0007](architecture/adr/0007-branch-protection-enforces-checks-not-labels.md)
+for the decision and the deferred `label gate` check.
 
 ## Testing
 
@@ -481,6 +556,15 @@ Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
 a second sidecar on the MCP passthrough backend. Two projects run against
 them: `chromium` for the local backend (the product default) and
 `mcp-backend` for the passthrough.
+
+A third project, `screenshots`, is added only when `PR_SCREENSHOTS=1` is set.
+It runs `e2e/pr-screenshots.spec.ts`, which writes one PNG per key screen into
+the `pr-screenshots` directory under `apps/studio` for human review. The
+default `test:e2e` run never sees it. The `pr-screenshots` workflow sets the
+variable, captures the screens against a live backend, and posts them as a
+single comment on the pull request. The job is advisory — `continue-on-error:
+true` and no membership in `ci-green`'s `needs` — so a screenshot failure
+cannot block a merge.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none. When a test

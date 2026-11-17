@@ -228,6 +228,8 @@ describe("studio shell", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
     fireEvent.click(await screen.findByRole("button", { name: /adjust scores/i }));
+    // The panel saves only a change: nudge an assumption before pressing Save.
+    fireEvent.change(screen.getByLabelText("Importance"), { target: { value: "9.5" } });
     fireEvent.click(screen.getByRole("button", { name: /save scores/i }));
 
     await waitFor(() => {
@@ -364,9 +366,10 @@ describe("studio shell", () => {
     }
   });
 
-  it("does say so when a sidecar it had been reaching stops answering", async () => {
-    // The control for the two tests above: the strips are deferred, never missing. A
-    // studio that was talking to a sidecar and then was not has a real outage to name.
+  it("stays quiet when a sidecar it had been reaching stops answering", async () => {
+    // #511: the assistant answers from the built-in fallback when the sidecar is
+    // unreachable, so a sidecar that goes away is no longer an outage to name.
+    // The reply carries the "Built-in assistant" tag instead of a banner.
     vi.useFakeTimers();
     try {
       render(<App />);
@@ -382,9 +385,7 @@ describe("studio shell", () => {
         await vi.advanceTimersByTimeAsync(PROBE_BASE_MS * (1 + PROBE_JITTER) + 5_000);
       });
 
-      const banners = document.querySelectorAll(".banner");
-      expect(banners.length).toBeGreaterThan(0);
-      expect(banners[0].textContent).toMatch(/sidecar/i);
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }
