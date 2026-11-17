@@ -337,7 +337,13 @@ def test_stamping_the_same_signal_twice_spends_one_event_id() -> None:
     assert repo.last_event_id() == after_add + 1
 
 
-def _link(source_type="job", source_id="s1", target_type="outcome", target_id="o1", relationship_type="references") -> Link:
+def _link(
+    source_type="job",
+    source_id="s1",
+    target_type="outcome",
+    target_id="o1",
+    relationship_type="references",
+) -> Link:
     return Link(
         source_type=source_type,
         source_id=source_id,
@@ -364,7 +370,9 @@ def test_list_links_filters_by_source_and_target() -> None:
     assert len(by_source) == 2
     by_target = [link.id for link in repo.list_links(target_type="outcome", target_id="o1")]
     assert len(by_target) == 1
-    assert repo.list_links(source_type="job", target_type="outcome") == [repo.get_link(by_source[0])]
+    assert repo.list_links(source_type="job", target_type="outcome") == [
+        repo.get_link(by_source[0])
+    ]
 
 
 def test_remove_link_returns_true() -> None:
