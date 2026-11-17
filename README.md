@@ -61,9 +61,12 @@ The project card, rendered from the committed source by
 | **A conversation, not a form.** The Living Studio opens on one question — **What do you want to win?** — with the composer focused. When you ask for context, the agent speaks first, and the answers come back as a brief you can edit line by line. Every claim in a reply names the record behind it, or says it is a hypothesis. | [The Living Studio →](docs/living-studio.md) |
 | **A document when the conversation needs one.** `/brief` writes the decision brief from the canvas — the ranked bets, the records behind each, what argues against them, and the next evidence to collect — as Markdown a review can read with or without the Studio. Provenance travels with it: demo rows are excluded from every count and labelled. | [The Living Studio →](docs/living-studio.md) |
 | **Evidence becomes outcomes.** An ingested record is mined into a scored, approvable outcome proposal — statement, direction, importance, satisfaction, and a stated confidence, with its rationale and the quote it came from. The mining is deterministic and offline. | [The method →](docs/method.md) |
+| **Candidates linked to underserved outcomes.** Evidence is mined into candidate proposals (statement, importance, satisfaction, confidence, rationale) that can be reviewed, edited, approved as outcomes, or rejected — all with full traceability. | [The method →](docs/method.md) |
 | **A catch-up that means something.** Writes emit signals — an outcome re-scored, evidence promoted, a job map completed — stored in the same event log and read by the CLI, any MCP client, and the Studio's bell. Nothing is invented, and the feed is deduped and budgeted. | [CLI reference →](docs/cli.md) |
 | **Connectors, without storing a credential.** Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) from a trusted vendor marketplace, conversationally, or from the CLI. A listing that needs a token names the environment variable to set. | [External Connectors →](docs/connectors.md) |
+| **Accepted bets written to delivery tools.** Approved outcomes and strategy bets push to Linear, GitHub, Jira, and other delivery trackers via MCP connectors — closing the loop from evidence to execution. | [External Connectors →](docs/connectors.md) |
 | **Browser-first, local-second.** The Studio opens in any browser and is fully usable with no account, no server, and no sidecar: jobs, outcomes, memory, and the assistant all run locally on your device. The desktop app (any OS) and the sidecar elevate your capabilities — local LLM proxy, connectors, MCP passthrough, updates — when you choose to add them. Start on web or mobile, then graduate to the CLI or local app as you get deeper. | [Local LLM Backend →](docs/local-llm.md) |
+| **Candidates and delivery write-back.** Candidate solutions link to the underserved outcomes they serve, with opportunity scores that rank the bets worth taking; accepted candidates are written to delivery tools such as Linear so the roadmap moves from the evidence that justifies it. | [The method →](docs/method.md) |
 
 **How you start.** Open the Studio on the web (desktop or mobile) or connect any
 MCP client to the local server. Everything works right there. When you want more
@@ -287,8 +290,8 @@ drift from the workspace. The distributions are:
 <!-- BEGIN GENERATED: packages -->
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/connectors/`** | `agentic-odi-connectors` | External system connectors for Agentic ODI, including an MCP client ingest connector and REST item previews. |
-| **`packages/core/`** | `agentic-odi-core` | Core domain models, services, and repositories for Agentic ODI. |
+| **`packages/connectors/`** | `agentic-odi-connectors` | External system connectors for Agentic ODI, including an MCP client ingest connector, REST item previews, and delivery write-back to Linear, GitHub, and Jira. |
+| **`packages/core/`** | `agentic-odi-core` | Core domain models, services, and repositories for Agentic ODI; includes candidate proposal extraction, approval, and rejection. |
 | **`apps/cli/`** | `agentic-odi-cli` | Command-line interface for Agentic ODI. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server for Agentic ODI. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI sidecar for the Agentic ODI Living Studio. |
