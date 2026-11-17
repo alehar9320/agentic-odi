@@ -56,6 +56,21 @@ export interface StoredTurn extends ConversationTurn {
   parent_id: string | null;
 }
 
+/**
+ * A half-finished interview, kept so a reload resumes it (#402).
+ *
+ * This is the storage shape, not a domain type: it holds the answers the
+ * conductor collected and the question it was on, and nothing about what an
+ * answer means. `jobId` scopes it — a draft for another job is never shown.
+ */
+export interface InterviewDraft {
+  id: string;
+  jobId: string;
+  answers: Record<string, string | number>;
+  index: number;
+  updatedAt: string;
+}
+
 export type OutboxKind = "create" | "update" | "delete";
 export type OutboxEntity = "job" | "step" | "outcome" | "evidence";
 export type OutboxState =
@@ -185,6 +200,10 @@ export interface LocalStore {
     messages: StoredTurn[];
     head_id: string | null;
   }>;
+  listInterviewDrafts(jobId?: string): Promise<InterviewDraft[]>;
+  getInterviewDraft(id: string): Promise<InterviewDraft | undefined>;
+  putInterviewDraft(draft: InterviewDraft): Promise<void>;
+  deleteInterviewDraft(id: string): Promise<void>;
   /** Serialize every stored workspace record for export. */
   snapshot(): Promise<WorkspaceSnapshot>;
   /** Replace every stored workspace record with the imported snapshot. */

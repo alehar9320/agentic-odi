@@ -241,6 +241,15 @@ Studio says so in one place and keeps going:
   registered step from the version the person has up to `DB_VERSION`, so a
   release that adds a store upgrades an existing database instead of failing to
   open it. A version bump with no migration is caught by a test before it ships.
+- A half-finished interview survives a reload. `apps/studio/src/assistant/interview/persistence.ts`
+  writes the conductor's draft — the answers and the question it was on — to the
+  browser's `interview_drafts` store (schema v4 in
+  `apps/studio/src/bff/store/migrations.ts`) on every transition, debounced to at
+  most one write per second, and deletes it once the interview reaches a terminal
+  state. On mount the most recent draft for the current job is read back and the
+  interview reopens at the same question; a draft for another job is ignored. A
+  store that throws leaves the interview usable in memory and raises no banner,
+  and a submitted interview leaves no draft behind.
 - When a second tab opens a newer schema, the first tab would otherwise hold the
   old connection and block the upgrade. `IndexedDbLocalStore` closes its
   connection on `versionchange` and sets `needsReload`, which the app can read

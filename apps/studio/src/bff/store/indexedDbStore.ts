@@ -13,6 +13,7 @@ import {
   byCreated,
   bySeq,
   type DrainLease,
+  type InterviewDraft,
   type LocalStore,
   type OutboxRecord,
   type StoredConversation,
@@ -368,6 +369,25 @@ export class IndexedDbLocalStore implements LocalStore {
     await tx.done;
   }
 
+  async listInterviewDrafts(jobId?: string): Promise<InterviewDraft[]> {
+    const drafts = jobId
+      ? await this.db.getAllFromIndex("interview_drafts", "by-job", jobId)
+      : await this.db.getAll("interview_drafts");
+    return drafts.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async getInterviewDraft(id: string): Promise<InterviewDraft | undefined> {
+    return this.db.get("interview_drafts", id);
+  }
+
+  async putInterviewDraft(draft: InterviewDraft): Promise<void> {
+    await this.db.put("interview_drafts", draft);
+  }
+
+  async deleteInterviewDraft(id: string): Promise<void> {
+    await this.db.delete("interview_drafts", id);
+  }
+
   async snapshot(): Promise<WorkspaceSnapshot> {
     const [jobs, steps, outcomes, evidence, observations, conversations] =
       await Promise.all([
@@ -438,6 +458,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "outbox",
         "conversations",
         "turns",
+        "interview_drafts",
       ],
       "readwrite",
     );
@@ -451,6 +472,7 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("outbox").clear(),
       tx.objectStore("conversations").clear(),
       tx.objectStore("turns").clear(),
+      tx.objectStore("interview_drafts").clear(),
     ]);
     await tx.done;
   }

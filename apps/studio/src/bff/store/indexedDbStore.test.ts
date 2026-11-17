@@ -253,6 +253,7 @@ describe("IndexedDbLocalStore", () => {
     // The later stores are added, and they start empty.
     expect(after.outbox).toEqual([]);
     expect(after.evidence).toEqual([]);
+    expect(after.interview_drafts).toEqual([]);
     store.close();
 
     // The migrated schema equals a fresh database: same stores, key paths,
@@ -286,6 +287,40 @@ describe("IndexedDbLocalStore", () => {
     const jobs = await upgraded.getAll("jobs");
     expect(jobs.map((row) => row.name)).toEqual(["Kept"]);
     upgraded.close();
+  });
+
+  it("round-trips an interview draft, newest first, scoped to its job", async () => {
+    const store = await makeStore();
+    await store.putInterviewDraft({
+      id: "draft-old",
+      jobId: "j-1",
+      answers: { job: "A job", importance: 8 },
+      index: 1,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    await store.putInterviewDraft({
+      id: "draft-new",
+      jobId: "j-1",
+      answers: { job: "A job", importance: 9 },
+      index: 2,
+      updatedAt: "2026-01-02T00:00:00.000Z",
+    });
+    await store.putInterviewDraft({
+      id: "draft-other",
+      jobId: "j-2",
+      answers: { job: "Another job" },
+      index: 0,
+      updatedAt: "2026-01-03T00:00:00.000Z",
+    });
+
+    const forJob = await store.listInterviewDrafts("j-1");
+    expect(forJob.map((draft) => draft.id)).toEqual(["draft-new", "draft-old"]);
+    expect(forJob[0].answers).toEqual({ job: "A job", importance: 9 });
+    expect((await store.getInterviewDraft("draft-new"))?.index).toBe(2);
+
+    await store.deleteInterviewDraft("draft-new");
+    expect(await store.getInterviewDraft("draft-new")).toBeUndefined();
+    store.close();
   });
 
   it("never needs a reload in the memory-only fallback", () => {
@@ -482,6 +517,12 @@ function expectedSchema() {
       keyPath: "id",
       autoIncrement: false,
       indexes: ["by-job", "by-seq"],
+    },
+    {
+      store: "interview_drafts",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-updated"],
     },
     {
       store: "jobs",

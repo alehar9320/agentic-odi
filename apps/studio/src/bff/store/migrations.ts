@@ -3,6 +3,7 @@ import type { DBSchema, IDBPDatabase } from "idb";
 import type { Observation } from "../../types";
 import type {
   DrainLease,
+  InterviewDraft,
   OutboxRecord,
   StoredConversation,
   StoredEvidence,
@@ -19,7 +20,7 @@ export const DB_NAME = "agentic-odi-studio";
  * `MIGRATIONS` entry is caught by `migrations.test.ts`, so a release can never
  * ship a bump that would throw `ConstraintError` on an existing database.
  */
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export type MetaValue = number | DrainLease;
 
@@ -65,6 +66,11 @@ export interface StudioDb extends DBSchema {
     key: number;
     value: StoredTurn;
     indexes: { "by-conversation": string };
+  };
+  interview_drafts: {
+    key: string;
+    value: InterviewDraft;
+    indexes: { "by-updated": string; "by-job": string };
   };
 }
 
@@ -114,6 +120,16 @@ export const MIGRATIONS: Record<number, Migration> = {
     const evidence = db.createObjectStore("evidence", { keyPath: "id" });
     evidence.createIndex("by-job", "job_id");
     evidence.createIndex("by-seq", "seq");
+  },
+  4: (db) => {
+    // A half-finished interview is a draft, not a workspace record: it lives in
+    // its own store so a reload can resume it (#402) without it counting as a
+    // canvas write or appearing in a snapshot. Ordered by `updatedAt` for the
+    // "most recent draft for this job" read, and indexed by job so another job's
+    // draft is never restored.
+    const drafts = db.createObjectStore("interview_drafts", { keyPath: "id" });
+    drafts.createIndex("by-updated", "updatedAt");
+    drafts.createIndex("by-job", "jobId");
   },
 };
 
