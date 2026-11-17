@@ -37,3 +37,10 @@
     The seven parser behaviours moved to `components/chat/Markdown.test.tsx`
     against the library renderer, so this parser test goes with its parser
     (#394).
+- path: ".qoder/worktrees/*"
+  issue: 1101
+  reason: >-
+    Accidentally committed Qoder IDE worktree gitlinks (mode 160000 submodule
+    pointers) with no URL in .gitmodules; they break `actions/checkout`
+    submodule auth cleanup during CI. PR #1101 removes them and gitignores
+    `.qoder/` to prevent recurrence.
