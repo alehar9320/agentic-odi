@@ -64,6 +64,19 @@ class IngestBatch(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class LinkPreviewData(BaseModel):
+    """A single external item's summary, as a connector can describe it.
+
+    Serializes to the keys ``Link.preview`` already holds in core, so a caller
+    can store it without a translation layer.
+    """
+
+    title: str
+    status: str | None = None
+    url: str | None = None
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class McpConnectorSettings(BaseModel):
     """Connection details for an MCP server.
 
@@ -89,15 +102,6 @@ class PaginationSettings(BaseModel):
     next_path: str = Field(
         ..., description="Dotted path to the next page URL or cursor in the response."
     )
-
-
-class LinkPreviewData(BaseModel):
-    """One external item's summary, ready to store on Link.preview."""
-
-    title: str
-    status: str | None = None
-    url: str | None = None
-    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class RestConnectorSettings(BaseModel):

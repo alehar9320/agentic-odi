@@ -278,6 +278,18 @@ explicit `RateLimiter` to override the rate or the burst in-process.
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.
 
+### Optional previews
+
+`Connector.preview(external_id)` is a concrete method that returns
+`LinkPreviewData | None`; the default returns `None`, meaning "this connector
+cannot describe the item". It is not abstract, so a connector without preview
+support inherits the default and cannot break. `LinkPreviewData` carries
+`title`, `status`, `url`, and `fetched_at`, and serializes to the keys
+`Link.preview` already holds. `RestConnector` overrides it: one request to the
+item's URL, mapped from `title`/`name`/`id`, `status`/`state`, and
+`url`/`html_url`/`web_url`. A non-2xx response, a non-object body, or a
+transport error returns `None` rather than raising.
+
 ## HTTP client configuration
 
 Connector HTTP traffic goes through one configurable client,

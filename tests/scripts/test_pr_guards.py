@@ -522,6 +522,17 @@ def test_count_tests_added_counts_python_and_javascript_definitions() -> None:
     assert count_tests_added(lines) == 3
 
 
+def test_count_tests_added_counts_async_python_definitions() -> None:
+    lines = [
+        ("a.py", 1, "async def test_async_one() -> None:"),
+        ("b.py", 2, "    async def test_async_method(self) -> None:"),
+        ("c.py", 3, "async def helper() -> None:"),
+        ("d.py", 4, "def test_sync_one() -> None:"),
+    ]
+
+    assert count_tests_added(lines) == 3
+
+
 def test_count_tests_added_ignores_removed_context() -> None:
     assert count_tests_added([]) == 0
 

@@ -22,8 +22,10 @@ class Connector(ABC):
         """Pull data from the external system into a normalized batch."""
 
     async def preview(self, external_id: str) -> LinkPreviewData | None:
-        """Return a short summary for an external item, or None if unsupported/unavailable.
+        """Describe one external item by id, or return ``None``.
 
-        A None result means \"this connector cannot describe the item\".
+        ``None`` means this connector cannot describe the item (unsupported or
+        unavailable). The default is concrete, not abstract, so a connector
+        without preview support inherits this answer and cannot break.
         """
         return None

@@ -5,7 +5,12 @@ import time
 from typing import Any
 
 import pytest
-from agentic_odi_connectors.models import RestConnectorSettings
+from agentic_odi_connectors.models import (
+    HealthStatus,
+    IngestBatch,
+    RestConnectorSettings,
+)
+from agentic_odi_connectors.protocol import Connector
 from agentic_odi_connectors.rest.connector import (
     RestConnector,
     WebhookConnector,
@@ -289,3 +294,99 @@ async def test_webhook_posts_json_body_and_uses_configured_item_type() -> None:
     assert body is not None and json.loads(body) == {"query": "latest"}
     assert batch.records[0].source_kind == "webhook"
     assert batch.records[0].item_type == "tool_result"
+
+
+@pytest.mark.asyncio
+async def test_preview_maps_a_supported_item() -> None:
+    calls: Calls = []
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/records"),
+        fetcher=_fetcher(
+            200,
+            {
+                "title": "Slow corn germination",
+                "status": "In Progress",
+                "html_url": "https://jira.example/ODI-42",
+            },
+            calls,
+        ),
+    )
+
+    preview = await connector.preview("ODI-42")
+
+    assert preview is not None
+    assert preview.title == "Slow corn germination"
+    assert preview.status == "In Progress"
+    assert preview.url == "https://jira.example/ODI-42"
+    assert preview.fetched_at is not None
+    assert len(calls) == 1
+    assert calls[0][1] == "https://api.example/records/ODI-42"
+
+
+@pytest.mark.asyncio
+async def test_preview_accepts_a_full_url_as_the_external_id() -> None:
+    calls: Calls = []
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/records"),
+        fetcher=_fetcher(200, {"name": "Quote"}, calls),
+    )
+
+    preview = await connector.preview("https://api.example/records/ODI-9")
+
+    assert preview is not None
+    assert preview.title == "Quote"
+    assert calls[0][1] == "https://api.example/records/ODI-9"
+
+
+@pytest.mark.asyncio
+async def test_preview_returns_none_on_http_404() -> None:
+    connector = _connector({"error": "not found"}, status=404)
+
+    assert await connector.preview("ODI-404") is None
+
+
+@pytest.mark.asyncio
+async def test_preview_returns_none_on_http_3xx() -> None:
+    connector = _connector({"title": "Moved"}, status=301)
+
+    assert await connector.preview("ODI-301") is None
+
+
+@pytest.mark.asyncio
+async def test_preview_returns_none_on_a_non_object_body() -> None:
+    connector = _connector(["not", "an", "object"], status=200)
+
+    assert await connector.preview("ODI-1") is None
+
+
+@pytest.mark.asyncio
+async def test_preview_returns_none_when_the_fetcher_raises() -> None:
+    def fetch(*_args: Any) -> tuple[int, bytes]:
+        raise ConnectionError("refused")
+
+    connector = RestConnector(
+        name="jira",
+        settings=RestConnectorSettings(url="https://api.example/records"),
+        fetcher=fetch,
+    )
+
+    assert await connector.preview("ODI-1") is None
+
+
+@pytest.mark.asyncio
+async def test_preview_defaults_to_none_when_not_overridden() -> None:
+    class PlainConnector(Connector):
+        kind = "plain"
+        name = "plain"
+
+        async def health(self) -> HealthStatus:
+            return HealthStatus(ok=True, message="ok")
+
+        async def ingest(self) -> IngestBatch:
+            return IngestBatch(connector_name=self.name)
+
+    connector = PlainConnector()
+
+    assert await connector.preview("anything") is None

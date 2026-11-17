@@ -200,6 +200,56 @@ class RestConnector(Connector):
             raw=raw,
         )
 
+    async def preview(self, external_id: str) -> LinkPreviewData | None:
+        """Describe one external item by id, or return ``None``.
+
+        Sends one request for the item and maps the JSON body onto
+        ``LinkPreviewData``. A non-2xx response or a body that is not a JSON
+        object returns ``None`` rather than raising.
+        """
+        url = self._item_url(external_id)
+        try:
+            status, body = self._request(url)
+        except Exception:  # noqa: BLE001
+            return None
+        if not 200 <= status < 300:
+            return None
+        try:
+            payload: Any = json.loads(body.decode("utf-8", errors="replace"))
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        title = payload.get("title") or payload.get("name") or payload.get("id")
+        if title is None:
+            return None
+        status_value = payload.get("status") or payload.get("state")
+        return LinkPreviewData(
+            title=str(title),
+            status=str(status_value) if status_value is not None else None,
+            url=self._preview_url(payload),
+        )
+
+    def _item_url(self, external_id: str) -> str:
+        """Resolve the URL for a single item from its external id.
+
+        The id is appended to the base path and percent-encoded; any query
+        string on the base URL is preserved.
+        """
+        if external_id.startswith(("http://", "https://")):
+            return external_id
+        parts = urllib.parse.urlsplit(self.settings.url)
+        path = parts.path.rstrip("/")
+        path = f"{path}/{urllib.parse.quote(external_id, safe='')}"
+        return urllib.parse.urlunsplit(parts._replace(path=path))
+
+    def _preview_url(self, payload: dict[str, Any]) -> str | None:
+        for key in ("url", "html_url", "web_url"):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                return value
+        return None
+
     async def health(self) -> HealthStatus:
         cached = _cached_health(self.name)
         if cached is not None:
@@ -217,46 +267,6 @@ class RestConnector(Connector):
             )
         _store_health(self.name, result)
         return result
-
-    async def preview(self, external_id: str) -> LinkPreviewData | None:
-        """Fetch one item by id and map it to a preview."""
-        parts = urllib.parse.urlsplit(self.settings.url)
-        path = parts.path.rstrip("/")
-        if external_id:
-            path = f"{path}/{urllib.parse.quote(external_id, safe='')}"
-        url = urllib.parse.urlunsplit(parts._replace(path=path))
-        try:
-            status, body = self._fetch(
-                "GET",
-                url,
-                dict(self.settings.headers),
-                None,
-                self.settings.timeout,
-            )
-        except Exception:  # noqa: BLE001
-            return None
-        if not 200 <= status < 400:
-            return None
-        text = body.decode("utf-8", errors="replace")
-        try:
-            payload: Any = json.loads(text)
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(payload, dict):
-            return None
-        title = str(payload.get("title") or payload.get("name") or payload.get("id") or external_id)
-        status_val = payload.get("status") if isinstance(payload.get("status"), str) else None
-        if status_val is None:
-            state_val = payload.get("state")
-            status_val = state_val if isinstance(state_val, str) else None
-        url_val = payload.get("url") if isinstance(payload.get("url"), str) else None
-        if url_val is None:
-            for key in ("html_url", "web_url"):
-                candidate = payload.get(key)
-                if isinstance(candidate, str):
-                    url_val = candidate
-                    break
-        return LinkPreviewData(title=title, status=status_val, url=url_val)
 
     async def ingest(self) -> IngestBatch:
         batch = IngestBatch(connector_name=self.name)
