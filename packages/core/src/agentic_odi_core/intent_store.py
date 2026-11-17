@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
@@ -124,6 +126,25 @@ class IntentStore:
         if row[2] != workspace_id:
             raise ConflictError(f"event_id {resolved_id} already belongs to another workspace")
         return self._to_event(row)
+
+    @contextmanager
+    def write_transaction(self) -> Iterator[None]:
+        """Serialize a read-check-append sequence across connections.
+
+        ``BEGIN IMMEDIATE`` takes the database write lock before the first read,
+        so a caller that replays the snapshot, decides, and appends cannot be
+        overtaken by another connection between the read and the append.
+        ``append`` commits the transaction it runs inside, which is what
+        releases the lock.
+        """
+        self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+            self.conn.commit()
+        except BaseException:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            raise
 
     def get_stream(
         self,

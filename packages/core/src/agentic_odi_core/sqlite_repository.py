@@ -844,22 +844,26 @@ class SQLiteRepository(Repository):
 
     def add_link(self, link: Link) -> Link:
         with self._lock:
-            self._sync()
-            identity = link_identity(link)
-            if any(link_identity(existing) == identity for existing in self.links.values()):
-                raise ConflictError(
-                    f"A {link.relationship_type.value} link already connects "
-                    f"{link.source_type}:{link.source_id} to "
-                    f"{link.target_type}:{link.target_id}."
+            # The snapshot read, the duplicate check, and the append share one
+            # write lock: two connections must not both pass the check before
+            # either event is durable.
+            with self.store.write_transaction():
+                self._sync()
+                identity = link_identity(link)
+                if any(link_identity(existing) == identity for existing in self.links.values()):
+                    raise ConflictError(
+                        f"A {link.relationship_type.value} link already connects "
+                        f"{link.source_type}:{link.source_id} to "
+                        f"{link.target_type}:{link.target_id}."
+                    )
+                self.store.append(
+                    "LINK_CREATED",
+                    link.model_dump(mode="json"),
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
                 )
-            self.store.append(
-                "LINK_CREATED",
-                link.model_dump(mode="json"),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return link
+                self._sync()
+                return link
 
     def get_link(self, link_id: str) -> Link | None:
         with self._lock:
