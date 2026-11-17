@@ -248,13 +248,19 @@ def show_profile(
     if as_json:
         typer.echo(json.dumps(b.to_dict(), indent=2))
         return
-    typer.echo(f"Product Name: {b.product_name or ''}")
-    typer.echo(f"Product URL:  {b.product_url or ''}")
-    typer.echo(f"Domain:       {b.domain or ''}")
-    typer.echo(f"Primary User: {b.primary_user or ''}")
-    typer.echo(f"Business:     {b.business_model or ''}")
-    typer.echo(f"Core Problem: {b.core_problem or ''}")
-    typer.echo(f"Focus:        {b.current_focus or ''}")
+    def _fmt(v):
+        if v is None:
+            return "—"
+        if v == "":
+            return "(empty)"
+        return v
+    typer.echo(f"Product Name: {_fmt(b.product_name)}")
+    typer.echo(f"Product URL:  {_fmt(b.product_url)}")
+    typer.echo(f"Domain:       {_fmt(b.domain)}")
+    typer.echo(f"Primary User: {_fmt(b.primary_user)}")
+    typer.echo(f"Business:     {_fmt(b.business_model)}")
+    typer.echo(f"Core Problem: {_fmt(b.core_problem)}")
+    typer.echo(f"Focus:        {_fmt(b.current_focus)}")
     typer.echo(f"Confidence:   {b.confidence or ''}")
 
 
@@ -264,19 +270,31 @@ def path_cmd() -> None:
     typer.echo(str(baseline_file()))
 
 
+_NON_CLEARABLE = {"schema_version", "inferred", "confidence", "created_at", "source"}
+_CLEARABLE = [f for f in Baseline.__dataclass_fields__ if f not in _NON_CLEARABLE]
+
+
 @app.command("set")
 def set_profile(
     product_name: str | None = typer.Option(None, help="Product name"),
+    product_url: str | None = typer.Option(None, help="Product URL"),
     domain: str | None = typer.Option(None, help="Domain"),
     primary_user: str | None = typer.Option(None, help="Primary user persona"),
     business_model: str | None = typer.Option(None, help="Business model"),
     core_problem: str | None = typer.Option(None, help="Core problem solved"),
     current_focus: str | None = typer.Option(None, help="Current focus"),
+    clear: list[str] = typer.Option([], "--clear", help="Field to unset (repeatable): product_name, domain, primary_user, business_model, core_problem, current_focus"),
 ) -> None:
     """Set profile values non-interactively."""
+    for name in clear:
+        if name not in _CLEARABLE:
+            typer.echo(f"Unknown field: {name}. Valid: {', '.join(_CLEARABLE)}")
+            raise typer.Exit(code=2)
     b = load_baseline() or Baseline(schema_version=1, source="cli")
     if product_name is not None:
         b.product_name = product_name
+    if product_url is not None:
+        b.product_url = product_url
     if domain is not None:
         b.domain = domain
     if primary_user is not None:
@@ -287,6 +305,9 @@ def set_profile(
         b.core_problem = core_problem
     if current_focus is not None:
         b.current_focus = current_focus
+    # --clear applied after set-options so a cleared field ends unset
+    for name in clear:
+        setattr(b, name, None)
     p = save_baseline(b)
     typer.echo(f"Profile saved to {p}")
 
