@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Living Studio</title>
+    <!-- The desktop splash (#963). A plain page, not a React route: it has to
+         paint before the bundle parses, so it ships no module and no request of
+         its own beyond the local mascot the shell already bundles. The Rust
+         shell closes this window and reveals `main` once the app reports in. -->
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0b0e;
+        --text: #f1f2f4;
+        --muted: #a2a7b3;
+        --accent: #8b8cf8;
+        --line: rgba(255, 255, 255, 0.08);
+        --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      html.theme-light {
+        color-scheme: light;
+        --bg: #f5f6f8;
+        --text: #15171c;
+        --muted: #565d6b;
+        --accent: #5b5bd6;
+        --line: rgba(15, 23, 42, 0.1);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;
+        user-select: none;
+      }
+      .splash {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 24px;
+        text-align: center;
+        animation: splash-in 220ms ease-out both;
+      }
+      .splash__mascot {
+        width: 96px;
+        height: 96px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        animation: splash-breathe 2400ms ease-in-out infinite;
+      }
+      .splash__wordmark {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+      .splash__status {
+        margin: 0;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      @keyframes splash-in {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes splash-breathe {
+        0%,
+        100% {
+          opacity: 0.92;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+      /* Minimal motion, and none at all when the person asks for that. */
+      @media (prefers-reduced-motion: reduce) {
+        .splash,
+        .splash__mascot {
+          animation: none;
+        }
+      }
+    </style>
+    <!-- Resolve the theme before first paint, from the same key the shell writes,
+         so the splash and the window it hands over to agree on one palette. -->
+    <script>
+      (function () {
+        var theme = null;
+        try {
+          var stored = JSON.parse(window.localStorage.getItem("studio.settings") || "null");
+          if (stored && (stored.theme === "light" || stored.theme === "dark")) theme = stored.theme;
+        } catch (error) {}
+        if (!theme) {
+          var light =
+            typeof window.matchMedia === "function" &&
+            window.matchMedia("(prefers-color-scheme: light)").matches;
+          theme = light ? "light" : "dark";
+        }
+        document.documentElement.classList.add(theme === "light" ? "theme-light" : "theme-dark");
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+  </head>
+  <body>
+    <main class="splash" aria-label="Living Studio is starting">
+      <img
+        class="splash__mascot"
+        src="/odi-mascot-256.png"
+        width="96"
+        height="96"
+        alt="Odi the otter"
+      />
+      <p class="splash__wordmark">Living Studio</p>
+      <p class="splash__status" role="status">Waking up</p>
+    </main>
+  </body>
+</html>
