@@ -95,6 +95,14 @@ def test_the_template_documents_every_supported_metadata_key():
     assert "agent_confidence" in body
 
 
+def test_a_completed_check_suite_keeps_the_ready_label_current():
+    """`ready-for-merge` needs a `clean` state, which only exists after the
+    checks pass; the six-hourly sweep used to be the only thing looking again."""
+    text = CONFLICTS.read_text(encoding="utf-8")
+    assert "check_suite:" in text
+    assert "github.event.check_suite.head_sha" in text
+
+
 def test_the_development_guide_documents_the_labeler():
     guide = (ROOT / "docs" / "development.md").read_text(encoding="utf-8")
     assert "PR labels" in guide

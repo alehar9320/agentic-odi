@@ -385,7 +385,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_hosted_first_run_workflow.py` | The hosted probe has a schedule, a commit to compare against, and no vote. |
 | `tests/scripts/test_label_merge_conflicts.py` | The merge-conflict labeler, pinned against the failures that silenced it. |
 | `tests/scripts/test_migrations_registry.py` | The migration registries are contracts, and these are their guards. |
-| `tests/scripts/test_pr_ai_authorize.py` | Test the AI merge authorization script (``scripts/pr_ai_authorize.py``). |
+| `tests/scripts/test_pr_ai_authorize.py` | Test the AI merge authorization and the check-suite gate it reads. |
 | `tests/scripts/test_pr_ai_merge.py` | The AI merge trust labeler, pinned so a silent gate failure cannot ship. |
 | `tests/scripts/test_pr_ai_merge_act.py` | Test the AI merge act workflow (``.github/workflows/pr-ai-merge-act.yml``). |
 | `tests/scripts/test_pr_ai_merge_workflow.py` | The AI merge trust workflow, pinned so the silent failures cannot come back. |
