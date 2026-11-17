@@ -330,6 +330,11 @@ map, and how every pull request is automatically risk-classified.
 The browser-level Studio suite runs in its own non-blocking CI job; set the
 repository variable `AGENTIC_ODI_E2E` to `false` to skip it.
 
+A `dependencies` CI job fails a pull request that pins a high-severity advisory
+in the Python, npm, or Cargo dependency set. Accepted advisories live in
+`security/audit-ignore.toml` with an expiry date; see
+[ADR 0008](docs/architecture/adr/0008-dependency-advisories-are-a-gate.md).
+
 ## Brand
 
 **Odi the Otter** is the mascot — a golden-ratio-derived pixel otter appearing in

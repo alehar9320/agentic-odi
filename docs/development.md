@@ -29,6 +29,35 @@ uv run --directory website mypy .
 uv run bandit -c pyproject.toml -r apps packages website/
 ```
 
+Bandit reads code patterns. It cannot say that a pinned version has a known
+advisory, so a separate `dependencies` CI job asks the advisory databases
+directly, for the Python runtime export, the Studio's npm packages, and the
+Tauri `Cargo.lock`. Run the same three commands locally:
+
+```bash
+uv export --all-packages --format requirements-txt --no-hashes --no-dev > /tmp/req.txt
+uvx pip-audit==2.7.3 -r /tmp/req.txt --skip-editable
+npm --prefix apps/studio audit --omit=dev --audit-level=high
+cargo audit --file apps/studio/src-tauri/Cargo.lock
+```
+
+An advisory the repository accepts rather than fixes is recorded in
+`security/audit-ignore.toml` with a reason and an `expires` date no more than 90
+days out; `scripts/audit_ignore.py` reads that ledger, builds the tools' ignore
+arguments, filters `npm audit` (which has no ignore flag), and fails the job when
+an entry is expired. Validate the ledger and preview the arguments with:
+
+```bash
+uv run python scripts/audit_ignore.py --check
+uv run python scripts/audit_ignore.py --pip-args
+uv run python scripts/audit_ignore.py --cargo-args
+```
+
+The audit is not part of `scripts/verify.py --changed`: it needs the lockfiles
+rather than the diff, and its result does not depend on which files a pull
+request touched. See
+[ADR 0008](architecture/adr/0008-dependency-advisories-are-a-gate.md).
+
 ## Documentation Checks
 
 `scripts/doc_check.py` keeps the living docs honest against the code:
