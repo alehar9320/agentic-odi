@@ -23,6 +23,7 @@ from typing import Any
 
 from agentic_odi_core.errors import StoreCorrupt
 from agentic_odi_core.integrity import ensure_intact
+from agentic_odi_core.migrations import Migration, migrate
 
 from agentic_odi_studio_api.studio.claims import (
     Claim,
@@ -298,9 +299,11 @@ CREATE INDEX IF NOT EXISTS shares_by_hash ON shares(token_hash);
 """
 
 
-#: Columns added after the first release. A database created by an older build
-#: is upgraded in place: nothing is dropped and no data is rewritten.
-_MIGRATIONS: tuple[tuple[str, str, str], ...] = (
+#: Columns added after the first release, as migration 1. A database created by
+#: an older build is upgraded in place: nothing is dropped and no data is
+#: rewritten. The index on the message id is migration 2, kept separate so a
+#: step that only adds an index is its own entry rather than a re-run on open.
+_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("conversations", "head_id", "TEXT"),
     ("turns", "message_id", "TEXT"),
     ("turns", "parent_id", "TEXT"),
@@ -309,16 +312,29 @@ _MIGRATIONS: tuple[tuple[str, str, str], ...] = (
 )
 
 
-def _migrate(connection: sqlite3.Connection) -> None:
-    for table, column, kind in _MIGRATIONS:
-        columns = {
-            row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
-        }
+def _studio_migration_1(connection: sqlite3.Connection) -> None:
+    """Add the columns the first release shipped without."""
+    for table, column, kind in _ADDED_COLUMNS:
+        columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
         if column not in columns:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+
+
+def _studio_migration_2(connection: sqlite3.Connection) -> None:
+    """Index a turn by the message id a branch is rebuilt from."""
     connection.execute(
         "CREATE INDEX IF NOT EXISTS turns_by_message ON turns(conversation_id, message_id)"
     )
+
+
+#: Every step for ``studio.db``, keyed by the version it produces. The runner in
+#: ``agentic_odi_core.migrations`` applies the steps newer than the file records.
+STUDIO_MIGRATIONS: tuple[Migration, ...] = (
+    Migration(
+        1, "Add head_id, message_id, parent_id, and observation subjects.", _studio_migration_1
+    ),
+    Migration(2, "Index turns by conversation and message id.", _studio_migration_2),
+)
 
 
 def _validate_text(text: str) -> str:
@@ -403,7 +419,7 @@ class StudioMemory:
                 self._connection.execute("PRAGMA busy_timeout = 5000")
             with self._connection:
                 self._connection.executescript(_SCHEMA)
-                _migrate(self._connection)
+                migrate(self._connection, STUDIO_MIGRATIONS, label="Your Studio memory")
         except sqlite3.DatabaseError as exc:
             self._connection.close()
             raise StoreCorrupt(str(self.db_path), [str(exc)], label="Your Studio memory") from exc

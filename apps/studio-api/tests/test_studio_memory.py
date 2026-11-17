@@ -8,6 +8,7 @@ from collections.abc import Iterator
 import pytest
 from agentic_odi_studio_api.studio.memory import (
     OBSERVATION_KINDS,
+    STUDIO_MIGRATIONS,
     ConversationNotFoundError,
     ObservationNotFoundError,
     StudioMemory,
@@ -299,6 +300,33 @@ def test_a_database_without_the_subject_columns_migrates_in_place(tmp_path) -> N
         assert rows[0].subject_id is None
     finally:
         store.close()
+
+
+def test_studio_memory_records_its_schema_version_and_reopens_as_a_no_op(tmp_path) -> None:
+    from agentic_odi_core.migrations import current_version
+
+    path = tmp_path / "studio.db"
+    store = StudioMemory(str(path))
+    store.close()
+
+    connection = sqlite3.connect(str(path))
+    try:
+        version = current_version(connection)
+    finally:
+        connection.close()
+    assert version == max(step.version for step in STUDIO_MIGRATIONS)
+
+    reopened = StudioMemory(str(path))
+    try:
+        assert reopened.list_observations() == []
+    finally:
+        reopened.close()
+
+    check = sqlite3.connect(str(path))
+    try:
+        assert current_version(check) == version
+    finally:
+        check.close()
 
 
 def test_memory_context_names_a_subject_only_when_one_exists(
