@@ -66,9 +66,10 @@ request touched. See
 uv run python scripts/doc_check.py
 ```
 
-`docs/roadmap.md` is a pointer page; its three lists point at the sources that
-own the facts (the changelog, the open pull-request list, and the ready-for-dev
-issue filter). No check requires a new capability to edit it.
+`docs/roadmap.md` is a pointer page, not a register. It keeps no shipped,
+in-flight, or queued lists of its own — those facts live in `CHANGELOG.md` and
+Releases, the open-pull-request list, and the `ready-for-dev` issue filter — so
+no capability change has to edit a roadmap file to land.
 
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,

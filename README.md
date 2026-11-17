@@ -331,7 +331,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [Development](docs/development.md) | Lint, types, frontend checks, and the coverage map. |
 | [The assistant-ui ledger](docs/assistant-ui-ledger.md) | Every assistant-ui capability, and the one honest state it is in. |
 | [Agent Assignment](docs/agents.md) | Which agents take issues, how to claim one, and when a claim expires. |
-| [Roadmap](docs/roadmap.md) | What has shipped, and what is queued. |
+| [Roadmap](docs/roadmap.md) | Where to see what shipped, what is in review, and what is queued. |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration. |
 | [Configuration](docs/reference/configuration.md) | Every environment variable, its default, and the form it accepts. |
 <!-- END GENERATED: docs -->
