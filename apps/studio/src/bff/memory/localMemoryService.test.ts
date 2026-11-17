@@ -74,6 +74,94 @@ describe("LocalMemoryService observations", () => {
     const remaining = await memory.listObservations();
     expect(remaining).toEqual([]);
   });
+
+  it("attaches an observation to a subject", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const obs = await memory.addObservation({
+      kind: "opportunity",
+      text: "Activation is stuck.",
+      subject_type: "outcome",
+      subject_id: "O-12",
+    });
+    expect(obs.subject_type).toBe("outcome");
+    expect(obs.subject_id).toBe("O-12");
+  });
+
+  it("leaves an observation unattached when no subject is given", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const obs = await memory.addObservation({ kind: "career", text: "Owns activation." });
+    expect(obs.subject_type).toBeNull();
+    expect(obs.subject_id).toBeNull();
+  });
+
+  it("rejects an unknown subject type and a subject without an id", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    await expect(
+      memory.addObservation({
+        kind: "opportunity",
+        text: "Activation is stuck.",
+        subject_type: "planet" as never,
+        subject_id: "O-12",
+      }),
+    ).rejects.toThrow();
+    await expect(
+      memory.addObservation({
+        kind: "opportunity",
+        text: "Activation is stuck.",
+        subject_type: "outcome",
+        subject_id: "  ",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("updates the same observation instead of duplicating it", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const first = await memory.addObservation({
+      kind: "opportunity",
+      text: "Activation is stuck.",
+      confidence: 0.4,
+      subject_type: "outcome",
+      subject_id: "O-12",
+    });
+    const second = await memory.addObservation({
+      kind: "opportunity",
+      text: "Activation is stuck.",
+      confidence: 0.9,
+      subject_type: "outcome",
+      subject_id: "O-12",
+    });
+    expect(second.id).toBe(first.id);
+    const list = await memory.listObservations();
+    expect(list).toHaveLength(1);
+    expect(list[0].confidence).toBe(0.9);
+  });
+
+  it("filters observations by subject", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    await memory.addObservation({
+      kind: "opportunity",
+      text: "Activation is stuck.",
+      subject_type: "outcome",
+      subject_id: "O-12",
+    });
+    await memory.addObservation({
+      kind: "opportunity",
+      text: "Retention is stuck.",
+      subject_type: "outcome",
+      subject_id: "O-13",
+    });
+
+    const found = await memory.listObservations(false, {
+      subject_type: "outcome",
+      subject_id: "O-12",
+    });
+    expect(found.map((item) => item.text)).toEqual(["Activation is stuck."]);
+  });
 });
 
 describe("LocalMemoryService conversations", () => {
@@ -185,5 +273,56 @@ describe("LocalMemoryService conversations", () => {
     // Newest first: the five oldest threads fall off the end.
     expect(listed[0].id).toBe("c-24");
     expect(listed.map((item) => item.id)).not.toContain("c-4");
+  });
+
+  it("renames a thread, trimming and capping the name", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const conv = await memory.createConversation("Old name");
+
+    const renamed = await memory.renameConversation(conv.id, "  Retention work  ");
+
+    expect(renamed.title).toBe("Retention work");
+    expect((await memory.getConversation(conv.id))?.title).toBe("Retention work");
+
+    // The sidecar caps a title at 200 characters; the local path matches it.
+    await memory.renameConversation(conv.id, "x".repeat(250));
+    expect((await memory.getConversation(conv.id))?.title).toHaveLength(200);
+  });
+
+  it("refuses an empty rename and reports an unknown thread", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const conv = await memory.createConversation("Keep me");
+
+    await expect(memory.renameConversation(conv.id, "   ")).rejects.toMatchObject({
+      studioError: { code: "validation" },
+    });
+    expect((await memory.getConversation(conv.id))?.title).toBe("Keep me");
+
+    await expect(memory.renameConversation("missing", "New")).rejects.toMatchObject({
+      studioError: { code: "not_found" },
+    });
+  });
+
+  it("deletes a thread and its turns, and reports an unknown one", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const kept = await memory.createConversation("Keep me");
+    const doomed = await memory.createConversation("Delete me");
+    await memory.appendTurn(doomed.id, "user", "hello", "m-1", null);
+    await memory.appendTurn(doomed.id, "assistant", "hi", "m-2", "m-1");
+
+    await expect(memory.deleteConversation(doomed.id)).resolves.toEqual({ ok: true });
+
+    expect(await memory.getConversation(doomed.id)).toBeUndefined();
+    expect((await memory.listConversations()).map((item) => item.id)).toEqual([kept.id]);
+    await expect(memory.conversationTree(doomed.id)).rejects.toThrow(/not found/i);
+    // The kept thread is untouched: deleting one thread is not clearing the store.
+    expect(await memory.getConversation(kept.id)).toBeDefined();
+
+    await expect(memory.deleteConversation("missing")).rejects.toMatchObject({
+      studioError: { code: "not_found" },
+    });
   });
 });

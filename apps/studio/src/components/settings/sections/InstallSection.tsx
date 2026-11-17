@@ -1,3 +1,4 @@
+import { runtimeFacts } from "../../../bridge/runtime";
 import { dismissInstall, isDismissed, isInstalled, offerInstall } from "../../../install";
 
 /**
@@ -5,10 +6,12 @@ import { dismissInstall, isDismissed, isInstalled, offerInstall } from "../../..
  *
  * The install prompt is browser-owned and local, so this section has nothing to
  * load and nothing to fail on its own. It renders nothing once the app is
- * installed or the offer has been dismissed.
+ * installed, once the offer has been dismissed, or inside the desktop app —
+ * which is already its own window and cannot be installed into one.
  */
 export function InstallSection() {
-  const canInstall = !isInstalled() && !isDismissed();
+  const facts = runtimeFacts();
+  const canInstall = facts.host === "browser" && !isInstalled() && !isDismissed();
 
   return (
     <section className="settings__install" aria-labelledby="settings-install-heading">

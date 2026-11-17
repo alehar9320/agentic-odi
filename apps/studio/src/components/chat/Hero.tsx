@@ -12,7 +12,7 @@ import { useStudio } from "../../state/StudioContext";
  * live in the composer, where they stay reachable once the thread starts.
  */
 export function Hero() {
-  const { displayName, canvas, llmHealth, brief, openSetup } = useStudio();
+  const { displayName, canvas, llmHealth, brief, openSetup, openPanel } = useStudio();
   const { enabled: tourEnabled, openTour } = useOnboarding();
 
   const jobs = canvas?.jobs.length ?? 0;
@@ -65,6 +65,17 @@ export function Hero() {
           title="Tell me who you are and what you're working on"
         >
           {brief ? "Edit context" : "Start with you and your team"}
+        </button>
+        <span className="hero__aside-divider" aria-hidden="true">
+          ·
+        </span>
+        <button
+          type="button"
+          className="hero__tour"
+          onClick={() => openPanel("dashboard")}
+          title="See the headline numbers and how they moved"
+        >
+          Open your dashboard
         </button>
         {tourEnabled ? (
           <>

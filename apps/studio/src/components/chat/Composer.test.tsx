@@ -138,6 +138,7 @@ describe("ThreadComposer attachment guidance", () => {
     const attachment = screen.getByRole("button", { name: "Attach a file" });
     expect(attachment).toHaveAccessibleDescription(/\.md.*\.json.*PNG.*JPEG.*WEBP.*GIF/i);
     expect(attachment).toHaveAccessibleDescription(/\.docx/i);
+    expect(attachment).toHaveAccessibleDescription(/\.pdf/i);
     expect(attachment).toHaveAccessibleDescription(/5 MB/);
     expect(attachment).toHaveAccessibleDescription(/20,000 characters/);
   });
@@ -189,12 +190,12 @@ describe("ThreadComposer attachments", () => {
     const pushToast = vi.fn();
     const { container } = await renderThreadComposer({ pushToast });
     const root = container.querySelector(".composer") as HTMLElement;
-    const file = new File(["x"], "deck.pdf", { type: "application/pdf" });
+    const file = new File(["x"], "archive.zip", { type: "application/zip" });
 
     fireEvent.drop(root, { dataTransfer: { types: ["Files"], files: [file] } });
 
-    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("deck.pdf"));
-    expect(screen.queryByText("deck.pdf")).toBeNull();
+    expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("archive.zip"));
+    expect(screen.queryByText("archive.zip")).toBeNull();
   });
 
   it("accepts a dropped .docx as an attachment chip", async () => {
@@ -244,7 +245,9 @@ describe("ThreadComposer attachments", () => {
     await screen.findByText("notes-1.txt");
     await screen.findByText("notes-5.txt");
     expect(screen.queryByText("notes-6.txt")).toBeNull();
-    expect(await screen.findAllByRole("listitem")).toHaveLength(5);
+    const items = await screen.findAllByRole("listitem");
+    // The starter cards are list items too now (#600); count only the attachments.
+    expect(items.filter((item) => item.closest(".composer__attachments"))).toHaveLength(5);
 
     expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("notes-6.txt"));
     expect(pushToast).toHaveBeenCalledWith("error", expect.stringContaining("5-file"));

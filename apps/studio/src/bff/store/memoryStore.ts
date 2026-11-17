@@ -6,9 +6,11 @@ import {
   byCreated,
   bySeq,
   type DrainLease,
+  type InterviewDraft,
   type LocalStore,
   type OutboxRecord,
   type StoredConversation,
+  type StoredEvidence,
   type StoredJob,
   type StoredNotice,
   type StoredOutcome,
@@ -25,10 +27,12 @@ export class MemoryLocalStore implements LocalStore {
   private readonly jobs = new Map<string, StoredJob>();
   private readonly steps = new Map<string, StoredStep>();
   private readonly outcomes = new Map<string, StoredOutcome>();
+  private readonly evidence = new Map<string, StoredEvidence>();
   private readonly observations = new Map<string, Observation>();
   private readonly conversations = new Map<string, StoredConversation>();
   private readonly notices = new Map<string, StoredNotice>();
   private readonly turns: StoredTurn[] = [];
+  private readonly drafts = new Map<string, InterviewDraft>();
   private readonly outbox = new Map<string, OutboxRecord>();
   private lease: DrainLease | null = null;
 
@@ -95,6 +99,24 @@ export class MemoryLocalStore implements LocalStore {
 
   async deleteOutcome(id: string): Promise<void> {
     this.outcomes.delete(id);
+  }
+
+  async listEvidence(jobId?: string): Promise<StoredEvidence[]> {
+    return [...this.evidence.values()]
+      .filter((record) => !jobId || record.job_id === jobId)
+      .sort(bySeq);
+  }
+
+  async getEvidence(id: string): Promise<StoredEvidence | undefined> {
+    return this.evidence.get(id);
+  }
+
+  async putEvidence(evidence: StoredEvidence): Promise<void> {
+    this.evidence.set(evidence.id, evidence);
+  }
+
+  async deleteEvidence(id: string): Promise<void> {
+    this.evidence.delete(id);
   }
 
   async listObservations(): Promise<Observation[]> {
@@ -203,6 +225,20 @@ export class MemoryLocalStore implements LocalStore {
     return next;
   }
 
+  async renameConversation(id: string, title: string): Promise<StoredConversation> {
+    const conversation = this.conversations.get(id);
+    if (!conversation) {
+      throw new Error(`Conversation ${id} not found`);
+    }
+    const next: StoredConversation = {
+      ...conversation,
+      title,
+      updated_at: nowIso(),
+    };
+    this.conversations.set(id, next);
+    return next;
+  }
+
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.turns
       .filter((turn) => turn.conversation_id === conversationId)
@@ -252,10 +288,34 @@ export class MemoryLocalStore implements LocalStore {
     }
   }
 
+  async listInterviewDrafts(jobId?: string): Promise<InterviewDraft[]> {
+    return [...this.drafts.values()]
+      .filter((draft) => !jobId || draft.jobId === jobId)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async getInterviewDraft(id: string): Promise<InterviewDraft | undefined> {
+    return this.drafts.get(id);
+  }
+
+  async putInterviewDraft(draft: InterviewDraft): Promise<void> {
+    this.drafts.set(draft.id, draft);
+  }
+
+  async deleteInterviewDraft(id: string): Promise<void> {
+    this.drafts.delete(id);
+  }
+
+  async deleteConversation(id: string): Promise<void> {
+    this.conversations.delete(id);
+    await this.clearTurns(id);
+  }
+
   async snapshot(): Promise<WorkspaceSnapshot> {
     const jobs = await this.listJobs();
     const steps = await this.listSteps();
     const outcomes = await this.listOutcomes();
+    const evidence = await this.listEvidence();
     const observations = await this.listObservations();
     const conversations = await this.listConversations();
     return {
@@ -263,6 +323,7 @@ export class MemoryLocalStore implements LocalStore {
       jobs,
       steps,
       outcomes,
+      evidence,
       observations,
       conversations,
       turns: [...this.turns],
@@ -281,6 +342,10 @@ export class MemoryLocalStore implements LocalStore {
     this.outcomes.clear();
     for (const outcome of snapshot.outcomes) {
       this.outcomes.set(outcome.id, outcome);
+    }
+    this.evidence.clear();
+    for (const record of snapshot.evidence ?? []) {
+      this.evidence.set(record.id, record);
     }
     this.observations.clear();
     for (const observation of snapshot.observations) {
@@ -309,10 +374,12 @@ export class MemoryLocalStore implements LocalStore {
     this.jobs.clear();
     this.steps.clear();
     this.outcomes.clear();
+    this.evidence.clear();
     this.observations.clear();
     this.conversations.clear();
     this.notices.clear();
     this.turns.length = 0;
+    this.drafts.clear();
     this.outbox.clear();
     this.lease = null;
     this.seq = 0;

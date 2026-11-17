@@ -2,27 +2,50 @@
 description: how to run the test suite
 ---
 
-# Testing Tiers
+# Test tiers
 
-There are three tiers. They are not three ways to run "the whole suite" — each
-one is a different amount of the product, and the bar for opening a pull
-request is the middle one.
+Pick the smallest tier that matches your time budget. CI owns the full matrix; agents must not be asked to run it all locally.
 
-| Tier | What it runs | Who runs it |
-|---|---|---|
-| **Fast** | pytest on the changed packages, ruff on the changed files | anyone who wants a quick answer |
-| **Default** | the fast tier, plus type checking, plus the studio units | **the bar for opening a PR** |
-| **Full** | the default tier, plus the studio build, plus the browser e2e suite | CI |
+| Tier | Command | When | Notes |
+|---|---|---|---|
+| `--changed` (fast gate) | `uv run python scripts/verify.py --changed` | **Bar for opening a PR.** Run before opening or updating a PR. Fits inside a 10–30 minute agent budget. | Ruff on touched paths, pytest for selected packages. Prints elapsed seconds per step and what was skipped. Fails loudly if a touched file maps to no test target. |
+| `--default` | `uv run python scripts/verify.py --default` | Before asking for merge review. | Adds `mypy` for touched packages and `vitest` for touched studio files. Still not a substitute for CI. |
+| `--full` | `uv run python scripts/verify.py --full` | **CI's job.** Do not run by default in agent runs. | Runs today's full matrix (Python, website pytest, studio vitest, `npm run build`, Playwright e2e). Per-job budgets are 5–20 minutes in CI. |
 
 `--full` is CI's responsibility. It budgets 5–20 minutes per job
 (`.github/workflows/ci.yml`), so nobody is asked to run it locally before
 opening a pull request.
 
-The fast tier is the focused gate described in issue #754, which has not
-landed yet. Until it does, the fast tier is that gate run by hand — pytest on
-the packages the diff touches, lint on the changed files:
+## What `--changed` does not cover
 
-## 1. Fast tier
+The dependency audit (`pip-audit`, `npm audit`, `cargo audit`) is a CI job, not a
+tier. It reads the lockfiles rather than the diff, so its result does not depend
+on which files a pull request touched, and `--changed` neither runs it nor skips
+it by selection. Run it by hand when a pull request changes a dependency; the
+commands and the accepted-advisory ledger are in
+[Development](../docs/development.md#linting-formatting--type-checks).
+
+## PR requirement (honest verification)
+
+A pull request **must** list the tiers it ran and the tiers it skipped in the PR body (in the repo's spirit of no-silent-fabrication). For example:
+
+```markdown
+**Verification**
+- Ran: `--changed`
+- Skipped: `--default` (reason), `--full` (CI)
+- Not verified: coverage, e2e, website, desktop (as applicable)
+```
+
+This is the repo's no-silent-fabrication rule applied to verification: a PR
+that ran only the fast tier must not read as if it ran the default tier, and
+a PR that ran nothing must say so instead of leaving the checkboxes blank.
+
+## Running a tier by hand (for reference)
+
+The script wraps these commands. Run them directly when you want to check one
+slice yourself.
+
+### Fast tier
 
 ```bash
 uv run pytest packages/<changed>     # pytest on the packages the diff touches
@@ -57,9 +80,11 @@ npm --prefix apps/studio run test:e2e
 ```
 
 CI runs this in the `e2e` job against the real Studio, the real sidecar, and
-the real MCP server. It is deliberately non-blocking: set the repository
-variable `AGENTIC_ODI_E2E` to `false` to skip it, and `continue-on-error`
-keeps a failure from turning CI red.
+the real MCP server. It is advisory by default: set the repository variable
+`AGENTIC_ODI_E2E` to `false` to skip it, and a failure is reported — in the job
+summary, in a warning annotation, and in `CI green`'s table — without turning
+CI red. Set `AGENTIC_ODI_E2E_BLOCKING` to `true` to make a browser failure
+block a merge.
 
 ## Honest PR bodies
 

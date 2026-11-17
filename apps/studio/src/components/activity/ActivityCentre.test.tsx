@@ -10,19 +10,17 @@ vi.mock("../../state/StudioContext", () => ({
 
 import { useStudio } from "../../state/StudioContext";
 
-type StudioMock = {
-  store: object;
-  loadNotices: () => Promise<StoredNotice[]>;
-  saveNotices: (notices: StoredNotice[]) => Promise<void>;
-};
-
-function mockStudioContext(overrides: Partial<StudioMock> = {}) {
+function mockStudioContext(
+  overrides: Partial<{
+    loadNotices: () => Promise<StoredNotice[]>;
+    saveNotices: (notices: StoredNotice[]) => Promise<void>;
+  }> = {},
+) {
   vi.mocked(useStudio).mockReturnValue({
-    store: {},
     loadNotices: vi.fn().mockResolvedValue([]),
     saveNotices: vi.fn().mockResolvedValue(undefined),
     ...overrides,
-  } as ReturnType<typeof useStudio>);
+  } as unknown as ReturnType<typeof useStudio>);
 }
 
 const mockNotices: StoredNotice[] = [
@@ -160,8 +158,8 @@ describe("ActivityCentre", () => {
 
     await waitFor(() => {
       expect(saveNotices).toHaveBeenCalled();
-      const savedNotices = vi.mocked(saveNotices).mock.calls[0][0];
-      expect(savedNotices.find((n) => n.id === "notice-1")?.dismissed).toBe(true);
+      const savedNotices = vi.mocked(saveNotices).mock.calls[0][0] as StoredNotice[];
+      expect(savedNotices.find((n: StoredNotice) => n.id === "notice-1")?.dismissed).toBe(true);
     });
   });
 
@@ -182,8 +180,8 @@ describe("ActivityCentre", () => {
 
     await waitFor(() => {
       expect(saveNotices).toHaveBeenCalled();
-      const savedNotices = vi.mocked(saveNotices).mock.calls[0][0];
-      expect(savedNotices.every((n) => n.dismissed)).toBe(true);
+      const savedNotices = vi.mocked(saveNotices).mock.calls[0][0] as StoredNotice[];
+      expect(savedNotices.every((n: StoredNotice) => n.dismissed)).toBe(true);
     });
   });
 

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import type { WorkspacePanelId } from "../../types";
 import { BriefLens } from "../brief/BriefLens";
+import { Dashboard } from "../canvas/Dashboard";
 import { DirectCapture } from "../canvas/DirectCapture";
 import { EvidenceStream } from "../canvas/EvidenceStream";
 import { JobMap } from "../canvas/JobMap";
@@ -32,6 +33,15 @@ export interface PanelTalk {
   intent: string;
 }
 
+/**
+ * How a panel behaves as the right region's one detail (#740).
+ *
+ * `detail` is a lens on one thing the mainstage pointed at; `browse` is a list
+ * the person is scanning. The distinction is framing, not navigation: both stay
+ * panel content, and neither becomes a switcher.
+ */
+export type PanelMode = "detail" | "browse";
+
 export interface PanelDefinition {
   id: WorkspacePanelId;
   /** Short label used by the rail and the lens header. */
@@ -42,6 +52,14 @@ export interface PanelDefinition {
   render: () => ReactNode;
   /** The one sentence that takes the user back into the thread. */
   talk?: PanelTalk;
+  /**
+   * Where this detail sits in the job it belongs to, e.g. *Step 2 of 4 •
+   * Locate*. Only set where a real step backs it; a panel with none omits the
+   * line rather than inventing one.
+   */
+  contextLine?: string;
+  /** Whether the lens reads as one detail or a browsable list. Defaults to `browse`. */
+  mode?: PanelMode;
 }
 
 /**
@@ -49,6 +67,18 @@ export interface PanelDefinition {
  * them owns an input the agent could take more naturally as a message.
  */
 export const WORKSPACE_PANELS: PanelDefinition[] = [
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    title: "Dashboard",
+    blurb: "Where your attention should go: the headline numbers and how they moved.",
+    icon: <TableIcon />,
+    render: () => <Dashboard />,
+    talk: {
+      label: "Ask what to look at",
+      intent: "Looking at my dashboard, where should my attention go next, and why?",
+    },
+  },
   {
     id: "records",
     label: "Records",
@@ -93,6 +123,7 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
     blurb: "The document a review reads: the vision, the ranked bets, their evidence, the dissent.",
     icon: <FileIcon />,
     render: () => <BriefLens />,
+    mode: "detail",
   },
   {
     id: "jobmap",

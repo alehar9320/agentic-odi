@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentic_odi_core.evaluation import evaluate_outcome_statement
+from agentic_odi_core.evaluation import evaluate_outcome_statement, outcome_rubric
 
 WELL_FORMED = "Minimize the time it takes to onboard a customer when they sign up"
 
@@ -107,3 +107,143 @@ def test_blank_input_reports_every_missing_part() -> None:
     assert result["valid"] is False
     assert len(result["issues"]) == 5
     assert result["statement"] == ""
+
+
+def test_outcome_rubric_returns_all_eight_rules() -> None:
+    rubric = outcome_rubric()
+
+    assert rubric["version"] == "1"
+    assert len(rubric["rules"]) == 8
+    rule_ids = [rule["id"] for rule in rubric["rules"]]
+    expected_ids = [
+        "direction",
+        "unit_of_measure",
+        "object_of_control",
+        "contextual_clarifier",
+        "min_words",
+        "max_chars",
+        "vague_terms",
+        "solution_nouns",
+    ]
+    assert rule_ids == expected_ids
+    for rule in rubric["rules"]:
+        assert "id" in rule
+        assert "label" in rule
+        assert "summary" in rule
+        assert "fix" in rule
+        assert "examples" in rule
+        assert "good" in rule["examples"]
+        assert "bad" in rule["examples"]
+
+
+def test_evaluate_outcome_statement_returns_checks_for_each_rule() -> None:
+    result = evaluate_outcome_statement(WELL_FORMED)
+
+    assert "checks" in result
+    assert len(result["checks"]) == 8
+    check_ids = [check["id"] for check in result["checks"]]
+    expected_ids = [
+        "direction",
+        "unit_of_measure",
+        "object_of_control",
+        "contextual_clarifier",
+        "min_words",
+        "max_chars",
+        "vague_terms",
+        "solution_nouns",
+    ]
+    assert check_ids == expected_ids
+    for check in result["checks"]:
+        assert "id" in check
+        assert "ok" in check
+        assert "message" in check
+        assert "fix" in check
+
+
+def test_valid_statement_has_all_checks_ok() -> None:
+    result = evaluate_outcome_statement(WELL_FORMED)
+
+    assert result["valid"] is True
+    for check in result["checks"]:
+        assert check["ok"] is True
+        assert check["message"] == ""
+        assert check["fix"] == ""
+
+
+def test_invalid_statement_has_failing_checks_with_messages() -> None:
+    result = evaluate_outcome_statement("Make it faster")
+
+    assert result["valid"] is False
+    failing_checks = [check for check in result["checks"] if not check["ok"]]
+    assert len(failing_checks) >= 3  # direction, vague_terms, min_words at minimum
+    for check in failing_checks:
+        assert check["message"]
+        assert check["fix"]
+
+
+def test_statement_breaking_three_rules_returns_three_failing_checks() -> None:
+    # Has direction, unit, object - but missing context, too short, vague term
+    result = evaluate_outcome_statement("Maximize the time faster")
+
+    assert result["valid"] is False
+    failing_checks = [check for check in result["checks"] if not check["ok"]]
+    assert len(failing_checks) == 3
+    failing_ids = {check["id"] for check in failing_checks}
+    assert "contextual_clarifier" in failing_ids
+    assert "min_words" in failing_ids
+    assert "vague_terms" in failing_ids
+
+
+def test_rubric_parity_with_evaluate_outcome_statement() -> None:
+    """Every rule in outcome_rubric() must be produced by evaluate_outcome_statement and vice versa."""
+    rubric = outcome_rubric()
+    rubric_ids = {rule["id"] for rule in rubric["rules"]}
+
+    result = evaluate_outcome_statement(WELL_FORMED)
+    check_ids = {check["id"] for check in result["checks"]}
+
+    assert rubric_ids == check_ids
+
+
+def test_rubric_constants_not_hand_copied() -> None:
+    """Verify rubric values are derived from validator constants, not hand-copied."""
+    rubric = outcome_rubric()
+
+    # Check min_words rule references _MIN_WORDS constant value
+    min_words_rule = next(rule for rule in rubric["rules"] if rule["id"] == "min_words")
+    assert str(6) in min_words_rule["summary"]  # _MIN_WORDS = 6
+
+    # Check max_chars rule references _MAX_CHARS constant value
+    max_chars_rule = next(rule for rule in rubric["rules"] if rule["id"] == "max_chars")
+    assert str(200) in max_chars_rule["summary"]  # _MAX_CHARS = 200
+
+    # Check vague_terms rule references _VAGUE_TERMS
+    vague_terms_rule = next(rule for rule in rubric["rules"] if rule["id"] == "vague_terms")
+    for term in ("better", "improve", "optimize", "faster", "easier"):
+        assert term in vague_terms_rule["summary"]
+
+    # Check solution_nouns rule references _SOLUTION_NOUNS
+    solution_nouns_rule = next(rule for rule in rubric["rules"] if rule["id"] == "solution_nouns")
+    for noun in (
+        "notification",
+        "dashboard",
+        "button",
+        "feature",
+        "screen",
+        "email",
+        "workflow",
+        "integration",
+        "report",
+        "toggle",
+    ):
+        assert noun in solution_nouns_rule["summary"]
+
+    # Check direction rule references _DIRECTIONS
+    direction_rule = next(rule for rule in rubric["rules"] if rule["id"] == "direction")
+    for direction in ("minimize", "maximize"):
+        assert direction in direction_rule["summary"].lower()
+
+    # Check contextual_clarifier rule references _CONTEXT_MARKERS
+    contextual_rule = next(rule for rule in rubric["rules"] if rule["id"] == "contextual_clarifier")
+    for marker in ("when", "while", "before", "after", "during", "if", "as"):
+        assert marker in contextual_rule["summary"]

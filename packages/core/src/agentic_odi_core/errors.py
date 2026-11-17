@@ -45,6 +45,20 @@ class ConflictError(OdiError):
     """The requested change conflicts with the current state."""
 
 
+class AlreadyPromotedError(ConflictError):
+    """A quote was already promoted, so promoting it again would duplicate demand.
+
+    Carries the id of the outcome the evidence already supports so a caller can
+    offer to open that outcome instead of creating a second one.
+    """
+
+    def __init__(self, outcome_id: str) -> None:
+        self.outcome_id = outcome_id
+        super().__init__(
+            f"This quote already supports {outcome_id}; open it instead of promoting again."
+        )
+
+
 class RateLimitError(OdiError):
     """The caller exceeded an allowed rate or volume."""
 
@@ -89,6 +103,15 @@ class StoreCorrupt(StoreError):
         if count:
             summary = f"{summary} ({count} problem{'s' if count != 1 else ''} found)"
         super().__init__(summary)
+
+
+class MigrationError(StoreError):
+    """A schema migration could not be applied.
+
+    Raised when the registry has a gap (a version with no step) or when a step
+    fails. It names the version so the failure points at the ledger entry that
+    is wrong, not at the line that happened to raise.
+    """
 
 
 class SerializationError(OdiError):

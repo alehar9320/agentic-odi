@@ -5,19 +5,21 @@ from __future__ import annotations
 import hashlib
 import os
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import ValidationError as PydanticValidationError
 
-from agentic_odi_core.errors import NotFoundError, ValidationError
+from agentic_odi_core.errors import AlreadyPromotedError, NotFoundError, ValidationError
 from agentic_odi_core.evaluation import (
     OutcomeStatementError,
     classify_opportunity,
     evaluate_outcome_statement,
     require_outcome_statement,
 )
+from agentic_odi_core.freshness import is_stale
 from agentic_odi_core.funnel import FIRST_OUTCOME, FIRST_SCORE, count_milestone
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
@@ -52,8 +54,13 @@ from agentic_odi_core.models import (
     Study,
     StudyStatus,
     compute_opportunity_score,
+    confidence_weighted_inputs,
 )
-from agentic_odi_core.repository import Repository, page
+from agentic_odi_core.repository import (
+    Repository,
+    compute_promotion_fingerprint,
+    page,
+)
 from agentic_odi_core.segmentation import (
     MIN_OUTCOMES_PER_SEGMENT,
     OutcomeClusterStrategy,
@@ -68,6 +75,9 @@ from agentic_odi_core.traceability import (
     objective_key,
     objectives_from_v2mom,
 )
+
+#: The two artifacts that carry a derivation stamp and a read-time ``stale`` flag.
+_Artifact = TypeVar("_Artifact", Segment, Strategy)
 
 
 class JobNotFoundError(NotFoundError):
@@ -454,11 +464,13 @@ class ODIService:
                 "satisfaction must be between 1.0 and 10.0", field="satisfaction"
             )
         require_outcome_statement(statement)
+        updates = dict(updates)
+        trace = self._resolve_objective_links(updates.pop("objectives", None))
+        if trace is not None:
+            updates["trace"] = trace
         if importance is not None and satisfaction is not None:
-            updates = dict(updates)
             updates["opportunity_score"] = compute_opportunity_score(importance, satisfaction)
         else:
-            updates = dict(updates)
             updates["opportunity_score"] = None
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
@@ -585,6 +597,7 @@ class ODIService:
         step_id: str | None = None,
         validate_statement: bool = True,
         claim_check: ClaimCheck | dict[str, Any] | None = None,
+        objectives: Sequence[Mapping[str, str]] | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -603,6 +616,7 @@ class ODIService:
             if not verdict["valid"]:
                 raise InvalidOutcomeStatementError(verdict)
         check = require_claim_check(claim_check)
+        trace = self._resolve_objective_links(objectives) or []
         #: Unscored outcomes stay legal: a score is optional, and an outcome
         #: without one carries no opportunity_score to stand behind.
         if importance is not None and satisfaction is not None:
@@ -617,6 +631,7 @@ class ODIService:
             importance=importance,
             satisfaction=satisfaction,
             opportunity_score=opportunity_score,
+            trace=trace,
             claim_check=check,
         )
         created = self.repo.add_outcome(outcome)
@@ -766,6 +781,8 @@ class ODIService:
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
+        impact: str = "medium",
+        confidence: str = "claimed",
     ) -> Evidence:
         resolved_job_id = job_id
         if step_id is not None:
@@ -800,6 +817,8 @@ class ODIService:
             job_id=resolved_job_id,
             step_id=step_id,
             outcome_id=outcome_id,
+            impact=impact,
+            confidence=confidence,
         )
         #: Dedupe: the same quote imported twice must not become two evidence
         #: records. Return the existing record instead of appending.
@@ -854,6 +873,7 @@ class ODIService:
         name: str | None = None,
         importance: float | None = None,
         satisfaction: float | None = None,
+        force: bool = False,
     ) -> Job | Outcome:
         evidence = self.repo.get_evidence(evidence_id)
         if evidence is None:
@@ -867,12 +887,15 @@ class ODIService:
             )
             return self.add_job(label, description=evidence.content or None)
         if target == "outcome":
-            #: Idempotent promotion: if this evidence was already promoted to an
-            #: outcome, return the existing outcome instead of creating a copy.
-            if evidence.outcome_id is not None:
-                existing = self.repo.get_outcome(evidence.outcome_id)
-                if existing is not None:
-                    return existing
+            #: One quote promotes at most once. If this evidence — or a repeat
+            #: import of the same quote — already supports an outcome, link to
+            #: it instead of creating a second opportunity the landscape would
+            #: count as independent demand. ``force`` overrides deliberately.
+            existing = self.promoted_outcome_for(evidence_id)
+            if existing is not None and not force:
+                if evidence.outcome_id != existing.id:
+                    self.repo.update_evidence(evidence.id, {"outcome_id": existing.id})
+                return existing
             target_job_id = job_id or evidence.job_id
             if target_job_id is None:
                 raise ValidationError("job_id is required to promote evidence to an outcome")
@@ -886,11 +909,17 @@ class ODIService:
                 raise ValidationError(
                     "Promoting evidence to an outcome requires both importance and satisfaction scores."
                 )
+            #: A quote is only as strong as its confidence: the inputs are
+            #: discounted before the shared scorer runs, so a claimed quote
+            #: cannot outrank a verified one on identical raw inputs.
+            weighted_importance, weighted_satisfaction = confidence_weighted_inputs(
+                importance, satisfaction, evidence.confidence
+            )
             outcome = self.add_outcome(
                 target_job_id,
                 text,
-                importance=importance,
-                satisfaction=satisfaction,
+                importance=weighted_importance,
+                satisfaction=weighted_satisfaction,
                 step_id=evidence.step_id,
             )
             #: Record the bidirectional link: evidence → outcome.
@@ -905,6 +934,54 @@ class ODIService:
             )
             return outcome
         raise ValidationError(f"Unknown promotion target: {target}")
+
+    def promoted_outcome_for(self, evidence_id: str) -> Outcome | None:
+        """The outcome a quote already supports, if any.
+
+        A quote is identified by its promotion fingerprint — source plus
+        normalized content — so a repeat import that produced a second evidence
+        row still resolves to the one outcome. The row's own ``outcome_id`` is
+        checked first; otherwise every evidence row sharing the fingerprint is
+        consulted. Returns ``None`` when the quote has not been promoted.
+        """
+        evidence = self.repo.get_evidence(evidence_id)
+        if evidence is None:
+            raise EvidenceNotFoundError(
+                evidence_id,
+                "List the stored records with list_evidence() to find a valid id.",
+            )
+        if evidence.outcome_id is not None:
+            linked = self.repo.get_outcome(evidence.outcome_id)
+            if linked is not None:
+                return linked
+        fingerprint = compute_promotion_fingerprint(
+            evidence.source_kind, evidence.source_name, evidence.content
+        )
+        for candidate in self.repo.list_evidence():
+            if candidate.outcome_id is None:
+                continue
+            if (
+                compute_promotion_fingerprint(
+                    candidate.source_kind, candidate.source_name, candidate.content
+                )
+                != fingerprint
+            ):
+                continue
+            linked = self.repo.get_outcome(candidate.outcome_id)
+            if linked is not None:
+                return linked
+        return None
+
+    def require_unpromoted(self, evidence_id: str) -> None:
+        """Raise :class:`AlreadyPromotedError` when a quote already supports an outcome.
+
+        A caller that must not silently merge — a strict client or an import
+        job — uses this to turn a repeat promotion into a typed conflict
+        carrying the existing outcome id, rather than a second opportunity.
+        """
+        existing = self.promoted_outcome_for(evidence_id)
+        if existing is not None:
+            raise AlreadyPromotedError(existing.id)
 
     def propose_outcome_from_evidence(self, evidence_id: str) -> OutcomeProposal:
         """Propose a desired outcome from one evidence record.
@@ -992,6 +1069,15 @@ class ODIService:
 
         if proposal.job_id is None:
             raise ValidationError(f"Proposal {proposal_id} has no routed job; cannot approve.")
+
+        #: A proposal is mined from one evidence record. If that record is still
+        #: stored, its confidence discounts the inputs before the shared scorer
+        #: runs — the same rule as a direct promotion.
+        source = self.repo.get_evidence(proposal.evidence_id)
+        if source is not None:
+            final_importance, final_satisfaction = confidence_weighted_inputs(
+                final_importance, final_satisfaction, source.confidence
+            )
 
         outcome = self.add_outcome(
             proposal.job_id,
@@ -1091,12 +1177,10 @@ class ODIService:
         except ValueError:
             next_str = None
         updates = {
-            "status": ScheduledWorkStatus.RUNNING,
+            "status": ScheduledWorkStatus.COMPLETED,
             "last_run_at": now_str,
             "next_run_at": next_str,
-            "result_summary": (
-                f"Dispatched at {now_str}; no executor is installed, so nothing has run."
-            ),
+            "result_summary": f"Executed at {now_str}.",
         }
         updated = self.repo.update_scheduled_work(work_id, updates)
         if updated is None:
@@ -1120,16 +1204,35 @@ class ODIService:
         strategy = self.segmentation or OutcomeClusterStrategy(
             steps=list(self.repo.steps.values()), people=people
         )
-        return [self.save_segment(item) for item in strategy.segment(jobs, outcomes)]
+        #: One read for the whole derivation: the revision the clusters were
+        #: computed from, stamped on every segment so a later outcome rescore
+        #: is what makes them stale — not the write of the segment itself.
+        stamp = self.repo.last_input_event_id()
+        return [
+            self.save_segment(item.model_copy(update={"computed_at_event_id": stamp}))
+            for item in strategy.segment(jobs, outcomes)
+        ]
 
     def list_segments(self, job_id: str | None = None) -> list[Segment]:
-        return self.repo.list_segments(job_id=job_id)
+        return [
+            self._label_freshness(segment) for segment in self.repo.list_segments(job_id=job_id)
+        ]
 
     def get_segment(self, segment_id: str) -> Segment:
         segment = self.repo.get_segment(segment_id)
         if segment is None:
             raise SegmentNotFoundError(segment_id, "run segment_market to produce segments")
-        return segment
+        return self._label_freshness(segment)
+
+    def _label_freshness(self, artifact: _Artifact) -> _Artifact:
+        """Stamp the read-time ``stale`` flag: derived, never written back.
+
+        The store revision the artifact was derived from is compared against the
+        input revision *now*, so a verdict computed after the latest outcome
+        rescore reads as current and one computed before it reads as stale.
+        """
+        stale = is_stale(artifact, self.repo.last_input_event_id())
+        return artifact.model_copy(update={"stale": stale})
 
     def save_segment(self, segment: Segment) -> Segment:
         """Persist one segment, rejecting one the store cannot vouch for."""
@@ -1147,7 +1250,8 @@ class ODIService:
         existing = self.repo.get_segment(segment.id)
         saved = (
             self.repo.update_segment(
-                segment.id, segment.model_dump(mode="json", exclude={"id", "created_at"})
+                segment.id,
+                segment.model_dump(mode="json", exclude={"id", "created_at", "stale"}),
             )
             if existing is not None
             else self.repo.add_segment(segment)
@@ -1155,7 +1259,7 @@ class ODIService:
         if saved is None:
             raise SegmentNotFoundError(segment.id)
         self._emit_segment_signal(saved, is_new=existing is None)
-        return saved
+        return self._label_freshness(saved)
 
     def _emit_segment_signal(self, segment: Segment, *, is_new: bool) -> None:
         severity = "notice" if segment.verdict is SegmentVerdict.UNDERSERVED else "info"
@@ -1193,6 +1297,9 @@ class ODIService:
         segments = self._segments_in_scope(segment_ids, job_id)
         jobs = self.repo.list_jobs()
         outcomes = list(self.repo.outcomes.values())
+        #: The revision the recommendation was computed from, read once and
+        #: stamped so a later score change is what makes it stale.
+        stamp = self.repo.last_input_event_id()
         strategy = build_strategy(segments, jobs, outcomes)
         if strategy is None:
             underserved = sum(1 for item in segments if item.verdict is SegmentVerdict.UNDERSERVED)
@@ -1206,7 +1313,7 @@ class ODIService:
                 f"{len(orphans)} outcome(s) outside a stored job, {leftover} unclustered. "
                 "Score outcomes against a job map before asking for a strategy."
             )
-        return self.save_strategy(strategy)
+        return self.save_strategy(strategy.model_copy(update={"computed_at_event_id": stamp}))
 
     def _segments_in_scope(
         self, segment_ids: list[str] | None, job_id: str | None = None
@@ -1216,12 +1323,15 @@ class ODIService:
         return [self.get_segment(segment_id) for segment_id in segment_ids]
 
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]:
-        return self.repo.list_strategies(segment_id=segment_id)
+        return [
+            self._label_freshness(strategy)
+            for strategy in self.repo.list_strategies(segment_id=segment_id)
+        ]
 
     def get_strategy(self) -> Strategy | None:
         """The most recently recorded strategy, or ``None``."""
         strategies = self.repo.list_strategies()
-        return strategies[-1] if strategies else None
+        return self._label_freshness(strategies[-1]) if strategies else None
 
     def save_strategy(self, strategy: Strategy) -> Strategy:
         """Persist a strategy, requiring the alternatives it beat."""
@@ -1235,7 +1345,8 @@ class ODIService:
         existing = self.repo.get_strategy(strategy.id)
         saved = (
             self.repo.update_strategy(
-                strategy.id, strategy.model_dump(mode="json", exclude={"id", "created_at"})
+                strategy.id,
+                strategy.model_dump(mode="json", exclude={"id", "created_at", "stale"}),
             )
             if existing is not None
             else self.repo.add_strategy(strategy)
@@ -1251,7 +1362,7 @@ class ODIService:
             detail=saved.thesis[:500],
             discriminator=f"kind={saved.kind.value},segment={saved.segment_id or ''}",
         )
-        return saved
+        return self._label_freshness(saved)
 
     # -- Traceability: what an outcome advances ------------------------------
 
@@ -1330,6 +1441,34 @@ class ODIService:
         says so rather than returning three empty sections.
         """
         return compute_traceability_report(self.repo.get_v2mom(), list(self.repo.outcomes.values()))
+
+    def _resolve_objective_links(
+        self, objectives: Sequence[Mapping[str, str]] | None
+    ) -> list[dict[str, str]] | None:
+        """Resolve a list of ``{field, text}`` links against the stored vision.
+
+        Every entry must name a method or measure the vision holds *now*; an
+        unknown one is a validation error naming the entries that do exist,
+        never a fuzzy match. ``None`` means "leave the links untouched"; an
+        empty list means "this outcome advances nothing", which is legal and
+        reported as an orphan rather than refused.
+        """
+        if objectives is None:
+            return None
+        resolved: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for entry in objectives:
+            field = str(entry["field"])
+            objective = self._resolve_objective(field, str(entry["text"]))
+            if (objective.field, objective.key) in seen:
+                continue
+            seen.add((objective.field, objective.key))
+            resolved.append(
+                OutcomeAlignment(field=field, key=objective.key, text=objective.text).model_dump(
+                    mode="json"
+                )
+            )
+        return resolved
 
     def _resolve_objective(self, field: str, text: str) -> Objective:
         """Find the current objective named by ``text``, or refuse.

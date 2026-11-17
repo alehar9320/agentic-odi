@@ -522,6 +522,17 @@ def test_count_tests_added_counts_python_and_javascript_definitions() -> None:
     assert count_tests_added(lines) == 3
 
 
+def test_count_tests_added_counts_async_python_definitions() -> None:
+    lines = [
+        ("a.py", 1, "async def test_async_one() -> None:"),
+        ("b.py", 2, "    async def test_async_method(self) -> None:"),
+        ("c.py", 3, "async def helper() -> None:"),
+        ("d.py", 4, "def test_sync_one() -> None:"),
+    ]
+
+    assert count_tests_added(lines) == 3
+
+
 def test_count_tests_added_ignores_removed_context() -> None:
     assert count_tests_added([]) == 0
 
@@ -593,7 +604,12 @@ def test_the_allowlist_only_approves_reviewed_deletions() -> None:
             "apps/studio/src/components/notices/SidecarNotice.test.tsx",
             "apps/studio/src/components/notices/SidecarNotice.tsx",
         },
+        394: {
+            "apps/studio/src/lib/markdown.test.ts",
+            "apps/studio/src/lib/markdown.ts",
+        },
         497: {"tests/scripts/test_roadmap_check.py"},
+        1101: {".qoder/worktrees/*"},
     }
     assert all(entry["reason"] for entry in allowlist)
 

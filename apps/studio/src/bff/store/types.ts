@@ -1,6 +1,7 @@
 import type {
   Conversation,
   ConversationTurn,
+  Evidence,
   Job,
   Observation,
   Outcome,
@@ -39,6 +40,13 @@ export interface StoredOutcome extends Outcome {
   updated_at: string;
 }
 
+export interface StoredEvidence extends Evidence {
+  id: string;
+  seq: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface StoredConversation extends Conversation {
   head_id: string | null;
 }
@@ -46,6 +54,21 @@ export interface StoredConversation extends Conversation {
 export interface StoredTurn extends ConversationTurn {
   message_id: string | null;
   parent_id: string | null;
+}
+
+/**
+ * A half-finished interview, kept so a reload resumes it (#402).
+ *
+ * This is the storage shape, not a domain type: it holds the answers the
+ * conductor collected and the question it was on, and nothing about what an
+ * answer means. `jobId` scopes it — a draft for another job is never shown.
+ */
+export interface InterviewDraft {
+  id: string;
+  jobId: string;
+  answers: Record<string, string | number>;
+  index: number;
+  updatedAt: string;
 }
 
 export type OutboxKind = "create" | "update" | "delete";
@@ -95,6 +118,7 @@ export interface WorkspaceSnapshot {
   jobs: StoredJob[];
   steps: StoredStep[];
   outcomes: StoredOutcome[];
+  evidence: StoredEvidence[];
   observations: Observation[];
   conversations: StoredConversation[];
   turns: StoredTurn[];
@@ -133,6 +157,10 @@ export interface LocalStore {
   getOutcome(id: string): Promise<StoredOutcome | undefined>;
   putOutcome(outcome: StoredOutcome): Promise<void>;
   deleteOutcome(id: string): Promise<void>;
+  listEvidence(jobId?: string): Promise<StoredEvidence[]>;
+  getEvidence(id: string): Promise<StoredEvidence | undefined>;
+  putEvidence(evidence: StoredEvidence): Promise<void>;
+  deleteEvidence(id: string): Promise<void>;
   listObservations(): Promise<Observation[]>;
   putObservation(observation: Observation): Promise<void>;
   deleteObservation(id: string): Promise<void>;
@@ -158,16 +186,24 @@ export interface LocalStore {
   getConversation(id: string): Promise<StoredConversation | undefined>;
   putConversation(conversation: StoredConversation): Promise<void>;
   setConversationHead(id: string, headId: string | null): Promise<StoredConversation>;
+  /** Give a thread a new name. An unknown id throws rather than writing a row. */
+  renameConversation(id: string, title: string): Promise<StoredConversation>;
   listTurns(conversationId: string): Promise<ConversationTurn[]>;
   /** How much a conversation holds, without reading every turn. */
   countTurns(conversationId: string): Promise<number>;
   appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn>;
   clearTurns(conversationId: string): Promise<void>;
+  /** Remove a conversation and its turns together, as one unit. */
+  deleteConversation(id: string): Promise<void>;
   conversationTree(conversationId: string): Promise<{
     conversation: StoredConversation;
     messages: StoredTurn[];
     head_id: string | null;
   }>;
+  listInterviewDrafts(jobId?: string): Promise<InterviewDraft[]>;
+  getInterviewDraft(id: string): Promise<InterviewDraft | undefined>;
+  putInterviewDraft(draft: InterviewDraft): Promise<void>;
+  deleteInterviewDraft(id: string): Promise<void>;
   /** Serialize every stored workspace record for export. */
   snapshot(): Promise<WorkspaceSnapshot>;
   /** Replace every stored workspace record with the imported snapshot. */

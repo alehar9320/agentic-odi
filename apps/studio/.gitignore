@@ -10,3 +10,6 @@ src-tauri/target
 src-tauri/gen
 playwright-report
 test-results
+# Screenshots for human review, written by the pr-screenshots spec and
+# uploaded as a workflow artifact — never committed.
+pr-screenshots

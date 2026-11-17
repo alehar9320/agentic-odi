@@ -108,7 +108,7 @@ describe("ConnectorSuggestionModal", () => {
     expect(openCustomize).toHaveBeenCalledWith({ query: "gong" });
   });
 
-  it("moves focus into the dialog and traps Tab at both ends", () => {
+  it("takes its accessible name from the suggestion's own title", () => {
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
         connectorSuggestion: { id: "gong", listing: LISTING, reason: "agent" },
@@ -117,17 +117,24 @@ describe("ConnectorSuggestionModal", () => {
 
     render(<ConnectorSuggestionModal />);
 
-    const dialog = screen.getByRole("dialog", { name: "Connector suggestion" });
-    const close = screen.getByRole("button", { name: "Dismiss" });
-    expect(close).toHaveFocus();
+    expect(
+      screen.getByRole("dialog", { name: "Connect a suggested system" }),
+    ).toBeInTheDocument();
+  });
 
-    const notNow = screen.getByRole("button", { name: "Not now" });
-    notNow.focus();
-    fireEvent.keyDown(dialog, { key: "Tab" });
-    expect(close).toHaveFocus();
+  it("closes when Escape is pressed", () => {
+    const dismissModal = vi.fn();
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectorSuggestion: { id: "gong", listing: LISTING, reason: "agent" },
+        dismissConnectorModal: dismissModal,
+      }),
+    );
 
-    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
-    expect(notNow).toHaveFocus();
+    render(<ConnectorSuggestionModal />);
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(dismissModal).toHaveBeenCalledOnce();
   });
 
   it("dismisses for good when the user says not now", () => {

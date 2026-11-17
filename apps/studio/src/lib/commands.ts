@@ -79,6 +79,14 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
     keywords: ["summary", "list"],
   },
   {
+    id: "dashboard",
+    name: "/dashboard",
+    label: "Dashboard",
+    description: "Headline numbers and how they moved over a date range.",
+    category: "Explore",
+    keywords: ["metrics", "trends", "overview", "attention"],
+  },
+  {
     id: "landscape",
     name: "/landscape",
     label: "Opportunity landscape",

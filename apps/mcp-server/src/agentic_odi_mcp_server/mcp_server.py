@@ -254,6 +254,7 @@ def add_outcome(
     satisfaction: float | None = None,
     step_id: str | None = None,
     claim_check: dict[str, Any] | None = None,
+    objectives: list[dict[str, str]] | None = None,
 ) -> str:
     """Add a desired Outcome to a Job.
 
@@ -272,6 +273,11 @@ def add_outcome(
 
     Each skip needs a reason. To record an outcome before you have asked, omit
     both scores: an unscored outcome is legal, a bare number is not.
+
+    ``objectives`` names the V2MOM methods and measures this outcome advances,
+    each as ``{"field": "method" | "measure", "text": "<objective text>"}``. The
+    text must match an entry the vision holds now; an unknown one is refused with
+    the entries that do exist. Omit it (or pass ``[]``) for an unlinked outcome.
     """
     if service.get_job(job_id) is None:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
@@ -299,6 +305,7 @@ def add_outcome(
             satisfaction=satisfaction,
             step_id=step_id,
             claim_check=claim_check,
+            objectives=objectives,
         )
     except JobNotFoundError:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
@@ -307,6 +314,8 @@ def add_outcome(
     except ValueOutOfRangeError as exc:
         return _fail(exc, "Error: importance and satisfaction must be between 1.0 and 10.0")
     except ClaimCheckError as exc:
+        return _fail(exc)
+    except OdiValidationError as exc:
         return _fail(exc)
     except OutcomeStatementError as exc:
         return _fail(exc)
@@ -546,6 +555,7 @@ def update_outcome(
     importance: float | None = None,
     satisfaction: float | None = None,
     step_id: str | None = None,
+    objectives: list[dict[str, str]] | None = None,
 ) -> str:
     updates: dict = {}
     if statement is not None:
@@ -556,11 +566,15 @@ def update_outcome(
         updates["satisfaction"] = satisfaction
     if step_id is not None:
         updates["step_id"] = step_id
+    if objectives is not None:
+        updates["objectives"] = objectives
     try:
         updated = service.update_outcome(outcome_id, updates)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     except OutcomeStatementError as exc:
+        return _fail(exc)
+    except OdiValidationError as exc:
         return _fail(exc)
     except ValueOutOfRangeError as exc:
         return _fail(exc, "Error: importance and satisfaction must be between 1.0 and 10.0")
@@ -576,6 +590,9 @@ def delete_outcome(outcome_id: str) -> str:
     return f"Outcome deleted successfully: {outcome_id}"
 
 
+# impact and confidence are accepted per the add_evidence contract (impact:
+# high/medium/low, confidence: verified/claimed) but not yet stored;
+# persistence lands in issue #984.
 @mcp.tool
 async def add_evidence(
     ctx: Context,
@@ -589,6 +606,8 @@ async def add_evidence(
     job_id: str | None = None,
     step_id: str | None = None,
     outcome_id: str | None = None,
+    impact: str = "medium",
+    confidence: str = "claimed",
 ) -> str:
     await ctx.report_progress(0, 2, "Validating the evidence links")
     try:
@@ -603,6 +622,8 @@ async def add_evidence(
             job_id=job_id,
             step_id=step_id,
             outcome_id=outcome_id,
+            impact=impact,
+            confidence=confidence,
         )
     except JobNotFoundError:
         return _fail(JobNotFoundError(job_id or ""), job_not_found(job_id or ""))
@@ -660,6 +681,7 @@ def promote_evidence(
     name: str | None = None,
     importance: float | None = None,
     satisfaction: float | None = None,
+    force: bool = False,
 ) -> str:
     try:
         artifact = service.promote_evidence(
@@ -670,6 +692,7 @@ def promote_evidence(
             name=name,
             importance=importance,
             satisfaction=satisfaction,
+            force=force,
         )
     except EvidenceNotFoundError as exc:
         return _evidence_not_found(evidence_id, exc.hint)
@@ -979,6 +1002,50 @@ def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
     except OutcomeNotFoundError as exc:
         return _fail(exc, f"Error: Outcome {outcome_id} not found.")
     return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def links_add(
+    source_type: str,
+    source_id: str,
+    target_type: str,
+    target_id: str,
+    relationship_type: str,
+    external_system: str | None = None,
+    external_id: str | None = None,
+    preview: dict | None = None,
+) -> str:
+    """Create a typed link between two entities. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_add is not yet implemented"),
+        "Error: links_add is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
+def links_list(
+    source_type: str | None = None,
+    source_id: str | None = None,
+    target_type: str | None = None,
+    target_id: str | None = None,
+    relationship_type: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> str:
+    """List links, optionally filtered by source, target, or relationship type. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_list is not yet implemented"),
+        "Error: links_list is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
+def links_remove(link_id: str) -> str:
+    """Remove a link by ID. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_remove is not yet implemented"),
+        "Error: links_remove is not yet implemented. The Link model and repository are in progress.",
+    )
 
 
 @mcp.tool

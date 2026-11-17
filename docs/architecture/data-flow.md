@@ -87,6 +87,20 @@ and stops there. `APP_STORAGE_KEYS` and `APP_STORAGE_PREFIXES` are that
 inventory, and a test fails when a writer uses a `studio.*` or `agentic-odi.*`
 key that the inventory does not cover.
 
+## Runtime facts
+
+`apps/studio/src/bridge/runtime.ts` answers "which host am I in?" from one pure
+`detectRuntime(env)`, with `runtimeFacts()` as the only impure edge. The answer is
+`{host, install, originClass, apiTransport, offlineShell, platform, version,
+label}`: host is `desktop` (Tauri) or `browser`; install is `installed` or `tab`;
+origin class is `loopback` or `remote`; transport is `sidecar-direct` for the
+desktop app and `same-origin` for a page. `isInstalled()` and `isTauri()` feed it,
+and `isInstalled()` no longer depends on a pending install prompt.
+
+Settings → About and the diagnostics bundle (`app.runtime`) read the same facts,
+so they cannot disagree; the bundle carries no hostname or key. Host decides the
+API base only — nothing reads model availability from it.
+
 ## Write Paths
 
 ### Local CLI
@@ -140,6 +154,27 @@ server is a normal state the picker explains.
 
 The studio memory is a separate SQLite file, not an ODI repository. It never
 feeds the canvas; it only supplies bounded context to the next chat turn.
+
+### Schema migrations
+
+A schema change is a new numbered migration, never an edit to an old one. Both
+stores run the same ledger, `agentic_odi_core.migrations`: an ordered tuple of
+`Migration(version, description, apply)` steps, `PRAGMA user_version` as the
+record of what has run, and a runner that applies every step newer than the
+stored version in one transaction and writes the new version in that same
+transaction. A crash leaves the file at its previous version, not
+half-migrated, and a database already at the target version is a no-op.
+`odi.db` uses `migrations.MIGRATIONS`; `studio.db` uses
+`studio.memory.STUDIO_MIGRATIONS`. `tests/scripts/test_migrations_registry.py`
+fails when the current version is raised without a registered step, and
+`packages/core/tests/test_migrations.py` opens a pre-change fixture and asserts
+its rows survive.
+
+This replaced an older shape where each store compared `PRAGMA table_info`
+against a column list on every open and ran `ALTER TABLE` for each missing one.
+That could only express an additive column, and it left no record of what had
+already run. Only additive steps live in the ledger today; the first destructive
+migration (a backfill, a table rebuild, a dropped column) is its own change.
 
 ### Store open and close
 
@@ -221,11 +256,17 @@ GET   /api/conversations                       -> every thread, last touch first
 GET   /api/conversations/latest                -> thread + turns (resume)
 GET   /api/conversations/{id}/tree             -> branch tree + head
 PATCH /api/conversations/{id} {"head_id"}      -> record the visible branch
+DELETE /api/conversations/{id}                 -> drop the thread and its turns
 ```
 
 A conversation written before ids existed has none, so the tree endpoint
 synthesises a linear chain and old threads still open. `apps/studio` never
 invents a branch the sidecar cannot reproduce.
+
+A delete removes the thread and its turns in one transaction, and an unknown
+id answers 404 rather than a silent success. The SPA asks before it sends the
+request and clears the stage when the thread it was reading is the one that
+went.
 
 ## Read Paths
 
@@ -278,6 +319,25 @@ The capability probe and the bar's model chip both read this, so a person is tol
 why a local model cannot be reached from this page instead of being shown a generic
 offline state.
 
+### One probe at a time, and a breaker for a dead endpoint (#536)
+
+Every connection probe — the scheduled one and the person's "Check now" — runs
+through one breaker in `apps/studio/src/state/probeBreaker.ts`. It holds two
+guarantees:
+
+- **Single flight.** A probe already on the wire is joined, never duplicated, so a
+  slow failure cannot land after a fresher success and overwrite it.
+- **A circuit breaker.** Three transport failures open it, and a probe then costs
+  nothing until a half-open probe is allowed 60 s later; that probe closing the
+  breaker on success or reopening it on failure. A refusal a retry cannot clear — a
+  rejected key (401/403), a missing model — parks it as `degraded` instead of
+  retrying forever as though the network were flaky.
+
+While the breaker is open the bar shows a "Retrying in N min" countdown instead of
+a spinner, because nothing is being probed. A person asking resets the breaker and
+the cadence: the endpoint they just edited is not the one that kept failing.
+
+
 ## Trust Boundaries
 
 Each process, the credentials it holds, and what crosses every wire are
@@ -305,6 +365,13 @@ MCP tool result (text)
   produces a readable message. Write routes no longer wrap their result in
   `{"ok": true, "result": ...}`: a success is the object, a delete is
   `{"deleted": id}`.
+- **Who produced the failure.** The hosted Worker builds its own failures from
+  one factory, and that body carries `origin: "proxy"`. The SPA treats any
+  body with that marker as transport — it falls back to the local BFF, the
+  same as a dropped connection — while a sidecar's own structured 502 stays an
+  application error the person can read. A static host that answers an `/api`
+  route with the SPA shell (`200 text/html`) is transport too, so the SPA
+  rejects a non-JSON payload before trusting it as an answer.
 - **The same envelope over MCP.** A failing tool returns
   `{"error": StudioError, "message": "Error: …"}` as its text: the code,
   retryability, detail, suggestion, and request id travel as data, and the
