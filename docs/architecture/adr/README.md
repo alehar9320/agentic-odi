@@ -33,3 +33,4 @@ decisions.
 | [0005](0005-core-layers-and-the-contract-split.md) | Name core's four layers; do not split `contract.py` out yet | accepted |
 | [0006](0006-browser-first-studio-sidecar-optional.md) | Browser-first, sidecar-optional Studio | proposed |
 | [0007](0007-branch-protection-enforces-checks-not-labels.md) | Branch protection enforces the checks, not the label | accepted |
+| [0008](0008-require-current-branches-and-queue-merges.md) | Require current branches and queue merges | accepted |

@@ -461,6 +461,10 @@ ruleset on `main` requires these checks, and nothing can bypass them:
 The `protect-main` ruleset adds the branch-level rules: no deletion, no
 non-fast-forward push, and every change arrives through a pull request.
 
+The `main-requires-ci-green` ruleset now requires up-to-date branches
+(`strict_required_status_checks_policy: true`) and merges go through the merge
+queue. The PR guardrail threshold `max_behind` is `10`.
+
 A ruleset cannot require a *label* — its rule types are checks, reviews, and push
 rules, not labels — so `ai-merge-safe` is enforced one step later, by the merge
 path: gate 1 of `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized`
