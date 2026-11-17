@@ -20,7 +20,8 @@ def _open(registry: ApprovalRegistry) -> tuple[object, object]:
             tool_call_id="call-1",
             name="add_job",
             arguments={"name": "Retention"},
-            prompt="Allow the assistant to add job?",
+            prompt='Allow the assistant to Add Job "Retention"?',
+            consequence='Add Job "Retention"',
         )
 
     return asyncio.run(_run())
@@ -36,8 +37,22 @@ def test_open_describes_the_call_for_the_ui() -> None:
     assert payload["tool_call_id"] == "call-1"
     assert payload["name"] == "add_job"
     assert payload["arguments"] == {"name": "Retention"}
-    assert payload["prompt"] == "Allow the assistant to add job?"
+    assert payload["prompt"] == 'Allow the assistant to Add Job "Retention"?'
+    assert payload["consequence"] == 'Add Job "Retention"'
     assert registry.pending == 1
+
+
+def test_consequence_defaults_to_empty_when_a_caller_omits_it() -> None:
+    registry = ApprovalRegistry()
+
+    async def _run() -> object:
+        request, _future = registry.open(
+            tool_call_id="call-1", name="add_job", arguments={}, prompt="?"
+        )
+        return request
+
+    request = asyncio.run(_run())
+    assert request.to_dict()["consequence"] == ""  # type: ignore[attr-defined]
 
 
 def test_resolve_answers_the_waiting_turn() -> None:

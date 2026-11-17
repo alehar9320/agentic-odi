@@ -22,7 +22,7 @@ from contextlib import AsyncExitStack
 from typing import Any
 
 from agentic_odi_core import ModelRouter, ModelTier, ODIService, Outcome, RoutingMode
-from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
+from agentic_odi_core.contract import TOOL_SPECS, ToolEffect, ToolSpec
 from agentic_odi_core.funnel import FIRST_MESSAGE, count_milestone
 from agentic_odi_core.remote import (
     StudioError,
@@ -456,9 +456,120 @@ def _reasoning_text(delta: Any) -> str:
     return ""
 
 
-def _approval_prompt(name: str, arguments: dict[str, Any]) -> str:
-    human = name.replace("_", " ")
-    return f"Allow the assistant to {human}?"
+#: Argument values are quoted into a sentence, never dumped as JSON, and bounded
+#: so one pasted transcript cannot turn the question into a wall of text.
+MAX_CONSEQUENCE_VALUE = 80
+
+#: Ordered most-specific-first: the first argument present in a tool's spec that
+#: the call actually supplies names the object being changed. This keeps the
+#: sentence honest without a per-tool branch.
+_NAMING_ARGUMENTS = ("name", "statement", "source_name", "signal_id", "work_id")
+
+#: The ODI entity each tool prefix acts on, used to name the artifact when the
+#: call carries no identifying argument (an empty or absent value).
+_TOOL_ARTIFACT = {
+    "job": "Job",
+    "step": "Step",
+    "outcome": "Outcome",
+    "customer_outcome": "Customer Outcome",
+    "evidence": "evidence record",
+    "signal": "signal",
+    "scheduled_work": "scheduled work",
+    "study": "study",
+    "proposal": "proposal",
+    "segment": "segment",
+    "strategy": "strategy",
+    "connector": "connector",
+}
+
+
+#: Tools whose verb or artifact does not follow from their name prefix. Kept
+#: small and explicit; everything else is derived from the name and ``TOOL_SPECS``.
+_CONSEQUENCE_OVERRIDES: dict[str, tuple[str, str]] = {
+    "schedule_work": ("Schedule", "work"),
+    "trigger_scheduled_work": ("Trigger", "scheduled work"),
+    "cancel_scheduled_work": ("Cancel", "scheduled work"),
+    "mark_signal_read": ("Mark", "signal"),
+    "dismiss_signal": ("Dismiss", "signal"),
+    "add_connector": ("Add", "connector"),
+    "propose_outcome": ("Propose", "Outcome"),
+    "propose_strategy": ("Propose", "strategy"),
+    "segment_market": ("Segment", "market"),
+}
+
+
+def _artifact_kind(name: str) -> str:
+    """The human noun for the thing a tool acts on, from its own name."""
+    stem = name
+    for verb in ("add_", "update_", "delete_", "promote_", "approve_", "reject_", "open_"):
+        if stem.startswith(verb):
+            stem = stem[len(verb) :]
+            break
+    for key in sorted(_TOOL_ARTIFACT, key=len, reverse=True):
+        if stem == key or stem.endswith("_" + key):
+            return _TOOL_ARTIFACT[key]
+    return stem.replace("_", " ").title()
+
+
+def _consequence_verb(name: str, spec: ToolSpec) -> str:
+    """The action verb, derived from the name so a new tool needs no branch."""
+    if spec.effect == ToolEffect.DESTRUCTIVE:
+        return "Delete"
+    for prefix, verb in (
+        ("update_", "Update"),
+        ("promote_", "Promote"),
+        ("approve_", "Approve"),
+        ("reject_", "Reject"),
+        ("open_", "Open"),
+        ("add_", "Add"),
+    ):
+        if name.startswith(prefix):
+            return verb
+    return spec.summary.rstrip(".").split(" ", 1)[0] or "Run"
+
+
+def _naming_value(name: str, arguments: dict[str, Any], spec: ToolSpec) -> str | None:
+    """The most meaningful short string argument, or ``None`` when there is none.
+
+    Preference follows the tool's own declared argument order, so ``add_job``
+    names ``name`` and ``add_outcome`` names ``statement`` without a branch. A
+    creation tool ignores ``*_id`` arguments: they name the parent it is added
+    to, not the thing being created.
+    """
+    ordered = [arg for arg in _NAMING_ARGUMENTS if arg in spec.arguments]
+    ordered += [arg for arg in spec.arguments if arg not in ordered]
+    for key in ordered:
+        if name.startswith("add_") and key.endswith("_id"):
+            continue
+        value = arguments.get(key)
+        if isinstance(value, str) and value.strip():
+            text = " ".join(value.split())
+            if len(text) > MAX_CONSEQUENCE_VALUE:
+                text = text[: MAX_CONSEQUENCE_VALUE - 1].rstrip() + "…"
+            return text
+    return None
+
+
+def _consequence_for(name: str, arguments: dict[str, Any], spec: ToolSpec | None) -> str:
+    """One plain sentence describing what a gated tool call will change.
+
+    Built from the call's arguments and the tool's own metadata, so a new tool
+    added to ``TOOL_SPECS`` produces a sensible sentence with no new branch.
+    Never stringifies the whole argument dict.
+    """
+    override = _CONSEQUENCE_OVERRIDES.get(name)
+    if override is not None:
+        verb, kind = override
+    elif spec is None:
+        return f"Run {name.replace('_', ' ')}"
+    else:
+        verb = _consequence_verb(name, spec)
+        kind = _artifact_kind(name)
+    value = _naming_value(name, arguments, spec) if spec is not None else None
+    if value:
+        return f'{verb} {kind} "{value}"'
+    article = "an" if kind[:1].lower() in "aeiou" else "a"
+    return f"{verb} {article} {kind}"
 
 
 def _denial_result(name: str, decision: Any) -> str | None:
@@ -838,11 +949,13 @@ async def _turn_frames(
 
                 declined: str | None = None
                 if request.approvals and approvals is not None and is_mutating_tool(name):
+                    consequence = _consequence_for(name, arguments, TOOL_SPECS.get(name))
                     approval, future = approvals.open(
                         tool_call_id=entry["id"],
                         name=name,
                         arguments=arguments,
-                        prompt=_approval_prompt(name, arguments),
+                        prompt=f"Allow the assistant to {consequence}?",
+                        consequence=consequence,
                     )
                     # The gate is announced before it is awaited: the client
                     # cannot answer a question it was never sent.
