@@ -681,6 +681,7 @@ def _focus_context(focus: FocusRef | None, service: ODIService | None) -> str:
     try:
         described = _focus_description(focus, service)
     except Exception:  # noqa: BLE001 - the store is optional context
+        log.warning("focus description lookup failed; continuing without it")
         return ""
     if not described:
         return ""
