@@ -292,7 +292,8 @@ written down rather than implied — with `errors.py`, the exception hierarchy, 
 to every group. **Domain** (`models.py`, `evaluation.py`, `mapping.py`,
 `corpus.py`) is the vocabulary and imports no other group. **Persistence**
 (`repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`,
-`factory.py`) stores what the other groups decide and may not import methodology —
+`factory.py`, `integrity.py`, `migrations.py`) stores what the other groups
+decide and may not import methodology —
 `tests/test_architecture.py` enforces that one rule, and also refuses a new core
 module that belongs to no group. **Methodology** (`services.py`, `segmentation.py`,
 `strategy.py`, `router.py`, `messages.py`, `steve_jobs.py`) owns the service door,
