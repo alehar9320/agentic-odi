@@ -427,6 +427,41 @@ class UpdateConversationRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
 
 
+class ScorePlanModel(BaseModel):
+    """A score's open questions, or the basis of a resolved one.
+
+    ``status`` is ``open`` until the person answers or skips; the proposed
+    ``importance`` and ``satisfaction`` travel with the plan but are not recorded
+    while it is open.
+    """
+
+    id: str
+    conversation_id: str
+    statement: str
+    job_id: str | None = None
+    importance: float | None = None
+    satisfaction: float | None = None
+    questions: list[str] = Field(default_factory=list)
+    status: str = "open"
+    answers: list[str] = Field(default_factory=list)
+    skips: list[dict[str, Any]] = Field(default_factory=list)
+    skip_reason: str | None = None
+    created_at: str = ""
+    updated_at: str = ""
+    expires_at: str = ""
+
+
+class ResolveScorePlanRequest(BaseModel):
+    """The person's answer to an open plan: answers, or a skip with a reason."""
+
+    answers: list[str] = Field(default_factory=list)
+    skip_reason: str | None = None
+
+
+class ScorePlanResponse(BaseModel):
+    plan: ScorePlanModel
+
+
 class LlmProxyMessage(BaseModel):
     role: Literal["system", "user", "assistant", "tool"]
     content: str = ""

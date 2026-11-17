@@ -92,8 +92,8 @@ How to work:
 2. Mirror their words back, then offer a sharp hypothesis they can correct.
 3. When they give you context worth keeping — a career goal, a constraint, a stakeholder, a belief — call `remember` with the smallest useful observation. Do not ask permission first; the UI lets them confirm, edit, or dismiss it.
 4. Use ODI when it earns its keep: a job statement clarifies, a desired outcome sharpens, an opportunity score compares. Never lead with the framework or lecture about stages.
-5. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Above 10 means underserved. Before either number, put three questions to the PM about the claim — four when it is broad — and record their replies as the answers; never answer your own question and count it. A skip with a reason is honest, a guess is not.
-6. When a surface carries the evidence better than a paragraph, call `render_ui` once, then write one short sentence. Never describe in prose what a card can already show. A card's action is one of two things: an `intent` comes back to you as the user's next message, while a `detail` opens the record it names in the right-hand panel and sends nothing. Use a detail action when the next useful move is to inspect the record the card is about; use an intent when the next move is more conversation.
+5. Opportunity Score = Importance + max(Importance - Satisfaction, 0). Above 10 means underserved. Before either number, put three questions to the PM about the claim — four when it is broad — and record their replies as the answers; never answer your own question and count it. A skip with a reason is honest, a guess is not. Call `prepare_score` first with the statement, your two proposed numbers, and the questions; the Studio will refuse a score with no resolved plan, so wait for the person to answer or skip before you file the outcome.
+6. When a surface carries the evidence better than a paragraph, call `render_ui` once, then write one short sentence. Never describe in prose what a card can already show.
 7. The conversation is the product: every surface you render lands in the thread the PM is already reading. Never tell them to open a panel, a tab, or a view to see something you can show inline.
 8. Capture and simulation are conversations, not forms: ask for the customer's words or the bet in plain language, render the card that carries it, and offer the next move as an action on that card.
 9. When asked to add or query Jobs, Steps, or Outcomes, ALWAYS invoke the corresponding tools.
@@ -310,6 +310,52 @@ REMEMBER_TOOL: dict[str, Any] = {
 }
 
 
+PREPARE_SCORE_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "prepare_score",
+        "description": (
+            "Open the questions that must be answered before an opportunity score is "
+            "written. Call this before add_outcome whenever the outcome carries an "
+            "importance or satisfaction number: the Studio will refuse a score with no "
+            "resolved plan in this conversation. Provide the outcome statement, the two "
+            "numbers you propose (they are shown as 'not recorded' until the person "
+            "answers), and three to five distinct questions, at least one about the "
+            "current workaround or what it costs. The person answers or skips with a "
+            "reason on the card that appears, and only then does the score become "
+            "writable."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "statement": {
+                    "type": "string",
+                    "description": "The desired-outcome statement the score belongs to.",
+                },
+                "questions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Three to five distinct questions to put to the person.",
+                },
+                "importance": {
+                    "type": "number",
+                    "description": "Proposed importance, 1-10. Not recorded until resolved.",
+                },
+                "satisfaction": {
+                    "type": "number",
+                    "description": "Proposed satisfaction, 1-10. Not recorded until resolved.",
+                },
+                "job_id": {
+                    "type": "string",
+                    "description": "Optional job the outcome belongs to.",
+                },
+            },
+            "required": ["statement", "questions"],
+        },
+    },
+}
+
+
 def _apply_add_connector(
     arguments: dict[str, Any], service: ConnectorService
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -358,6 +404,89 @@ def _apply_remember(
     return "Saved for the user to review.", {"observation": observation.to_dict()}
 
 
+def _apply_prepare_score(
+    arguments: dict[str, Any],
+    memory: StudioMemory | None,
+    conversation_id: str | None,
+) -> tuple[str, dict[str, Any] | None]:
+    """Open the questions that must be answered before this score is written.
+
+    The proposed numbers travel with the plan but are *not recorded*: they reach
+    the canvas only after the person answers or skips and the model files the
+    outcome again with the resolved basis.
+    """
+    if memory is None or conversation_id is None:
+        return "Score planning is not available in this conversation.", None
+
+    statement = str(arguments.get("statement", ""))
+    questions = arguments.get("questions")
+    if not isinstance(questions, list):
+        return "prepare_score needs a 'questions' list of three to five questions.", None
+    try:
+        plan = memory.open_score_plan(
+            conversation_id=conversation_id,
+            statement=statement,
+            questions=[str(question) for question in questions],
+            importance=arguments.get("importance"),
+            satisfaction=arguments.get("satisfaction"),
+            job_id=arguments.get("job_id"),
+        )
+    except ValueError as exc:
+        return f"Could not prepare the score: {exc}", None
+    return (
+        "Asked the questions. Record the score only after the person answers or skips.",
+        plan.to_dict(),
+    )
+
+
+def _resolved_plan_for(
+    memory: StudioMemory | None, conversation_id: str | None, arguments: dict[str, Any]
+) -> Any:
+    """The resolved score plan backing this add_outcome call, if any."""
+    if memory is None or conversation_id is None:
+        return None
+    statement = arguments.get("statement")
+    if not isinstance(statement, str) or not statement.strip():
+        return None
+    return memory.resolved_score_plan(conversation_id, statement)
+
+
+def _score_gate_message(
+    name: str, arguments: dict[str, Any], memory: StudioMemory | None, conversation_id: str | None
+) -> str | None:
+    """Why a scored ``add_outcome`` may not run yet, or ``None`` to allow it.
+
+    The MCP gate proves a ``claim_check`` is present, not that a person answered.
+    This is the Studio half: a score is written only when a plan resolved in
+    this conversation, so a model cannot self-certify a number in its first
+    turn.
+    """
+    if name != "add_outcome" or memory is None or conversation_id is None:
+        return None
+    scored = arguments.get("importance") is not None or arguments.get("satisfaction") is not None
+    if not scored:
+        return None
+    if _resolved_plan_for(memory, conversation_id, arguments) is not None:
+        return None
+    return (
+        "No score was written: this outcome has no resolved score plan in this conversation. "
+        "Call prepare_score first with three to five questions, then ask the person to answer "
+        "or skip before recording the number."
+    )
+
+
+def _inject_score_basis(
+    arguments: dict[str, Any], memory: StudioMemory | None, conversation_id: str | None
+) -> dict[str, Any]:
+    """Attach the resolved plan's basis, discarding any the model supplied."""
+    if arguments.get("importance") is None and arguments.get("satisfaction") is None:
+        return arguments
+    plan = _resolved_plan_for(memory, conversation_id, arguments)
+    if plan is None:
+        return arguments
+    return {**arguments, "claim_check": plan.basis().model_dump(mode="json")}
+
+
 def _render_ui_tool(catalog: UiCatalog) -> dict[str, Any]:
     return {
         "type": "function",
@@ -378,7 +507,7 @@ def _render_ui_tool(catalog: UiCatalog) -> dict[str, Any]:
 
 def _local_tools(catalog: UiCatalog | None) -> list[dict[str, Any]]:
     tools = [_render_ui_tool(catalog)] if catalog is not None else []
-    return [*tools, REMEMBER_TOOL, ADD_CONNECTOR_TOOL]
+    return [*tools, REMEMBER_TOOL, ADD_CONNECTOR_TOOL, PREPARE_SCORE_TOOL]
 
 
 def _parse_arguments(raw: str) -> dict[str, Any]:
@@ -877,68 +1006,92 @@ async def _turn_frames(
                     else:
                         yield frame("tool", {"name": name, "status": "ok"})
                         yield frame("memory", memory_event)
-                else:
+                elif name == "prepare_score":
                     yield frame("tool", {"name": name, "status": "start"})
-                    if name == RENDER_UI_TOOL:
-                        if catalog is None:
-                            result_str = (
-                                "UI is not available to this client. Answer in prose instead."
-                            )
-                            counters["tool_errors"] += 1
-                            yield frame(
-                                "tool", {"name": name, "status": "error", "preview": result_str}
-                            )
-                        else:
-                            problem = catalog.validate(arguments)
-                            if problem:
-                                result_str = (
-                                    f"UI rejected: {problem}. Nothing was shown to the user. "
-                                    "Fix it and try once more."
-                                )
-                                counters["tool_errors"] += 1
-                                yield frame(
-                                    "tool", {"name": name, "status": "error", "preview": problem}
-                                )
-                            else:
-                                ui_count += 1
-                                result_str = "Rendered inline for the user."
-                                yield frame("tool", {"name": name, "status": "ok"})
-                                yield frame("ui", {"id": f"ui-{ui_count}", "spec": arguments})
+                    result_str, plan_event = _apply_prepare_score(
+                        arguments, memory, conversation_id
+                    )
+                    if plan_event is None:
+                        counters["tool_errors"] += 1
+                        yield frame(
+                            "tool", {"name": name, "status": "error", "preview": result_str}
+                        )
                     else:
-                        try:
-                            result = await mcp_client.call_tool(name, arguments)
-                            result_str = tool_result_text(result)
-                        except Exception as exc:  # noqa: BLE001
-                            result_str = f"Error calling {name}: {exc}"
-                            counters["tool_errors"] += 1
-                            yield frame(
-                                "tool", {"name": name, "status": "error", "preview": result_str}
-                            )
-                        else:
-                            failure = parse_tool_result(result_str)
-                            if failure is not None:
-                                # The model can recover from a tool error, so it
-                                # stays a tool result — but it is never dressed
-                                # up as a success.
+                        yield frame("tool", {"name": name, "status": "ok"})
+                        yield frame("score_plan", plan_event)
+                else:
+                    gate = _score_gate_message(name, arguments, memory, conversation_id)
+                    if gate is not None:
+                        # The model may self-certify a number in its first turn;
+                        # the gate refuses the write and names the missing step.
+                        counters["tool_errors"] += 1
+                        result_str = gate
+                        yield frame("tool", {"name": name, "status": "error", "preview": gate})
+                        yield frame("score_gate", {"name": name, "reason": gate})
+                    else:
+                        arguments = _inject_score_basis(arguments, memory, conversation_id)
+                        yield frame("tool", {"name": name, "status": "start"})
+                        if name == RENDER_UI_TOOL:
+                            if catalog is None:
+                                result_str = (
+                                    "UI is not available to this client. Answer in prose instead."
+                                )
                                 counters["tool_errors"] += 1
                                 yield frame(
-                                    "tool",
-                                    {
-                                        "name": name,
-                                        "status": "error",
-                                        "preview": result_str[:280],
-                                        "error": failure.model_dump(mode="json"),
-                                    },
+                                    "tool", {"name": name, "status": "error", "preview": result_str}
                                 )
                             else:
-                                canvas_dirty = True
-                                evidence.ingest(name, arguments, result_str)
+                                problem = catalog.validate(arguments)
+                                if problem:
+                                    result_str = (
+                                        f"UI rejected: {problem}. Nothing was shown to the user. "
+                                        "Fix it and try once more."
+                                    )
+                                    counters["tool_errors"] += 1
+                                    yield frame(
+                                        "tool",
+                                        {"name": name, "status": "error", "preview": problem},
+                                    )
+                                else:
+                                    ui_count += 1
+                                    result_str = "Rendered inline for the user."
+                                    yield frame("tool", {"name": name, "status": "ok"})
+                                    yield frame("ui", {"id": f"ui-{ui_count}", "spec": arguments})
+                        else:
+                            try:
+                                result = await mcp_client.call_tool(name, arguments)
+                                result_str = tool_result_text(result)
+                            except Exception as exc:  # noqa: BLE001
+                                result_str = f"Error calling {name}: {exc}"
+                                counters["tool_errors"] += 1
                                 yield frame(
-                                    "tool",
-                                    {"name": name, "status": "ok", "preview": result_str[:280]},
+                                    "tool", {"name": name, "status": "error", "preview": result_str}
                                 )
-                                source = _source_frame(counters, name, result_str)
-                                yield frame(source["event"], source["data"])
+                            else:
+                                failure = parse_tool_result(result_str)
+                                if failure is not None:
+                                    # The model can recover from a tool error, so it
+                                    # stays a tool result — but it is never dressed
+                                    # up as a success.
+                                    counters["tool_errors"] += 1
+                                    yield frame(
+                                        "tool",
+                                        {
+                                            "name": name,
+                                            "status": "error",
+                                            "preview": result_str[:280],
+                                            "error": failure.model_dump(mode="json"),
+                                        },
+                                    )
+                                else:
+                                    canvas_dirty = True
+                                    evidence.ingest(name, arguments, result_str)
+                                    yield frame(
+                                        "tool",
+                                        {"name": name, "status": "ok", "preview": result_str[:280]},
+                                    )
+                                    source = _source_frame(counters, name, result_str)
+                                    yield frame(source["event"], source["data"])
 
                 messages.append(
                     {
@@ -1045,6 +1198,7 @@ async def stream_chat(
 
 
 __all__ = [
+    "PREPARE_SCORE_TOOL",
     "REMEMBER_TOOL",
     "SYSTEM_PROMPT",
     "offline_fallback",

@@ -416,3 +416,76 @@ def test_the_tree_endpoint_restores_claims_with_their_labels() -> None:
     claims = body["messages"][0]["claims"]
     assert [claim["status"] for claim in claims] == ["cited", "hypothesis"]
     assert claims[0]["evidence"] == [{"id": "E-1", "name": "Call with Acme", "source_name": "Gong"}]
+
+
+# -- score plans (issue #341) ---------------------------------------------
+
+SCORE_QUESTIONS = [
+    "Who feels this problem most sharply today?",
+    "What workaround do they use right now?",
+    "What does that workaround cost them in time?",
+]
+SCORE_STATEMENT = "Minimize the time it takes to file a claim"
+
+
+def test_resolving_a_score_plan_with_answers_returns_the_basis() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    plan = memory.open_score_plan(conversation.id, SCORE_STATEMENT, SCORE_QUESTIONS)
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=memory))
+
+    response = client.post(
+        f"/api/score-plans/{plan.id}",
+        json={"answers": ["Claims reps", "Email threads", "40 minutes"]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()["plan"]
+    assert body["status"] == "answered"
+    assert body["answers"] == ["Claims reps", "Email threads", "40 minutes"]
+
+
+def test_resolving_a_score_plan_with_a_skip_keeps_the_reason() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    plan = memory.open_score_plan(conversation.id, SCORE_STATEMENT, SCORE_QUESTIONS)
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=memory))
+
+    response = client.post(
+        f"/api/score-plans/{plan.id}", json={"skip_reason": "No customer access this week"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()["plan"]
+    assert body["status"] == "skipped"
+    assert body["skip_reason"] == "No customer access this week"
+    assert all(skip["reason"] == "No customer access this week" for skip in body["skips"])
+
+
+def test_a_skip_without_a_reason_is_a_validation_error() -> None:
+    memory = _memory()
+    conversation = memory.create_conversation()
+    plan = memory.open_score_plan(conversation.id, SCORE_STATEMENT, SCORE_QUESTIONS)
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=memory))
+
+    response = client.post(f"/api/score-plans/{plan.id}", json={"skip_reason": "   "})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation"
+
+
+def test_resolving_an_unknown_score_plan_is_a_404() -> None:
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=_memory()))
+
+    response = client.post("/api/score-plans/missing", json={"answers": ["a", "b", "c"]})
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+
+def test_getting_a_score_plan_reports_an_unknown_id() -> None:
+    client = TestClient(create_app(repo=InMemoryRepository(), memory=_memory()))
+
+    response = client.get("/api/score-plans/missing")
+
+    assert response.status_code == 404

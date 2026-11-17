@@ -11,16 +11,18 @@ The store is deliberately small and boring: stdlib ``sqlite3``, one file under
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from agentic_odi_core import ClaimCheck, ClaimSkip
 from agentic_odi_core.errors import StoreCorrupt
 from agentic_odi_core.integrity import ensure_intact
 
@@ -56,6 +58,31 @@ MAX_SUGGESTED_IN_CONTEXT = 10
 #: owns paging; this slice shows the recent ones and stops.
 MAX_CONVERSATIONS = 20
 
+SCORE_PLAN_STATUSES: frozenset[str] = frozenset({"open", "answered", "skipped"})
+#: A score is interrogated by three to five questions, never one and never a
+#: questionnaire.
+MIN_SCORE_PLAN_QUESTIONS = 3
+MAX_SCORE_PLAN_QUESTIONS = 5
+MIN_SCORE_PLAN_QUESTION = 8
+MAX_SCORE_PLAN_QUESTION = 160
+MAX_SCORE_PLAN_STATEMENT = 400
+#: A plan that is not resolved within a day is stale: it is re-asked rather than
+#: silently reused, and the card says so.
+SCORE_PLAN_TTL_SECONDS = 24 * 60 * 60
+#: At least one question must ask about the current workaround or what it costs,
+#: or the basis is opinion rather than evidence.
+_WORKAROUND_HINTS = (
+    "workaround",
+    "work around",
+    "today",
+    "currently",
+    "current",
+    "cost",
+    "spend",
+    "pay",
+    "price",
+)
+
 
 class MemoryError(ValueError):
     """Base class for recoverable memory errors."""
@@ -66,6 +93,10 @@ class ObservationNotFoundError(MemoryError):
 
 
 class ConversationNotFoundError(MemoryError):
+    pass
+
+
+class ScorePlanNotFoundError(MemoryError):
     pass
 
 
@@ -235,6 +266,63 @@ class Share:
         }
 
 
+@dataclass
+class ScorePlan:
+    """The questions that must be answered before a score may be written.
+
+    A plan is the two-turn half of scoring: the agent proposes a statement and
+    two numbers, the person answers or skips with a reason, and only then does
+    the plan resolve and the score become writable. Until it resolves the
+    proposed numbers are *not recorded* — they never reach the canvas.
+
+    ``basis`` is the ``ClaimCheck`` the resolved plan hands to the outcome, so
+    a score carries the questions that produced it rather than a bare number.
+    """
+
+    id: str
+    conversation_id: str
+    statement_hash: str
+    statement: str
+    job_id: str | None
+    importance: float | None
+    satisfaction: float | None
+    questions: list[str]
+    status: str = "open"
+    answers: list[str] = field(default_factory=list)
+    skips: list[ClaimSkip] = field(default_factory=list)
+    skip_reason: str | None = None
+    created_at: str = ""
+    updated_at: str = ""
+    expires_at: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "conversation_id": self.conversation_id,
+            "statement": self.statement,
+            "job_id": self.job_id,
+            "importance": self.importance,
+            "satisfaction": self.satisfaction,
+            "questions": list(self.questions),
+            "status": self.status,
+            "answers": list(self.answers),
+            "skips": [skip.model_dump(mode="json") for skip in self.skips],
+            "skip_reason": self.skip_reason,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "expires_at": self.expires_at,
+        }
+
+    def is_expired(self, *, now: datetime | None = None) -> bool:
+        return _plan_expired(self.expires_at, now=now)
+
+    def basis(self) -> ClaimCheck:
+        """The claim check this resolved plan hands to the outcome it produced."""
+        return ClaimCheck(
+            asked=list(self.questions), answers=list(self.answers), skips=list(self.skips)
+        )
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
@@ -295,6 +383,27 @@ CREATE TABLE IF NOT EXISTS shares (
 );
 
 CREATE INDEX IF NOT EXISTS shares_by_hash ON shares(token_hash);
+
+CREATE TABLE IF NOT EXISTS score_plans (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    statement_hash TEXT NOT NULL,
+    statement TEXT NOT NULL,
+    job_id TEXT,
+    importance REAL,
+    satisfaction REAL,
+    questions TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'open',
+    answers TEXT NOT NULL DEFAULT '[]',
+    skips TEXT NOT NULL DEFAULT '[]',
+    skip_reason TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS score_plans_by_statement
+    ON score_plans(conversation_id, statement_hash);
 """
 
 
@@ -370,6 +479,86 @@ def _validate_subject(
     if subject_id is None or not str(subject_id).strip():
         raise MemoryError("a subject_type requires a non-empty subject_id")
     return subject_type, str(subject_id).strip()
+
+
+def _normalize_statement(statement: str) -> str:
+    return " ".join(statement.split()).casefold()
+
+
+def _statement_hash(statement: str) -> str:
+    return hashlib.sha256(_normalize_statement(statement).encode("utf-8")).hexdigest()
+
+
+def _plan_expired(expires_at: str, *, now: datetime | None = None) -> bool:
+    if not expires_at:
+        return False
+    try:
+        deadline = datetime.fromisoformat(expires_at)
+    except ValueError:
+        return False
+    moment = now or datetime.now(timezone.utc)
+    return moment >= deadline
+
+
+def _validate_score_plan_statement(statement: str) -> str:
+    cleaned = statement.strip()
+    if not cleaned:
+        raise MemoryError("a score plan needs the outcome statement it scores")
+    if len(cleaned) > MAX_SCORE_PLAN_STATEMENT:
+        raise MemoryError(
+            f"a score plan statement cannot exceed {MAX_SCORE_PLAN_STATEMENT} characters"
+        )
+    return cleaned
+
+
+def _validate_score_plan_questions(questions: list[str] | None) -> list[str]:
+    """Three to five distinct questions, one of which asks about today's workaround.
+
+    The count is the spec's, not a preference: fewer than three does not
+    interrogate a claim, and more than five turns the check into a
+    questionnaire the person will not finish.
+    """
+    cleaned: list[str] = []
+    for raw in questions or []:
+        question = str(raw).strip()
+        if not question:
+            continue
+        if not MIN_SCORE_PLAN_QUESTION <= len(question) <= MAX_SCORE_PLAN_QUESTION:
+            raise MemoryError(
+                "each score question must be "
+                f"{MIN_SCORE_PLAN_QUESTION}–{MAX_SCORE_PLAN_QUESTION} characters"
+            )
+        cleaned.append(question)
+    if len(cleaned) < MIN_SCORE_PLAN_QUESTIONS:
+        raise MemoryError(
+            f"a score plan needs at least {MIN_SCORE_PLAN_QUESTIONS} questions; "
+            "one or two does not interrogate the claim"
+        )
+    if len(cleaned) > MAX_SCORE_PLAN_QUESTIONS:
+        raise MemoryError(
+            f"a score plan cannot carry more than {MAX_SCORE_PLAN_QUESTIONS} questions"
+        )
+    if len({_normalize_statement(question) for question in cleaned}) != len(cleaned):
+        raise MemoryError("score plan questions must be distinct")
+    if not any(
+        hint in _normalize_statement(question) for question in cleaned for hint in _WORKAROUND_HINTS
+    ):
+        raise MemoryError(
+            "a score plan needs at least one question about the current workaround or what it costs"
+        )
+    return cleaned
+
+
+def _validate_score(value: Any, name: str) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise MemoryError(f"{name} must be a number between 1 and 10") from exc
+    if not 1.0 <= number <= 10.0:
+        raise MemoryError(f"{name} must be between 1 and 10")
+    return number
 
 
 class StudioMemory:
@@ -694,6 +883,196 @@ class StudioMemory:
             previous = turn.message_id
             turn.claims = self.claims_for_turn(turn)
         return turns
+
+    # -- score plans -------------------------------------------------------
+
+    def open_score_plan(
+        self,
+        conversation_id: str,
+        statement: str,
+        questions: list[str],
+        importance: float | None = None,
+        satisfaction: float | None = None,
+        job_id: str | None = None,
+    ) -> ScorePlan:
+        """Open the questions that must be answered before this score is written.
+
+        Re-opening the same statement in the same conversation replaces any
+        still-open plan for it rather than stacking a second one: one statement
+        has one live interrogation at a time.
+        """
+        clean_statement = _validate_score_plan_statement(statement)
+        clean_questions = _validate_score_plan_questions(questions)
+        clean_importance = _validate_score(importance, "importance")
+        clean_satisfaction = _validate_score(satisfaction, "satisfaction")
+        if self.get_conversation(conversation_id) is None:
+            raise ConversationNotFoundError(conversation_id)
+        now = datetime.now(timezone.utc)
+        statement_hash = _statement_hash(clean_statement)
+        plan = ScorePlan(
+            id=uuid.uuid4().hex,
+            conversation_id=conversation_id,
+            statement_hash=statement_hash,
+            statement=clean_statement,
+            job_id=job_id,
+            importance=clean_importance,
+            satisfaction=clean_satisfaction,
+            questions=clean_questions,
+            created_at=now.isoformat(),
+            updated_at=now.isoformat(),
+            expires_at=(now + timedelta(seconds=SCORE_PLAN_TTL_SECONDS)).isoformat(),
+        )
+        with self._lock, self._connection:
+            self._connection.execute(
+                "DELETE FROM score_plans WHERE conversation_id = ? AND statement_hash = ? "
+                "AND status = 'open'",
+                (conversation_id, statement_hash),
+            )
+            self._connection.execute(
+                "INSERT INTO score_plans "
+                "(id, conversation_id, statement_hash, statement, job_id, importance, "
+                "satisfaction, questions, status, answers, skips, skip_reason, "
+                "created_at, updated_at, expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    plan.id,
+                    plan.conversation_id,
+                    plan.statement_hash,
+                    plan.statement,
+                    plan.job_id,
+                    plan.importance,
+                    plan.satisfaction,
+                    json.dumps(plan.questions),
+                    plan.status,
+                    json.dumps(plan.answers),
+                    json.dumps([]),
+                    plan.skip_reason,
+                    plan.created_at,
+                    plan.updated_at,
+                    plan.expires_at,
+                ),
+            )
+        return plan
+
+    def get_score_plan(self, plan_id: str) -> ScorePlan | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM score_plans WHERE id = ?", (plan_id,)
+            ).fetchone()
+        return self._score_plan_from_row(row) if row is not None else None
+
+    def resolved_score_plan(self, conversation_id: str, statement: str) -> ScorePlan | None:
+        """The resolved, unexpired plan for this statement, or ``None``.
+
+        An expired plan is not resolved: the person is asked again rather than
+        having a day-old answer silently reused for a fresh score.
+        """
+        statement_hash = _statement_hash(statement)
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM score_plans WHERE conversation_id = ? AND statement_hash = ? "
+                "AND status != 'open' ORDER BY updated_at DESC LIMIT 1",
+                (conversation_id, statement_hash),
+            ).fetchone()
+        if row is None:
+            return None
+        plan = self._score_plan_from_row(row)
+        return None if plan.is_expired() else plan
+
+    def answer_score_plan(self, plan_id: str, answers: list[str]) -> ScorePlan:
+        """Resolve a plan with the person's answers, one per question asked."""
+        plan = self._require_score_plan(plan_id)
+        cleaned = [str(answer).strip() for answer in answers or []]
+        if not cleaned or any(not answer for answer in cleaned):
+            raise MemoryError("every question needs an answer, or skip the plan with a reason")
+        if len(cleaned) != len(plan.questions):
+            raise MemoryError(
+                f"this plan asked {len(plan.questions)} questions; provide one answer for each"
+            )
+        return self._resolve_score_plan(plan, answers=cleaned, skips=[], skip_reason=None)
+
+    def skip_score_plan(self, plan_id: str, reason: str) -> ScorePlan:
+        """Resolve a plan as skipped, with a reason that says what would change it."""
+        plan = self._require_score_plan(plan_id)
+        cleaned = str(reason or "").strip()
+        if not cleaned:
+            raise MemoryError("a skip needs a reason: what would you need to believe this instead?")
+        skips = [ClaimSkip(question=question, reason=cleaned) for question in plan.questions]
+        return self._resolve_score_plan(plan, answers=[], skips=skips, skip_reason=cleaned)
+
+    def _resolve_score_plan(
+        self,
+        plan: ScorePlan,
+        *,
+        answers: list[str],
+        skips: list[ClaimSkip],
+        skip_reason: str | None,
+    ) -> ScorePlan:
+        now = _now()
+        status = "answered" if answers else "skipped"
+        with self._lock, self._connection:
+            self._connection.execute(
+                "UPDATE score_plans SET status = ?, answers = ?, skips = ?, skip_reason = ?, "
+                "updated_at = ? WHERE id = ?",
+                (
+                    status,
+                    json.dumps(answers),
+                    json.dumps([skip.model_dump(mode="json") for skip in skips]),
+                    skip_reason,
+                    now,
+                    plan.id,
+                ),
+            )
+        plan.status = status
+        plan.answers = answers
+        plan.skips = skips
+        plan.skip_reason = skip_reason
+        plan.updated_at = now
+        return plan
+
+    def _require_score_plan(self, plan_id: str) -> ScorePlan:
+        plan = self.get_score_plan(plan_id)
+        if plan is None:
+            raise ScorePlanNotFoundError(plan_id)
+        if plan.status != "open":
+            raise MemoryError("this score plan is already resolved")
+        if plan.is_expired():
+            raise MemoryError("this score plan expired; ask again before scoring")
+        return plan
+
+    @staticmethod
+    def _score_plan_from_row(row: sqlite3.Row) -> ScorePlan:
+        skips: list[ClaimSkip] = []
+        try:
+            decoded = json.loads(row["skips"])
+        except (TypeError, ValueError):
+            decoded = []
+        if isinstance(decoded, list):
+            for entry in decoded:
+                if isinstance(entry, dict) and entry.get("question"):
+                    skips.append(
+                        ClaimSkip(
+                            question=str(entry.get("question", "")),
+                            reason=str(entry.get("reason", "")),
+                        )
+                    )
+        return ScorePlan(
+            id=row["id"],
+            conversation_id=row["conversation_id"],
+            statement_hash=row["statement_hash"],
+            statement=row["statement"],
+            job_id=row["job_id"],
+            importance=row["importance"],
+            satisfaction=row["satisfaction"],
+            questions=_json_values(row["questions"]),
+            status=row["status"],
+            answers=_json_values(row["answers"]),
+            skips=skips,
+            skip_reason=row["skip_reason"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            expires_at=row["expires_at"],
+        )
 
     # -- observations ------------------------------------------------------
 
@@ -1048,15 +1427,20 @@ class StudioMemory:
 __all__ = [
     "MAX_CONTEXT_CHARS",
     "MAX_CONVERSATIONS",
+    "MAX_SCORE_PLAN_QUESTIONS",
     "MAX_SUGGESTED_IN_CONTEXT",
+    "MIN_SCORE_PLAN_QUESTIONS",
     "OBSERVATION_KINDS",
     "OBSERVATION_STATUSES",
     "OBSERVATION_SUBJECT_TYPES",
+    "SCORE_PLAN_TTL_SECONDS",
     "Conversation",
     "ConversationNotFoundError",
     "MemoryError",
     "Observation",
     "ObservationNotFoundError",
+    "ScorePlan",
+    "ScorePlanNotFoundError",
     "Share",
     "StudioMemory",
     "Turn",

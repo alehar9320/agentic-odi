@@ -218,6 +218,8 @@ string. Events, in the order they can appear:
 | `approval` | `id`, `tool_call_id`, `name`, `arguments`, `prompt` | A write is waiting for the person |
 | `source` | `id`, `title`, `filename`, `mediaType`, `preview` | What the turn actually read |
 | `ui` | `id`, `spec` | A validated generated surface |
+| `score_plan` | the open plan | `prepare_score` opened questions the person must answer or skip |
+| `score_gate` | `name`, `reason` | A scored write was refused for want of a resolved plan |
 | `memory`, `connector`, `canvas_dirty` | — | Side effects the SPA applies without a refresh |
 | `message` / `error` | `content` / `StudioError` | Exactly one terminal event |
 
@@ -227,6 +229,14 @@ the same stream continues with the call or with a declined tool result. A
 timeout (300 s), a cancelled turn, or sidecar shutdown closes the gate, so a
 turn always terminates.
 
+A score is a two-turn act. `prepare_score` opens a plan (three to five
+questions, one about the workaround and what it costs) and streams it; the
+person answers, or skips with a reason, at `POST /api/score-plans/{id}`. Only
+then may `add_outcome` carry an `importance` or `satisfaction`: the tool loop
+refuses a scored write with no resolved plan for that statement and attaches the
+plan's basis as the `claim_check`, discarding any the model supplied. A plan
+expires after 24 hours, after which the person is asked again.
+
 The SPA owns the visible path; the sidecar owns the record. Turns persist with
 `message_id` and `parent_id`, and the conversation stores `head_id`:
 
@@ -235,6 +245,8 @@ GET   /api/conversations                       -> every thread, last touch first
 GET   /api/conversations/latest                -> thread + turns (resume)
 GET   /api/conversations/{id}/tree             -> branch tree + head
 PATCH /api/conversations/{id} {"head_id"}      -> record the visible branch
+GET   /api/score-plans/{id}                    -> one plan and its status
+POST  /api/score-plans/{id} {answers|skip_reason} -> resolve a plan
 DELETE /api/conversations/{id}                 -> drop the thread and its turns
 ```
 
