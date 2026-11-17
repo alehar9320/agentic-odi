@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import sys
 
@@ -9,6 +10,8 @@ import httpx
 import typer
 
 from agentic_odi_cli import profile
+
+log = logging.getLogger(__name__)
 
 # ── PageSignals ──────────────────────────────────────────────────────────────
 
@@ -194,7 +197,10 @@ def fetch_signals(url: str, timeout: float = 8.0) -> tuple[profile.Baseline | Pa
     try:
         response = httpx.get(url, timeout=timeout, headers={"User-Agent": UA})
         response.raise_for_status()
-    except Exception:  # noqa: BLE001 - any fetch failure falls back to the typed path
+    except Exception as exc:  # noqa: BLE001 - any fetch failure falls back to the typed path
+        log.warning(
+            "page fetch failed, using the typed path (url=%s, error=%s)", url, type(exc).__name__
+        )
         # Fetch failure → typed path
         return _default_signals(low_confidence=True)
 

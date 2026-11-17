@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import socket
 import threading
@@ -18,6 +19,8 @@ from urllib.parse import urlparse
 
 from agentic_odi_core import settings
 from openai import AsyncOpenAI
+
+log = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "http://localhost:8001/v1"
 DEFAULT_API_KEY = "local"
@@ -206,7 +209,8 @@ async def list_models(base_url: str, api_key: str) -> tuple[list[str], str | Non
     client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=2.0)
     try:
         page = await asyncio.wait_for(client.models.list(), timeout=2.0)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - a probe reports a failure, it never raises
+        log.warning("model listing failed (base_url=%s, error=%s)", base_url, type(exc).__name__)
         status, detail = classify_llm_error(exc)
         return [], f"{status}: {detail}"
 
@@ -228,7 +232,8 @@ async def _probe_llm_health(base_url: str, api_key: str, model_name: str) -> tup
     try:
         await asyncio.wait_for(client.models.list(), timeout=1.2)
         return True, "LLM backend is reachable."
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - a probe reports a failure, it never raises
+        log.warning("LLM health probe failed (base_url=%s, error=%s)", base_url, type(exc).__name__)
         status, detail = classify_llm_error(exc)
         return False, f"{status}: {detail}"
 

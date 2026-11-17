@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 
 def install_root() -> Path:
@@ -94,5 +97,6 @@ def is_writable_dir(p: Path) -> bool:
     """Check if the given path is a writable directory."""
     try:
         return p.is_dir() and os.access(p, os.W_OK)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - an unreadable path is simply not writable
+        log.warning("writability check failed (path=%s, error=%s)", p, type(exc).__name__)
         return False
