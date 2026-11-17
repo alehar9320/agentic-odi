@@ -824,15 +824,16 @@ describe("composer shortcuts (#692)", () => {
     fireEvent.click(await screen.findByRole("button", { name: /open what's new changelog/i }));
     const dialog = await screen.findByRole("dialog");
 
-    expect(document.querySelector(".studio-app")).toHaveAttribute("inert");
-    // The dialog is not inside the inert shell, so it stays reachable.
+    // The shared Dialog is modal: it announces itself as such, which is what
+    // the shell's `dialogOpen` gate reads to keep its shortcuts out of reach.
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    // It portals to the document root, so it stays reachable while the page
+    // behind it is hidden.
     expect(document.querySelector(".studio-app")?.contains(dialog)).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
 
-    await waitFor(() => {
-      expect(document.querySelector(".studio-app")).not.toHaveAttribute("inert");
-    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("returns focus to the What's New control after the changelog closes", async () => {
@@ -870,8 +871,10 @@ describe("composer shortcuts (#692)", () => {
     fireEvent.click(screen.getByRole("button", { name: /open what's new changelog/i }));
     await screen.findByRole("dialog");
 
-    // One Escape closes the changelog; the reply keeps streaming.
-    fireEvent.keyDown(window, { key: "Escape" });
+    // One Escape closes the changelog; the reply keeps streaming. The Escape is
+    // dispatched on the document, which is where the shared Dialog listens for
+    // it, before it bubbles on to the shell's window handler.
+    fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("button", { name: /stop generating/i })).toBeInTheDocument();
 
