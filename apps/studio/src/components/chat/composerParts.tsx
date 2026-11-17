@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { useAuiState } from "@assistant-ui/react";
+import { ThreadPrimitive, useAuiState } from "@assistant-ui/react";
 
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
 import { useReducedMotion } from "../../lib/useReducedMotion";
@@ -24,43 +24,30 @@ const STARTER_ICONS: ReactNode[] = [
   <CaptureIcon size={16} key="capture" />,
 ];
 
-interface StarterCard {
-  id: string;
-  title: string;
-  /** The one action line: what a click does. */
-  action: string;
-  /** The shape of what comes back, e.g. "A job map · steps · what is still a guess". */
-  artifact?: string;
-  icon: ReactNode;
-  recommended: boolean;
-  run: () => void;
-}
-
 /**
  * The runtime's suggestions, pinned to the composer so they stay reachable
  * once the thread starts. What is offered here and what the thread knows are
  * the same store, so they cannot drift apart.
  *
  * Each starter is a card with one anatomy — icon, title, artifact preview, one
- * action — in a grid that never wraps mid-set (#317). The panel opener
+ * action — in a grid that never wraps mid-set (#317). assistant-ui's
+ * `ThreadPrimitive.Suggestion` owns the click: it sends the prompt through the
+ * runtime (queueing a follow-up mid-answer instead of swallowing it), so the
+ * card carries no submission path of its own (#996). The panel opener
  * ("Opportunity landscape", or the capture fallback) is a quiet text action
  * under the grid, never a fourth card.
+ *
+ * The list is still ours, not `ThreadPrimitive.Suggestions`, because the card's
+ * artifact preview lives on the canvas suggestion and does not survive the
+ * runtime's suggestion store (which keeps only title, label, and prompt). The
+ * preview is read from `state.thread.suggestions`, the same ordered list the
+ * primitive would render.
  */
 export function SuggestionPills() {
-  const { canvas, llmHealth, openPanel, sendMessage } = useStudio();
+  const { canvas, llmHealth, openPanel } = useStudio();
   const suggestions = useAuiState((state) => state.thread.suggestions);
 
   const jobs = canvas?.jobs.length ?? 0;
-
-  const cards: StarterCard[] = suggestions.map((suggestion, index) => ({
-    id: `suggestion-${index}`,
-    title: suggestion.title ?? suggestion.prompt,
-    action: suggestion.label ?? "",
-    artifact: (suggestion as { artifact?: string }).artifact,
-    icon: STARTER_ICONS[index % STARTER_ICONS.length],
-    recommended: index === 0,
-    run: () => void sendMessage(suggestion.prompt),
-  }));
 
   const aside =
     jobs > 0 && llmHealth.healthy === false
@@ -70,36 +57,42 @@ export function SuggestionPills() {
   return (
     <div className="composer__starters" aria-label="Suggested next steps">
       <ul className="starter-grid" role="list">
-        {cards.map((card) => (
-          <li key={card.id} className="starter-item">
-            <button
-              type="button"
-              className="starter"
-              onClick={card.run}
-              aria-label={card.title}
-              aria-describedby={card.artifact ? `${card.id}-artifact` : undefined}
-            >
-              <span className="starter__head">
-                <span className="starter__icon" aria-hidden="true">
-                  {card.icon}
+        {suggestions.map((suggestion, index) => {
+          const id = `suggestion-${index}`;
+          const title = suggestion.title ?? suggestion.prompt;
+          const action = suggestion.label ?? "";
+          const artifact = (suggestion as { artifact?: string }).artifact;
+          return (
+            <li key={id} className="starter-item">
+              <ThreadPrimitive.Suggestion
+                prompt={suggestion.prompt}
+                send
+                className="starter"
+                aria-label={title}
+                aria-describedby={artifact ? `${id}-artifact` : undefined}
+              >
+                <span className="starter__head">
+                  <span className="starter__icon" aria-hidden="true">
+                    {STARTER_ICONS[index % STARTER_ICONS.length]}
+                  </span>
+                  {index === 0 && (
+                    <span className="starter__recommended" aria-hidden="true">
+                      Recommended
+                    </span>
+                  )}
                 </span>
-                {card.recommended && (
-                  <span className="starter__recommended" aria-hidden="true">
-                    Recommended
+                <span className="starter__title">{title}</span>
+                {artifact && (
+                  <span className="starter__artifact" id={`${id}-artifact`}>
+                    <span className="starter__artifact-label">Produces</span>
+                    {artifact}
                   </span>
                 )}
-              </span>
-              <span className="starter__title">{card.title}</span>
-              {card.artifact && (
-                <span className="starter__artifact" id={`${card.id}-artifact`}>
-                  <span className="starter__artifact-label">Produces</span>
-                  {card.artifact}
-                </span>
-              )}
-              {card.action && <span className="starter__action">{card.action}</span>}
-            </button>
-          </li>
-        ))}
+                {action && <span className="starter__action">{action}</span>}
+              </ThreadPrimitive.Suggestion>
+            </li>
+          );
+        })}
       </ul>
       <button type="button" className="composer__starter-aside" onClick={aside.run}>
         {aside.label}

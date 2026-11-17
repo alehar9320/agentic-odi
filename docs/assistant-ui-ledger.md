@@ -87,7 +87,7 @@ by the presence of one handler.
 | `ThreadPrimitive.ViewportProvider` | Rejected | — | — | One viewport; the provider exists for multiple viewports on one thread. |
 | `ThreadPrimitive.Row` | Decision | — | — | Only with `createThreadRowsSelector`, together. |
 | `ThreadPrimitive.MessageByIndex` / `Unstable_MessageById` | Rejected | — | — | The Messages map covers it; addressing one message by position is fragile under branching. |
-| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | `apps/studio/src/components/chat/composerParts.tsx` | — | The data (`suggestions`) is adopted; the pills are hand-rolled because they carry the artifact-preview copy. Adopting the primitives would drop that copy; `SuggestionByIndex` is not an option since the list is computed from canvas state. |
+| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | `apps/studio/src/components/chat/composerParts.tsx` | — | Selection and submission are the primitive's: every starter card is a `ThreadPrimitive.Suggestion` with `send`, so a click enters the runtime's queue instead of a hand-rolled send (#996). The list stays ours because the artifact preview on the canvas suggestion does not survive the runtime's suggestion store (title, label, prompt only); `Suggestions` would drop that copy. |
 
 ## Message and parts
 

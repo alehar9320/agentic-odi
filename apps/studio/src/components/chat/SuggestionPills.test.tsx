@@ -1,7 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NOTES_PROMPT, StudioRuntimeProvider } from "../../assistant/StudioRuntime";
+import {
+  CAPTURE_PROMPT,
+  NOTES_PROMPT,
+  StudioRuntimeProvider,
+} from "../../assistant/StudioRuntime";
+import { createTurnQueue, queuedUserMessage } from "../../assistant/queue";
 import type { StudioContextValue } from "../../state/StudioContext";
 import { SuggestionPills } from "./composerParts";
 
@@ -12,6 +17,7 @@ vi.mock("../../state/StudioContext", () => ({
 import { useStudio } from "../../state/StudioContext";
 
 const FIRST_STARTER = "Turn 40 interview notes into one bet";
+const CANVAS_STARTER = "Capture what you heard";
 
 const stubContext = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -32,6 +38,22 @@ function renderPills() {
   );
 }
 
+// A turn that only settles when the test says so, so a click mid-answer has
+// nowhere to go but the queue lane (#410).
+function liveController() {
+  let settleTurn: () => void = () => undefined;
+  const driver = {
+    run: vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          settleTurn = () => resolve();
+        }),
+    ),
+    cancel: vi.fn(),
+  };
+  return { controller: createTurnQueue(driver), driver, endTurn: () => settleTurn() };
+}
+
 describe("SuggestionPills starters", () => {
   beforeEach(() => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
@@ -46,21 +68,50 @@ describe("SuggestionPills starters", () => {
 
     // Exactly one call, exactly the constant: no prefix, suffix, or wrapper.
     expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(sendMessage).toHaveBeenCalledWith(NOTES_PROMPT);
+    expect(sendMessage).toHaveBeenCalledWith(NOTES_PROMPT, []);
   });
 
-  it("enqueues a starter clicked while a reply streams", () => {
+  it("lets the runtime own submission: the prompt enters the queue, not a hand-rolled send", async () => {
+    const { controller, driver } = liveController();
     const sendMessage = vi.fn(async () => {});
-    vi.mocked(useStudio).mockReturnValue(stubContext({ streaming: true, sendMessage }));
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ streaming: true, queue: controller.adapter, sendMessage }),
+    );
 
     renderPills();
-    fireEvent.click(screen.getByRole("button", { name: FIRST_STARTER }));
 
-    // The pill stays live mid-answer (#410): the context puts the follow-up
-    // in the queue lane instead of the click being swallowed by a disabled
-    // button.
+    // A turn is already in flight, so the queue is busy: the click has to wait
+    // its turn rather than opening a second stream.
+    await act(async () => {
+      controller.adapter.enqueue(queuedUserMessage("the live turn"));
+      fireEvent.click(screen.getByRole("button", { name: FIRST_STARTER }));
+    });
+
+    // The suggestion primitive routes through the runtime; the context's own
+    // send path is untouched. A hand-built onClick would have called
+    // sendMessage directly and swallowed the click mid-answer (#410).
+    expect(sendMessage).not.toHaveBeenCalled();
+    const texts = driver.run.mock.calls.map((call: unknown[]) => {
+      const message = call[0] as { content?: { text?: string }[] };
+      return message.content?.[0]?.text;
+    });
+    expect(texts).toContain(NOTES_PROMPT);
+  });
+
+  it("submits a returning-user starter from a non-empty canvas unchanged", () => {
+    const sendMessage = vi.fn(async () => {});
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        canvas: { jobs: [{ id: "job-1" }], outcomes: [] },
+        sendMessage,
+      }),
+    );
+
+    renderPills();
+    fireEvent.click(screen.getByRole("button", { name: CANVAS_STARTER }));
+
     expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(sendMessage).toHaveBeenCalledWith(NOTES_PROMPT);
+    expect(sendMessage).toHaveBeenCalledWith(CAPTURE_PROMPT, []);
   });
 
   it("renders the starters as one list of three cards", () => {
