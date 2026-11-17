@@ -8,6 +8,9 @@ Owns every generated region in the docs:
 - README Documentation table (docs) + ``website/content/nav.json``: derived
   from the front matter on each page in ``docs/`` so a new guide registers
   itself in the navigation without touching a shared file.
+- ``docs/reference/test-map.md`` (test-map): one row per test file, derived
+  from the file's own docstring or leading comment (#1047), so writing a test
+  means writing a docstring instead of editing a shared table.
 
 Run locally with::
 
@@ -18,6 +21,7 @@ Run locally with::
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -29,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = ROOT / "docs"
 NAV_JSON = ROOT / "website" / "content" / "nav.json"
 README = ROOT / "README.md"
+TEST_MAP = "docs/reference/test-map.md"
 
 # --- README Documentation table + website/content/nav.json (docs block) ---
 
@@ -293,9 +298,119 @@ def replace_block(text: str, name: str, body: str) -> str:
     start = text.find(begin)
     stop = text.find(end)
     if start == -1 or stop == -1 or stop < start:
-        raise ValueError(f"README is missing the {name!r} generated markers")
+        raise ValueError(f"the file is missing the {name!r} generated markers")
     start += len(begin)
     return f"{text[:start]}\n{body}\n{text[stop:]}"
+
+
+# --- docs/reference/test-map.md (test-map block, #1047) ---
+
+# Every Python file under these directories is a row: helpers and conftest
+# included, so a file cannot hide by having no description.
+TEST_DIR_GLOBS = (
+    "packages/*/tests",
+    "apps/*/tests",
+    "tests",
+    "website/tests",
+    "brand/tests",
+)
+# The frontend tests live beside the code they cover.
+TS_TEST_GLOBS = ("apps/studio/src/**/*.test.ts", "apps/studio/src/**/*.test.tsx")
+
+_REFERENCE_DIRECTIVE = re.compile(r"^\s*///\s*<reference")
+_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_LINE_COMMENT = re.compile(r"^[ \t]*//(.*)$", re.MULTILINE)
+
+
+def _first_prose_line(text: str) -> str | None:
+    for raw in text.splitlines():
+        line = raw.strip().lstrip("*/").strip()
+        if line:
+            return line
+    return None
+
+
+def _python_description(path: Path) -> str | None:
+    """The first line of a Python module's docstring, or ``None``."""
+    try:
+        module = ast.parse(path.read_text(encoding="utf-8"))
+    except (SyntaxError, UnicodeDecodeError):
+        return None
+    docstring = ast.get_docstring(module)
+    return _first_prose_line(docstring) if docstring else None
+
+
+def _typescript_description(path: Path) -> str | None:
+    """The first line of a TypeScript file's leading comment, or ``None``.
+
+    A ``/// <reference ...>`` directive is a compiler instruction, not a
+    description, so the first comment that is not one is the one that counts.
+    """
+    text = path.read_text(encoding="utf-8")
+    block = _BLOCK_COMMENT.search(text)
+    line = next(
+        (
+            match
+            for match in _LINE_COMMENT.finditer(text)
+            if not _REFERENCE_DIRECTIVE.match(match.group(0))
+        ),
+        None,
+    )
+    if line is not None and (block is None or line.start() < block.start()):
+        return line.group(1).strip() or None
+    if block is not None:
+        return _first_prose_line(block.group(0))
+    return None
+
+
+def test_files(root: Path = ROOT) -> list[tuple[str, str | None]]:
+    """``(path, description)`` for every test file, sorted by path."""
+    rows: list[tuple[str, str | None]] = []
+    seen: set[str] = set()
+
+    def add(relative: str, description: str | None) -> None:
+        if relative not in seen:
+            seen.add(relative)
+            rows.append((relative, description))
+
+    for pattern in TEST_DIR_GLOBS:
+        for base in sorted(root.glob(pattern)):
+            if not base.is_dir():
+                continue
+            for path in sorted(base.rglob("*.py")):
+                if "__pycache__" in path.parts:
+                    continue
+                add(path.relative_to(root).as_posix(), _python_description(path))
+    for pattern in TS_TEST_GLOBS:
+        for path in sorted(root.glob(pattern)):
+            add(path.relative_to(root).as_posix(), _typescript_description(path))
+
+    rows.sort(key=lambda row: row[0])
+    return rows
+
+
+def render_test_map(root: Path = ROOT) -> str:
+    """The test map, one row per test file, described by the file itself."""
+    lines = ["| Path | Covers |", "|---|---|"]
+    for path, description in test_files(root):
+        lines.append(f"| `{path}` | {_cell(description or '')} |")
+    return "\n".join(lines)
+
+
+# Blocks whose home is not README.md. They are rendered on their own so a test
+# fixture that writes only a README does not have to create them.
+STANDALONE_BLOCKS: tuple[tuple[str, str, Callable[[Path], str]], ...] = (
+    ("test-map", TEST_MAP, render_test_map),
+)
+
+
+def _standalone_content(
+    path: Path, name: str, render: Callable[[Path], str], root: Path
+) -> str | None:
+    """The file with its generated block refreshed, or ``None`` when absent."""
+    if not path.is_file():
+        return None
+    return replace_block(path.read_text(encoding="utf-8"), name, render(root))
 
 
 def expected(root: Path = ROOT) -> dict[str, str]:
@@ -317,6 +432,14 @@ def write(root: Path = ROOT) -> list[str]:
         path = root / relative
         if path.read_text(encoding="utf-8") != content:
             path.write_text(content, encoding="utf-8")
+            changed.append(relative)
+
+    # Standalone blocks: their own file, not the README.
+    for name, relative, render in STANDALONE_BLOCKS:
+        path = root / relative
+        refreshed = _standalone_content(path, name, render, root)
+        if refreshed is not None and path.read_text(encoding="utf-8") != refreshed:
+            path.write_text(refreshed, encoding="utf-8")
             changed.append(relative)
 
     # Docs / nav block: README docs table + website/content/nav.json.
@@ -356,6 +479,13 @@ def check(root: Path = ROOT) -> list[str]:
     # Packages block.
     for relative, content in expected(root).items():
         if (root / relative).read_text(encoding="utf-8") != content:
+            issues.append(f"{relative} is stale; run scripts/docs_index.py --write")
+
+    # Standalone blocks, each in its own file.
+    for name, relative, render in STANDALONE_BLOCKS:
+        path = root / relative
+        refreshed = _standalone_content(path, name, render, root)
+        if refreshed is not None and path.read_text(encoding="utf-8") != refreshed:
             issues.append(f"{relative} is stale; run scripts/docs_index.py --write")
 
     # Docs / nav block (only when the README carries the docs markers).

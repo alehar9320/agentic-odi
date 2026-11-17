@@ -60,6 +60,12 @@
           "slug": "architecture",
           "source": "docs/architecture/README.md",
           "title": "Architecture"
+        },
+        {
+          "blurb": "Every test file and the one line it says about itself.",
+          "slug": "test-map",
+          "source": "docs/reference/test-map.md",
+          "title": "Test map"
         }
       ],
       "title": "Build"

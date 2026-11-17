@@ -471,3 +471,90 @@ def test_write_is_byte_stable_across_two_runs(tmp_path: Path) -> None:
 
 def test_the_committed_readme_matches_a_fresh_render() -> None:
     assert docs_index.check(ROOT) == []
+
+
+# --- test-map block (#1047) ---
+
+
+def _test_map(tmp_path: Path, body: str = "") -> Path:
+    """A ``docs/reference/test-map.md`` fixture, plus the README the map needs.
+
+    ``write`` and ``check`` also refresh the README-based blocks, so the fixture
+    carries a README whose packages block is already current.
+    """
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        f"{docs_index.BEGIN.format(name='packages')}\n"
+        f"{docs_index.render_packages(tmp_path)}\n"
+        f"{docs_index.END.format(name='packages')}\n",
+        encoding="utf-8",
+    )
+    path = tmp_path / "docs" / "reference" / "test-map.md"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        f"# Test map\n\n{docs_index.BEGIN.format(name='test-map')}\n"
+        f"{body}\n{docs_index.END.format(name='test-map')}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_a_new_test_file_becomes_a_row(tmp_path: Path) -> None:
+    """A test file added to a covered tree appears after ``--write``."""
+    tests_dir = tmp_path / "packages" / "core" / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_new_thing.py").write_text(
+        '"""The new thing, described by its own docstring."""\n', encoding="utf-8"
+    )
+    path = _test_map(tmp_path)
+
+    assert docs_index.write(tmp_path) == ["docs/reference/test-map.md"]
+    body = path.read_text(encoding="utf-8")
+    assert (
+        "| `packages/core/tests/test_new_thing.py` | The new thing, described by its own docstring. |"
+        in body
+    )
+
+
+def test_a_test_file_without_a_description_still_appears(tmp_path: Path) -> None:
+    """A file with no docstring is a named row with an em dash, not a gap."""
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_undocumented.py").write_text("x = 1\n", encoding="utf-8")
+    path = _test_map(tmp_path)
+
+    docs_index.write(tmp_path)
+    body = path.read_text(encoding="utf-8")
+    assert "| `tests/test_undocumented.py` | — |" in body
+
+
+def test_a_typescript_test_is_described_by_its_leading_comment(tmp_path: Path) -> None:
+    """A ``/// <reference>`` directive is skipped for the comment that describes."""
+    src = tmp_path / "apps" / "studio" / "src" / "lib"
+    src.mkdir(parents=True)
+    (src / "thing.test.ts").write_text(
+        '/// <reference types="node" />\n'
+        "/**\n * The thing's rules, in its own words.\n */\n"
+        "import { it } from 'vitest';\n",
+        encoding="utf-8",
+    )
+    path = _test_map(tmp_path)
+
+    docs_index.write(tmp_path)
+    body = path.read_text(encoding="utf-8")
+    assert "| `apps/studio/src/lib/thing.test.ts` | The thing's rules, in its own words. |" in body
+
+
+def test_check_names_the_stale_test_map(tmp_path: Path) -> None:
+    """``--check`` fails and names the file when the map is stale."""
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_late.py").write_text('"""A test added after the map."""\n', encoding="utf-8")
+    _test_map(tmp_path, "| Path | Covers |\n|---|---|\n")
+
+    issues = docs_index.check(tmp_path)
+    assert "docs/reference/test-map.md is stale; run scripts/docs_index.py --write" in issues
+
+
+def test_the_committed_test_map_matches_a_fresh_render() -> None:
+    assert docs_index.check(ROOT) == []
