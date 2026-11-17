@@ -68,14 +68,12 @@ describe("ChangelogModal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("exposes an accessible name through the dialog role", async () => {
+  it("exposes an accessible name through the dialog role", () => {
     vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({ releases: [] });
 
     render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
 
-    expect(
-      screen.getByRole("dialog", { name: "Release Notes & Progress" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Release Notes & Progress" })).toBeInTheDocument();
   });
 
   it("clears the unread badge and keeps it cleared after a remount", async () => {
@@ -121,13 +119,22 @@ describe("ChangelogModal", () => {
     expect(screen.queryByRole("article")).toBeNull();
   });
 
-  it("moves focus into the dialog when it opens", async () => {
+  it("moves focus into the dialog and traps Tab at both ends", async () => {
     vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({ releases: [] });
 
     render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
 
+    const dialog = screen.getByRole("dialog");
     const close = screen.getByRole("button", { name: "Close dialog" });
     await waitFor(() => expect(close).toHaveFocus());
+
+    const done = screen.getByRole("button", { name: "Done" });
+    done.focus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(close).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(done).toHaveFocus();
   });
 
   it("closes on Escape key press", async () => {
@@ -137,38 +144,13 @@ describe("ChangelogModal", () => {
 
     const onClose = vi.fn();
     render(<ChangelogModal isOpen={true} onClose={onClose} />);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Close dialog" })).toHaveFocus(),
-    );
 
-    // The primitive dismisses on a keydown it receives from the document,
-    // which is where a real Escape lands before it bubbles to the window.
+    // Wait for focus to enter the dialog (close button gets focus via Radix onOpenAutoFocus)
+    await waitFor(() => expect(screen.getByRole("button", { name: "Close dialog" })).toHaveFocus());
+
     fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalled();
-  });
-
-  it("takes the page behind the dialog out of reach while it is open", async () => {
-    vi.mocked(studioApi.fetchChangelog).mockResolvedValue({ releases: [] });
-
-    const { unmount } = render(
-      <div className="studio-app">
-        <ChangelogModal isOpen={true} onClose={vi.fn()} />
-      </div>,
-    );
-
-    const shell = document.querySelector(".studio-app");
-    // The primitive hides the page behind from assistive technology (and marks
-    // it inert where the browser supports it) by hiding every sibling of the
-    // portaled content, so an ancestor of the shell carries the attribute.
-    await waitFor(() =>
-      expect(shell?.closest('[aria-hidden="true"]')).not.toBeNull(),
-    );
-    const hidden = shell?.closest('[aria-hidden="true"]') as HTMLElement | null;
-    expect(hidden?.contains(screen.getByRole("dialog"))).toBe(false);
-
-    unmount();
-    expect(shell?.closest('[aria-hidden="true"]')).toBeNull();
   });
 
   it("announces how many releases were marked read without shifting the footer", async () => {

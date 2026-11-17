@@ -38,7 +38,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   useEffect(() => {
     if (!isOpen) return;
 
-    let mounted = true;
+    const mounted = true;
 
     fetchChangelog()
       .then((data) => {
@@ -55,55 +55,40 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
         }
       });
 
-    return () => {
-      mounted = false;
-    };
-  }, [isOpen]);
+    // Make the shell behind the dialog inert (preserves pre-migration behaviour)
+    const shell = document.querySelector(".studio-app");
+    if (shell instanceof HTMLElement) {
+      shell.setAttribute("inert", "");
+    }
 
-  return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-      title="Release Notes & Progress"
-      footer={
-        <>
-          <span className="changelog-modal__quote">
-            "Design is not just what it looks like and feels like. Design is how it works."
-          </span>
-          {/* Says what the action did. Kept out of the layout flow so the
-              button disabling never shifts the footer. */}
-          <p className="sr-only" aria-live="polite">
-            {markMessage}
-          </p>
-          <div className="changelog-modal__actions">
-            <button
-              type="button"
-              className="studio-button"
-              onClick={markAllRead}
-              disabled={unread.length === 0}
-            >
-              Mark all read
-            </button>
-            <button type="button" className="studio-button" onClick={onClose}>
-              Done
-            </button>
-          </div>
-        </>
+    // Global Escape handler (preserves pre-migration behaviour)
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
       }
-    >
-      <div className="changelog-modal__header">
-        <div>
-          <div className="changelog-modal__badge">WHAT'S NEW</div>
-          {unread.length > 0 && (
-            <p className="changelog-modal__unread" role="status">
-              {unread.length} new
-            </p>
-          )}
-        </div>
-      </div>
+    }
+    window.addEventListener("keydown", onKeyDown);
 
+    return () => {
+      if (shell instanceof HTMLElement) {
+        shell.removeAttribute("inert");
+      }
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const children = (
+    <>
+      <div>
+        <div className="changelog-modal__badge">WHAT'S NEW</div>
+        {unread.length > 0 && (
+          <p className="changelog-modal__unread" role="status">
+            {unread.length} new
+          </p>
+        )}
+      </div>
       <div className="changelog-modal__body">
         {loading && (
           <div className="changelog-modal__loading">
@@ -171,6 +156,46 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
           </div>
         )}
       </div>
-    </Dialog>
+    </>
+  );
+
+  const footer = (
+    <div className="changelog-modal__actions">
+      <span className="changelog-modal__quote">
+        "Design is not just what it looks like and feels like. Design is how it works."
+      </span>
+      {/* Says what the action did. Kept out of the layout flow so the
+          button disabling never shifts the footer. */}
+      <p className="sr-only" aria-live="polite">
+        {markMessage}
+      </p>
+      <button
+        type="button"
+        className="studio-button"
+        onClick={markAllRead}
+        disabled={unread.length === 0}
+      >
+        Mark all read
+      </button>
+      <button
+        type="button"
+        className="studio-button"
+        onClick={onClose}
+      >
+        Done
+      </button>
+    </div>
+  );
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title="Release Notes & Progress"
+      children={children}
+      footer={footer}
+    />
   );
 }
