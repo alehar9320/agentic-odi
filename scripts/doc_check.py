@@ -311,7 +311,6 @@ def readme_code_overview_paths(readme: str) -> list[str]:
 
 LEDGER_HEADING = "# The assistant-ui ledger"
 LEDGER_SOURCE = "docs/assistant-ui-ledger.md"
-LEDGER_PROJECTION_HEADING = "#### What the runtime gives us, and what we did not take"
 LEDGER_STATUSES = {"Adopted", "Partial", "Planned", "Decision", "Rejected"}
 LEDGER_CITATION = re.compile(r"#(\d+)")
 LEDGER_DASH = "—"
@@ -417,30 +416,41 @@ def _table_rows(lines: list[str]) -> list[list[str]]:
     return rows
 
 
+def ledger_rows(source: str) -> list[list[str]]:
+    """The five-column capability rows of the ledger, in file order.
+
+    The ``## The count`` table and the Living Studio projection are generated
+    from these rows by ``scripts/docs_index.py``; the generator and this module
+    share this one parser so a row is read the same way in both places.
+    """
+    return [
+        cells for cells in _table_rows(_section_lines(source, LEDGER_HEADING)) if len(cells) == 5
+    ]
+
+
 def ledger_errors(
     source: str,
-    projection: str,
     root: Path = ROOT,
     delivered: set[str] | None = None,
 ) -> list[str]:
-    """Check the assistant-ui ledger page and its Living Studio projection.
+    """Row-validity for the assistant-ui ledger.
+
+    The ``## The count`` table and the Living Studio projection are generated
+    from these rows by ``scripts/docs_index.py``, so this checker no longer
+    polices their arithmetic — ``docs_index.py --check`` fails when either
+    generated block is stale. What remains is the judgement a generator cannot
+    make: a status is known, an ``Adopted`` row cites a delivery that history
+    proves merged and names a file that exists, and a ``Planned`` row does not
+    cite one that already landed.
 
     ``delivered`` is the set of issue/PR numbers this repository's history
     proves merged. It is only supplied by the command-line entry point, which
     reads git; on a shallow checkout the membership rule is skipped, because a
     green docs job must not depend on how deep the clone happened to be.
     """
-    has_source = LEDGER_HEADING in source
-    has_projection = LEDGER_PROJECTION_HEADING in projection
-    if not has_source and not has_projection:
+    if LEDGER_HEADING not in source:
         return []
     issues: list[str] = []
-    if not has_source:
-        return ["ledger projection exists but the source section is missing"]
-    if not has_projection:
-        return ["the ledger exists but its Living Studio projection is missing"]
-
-    rows: list[tuple[str, str, str, str]] = []
     seen: set[str] = set()
     for cells in _table_rows(_section_lines(source, LEDGER_HEADING)):
         if len(cells) != 5:
@@ -452,7 +462,6 @@ def ledger_errors(
         if status not in LEDGER_STATUSES:
             issues.append(f"unknown ledger status {status!r} for {capability}")
             continue
-        rows.append((capability, status, file_cell, delivered_cell))
         if status == "Adopted":
             citation = LEDGER_CITATION.fullmatch(delivered_cell)
             if citation is None:
@@ -477,35 +486,6 @@ def ledger_errors(
                 )
         elif delivered_cell != LEDGER_DASH:
             issues.append(f"{status.lower()} row must not cite a delivery: {capability}")
-
-    tallies: dict[str, int] = {}
-    declared: dict[str, int] = {}
-    for cells in _table_rows(_section_lines(source, LEDGER_HEADING)):
-        if len(cells) == 2:
-            if not cells[1].isdigit():
-                issues.append(f"count table row is not a number: {cells[1]}")
-                continue
-            declared[cells[0]] = int(cells[1])
-    for _, status, _, _ in rows:
-        tallies[status] = tallies.get(status, 0) + 1
-    for status in sorted(LEDGER_STATUSES):
-        if declared.get(status) != tallies.get(status, 0):
-            issues.append(
-                f"count table says {declared.get(status)} {status}, the rows say {tallies.get(status, 0)}"
-            )
-    if declared.get("Total") != len(rows):
-        issues.append(f"count table says {declared.get('Total')} total, the rows count {len(rows)}")
-
-    projected = {
-        (cells[0], cells[1], cells[3])
-        for cells in _table_rows(_section_lines(projection, LEDGER_PROJECTION_HEADING))
-        if len(cells) == 4
-    }
-    expected = {(r[0], r[1], r[3]) for r in rows if r[1] in {"Adopted", "Partial"}}
-    for missing in sorted(expected - projected):
-        issues.append(f"projection is missing a ledger row: {missing[0]}")
-    for extra in sorted(projected - expected):
-        issues.append(f"projection carries a row the ledger does not adopt: {extra[0]}")
     return issues
 
 
@@ -572,7 +552,6 @@ def collect_issues(root: Path = ROOT, delivered: set[str] | None = None) -> list
         f"assistant-ui ledger: {issue}"
         for issue in ledger_errors(
             docs.get(LEDGER_SOURCE, ""),
-            docs.get("docs/living-studio.md", ""),
             root=root,
             delivered=delivered,
         )

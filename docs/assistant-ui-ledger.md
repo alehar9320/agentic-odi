@@ -325,6 +325,7 @@ only the surface is missing.
 | `DevToolsHooks` / `DevToolsProviderApi` | Rejected | — | — | Developer surface, not a PM surface. `docs/` and the sidecar's diagnostics already cover the need. |
 | `webmcp` host/registration | Rejected | — | — | Would expose the Studio's actions to an external agent browser. Out of scope for a local-first app with approvals. |
 
+<!-- BEGIN GENERATED: assistant-ui-count -->
 ## The count
 
 | Status | Rows |
@@ -340,4 +341,5 @@ Read it as: **59** of the library's 157 relevant capabilities already deliver
 something a person can use, **13** more are carried by open issues, **41** rows
 wait on a named decision, and **44** are rejected with a reason. Every row is
 accounted for — that is the whole point of the page.
+<!-- END GENERATED: assistant-ui-count -->
 
