@@ -118,6 +118,7 @@ beforeEach(() => {
     "studio.settings",
     "studio.canvas",
     "studio.displayName",
+    "studio.drawer",
     "studio.setupDismissed",
     "studio.setupDraft",
     "studio.setupStep",
@@ -391,7 +392,7 @@ describe("studio shell", () => {
     }
   });
 
-  it("stops a running stream on Escape before closing the workspace", async () => {
+  it("backs out of the detail and the drawer before it stops a running stream", async () => {
     const { streamChat } = await import("./api/studioApi");
     vi.mocked(streamChat).mockImplementationOnce(
       (_request, _onEvent, signal) =>
@@ -415,17 +416,24 @@ describe("studio shell", () => {
       await screen.findByRole("heading", { name: /opportunity landscape/i }),
     ).toBeInTheDocument();
 
+    // Deeper is right; Escape backs out leftwards. The detail goes first.
     fireEvent.keyDown(window, { key: "Escape" });
-
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
-    });
-    expect(screen.getByRole("heading", { name: /opportunity landscape/i })).toBeInTheDocument();
-
-    fireEvent.keyDown(window, { key: "Escape" });
-
     await waitFor(() => {
       expect(screen.queryByRole("heading", { name: /opportunity landscape/i })).toBeNull();
+    });
+    expect(screen.getByRole("button", { name: /stop generating/i })).toBeInTheDocument();
+
+    // Then the drawer.
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("navigation", { name: "Your work" })).toBeNull(),
+    );
+    expect(screen.getByRole("button", { name: /stop generating/i })).toBeInTheDocument();
+
+    // With nothing left to close, Escape stops the reply.
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
     });
   });
 
@@ -766,8 +774,8 @@ describe("boot failure", () => {
   });
 });
 
-describe("composer shortcuts (#692)", () => {
-  it("puts the caret in the composer with Meta+K from the home stage", async () => {
+describe("composer shortcuts (#692, superseded by #736)", () => {
+  it("opens Quick jump with Meta+K and returns the caret through New inquiry", async () => {
     render(<App />);
 
     const composer = await screen.findByRole("textbox", { name: /message the studio/i });
@@ -775,6 +783,25 @@ describe("composer shortcuts (#692)", () => {
     expect(composer).not.toHaveFocus();
 
     fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    const dialog = await screen.findByRole("dialog", { name: "Quick jump" });
+    expect(composer).not.toHaveFocus();
+
+    fireEvent.click(within(dialog).getByRole("option", { name: /new inquiry/i }));
+
+    await waitFor(() => expect(composer).toHaveFocus());
+    expect(screen.queryByRole("dialog", { name: "Quick jump" })).toBeNull();
+  });
+
+  it("hands the caret back from the drawer's New inquiry", async () => {
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(composer).not.toHaveFocus();
+
+    const drawer = screen.getByRole("navigation", { name: "Your work" });
+    fireEvent.click(within(drawer).getByRole("button", { name: /new inquiry/i }));
 
     expect(composer).toHaveFocus();
   });
@@ -875,18 +902,33 @@ describe("composer shortcuts (#692)", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("button", { name: /stop generating/i })).toBeInTheDocument();
 
-    // A second Escape, with nothing open, stops it.
+    // The drawer is the next thing to back out of; the stream keeps running.
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("navigation", { name: "Your work" })).toBeNull(),
+    );
+    expect(screen.getByRole("button", { name: /stop generating/i })).toBeInTheDocument();
+
+    // With nothing open, the next Escape stops it.
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
     });
   });
 
-  it("gives Escape somewhere to go when nothing else is open", async () => {
+  it("backs out of the drawer before it takes the caret", async () => {
     render(<App />);
 
     const composer = await screen.findByRole("textbox", { name: /message the studio/i });
     (document.activeElement as HTMLElement | null)?.blur();
+    expect(composer).not.toHaveFocus();
+    expect(screen.getByRole("navigation", { name: "Your work" })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("navigation", { name: "Your work" })).toBeNull(),
+    );
     expect(composer).not.toHaveFocus();
 
     fireEvent.keyDown(window, { key: "Escape" });
@@ -923,6 +965,19 @@ describe("the bar's new thread can be undone (#319)", () => {
     fireEvent.click(screen.getByRole("button", { name: /send message/i }));
     await screen.findByText("Where do I start?");
   }
+
+  it("leaves the thread alone when the drawer's New inquiry takes the caret", async () => {
+    await withAThread();
+    const composer = screen.getByRole("textbox", { name: /message the studio/i });
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(composer).not.toHaveFocus();
+
+    const drawer = screen.getByRole("navigation", { name: "Your work" });
+    fireEvent.click(within(drawer).getByRole("button", { name: /new inquiry/i }));
+
+    expect(screen.getByText("Where do I start?")).toBeInTheDocument();
+    expect(composer).toHaveFocus();
+  });
 
   it("clears the transcript from the bar and offers the same thread back", async () => {
     await withAThread();

@@ -1,6 +1,13 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-import { COMPOSER, lens, openStudio, resetRepository, seedOutcomes } from "./helpers";
+import {
+  COMPOSER,
+  lens,
+  openStudio,
+  resetRepository,
+  seedOutcomes,
+  workbench,
+} from "./helpers";
 
 /**
  * The decision brief is the document the studio writes for a review, and it is
@@ -28,7 +35,7 @@ test.describe("the decision brief", () => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    await railLandscape(page).click();
+    await workbench(page).getByRole("button", { name: /^Landscape,/ }).click();
     await page.getByRole("button", { name: "Export brief" }).click();
 
     await expect(lens(page)).toHaveAttribute("aria-label", DOCUMENT);
@@ -101,9 +108,3 @@ test.describe("the decision brief", () => {
   });
 });
 
-/** The landscape chip in the workbench rail. */
-function railLandscape(page: Page) {
-  return page
-    .getByRole("navigation", { name: "Your work" })
-    .getByRole("button", { name: /^Landscape,/ });
-}

@@ -1,8 +1,10 @@
 /**
- * Slash commands give the keyboard the reach the drawer has.
+ * Slash commands are the keyboard's own route through the Studio.
  *
- * The Studio handles these locally: a command never costs a model round trip,
- * which is what keeps the surface usable when the model is offline.
+ * The drawer now gives the pointer the same reach (#736); neither surface is a
+ * prerequisite for the other. The Studio handles these locally: a command never
+ * costs a model round trip, which is what keeps the surface usable when the
+ * model is offline.
  */
 
 import type { WorkspacePanelId } from "../types";

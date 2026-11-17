@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { offlineNotice, openStudio, rail, resetRepository } from "./helpers";
+import { offlineNotice, openStudio, resetRepository, workbench } from "./helpers";
 
 /**
  * Capturing an outcome by hand is the promise the Studio makes when no model
@@ -39,7 +39,7 @@ test.describe("capturing an outcome", () => {
     await expect(page.locator(".banner").filter({ hasText: "Outcome captured" })).toBeVisible();
 
     // The outcome is now part of the canvas.
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await workbench(page).getByRole("button", { name: /^Landscape,/ }).click();
     const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
     await expect(landscape).toBeVisible();
     await expect(landscape).toContainText("Minimize the time to deploy a service");

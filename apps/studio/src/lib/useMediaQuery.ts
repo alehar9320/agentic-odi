@@ -1,5 +1,8 @@
 import { useCallback, useSyncExternalStore } from "react";
 
+/** One breakpoint for the Studio: below it the regions become sheets. */
+export const MOBILE_QUERY = "(max-width: 1023px)";
+
 function queryMatches(query: string): boolean {
   return (
     typeof window !== "undefined" &&

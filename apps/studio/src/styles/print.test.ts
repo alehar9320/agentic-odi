@@ -9,7 +9,7 @@ describe("print stylesheet", () => {
   });
 
   it("hides the studio chrome so only the work prints", () => {
-    for (const selector of [".bar", ".composer", ".rail", ".scrim"]) {
+    for (const selector of [".bar", ".composer", ".rail", ".drawer", ".scrim"]) {
       expect(printCss).toContain(selector);
     }
     expect(printCss).toMatch(/display:\s*none/);

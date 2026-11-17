@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-import { lens, offlineNotice, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import {
+  lens,
+  offlineNotice,
+  openStudio,
+  resetRepository,
+  seedOutcomes,
+  workbench,
+} from "./helpers";
 
 /**
  * The Studio is a single surface with views that open beside the
@@ -18,12 +25,12 @@ test.describe("the workspace", () => {
     await resetRepository(request);
   });
 
-  test("opens a view from the workbench rail", async ({ page, request }) => {
+  test("opens a view from the artifacts strip", async ({ page, request }) => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    // The rail only appears once there is something to look at.
-    const landscape = rail(page).getByRole("button", { name: /^Landscape,/ });
+    // The strip only appears once there is something to look at.
+    const landscape = workbench(page).getByRole("button", { name: /^Landscape,/ });
     await expect(landscape).toBeVisible();
 
     await landscape.click();
@@ -34,7 +41,7 @@ test.describe("the workspace", () => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    const landscape = rail(page).getByRole("button", { name: /^Landscape,/ });
+    const landscape = workbench(page).getByRole("button", { name: /^Landscape,/ });
     await expect(landscape).not.toHaveAttribute("aria-current", "page");
 
     await landscape.click();
@@ -45,7 +52,7 @@ test.describe("the workspace", () => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await workbench(page).getByRole("button", { name: /^Landscape,/ }).click();
     await expect(lens(page)).toBeVisible();
 
     await page.getByRole("button", { name: "Close workspace view" }).click();
@@ -56,7 +63,7 @@ test.describe("the workspace", () => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
+    await workbench(page).getByRole("button", { name: /^Landscape,/ }).click();
     await expect(lens(page)).toBeVisible();
 
     await page.keyboard.press("Escape");

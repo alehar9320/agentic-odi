@@ -70,7 +70,7 @@ export default defineConfig({
       // keeps `npm run test:e2e` with exactly the coverage it had before; the
       // `pr-screenshots` workflow runs it through the project below.
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: [/mcp-backend\.spec\.ts/, /pr-screenshots\.spec\.ts/],
+      testIgnore: [/mcp-backend\.spec\.ts/, /pr-screenshots\.spec\.ts/, /visual\.spec\.ts/],
     },
     {
       // The visual harness: deterministic screens at two sizes, in both themes,

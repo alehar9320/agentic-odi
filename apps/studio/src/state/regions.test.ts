@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { INITIAL_REGIONS, regionReducer, type RegionState } from "./regions";
+import { MOBILE_QUERY } from "../lib/useMediaQuery";
+import {
+  DRAWER_STORAGE_KEY,
+  INITIAL_REGIONS,
+  initialDrawerOpen,
+  readDrawerPreference,
+  regionReducer,
+  useRegionState,
+  writeDrawerPreference,
+  type RegionState,
+} from "./regions";
 
 /**
  * The navigation contract from #735, proved without a renderer:
@@ -64,5 +75,74 @@ describe("region reducer", () => {
     const state: RegionState = INITIAL_REGIONS;
     expect(regionReducer(state, { type: "close-detail" })).toBe(state);
     expect(regionReducer(state, { type: "close-drawer" })).toBe(state);
+  });
+});
+
+const originalMatchMedia = window.matchMedia;
+
+function setViewport(matches: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: query === MOBILE_QUERY ? matches : false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
+describe("drawer persistence (#736)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia,
+    });
+    window.localStorage.clear();
+  });
+
+  it("opens on a desk and stays closed where it would be a sheet", () => {
+    setViewport(false);
+    expect(initialDrawerOpen()).toBe(true);
+
+    setViewport(true);
+    expect(initialDrawerOpen()).toBe(false);
+  });
+
+  it("lets a stored choice beat the viewport", () => {
+    setViewport(true);
+    writeDrawerPreference(true);
+    expect(initialDrawerOpen()).toBe(true);
+
+    setViewport(false);
+    writeDrawerPreference(false);
+    expect(initialDrawerOpen()).toBe(false);
+  });
+
+  it("ignores an unknown stored value", () => {
+    window.localStorage.setItem(DRAWER_STORAGE_KEY, "maybe");
+    expect(readDrawerPreference()).toBeNull();
+  });
+
+  it("persists the first collapse and restores it on the next mount", () => {
+    setViewport(false);
+    const first = renderHook(() => useRegionState());
+    expect(first.result.current.drawerOpen).toBe(true);
+
+    act(() => first.result.current.toggleDrawer());
+
+    expect(window.localStorage.getItem(DRAWER_STORAGE_KEY)).toBe("closed");
+    const second = renderHook(() => useRegionState());
+    expect(second.result.current.drawerOpen).toBe(false);
   });
 });

@@ -81,6 +81,25 @@ describe("WorkbenchRail", () => {
     expect(screen.getByRole("button", { name: "Evidence, 1 signal" })).toBeInTheDocument();
   });
 
+  it("takes the drawer's landmark name when both regions are on screen", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
+
+    render(<WorkbenchRail label="What this thread made" />);
+
+    expect(
+      screen.getByRole("navigation", { name: "What this thread made" }),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the job map to the drawer while the drawer holds it", () => {
+    studio.canvas = canvas({ outcomes: [{ id: "O-1" }], steps: [{ id: "S-1" }] });
+
+    render(<WorkbenchRail jobMapInDrawer />);
+
+    expect(screen.queryByRole("button", { name: /job map/i })).toBeNull();
+    expect(screen.getByRole("button", { name: "Landscape, 1 opportunity" })).toBeInTheDocument();
+  });
+
   it("takes focus when it is activated, so the lens it opens can give it back (#810)", () => {
     studio.canvas = canvas({ outcomes: [{ id: "O-1" }] });
     render(<WorkbenchRail />);

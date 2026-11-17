@@ -1,5 +1,6 @@
-import { useCallback, useReducer } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 
+import { MOBILE_QUERY } from "../lib/useMediaQuery";
 import type { WorkspacePanelId } from "../types";
 
 /**
@@ -48,6 +49,58 @@ export const INITIAL_REGIONS: RegionState = {
   collapsed: false,
 };
 
+/** Where the drawer's collapse state outlives a reload (#736). */
+export const DRAWER_STORAGE_KEY = "studio.drawer";
+
+export function readDrawerPreference(): boolean | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(DRAWER_STORAGE_KEY);
+    if (raw === "open") {
+      return true;
+    }
+    if (raw === "closed") {
+      return false;
+    }
+    return null;
+  } catch {
+    // Private browsing modes can deny storage access.
+    return null;
+  }
+}
+
+export function writeDrawerPreference(open: boolean): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(DRAWER_STORAGE_KEY, open ? "open" : "closed");
+  } catch {
+    // Storage is an optimisation; the region still opens this session.
+  }
+}
+
+/**
+ * A fresh Studio opens the drawer where it is a region rather than a sheet.
+ * A stored choice always wins, so collapsing survives a reload.
+ */
+export function initialDrawerOpen(): boolean {
+  const stored = readDrawerPreference();
+  if (stored !== null) {
+    return stored;
+  }
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return true;
+  }
+  return !window.matchMedia(MOBILE_QUERY).matches;
+}
+
+function initialRegionState(): RegionState {
+  return { ...INITIAL_REGIONS, drawerOpen: initialDrawerOpen() };
+}
+
 /**
  * Pure, so the contract is provable without a renderer.
  *
@@ -88,7 +141,17 @@ export interface RegionSurface {
 }
 
 export function useRegionState(): RegionSurface {
-  const [state, dispatch] = useReducer(regionReducer, INITIAL_REGIONS);
+  const [state, dispatch] = useReducer(regionReducer, undefined, initialRegionState);
+  // Persist a collapse once it has happened, never the initializer's own
+  // default: opening on a desk is not a choice the person made.
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    writeDrawerPreference(state.drawerOpen);
+  }, [state.drawerOpen]);
 
   const openDetail = useCallback(
     (panel: WorkspacePanelId, subject?: DetailSubject) =>

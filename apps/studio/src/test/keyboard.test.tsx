@@ -40,10 +40,18 @@ vi.mock("../components/chat/ChatStage", () => ({
     </div>
   ),
 }));
+vi.mock("../components/layout/NavigationDrawer", () => ({
+  NavigationDrawer: () => (
+    <nav aria-label="Your work">
+      <button type="button">New inquiry</button>
+    </nav>
+  ),
+}));
+vi.mock("../components/layout/QuickJump", () => ({ QuickJump: () => null }));
 vi.mock("../components/workspace/WorkbenchRail", () => ({
   WorkbenchRail: () => (
-    <nav aria-label="Your work">
-      <button type="button">Open inbox</button>
+    <nav aria-label="What this thread made">
+      <button type="button">Open landscape</button>
     </nav>
   ),
 }));
@@ -125,20 +133,25 @@ describe("studio shell landmarks", () => {
     expect(main).toHaveAttribute("tabindex", "-1");
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Your work" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "What this thread made" }),
+    ).toBeInTheDocument();
   });
 
-  it("walks the tab path in order: skip link, top bar, rail, transcript", () => {
+  it("walks the tab path in order: skip link, top bar, drawer, rail, transcript", () => {
     render(<StudioShell />);
 
     const order = focusableWithin(document.body);
     const skip = screen.getByRole("link", { name: /skip to conversation/i });
     const bell = screen.getByRole("button", { name: "Notifications" });
-    const rail = screen.getByRole("button", { name: "Open inbox" });
+    const drawer = screen.getByRole("button", { name: "New inquiry" });
+    const rail = screen.getByRole("button", { name: "Open landscape" });
     const composer = screen.getByRole("textbox", { name: "Message the studio" });
 
     expect(order[0]).toBe(skip);
     expect(order.indexOf(bell)).toBeGreaterThan(0);
-    expect(order.indexOf(rail)).toBeGreaterThan(order.indexOf(bell));
+    expect(order.indexOf(drawer)).toBeGreaterThan(order.indexOf(bell));
+    expect(order.indexOf(rail)).toBeGreaterThan(order.indexOf(drawer));
     expect(order.indexOf(composer)).toBeGreaterThan(order.indexOf(rail));
   });
 });
