@@ -21,6 +21,7 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
 from typing import Any
 
+import openai
 from agentic_odi_core import ModelRouter, ModelTier, ODIService, Outcome, RoutingMode
 from agentic_odi_core.contract import TOOL_SPECS, ToolEffect, ToolSpec
 from agentic_odi_core.funnel import FIRST_MESSAGE, count_milestone
@@ -73,6 +74,31 @@ MAX_ATTACHMENT_TEXT = 20_000
 
 #: A single tool result is summarized for the source chip, never quoted whole.
 MAX_SOURCE_PREVIEW = 160
+
+#: Backends that reject ``stream_options={"include_usage": True}`` are remembered
+#: here for the life of the process, keyed by base URL. Many local
+#: OpenAI-compatible servers 400 on an unknown parameter; a hard requirement
+#: would break them, so the fallback is the common path.
+_USAGE_UNSUPPORTED: set[str] = set()
+
+
+def _usage_from(chunk: Any) -> tuple[int | None, int | None, int | None]:
+    """The token counts a usage chunk reports, or ``(None, None, None)``.
+
+    A backend that omits usage is not guessed at: an absent count stays absent.
+    """
+    usage = getattr(chunk, "usage", None)
+    if usage is None:
+        return (None, None, None)
+    return (
+        getattr(usage, "prompt_tokens", None),
+        getattr(usage, "completion_tokens", None),
+        getattr(usage, "total_tokens", None),
+    )
+
+
+def _records_usage(base_url: str) -> bool:
+    return base_url not in _USAGE_UNSUPPORTED
 
 
 def is_mutating_tool(name: str) -> bool:
@@ -691,6 +717,37 @@ def _routing_mode(value: str | None) -> RoutingMode:
         return RoutingMode.AUTO
 
 
+async def _open_stream(
+    llm_client: Any,
+    request: ChatRequest,
+    messages: list[Any],
+    openai_tools: list[dict[str, Any]],
+) -> Any:
+    """Open the completion stream, asking for usage when the backend allows it.
+
+    ``stream_options={"include_usage": True}`` is how an OpenAI-compatible
+    backend reports token counts on a streamed completion. A backend that does
+    not know the parameter answers 400; the retry drops it and remembers the
+    base URL for the process, so the next turn does not pay for the probe again.
+    """
+    kwargs: dict[str, Any] = {
+        "model": request.model,
+        "messages": messages,
+        "tools": openai_tools if openai_tools else None,
+        "tool_choice": "auto" if openai_tools else None,
+        "stream": True,
+    }
+    if _records_usage(request.base_url):
+        try:
+            return await llm_client.chat.completions.create(
+                **kwargs, stream_options={"include_usage": True}
+            )
+        except openai.BadRequestError:
+            _USAGE_UNSUPPORTED.add(request.base_url)
+            log.info("The model backend rejected include_usage; token counts will be omitted")
+    return await llm_client.chat.completions.create(**kwargs)
+
+
 async def _turn_frames(
     request: ChatRequest,
     service: ConnectorService | None,
@@ -699,6 +756,7 @@ async def _turn_frames(
     counters: dict[str, int],
     approvals: ApprovalRegistry | None = None,
     local_service: ODIService | None = None,
+    usage: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:
     """Yield the frames of one turn, raising ``_TurnFailure`` on a fatal error."""
 
@@ -861,13 +919,7 @@ async def _turn_frames(
             counters["rounds"] += 1
             yield frame("status", {"phase": "model"})
             try:
-                stream: Any = await llm_client.chat.completions.create(  # type: ignore[call-overload]
-                    model=request.model,
-                    messages=messages,
-                    tools=openai_tools if openai_tools else None,
-                    tool_choice="auto" if openai_tools else None,
-                    stream=True,
-                )
+                stream: Any = await _open_stream(llm_client, request, messages, openai_tools)
             except Exception as exc:  # noqa: BLE001
                 log.exception("The model could not be reached (request_id=%s)", request_id)
                 raise _TurnFailure(
@@ -884,6 +936,16 @@ async def _turn_frames(
 
             try:
                 async for chunk in stream:
+                    # A usage chunk carries counts and no choices; every other
+                    # chunk carries choices. Reading usage first is what keeps a
+                    # backend that reports it from crashing the loop.
+                    prompt_tokens, completion_tokens, total_tokens = _usage_from(chunk)
+                    if usage is not None and total_tokens is not None:
+                        usage["prompt_tokens"] = prompt_tokens
+                        usage["completion_tokens"] = completion_tokens
+                        usage["total_tokens"] = total_tokens
+                    if not chunk.choices:
+                        continue
                     delta = chunk.choices[0].delta
                     reasoning = _reasoning_text(delta)
                     if reasoning:
@@ -1113,9 +1175,14 @@ async def stream_chat(
     }
     outcome = "failed"
     error_code: str | None = None
+    usage: dict[str, Any] = {
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "total_tokens": None,
+    }
     try:
         async for chunk in _turn_frames(
-            request, service, memory, rid, counters, approvals, local_service
+            request, service, memory, rid, counters, approvals, local_service, usage
         ):
             yield chunk
         outcome = "completed"
@@ -1148,6 +1215,9 @@ async def stream_chat(
             duration_ms=int((time.monotonic() - started) * 1000),
             outcome=outcome,
             error_code=error_code,
+            prompt_tokens=usage["prompt_tokens"],
+            completion_tokens=usage["completion_tokens"],
+            total_tokens=usage["total_tokens"],
         )
         if outcome != "failed":
             # A turn that reached an ending is the first message of this

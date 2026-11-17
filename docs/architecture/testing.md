@@ -219,3 +219,22 @@ compares the colour it painted against the `--bg` token for each theme.
 CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
 repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
 `continue-on-error` on the job keeps a failure from turning CI red.
+
+## Observability
+
+Two record shapes are asserted, and both are asserted on their contents rather
+than on a line existing:
+
+- `apps/studio-api/tests/test_studio_observability.py` checks the per-turn JSON
+  line carries the token counts and the model, that a backend without usage
+  leaves the counts `null` (never estimated), and that no API key, bearer token,
+  or authorization header reaches a record.
+- `apps/studio-api/tests/test_studio_chat_stream.py` drives a usage chunk and a
+  backend that rejects `include_usage`, so the fallback path is exercised.
+- `apps/mcp-server/tests/test_tool_timing.py` captures one log record per tool
+  call and asserts the tool name, the duration key, and — for a failing tool —
+  the envelope code the client already branches on.
+- `packages/core/tests/test_logging.py` checks the shared `configure_logging()`
+  is idempotent: calling it twice does not duplicate a handler.
+
+See [Observability](observability.md) for the two record shapes.
