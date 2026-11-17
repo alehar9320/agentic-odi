@@ -100,6 +100,13 @@ jobs:
       - name: Check the generated documentation blocks are current
         run: uv run python scripts/docs_index.py --check
 
+      # The SPA's TypeScript types come from apps/studio/openapi.json, which is
+      # generated from the running FastAPI app. A stale copy is a contract the
+      # client compiles against and the server does not honour, so the drift
+      # fails here, naming the routes that moved.
+      - name: Check the Studio OpenAPI contract matches the app
+        run: uv run python -m agentic_odi_studio_api.openapi --check
+
   security:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -746,13 +753,14 @@ jobs:
   ci-green:
     name: CI green
     runs-on: ubuntu-24.04
-    needs: [lint, typecheck, security, test, smoke, website, studio, contrast, tauri-check, tauri-build, e2e]
+    needs: [lint, typecheck, docs, security, test, smoke, website, studio, contrast, tauri-check, tauri-build, e2e]
     if: always()
     steps:
       - name: Verify the required jobs and report what was verified
         env:
           LINT: ${{ needs.lint.result }}
           TYPECHECK: ${{ needs.typecheck.result }}
+          DOCS: ${{ needs.docs.result }}
           SECURITY: ${{ needs.security.result }}
           TEST: ${{ needs.test.result }}
           SMOKE: ${{ needs.smoke.result }}
@@ -770,7 +778,7 @@ jobs:
           E2E_BLOCKING: ${{ vars.AGENTIC_ODI_E2E_BLOCKING }}
         run: |
           failed=0
-          for job in LINT TYPECHECK SECURITY TEST SMOKE WEBSITE STUDIO CONTRAST TAURI_CHECK TAURI_BUILD; do
+          for job in LINT TYPECHECK DOCS SECURITY TEST SMOKE WEBSITE STUDIO CONTRAST TAURI_CHECK TAURI_BUILD; do
             result="${!job}"
             if [ "$result" != "success" ]; then
               echo "::error::$job did not succeed ($result)"

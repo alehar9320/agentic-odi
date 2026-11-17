@@ -91,7 +91,18 @@ Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpath
 - `test_studio_router.py` — passthrough responses from the Studio router.
 - `test_app_spa.py` — static SPA fallback and the local server entrypoint.
 - `test_boot_integrity.py` — the boot failure page, the idle checkpoint, and the clean shutdown that closes both stores.
+- `test_openapi_contract.py` — the committed OpenAPI contract matches the live app, and the count of operations answering with an open object stays at or below a ratchet ceiling (60 today).
 - `conftest.py` — shared `InMemoryRepository` fixtures.
+
+The contract check is not just a test. `uv run python -m agentic_odi_studio_api.openapi --check`
+regenerates the document from the running app and fails, naming the drifted
+paths, when `apps/studio/openapi.json` is stale; `--write` refreshes it. CI runs
+`--check` in the `docs` job, which is a required input to `CI green`. The SPA's
+`src/api/schema.d.ts` is generated from that file by `npm run gen:api-types`, and
+`src/api/contract.ts` asserts the hand-written interfaces in `src/types.ts`
+satisfy the generated models, so `npm run typecheck` (the `studio` job) fails on
+a renamed server field. A route change is one `--write`, one `gen:api-types`, and
+whatever `contract.ts` then complains about — never a hand edit of the artifacts.
 
 ### `apps/cli/tests/`
 
@@ -136,6 +147,7 @@ Checks that span the workspace rather than one distribution:
 - `tests/scripts/test_dev.py`, `test_dev_main.py` — `scripts/dev.py` startup, ports, signals, and shutdown.
 - `tests/scripts/test_doc_check.py` — documentation drift: commands, paths, routes, env vars, and README layout.
 - `tests/scripts/test_assistant_ui_ledger.py` — the assistant-ui ledger (issue #429): adopted rows cite a merged delivery and name an existing file, counts and the Living Studio projection match the rows.
+- `tests/scripts/test_openapi_contract_ci.py` — the Studio OpenAPI drift check runs in CI and is enforced by `CI green`.
 - `tests/scripts/test_pr_body_gate.py` — CI refuses a branch without a described pull request.
 - `tests/scripts/test_release_instructions.py` — release-note section generation.
 - `tests/scripts/test_version_sync.py` — the declared version matches the release.
