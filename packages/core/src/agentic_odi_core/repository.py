@@ -8,6 +8,7 @@ import unicodedata
 from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
+from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
@@ -58,6 +59,21 @@ def page(items: list[_Item], limit: int | None = None, offset: int = 0) -> list[
         raise ValueError("limit must be >= 0")
     sliced = items[offset:] if offset else items
     return sliced if limit is None else sliced[:limit]
+
+
+def link_identity(link: Link) -> tuple[str, str, str, str, str]:
+    """The five columns that make two links the same relationship.
+
+    Duplicates are a property of the endpoints and the relationship, not of the
+    generated id, so both repositories key on this tuple.
+    """
+    return (
+        link.source_type,
+        link.source_id,
+        link.target_type,
+        link.target_id,
+        link.relationship_type.value,
+    )
 
 
 def rank_signals(signals: list[Signal]) -> list[Signal]:
@@ -732,6 +748,13 @@ class InMemoryRepository:
         return new_study
 
     def add_link(self, link: Link) -> Link:
+        identity = link_identity(link)
+        if any(link_identity(existing) == identity for existing in self.links.values()):
+            raise ConflictError(
+                f"A {link.relationship_type.value} link already connects "
+                f"{link.source_type}:{link.source_id} to "
+                f"{link.target_type}:{link.target_id}."
+            )
         self._append_event()
         self.links[link.id] = link
         return link
@@ -749,17 +772,15 @@ class InMemoryRepository:
         limit: int | None = None,
         offset: int = 0,
     ) -> list[Link]:
-        items = list(self.links.values())
-        if source_type is not None:
-            items = [link for link in items if link.source_type == source_type]
-        if source_id is not None:
-            items = [link for link in items if link.source_id == source_id]
-        if target_type is not None:
-            items = [link for link in items if link.target_type == target_type]
-        if target_id is not None:
-            items = [link for link in items if link.target_id == target_id]
-        if relationship_type is not None:
-            items = [link for link in items if link.relationship_type == relationship_type]
+        items = [
+            link
+            for link in self.links.values()
+            if (source_type is None or link.source_type == source_type)
+            and (source_id is None or link.source_id == source_id)
+            and (target_type is None or link.target_type == target_type)
+            and (target_id is None or link.target_id == target_id)
+            and (relationship_type is None or link.relationship_type.value == relationship_type)
+        ]
         return page(items, limit, offset)
 
     def remove_link(self, link_id: str) -> bool:

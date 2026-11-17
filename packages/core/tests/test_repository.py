@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
@@ -19,6 +20,23 @@ from agentic_odi_core.models import (
     Step,
 )
 from agentic_odi_core.repository import InMemoryRepository
+
+
+def _link(
+    link_id: str = "link-1",
+    *,
+    source_id: str = "outcome-1",
+    target_id: str = "evidence-1",
+    relationship: RelationshipType = RelationshipType.evidence_for,
+) -> Link:
+    return Link(
+        id=link_id,
+        source_type="outcome",
+        source_id=source_id,
+        target_type="evidence",
+        target_id=target_id,
+        relationship_type=relationship,
+    )
 
 
 def _customer_outcome(outcome_id: str, job_id: str = "job-1") -> CustomerOutcome:
@@ -385,3 +403,11 @@ def test_remove_link_returns_true() -> None:
 
 def test_remove_link_unknown_returns_false() -> None:
     assert InMemoryRepository().remove_link("missing") is False
+
+
+def test_adding_the_same_link_twice_raises_conflict() -> None:
+    repo = InMemoryRepository()
+    repo.add_link(_link())
+
+    with pytest.raises(ConflictError):
+        repo.add_link(_link())
