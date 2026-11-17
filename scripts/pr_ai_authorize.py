@@ -67,6 +67,16 @@ NON_BLOCKING_CONCLUSIONS: frozenset[str] = frozenset(
 # vendor outage must not stop merges.
 ACTIONS_APP = "github-actions"
 
+# The check runs the merge-control workflows own. A workflow cannot judge a head
+# commit while its own job is still running: the check-runs API returns that job
+# on the same SHA with `status: in_progress`, so counting it would call every
+# candidate pending and would never authorize or arm a merge. These runs are the
+# machinery, not evidence about the change. The names are the `jobs.<id>.name`
+# values of pr-ai-authorize.yml (``Label pull request``) and
+# pr-ai-merge-act.yml (``Auto-merge authorized PR``); a test reads those files
+# so a rename cannot quietly bring the deadlock back.
+CONTROL_CHECKS: frozenset[str] = frozenset({"Auto-merge authorized PR", "Label pull request"})
+
 
 def advisory_checks() -> frozenset[str]:
     """The advisory set, honouring the repository's e2e policy switch."""
@@ -104,20 +114,26 @@ def compute_ci_state(facts: dict) -> dict:
 
     Returns ``state`` (``green``, ``pending`` or ``red``) plus the names behind
     the verdict: ``blocking`` (ran and failed), ``pending`` (not finished),
-    ``missing`` (required check never reported) and ``advisory`` (failed but
-    allowed). Only ``green`` may authorize a merge.
+    ``missing`` (required check never reported), ``advisory`` (failed but
+    allowed) and ``control`` (the merge workflows' own in-progress runs, which
+    never affect the verdict). Only ``green`` may authorize a merge.
     """
     checks = [run for run in facts.get("checks") or [] if isinstance(run, dict)]
     required = tuple(facts.get("required") or REQUIRED_CHECKS)
     advisory = advisory_checks()
 
     runs_by_name: dict[str, list[dict]] = {}
+    control: list[str] = []
     for run in checks:
         if not _is_actions_check(run):
             continue
         name = str(run.get("name") or "")
-        if name:
-            runs_by_name.setdefault(name, []).append(run)
+        if not name:
+            continue
+        if name in CONTROL_CHECKS:
+            control.append(name)
+            continue
+        runs_by_name.setdefault(name, []).append(run)
 
     blocking: list[str] = []
     pending: list[str] = []
@@ -175,6 +191,7 @@ def compute_ci_state(facts: dict) -> dict:
         "missing": sorted(set(missing)),
         "unconfirmed": sorted(set(unconfirmed)),
         "advisory": sorted(set(advisory_failed)),
+        "control": sorted(set(control)),
     }
 
 

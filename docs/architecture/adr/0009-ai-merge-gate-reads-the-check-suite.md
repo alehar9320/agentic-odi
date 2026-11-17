@@ -50,20 +50,31 @@ and acted on an event that was not authorization.
    (`End-to-end`, the browser suite, which `AGENTIC_ODI_E2E_BLOCKING` promotes
    to a gate). Absent or unfinished is pending, never green. Check runs from
    other apps are reported, not gated: they are not required checks. The legacy
-   combined commit status is not consulted.
+   combined commit status is not consulted. The verdict also ignores the two
+   control-plane jobs (`Label pull request`, `Auto-merge authorized PR`): a
+   workflow that judged its own in-progress run would call every head pending
+   and never authorize or arm anything. A test reads the job names out of both
+   workflows, so a rename fails loudly instead of silently restoring the
+   deadlock.
 2. `pr-ai-authorize.yml` and `pr-ai-merge-act.yml` consume that one entrypoint,
    so the label and the arm decision cannot disagree about what green means.
 3. The merge act wakes only on the labels that can change its decision
    (`ai-merge-authorized`, `do-not-merge`, `needs human review`), and re-reads
    the whole chain before arming: authorization, trust label, merge state, open
    state, head SHA, check suite.
-4. Every run can disarm. If `autoMergeRequest` is set and a gate stops holding —
+   4. Every run can disarm. If `autoMergeRequest` is set and a gate stops holding —
    label removed, new push, human override, red check — the workflow calls
    `gh pr merge --disable-auto` and comments why. Arming is a request, not a
-   decision.
-5. `label-merge-conflicts.yml` also runs on `check_suite: completed`, so
-   `ready-for-merge` lands when CI finishes instead of up to six hours later.
-   Closing the fast path without this would effectively switch auto-merge off.
+   decision. Disarming is keyed on a *failed gate*, never on the absence of an
+   action: a green pull request that was already armed must stay armed.
+5. `label-merge-conflicts.yml` and `pr-ai-authorize.yml` also run on
+   `workflow_run: {workflows: [CI, PR guardrails], types: [completed]}`, so
+   `ready-for-merge` lands when the required checks finish instead of up to six
+   hours later. The obvious `check_suite: completed` trigger cannot do this:
+   GitHub documents that it does not fire for check suites GitHub Actions
+   created, so it could never observe the two checks that matter. The PR number
+   is resolved from the head SHA through the commit's pull-request list, which
+   is paginated and has no 30-row cap.
 
 ## Consequences
 
@@ -79,8 +90,11 @@ and acted on an event that was not authorization.
   or sweep event, so a few queued merges will stop and need a human.
 - Maintained: `tests/scripts/test_pr_ai_authorize.py` pins the verdict (red
   required, red non-advisory, red advisory, pending, absent, cancelled,
-  third-party) and `tests/scripts/test_pr_ai_merge_act.py` pins the trigger, the
-  re-read and the disarm, including that both workflows use the same entrypoint.
+  third-party, and the ignored control-plane runs) and
+  `tests/scripts/test_pr_ai_merge_act.py` pins the trigger, the re-read, the
+  disarm-only-on-failure rule, and that both workflows use the same entrypoint.
+  `tests/scripts/test_label_merge_conflicts.py` pins the `workflow_run` trigger
+  and the addressed PR lookup.
 
 ## Alternatives considered
 
@@ -97,3 +111,10 @@ and acted on an event that was not authorization.
   authorized, not to re-implement the merge.
 - **Arm only from the schedule.** Rejected: up to six hours of latency, and the
   schedule still needs the same disarm path.
+- **Count the merge workflows' own check runs.** Rejected: the check-runs API
+  returns the caller's own in-progress job for the same head SHA, so the verdict
+  would be pending exactly when it is asked, and no merge could ever be armed.
+  The control plane is excluded by name and pinned by a test.
+- **Keep `check_suite: completed` for the fast path.** Rejected: GitHub does not
+  fire it for check suites created by GitHub Actions, so it would only react to
+  third-party suites and the required checks would still wait for the sweep.

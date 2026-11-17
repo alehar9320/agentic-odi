@@ -19,11 +19,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
 from pr_ai_authorize import (  # noqa: E402
     BLOCKING_CONCLUSIONS,
+    CONTROL_CHECKS,
     LABEL,
     MANAGED_LABELS,
     compute_ai_merge_authorized,
     compute_ci_state,
 )
+
+ROOT = Path(__file__).resolve().parents[2]
+WORKFLOWS = ROOT / ".github" / "workflows"
 
 
 def check(name, conclusion="success", status="completed", app="github-actions"):
@@ -190,6 +194,48 @@ def test_a_third_party_check_run_does_not_gate():
         ),
     ]
     assert compute_ci_state(base_facts(checks=checks))["state"] == "green"
+
+
+def test_the_control_jobs_do_not_judge_themselves():
+    """The workflow that asks is a check run on the same head it is judging."""
+    checks = green_checks() + [
+        check("Label pull request", status="in_progress", conclusion=""),
+        check("Auto-merge authorized PR", status="in_progress", conclusion=""),
+    ]
+    state = compute_ci_state(base_facts(checks=checks))
+    assert state["state"] == "green"
+    assert state["pending"] == []
+    assert state["control"] == ["Auto-merge authorized PR", "Label pull request"]
+    assert compute_ai_merge_authorized(base_facts(checks=checks)) == {LABEL}
+
+
+def test_a_failed_control_run_does_not_block_a_merge():
+    """A control run's failure is its own bug, not evidence about the change."""
+    checks = green_checks() + [
+        check("Auto-merge authorized PR", conclusion="failure"),
+        check("Label pull request", conclusion="cancelled"),
+    ]
+    assert compute_ci_state(base_facts(checks=checks))["state"] == "green"
+
+
+def _job_names(path: Path) -> set[str]:
+    """The ``name:`` of every job in a workflow file."""
+    names: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("    name: "):
+            names.add(line.split("name: ", 1)[1].strip())
+    return names
+
+
+def test_the_control_check_names_are_the_workflow_job_names():
+    """A renamed job would count its own run and never turn green again."""
+    names = _job_names(WORKFLOWS / "pr-ai-authorize.yml") | _job_names(
+        WORKFLOWS / "pr-ai-merge-act.yml"
+    )
+    assert CONTROL_CHECKS <= names, (
+        f"the verdict ignores {sorted(CONTROL_CHECKS)}, but the workflows name "
+        f"{sorted(names)}; the gate would count its own running job"
+    )
 
 
 def test_an_unrecognised_conclusion_is_not_green():

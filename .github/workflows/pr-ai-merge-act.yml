@@ -15,7 +15,8 @@ name: PR AI merge act
 #
 # Arming is not the decision. ``--auto`` is a request to GitHub that survives
 # later pushes, so every run re-verifies the head commit and disarms when a gate
-# stops holding.
+# stops holding. A green verdict never disarms: a request that is already armed
+# is left exactly as it is.
 #
 # Human override: ``do-not-merge`` or ``needs human review`` disarms.
 # Deterministic: no LLM calls, no pull request code executed. Fork pull requests
@@ -84,8 +85,10 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-numbers.txt"
           else
+            # `gh pr list` caps at 30 rows without `--limit`; an armed pull
+            # request outside the first page would otherwise never be revisited.
             gh pr list --repo "$REPO" --base main \
-              --state open --label "ai-merge-authorized" \
+              --state open --label "ai-merge-authorized" --limit 1000 \
               --json number -q '.[].number' \
               > "$RUNNER_TEMP/pr-numbers.txt"
           fi
@@ -116,6 +119,7 @@ jobs:
 
             action=""
             verdict=""
+            gate_ok="no"
 
             if [ "$STATE" != "OPEN" ]; then
               verdict="Pull request is not open (state: $STATE)."
@@ -147,6 +151,7 @@ jobs:
               ci_state="$(jq -r '.state' <<<"$ci")"
 
               if [ "$ci_state" = "green" ]; then
+                gate_ok="yes"
                 if [ "$ARMED" = "yes" ]; then
                   verdict="Check suite green on $HEAD_SHA; auto-merge is already armed."
                 else
@@ -160,7 +165,10 @@ jobs:
             fi
 
             # A gate that stops holding must take the armed request with it.
-            if [ "$action" != "armed" ] && [ "$ARMED" = "yes" ]; then
+            # Keyed on the gate, not on `action`: a green pull request that was
+            # already armed produces no action, and disarming it here would
+            # cancel the very merge the gate just approved.
+            if [ "$gate_ok" != "yes" ] && [ "$ARMED" = "yes" ]; then
               gh pr merge --disable-auto "$PR_NUMBER" --repo "$REPO"
               action="disarmed"
               verdict="$verdict Auto-merge was armed, so it was disarmed."
@@ -179,8 +187,12 @@ jobs:
                 echo "- **Labels:** \`$LABELS\`"
               } > "$RUNNER_TEMP/merge-act-$PR_NUMBER.md"
 
-              comment_id="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
-                --jq '.[] | select(.body | startswith("## AI merge act")) | .id' | head -n 1)"
+              # Do not pipe `gh api` into `head`: gh exits on SIGPIPE and the
+              # job's `pipefail` would turn a successful lookup into a red step.
+              gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+                --jq '.[] | select(.body | startswith("## AI merge act")) | .id' \
+                > "$RUNNER_TEMP/merge-act-comment-ids-$PR_NUMBER.txt"
+              comment_id="$(head -n 1 "$RUNNER_TEMP/merge-act-comment-ids-$PR_NUMBER.txt")"
               if [ -n "$comment_id" ]; then
                 gh api --method PATCH "repos/$REPO/issues/comments/$comment_id" \
                   -F body=@"$RUNNER_TEMP/merge-act-$PR_NUMBER.md" >/dev/null

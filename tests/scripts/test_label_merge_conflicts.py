@@ -95,12 +95,24 @@ def test_the_template_documents_every_supported_metadata_key():
     assert "agent_confidence" in body
 
 
-def test_a_completed_check_suite_keeps_the_ready_label_current():
+def test_a_completed_required_workflow_keeps_the_ready_label_current():
     """`ready-for-merge` needs a `clean` state, which only exists after the
     checks pass; the six-hourly sweep used to be the only thing looking again."""
     text = CONFLICTS.read_text(encoding="utf-8")
-    assert "check_suite:" in text
-    assert "github.event.check_suite.head_sha" in text
+    trigger = text.split("\npermissions:", 1)[0]
+    assert "workflow_run:" in trigger
+    assert 'workflows: ["CI", "PR guardrails"]' in trigger
+    # GitHub does not fire `check_suite` for suites GitHub Actions created, so
+    # that trigger could never see the required workflows finish.
+    assert "check_suite:" not in trigger
+    assert "github.event.workflow_run.head_sha" in text
+    assert "commits/$head_sha/pulls" in text
+    assert "--paginate" in text
+
+
+def test_the_scheduled_sweep_is_not_capped_at_one_page():
+    text = CONFLICTS.read_text(encoding="utf-8")
+    assert "--limit 1000" in text
 
 
 def test_the_development_guide_documents_the_labeler():

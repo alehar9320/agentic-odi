@@ -14,7 +14,11 @@ name: PR AI merge authorize
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  check_suite:
+  # `check_suite` does not fire for suites GitHub Actions created itself, so it
+  # could never see `CI green` or `PR guardrails` finish. `workflow_run` is the
+  # trigger that follows an Actions workflow to completion.
+  workflow_run:
+    workflows: ["CI", "PR guardrails"]
     types: [completed]
   schedule:
     - cron: '0 */6 * * *'
@@ -50,7 +54,7 @@ jobs:
         run: echo "::notice::Skipping AI merge authorize labels for a fork pull request (read-only token)."
 
       # Resolve which pull request(s) to process. On pull_request events we
-      # have a PR number. On check_suite we have the head SHA but need to map
+      # have a PR number. On workflow_run we have the head SHA but need to map
       # it to a PR number. On schedule / workflow_dispatch we re-scan every
       # open PR targeting main so labels stay eventually consistent.
       - name: Resolve pull request numbers to process
@@ -61,14 +65,16 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-numbers.txt"
-          elif [ "${{ github.event_name }}" = "check_suite" ]; then
-            head_sha="${{ github.event.check_suite.head_sha }}"
-            gh pr list --repo "$REPO" --base main --state open --json number,headRefOid \
-              -q '.[] | select(.headRefOid == "'"$head_sha"'") | .number' \
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            head_sha="${{ github.event.workflow_run.head_sha }}"
+            # `gh pr list` caps at 30 rows before a local filter runs; ask the
+            # commit which pull requests contain it instead.
+            gh api "repos/$REPO/commits/$head_sha/pulls" --paginate \
+              --jq '.[] | select(.state == "open") | .number' \
               > "$RUNNER_TEMP/pr-numbers.txt" || true
           else
-            gh pr list --repo "$REPO" --base main \
-              --state open --json number -q '.[].number' \
+            gh pr list --repo "$REPO" --base main --state open --limit 1000 \
+              --json number -q '.[].number' \
               > "$RUNNER_TEMP/pr-numbers.txt"
           fi
 

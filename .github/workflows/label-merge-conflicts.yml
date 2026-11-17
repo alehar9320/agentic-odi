@@ -6,17 +6,19 @@ name: Label merge conflicts
 # it settles; reading it once labelled nothing, which is why the label had never
 # been applied to a single pull request.
 #
-# It also runs when a check suite completes: `clean` (the state that earns
-# `ready-for-merge`) only becomes true once the required checks have passed, and
-# the six-hourly sweep used to be the only thing that looked again. The merge
-# path waits on this label, so a green pull request could sit unauthorized for
-# hours while the fast path was a bug (ADR 0009).
+# It also runs when `CI` or `PR guardrails` completes: `clean` (the state that
+# earns `ready-for-merge`) only becomes true once the required checks have
+# passed, and the six-hourly sweep used to be the only thing that looked again.
+# The merge path waits on this label, so a green pull request could sit
+# unauthorized for hours while the fast path was a bug (ADR 0009). `check_suite`
+# cannot be that trigger: GitHub does not fire it for suites Actions created.
 
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-  check_suite:
+  workflow_run:
+    workflows: ["CI", "PR guardrails"]
     types: [completed]
   schedule:
     - cron: '0 */6 * * *'
@@ -62,15 +64,16 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-numbers.txt"
-          elif [ "${{ github.event_name }}" = "check_suite" ]; then
-            head_sha="${{ github.event.check_suite.head_sha }}"
-            gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
-              --json number,headRefOid \
-              -q '.[] | select(.headRefOid == "'"$head_sha"'") | .number' \
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            head_sha="${{ github.event.workflow_run.head_sha }}"
+            # `gh pr list` caps at 30 rows before a local filter runs; ask the
+            # commit which pull requests contain it instead.
+            gh api "repos/$GITHUB_REPOSITORY/commits/$head_sha/pulls" --paginate \
+              --jq '.[] | select(.state == "open") | .number' \
               > "$RUNNER_TEMP/pr-numbers.txt" || true
           else
-            gh pr list --repo "$GITHUB_REPOSITORY" --base main \
-              --state open --json number -q '.[].number' \
+            gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
+              --limit 1000 --json number -q '.[].number' \
               > "$RUNNER_TEMP/pr-numbers.txt"
           fi
 

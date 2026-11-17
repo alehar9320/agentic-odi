@@ -86,6 +86,26 @@ def test_auto_merge_is_disarmed_when_a_gate_stops_holding():
     assert "autoMergeRequest" in text
 
 
+def test_a_green_armed_pull_request_is_not_disarmed():
+    """A green verdict with auto-merge already armed must not cancel it."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert 'gate_ok="yes"' in text
+    assert '[ "$gate_ok" != "yes" ] && [ "$ARMED" = "yes" ]' in text
+    # The old condition keyed on `action`, which is empty for an armed PR.
+    assert '[ "$action" != "armed" ]' not in text
+
+
+def test_the_comment_lookup_does_not_pipe_gh_into_head():
+    # gh exits on SIGPIPE and the job's pipefail would fail a good lookup.
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "| head -n 1" not in text
+
+
+def test_the_scheduled_scan_is_not_capped_at_one_page():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "--limit 1000" in text
+
+
 def test_both_merge_workflows_share_one_gate():
     """Fixing one half and forgetting the other is how the signals drifted."""
     for workflow in (WORKFLOW, AUTHORIZE):
