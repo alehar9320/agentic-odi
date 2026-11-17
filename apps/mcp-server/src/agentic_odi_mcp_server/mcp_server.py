@@ -40,6 +40,7 @@ from agentic_odi_core import (
     capability_manifest,
     capability_summary,
     compute_opportunity_score,
+    configure_logging,
     error_envelope,
     evaluate_outcome_statement,
     invalid_strategy_request,
@@ -50,7 +51,6 @@ from agentic_odi_core import (
 from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
 )
-from agentic_odi_core import configure_logging
 from agentic_odi_core.errors import ValidationError as OdiValidationError
 from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
