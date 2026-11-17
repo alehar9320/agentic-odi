@@ -598,6 +598,7 @@ def test_the_allowlist_only_approves_reviewed_deletions() -> None:
             "apps/studio/src/lib/markdown.ts",
         },
         497: {"tests/scripts/test_roadmap_check.py"},
+        1101: {".qoder/worktrees/*"},
     }
     assert all(entry["reason"] for entry in allowlist)
 
