@@ -634,19 +634,24 @@
 
 /* Settings entry ---------------------------------------------------- */
 
+/* One link in About, not a section of its own: the tour is an answer to
+   "show me around", so it sits beside the other facts about the build. */
 .settings__tour {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 14px 0;
-  border-top: 1px solid var(--line);
+  margin: 10px 0 0;
 }
 
-.settings__tour .settings__title {
-  margin-bottom: 0;
+.settings__tour-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
-.settings__tour .muted {
-  margin: 0;
+.settings__tour-link:hover {
+  color: var(--text);
 }
