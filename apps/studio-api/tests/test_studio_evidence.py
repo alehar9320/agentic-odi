@@ -67,7 +67,9 @@ def test_evidence_promotes_into_an_outcome_on_its_job() -> None:
 
     assert promoted.status_code == 200
     assert promoted.json()["result"]["job_id"] == job_id
-    assert promoted.json()["result"]["importance"] == 8.0
+    #: The record is claimed by default, so its inputs are discounted before
+    #: the shared scorer runs.
+    assert promoted.json()["result"]["importance"] == 4.0
     assert [item["statement"] for item in client.get("/api/canvas").json()["outcomes"]] == [
         STATEMENT
     ]
