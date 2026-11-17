@@ -37,9 +37,9 @@ uv run bandit -c pyproject.toml -r apps packages website/
 uv run python scripts/doc_check.py
 ```
 
-`docs/roadmap.md` is maintained by hand. No check requires a new capability to
-add a roadmap line, because a shared file every change had to edit conflicted
-with every other change.
+`docs/roadmap.md` is a pointer page; its three lists point at the sources that
+own the facts (the changelog, the open pull-request list, and the ready-for-dev
+issue filter). No check requires a new capability to edit it.
 
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,
