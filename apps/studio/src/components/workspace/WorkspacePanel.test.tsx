@@ -12,6 +12,7 @@ const studio = vi.hoisted(() => ({
   conversations: [{ id: "c1", title: "Pricing research", turn_count: 2 }],
   memory: [],
   segments: [],
+  detail: null as null | { panel: string; subject?: { kind: string; id: string } },
   canvas: {
     jobs: [{ id: "J-1", name: "Ship" }],
     steps: [{ id: "S-1", job_id: "J-1", name: "Plan", order: 1 }],
@@ -86,6 +87,7 @@ describe("WorkspacePanel", () => {
     brokenPanel.renders = 0;
     studio.activePanel = "landscape";
     studio.openPanel.mockClear();
+    studio.detail = null;
     studio.closePanel.mockClear();
     studio.sendMessage.mockClear();
     studio.conversationId = "c1";
@@ -241,6 +243,47 @@ describe("WorkspacePanel", () => {
 
     expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("frames the detail with its place in the job when a step backs it (#740)", () => {
+    studio.activePanel = "jobmap";
+    studio.detail = { panel: "jobmap", subject: { kind: "step", id: "S-2" } };
+    studio.canvas = {
+      jobs: [],
+      steps: [
+        { id: "S-1", order: 1, name: "Frame the question" },
+        { id: "S-2", order: 2, name: "Locate" },
+      ],
+      outcomes: [],
+      source: "seed",
+    } as never;
+
+    render(<Stage />);
+
+    expect(screen.getByText("Step 2 of 2 • Locate")).toBeInTheDocument();
+  });
+
+  it("omits the context line when nothing real backs it (#740)", () => {
+    studio.activePanel = "landscape";
+    studio.detail = { panel: "landscape" };
+
+    render(<Stage />);
+
+    expect(document.querySelector(".lens__context")).toBeNull();
+  });
+
+  it("offers an expand control that is off until used (#740)", () => {
+    render(<Stage />);
+
+    const expand = screen.getByRole("button", { name: /expand workspace view/i });
+    expect(expand).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(expand);
+
+    expect(screen.getByRole("button", { name: /restore workspace view/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 });
 

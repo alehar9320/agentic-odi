@@ -141,6 +141,14 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
+export function ExpandIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 4H5a1 1 0 0 0-1 1v4M15 4h4a1 1 0 0 1 1 1v4M15 20h4a1 1 0 0 0 1-1v-4M9 20H5a1 1 0 0 1-1-1v-4" />
+    </Icon>
+  );
+}
+
 export function ArrowUpIcon(props: IconProps) {
   return (
     <Icon {...props}>
