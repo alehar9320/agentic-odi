@@ -348,6 +348,13 @@ async def test_preview_returns_none_on_http_404() -> None:
 
 
 @pytest.mark.asyncio
+async def test_preview_returns_none_on_http_3xx() -> None:
+    connector = _connector({"title": "Moved"}, status=301)
+
+    assert await connector.preview("ODI-301") is None
+
+
+@pytest.mark.asyncio
 async def test_preview_returns_none_on_a_non_object_body() -> None:
     connector = _connector(["not", "an", "object"], status=200)
 

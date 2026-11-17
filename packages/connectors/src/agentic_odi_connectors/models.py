@@ -104,15 +104,6 @@ class PaginationSettings(BaseModel):
     )
 
 
-class LinkPreviewData(BaseModel):
-    """One external item's summary, ready to store on Link.preview."""
-
-    title: str
-    status: str | None = None
-    url: str | None = None
-    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
 class RestConnectorSettings(BaseModel):
     url: str
     method: Literal["GET", "POST"] = "GET"
