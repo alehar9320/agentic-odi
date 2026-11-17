@@ -21,6 +21,7 @@ import {
   summarizeMemberScores,
   underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
+  UNSCORED_LABEL,
 } from "./odi";
 
 // The fixture is the contract between the Python service and the TypeScript
@@ -160,9 +161,9 @@ describe("hasScore", () => {
 });
 
 describe("formatOpportunityScore (regression: crash when opp is None)", () => {
-  it("renders N/A for nullish scores", () => {
-    expect(formatOpportunityScore(null)).toBe("N/A");
-    expect(formatOpportunityScore(undefined)).toBe("N/A");
+  it("renders the shared label for nullish scores", () => {
+    expect(formatOpportunityScore(null)).toBe(UNSCORED_LABEL);
+    expect(formatOpportunityScore(undefined)).toBe(UNSCORED_LABEL);
   });
 
   it("formats real scores to one decimal", () => {
@@ -189,8 +190,8 @@ describe("opportunityPill", () => {
   // A missing score is not a verdict. The pill must not read "Served", and it
   // must not print "N/A" inside a sentence that claims something about the outcome.
   it("returns a neutral Not scored descriptor for a missing score", () => {
-    expect(opportunityPill(null)).toEqual({ label: "Not scored", variant: "blue" });
-    expect(opportunityPill(undefined)).toEqual({ label: "Not scored", variant: "blue" });
+    expect(opportunityPill(null)).toEqual({ label: UNSCORED_LABEL, variant: "blue" });
+    expect(opportunityPill(undefined)).toEqual({ label: UNSCORED_LABEL, variant: "blue" });
     expect(opportunityPill(null).label).not.toContain("Served");
     expect(opportunityPill(null).label).not.toContain("N/A");
   });
@@ -286,7 +287,7 @@ describe("formatMemberMean", () => {
   });
 
   it("renders Not scored instead of a fake zero, NaN, or dash", () => {
-    expect(formatMemberMean(summarizeMemberScores([null, undefined]))).toBe("Not scored");
+    expect(formatMemberMean(summarizeMemberScores([null, undefined]))).toBe(UNSCORED_LABEL);
   });
 });
 
