@@ -16,6 +16,15 @@ Pick the smallest tier that matches your time budget. CI owns the full matrix; a
 (`.github/workflows/ci.yml`), so nobody is asked to run it locally before
 opening a pull request.
 
+## What `--changed` does not cover
+
+The dependency audit (`pip-audit`, `npm audit`, `cargo audit`) is a CI job, not a
+tier. It reads the lockfiles rather than the diff, so its result does not depend
+on which files a pull request touched, and `--changed` neither runs it nor skips
+it by selection. Run it by hand when a pull request changes a dependency; the
+commands and the accepted-advisory ledger are in
+[Development](../docs/development.md#linting-formatting--type-checks).
+
 ## PR requirement (honest verification)
 
 A pull request **must** list the tiers it ran and the tiers it skipped in the PR body (in the repo's spirit of no-silent-fabrication). For example:
