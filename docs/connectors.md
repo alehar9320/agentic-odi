@@ -302,6 +302,9 @@ behavior are predictable. Tune it with environment variables:
 | `AGENTIC_ODI_HTTP_TIMEOUT` | `30.0` | Per-request timeout in seconds |
 | `AGENTIC_ODI_HTTP_RETRIES` | `3` | Retries for connection-level failures |
 
-Invalid or out-of-range values fall back to the default instead of failing the
-process.
+An unset or empty variable uses its default. A present but invalid value — a
+typo, or a number below the minimum (1 for the pool size, 0.001 for the
+timeout, 0 for retries) — raises `ValueError` naming the variable, so a
+mistyped configuration fails loudly instead of silently behaving like the
+default.
 
