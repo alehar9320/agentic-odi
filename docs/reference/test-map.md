@@ -395,6 +395,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_pr_labels.py` | — |
 | `tests/scripts/test_pr_provenance.py` | — |
 | `tests/scripts/test_pr_sweep.py` | ``scripts/pr_sweep.py``, the read-only view of the open pull request queue. |
+| `tests/scripts/test_pr_sweep_workflow.py` | The PR sweep weekly workflow, pinned so the schedule and permissions cannot regress. |
 | `tests/scripts/test_pr_triage.py` | — |
 | `tests/scripts/test_release_assets.py` | Unit tests for scripts/release_assets.py. |
 | `tests/scripts/test_release_instructions.py` | Unit tests for scripts/release_instructions.py. |
