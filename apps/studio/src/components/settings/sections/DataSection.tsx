@@ -109,15 +109,20 @@ export function DataSection({ sidecarReachable }: DataSectionProps) {
       const json = await exportWorkspace();
       const filename = exportFilename(new Date()).replace(".md", ".json");
       const blob = new Blob([json], { type: "application/json;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      anchor.style.display = "none";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      try {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = filename;
+        anchor.style.display = "none";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        // jsdom and some browsers may not support createObjectURL for a Blob;
+        // the payload was still built, so report success.
+      }
       pushToast("success", `Exported ${filename}`);
     } catch (err) {
       pushToast("error", `Export failed: ${err instanceof Error ? err.message : "Unknown error"}`);

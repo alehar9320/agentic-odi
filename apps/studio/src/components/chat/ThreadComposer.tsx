@@ -56,7 +56,13 @@ function AttachmentThumb({ file }: { file?: File }) {
     if (!file || !isImageLike(file.type) || typeof URL.createObjectURL !== "function") {
       return null;
     }
-    return URL.createObjectURL(file);
+    try {
+      return URL.createObjectURL(file);
+    } catch {
+      // jsdom and some browsers may not support createObjectURL for a File;
+      // degrade to no thumbnail rather than crashing the composer.
+      return null;
+    }
   }, [file]);
 
   useEffect(() => {
