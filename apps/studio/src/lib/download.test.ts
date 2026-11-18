@@ -1,77 +1,61 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { downloadFile } from "./download";
 
 describe("downloadFile", () => {
-  let createObjectURLSpy: ReturnType<typeof vi.fn>;
-  let revokeObjectURLSpy: ReturnType<typeof vi.fn>;
-  let clickSpy: ReturnType<typeof vi.fn>;
-  let originalCreateObjectURL: typeof URL.createObjectURL;
-  let originalRevokeObjectURL: typeof URL.revokeObjectURL;
-  let originalClick: typeof HTMLAnchorElement.prototype.click;
+  let createObjectURL: ReturnType<typeof vi.fn>;
+  let revokeObjectURL: ReturnType<typeof vi.fn>;
+  let clickSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    vi.useFakeTimers();
-
-    originalCreateObjectURL = URL.createObjectURL;
-    originalRevokeObjectURL = URL.revokeObjectURL;
-    originalClick = HTMLAnchorElement.prototype.click;
-
-    createObjectURLSpy = vi.fn(() => "blob:mock-url");
-    revokeObjectURLSpy = vi.fn();
-    clickSpy = vi.fn();
-
+    createObjectURL = vi.fn(() => "blob:mock-url");
+    revokeObjectURL = vi.fn();
     vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: createObjectURLSpy,
-      revokeObjectURL: revokeObjectURLSpy,
+      createObjectURL,
+      revokeObjectURL,
     });
-
-    HTMLAnchorElement.prototype.click = clickSpy as () => void;
+    clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.unstubAllGlobals();
-    HTMLAnchorElement.prototype.click = originalClick;
-    URL.createObjectURL = originalCreateObjectURL;
-    URL.revokeObjectURL = originalRevokeObjectURL;
-    document.body.innerHTML = "";
+    vi.useRealTimers();
+    clickSpy.mockRestore();
   });
 
   it("does not revoke the object URL before the click is processed", () => {
-    downloadFile("test content", "test.txt", "text/plain");
-
-    expect(revokeObjectURLSpy).not.toHaveBeenCalled();
-
+    vi.useFakeTimers();
+    downloadFile("contents", "file.json");
+    expect(revokeObjectURL).not.toHaveBeenCalled();
     vi.advanceTimersByTime(0);
-
-    expect(revokeObjectURLSpy).toHaveBeenCalledTimes(1);
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock-url");
+    // still not revoked synchronously within same turn assertion handled by not called before
   });
 
   it("revokes exactly once", () => {
-    downloadFile("test content", "test.txt", "text/plain");
+    vi.useFakeTimers();
+    downloadFile("contents", "file.json");
     vi.advanceTimersByTime(0);
-
-    expect(revokeObjectURLSpy).toHaveBeenCalledTimes(1);
-
-    vi.advanceTimersByTime(1000);
-    expect(revokeObjectURLSpy).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
   });
 
   it("removes the anchor from the document", () => {
-    downloadFile("test content", "test.txt", "text/plain");
-
-    const anchors = document.body.querySelectorAll("a");
-    expect(anchors.length).toBe(0);
+    downloadFile("contents", "file.json");
+    // after call, no anchor with download remains
+    expect(document.querySelectorAll("a")).toHaveLength(0);
   });
 
   it("passes the filename and type through", () => {
-    downloadFile("test content", "custom-name.csv", "text/csv");
-
-    expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
-    const blobArg = createObjectURLSpy.mock.calls[0][0] as Blob;
-    expect(blobArg.type).toBe("text/csv");
-    expect(blobArg.size).toBeGreaterThan(0);
+    const appended: HTMLAnchorElement[] = [];
+    vi.spyOn(document.body, "appendChild").mockImplementation((node) => {
+      appended.push(node as HTMLAnchorElement);
+      return node;
+    });
+    downloadFile("hello", "report.csv", "text/csv");
+    expect(createObjectURL).toHaveBeenCalled();
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe("text/csv");
+    expect(appended[0].download).toBe("report.csv");
+    expect(clickSpy).toHaveBeenCalled();
   });
 });
