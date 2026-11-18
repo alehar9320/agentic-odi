@@ -71,6 +71,26 @@ def test_load_baseline_rejects_corrupt_json(monkeypatch, tmp_path):
         raise AssertionError("expected ValueError")
 
 
+def test_from_dict_rejects_unknown_keys(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    try:
+        profile.Baseline.from_dict({"product_name": "Acme", "made_up_field": 1})
+    except ValueError as exc:
+        assert "made_up_field" in str(exc)
+        assert "valid fields" in str(exc)
+    else:  # pragma: no cover - unknown keys must raise
+        raise AssertionError("expected ValueError for unknown keys")
+
+
+def test_from_dict_accepts_known_keys(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    b = profile.Baseline.from_dict({"product_name": "Acme", "schema_version": 1, "source": "url"})
+    assert b.product_name == "Acme"
+    assert b.schema_version == 1
+    assert b.source == "url"
+    assert b.inferred is False
+
+
 def test_save_sets_created_at_when_missing(monkeypatch, tmp_path):
     _isolate(monkeypatch, tmp_path)
 
