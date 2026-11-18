@@ -468,8 +468,8 @@ def _run_steps(tier: str, steps: list[Step], files: list[str] | None) -> int:
 def verify_changed(base: str = "origin/main", head: str = "HEAD") -> int:
     print("Tier: --changed (fast gate)")
     print(
-        f"Budget: designed for < 5 minutes on warm env; per-command ceiling "
-        f"{BUDGET_CEILING_SECONDS}s; total budget {TOTAL_BUDGET_MINUTES} min including cold uv sync"
+        f"Budget: per-command ceiling {BUDGET_CEILING_SECONDS}s; total budget "
+        f"{TOTAL_BUDGET_MINUTES} min including cold uv sync"
     )
     print()
     files = get_changed_files(base, head)
