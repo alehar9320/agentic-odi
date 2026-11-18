@@ -35,7 +35,7 @@ def test_malformed_config_emits_a_warning_and_nothing_else(
     caplog.set_level(logging.WARNING, logger="agentic_odi_connectors")
     with pytest.raises(SystemExit):
         _load_and_validate_presets()
-    assert any("could not read connectors config" in r.message for r in caplog.records)
+    assert any("invalid connector preset" in r.message for r in caplog.records)
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
