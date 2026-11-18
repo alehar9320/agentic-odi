@@ -412,12 +412,17 @@ gates raw MCP trace debugging.
 agentic-odi profile show
 agentic-odi profile show --json
 agentic-odi profile set --product-name "My Product" --domain "acme.test"
+agentic-odi profile set --clear core_problem --clear current_focus
 agentic-odi profile path
 agentic-odi setup       # interactive baseline wizard
 ```
 
 `profile show` prints the baseline fields; add `--json` to emit the raw JSON.
+Unset fields render as `—` and explicitly empty strings as `(empty)`.
 `profile set` updates any subset of baseline fields with explicit options.
+Use `--clear <field>` (repeatable) to unset `product_name`, `domain`,
+`primary_user`, `business_model`, `core_problem`, or `current_focus`; an
+unknown name exits 2, and clear is applied after set options in the same call.
 `profile path` prints the baseline file path. `setup` runs the interactive
 baseline wizard.
 

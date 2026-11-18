@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
@@ -49,6 +50,16 @@ class Baseline:
     def from_dict(cls, d: dict) -> Baseline:
         kwargs = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}  # type: ignore[attr-defined]
         return cls(**kwargs)
+
+
+_CLEARABLE_PROFILE_FIELDS = (
+    "product_name",
+    "domain",
+    "primary_user",
+    "business_model",
+    "core_problem",
+    "current_focus",
+)
 
 
 def config_dir() -> Path:
@@ -233,6 +244,14 @@ def save_llm_profile(p: LLMProfile) -> Path:
 # ---------------------------------------------------------------------------
 
 
+def _profile_display_value(value: str | None) -> str:
+    if value is None:
+        return "—"
+    if value == "":
+        return "(empty)"
+    return value
+
+
 @app.command("show")
 def show_profile(
     as_json: bool = typer.Option(False, "--json", help="Format output as JSON"),
@@ -248,14 +267,14 @@ def show_profile(
     if as_json:
         typer.echo(json.dumps(b.to_dict(), indent=2))
         return
-    typer.echo(f"Product Name: {b.product_name or ''}")
-    typer.echo(f"Product URL:  {b.product_url or ''}")
-    typer.echo(f"Domain:       {b.domain or ''}")
-    typer.echo(f"Primary User: {b.primary_user or ''}")
-    typer.echo(f"Business:     {b.business_model or ''}")
-    typer.echo(f"Core Problem: {b.core_problem or ''}")
-    typer.echo(f"Focus:        {b.current_focus or ''}")
-    typer.echo(f"Confidence:   {b.confidence or ''}")
+    typer.echo(f"Product Name: {_profile_display_value(b.product_name)}")
+    typer.echo(f"Product URL:  {_profile_display_value(b.product_url)}")
+    typer.echo(f"Domain:       {_profile_display_value(b.domain)}")
+    typer.echo(f"Primary User: {_profile_display_value(b.primary_user)}")
+    typer.echo(f"Business:     {_profile_display_value(b.business_model)}")
+    typer.echo(f"Core Problem: {_profile_display_value(b.core_problem)}")
+    typer.echo(f"Focus:        {_profile_display_value(b.current_focus)}")
+    typer.echo(f"Confidence:   {b.confidence if b.confidence is not None else '—'}")
 
 
 @app.command("path")
@@ -272,8 +291,28 @@ def set_profile(
     business_model: str | None = typer.Option(None, help="Business model"),
     core_problem: str | None = typer.Option(None, help="Core problem solved"),
     current_focus: str | None = typer.Option(None, help="Current focus"),
+    clear: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--clear",
+            help=(
+                "Field to unset (repeatable): product_name, domain, primary_user, "
+                "business_model, core_problem, current_focus"
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Set profile values non-interactively."""
+    clear_fields = clear or []
+    valid_clear_fields = _CLEARABLE_PROFILE_FIELDS
+    for name in clear_fields:
+        if name not in valid_clear_fields:
+            typer.echo(
+                f"Unknown field to clear: {name}. Valid names: {', '.join(valid_clear_fields)}",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+
     b = load_baseline() or Baseline(schema_version=1, source="cli")
     if product_name is not None:
         b.product_name = product_name
@@ -287,6 +326,9 @@ def set_profile(
         b.core_problem = core_problem
     if current_focus is not None:
         b.current_focus = current_focus
+    # Apply --clear after set-options so `--core-problem x --clear core_problem` ends unset.
+    for name in clear_fields:
+        setattr(b, name, None)
     p = save_baseline(b)
     typer.echo(f"Profile saved to {p}")
 
