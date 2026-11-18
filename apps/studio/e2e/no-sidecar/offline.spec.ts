@@ -1,6 +1,6 @@
 import { expect, test } from "../fixtures";
 
-import { banners } from "../helpers";
+import { banners, waitForStudioReady } from "../helpers";
 
 /**
  * #545: the built app opens with no network.
@@ -59,7 +59,7 @@ test.describe("the shell opens with no network", () => {
     const response = await page.goto(APP);
 
     expect(response?.status()).toBe(200);
-    await expect(page.getByRole("textbox", { name: "Message the studio" })).toBeVisible();
+    await waitForStudioReady(page);
     // The banner renders its title and an aria-live announcement, so match the
     // visible title rather than the text, which would be two elements.
     await expect(banners(page).filter({ hasText: /you're offline/i })).toBeVisible();

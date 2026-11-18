@@ -246,6 +246,15 @@ cleared by exactly one file. That made the result depend on the order Playwright
 happened to choose, and `/brief` inside a neighbour's thread is what a `brief`
 failure looked like (#1118).
 
+A studio that has just been emptied is a studio that has not met the product
+
+yet: it opens the connector offer over the composer, and a modal hides the
+composer behind it. `waitForStudioReady()` answers that offer the way a person
+would, so a spec that starts from the shared reset reaches the composer without
+its own onboarding code. It belongs in the readiness helper for the same reason
+the reset belongs in a fixture: a spec that has to remember it is a spec that
+will eventually forget (#1118).
+
 ### The visual contract is opt-in until it has baselines
 
 `e2e/visual.spec.ts` compares screens with `toHaveScreenshot`, and this

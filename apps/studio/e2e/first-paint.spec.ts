@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
+import { waitForStudioReady } from "./helpers";
 
 /**
  * The shell that paints before JavaScript runs.
@@ -126,7 +127,7 @@ test.describe("the handover", () => {
 
     // The app is mounted (its bundle was not blocked here) and the shell is gone.
     await expect(page.locator("#boot")).toHaveCount(0);
-    await expect(page.getByRole("textbox", { name: "Message the studio" })).toBeVisible();
+    await waitForStudioReady(page);
 
     // The class the inline script painted is the class the app keeps, and the
     // page background is the same token the shell showed: one colour across the
@@ -144,7 +145,7 @@ test.describe("the handover", () => {
     await page.goto("/");
 
     await expect(page.locator("#boot")).toHaveCount(0);
-    await expect(page.getByRole("textbox", { name: "Message the studio" })).toBeVisible();
+    await waitForStudioReady(page);
 
     // The bootstrap resolved light before React; React must not flip it to dark.
     await expect(page.locator("html")).toHaveClass(/theme-light/);

@@ -62,7 +62,6 @@ export async function openStudio(page: Page): Promise<void> {
   });
   await page.goto("/?flags=firstRunWizard:off");
   await waitForStudioReady(page);
-  await dismissConnectorSuggestion(page);
 }
 
 /**
@@ -72,12 +71,28 @@ export async function openStudio(page: Page): Promise<void> {
  * it on mount. Waiting for the composer alone would accept the shell's own
  * composer-shaped placeholder if one is ever added; waiting for both is the
  * statement these tests mean: the application has taken over.
+ *
+ * An empty studio — which is every studio whose state the fixture just
+ * cleared — opens the connector offer over the composer, and a modal hides
+ * everything behind it, so the composer cannot be what we wait for first. The
+ * offer is answered here, the way a person answers it, because it is part of
+ * what "ready" means: a spec that had to remember to dismiss it itself is how
+ * the offer ended up blocking a spec that forgot (#1118).
  */
 export async function waitForStudioReady(page: Page): Promise<void> {
-  await expect(page.getByRole("textbox", { name: COMPOSER })).toBeVisible({
+  await expect(page.locator("#boot")).toHaveCount(0, { timeout: READY_TIMEOUT_MS });
+
+  const composer = page.getByRole("textbox", { name: COMPOSER });
+  // One of the two is what first paint puts on screen; which one is the app's
+  // decision, and it depends on whether the studio has a context yet.
+  await expect(composer.or(connectorSuggestion(page))).toBeVisible({
     timeout: READY_TIMEOUT_MS,
   });
-  await expect(page.locator("#boot")).toHaveCount(0, { timeout: READY_TIMEOUT_MS });
+  // Also covers an offer that renders after its listing arrives, rather than
+  // with the first paint, which would otherwise open over the next click.
+  await dismissConnectorSuggestion(page);
+
+  await expect(composer).toBeVisible({ timeout: READY_TIMEOUT_MS });
 }
 
 /**
