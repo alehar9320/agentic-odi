@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,7 @@ import typer
 app = typer.Typer(name="profile", help="Profile management commands")
 
 BASELINE_FILE_NAME = "baseline.json"
+BASELINE_BACKUP_KEEP = 5
 
 
 @dataclass
@@ -125,6 +127,35 @@ def save_baseline(b: Baseline) -> Path:
     return target
 
 
+def _backup_timestamp() -> str:
+    """Return the fixed-width UTC stamp used to name baseline backups."""
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def prune_baseline_backups(keep: int = BASELINE_BACKUP_KEEP) -> list[Path]:
+    """Delete all but the newest `keep` baseline backups.
+
+    The stamp is fixed-width ISO, so lexical order is chronological. Returns the
+    removed paths. A failed unlink is skipped rather than raised. `keep <= 0`
+    disables retention and removes nothing.
+    """
+    if keep <= 0:
+        return []
+    backups = sorted(
+        baseline_file().parent.glob(f"{BASELINE_FILE_NAME}.bak-*"),
+        key=lambda p: p.name,
+        reverse=True,
+    )
+    removed: list[Path] = []
+    for stale in backups[keep:]:
+        try:
+            stale.unlink()
+        except OSError:
+            continue
+        removed.append(stale)
+    return removed
+
+
 def backup_baseline() -> Path | None:
     """Copy the existing baseline file to a dated backup.
 
@@ -132,12 +163,12 @@ def backup_baseline() -> Path | None:
     """
     if not baseline_exists():
         return None
-    import shutil
-
     backup_path = baseline_file().with_name(
-        f"baseline.json.bak-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+        f"{BASELINE_FILE_NAME}.bak-{_backup_timestamp()}"
     )
     shutil.copy2(baseline_file(), backup_path)
+    if BASELINE_BACKUP_KEEP > 0:
+        prune_baseline_backups()
     return backup_path
 
 
