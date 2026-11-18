@@ -33,6 +33,7 @@ from agentic_odi_core.repository import (
     V2MOM_ID,
     Repository,
     compute_evidence_fingerprint,
+    link_identity,
     page,
     rank_signals,
     sort_outcomes,
@@ -844,26 +845,26 @@ class SQLiteRepository(Repository):
 
     def add_link(self, link: Link) -> Link:
         with self._lock:
-            self._sync()
-            for existing in self.links.values():
-                if (
-                    existing.source_type == link.source_type
-                    and existing.source_id == link.source_id
-                    and existing.target_type == link.target_type
-                    and existing.target_id == link.target_id
-                    and existing.relationship_type == link.relationship_type
-                ):
+            # The snapshot read, the duplicate check, and the append share one
+            # write lock: two connections must not both pass the check before
+            # either event is durable.
+            with self.store.write_transaction():
+                self._sync()
+                identity = link_identity(link)
+                if any(link_identity(existing) == identity for existing in self.links.values()):
                     raise ConflictError(
-                        f"Link already exists: {link.source_type}:{link.source_id} -> {link.target_type}:{link.target_id} ({link.relationship_type})"
+                        f"A {link.relationship_type.value} link already connects "
+                        f"{link.source_type}:{link.source_id} to "
+                        f"{link.target_type}:{link.target_id}."
                     )
-            self.store.append(
-                "LINK_CREATED",
-                link.model_dump(mode="json"),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return link
+                self.store.append(
+                    "LINK_CREATED",
+                    link.model_dump(mode="json"),
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
+                self._sync()
+                return link
 
     def get_link(self, link_id: str) -> Link | None:
         with self._lock:
@@ -882,17 +883,15 @@ class SQLiteRepository(Repository):
     ) -> list[Link]:
         with self._lock:
             self._sync()
-            items = list(self.links.values())
-            if source_type is not None:
-                items = [link for link in items if link.source_type == source_type]
-            if source_id is not None:
-                items = [link for link in items if link.source_id == source_id]
-            if target_type is not None:
-                items = [link for link in items if link.target_type == target_type]
-            if target_id is not None:
-                items = [link for link in items if link.target_id == target_id]
-            if relationship_type is not None:
-                items = [link for link in items if link.relationship_type == relationship_type]
+            items = [
+                link
+                for link in self.links.values()
+                if (source_type is None or link.source_type == source_type)
+                and (source_id is None or link.source_id == source_id)
+                and (target_type is None or link.target_type == target_type)
+                and (target_id is None or link.target_id == target_id)
+                and (relationship_type is None or link.relationship_type.value == relationship_type)
+            ]
             return page(items, limit, offset)
 
     def remove_link(self, link_id: str) -> bool:

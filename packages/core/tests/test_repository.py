@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
+from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
@@ -19,6 +22,25 @@ from agentic_odi_core.models import (
     Step,
 )
 from agentic_odi_core.repository import InMemoryRepository
+
+
+def _link(
+    link_id: str | None = None,
+    *,
+    source_type: str = "outcome",
+    source_id: str = "outcome-1",
+    target_type: str = "evidence",
+    target_id: str = "evidence-1",
+    relationship: RelationshipType = RelationshipType.evidence_for,
+) -> Link:
+    return Link(
+        id=link_id or str(uuid.uuid4()),
+        source_type=source_type,
+        source_id=source_id,
+        target_type=target_type,
+        target_id=target_id,
+        relationship_type=relationship,
+    )
 
 
 def _customer_outcome(outcome_id: str, job_id: str = "job-1") -> CustomerOutcome:
@@ -337,22 +359,6 @@ def test_stamping_the_same_signal_twice_spends_one_event_id() -> None:
     assert repo.last_event_id() == after_add + 1
 
 
-def _link(
-    source_type="job",
-    source_id="s1",
-    target_type="outcome",
-    target_id="o1",
-    relationship_type="references",
-) -> Link:
-    return Link(
-        source_type=source_type,
-        source_id=source_id,
-        target_type=target_type,
-        target_id=target_id,
-        relationship_type=RelationshipType(relationship_type),
-    )
-
-
 def test_add_and_get_link() -> None:
     repo = InMemoryRepository()
     link = _link()
@@ -385,3 +391,11 @@ def test_remove_link_returns_true() -> None:
 
 def test_remove_link_unknown_returns_false() -> None:
     assert InMemoryRepository().remove_link("missing") is False
+
+
+def test_adding_the_same_link_twice_raises_conflict() -> None:
+    repo = InMemoryRepository()
+    repo.add_link(_link())
+
+    with pytest.raises(ConflictError):
+        repo.add_link(_link())
