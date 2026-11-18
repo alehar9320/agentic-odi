@@ -4,9 +4,11 @@ import argparse
 import asyncio
 import hmac
 import json
+import logging
 import os
 import signal
 import sys
+import time
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -38,6 +40,7 @@ from agentic_odi_core import (
     capability_manifest,
     capability_summary,
     compute_opportunity_score,
+    configure_logging,
     error_envelope,
     evaluate_outcome_statement,
     invalid_strategy_request,
@@ -51,10 +54,13 @@ from agentic_odi_core import (
 from agentic_odi_core.errors import ValidationError as OdiValidationError
 from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
+from fastmcp.server.middleware import Middleware
 from pydantic import ValidationError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"  # nosec B105 - env var name, not a secret
+
+log = logging.getLogger(__name__)
 
 
 def _token_path() -> Path:
@@ -140,6 +146,70 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
 
 mcp = FastMCP("Agentic ODI", lifespan=_lifespan)
+
+
+class _ToolTimingMiddleware(Middleware):
+    """Emit one log line per tool call, so a slow tool is not a hung one.
+
+    A tool call previously left no trace: an operator could not tell a slow
+    call from a server that had stopped answering. This records the tool name,
+    how long it took, and whether it returned an error — the error case keys on
+    the same envelope code the client already branches on, so the log and the
+    wire agree on one vocabulary.
+    """
+
+    async def on_call_tool(self, context: Any, call_next: Any) -> Any:
+        name = getattr(context.message, "name", "unknown")
+        started = time.perf_counter()
+        try:
+            result = await call_next(context)
+        except Exception as exc:
+            log.warning(
+                "mcp.tool name=%s duration_ms=%d outcome=error code=%s",
+                name,
+                int((time.perf_counter() - started) * 1000),
+                error_envelope(exc)["code"],
+            )
+            raise
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        code = _envelope_code(result)
+        if code is not None:
+            log.warning(
+                "mcp.tool name=%s duration_ms=%d outcome=error code=%s",
+                name,
+                duration_ms,
+                code,
+            )
+        else:
+            log.info("mcp.tool name=%s duration_ms=%d outcome=ok", name, duration_ms)
+        return result
+
+
+def _envelope_code(result: Any) -> str | None:
+    """The error code a tool returned, or ``None`` when the tool succeeded.
+
+    Tools answer a failure by returning the ``_fail`` envelope as their content
+    rather than raising, so the timing line reads the same envelope a client
+    branches on instead of inventing a second vocabulary.
+    """
+    content = getattr(result, "content", None) or []
+    for item in content:
+        text = getattr(item, "text", None)
+        if not isinstance(text, str):
+            continue
+        try:
+            payload = json.loads(text)
+        except ValueError:
+            continue
+        if isinstance(payload, dict) and isinstance(payload.get("error"), dict):
+            code = payload["error"].get("code")
+            if isinstance(code, str):
+                return code
+    return None
+
+
+mcp.add_middleware(_ToolTimingMiddleware())
+
 
 jobs_db = _repo.jobs
 steps_db = _repo.steps
@@ -1152,6 +1222,7 @@ def main(argv: list[str] | None = None) -> None:
         help=f"Port to listen on (default: $AGENTIC_ODI_MCP_PORT or {DEFAULT_PORT}).",
     )
     args = parser.parse_args(argv)
+    configure_logging()
     validate_at_startup()
     setup_graceful_shutdown()
     # Gate only a token a studio has already minted. Minting one here would 401

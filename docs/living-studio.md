@@ -485,72 +485,74 @@ without giving up the message model the sidecar already understands.
 
 The full coverage ledger — every assistant-ui capability and its one honest
 state — is authored in [The assistant-ui ledger](assistant-ui-ledger.md),
-and `scripts/doc_check.py` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
+and `scripts/docs_index.py --check` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
 narrower than the library offers (Partial). A row is Adopted only when a test
 proves a person can use it, the named file exists, and the Delivered column
 cites the issue or PR that landed it.
 
+<!-- BEGIN GENERATED: living-studio-projection -->
 | Capability | Status | What it means here | Delivered |
 |---|---|---|---|
-| `useExternalStoreRuntime` | Adopted | The bridge: the sidecar's store, presented as a thread. | #238 |
+| `useExternalStoreRuntime` | Adopted | The bridge itself: the sidecar's store, presented as a thread. | #238 |
 | `AssistantRuntimeProvider` | Adopted | One provider, whole app. | #238 |
-| `convertMessage` (`toThreadMessageLike`) | Adopted | The only mapping between our messages and runtime messages. | #238 |
+| `convertMessage` (`toThreadMessageLike`) | Adopted | The only mapping between `ChatMessage`/`ChatPart` and runtime messages. | #238 |
 | `isRunning` | Adopted | Driven by `streaming`. | #238 |
-| `setMessages` (branch switch) | Adopted | Branch switch swaps the visible path; the sidecar keeps `head_id`. | #238 |
-| `onNew` | Adopted | Sending a message. | #238 |
-| `onEdit` | Adopted | Editing a user turn keeps the old path as a branch. | #238 |
-| `onReload` (regenerate) | Adopted | Regenerating a reply as a sibling branch. | #238 |
-| `onCancel` | Adopted | The stop button. | #238 |
-| `onRespondToToolApproval` | Adopted | Allow/Decline on a pending write. | #238 |
-| `adapters.attachments` | Adopted | Text capped at 20k chars, images at 5 MB, refusals explained. | #238 |
-| runtime `suggestions` | Adopted | Starter suggestions computed from canvas state. | #238 |
-| `queue` adapter | Adopted | The follow-up lane: a send while a reply runs joins the queue instead of the wall. | #410 |
-| `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works; the dedicated adapter is unused, branches are inferred from parent ids. | — |
-| `groupPartByType` / `GroupedParts` | Partial | The work row groups through `GroupedParts` with our own `workGrouping`; the helper, which keys by part type alone, is unused. | — |
+| `setMessages` (branch switch) | Adopted | `switchBranch` swaps the visible path; the sidecar persists `head_id`. | #238 |
+| `onNew` | Adopted | `sendMessage`. | #238 |
+| `onEdit` | Adopted | `editFrom`. | #238 |
+| `onReload` (regenerate) | Adopted | `regenerateFrom`. | #238 |
+| `onCancel` | Adopted | `stopStreaming`. | #238 |
+| `onRespondToToolApproval` | Adopted | `respondToApproval`, the write gate. | #238 |
+| `adapters.attachments` | Adopted | Text refused above 20k chars (not shortened, #652), images at 5 MB, `.docx` and `.pdf` extracted in the browser (#393), refusals explained. | #238 |
+| runtime `suggestions` | Adopted | `suggestionsFor`, computed from canvas state. | #238 |
+| `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works through `setMessages` and `head_id`; the dedicated adapter is unused, so the runtime infers branches from parent ids. | — |
+| `queue` adapter | Adopted | Keeps a follow-up while a reply runs. | #410 |
+| `groupPartByType` / `GroupedParts` | Partial | The fallback fired: the turn's work groups through `GroupedParts` (see the message table), but with our own `workGrouping`. `groupPartByType` keys by part type or tool name alone, so a pending approval — a `tool-call` part — would be folded into the row. | — |
 | `ThreadPrimitive.Root` | Adopted | The transcript's shell. | #238 |
 | `ThreadPrimitive.Viewport` | Adopted | Scrolling; the jump-to-latest affordance reads its `isAtBottom`. | #238 |
 | `ThreadPrimitive.Messages` | Adopted | The message map. | #238 |
-| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data is adopted; the pills are hand-rolled because they carry the artifact-preview copy. | — |
-| `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
-| `MessagePrimitive.GroupedParts` | Adopted | One collapsed row holds what a turn did — its reasoning and tool calls — and never hides a write that is still asking. | #392 |
+| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data (`suggestions`) is adopted; the pills are hand-rolled because they carry the artifact-preview copy. Adopting the primitives would drop that copy; `SuggestionByIndex` is not an option since the list is computed from canvas state. | — |
+| `MessagePrimitive.Parts` | Adopted | With the `components` map. | #238 |
 | `MessagePrimitive.Attachments` | Adopted | User turns show what was sent. | #238 |
-| `MessagePrimitive.Root` | Adopted | Every turn renders its root through the primitive — the hover state the actions read and the top anchor come from it; the `article`, the classes and `aria-busy` ride on it unchanged. | #994 |
-| `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
-| `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Custom text/file renderers, because claim chips and extraction state need them. | — |
+| `MessagePrimitive.Root` | Adopted | Every turn — user, assistant, and notice — renders its root through the primitive, which supplies the hover state the action bar reads and the top anchor. The `article`, the classes, the assistant avatar, and `aria-busy` ride on it unchanged. | #994 |
+| `MessagePrimitive.Quote` | Adopted | Renders the quoted passage on a sent turn. | #435 |
+| `MessagePrimitive.GroupedParts` | Adopted | The reasoning and tool calls of one run fold into a single disclosure; `indicator="never"` keeps the activity line and caret where the `components` map put them. | #392 |
+| `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Rendered through the `components` map (custom `TextPart`, `FilePart`) rather than the bare primitives, which cannot show claim chips or extraction state. | — |
+| `thread` Element | Partial | The frame is copied in: the thread root, the scrolling viewport, and the viewport footer the composer docks into, so the empty stage and a running thread share one layout (#993). The Element's message, composer, attachment, markdown, reasoning, and tool-group sections are not taken — `Conversation`/`parts.tsx`, `ThreadComposer`, and `Markdown.tsx` own those, and the arrival count, branch picker, and part renderers are product concerns the Element would not carry. The copy's provenance header and `vendor.lock.json` entry record exactly what was dropped. | — |
+| `button` Element | Adopted | The one copy-in. Carries a provenance header and an entry in `vendor.lock.json`; the class-merger import is local. | #383 |
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
-| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter; each chip is an `AttachmentPrimitive.Root`. | #238 |
-| `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works through the composer's own handlers with the same accept rules. | — |
-| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`; extraction state, refusal reason and size ride inside `Root` as children, but the sent-turn chip in `parts.tsx` still writes its own markup. | — |
-| `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | The quote shows above the input and can be cleared before send. | #435 |
-| `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | The microphone, hidden where unsupported. | #433 |
-| `ComposerPrimitive.Queue` | Adopted | The pending lane rendered above the composer. | #410 |
-| `createMessageQueue(driver)` | Adopted | The queue's own driver hook: run with `steer`, optional cancel. | #410 |
-| `MessageQueueController` | Adopted | Busy/idle/cancelled signalling and hold/release — the reason the lane is not hand-rolled. | #410 |
-| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Adopted | One lane row: its text, Run now, and a remove that drops only that message. | #410 |
-| `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | Quote, dictation, and queue state are read today — the follow-up lane is `composer.queue`; in-transit state arrives later. | — |
+| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Bounded by `apps/studio/src/assistant/attachments.ts`. | #238 |
+| `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works: the composer has its own `onDragOver`/`onDrop` with the same accept rules as `attachmentRejection`. Adopting the primitive would only relocate the same logic. | — |
+| `ComposerPrimitive.Queue` | Adopted | Renders the pending lane. | #410 |
+| `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | Shows and clears the quote before send. | #435 |
+| `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | Dictation, hidden where unsupported. | #433 |
+| `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | `quote` and `dictation` are read today; `queue` arrives with #410, and `submission`/`inTransit` matter to that issue's honesty: a sent message the thread does not show yet must not look lost. | — |
 | `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | The reply's own controls. | #238 |
-| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | **Read aloud** on a settled reply with prose, **Stop reading** while it speaks. Starting another reply stops the first; Stop reading, Escape inside the thread, and leaving the conversation end it. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken. A streaming reply is never spoken and speech is never persisted. | #432 |
-| `ActionBarPrimitive.ExportMarkdown` | Partial | Whole-conversation export is stronger than the per-reply primitive. | — |
-| `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | Alternative N of M, shown only when a branch exists. | #238 |
-| Attachment adapter (`AttachmentAdapter`) | Adopted | Browser-side extraction; nothing is stored server-side. | #238 |
-| Drop and paste | Adopted | The composer accepts exactly what the input accepts. | #238 |
-| `SelectionToolbarPrimitive.Root` / `.Quote` | Adopted | Selecting prose in a reply offers Quote. | #435 |
-| `data-aui-quote-selectable="false"` | Adopted | Tool traces and generated surfaces are marked non-prose. | #435 |
-| `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | The quote persists in the turn's metadata. | #435 |
-| `button` Element | Adopted | The one copy-in: a shadcn button under `src/vendor`, with a provenance header and a `vendor.lock.json` entry. It is not an assistant-ui primitive — it is a vendor decision, recorded here because the ledger audits the library and the alley is part of that audit. | #383 |
-| `thread` Element | Partial | Its frame is copied into `src/vendor/components/assistant/thread.tsx`: the thread root, the scrolling viewport, and the viewport footer the composer docks into, so the empty stage and a running thread share one layout. The Element's own message, composer, and markdown sections are not taken — `Conversation`/`parts.tsx`, `ThreadComposer`, and `Markdown.tsx` own those. | — |
-| Structured turn failure | Adopted | The failure panel with retry copy. | #129 |
-| `unstable_useMessageStallDetection` | Adopted | "Still working · no new output for Ns", only when output stops moving. | #431 |
-| `useAuiState` | Adopted | Runtime state read across the transcript and composer. | #238 |
-| `useAui` | Adopted | Imperative composer actions. | #238 |
+| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | Read a reply aloud, and **Stop reading** while it speaks. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken; a streaming reply is never spoken and speech is never persisted. | #432 |
+| `ActionBarPrimitive.ExportMarkdown` | Partial | Whole-conversation Markdown export exists and also serialises generated surfaces. Adopting the primitive for one reply would produce a second, weaker export format. | — |
+| `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | Exposed only when `branchCount > 1`. Branching, editing, and regenerating round-trip through the sidecar's `head_id`. | #238 |
+| Attachment adapter (`AttachmentAdapter`) | Adopted | Text extraction refused above 20k chars (not shortened, #652), images capped at 5 MB, `.docx` and `.pdf` extracted in the browser (#393), refusals explained. | #238 |
+| Drop and paste | Adopted | The composer follows the same accept rules as the input. | #238 |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`, which scopes each chip to its own attachment; the extraction state, the refusal reason and the size ride inside `Root` as children, so the primitive shows more than a name. The sent-turn chip in `parts.tsx` still writes its own `attachment-chip` markup, so this is a partial slice of #859. | — |
+| `createMessageQueue(driver)` | Adopted | `driver.run(message, {steer})`, optional `driver.cancel`. | #410 |
+| `MessageQueueController` | Adopted | `notifyBusy` / `notifyIdle` / `notifyCancelled` / `hold` / `release` / `clear` / `subscribe` — the cancel pause is why we must not hand-roll. | #410 |
+| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Adopted | One lane above the composer. | #410 |
+| Pending-call strip | Adopted | The running and awaiting-approval calls, below the last message. A summary, never a queue: no speculative "up next" rows. | #390 |
+| `SelectionToolbarPrimitive.Root` / `.Quote` | Adopted | Quote on select, inside one message. | #435 |
+| `data-aui-quote-selectable="false"` | Adopted | Marks tool traces, approval cards, and generated surfaces as non-prose; inline claim chips stay selectable. | #435 |
+| `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | The quote persists in `metadata.custom.quote` and renders on the sent turn. | #435 |
+| Structured turn failure | Adopted | `metadata.custom.error` / `retryText`, rendered by `FailurePanel`. | #129 |
+| `unstable_useMessageStallDetection` | Adopted | Speaks only when output stops moving. | #431 |
+| `useAuiState` | Adopted | Read across the transcript and composer. | #238 |
+| `useAui` | Adopted | Imperative actions. | #238 |
 | `AuiIf` | Adopted | The conditional idiom in use. | #238 |
-| `unstable_useComposerInputHistory` | Adopted | Up-arrow recalls what you sent last. | #430 |
-| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count is ours (`arrivalCount.ts`). | #245 |
-| Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
-| Tool result rendering | Adopted | Each MCP call is a trace chip, gathered under the turn's work row. | #238 |
-| Pending-call strip | Adopted | The calls a turn is still waiting on, below the last message: running, or holding an unanswered approval — never a speculative "up next" list. | #390 |
-| `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
-| ODI surfaces as `data` parts | Adopted | A validated `UiNode` rides the transcript and renders through `UiRenderer`. | #55 |
+| `unstable_useComposerInputHistory` | Adopted | ArrowUp recall. | #430 |
+| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count lives in `arrivalCount.ts`. | #245 |
+| Tool approval gate | Adopted | Plus the sidecar approval registry; a pending write blocks the turn. | #238 |
+| Tool result rendering | Adopted | `tools: { Fallback: ToolPart }`. | #238 |
+| `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | We use the `components.data.by_name` map for the validated ODI catalog and claims. The client-level `DataRenderers` scope would be a second registration path for the same thing. | — |
+| ODI surfaces as `data` parts | Adopted | Validated by a catalog manifest and rendered through the same `UiRenderer`. | #55 |
+<!-- END GENERATED: living-studio-projection -->
 
 #### Where the bridge lives
 

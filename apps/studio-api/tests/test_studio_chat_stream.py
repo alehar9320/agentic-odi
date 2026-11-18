@@ -108,6 +108,21 @@ def _tool_call(arguments: str, name: str = "get_jobs") -> Any:
     )
 
 
+def _usage_chunk(prompt: int, completion: int, total: int) -> Any:
+    """The final chunk an OpenAI-compatible backend sends when usage is on.
+
+    It carries counts and no choices, which is what the stream loop must expect.
+    """
+    return SimpleNamespace(
+        choices=[],
+        usage=SimpleNamespace(
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=total,
+        ),
+    )
+
+
 def _install(monkeypatch, streams: list[_FakeStream]) -> None:
     async def _healthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:
         return True, "ok"
@@ -778,3 +793,84 @@ def test_the_persistence_warning_quotes_nothing_anyone_said(monkeypatch, caplog)
     assert logged
     assert secret_words not in logged
     assert "sk-supersecret" not in logged
+
+
+def _turn_payload(caplog) -> dict[str, Any]:
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "agentic_odi_studio_api.studio.observability"
+    ]
+    assert records, "expected one turn log line"
+    return json.loads(records[-1].getMessage())
+
+
+def test_a_usage_chunk_lands_in_the_turn_line(monkeypatch, caplog) -> None:
+    chat._USAGE_UNSUPPORTED.clear()
+    _install(
+        monkeypatch,
+        [_FakeStream([_chunk(content="Done."), _usage_chunk(120, 40, 160)])],
+    )
+
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        _collect(_request())
+
+    payload = _turn_payload(caplog)
+    assert payload["prompt_tokens"] == 120
+    assert payload["completion_tokens"] == 40
+    assert payload["total_tokens"] == 160
+    assert payload["model"] == "model"
+
+
+def test_a_backend_without_usage_records_null_counts(monkeypatch, caplog) -> None:
+    chat._USAGE_UNSUPPORTED.clear()
+    _install(monkeypatch, [_FakeStream([_chunk(content="Done.")])])
+
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        _collect(_request())
+
+    payload = _turn_payload(caplog)
+    assert payload["prompt_tokens"] is None
+    assert payload["completion_tokens"] is None
+    assert payload["total_tokens"] is None
+
+
+def test_a_rejected_include_usage_is_retried_without_it(monkeypatch, caplog) -> None:
+    """A backend that 400s on include_usage still completes, without counts."""
+    chat._USAGE_UNSUPPORTED.clear()
+    calls: list[dict[str, Any]] = []
+
+    class _Rejecting:
+        def __init__(self, **kwargs: Any) -> None:
+            self.chat = SimpleNamespace(completions=self)
+
+        async def create(self, **kwargs: Any) -> Any:
+            calls.append(kwargs)
+            if "stream_options" in kwargs:
+                raise _bad_request()
+            return _FakeStream([_chunk(content="Done.")])
+
+    def _bad_request() -> Any:
+        import httpx2
+
+        request = httpx2.Request("POST", "http://llm/v1/chat/completions")
+        response = httpx2.Response(400, request=request)
+        return chat.openai.BadRequestError("unsupported", response=response, body=None)
+
+    async def _healthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+        return True, "ok"
+
+    monkeypatch.setattr(chat, "check_llm_health", _healthy)
+    monkeypatch.setattr(chat, "McpClient", _Mcp)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(chat, "AsyncOpenAI", lambda **kwargs: _Rejecting(**kwargs))
+
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        events = _parse(_collect(_request()))
+
+    assert any(name == "message" for name, _ in events)
+    assert "stream_options" in calls[0]
+    assert "stream_options" not in calls[1]
+    # The backend is remembered, so the probe is not repeated for this process.
+    assert "http://llm/v1" in chat._USAGE_UNSUPPORTED
+    assert _turn_payload(caplog)["total_tokens"] is None

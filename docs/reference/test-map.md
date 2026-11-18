@@ -39,6 +39,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_context.py` | Tests for the CLI's global backend context. |
 | `apps/cli/tests/test_customer_outcomes_cli.py` | Customer Outcomes CLI: local backend, aliases, output, and errors. |
 | `apps/cli/tests/test_data_export.py` | `data-export` writes a restorable snapshot of the local store. |
+| `apps/cli/tests/test_data_path.py` | `odi data path` prints the resolved ODI and Studio database paths. |
 | `apps/cli/tests/test_desired_outcomes_cli.py` | Tests for desired Outcomes CLI commands. |
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |
@@ -80,6 +81,7 @@ isolation, and coverage rules stay in
 | `apps/mcp-server/tests/test_tool_branches.py` | Branch coverage for MCP tool prompts, errors, and full updates. |
 | `apps/mcp-server/tests/test_tool_progress.py` | Long tools report progress so the Studio can stop looking hung. |
 | `apps/mcp-server/tests/test_tool_spec_validation.py` | Startup validation refuses a contract that the server cannot serve. |
+| `apps/mcp-server/tests/test_tool_timing.py` | Every MCP tool call emits one timing line, so a slow tool is visible. |
 | `apps/mcp-server/tests/test_tools.py` | — |
 | `apps/mcp-server/tests/test_traceability_tools.py` | The traceability tools round-trip through the live MCP registry. |
 | `apps/studio-api/tests/conftest.py` | Isolate each test's Studio memory database from the developer's home. |
@@ -116,6 +118,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_studio_models.py` | Tests for listing the configured backend's model ids. |
 | `apps/studio-api/tests/test_studio_observability.py` | Tests for the per-turn structured log line and its redaction. |
 | `apps/studio-api/tests/test_studio_outcome_evidence_crud.py` | Customer-outcome and evidence CRUD through the Studio API. |
+| `apps/studio-api/tests/test_studio_paths.py` | Tests for the per-install sidecar token file and its mode. |
 | `apps/studio-api/tests/test_studio_probes.py` | Tests for endpoint probing and LLM health classification. |
 | `apps/studio-api/tests/test_studio_proposals.py` | The proposal routes: mine evidence, review it, approve or reject it. |
 | `apps/studio-api/tests/test_studio_router.py` | Tests for successful passthrough responses from the Studio router. |
@@ -262,6 +265,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/records.test.ts` | — |
 | `apps/studio/src/lib/relativeTime.test.ts` | — |
 | `apps/studio/src/lib/sampleLoop.test.ts` | Bundled sample data, never the person's live canvas. |
+| `apps/studio/src/lib/scoreVocabulary.test.ts` | — |
 | `apps/studio/src/lib/session.test.ts` | — |
 | `apps/studio/src/lib/setup.test.ts` | — |
 | `apps/studio/src/lib/share.test.ts` | A token with a broken percent escape must not crash the boot; it is simply |
@@ -322,7 +326,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_capability_manifest.py` | Drift tests for the generated capability manifest. |
 | `packages/core/tests/test_claim_check.py` | A score carries the questions that produced it. |
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
-| `packages/core/tests/test_connection.py` | — |
+| `packages/core/tests/test_connection.py` | MCP connection settings, read and validated in one place (issue #1084). |
 | `packages/core/tests/test_consent_pause.py` | The agent must not act on the workspace before the PM agrees. |
 | `packages/core/tests/test_errors.py` | Tests for the ODI error hierarchy. |
 | `packages/core/tests/test_evaluation.py` | The outcome format guard: what it accepts, and what it refuses to bless. |
@@ -333,6 +337,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_funnel_service.py` | The funnel is counted by the paths a person actually walks. |
 | `packages/core/tests/test_intent_store.py` | Tests for the append-only Intent Store. |
 | `packages/core/tests/test_job_validation.py` | — |
+| `packages/core/tests/test_logging.py` | The shared logging configuration is idempotent and level-aware. |
 | `packages/core/tests/test_messages.py` | Tests for shared assistant messages and error helpers. |
 | `packages/core/tests/test_migrations.py` | The migration ledger: numbered, recorded, and gapless. |
 | `packages/core/tests/test_models.py` | Tests for core domain models. |
@@ -402,6 +407,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_release_instructions.py` | Unit tests for scripts/release_instructions.py. |
 | `tests/scripts/test_release_version_gate.py` | A release tag must match the version the CLI reports. |
 | `tests/scripts/test_release_workflow.py` | The release workflows must be wired so assets actually get attached. |
+| `tests/scripts/test_settings_registry.py` | Settings drift: declared variables, documented rows, and direct reads. |
 | `tests/scripts/test_updater_proof_gate.py` | Where the updater's proof gets read (#613). |
 | `tests/scripts/test_vendor_policy.py` | Tests for scripts/vendor_policy.py (issue #383). |
 | `tests/scripts/test_verify.py` | — |

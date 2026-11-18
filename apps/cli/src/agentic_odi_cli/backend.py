@@ -1020,6 +1020,8 @@ def require_backend() -> Backend:
 
 def run_tool(tool_name: str, args: dict[str, Any]) -> Any:
     """Call ``tool_name`` on the resolved backend, reporting failures cleanly."""
+    from agentic_odi_core.errors import ConfigurationError  # noqa: PLC0415
+
     try:
         return require_backend().call(tool_name, args)
     except BackendError as exc:
@@ -1029,4 +1031,9 @@ def run_tool(tool_name: str, args: dict[str, Any]) -> Any:
         typer.secho(f"Error: {message}", fg="red", err=True)
         if exc.suggestion:
             typer.secho(f"Hint: {exc.suggestion}", fg="yellow", err=True)
+        raise typer.Exit(code=1) from exc
+    except ConfigurationError as exc:
+        # A bad environment variable fails fast, but a user running a command
+        # should read one line naming it, not a traceback.
+        typer.secho(f"Error: {exc}", fg="red", err=True)
         raise typer.Exit(code=1) from exc

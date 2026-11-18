@@ -29,6 +29,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import doc_check
+
 ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = ROOT / "docs"
 NAV_JSON = ROOT / "website" / "content" / "nav.json"
@@ -285,6 +287,81 @@ def render_packages(root: Path = ROOT) -> str:
     return "\n".join(lines)
 
 
+# --- assistant-ui ledger: the count table and the Living Studio projection ---
+
+LEDGER_REL = "docs/assistant-ui-ledger.md"
+PROJECTION_REL = "docs/living-studio.md"
+
+
+def _ledger_source(root: Path) -> str:
+    return (root / LEDGER_REL).read_text(encoding="utf-8")
+
+
+def _ledger_tallies(source: str) -> dict[str, int]:
+    tallies: dict[str, int] = {}
+    for cells in doc_check.ledger_rows(source):
+        tallies[cells[1]] = tallies.get(cells[1], 0) + 1
+    return tallies
+
+
+def render_assistant_ui_count(root: Path) -> str:
+    """The ``## The count`` section, derived from the ledger rows.
+
+    The capability table is the row source of truth; this renders the tally and
+    the sentence that reads it, so promoting or demoting a capability touches
+    one row instead of three places.
+    """
+    tallies = _ledger_tallies(_ledger_source(root))
+    total = sum(tallies.values())
+    usable = tallies.get("Adopted", 0) + tallies.get("Partial", 0)
+    planned = tallies.get("Planned", 0)
+    decision = tallies.get("Decision", 0)
+    rejected = tallies.get("Rejected", 0)
+    return (
+        "## The count\n"
+        "\n"
+        "| Status | Rows |\n"
+        "|---|---|\n"
+        f"| Adopted | {tallies.get('Adopted', 0)} |\n"
+        f"| Partial | {tallies.get('Partial', 0)} |\n"
+        f"| Planned | {planned} |\n"
+        f"| Decision | {decision} |\n"
+        f"| Rejected | {rejected} |\n"
+        f"| Total | {total} |\n"
+        "\n"
+        f"Read it as: **{usable}** of the library's {total} relevant capabilities already deliver\n"
+        "something a person can use, "
+        f"**{planned}** more are carried by open issues, **{decision}** rows\n"
+        "wait on a named decision, and "
+        f"**{rejected}** are rejected with a reason. Every row is\n"
+        "accounted for — that is the whole point of the page."
+    )
+
+
+def render_living_studio_projection(root: Path) -> str:
+    """The Living Studio projection table, from the Adopted and Partial rows.
+
+    The ledger's *Where / why* prose is the row source, so the projection and
+    the ledger can no longer disagree about what a capability means here.
+    """
+    lines = [
+        "| Capability | Status | What it means here | Delivered |",
+        "|---|---|---|---|",
+    ]
+    for capability, status, _file_cell, delivered_cell, where_why in doc_check.ledger_rows(
+        _ledger_source(root)
+    ):
+        if status in {"Adopted", "Partial"}:
+            lines.append(f"| {capability} | {status} | {where_why} | {delivered_cell} |")
+    return "\n".join(lines)
+
+
+LEDGER_BLOCKS: tuple[tuple[str, str, Callable[[Path], str]], ...] = (
+    ("assistant-ui-count", LEDGER_REL, render_assistant_ui_count),
+    ("living-studio-projection", PROJECTION_REL, render_living_studio_projection),
+)
+
+
 # The generated blocks, in the order they appear in their file. A block is one
 # name, one renderer. ``#1041`` adds the docs/nav block here.
 BLOCKS: tuple[tuple[str, str, Callable[[Path], str]], ...] = (
@@ -414,10 +491,12 @@ def _standalone_content(
 
 
 def expected(root: Path = ROOT) -> dict[str, str]:
-    """``relative path -> generated content`` for every README-based block."""
+    """``relative path -> generated content`` for every generated block."""
     rendered: dict[str, str] = {}
-    for name, relative, render in BLOCKS:
+    for name, relative, render in BLOCKS + LEDGER_BLOCKS:
         path = root / relative
+        if not path.is_file():
+            continue
         text = rendered.get(relative) or path.read_text(encoding="utf-8")
         rendered[relative] = replace_block(text, name, render(root))
     return rendered
