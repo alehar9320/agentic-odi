@@ -47,8 +47,13 @@ class Baseline:
 
     @classmethod
     def from_dict(cls, d: dict) -> Baseline:
-        kwargs = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}  # type: ignore[attr-defined]
-        return cls(**kwargs)
+        fields = set(cls.__dataclass_fields__)  # type: ignore[attr-defined]
+        unknown = sorted(k for k in d if k not in fields)
+        if unknown:
+            raise ValueError(
+                f"Baseline.from_dict: unknown key(s) {unknown}; valid fields: {sorted(fields)}"
+            )
+        return cls(**{k: v for k, v in d.items() if k in fields})
 
 
 def config_dir() -> Path:
