@@ -71,6 +71,7 @@ def _seeded() -> tuple[TestClient, dict[str, str]]:
         content="A junior engineer broke staging because the secret was not copied.",
         raw={"token": "connector-secret", "headers": {"Authorization": "Bearer abc"}},
         outcome_id=first.id,
+        step_id=gather.id,
     )
     segment = service.segment_market()[0]
     strategy = service.propose_strategy()
@@ -180,6 +181,20 @@ def test_the_shared_evidence_never_carries_the_raw_payload() -> None:
     assert body["evidence"]
     assert all("raw" not in record for record in body["evidence"])
     assert "connector-secret" not in str(body)
+
+
+def test_shared_evidence_carries_its_job_and_step() -> None:
+    client, ids = _seeded()
+    minted = _mint(client, "outcome", ids["outcome"])
+
+    body = client.get(f"/api/share/{minted['token']}").json()
+
+    assert body["evidence"]
+    # Location is part of the artifact's meaning: a quote without its job and
+    # step has no place in the job map a share exists to carry.
+    assert all("job_id" in record and "step_id" in record for record in body["evidence"])
+    assert all(record["job_id"] for record in body["evidence"])
+    assert all(record["step_id"] for record in body["evidence"])
 
 
 def test_a_segment_share_carries_its_outcomes_evidence_only() -> None:
