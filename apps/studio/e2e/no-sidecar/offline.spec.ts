@@ -47,6 +47,10 @@ async function openStudioWithWorker(page: import("@playwright/test").Page) {
     const cache = await caches.open(name);
     return Boolean(await cache.match(shell));
   }, SHELL);
+  // The studio this worker controls is empty, so it opens the connector offer
+  // over everything else — including the banners these tests assert on, which a
+  // modal hides. Readiness answers the offer; every test here starts from it.
+  await waitForStudioReady(page);
 }
 
 test.describe("the shell opens with no network", () => {

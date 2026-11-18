@@ -224,8 +224,9 @@ asserts an attribute one shell happens to set (`aria-label` on the docked lens,
 which is labelled by `aria-labelledby`) passes at one viewport and fails at the
 other. The two structural handles left are the pre-JavaScript `#boot` shell,
 which has no roles because it paints before any script runs, and the
-`[role=…]` selector the banner helper uses to tell a toast from the live region
-that mirrors its text.
+`[role=…]` selector that finds banner rows before `banners()` narrows them to
+the one with actions in it — Radix renders each toast twice, as the row a
+person sees and as a hidden announcer with the same role and text.
 
 `first-paint.spec.ts` is the exception to "drives the real sidecar": it aborts
 the module bundle so it can read the pre-JavaScript shell in `index.html`, then

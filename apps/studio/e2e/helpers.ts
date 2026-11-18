@@ -168,14 +168,17 @@ export function openLens(page: Page) {
 /**
  * Every banner on screen.
  *
- * Radix renders each one with `role="status"` while it waits and
- * `role="alert"` once the banner system marks it urgent, and it mirrors the
- * text into a hidden live region of its own. Selecting on the role attribute
- * (rather than the rendered class) is what separates the banner from its own
- * announcement, and it keeps working when the banner is restyled.
+ * The banner is a Radix toast row, and Radix renders each toast twice: the row
+ * a person sees and dismisses, and a visually hidden announcer that mirrors its
+ * text for screen readers. Both carry `role="status"` (or `"alert"` when the
+ * banner is urgent), so the role alone resolves to two elements and every
+ * assertion on "the banner" fails strict mode. The row is the one with actions
+ * in it; the announcer is text and nothing else.
  */
 export function banners(page: Page) {
-  return page.locator('[role="status"], [role="alert"]');
+  return page
+    .locator('[role="status"], [role="alert"]')
+    .filter({ has: page.getByRole("button") });
 }
 
 /**
