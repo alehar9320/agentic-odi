@@ -9,6 +9,7 @@ left for the next process to recover.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 
 import pytest
 from agentic_odi_core.errors import StoreCorrupt
@@ -86,7 +87,10 @@ def test_the_boot_failure_names_the_last_backup(corrupt_store, tmp_path, monkeyp
         response = client.get("/api/canvas")
 
     error = response.json()["error"]
-    assert "06:14" in error["message"]
+    expected = datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ").replace(
+        tzinfo=timezone.utc
+    ).astimezone()
+    assert f"Last backup: {expected.strftime('%H:%M')} local" in error["message"]
     assert "odi-20260102T061400Z.db" in error["message"]
     assert "odi-20260102T061400Z.db" in error["suggestion"]
 

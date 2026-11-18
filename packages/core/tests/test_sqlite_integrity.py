@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import sys
 import time
+from datetime import datetime, timezone
 
 import pytest
 from agentic_odi_core.errors import StoreCorrupt, error_status
@@ -346,10 +348,29 @@ def test_latest_backup_is_none_when_nothing_exists(tmp_path) -> None:
     assert latest_backup("/home/me/.agentic-odi/odi.db", directory=tmp_path / "nope") is None
 
 
-def test_backup_time_is_read_from_the_filename(tmp_path) -> None:
-    assert format_backup_time(tmp_path / "odi-20260102T061400Z.db") == "06:14"
+def test_backup_time_is_local(tmp_path) -> None:
+    # The filename stamp is UTC; the display is the reader's local time. Compute
+    # the expectation from the same stamp so the test holds in any timezone.
+    expected = datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ").replace(
+        tzinfo=timezone.utc
+    ).astimezone()
+    assert format_backup_time(tmp_path / "odi-20260102T061400Z.db") == expected.strftime("%H:%M")
+
+
+def test_an_unparseable_stamp_returns_the_filename(tmp_path) -> None:
     # An unexpected name is shown as-is rather than dropped.
     assert format_backup_time(tmp_path / "odi-latest.db") == "odi-latest.db"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="time.tzset is not available on Windows")
+def test_backup_time_follows_a_non_utc_zone(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("TZ", "Etc/GMT-2")  # UTC+2
+    time.tzset()
+    try:
+        assert format_backup_time(tmp_path / "odi-20260102T061400Z.db") == "08:14"
+    finally:
+        monkeypatch.delenv("TZ", raising=False)
+        time.tzset()
 
 
 def test_the_message_names_the_file_and_the_last_backup(tmp_path) -> None:
@@ -361,8 +382,11 @@ def test_the_message_names_the_file_and_the_last_backup(tmp_path) -> None:
 
     message = corrupt_store_message(error, backup=backup)
 
+    expected = datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ").replace(
+        tzinfo=timezone.utc
+    ).astimezone()
     assert str(tmp_path / "odi.db") in message
-    assert "06:14" in message
+    assert f"Last backup: {expected.strftime('%H:%M')} local" in message
     assert backup.name in message
     assert "left untouched" in message
 
