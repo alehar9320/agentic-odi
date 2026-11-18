@@ -202,6 +202,12 @@ def map_files_to_targets(files: list[str]) -> dict[str, set[str] | bool]:
             targets["tests_root"] = True
             mapped = True
             continue
+        if path.startswith("infra/"):
+            # The Cloudflare Worker is TypeScript with no JS runner here, so its
+            # contract is pinned by the root suite (`tests/test_worker_*.py`).
+            targets["tests_root"] = True
+            mapped = True
+            continue
         if path.startswith("brand/"):
             targets["brand"] = True
             mapped = True
