@@ -87,6 +87,12 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
     return float(importance + max(importance - satisfaction, 0.0))
 
 
+#: Opportunity scores are stored and compared to one decimal place. Half of the
+#: last digit (0.05) is the Studio's score-mismatch tolerance; the two sides
+#: are pinned by tests/test_score_tolerance_parity.py.
+OPPORTUNITY_SCORE_DECIMALS = 1
+
+
 #: How much an evidence record's inputs count, by whether the person behind it
 #: confirmed the quote. A score built on a claimed quote must not outrank one
 #: built on verified interviews.
