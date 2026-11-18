@@ -38,15 +38,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # A write-permission workflow must not run pull request code. Checking out
-      # the base ref (and not persisting credentials, which `gh` does not use)
-      # keeps the checkout to the tree the labels describe.
-      - name: Checkout base branch
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.base.ref || github.ref }}
-          persist-credentials: false
-
+      # No checkout. A write-permission workflow must not run pull request code,
+      # and running no tree at all is the strongest form of that: every step
+      # below talks to the API through `gh` with an explicit --repo. The base-ref
+      # checkout this used to do added only a failure mode — actions/checkout
+      # runs `git submodule foreach` while removing its auth header, which exits
+      # 128 on a base tree carrying an unregistered gitlink, so the job went red
+      # over a tree it never read.
       - name: Ensure labels exist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
