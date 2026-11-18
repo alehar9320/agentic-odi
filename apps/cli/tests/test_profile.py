@@ -1,5 +1,8 @@
+import os
+import sys
 from pathlib import Path
 
+import pytest
 from agentic_odi_cli import profile
 
 
@@ -65,10 +68,37 @@ def test_load_baseline_rejects_corrupt_json(monkeypatch, tmp_path):
 
     try:
         profile.load_baseline()
-    except ValueError as exc:
-        assert "Failed to parse baseline file" in str(exc)
+    except profile.ProfileFileError as exc:
+        assert "is not valid JSON" in str(exc)
+        assert "line" in str(exc)
+        assert "column" in str(exc)
+        assert str(target) in str(exc)
     else:  # pragma: no cover - corrupt JSON must raise
-        raise AssertionError("expected ValueError")
+        raise AssertionError("expected ProfileFileError")
+
+
+def test_load_baseline_unreadable_file_reports_permission_not_parse(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text('{"product_name": "Acme"}')
+    if sys.platform != "win32" and os.geteuid() != 0:
+        os.chmod(target, 0o000)
+    try:
+        try:
+            profile.load_baseline()
+        except profile.ProfileFileError as exc:
+            msg = str(exc)
+            assert "Could not read" in msg
+            assert "parse" not in msg.lower()
+            assert str(target) in msg
+        else:  # pragma: no cover - unreadable file must raise
+            if sys.platform == "win32" or os.geteuid() == 0:
+                pytest.skip("Cannot test unreadable file as root or on Windows")
+            raise AssertionError("expected ProfileFileError")
+    finally:
+        if sys.platform != "win32" and os.geteuid() != 0:
+            os.chmod(target, 0o644)
 
 
 def test_from_dict_rejects_unknown_keys(monkeypatch, tmp_path):
@@ -262,10 +292,37 @@ def test_llm_profile_handles_corrupt_file(monkeypatch, tmp_path):
 
     try:
         profile.load_llm_profile()
-    except ValueError as exc:
-        assert "Failed to parse LLM profile file" in str(exc)
+    except profile.ProfileFileError as exc:
+        assert "is not valid JSON" in str(exc)
+        assert "line" in str(exc)
+        assert "column" in str(exc)
+        assert str(target) in str(exc)
     else:  # pragma: no cover - corrupt JSON must raise
-        raise AssertionError("expected ValueError")
+        raise AssertionError("expected ProfileFileError")
+
+
+def test_llm_profile_unreadable_file_reports_permission_not_parse(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    target = profile.llm_profile_file()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text('{"model": "test"}')
+    if sys.platform != "win32" and os.geteuid() != 0:
+        os.chmod(target, 0o000)
+    try:
+        try:
+            profile.load_llm_profile()
+        except profile.ProfileFileError as exc:
+            msg = str(exc)
+            assert "Could not read" in msg
+            assert "parse" not in msg.lower()
+            assert str(target) in msg
+        else:  # pragma: no cover - unreadable file must raise
+            if sys.platform == "win32" or os.geteuid() == 0:
+                pytest.skip("Cannot test unreadable file as root or on Windows")
+            raise AssertionError("expected ProfileFileError")
+    finally:
+        if sys.platform != "win32" and os.geteuid() != 0:
+            os.chmod(target, 0o644)
 
 
 def test_llm_profile_save_sets_timestamps(monkeypatch, tmp_path):

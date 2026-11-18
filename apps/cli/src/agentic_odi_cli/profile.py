@@ -18,6 +18,10 @@ BASELINE_FILE_NAME = "baseline.json"
 BASELINE_BACKUP_KEEP = 5
 
 
+class ProfileFileError(ValueError):
+    """A profile file could not be read or parsed, with the reason named."""
+
+
 @dataclass
 class Baseline:
     schema_version: int = 1
@@ -95,15 +99,20 @@ def baseline_exists() -> bool:
 def load_baseline() -> Baseline | None:
     """Load the baseline file, returning None if it does not exist.
 
-    Raises ValueError on unparseable JSON.
+    Raises ProfileFileError on unreadable file or unparseable JSON.
     """
     if not baseline_exists():
         return None
+    path = baseline_file()
     try:
-        with open(baseline_file(), encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        raise ValueError(f"Failed to parse baseline file: {e}") from e
+    except OSError as exc:
+        raise ProfileFileError(f"Could not read {path}: {exc.strerror or exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ProfileFileError(
+            f"{path} is not valid JSON: {exc.msg} (line {exc.lineno}, column {exc.colno})"
+        ) from exc
     return Baseline.from_dict(data)
 
 
@@ -221,15 +230,20 @@ def llm_profile_exists() -> bool:
 def load_llm_profile() -> LLMProfile | None:
     """Load the LLM profile file, returning None if it does not exist.
 
-    Raises ValueError on unparseable JSON.
+    Raises ProfileFileError on unreadable file or unparseable JSON.
     """
     if not llm_profile_exists():
         return None
+    path = llm_profile_file()
     try:
-        with open(llm_profile_file(), encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        raise ValueError(f"Failed to parse LLM profile file: {e}") from e
+    except OSError as exc:
+        raise ProfileFileError(f"Could not read {path}: {exc.strerror or exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ProfileFileError(
+            f"{path} is not valid JSON: {exc.msg} (line {exc.lineno}, column {exc.colno})"
+        ) from exc
     return LLMProfile.from_dict(data)
 
 
@@ -238,10 +252,13 @@ def load_llm_config_dict() -> dict[str, str]:
 
     Returns an empty dict if no profile exists or parsing fails.
     Keys: base_url, api_key, model, mcp_url (only non-None values included).
+
+    This function deliberately swallows ProfileFileError (and OSError) because it feeds
+    defaults to callers that expect graceful degradation rather than hard failures.
     """
     try:
         p = load_llm_profile()
-    except (ValueError, OSError):
+    except (ProfileFileError, OSError):
         return {}
     if p is None:
         return {}
@@ -292,7 +309,11 @@ def show_profile(
     as_json: bool = typer.Option(False, "--json", help="Format output as JSON"),
 ) -> None:
     """Show current product baseline profile."""
-    b = load_baseline()
+    try:
+        b = load_baseline()
+    except ProfileFileError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
     if b is None:
         if as_json:
             typer.echo(json.dumps({}))
@@ -348,7 +369,11 @@ def set_profile(
             )
             raise typer.Exit(code=2)
 
-    b = load_baseline() or Baseline(schema_version=1, source="cli")
+    try:
+        b = load_baseline() or Baseline(schema_version=1, source="cli")
+    except ProfileFileError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
     if product_name is not None:
         b.product_name = product_name
     if domain is not None:
@@ -372,7 +397,11 @@ def setup_wizard() -> None:
     """Run interactive baseline setup wizard."""
     typer.echo("Agentic ODI — Product Baseline Setup Wizard")
     typer.echo("==========================================")
-    existing = load_baseline() or Baseline()
+    try:
+        existing = load_baseline() or Baseline()
+    except ProfileFileError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
 
     p_name = typer.prompt("Product Name", default=existing.product_name or "")
     domain = typer.prompt("Domain", default=existing.domain or "")
