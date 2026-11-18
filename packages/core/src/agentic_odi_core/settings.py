@@ -47,13 +47,11 @@ def positive_float(name: str, default: float) -> float:
         value = float(raw)
     except ValueError:
         raise ConfigurationError(
-            f"{name}={raw!r} is not a number; use a number of seconds, "
-            f"for example {name}=30"
+            f"{name}={raw!r} is not a number; use a number of seconds, for example {name}=30"
         ) from None
     if value <= 0:
         raise ConfigurationError(
-            f"{name}={raw!r} must be greater than zero; use a number of seconds, "
-            f"for example {name}=30"
+            f"{name}={raw!r} must be greater than zero; use a number of seconds, for example {name}=30"
         )
     return value
 
@@ -67,13 +65,11 @@ def non_negative_float_or_none(name: str, default: float) -> float | None:
         value = float(raw)
     except ValueError:
         raise ConfigurationError(
-            f"{name}={raw!r} is not a number; use a number of seconds, "
-            f"or 0 to disable it"
+            f"{name}={raw!r} is not a number; use a number of seconds, or 0 to disable it"
         ) from None
     if value < 0:
         raise ConfigurationError(
-            f"{name}={raw!r} must be zero or greater; use a number of seconds, "
-            f"or 0 to disable it"
+            f"{name}={raw!r} must be zero or greater; use a number of seconds, or 0 to disable it"
         )
     return value or None
 

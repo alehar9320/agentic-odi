@@ -325,7 +325,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_capability_manifest.py` | Drift tests for the generated capability manifest. |
 | `packages/core/tests/test_claim_check.py` | A score carries the questions that produced it. |
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
-| `packages/core/tests/test_connection.py` | — |
+| `packages/core/tests/test_connection.py` | MCP connection settings, read and validated in one place (issue #1084). |
 | `packages/core/tests/test_consent_pause.py` | The agent must not act on the workspace before the PM agrees. |
 | `packages/core/tests/test_errors.py` | Tests for the ODI error hierarchy. |
 | `packages/core/tests/test_evaluation.py` | The outcome format guard: what it accepts, and what it refuses to bless. |
@@ -405,6 +405,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_release_instructions.py` | Unit tests for scripts/release_instructions.py. |
 | `tests/scripts/test_release_version_gate.py` | A release tag must match the version the CLI reports. |
 | `tests/scripts/test_release_workflow.py` | The release workflows must be wired so assets actually get attached. |
+| `tests/scripts/test_settings_registry.py` | Settings drift: declared variables, documented rows, and direct reads. |
 | `tests/scripts/test_updater_proof_gate.py` | Where the updater's proof gets read (#613). |
 | `tests/scripts/test_vendor_policy.py` | Tests for scripts/vendor_policy.py (issue #383). |
 | `tests/scripts/test_verify.py` | — |
