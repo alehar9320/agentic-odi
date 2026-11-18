@@ -44,6 +44,7 @@ class Baseline:
             "core_problem": self.core_problem,
             "current_focus": self.current_focus,
             "confidence": self.confidence,
+            "inferred": self.inferred,
         }
 
     @classmethod
