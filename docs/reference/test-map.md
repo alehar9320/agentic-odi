@@ -332,6 +332,7 @@ isolation, and coverage rules stay in
 | `packages/connectors/tests/test_evidence_equivalence.py` | Keep the connector's transport shape equal to the record it becomes. |
 | `packages/connectors/tests/test_factory.py` | — |
 | `packages/connectors/tests/test_http_client.py` | — |
+| `packages/connectors/tests/test_http_client_lifecycle.py` | The HTTP client factory owns nothing; its callers own the client. |
 | `packages/connectors/tests/test_mapping.py` | — |
 | `packages/connectors/tests/test_marketplace.py` | Marketplace normalization, trust matching, caching, and fallback. |
 | `packages/connectors/tests/test_mcp_connector.py` | — |

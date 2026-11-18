@@ -295,9 +295,22 @@ transport error returns `None` rather than raising.
 
 ## HTTP client configuration
 
-Connector HTTP traffic goes through one configurable client,
-`agentic_odi_connectors.get_http_client()`, so pool size, timeout, and retry
-behavior are predictable. Tune it with environment variables:
+Connector HTTP traffic goes through one configurable factory,
+`agentic_odi_connectors.new_http_client()`, so pool size, timeout, and retry
+behavior are predictable. Each call builds a new client with its own connection
+pool, and the caller owns it: enter it as an async context manager so the pool
+is closed when the ingest run ends.
+
+```python
+from agentic_odi_connectors import new_http_client
+
+async with new_http_client() as client:
+    response = await client.get(url)
+```
+
+Nothing closes a client the caller forgot, so a loop that calls the factory per
+record without closing opens one pool per record. Tune it with environment
+variables:
 
 | Variable | Default | Meaning |
 |---|---|---|
