@@ -77,14 +77,28 @@ download and a running sidecar, and they are CI's job.
 ```bash
 npm --prefix apps/studio run build
 npm --prefix apps/studio run test:e2e
+npm --prefix apps/studio run test:e2e:smoke
 ```
 
-CI runs this in the `e2e` job against the real Studio, the real sidecar, and
-the real MCP server. It is advisory by default: set the repository variable
-`AGENTIC_ODI_E2E` to `false` to skip it, and a failure is reported — in the job
-summary, in a warning annotation, and in `CI green`'s table — without turning
-CI red. Set `AGENTIC_ODI_E2E_BLOCKING` to `true` to make a browser failure
-block a merge.
+CI runs this against the real Studio, the real sidecar, and the real MCP
+server, in two jobs:
+
+- **`e2e-smoke` is required.** The `@smoke`-tagged handful, `--retries=0`, no
+  `continue-on-error`, no repository-variable kill switch. If it is red, the
+  merge is blocked, and that is the point.
+- **`e2e` is advisory.** The whole suite with `--retries=1`. Set the repository
+  variable `AGENTIC_ODI_E2E` to `false` to skip it; a failure is reported in the
+  job summary (every failure, with its locator and call site), in a warning
+  annotation, and in `CI green`'s table, without turning CI red. Set
+  `AGENTIC_ODI_E2E_BLOCKING` to `true` to make the whole lane block.
+
+`npm --prefix apps/studio run test:e2e:visual` is opt-in until the screenshot
+baselines are committed; it is not part of either CI job.
+
+A flaky spec is fixed or parked. Parking means a `// quarantined: #<issue>
+<YYYY-MM-DD>` line in the spec plus an entry in `apps/studio/e2e/quarantine.ts`;
+`apps/studio/src/test/e2eQuarantine.test.ts` fails the entry after thirty days,
+and fails a marker with no entry. Do not add a retry loop to hide one.
 
 ## Honest PR bodies
 
@@ -109,7 +123,9 @@ Tests live next to the package they cover (`packages/*/tests`,
   not skip it.
 - **End-to-end specs** live in `apps/studio/e2e/` and are named `*.spec.ts`.
   They bind to roles, labels, and visible text — never to a `data-testid`, of
-  which the application has none.
+  which the application has none, and never to a CSS class. Every spec imports
+  `test`/`expect` from `e2e/fixtures.ts`, whose automatic fixture resets the
+  shared studio before each test.
 - **Browser mode** needs Chromium locally: `npx --prefix apps/studio playwright
   install chromium`. The unit suite deliberately ignores `*.visual.test.tsx`;
   those run under Chromatic on every branch push.

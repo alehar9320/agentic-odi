@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 /**
  * The shell that paints before JavaScript runs.
@@ -115,7 +117,7 @@ test.describe("the theme is resolved before React", () => {
 });
 
 test.describe("the handover", () => {
-  test("React removes the shell and keeps the same colour", async ({ page }) => {
+  test("React removes the shell and keeps the same colour", { tag: "@smoke" }, async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem("studio.settings", JSON.stringify({ theme: "dark" }));
     });

@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
+
+import { banners } from "../helpers";
 
 /**
  * #545: the built app opens with no network.
@@ -60,7 +62,7 @@ test.describe("the shell opens with no network", () => {
     await expect(page.getByRole("textbox", { name: "Message the studio" })).toBeVisible();
     // The banner renders its title and an aria-live announcement, so match the
     // visible title rather than the text, which would be two elements.
-    await expect(page.locator(".banner__title", { hasText: /you're offline/i })).toBeVisible();
+    await expect(banners(page).filter({ hasText: /you're offline/i })).toBeVisible();
   });
 
   test("serves the offline page only when the shell cache was evicted", async ({ page, context }) => {
@@ -147,7 +149,7 @@ test.describe("a new build waits for a person", () => {
       await registration?.update();
     });
 
-    const offer = page.locator(".banner__title", { hasText: /a new version of the studio is ready/i });
+    const offer = banners(page).filter({ hasText: /a new version of the studio is ready/i });
     await expect(offer).toBeVisible();
     // One offer, never a loop.
     await expect(offer).toHaveCount(1);

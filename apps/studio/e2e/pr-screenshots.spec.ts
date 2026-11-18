@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
-import { COMPOSER, lens, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import { COMPOSER, openLens, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
 
 /**
  * Product screenshots for human review, not for assertions.
@@ -79,21 +79,21 @@ async function closeLens(page: Page): Promise<void> {
   const close = page.getByRole("button", { name: "Close workspace view" }).first();
   if (await close.isVisible().catch(() => false)) {
     await close.click();
-    await expect(lens(page)).toBeHidden();
+    await expect(openLens(page)).toBeHidden();
   }
 }
 
 /** Open a lens through the workbench rail. */
 async function openFromRail(page: Page, name: RegExp): Promise<void> {
   await rail(page).getByRole("button", { name }).click();
-  await expect(lens(page)).toBeVisible();
+  await expect(openLens(page)).toBeVisible();
 }
 
 /** Open a lens through its slash command, which works without rail content. */
 async function openFromCommand(page: Page, command: string): Promise<void> {
   await page.getByRole("textbox", { name: COMPOSER }).fill(command);
   await page.keyboard.press("Enter");
-  await expect(lens(page)).toBeVisible();
+  await expect(openLens(page)).toBeVisible();
 }
 
 test.describe("product screenshots", () => {
