@@ -118,6 +118,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_studio_models.py` | Tests for listing the configured backend's model ids. |
 | `apps/studio-api/tests/test_studio_observability.py` | Tests for the per-turn structured log line and its redaction. |
 | `apps/studio-api/tests/test_studio_outcome_evidence_crud.py` | Customer-outcome and evidence CRUD through the Studio API. |
+| `apps/studio-api/tests/test_studio_paths.py` | Tests for the per-install sidecar token file and its mode. |
 | `apps/studio-api/tests/test_studio_probes.py` | Tests for endpoint probing and LLM health classification. |
 | `apps/studio-api/tests/test_studio_proposals.py` | The proposal routes: mine evidence, review it, approve or reject it. |
 | `apps/studio-api/tests/test_studio_router.py` | Tests for successful passthrough responses from the Studio router. |

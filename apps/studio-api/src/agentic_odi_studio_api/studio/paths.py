@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import os
 import secrets
-import stat
 from pathlib import Path
 
 TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"  # nosec B105 - env var name, not a secret
