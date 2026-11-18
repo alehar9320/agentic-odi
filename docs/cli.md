@@ -48,14 +48,16 @@ machine-readable output. Diagnostics go to stderr and failures exit non-zero
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `AGENTIC_ODI_MCP_TIMEOUT` | `30.0` | Seconds allowed for one MCP call and for the connection handshake. Invalid or non-positive values fall back to the default. |
+| `AGENTIC_ODI_MCP_TIMEOUT` | `30.0` | Seconds allowed for one MCP call and for the connection handshake. A value that is not a number greater than zero fails the command. |
 | `AGENTIC_ODI_MCP_KEEPALIVE` | `15.0` | Keepalive interval in seconds for MCP sessions; `0` disables keepalive. |
 
 Both values are parsed by `agentic_odi_core.MCPConnectionConfig.from_env()`.
 The CLI hands the timeout to the FastMCP client for every call, so a frozen
 server fails with a clear error instead of hanging. FastMCP has no
 keepalive-interval setting yet, so the interval is carried for transports that
-support session keepalive.
+support session keepalive. A malformed value stops the command with one line
+naming the variable and the form it accepts; the full register is
+[Configuration](reference/configuration.md).
 
 ## Interactive chat
 

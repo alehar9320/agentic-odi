@@ -260,6 +260,7 @@ soon". See [External Connectors](docs/connectors.md).
 | [Agent Assignment](docs/agents.md) | Which agents take issues, how to claim one, and when a claim expires. |
 | [Roadmap](docs/roadmap.md) | What has shipped, and what is queued. |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration. |
+| [Configuration](docs/reference/configuration.md) | Every environment variable, its default, and the form it accepts. |
 <!-- END GENERATED: docs -->
 
 Every guide is also published on the
