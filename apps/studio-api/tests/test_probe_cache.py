@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 
 from agentic_odi_core import InMemoryRepository
 from agentic_odi_studio_api.app import create_app
@@ -72,10 +73,95 @@ def test_cache_retains_no_secret_or_response_body(monkeypatch):
     result = asyncio.run(probes.probe_llm_health("http://probe-c/v1", "super-secret", "m", now=now))
     assert "super-secret" not in result["message"]
 
+    key_hash = hashlib.sha256("super-secret".encode()).hexdigest()[:16]
     with probes._PROBE_CACHE_LOCK:
-        _, stored = probes._PROBE_CACHE[("http://probe-c/v1", "m")]
+        _, stored = probes._PROBE_CACHE[("http://probe-c/v1", "m", key_hash)]
     assert "super-secret" not in stored.message
     assert stored.healthy is True
+
+
+def test_a_new_credential_does_not_reuse_the_old_verdict(monkeypatch):
+    """Changing the API key must not reuse a cached verdict for the old key."""
+    counter = [0]
+
+    async def _probe(base_url, api_key, model_name):
+        counter[0] += 1
+        # First call (key A) fails, second call (key B) succeeds
+        if api_key == "key-A":
+            return False, "connection_error: invalid key"
+        return True, "LLM backend is reachable."
+
+    monkeypatch.setattr(probes, "_probe_llm_health", _probe)
+    t = [1000.0]
+
+    def now() -> float:
+        return t[0]
+
+    # Prime cache with failing probe for key A
+    first = asyncio.run(probes.probe_llm_health("http://probe/v1", "key-A", "model", now=now))
+    assert first["healthy"] is False
+    assert counter[0] == 1
+
+    # Change to key B - should NOT reuse the cached failure
+    second = asyncio.run(probes.probe_llm_health("http://probe/v1", "key-B", "model", now=now))
+    assert second["healthy"] is True
+    assert second["cached"] is False
+    assert counter[0] == 2  # new probe was actually called
+
+
+def test_invalidate_probe_cache_drops_every_entry(monkeypatch):
+    """Calling invalidate_probe_cache must clear the entire cache."""
+    counter = [0]
+    _make_healthy_probe(monkeypatch, counter)
+    t = [1000.0]
+
+    def now() -> float:
+        return t[0]
+
+    # Clear any existing cache entries from other tests
+    with probes._PROBE_CACHE_LOCK:
+        probes._PROBE_CACHE.clear()
+
+    # Prime two different cache entries
+    asyncio.run(probes.probe_llm_health("http://probe-1/v1", "k", "m1", now=now))
+    asyncio.run(probes.probe_llm_health("http://probe-2/v1", "k", "m2", now=now))
+    assert counter[0] == 2
+
+    with probes._PROBE_CACHE_LOCK:
+        assert len(probes._PROBE_CACHE) == 2
+
+    # Invalidate the cache
+    probes.invalidate_probe_cache()
+
+    with probes._PROBE_CACHE_LOCK:
+        assert len(probes._PROBE_CACHE) == 0
+
+    # Next call should probe again
+    asyncio.run(probes.probe_llm_health("http://probe-1/v1", "k", "m1", now=now))
+    assert counter[0] == 3
+
+
+def test_a_cached_verdict_is_still_reused_within_the_ttl(monkeypatch):
+    """Unchanged behaviour guard: cache hits work within TTL when nothing changed."""
+    counter = [0]
+    _make_healthy_probe(monkeypatch, counter)
+    t = [1000.0]
+
+    def now() -> float:
+        return t[0]
+
+    # First call populates cache
+    first = asyncio.run(probes.probe_llm_health("http://probe/v1", "k", "m", now=now))
+    assert first["cached"] is False
+    assert counter[0] == 1
+
+    # Multiple calls within TTL should reuse cache
+    for _ in range(5):
+        result = asyncio.run(probes.probe_llm_health("http://probe/v1", "k", "m", now=now))
+        assert result["cached"] is True
+        assert result["checked_at"] == first["checked_at"]
+
+    assert counter[0] == 1  # no additional probes
 
 
 def test_health_route_reports_checked_at_and_cached(monkeypatch):

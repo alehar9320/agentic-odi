@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import socket
 import threading
@@ -30,6 +31,10 @@ _PROBE_TTL_SECONDS = 30.0
 #: this cap on write.
 _PROBE_CACHE_CAP = 512
 
+#: Generation counter incremented when settings that affect probes are saved.
+#: Allows callers to detect that the cache was invalidated since their last read.
+_CONFIG_GENERATION = 0
+
 
 class ProbeResult(NamedTuple):
     """The outcome of one probe, stamped when it was obtained.
@@ -43,11 +48,20 @@ class ProbeResult(NamedTuple):
     checked_at: str  # ISO 8601 UTC
 
 
-#: (endpoint, model) -> (monotonic timestamp, ProbeResult). Keyed on the
-#: endpoint and model only -- never on a credential -- so concurrent tabs
-#: sharing an endpoint reuse a single probe.
-_PROBE_CACHE: OrderedDict[tuple[str, str], tuple[float, ProbeResult]] = OrderedDict()
+#: (endpoint, model, key_hash) -> (monotonic timestamp, ProbeResult). Keyed on
+#: the endpoint, model, and a truncated hash of the API key -- never the
+#: credential itself -- so a key rotation is a different entry even if an
+#: invalidator is missed.
+_PROBE_CACHE: OrderedDict[tuple[str, str, str], tuple[float, ProbeResult]] = OrderedDict()
 _PROBE_CACHE_LOCK = threading.Lock()
+
+
+def invalidate_probe_cache() -> None:
+    """Drop every cached verdict after a settings change."""
+    global _CONFIG_GENERATION
+    with _PROBE_CACHE_LOCK:
+        _PROBE_CACHE.clear()
+        _CONFIG_GENERATION += 1
 
 
 def _iso_utc(ts: float) -> str:
@@ -191,11 +205,13 @@ async def probe_llm_health(
 
     Returns ``{"healthy", "message", "checked_at", "cached"}``. When ``fresh``
     is true the cache is bypassed and the entry refreshed, so a user-initiated
-    "check now" is never stale. Results are keyed on (endpoint, model) -- never
-    on a credential -- and the map is bounded by TTL eviction and a size cap.
+    "check now" is never stale. Results are keyed on (endpoint, model, key_hash)
+    -- never the credential itself, a truncated hash -- and the map is bounded
+    by TTL eviction and a size cap.
     """
 
-    key = (base_url, model_name)
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
+    key = (base_url, model_name, key_hash)
     t = now()
 
     with _PROBE_CACHE_LOCK:

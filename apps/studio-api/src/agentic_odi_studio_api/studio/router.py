@@ -64,6 +64,7 @@ from agentic_odi_studio_api.studio.memory import (
 )
 from agentic_odi_studio_api.studio.probes import (
     defaults,
+    invalidate_probe_cache,
     is_endpoint_reachable,
     list_models,
     probe_llm_health,
@@ -106,6 +107,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeOutcomeRequest,
     ProposeStrategyRequest,
     RejectProposalRequest,
+    SaveConfigRequest,
     ScheduleWorkRequest,
     SharedArtifactResponse,
     ShareMintResponse,
@@ -254,6 +256,48 @@ def _approvals(request: Request) -> ApprovalRegistry:
 @router.get("/config")
 def get_config() -> dict:
     return {"defaults": defaults()}
+
+
+@router.post("/config")
+def save_config(body: SaveConfigRequest) -> dict:
+    """Persist LLM connection settings and invalidate the probe cache.
+
+    The probe cache is keyed on (endpoint, model, key_hash), so a credential
+    rotation naturally misses the cache. This endpoint additionally clears the
+    cache for base_url or model_name changes, which do not include the key.
+    """
+    from agentic_odi_studio_api.studio.probes import _load_profile_fallback
+
+    # Merge with existing profile to preserve fields not in the request
+    existing = _load_profile_fallback()
+    profile = {
+        "base_url": body.base_url,
+        "api_key": body.api_key,
+        "model": body.model_name,
+        "mcp_url": body.mcp_url,
+    }
+    # Only include non-empty values
+    profile = {k: v for k, v in profile.items() if v}
+    merged = {**existing, **profile}
+
+    # Write atomically to the same file the CLI uses
+    import json
+    import os
+    from pathlib import Path
+
+    xdg = os.getenv("XDG_CONFIG_HOME")
+    cfg_dir = Path(xdg) / "agentic-odi" if xdg else Path.home() / ".config" / "agentic-odi"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    profile_file = cfg_dir / "llm_profile.json"
+    tmp = profile_file.with_name(profile_file.name + ".tmp")
+    with open(tmp, "w") as f:
+        json.dump(merged, f)
+    os.replace(tmp, profile_file)
+
+    # Invalidate the probe cache so subsequent probes see the new settings
+    invalidate_probe_cache()
+
+    return {"ok": True, "saved": merged}
 
 
 @router.get("/diagnostics")
