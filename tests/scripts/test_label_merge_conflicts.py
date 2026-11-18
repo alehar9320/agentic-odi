@@ -16,6 +16,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
 CONFLICTS = ROOT / ".github" / "workflows" / "label-merge-conflicts.yml"
 
@@ -37,16 +39,25 @@ def test_conflicts_workflow_declares_issues_write():
     assert "issues: write" in text
 
 
-def test_the_workflow_checks_out_before_creating_labels():
-    """gh label create still needs a repository, so a checkout is present."""
-    text = CONFLICTS.read_text(encoding="utf-8")
-    assert "actions/checkout" in text
+def test_the_labeler_runs_no_checkout_and_holds_no_token():
+    """A labeler never pushes and never reads the tree.
 
-
-def test_the_workflow_does_not_persist_credentials_into_the_checkout():
-    """A labeler never pushes, so the token must not sit in the git config."""
-    text = CONFLICTS.read_text(encoding="utf-8")
-    assert "persist-credentials: false" in text
+    It used to check out the base ref, which also made it fail on any defect in
+    a tree it did not use: ``actions/checkout`` runs ``git submodule foreach``
+    while it removes its auth header, and git exits 128 on an unregistered
+    gitlink. Every ``gh`` call passes an explicit ``--repo``, so the job needs
+    no checkout at all -- and with no checkout there is no credential for the
+    job to persist.
+    """
+    workflow = yaml.safe_load(CONFLICTS.read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["label-merge-state"]["steps"]
+    assert not any((step.get("uses") or "").startswith("actions/checkout") for step in steps), (
+        "the labeler checks out a tree it never reads"
+    )
+    assert not any("persist-credentials" in (step.get("with") or {}) for step in steps), (
+        "a checkout that persists credentials would put the token in git config"
+    )
+    assert any("gh label create" in (step.get("run") or "") for step in steps)
 
 
 def test_merge_state_is_polled_until_it_is_decided():
@@ -93,6 +104,26 @@ def test_the_template_documents_every_supported_metadata_key():
     body = TEMPLATE.read_text(encoding="utf-8")
     assert "has_breaking_changes" in body
     assert "agent_confidence" in body
+
+
+def test_a_completed_required_workflow_keeps_the_ready_label_current():
+    """`ready-for-merge` needs a `clean` state, which only exists after the
+    checks pass; the six-hourly sweep used to be the only thing looking again."""
+    text = CONFLICTS.read_text(encoding="utf-8")
+    trigger = text.split("\npermissions:", 1)[0]
+    assert "workflow_run:" in trigger
+    assert 'workflows: ["CI", "PR guardrails"]' in trigger
+    # GitHub does not fire `check_suite` for suites GitHub Actions created, so
+    # that trigger could never see the required workflows finish.
+    assert "check_suite:" not in trigger
+    assert "github.event.workflow_run.head_sha" in text
+    assert "commits/$head_sha/pulls" in text
+    assert "--paginate" in text
+
+
+def test_the_scheduled_sweep_is_not_capped_at_one_page():
+    text = CONFLICTS.read_text(encoding="utf-8")
+    assert "--limit 1000" in text
 
 
 def test_the_development_guide_documents_the_labeler():

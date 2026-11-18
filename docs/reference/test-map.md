@@ -371,6 +371,7 @@ isolation, and coverage rules stay in
 | `tests/conftest.py` | Shared test configuration for cross-package tests. |
 | `tests/contract/test_cli_contract.py` | The CLI's local backend must stay aligned with the core contract. |
 | `tests/contract/test_mcp_contract.py` | Keep the live MCP surface in lockstep with the core contract. |
+| `tests/contract/test_no_unregistered_gitlinks.py` | Index gitlinks must be registered submodules with a url. |
 | `tests/contract/test_protected_files.py` | Protected files must never be deleted on main. |
 | `tests/scripts/conftest.py` | Make the standalone scripts in scripts/ importable under pytest. |
 | `tests/scripts/test_artifact_a11y.py` | The shared structural audit for artifact HTML (issue ALH-238). |
@@ -390,7 +391,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_hosted_first_run_workflow.py` | The hosted probe has a schedule, a commit to compare against, and no vote. |
 | `tests/scripts/test_label_merge_conflicts.py` | The merge-conflict labeler, pinned against the failures that silenced it. |
 | `tests/scripts/test_migrations_registry.py` | The migration registries are contracts, and these are their guards. |
-| `tests/scripts/test_pr_ai_authorize.py` | Test the AI merge authorization script (``scripts/pr_ai_authorize.py``). |
+| `tests/scripts/test_pr_ai_authorize.py` | Test the AI merge authorization and the check-suite gate it reads. |
 | `tests/scripts/test_pr_ai_merge.py` | The AI merge trust labeler, pinned so a silent gate failure cannot ship. |
 | `tests/scripts/test_pr_ai_merge_act.py` | Test the AI merge act workflow (``.github/workflows/pr-ai-merge-act.yml``). |
 | `tests/scripts/test_pr_ai_merge_workflow.py` | The AI merge trust workflow, pinned so the silent failures cannot come back. |
